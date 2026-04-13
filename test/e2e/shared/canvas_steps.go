@@ -28,12 +28,6 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
-func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
-	// ugly, but it is what it is for now
-	// TODO: remove this completely once edit mode is shipped
-	s.session.Sleep(2500)
-}
-
 func (s *CanvasSteps) Create() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/new")
 	s.session.FillIn(q.TestID("canvas-name-input"), s.CanvasName)
@@ -119,7 +113,6 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -153,25 +146,9 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	generatedName, err := loc.InputValue()
 	require.NoError(s.t, err)
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 
 	return generatedName
-}
-
-func (s *CanvasSteps) Save() {
-	saveButton := q.TestID("save-canvas-button")
-	loc := saveButton.Run(s.session)
-
-	if isVisible, _ := loc.IsVisible(); isVisible {
-		s.session.Click(saveButton)
-		s.session.AssertText("Canvas changes saved")
-		s.session.Sleep(500)
-		return
-	}
-
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
@@ -191,7 +168,6 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -203,7 +179,6 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -228,7 +203,6 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -242,7 +216,6 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -274,7 +247,6 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
