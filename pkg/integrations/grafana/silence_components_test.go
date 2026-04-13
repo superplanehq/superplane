@@ -30,21 +30,3 @@ func Test__DeleteSilence__Configuration__silenceIsIntegrationResource(t *testing
 	require.NotNil(t, fields[0].TypeOptions.Resource)
 	require.Equal(t, resourceTypeSilence, fields[0].TypeOptions.Resource.Type)
 }
-
-func Test__GetSilence__decodeGetSilenceSpec__acceptsLegacySilenceId(t *testing.T) {
-	spec, err := decodeGetSilenceSpec(map[string]any{
-		"silenceId": "silence-123",
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, "silence-123", spec.Silence)
-}
-
-func Test__DeleteSilence__decodeDeleteSilenceSpec__acceptsLegacySilenceId(t *testing.T) {
-	spec, err := decodeDeleteSilenceSpec(map[string]any{
-		"silenceId": "silence-123",
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, "silence-123", spec.Silence)
-}

@@ -350,13 +350,6 @@ func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
 	if err := mapstructure.Decode(configuration, &spec); err != nil {
 		return QueryDataSourceSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
-	if strings.TrimSpace(spec.DataSource) == "" {
-		if configMap, ok := configuration.(map[string]any); ok {
-			if legacyValue, ok := configMap["dataSourceUid"]; ok && legacyValue != nil {
-				spec.DataSource = strings.TrimSpace(fmt.Sprint(legacyValue))
-			}
-		}
-	}
 
 	return spec, nil
 }

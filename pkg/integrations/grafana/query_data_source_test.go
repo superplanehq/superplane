@@ -51,16 +51,6 @@ func Test__QueryDataSource__Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("legacy dataSourceUid configuration still passes", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-			},
-		})
-
-		require.NoError(t, err)
-	})
 }
 
 func Test__QueryDataSource__Configuration__UsesIntegrationResourceForDataSource(t *testing.T) {

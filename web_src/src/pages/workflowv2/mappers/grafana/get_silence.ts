@@ -6,15 +6,13 @@ import { buildSilenceSelectionMetadata, type SilenceSelectionNodeMetadata } from
 
 interface GetSilenceConfiguration {
   silence?: string;
-  silenceId?: string;
 }
 
 export const getSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext) {
     const configuration = context.node.configuration as GetSilenceConfiguration | undefined;
     const nodeMetadata = context.node.metadata as SilenceSelectionNodeMetadata | undefined;
-    const silence = configuration?.silence ?? configuration?.silenceId;
-    return grafanaComponentBaseProps(context, buildSilenceSelectionMetadata(nodeMetadata, silence));
+    return grafanaComponentBaseProps(context, buildSilenceSelectionMetadata(nodeMetadata, configuration?.silence));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {

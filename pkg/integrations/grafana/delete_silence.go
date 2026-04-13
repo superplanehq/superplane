@@ -157,13 +157,6 @@ func decodeDeleteSilenceSpec(config any) (DeleteSilenceSpec, error) {
 	if err := decoder.Decode(config); err != nil {
 		return DeleteSilenceSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
-	if strings.TrimSpace(spec.Silence) == "" {
-		if configMap, ok := config.(map[string]any); ok {
-			if legacyValue, ok := configMap["silenceId"]; ok && legacyValue != nil {
-				spec.Silence = strings.TrimSpace(fmt.Sprint(legacyValue))
-			}
-		}
-	}
 	return spec, nil
 }
 
