@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -18,13 +20,23 @@ const (
 	maxResponseSize = 2 * 1024 * 1024 // 2MB
 )
 
+// notificationPolicyTreeMutex serializes read-modify-write on the Grafana notification
+// policy tree so concurrent webhook setup/cleanup cannot drop each other's routes.
+var notificationPolicyTreeMutex sync.Mutex
+
+var createAnnotationRetryDelays = []time.Duration{
+	500 * time.Millisecond,
+	1 * time.Second,
+	2 * time.Second,
+}
+
 type Client struct {
 	BaseURL  string
 	APIToken string
 	http     core.HTTPContext
 }
 
-type contactPoint struct {
+type ContactPoint struct {
 	UID  string `json:"uid"`
 	Name string `json:"name"`
 }
@@ -55,6 +67,17 @@ type SilenceMatcher struct {
 	Value   string `json:"value"`
 	IsRegex bool   `json:"isRegex"`
 	IsEqual bool   `json:"isEqual"`
+}
+
+type Folder struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+type AlertRuleSummary struct {
+	UID       string `json:"uid"`
+	Title     string `json:"title"`
+	RuleGroup string `json:"ruleGroup"`
 }
 
 type apiStatusError struct {
@@ -207,7 +230,7 @@ func (c *Client) execRequestWithHeaders(
 	return responseBody, res.StatusCode, nil
 }
 
-func (c *Client) listContactPoints() ([]contactPoint, error) {
+func (c *Client) ListContactPoints() ([]ContactPoint, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/contact-points", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing contact points: %v", err)
@@ -217,7 +240,7 @@ func (c *Client) listContactPoints() ([]contactPoint, error) {
 		return nil, newAPIStatusError("grafana contact point list", status, responseBody)
 	}
 
-	var direct []contactPoint
+	var direct []ContactPoint
 	if err := json.Unmarshal(responseBody, &direct); err == nil {
 		return direct, nil
 	}
@@ -230,7 +253,7 @@ func (c *Client) listContactPoints() ([]contactPoint, error) {
 			return nil, fmt.Errorf("error parsing contact points response")
 		}
 
-		var items []contactPoint
+		var items []ContactPoint
 		if err := json.Unmarshal(wrapped.Items, &items); err != nil {
 			return nil, fmt.Errorf("error parsing contact points response")
 		}
@@ -242,7 +265,7 @@ func (c *Client) listContactPoints() ([]contactPoint, error) {
 }
 
 func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string) (string, error) {
-	points, err := c.listContactPoints()
+	points, err := c.ListContactPoints()
 	if err != nil {
 		return "", err
 	}
@@ -311,12 +334,12 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 		return "", newAPIStatusError("grafana contact point create", status, responseBody)
 	}
 
-	created := contactPoint{}
+	created := ContactPoint{}
 	if err := json.Unmarshal(responseBody, &created); err == nil && strings.TrimSpace(created.UID) != "" {
 		return strings.TrimSpace(created.UID), nil
 	}
 
-	refreshedPoints, err := c.listContactPoints()
+	refreshedPoints, err := c.ListContactPoints()
 	if err != nil {
 		return "", err
 	}
@@ -466,6 +489,9 @@ func (c *Client) putNotificationPolicies(root map[string]json.RawMessage) error 
 // =~ regex OR pattern; negative predicates (notEquals) become individual != matchers.
 // The route has continue=true so other routes still fire.
 func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNamePredicates []configuration.Predicate) error {
+	notificationPolicyTreeMutex.Lock()
+	defer notificationPolicyTreeMutex.Unlock()
+
 	root, err := c.getNotificationPolicies()
 	if err != nil {
 		return err
@@ -500,6 +526,164 @@ func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNam
 		return err
 	}
 	return c.putNotificationPolicies(root)
+}
+
+func (c *Client) ListAlertRules(folderUID, group string) ([]AlertRuleSummary, error) {
+	path := "/api/v1/provisioning/alert-rules"
+	params := url.Values{}
+	if folderUID != "" {
+		params.Set("folderUID", folderUID)
+	}
+	if group != "" {
+		params.Set("group", group)
+	}
+	if len(params) > 0 {
+		path = path + "?" + params.Encode()
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing alert rules: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule list", status, responseBody)
+	}
+
+	var rules []AlertRuleSummary
+	if err := json.Unmarshal(responseBody, &rules); err != nil {
+		return nil, fmt.Errorf("error parsing alert rules response: %v", err)
+	}
+
+	return rules, nil
+}
+
+func (c *Client) ListRuleGroups() ([]string, error) {
+	rules, err := c.ListAlertRules("", "")
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{}, len(rules))
+	groups := make([]string, 0)
+	for _, rule := range rules {
+		g := strings.TrimSpace(rule.RuleGroup)
+		if g == "" {
+			continue
+		}
+		if _, exists := seen[g]; !exists {
+			seen[g] = struct{}{}
+			groups = append(groups, g)
+		}
+	}
+
+	return groups, nil
+}
+
+func (c *Client) GetAlertRule(uid string) (map[string]any, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", url.PathEscape(uid)),
+		nil,
+		"",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule get", status, responseBody)
+	}
+
+	var rule map[string]any
+	if err := json.Unmarshal(responseBody, &rule); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return rule, nil
+}
+
+func (c *Client) CreateAlertRule(rule map[string]any) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPost,
+		"/api/v1/provisioning/alert-rules",
+		bytes.NewReader(body),
+		"application/json",
+		map[string]string{
+			"X-Disable-Provenance": "true",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule create", status, responseBody)
+	}
+
+	var created map[string]any
+	if err := json.Unmarshal(responseBody, &created); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return created, nil
+}
+
+func (c *Client) UpdateAlertRule(uid string, rule map[string]any, disableProvenance bool) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	headers := map[string]string{}
+	if disableProvenance {
+		headers["X-Disable-Provenance"] = "true"
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPut,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", url.PathEscape(uid)),
+		bytes.NewReader(body),
+		"application/json",
+		headers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error updating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule update", status, responseBody)
+	}
+
+	var updated map[string]any
+	if err := json.Unmarshal(responseBody, &updated); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return updated, nil
+}
+
+func (c *Client) DeleteAlertRule(uid string) error {
+	responseBody, status, err := c.execRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", url.PathEscape(uid)),
+		nil,
+		"",
+	)
+	if err != nil {
+		return fmt.Errorf("error deleting alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return newAPIStatusError("grafana alert rule delete", status, responseBody)
+	}
+
+	return nil
 }
 
 // combinedPositiveAlertNameRegex builds the =~ pattern Grafana uses for object_matchers on
@@ -545,6 +729,9 @@ func buildAlertNameMatchers(predicates []configuration.Predicate) [][]string {
 // RemoveNotificationPolicyRoute removes any child route for contactPointName from the
 // root of the policy tree. No-op if no such route exists.
 func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
+	notificationPolicyTreeMutex.Lock()
+	defer notificationPolicyTreeMutex.Unlock()
+
 	root, err := c.getNotificationPolicies()
 	if err != nil {
 		return err
@@ -716,6 +903,150 @@ func decodeCreateSilenceID(rawValue json.RawMessage) string {
 	return strings.TrimSpace(id)
 }
 
+type Annotation struct {
+	ID           int64    `json:"id"`
+	DashboardUID string   `json:"dashboardUID"`
+	PanelID      int64    `json:"panelId"`
+	Time         int64    `json:"time"`
+	TimeEnd      int64    `json:"timeEnd"`
+	Text         string   `json:"text"`
+	Tags         []string `json:"tags"`
+	Type         string   `json:"type"`
+}
+
+func (c *Client) CreateAnnotation(text string, tags []string, dashboardUID string, panelID *int64, timeMS, timeEndMS int64) (int64, error) {
+	payload := map[string]any{
+		"text": text,
+	}
+	if len(tags) > 0 {
+		payload["tags"] = tags
+	}
+	if strings.TrimSpace(dashboardUID) != "" {
+		payload["dashboardUID"] = strings.TrimSpace(dashboardUID)
+	}
+	if panelID != nil {
+		payload["panelId"] = *panelID
+	}
+	if timeMS > 0 {
+		payload["time"] = timeMS
+	}
+	if timeEndMS > 0 {
+		payload["timeEnd"] = timeEndMS
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return 0, fmt.Errorf("error marshaling annotation payload: %v", err)
+	}
+
+	for attempt := 0; ; attempt++ {
+		responseBody, status, err := c.execRequest(
+			http.MethodPost,
+			"/api/annotations",
+			bytes.NewReader(body),
+			"application/json",
+		)
+		if err != nil {
+			return 0, fmt.Errorf("error creating annotation: %v", err)
+		}
+		if status == http.StatusTooManyRequests && attempt < len(createAnnotationRetryDelays) {
+			time.Sleep(createAnnotationRetryDelays[attempt])
+			continue
+		}
+		if status < 200 || status >= 300 {
+			return 0, newAPIStatusError("grafana annotation create", status, responseBody)
+		}
+
+		var result struct {
+			ID      int64  `json:"id"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(responseBody, &result); err != nil {
+			return 0, fmt.Errorf("error parsing create annotation response: %v", err)
+		}
+		return result.ID, nil
+	}
+}
+
+func (c *Client) ListAnnotations(tags []string, dashboardUID string, panelID *int64, from, to, limit int64) ([]Annotation, error) {
+	q := url.Values{}
+	for _, tag := range tags {
+		if strings.TrimSpace(tag) != "" {
+			q.Add("tags", strings.TrimSpace(tag))
+		}
+	}
+	if strings.TrimSpace(dashboardUID) != "" {
+		q.Set("dashboardUID", strings.TrimSpace(dashboardUID))
+	}
+	if panelID != nil && *panelID > 0 {
+		q.Set("panelId", fmt.Sprintf("%d", *panelID))
+	}
+	if from > 0 {
+		q.Set("from", fmt.Sprintf("%d", from))
+	}
+	if to > 0 {
+		q.Set("to", fmt.Sprintf("%d", to))
+	}
+	if limit > 0 {
+		q.Set("limit", fmt.Sprintf("%d", limit))
+	}
+
+	path := "/api/annotations"
+	if encoded := q.Encode(); encoded != "" {
+		path = path + "?" + encoded
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing annotations: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana annotation list", status, responseBody)
+	}
+
+	var annotations []Annotation
+	if err := json.Unmarshal(responseBody, &annotations); err != nil {
+		return nil, fmt.Errorf("error parsing annotations response: %v", err)
+	}
+	return annotations, nil
+}
+
+func (c *Client) GetAnnotation(id int64) (Annotation, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/annotations/%d", id),
+		nil,
+		"",
+	)
+	if err != nil {
+		return Annotation{}, fmt.Errorf("error getting annotation: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return Annotation{}, newAPIStatusError("grafana annotation get", status, responseBody)
+	}
+
+	var annotation Annotation
+	if err := json.Unmarshal(responseBody, &annotation); err != nil {
+		return Annotation{}, fmt.Errorf("error parsing annotation response: %v", err)
+	}
+	return annotation, nil
+}
+
+func (c *Client) DeleteAnnotation(id int64) error {
+	responseBody, status, err := c.execRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/annotations/%d", id),
+		nil, "",
+	)
+	if err != nil {
+		return fmt.Errorf("error deleting annotation: %v", err)
+	}
+	if status == http.StatusNotFound || (status >= 200 && status < 300) {
+		return nil
+	}
+	return newAPIStatusError("grafana annotation delete", status, responseBody)
+}
+
 func (c *Client) ListDataSources() ([]DataSource, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/datasources", nil, "")
 	if err != nil {
@@ -732,4 +1063,153 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	}
 
 	return sources, nil
+}
+
+func (c *Client) ListFolders() ([]Folder, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/folders", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing folders: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana folder list", status, responseBody)
+	}
+
+	var folders []Folder
+	if err := json.Unmarshal(responseBody, &folders); err != nil {
+		return nil, fmt.Errorf("error parsing folders response: %v", err)
+	}
+
+	return folders, nil
+}
+
+// DashboardSearchHit matches Grafana GET /api/search entries for type=dash-db.
+type DashboardSearchHit struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+type DashboardPanel struct {
+	ID    int64
+	Title string
+}
+
+// SearchDashboards lists dashboards via the folder/dashboard search API (dashboard UID + title).
+func (c *Client) SearchDashboards() ([]DashboardSearchHit, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/search?type=dash-db&limit=5000", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error searching dashboards: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard search", status, responseBody)
+	}
+
+	var hits []DashboardSearchHit
+	if err := json.Unmarshal(responseBody, &hits); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard search response: %v", err)
+	}
+
+	return hits, nil
+}
+
+// GetDashboardTitle loads a dashboard by UID and returns its title (GET /api/dashboards/uid/:uid).
+func (c *Client) GetDashboardTitle(uid string) (string, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(strings.TrimSpace(uid))),
+		nil,
+		"",
+	)
+	if err != nil {
+		return "", fmt.Errorf("error getting dashboard: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return "", newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response struct {
+		Dashboard struct {
+			Title string `json:"title"`
+		} `json:"dashboard"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return "", fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+	return strings.TrimSpace(response.Dashboard.Title), nil
+}
+
+func (c *Client) ListDashboardPanels(uid string) ([]DashboardPanel, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(strings.TrimSpace(uid))),
+		nil,
+		"",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting dashboard: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response struct {
+		Dashboard map[string]any `json:"dashboard"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	return extractDashboardPanels(response.Dashboard), nil
+}
+
+func extractDashboardPanels(dashboard map[string]any) []DashboardPanel {
+	var panels []DashboardPanel
+	if dashboard == nil {
+		return panels
+	}
+
+	rootPanels, _ := dashboard["panels"].([]any)
+	collectDashboardPanels(rootPanels, &panels)
+	return panels
+}
+
+func collectDashboardPanels(values []any, destination *[]DashboardPanel) {
+	for _, value := range values {
+		panel, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if nestedPanels, ok := panel["panels"].([]any); ok {
+			collectDashboardPanels(nestedPanels, destination)
+		}
+
+		panelType, _ := panel["type"].(string)
+		if strings.EqualFold(strings.TrimSpace(panelType), "row") {
+			continue
+		}
+
+		idValue, ok := panel["id"]
+		if !ok {
+			continue
+		}
+
+		idFloat, ok := idValue.(float64)
+		if !ok {
+			continue
+		}
+
+		id := int64(idFloat)
+		if id <= 0 {
+			continue
+		}
+
+		title, _ := panel["title"].(string)
+		*destination = append(*destination, DashboardPanel{
+			ID:    id,
+			Title: title,
+		})
+	}
 }

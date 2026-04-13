@@ -1,3 +1,4 @@
+import type { MetadataItem } from "@/ui/metadataList";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -5,11 +6,10 @@ import type {
   NodeInfo,
   OutputPayload,
 } from "../types";
-import type { MetadataItem } from "@/ui/metadataList";
-import type { QueryDataSourceConfiguration } from "./types";
 import { truncate } from "../safeMappers";
 import { formatTimestamp } from "../utils";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
+import type { QueryDataSourceConfiguration } from "./types";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext) {
@@ -78,10 +78,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.format) {
     metadata.push({ icon: "funnel", label: `Format: ${configuration.format}` });
-  }
-
-  if (configuration?.timezone) {
-    metadata.push({ icon: "schedule", label: `Timezone: ${configuration.timezone}` });
   }
 
   return metadata;

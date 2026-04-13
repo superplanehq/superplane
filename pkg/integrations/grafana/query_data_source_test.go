@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -194,7 +195,6 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 				"query":      "{}",
 				"timeFrom":   "2026-04-01T10:15",
 				"timeTo":     "2026-04-01T11:45",
-				"timezone":   "5",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -210,8 +210,8 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 
 		body := decodeJSONBody(t, httpContext.Requests[0].Body)
-		assert.Equal(t, "1775020500000", body["from"])
-		assert.Equal(t, "1775025900000", body["to"])
+		assert.Equal(t, "1775038500000", body["from"])
+		assert.Equal(t, "1775043900000", body["to"])
 	})
 
 	t.Run("timezone aware timestamps are converted without timezone field", func(t *testing.T) {
@@ -249,13 +249,23 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		assert.Equal(t, "1775025900000", body["to"])
 	})
 
-	t.Run("datetime picker values require timezone", func(t *testing.T) {
+	t.Run("datetime picker values do not require timezone", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"results": {}}`)),
+				},
+			},
+		}
+
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"dataSource": "logs",
 				"query":      "{}",
 				"timeFrom":   "2026-04-01T10:15",
 			},
+			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
 					"apiToken": "token123",
@@ -265,7 +275,7 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 			ExecutionState: &contexts.ExecutionStateContext{},
 		})
 
-		require.ErrorContains(t, err, "timeFrom: timezone is required for datetime-local values")
+		require.NoError(t, err)
 	})
 
 	t.Run("defaults time range when missing", func(t *testing.T) {
@@ -335,14 +345,13 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 	})
 }
 
-func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
-	for _, offset := range []string{"5.75", "+5.75", "12.75", "-3.5"} {
-		t.Run(offset, func(t *testing.T) {
-			loc, err := parseGrafanaQueryTimezone(&offset)
-			require.NoError(t, err)
-			require.NotNil(t, loc)
-		})
-	}
+func Test__parseGrafanaQueryTime__acceptsGoTimeStringOutput(t *testing.T) {
+	value := "2026-04-08 11:53:05.86655651 +0000 UTC"
+
+	parsed, ok, err := parseGrafanaQueryTime(value, nil)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, time.Date(2026, time.April, 8, 11, 53, 5, 866556510, time.UTC), parsed.UTC())
 }
 
 func decodeJSONBody(t *testing.T, body io.ReadCloser) map[string]any {
