@@ -5,12 +5,11 @@ import { queryDataSourceMapper } from "./query_data_source";
 import { onAlertFiringTriggerRenderer } from "./on_alert_firing";
 import type {
   ExecutionDetailsContext,
+  ExecutionInfo,
   NodeInfo,
-  OutputPayload,
   SubtitleContext,
   TriggerRendererContext,
 } from "../types";
-import type { EventInfo } from "../types";
 
 // ===== Test Helpers =====
 
@@ -26,39 +25,21 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   };
 }
 
-function buildExecution({
-  outputs,
-  state = "STATE_FINISHED",
-  result = "RESULT_SUCCEEDED",
-  resultReason = "RESULT_REASON_UNSPECIFIED",
-  resultMessage = "",
-  updatedAt,
-  createdAt,
-  rootEvent,
-}: {
-  outputs?: Record<string, OutputPayload[]>;
-  state?: string;
-  result?: string;
-  resultReason?: string;
-  resultMessage?: string;
-  updatedAt?: string;
-  createdAt?: string;
-  rootEvent?: EventInfo;
-}) {
+function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
   const now = new Date().toISOString();
 
   return {
     id: "exec-1",
-    createdAt: createdAt || now,
-    updatedAt,
-    state,
-    result,
-    resultReason,
-    resultMessage,
+    createdAt: now,
+    updatedAt: now,
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    resultReason: "RESULT_REASON_OK",
+    resultMessage: "",
     metadata: {},
     configuration: {},
-    rootEvent,
-    outputs,
+    rootEvent: undefined,
+    ...overrides,
   };
 }
 
@@ -70,6 +51,12 @@ function buildTriggerRendererContext(overrides?: Partial<TriggerRendererContext>
     ...overrides,
   };
 }
+
+/** Minimal fields required by `EventInfo` for trigger renderer tests */
+const defaultTriggerEvent = {
+  nodeId: "node-trigger-1",
+  type: "grafana.alert.firing",
+} as const;
 
 // ===== Get Dashboard Mapper Tests =====
 
@@ -322,14 +309,21 @@ describe("queryDataSourceMapper.getExecutionDetails", () => {
 
 describe("onAlertFiringTriggerRenderer.getTitleAndSubtitle", () => {
   it("returns default title when event data is missing", () => {
-    const ctx = { event: { id: "e1", createdAt: new Date().toISOString(), data: undefined } };
+    const ctx = {
+      event: { ...defaultTriggerEvent, id: "e1", createdAt: new Date().toISOString(), data: undefined },
+    };
     const { title } = onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx);
     expect(title).toBe("Grafana alert firing");
   });
 
   it("uses event title field as alert name", () => {
     const ctx = {
-      event: { id: "e1", createdAt: new Date().toISOString(), data: { title: "High CPU", status: "firing" } },
+      event: {
+        ...defaultTriggerEvent,
+        id: "e1",
+        createdAt: new Date().toISOString(),
+        data: { title: "High CPU", status: "firing" },
+      },
     };
     expect(onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("High CPU");
   });
@@ -337,6 +331,7 @@ describe("onAlertFiringTriggerRenderer.getTitleAndSubtitle", () => {
   it("falls back to commonLabels.alertname", () => {
     const ctx = {
       event: {
+        ...defaultTriggerEvent,
         id: "e1",
         createdAt: new Date().toISOString(),
         data: { commonLabels: { alertname: "DiskWarn" }, status: "firing" },
@@ -348,6 +343,7 @@ describe("onAlertFiringTriggerRenderer.getTitleAndSubtitle", () => {
   it("falls back to first alert labels.alertname", () => {
     const ctx = {
       event: {
+        ...defaultTriggerEvent,
         id: "e1",
         createdAt: new Date().toISOString(),
         data: { alerts: [{ labels: { alertname: "MemoryLeak" } }], status: "firing" },
@@ -361,6 +357,7 @@ describe("onAlertFiringTriggerRenderer.getRootEventValues", () => {
   it("returns all alert fields from event data", () => {
     const ctx = {
       event: {
+        ...defaultTriggerEvent,
         id: "e1",
         createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
         data: {
@@ -385,7 +382,14 @@ describe("onAlertFiringTriggerRenderer.getRootEventValues", () => {
   });
 
   it("returns dashes for missing optional fields", () => {
-    const ctx = { event: { id: "e1", createdAt: new Date().toISOString(), data: { status: "firing" } } };
+    const ctx = {
+      event: {
+        ...defaultTriggerEvent,
+        id: "e1",
+        createdAt: new Date().toISOString(),
+        data: { status: "firing" },
+      },
+    };
     const values = onAlertFiringTriggerRenderer.getRootEventValues(ctx);
     expect(values.Status).toBe("firing");
     expect(values["Alert Name"]).toBe("-");
@@ -393,7 +397,9 @@ describe("onAlertFiringTriggerRenderer.getRootEventValues", () => {
   });
 
   it("defaults status to firing when absent", () => {
-    const ctx = { event: { id: "e1", createdAt: new Date().toISOString(), data: {} } };
+    const ctx = {
+      event: { ...defaultTriggerEvent, id: "e1", createdAt: new Date().toISOString(), data: {} },
+    };
     expect(onAlertFiringTriggerRenderer.getRootEventValues(ctx).Status).toBe("firing");
   });
 });
