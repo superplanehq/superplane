@@ -6,7 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.135.1",
   "grpcio>=1.71.0",
-  "logfire",
+  "logfire>=4.29.0",
   "PyJWT>=2.10.1",
   "protobuf>=5.29.0",
   "psycopg[binary]>=3.2.9,<3.3.0",
