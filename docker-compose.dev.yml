@@ -134,8 +134,8 @@ services:
       AGENT_HTTP_DEBUG: ${AGENT_HTTP_DEBUG:-true}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
       OTEL_ENABLED: "yes"
-      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4318"
       OTEL_SERVICE_NAME: "superplane-agent-dev"
     command: >-
       bash -lc "uv run python -m uvicorn ai.web:create_app
