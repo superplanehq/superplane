@@ -115,6 +115,41 @@ describe("queryDataSourceMapper", () => {
 
     expect(details["Data Source"]).toBe("prometheus-main");
   });
+
+  it("falls back to legacy configuration.dataSourceUid in metadata", () => {
+    const props = queryDataSourceMapper.props(
+      buildComponentContext("grafana.queryDataSource", {
+        configuration: {
+          dataSourceUid: "legacy-prometheus",
+          query: "up",
+        },
+      }),
+    );
+
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "Data Source: legacy-prometheus" })]),
+    );
+  });
+
+  it("falls back to legacy configuration.dataSourceUid in execution details", () => {
+    const details = queryDataSourceMapper.getExecutionDetails(
+      buildExecutionContext("grafana.queryDataSource", {
+        node: {
+          configuration: {
+            dataSourceUid: "legacy-prometheus",
+            query: "up",
+          },
+        },
+        execution: {
+          outputs: {
+            default: [buildOutput({})],
+          },
+        },
+      }),
+    );
+
+    expect(details["Data Source"]).toBe("legacy-prometheus");
+  });
 });
 
 describe("silence selection mappers", () => {

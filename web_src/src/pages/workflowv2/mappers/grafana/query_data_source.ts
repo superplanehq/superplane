@@ -19,7 +19,7 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const configuration = context.node.configuration as QueryDataSourceConfiguration | undefined;
-    const dataSource = configuration?.dataSource;
+    const dataSource = configuration?.dataSource ?? configuration?.dataSourceUid;
     const details: Record<string, string> = {
       "Queried At": formatTimestamp(context.execution.createdAt),
     };
@@ -65,7 +65,7 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as QueryDataSourceConfiguration;
-  const dataSource = configuration?.dataSource;
+  const dataSource = configuration?.dataSource ?? configuration?.dataSourceUid;
 
   if (dataSource) {
     metadata.push({ icon: "database", label: `Data Source: ${dataSource}` });
