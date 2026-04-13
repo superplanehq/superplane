@@ -36,7 +36,7 @@ func findCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (st
 
 	for _, version := range response.GetVersions() {
 		metadata := version.GetMetadata()
-		if metadata.GetIsPublished() {
+		if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
 			continue
 		}
 

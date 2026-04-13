@@ -277,7 +277,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 		return tx.Create(&models.CanvasVersion{
 			ID:          liveVersionID,
 			WorkflowID:  wf.ID,
-			IsPublished: true,
+			State:       models.CanvasVersionStatePublished,
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice(nodes),
 			Edges:       datatypes.NewJSONSlice(edges),
@@ -359,7 +359,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 		return tx.Create(&models.CanvasVersion{
 			ID:          liveVersionID,
 			WorkflowID:  wf.ID,
-			IsPublished: true,
+			State:       models.CanvasVersionStatePublished,
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice(nodes),
 			Edges:       datatypes.NewJSONSlice(edges),
