@@ -488,26 +488,26 @@ func (CanvasNodeExecution_ResultReason) EnumDescriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{52, 2}
 }
 
-type CanvasChangeSet_Change_Type int32
+type CanvasChangeset_Change_Type int32
 
 const (
-	CanvasChangeSet_Change_ADD_NODE         CanvasChangeSet_Change_Type = 0
-	CanvasChangeSet_Change_DELETE_NODE      CanvasChangeSet_Change_Type = 1
-	CanvasChangeSet_Change_UPDATE_NODE      CanvasChangeSet_Change_Type = 2
-	CanvasChangeSet_Change_CONNECT_NODES    CanvasChangeSet_Change_Type = 3
-	CanvasChangeSet_Change_DISCONNECT_NODES CanvasChangeSet_Change_Type = 4
+	CanvasChangeset_Change_ADD_NODE         CanvasChangeset_Change_Type = 0
+	CanvasChangeset_Change_DELETE_NODE      CanvasChangeset_Change_Type = 1
+	CanvasChangeset_Change_UPDATE_NODE      CanvasChangeset_Change_Type = 2
+	CanvasChangeset_Change_CONNECT_NODES    CanvasChangeset_Change_Type = 3
+	CanvasChangeset_Change_DISCONNECT_NODES CanvasChangeset_Change_Type = 4
 )
 
-// Enum value maps for CanvasChangeSet_Change_Type.
+// Enum value maps for CanvasChangeset_Change_Type.
 var (
-	CanvasChangeSet_Change_Type_name = map[int32]string{
+	CanvasChangeset_Change_Type_name = map[int32]string{
 		0: "ADD_NODE",
 		1: "DELETE_NODE",
 		2: "UPDATE_NODE",
 		3: "CONNECT_NODES",
 		4: "DISCONNECT_NODES",
 	}
-	CanvasChangeSet_Change_Type_value = map[string]int32{
+	CanvasChangeset_Change_Type_value = map[string]int32{
 		"ADD_NODE":         0,
 		"DELETE_NODE":      1,
 		"UPDATE_NODE":      2,
@@ -516,30 +516,30 @@ var (
 	}
 )
 
-func (x CanvasChangeSet_Change_Type) Enum() *CanvasChangeSet_Change_Type {
-	p := new(CanvasChangeSet_Change_Type)
+func (x CanvasChangeset_Change_Type) Enum() *CanvasChangeset_Change_Type {
+	p := new(CanvasChangeset_Change_Type)
 	*p = x
 	return p
 }
 
-func (x CanvasChangeSet_Change_Type) String() string {
+func (x CanvasChangeset_Change_Type) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (CanvasChangeSet_Change_Type) Descriptor() protoreflect.EnumDescriptor {
+func (CanvasChangeset_Change_Type) Descriptor() protoreflect.EnumDescriptor {
 	return file_canvases_proto_enumTypes[9].Descriptor()
 }
 
-func (CanvasChangeSet_Change_Type) Type() protoreflect.EnumType {
+func (CanvasChangeset_Change_Type) Type() protoreflect.EnumType {
 	return &file_canvases_proto_enumTypes[9]
 }
 
-func (x CanvasChangeSet_Change_Type) Number() protoreflect.EnumNumber {
+func (x CanvasChangeset_Change_Type) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use CanvasChangeSet_Change_Type.Descriptor instead.
-func (CanvasChangeSet_Change_Type) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use CanvasChangeset_Change_Type.Descriptor instead.
+func (CanvasChangeset_Change_Type) EnumDescriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{73, 0, 0}
 }
 
@@ -4792,28 +4792,28 @@ func (*ResolveExecutionErrorsResponse) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{72}
 }
 
-// CanvasChangeSet describe a unit of change for a canvas version.
-type CanvasChangeSet struct {
+// CanvasChangeset describes a unit of change for a canvas version.
+type CanvasChangeset struct {
 	state         protoimpl.MessageState    `protogen:"open.v1"`
-	Changes       []*CanvasChangeSet_Change `protobuf:"bytes,1,rep,name=changes,proto3" json:"changes,omitempty"`
+	Changes       []*CanvasChangeset_Change `protobuf:"bytes,1,rep,name=changes,proto3" json:"changes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CanvasChangeSet) Reset() {
-	*x = CanvasChangeSet{}
+func (x *CanvasChangeset) Reset() {
+	*x = CanvasChangeset{}
 	mi := &file_canvases_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CanvasChangeSet) String() string {
+func (x *CanvasChangeset) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CanvasChangeSet) ProtoMessage() {}
+func (*CanvasChangeset) ProtoMessage() {}
 
-func (x *CanvasChangeSet) ProtoReflect() protoreflect.Message {
+func (x *CanvasChangeset) ProtoReflect() protoreflect.Message {
 	mi := &file_canvases_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -4825,12 +4825,12 @@ func (x *CanvasChangeSet) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CanvasChangeSet.ProtoReflect.Descriptor instead.
-func (*CanvasChangeSet) Descriptor() ([]byte, []int) {
+// Deprecated: Use CanvasChangeset.ProtoReflect.Descriptor instead.
+func (*CanvasChangeset) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{73}
 }
 
-func (x *CanvasChangeSet) GetChanges() []*CanvasChangeSet_Change {
+func (x *CanvasChangeset) GetChanges() []*CanvasChangeset_Change {
 	if x != nil {
 		return x.Changes
 	}
@@ -5621,31 +5621,31 @@ func (x *CanvasChangeRequest_Metadata) GetIsConflicted() bool {
 	return false
 }
 
-type CanvasChangeSet_Change struct {
+type CanvasChangeset_Change struct {
 	state protoimpl.MessageState      `protogen:"open.v1"`
-	Type  CanvasChangeSet_Change_Type `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.Canvases.CanvasChangeSet_Change_Type" json:"type,omitempty"`
+	Type  CanvasChangeset_Change_Type `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.Canvases.CanvasChangeset_Change_Type" json:"type,omitempty"`
 	// Required for ADD_NODE, UPDATE_NODE, DELETE_NODE
-	Node *CanvasChangeSet_Change_Node `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
+	Node *CanvasChangeset_Change_Node `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
 	// Required for DISCONNECT_NODES and CONNECT_NODES
-	Edge          *CanvasChangeSet_Change_Edge `protobuf:"bytes,3,opt,name=edge,proto3" json:"edge,omitempty"`
+	Edge          *CanvasChangeset_Change_Edge `protobuf:"bytes,3,opt,name=edge,proto3" json:"edge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CanvasChangeSet_Change) Reset() {
-	*x = CanvasChangeSet_Change{}
+func (x *CanvasChangeset_Change) Reset() {
+	*x = CanvasChangeset_Change{}
 	mi := &file_canvases_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CanvasChangeSet_Change) String() string {
+func (x *CanvasChangeset_Change) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CanvasChangeSet_Change) ProtoMessage() {}
+func (*CanvasChangeset_Change) ProtoMessage() {}
 
-func (x *CanvasChangeSet_Change) ProtoReflect() protoreflect.Message {
+func (x *CanvasChangeset_Change) ProtoReflect() protoreflect.Message {
 	mi := &file_canvases_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -5657,33 +5657,33 @@ func (x *CanvasChangeSet_Change) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CanvasChangeSet_Change.ProtoReflect.Descriptor instead.
-func (*CanvasChangeSet_Change) Descriptor() ([]byte, []int) {
+// Deprecated: Use CanvasChangeset_Change.ProtoReflect.Descriptor instead.
+func (*CanvasChangeset_Change) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{73, 0}
 }
 
-func (x *CanvasChangeSet_Change) GetType() CanvasChangeSet_Change_Type {
+func (x *CanvasChangeset_Change) GetType() CanvasChangeset_Change_Type {
 	if x != nil {
 		return x.Type
 	}
-	return CanvasChangeSet_Change_ADD_NODE
+	return CanvasChangeset_Change_ADD_NODE
 }
 
-func (x *CanvasChangeSet_Change) GetNode() *CanvasChangeSet_Change_Node {
+func (x *CanvasChangeset_Change) GetNode() *CanvasChangeset_Change_Node {
 	if x != nil {
 		return x.Node
 	}
 	return nil
 }
 
-func (x *CanvasChangeSet_Change) GetEdge() *CanvasChangeSet_Change_Edge {
+func (x *CanvasChangeset_Change) GetEdge() *CanvasChangeset_Change_Edge {
 	if x != nil {
 		return x.Edge
 	}
 	return nil
 }
 
-type CanvasChangeSet_Change_Node struct {
+type CanvasChangeset_Change_Node struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
@@ -5694,20 +5694,20 @@ type CanvasChangeSet_Change_Node struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CanvasChangeSet_Change_Node) Reset() {
-	*x = CanvasChangeSet_Change_Node{}
+func (x *CanvasChangeset_Change_Node) Reset() {
+	*x = CanvasChangeset_Change_Node{}
 	mi := &file_canvases_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CanvasChangeSet_Change_Node) String() string {
+func (x *CanvasChangeset_Change_Node) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CanvasChangeSet_Change_Node) ProtoMessage() {}
+func (*CanvasChangeset_Change_Node) ProtoMessage() {}
 
-func (x *CanvasChangeSet_Change_Node) ProtoReflect() protoreflect.Message {
+func (x *CanvasChangeset_Change_Node) ProtoReflect() protoreflect.Message {
 	mi := &file_canvases_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -5719,47 +5719,47 @@ func (x *CanvasChangeSet_Change_Node) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CanvasChangeSet_Change_Node.ProtoReflect.Descriptor instead.
-func (*CanvasChangeSet_Change_Node) Descriptor() ([]byte, []int) {
+// Deprecated: Use CanvasChangeset_Change_Node.ProtoReflect.Descriptor instead.
+func (*CanvasChangeset_Change_Node) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{73, 0, 0}
 }
 
-func (x *CanvasChangeSet_Change_Node) GetId() string {
+func (x *CanvasChangeset_Change_Node) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *CanvasChangeSet_Change_Node) GetName() string {
+func (x *CanvasChangeset_Change_Node) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *CanvasChangeSet_Change_Node) GetBlock() string {
+func (x *CanvasChangeset_Change_Node) GetBlock() string {
 	if x != nil {
 		return x.Block
 	}
 	return ""
 }
 
-func (x *CanvasChangeSet_Change_Node) GetConfiguration() *_struct.Struct {
+func (x *CanvasChangeset_Change_Node) GetConfiguration() *_struct.Struct {
 	if x != nil {
 		return x.Configuration
 	}
 	return nil
 }
 
-func (x *CanvasChangeSet_Change_Node) GetChannel() string {
+func (x *CanvasChangeset_Change_Node) GetChannel() string {
 	if x != nil {
 		return x.Channel
 	}
 	return ""
 }
 
-type CanvasChangeSet_Change_Edge struct {
+type CanvasChangeset_Change_Edge struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SourceId      string                 `protobuf:"bytes,1,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
 	TargetId      string                 `protobuf:"bytes,2,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
@@ -5768,20 +5768,20 @@ type CanvasChangeSet_Change_Edge struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CanvasChangeSet_Change_Edge) Reset() {
-	*x = CanvasChangeSet_Change_Edge{}
+func (x *CanvasChangeset_Change_Edge) Reset() {
+	*x = CanvasChangeset_Change_Edge{}
 	mi := &file_canvases_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CanvasChangeSet_Change_Edge) String() string {
+func (x *CanvasChangeset_Change_Edge) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CanvasChangeSet_Change_Edge) ProtoMessage() {}
+func (*CanvasChangeset_Change_Edge) ProtoMessage() {}
 
-func (x *CanvasChangeSet_Change_Edge) ProtoReflect() protoreflect.Message {
+func (x *CanvasChangeset_Change_Edge) ProtoReflect() protoreflect.Message {
 	mi := &file_canvases_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -5793,26 +5793,26 @@ func (x *CanvasChangeSet_Change_Edge) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CanvasChangeSet_Change_Edge.ProtoReflect.Descriptor instead.
-func (*CanvasChangeSet_Change_Edge) Descriptor() ([]byte, []int) {
+// Deprecated: Use CanvasChangeset_Change_Edge.ProtoReflect.Descriptor instead.
+func (*CanvasChangeset_Change_Edge) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{73, 0, 1}
 }
 
-func (x *CanvasChangeSet_Change_Edge) GetSourceId() string {
+func (x *CanvasChangeset_Change_Edge) GetSourceId() string {
 	if x != nil {
 		return x.SourceId
 	}
 	return ""
 }
 
-func (x *CanvasChangeSet_Change_Edge) GetTargetId() string {
+func (x *CanvasChangeset_Change_Edge) GetTargetId() string {
 	if x != nil {
 		return x.TargetId
 	}
 	return ""
 }
 
-func (x *CanvasChangeSet_Change_Edge) GetChannel() string {
+func (x *CanvasChangeset_Change_Edge) GetChannel() string {
 	if x != nil {
 		return x.Channel
 	}
@@ -6235,12 +6235,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12#\n" +
 	"\rexecution_ids\x18\x02 \x03(\tR\fexecutionIds\" \n" +
 	"\x1eResolveExecutionErrorsResponse\"\x8e\x05\n" +
-	"\x0fCanvasChangeSet\x12E\n" +
-	"\achanges\x18\x01 \x03(\v2+.Superplane.Canvases.CanvasChangeSet.ChangeR\achanges\x1a\xb3\x04\n" +
+	"\x0fCanvasChangeset\x12E\n" +
+	"\achanges\x18\x01 \x03(\v2+.Superplane.Canvases.CanvasChangeset.ChangeR\achanges\x1a\xb3\x04\n" +
 	"\x06Change\x12D\n" +
-	"\x04type\x18\x01 \x01(\x0e20.Superplane.Canvases.CanvasChangeSet.Change.TypeR\x04type\x12D\n" +
-	"\x04node\x18\x02 \x01(\v20.Superplane.Canvases.CanvasChangeSet.Change.NodeR\x04node\x12D\n" +
-	"\x04edge\x18\x03 \x01(\v20.Superplane.Canvases.CanvasChangeSet.Change.EdgeR\x04edge\x1a\x99\x01\n" +
+	"\x04type\x18\x01 \x01(\x0e20.Superplane.Canvases.CanvasChangeset.Change.TypeR\x04type\x12D\n" +
+	"\x04node\x18\x02 \x01(\v20.Superplane.Canvases.CanvasChangeset.Change.NodeR\x04node\x12D\n" +
+	"\x04edge\x18\x03 \x01(\v20.Superplane.Canvases.CanvasChangeset.Change.EdgeR\x04edge\x1a\x99\x01\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -6376,7 +6376,7 @@ var file_canvases_proto_goTypes = []any{
 	(CanvasNodeExecution_State)(0),              // 6: Superplane.Canvases.CanvasNodeExecution.State
 	(CanvasNodeExecution_Result)(0),             // 7: Superplane.Canvases.CanvasNodeExecution.Result
 	(CanvasNodeExecution_ResultReason)(0),       // 8: Superplane.Canvases.CanvasNodeExecution.ResultReason
-	(CanvasChangeSet_Change_Type)(0),            // 9: Superplane.Canvases.CanvasChangeSet.Change.Type
+	(CanvasChangeset_Change_Type)(0),            // 9: Superplane.Canvases.CanvasChangeset.Change.Type
 	(*ListCanvasesRequest)(nil),                 // 10: Superplane.Canvases.ListCanvasesRequest
 	(*ListCanvasesResponse)(nil),                // 11: Superplane.Canvases.ListCanvasesResponse
 	(*DescribeCanvasRequest)(nil),               // 12: Superplane.Canvases.DescribeCanvasRequest
@@ -6450,7 +6450,7 @@ var file_canvases_proto_goTypes = []any{
 	(*CancelExecutionResponse)(nil),             // 80: Superplane.Canvases.CancelExecutionResponse
 	(*ResolveExecutionErrorsRequest)(nil),       // 81: Superplane.Canvases.ResolveExecutionErrorsRequest
 	(*ResolveExecutionErrorsResponse)(nil),      // 82: Superplane.Canvases.ResolveExecutionErrorsResponse
-	(*CanvasChangeSet)(nil),                     // 83: Superplane.Canvases.CanvasChangeSet
+	(*CanvasChangeset)(nil),                     // 83: Superplane.Canvases.CanvasChangeset
 	(*CanvasNodeEventMessage)(nil),              // 84: Superplane.Canvases.CanvasNodeEventMessage
 	(*CanvasNodeExecutionMessage)(nil),          // 85: Superplane.Canvases.CanvasNodeExecutionMessage
 	(*CanvasNodeQueueItemMessage)(nil),          // 86: Superplane.Canvases.CanvasNodeQueueItemMessage
@@ -6461,9 +6461,9 @@ var file_canvases_proto_goTypes = []any{
 	(*Canvas_Status)(nil),                       // 91: Superplane.Canvases.Canvas.Status
 	(*CanvasVersion_Metadata)(nil),              // 92: Superplane.Canvases.CanvasVersion.Metadata
 	(*CanvasChangeRequest_Metadata)(nil),        // 93: Superplane.Canvases.CanvasChangeRequest.Metadata
-	(*CanvasChangeSet_Change)(nil),              // 94: Superplane.Canvases.CanvasChangeSet.Change
-	(*CanvasChangeSet_Change_Node)(nil),         // 95: Superplane.Canvases.CanvasChangeSet.Change.Node
-	(*CanvasChangeSet_Change_Edge)(nil),         // 96: Superplane.Canvases.CanvasChangeSet.Change.Edge
+	(*CanvasChangeset_Change)(nil),              // 94: Superplane.Canvases.CanvasChangeset.Change
+	(*CanvasChangeset_Change_Node)(nil),         // 95: Superplane.Canvases.CanvasChangeset.Change.Node
+	(*CanvasChangeset_Change_Edge)(nil),         // 96: Superplane.Canvases.CanvasChangeset.Change.Edge
 	(*timestamp.Timestamp)(nil),                 // 97: google.protobuf.Timestamp
 	(*_struct.Struct)(nil),                      // 98: google.protobuf.Struct
 	(*components.Node)(nil),                     // 99: Superplane.Components.Node
@@ -6562,7 +6562,7 @@ var file_canvases_proto_depIdxs = []int32{
 	97,  // 88: Superplane.Canvases.CanvasEventWithExecutions.created_at:type_name -> google.protobuf.Timestamp
 	61,  // 89: Superplane.Canvases.CanvasEventWithExecutions.executions:type_name -> Superplane.Canvases.CanvasNodeExecutionRef
 	62,  // 90: Superplane.Canvases.ListEventExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
-	94,  // 91: Superplane.Canvases.CanvasChangeSet.changes:type_name -> Superplane.Canvases.CanvasChangeSet.Change
+	94,  // 91: Superplane.Canvases.CanvasChangeset.changes:type_name -> Superplane.Canvases.CanvasChangeset.Change
 	97,  // 92: Superplane.Canvases.CanvasNodeEventMessage.timestamp:type_name -> google.protobuf.Timestamp
 	97,  // 93: Superplane.Canvases.CanvasNodeExecutionMessage.timestamp:type_name -> google.protobuf.Timestamp
 	97,  // 94: Superplane.Canvases.CanvasNodeQueueItemMessage.timestamp:type_name -> google.protobuf.Timestamp
@@ -6585,10 +6585,10 @@ var file_canvases_proto_depIdxs = []int32{
 	97,  // 111: Superplane.Canvases.CanvasChangeRequest.Metadata.published_at:type_name -> google.protobuf.Timestamp
 	97,  // 112: Superplane.Canvases.CanvasChangeRequest.Metadata.created_at:type_name -> google.protobuf.Timestamp
 	97,  // 113: Superplane.Canvases.CanvasChangeRequest.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	9,   // 114: Superplane.Canvases.CanvasChangeSet.Change.type:type_name -> Superplane.Canvases.CanvasChangeSet.Change.Type
-	95,  // 115: Superplane.Canvases.CanvasChangeSet.Change.node:type_name -> Superplane.Canvases.CanvasChangeSet.Change.Node
-	96,  // 116: Superplane.Canvases.CanvasChangeSet.Change.edge:type_name -> Superplane.Canvases.CanvasChangeSet.Change.Edge
-	98,  // 117: Superplane.Canvases.CanvasChangeSet.Change.Node.configuration:type_name -> google.protobuf.Struct
+	9,   // 114: Superplane.Canvases.CanvasChangeset.Change.type:type_name -> Superplane.Canvases.CanvasChangeset.Change.Type
+	95,  // 115: Superplane.Canvases.CanvasChangeset.Change.node:type_name -> Superplane.Canvases.CanvasChangeset.Change.Node
+	96,  // 116: Superplane.Canvases.CanvasChangeset.Change.edge:type_name -> Superplane.Canvases.CanvasChangeset.Change.Edge
+	98,  // 117: Superplane.Canvases.CanvasChangeset.Change.Node.configuration:type_name -> google.protobuf.Struct
 	10,  // 118: Superplane.Canvases.Canvases.ListCanvases:input_type -> Superplane.Canvases.ListCanvasesRequest
 	16,  // 119: Superplane.Canvases.Canvases.CreateCanvas:input_type -> Superplane.Canvases.CreateCanvasRequest
 	12,  // 120: Superplane.Canvases.Canvases.DescribeCanvas:input_type -> Superplane.Canvases.DescribeCanvasRequest

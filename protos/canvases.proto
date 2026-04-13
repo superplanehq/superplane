@@ -900,9 +900,9 @@ message ResolveExecutionErrorsRequest {
 message ResolveExecutionErrorsResponse {}
 
 //
-// CanvasChangeSet describe a unit of change for a canvas version.
+// CanvasChangeset describes a unit of change for a canvas version.
 //
-message CanvasChangeSet {
+message CanvasChangeset {
   message Change {
     enum Type {
       ADD_NODE = 0;
