@@ -1424,6 +1424,7 @@ type UpdateCanvasVersionThroughOpsRequest struct {
 	CanvasId      string                   `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
 	VersionId     string                   `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
 	Operations    []*CanvasUpdateOperation `protobuf:"bytes,3,rep,name=operations,proto3" json:"operations,omitempty"`
+	DryRun        bool                     `protobuf:"varint,4,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1477,6 +1478,13 @@ func (x *UpdateCanvasVersionThroughOpsRequest) GetOperations() []*CanvasUpdateOp
 		return x.Operations
 	}
 	return nil
+}
+
+func (x *UpdateCanvasVersionThroughOpsRequest) GetDryRun() bool {
+	if x != nil {
+		return x.DryRun
+	}
+	return false
 }
 
 type UpdateCanvasVersionThroughOpsResponse struct {
@@ -5886,14 +5894,15 @@ const file_canvases_proto_rawDesc = "" +
 	"\vauto_layout\x18\x04 \x01(\v2%.Superplane.Canvases.CanvasAutoLayoutR\n" +
 	"autoLayout\"[\n" +
 	"\x1bUpdateCanvasVersionResponse\x12<\n" +
-	"\aversion\x18\x01 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\"\xae\x01\n" +
+	"\aversion\x18\x01 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\"\xc7\x01\n" +
 	"$UpdateCanvasVersionThroughOpsRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
 	"\n" +
 	"version_id\x18\x02 \x01(\tR\tversionId\x12J\n" +
 	"\n" +
 	"operations\x18\x03 \x03(\v2*.Superplane.Canvases.CanvasUpdateOperationR\n" +
-	"operations\"e\n" +
+	"operations\x12\x17\n" +
+	"\adry_run\x18\x04 \x01(\bR\x06dryRun\"e\n" +
 	"%UpdateCanvasVersionThroughOpsResponse\x12<\n" +
 	"\aversion\x18\x01 \x01(\v2\".Superplane.Canvases.CanvasVersionR\aversion\"\x96\x01\n" +
 	" CreateCanvasChangeRequestRequest\x12\x1b\n" +

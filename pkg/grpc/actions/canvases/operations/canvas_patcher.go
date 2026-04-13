@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -77,7 +77,7 @@ func (p *CanvasPatcher) addNode(operation *pb.CanvasUpdateOperation) error {
 		return fmt.Errorf("node %s already exists", nodeID)
 	}
 
-	nodeType, nodeRef, err := p.findBlock(target.GetBlock())
+	nodeType, nodeRef, err := p.findAndValidateBlock(target)
 	if err != nil {
 		return err
 	}
@@ -212,36 +212,60 @@ func (p *CanvasPatcher) findEdge(targetEdge models.Edge) (int, bool) {
 	return index, index >= 0
 }
 
-func (p *CanvasPatcher) findBlock(block string) (string, *models.NodeRef, error) {
-	if block == "" {
+func (p *CanvasPatcher) findAndValidateBlock(node *pb.CanvasUpdateOperation_Node) (string, *models.NodeRef, error) {
+	if node.GetBlock() == "" {
 		return "", nil, fmt.Errorf("block is required")
 	}
 
-	if _, err := uuid.Parse(block); err == nil {
-		return models.NodeTypeBlueprint, &models.NodeRef{
-			Blueprint: &models.BlueprintRef{ID: block},
-		}, nil
-	}
+	//
+	// Check if the block is a component
+	//
+	component, err := p.registry.GetComponent(node.GetBlock())
+	if err == nil {
+		err = configuration.ValidateConfiguration(component.Configuration(), node.GetConfiguration().AsMap())
+		if err != nil {
+			return "", nil, err
+		}
 
-	if _, err := p.registry.GetComponent(block); err == nil {
 		return models.NodeTypeComponent, &models.NodeRef{
-			Component: &models.ComponentRef{Name: block},
+			Component: &models.ComponentRef{Name: node.GetBlock()},
 		}, nil
 	}
 
-	if _, err := p.registry.GetTrigger(block); err == nil {
+	//
+	// Otherwise, check if the block is a trigger
+	//
+	trigger, err := p.registry.GetTrigger(node.GetBlock())
+	if err == nil {
+		err = configuration.ValidateConfiguration(trigger.Configuration(), node.GetConfiguration().AsMap())
+		if err != nil {
+			return "", nil, err
+		}
+
 		return models.NodeTypeTrigger, &models.NodeRef{
-			Trigger: &models.TriggerRef{Name: block},
+			Trigger: &models.TriggerRef{Name: node.GetBlock()},
 		}, nil
 	}
 
-	if _, err := p.registry.GetWidget(block); err == nil {
+	//
+	// Otherwise, check if the block is a widget
+	//
+	widget, err := p.registry.GetWidget(node.GetBlock())
+	if err == nil {
+		err = configuration.ValidateConfiguration(widget.Configuration(), node.GetConfiguration().AsMap())
+		if err != nil {
+			return "", nil, err
+		}
+
 		return models.NodeTypeWidget, &models.NodeRef{
-			Widget: &models.WidgetRef{Name: block},
+			Widget: &models.WidgetRef{Name: node.GetBlock()},
 		}, nil
 	}
 
-	return "", nil, fmt.Errorf("block %s not found in registry", block)
+	//
+	// If the block is not any of the above, return an error
+	//
+	return "", nil, fmt.Errorf("block %s not found in registry", node.GetBlock())
 }
 
 func edgeFromOperation(operation *pb.CanvasUpdateOperation) (models.Edge, error) {

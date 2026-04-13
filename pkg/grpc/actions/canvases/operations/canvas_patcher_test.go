@@ -116,6 +116,66 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.whenHandling([]*pb.CanvasUpdateOperation{})
 		steps.assertHasError()
 	})
+
+	t.Run("rejects add component node when configuration does not match schema", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling([]*pb.CanvasUpdateOperation{
+			{
+				Type: pb.CanvasUpdateOperation_ADD_NODE,
+				Target: &pb.CanvasUpdateOperation_Node{
+					Id:    "node-a",
+					Name:  "Node A",
+					Block: "if",
+				},
+			},
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("field 'expression' is required")
+		steps.assertNodeCount(0)
+	})
+
+	t.Run("rejects add trigger node when configuration does not match schema", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling([]*pb.CanvasUpdateOperation{
+			{
+				Type: pb.CanvasUpdateOperation_ADD_NODE,
+				Target: &pb.CanvasUpdateOperation_Node{
+					Id:    "node-a",
+					Name:  "Node A",
+					Block: "schedule",
+				},
+			},
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("field 'type' is required")
+		steps.assertNodeCount(0)
+	})
+
+	t.Run("rejects add widget node when configuration does not match schema", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling([]*pb.CanvasUpdateOperation{
+			{
+				Type: pb.CanvasUpdateOperation_ADD_NODE,
+				Target: &pb.CanvasUpdateOperation_Node{
+					Id:    "node-a",
+					Name:  "Node A",
+					Block: "annotation",
+				},
+			},
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("field 'text' is required")
+		steps.assertNodeCount(0)
+	})
 }
 
 type CanvasPatcherSteps struct {
@@ -144,6 +204,10 @@ func (s *CanvasPatcherSteps) assertNoError() {
 
 func (s *CanvasPatcherSteps) assertHasError() {
 	require.Error(s.t, s.err)
+}
+
+func (s *CanvasPatcherSteps) assertErrorContains(text string) {
+	require.ErrorContains(s.t, s.err, text)
 }
 
 func (s *CanvasPatcherSteps) assertHasNode(nodeID string, name string, configuration map[string]any) {

@@ -21,6 +21,7 @@ var _ MappedNullable = &CanvasesUpdateCanvasVersionThroughOpsBody{}
 // CanvasesUpdateCanvasVersionThroughOpsBody struct for CanvasesUpdateCanvasVersionThroughOpsBody
 type CanvasesUpdateCanvasVersionThroughOpsBody struct {
 	Operations []CanvasesCanvasUpdateOperation `json:"operations,omitempty"`
+	DryRun     *bool                           `json:"dryRun,omitempty"`
 }
 
 // NewCanvasesUpdateCanvasVersionThroughOpsBody instantiates a new CanvasesUpdateCanvasVersionThroughOpsBody object
@@ -72,6 +73,38 @@ func (o *CanvasesUpdateCanvasVersionThroughOpsBody) SetOperations(v []CanvasesCa
 	o.Operations = v
 }
 
+// GetDryRun returns the DryRun field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasVersionThroughOpsBody) GetDryRun() bool {
+	if o == nil || IsNil(o.DryRun) {
+		var ret bool
+		return ret
+	}
+	return *o.DryRun
+}
+
+// GetDryRunOk returns a tuple with the DryRun field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesUpdateCanvasVersionThroughOpsBody) GetDryRunOk() (*bool, bool) {
+	if o == nil || IsNil(o.DryRun) {
+		return nil, false
+	}
+	return o.DryRun, true
+}
+
+// HasDryRun returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasVersionThroughOpsBody) HasDryRun() bool {
+	if o != nil && !IsNil(o.DryRun) {
+		return true
+	}
+
+	return false
+}
+
+// SetDryRun gets a reference to the given bool and assigns it to the DryRun field.
+func (o *CanvasesUpdateCanvasVersionThroughOpsBody) SetDryRun(v bool) {
+	o.DryRun = &v
+}
+
 func (o CanvasesUpdateCanvasVersionThroughOpsBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o CanvasesUpdateCanvasVersionThroughOpsBody) ToMap() (map[string]interface
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Operations) {
 		toSerialize["operations"] = o.Operations
+	}
+	if !IsNil(o.DryRun) {
+		toSerialize["dryRun"] = o.DryRun
 	}
 	return toSerialize, nil
 }

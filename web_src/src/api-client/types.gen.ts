@@ -552,6 +552,7 @@ export type CanvasesUpdateCanvasVersionResponse = {
 
 export type CanvasesUpdateCanvasVersionThroughOpsBody = {
   operations?: Array<CanvasesCanvasUpdateOperation>;
+  dryRun?: boolean;
 };
 
 export type CanvasesUpdateCanvasVersionThroughOpsResponse = {

@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/operations"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -22,6 +24,7 @@ func UpdateCanvasVersionThroughOps(
 	canvasID uuid.UUID,
 	versionID uuid.UUID,
 	ops []*pb.CanvasUpdateOperation,
+	dryRun bool,
 ) (*pb.UpdateCanvasVersionThroughOpsResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
@@ -48,7 +51,19 @@ func UpdateCanvasVersionThroughOps(
 	}
 
 	//
-	// Persist change to database
+	// if dry run is used,
+	// we do not persist the change to the database.
+	// This allows clients a way to validate the changes,
+	// before applying them.
+	//
+	if dryRun {
+		return &pb.UpdateCanvasVersionThroughOpsResponse{
+			Version: SerializeCanvasVersion(updater.GetVersion(), organizationID.String()),
+		}, nil
+	}
+
+	//
+	// Otherwise, persist the change to the database
 	//
 	now := time.Now()
 	newVersion := updater.GetVersion()
@@ -59,15 +74,12 @@ func UpdateCanvasVersionThroughOps(
 		return nil, status.Errorf(codes.Internal, "failed to update canvas version: %v", err)
 	}
 
-	//
-	// Reload version
-	//
-	version, err = models.FindCanvasVersion(canvasID, versionID)
+	err = messages.NewCanvasVersionUpdatedMessage(canvasID.String(), version.ID.String()).PublishVersionUpdated()
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "version not found: %v", err)
+		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
 	return &pb.UpdateCanvasVersionThroughOpsResponse{
-		Version: SerializeCanvasVersion(version, organizationID.String()),
+		Version: SerializeCanvasVersion(newVersion, organizationID.String()),
 	}, nil
 }

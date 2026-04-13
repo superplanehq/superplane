@@ -5320,6 +5320,9 @@
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasUpdateOperation"
           }
+        },
+        "dryRun": {
+          "type": "boolean"
         }
       }
     },

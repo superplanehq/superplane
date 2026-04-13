@@ -477,6 +477,7 @@ message UpdateCanvasVersionThroughOpsRequest {
   string canvas_id = 1;
   string version_id = 2;
   repeated CanvasUpdateOperation operations = 3;
+  bool dry_run = 4;
 }
 
 message UpdateCanvasVersionThroughOpsResponse {

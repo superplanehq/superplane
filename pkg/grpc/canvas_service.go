@@ -125,6 +125,7 @@ func (s *CanvasService) UpdateCanvasVersionThroughOps(ctx context.Context, req *
 		canvasID,
 		versionID,
 		req.Operations,
+		req.DryRun,
 	)
 }
 
