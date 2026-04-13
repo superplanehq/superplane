@@ -45,7 +45,7 @@ from ai.session_store import (
 )
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
+from ai.telemetry import init_telemetry, shutdown_telemetry
 from ai.text import normalize_optional
 from ai.tools import format_tool_display_label
 from ai.usage_limit_checker import (
@@ -317,7 +317,6 @@ async def _stream_agent_run(
                     recorder.set_assistant_content(output)
                 usage = result.usage()
                 _record_usage(store, publisher, run_id, usage, chat.org_id, chat.id, payload.model)
-                record_agent_run_tokens(usage)
                 yield {
                     "type": "final_answer",
                     "output": output,
@@ -500,7 +499,6 @@ async def _stream_agent_run(
                 recorder.set_assistant_content(output)
             usage = result.usage()
             _record_usage(store, publisher, run_id, usage, chat.org_id, chat.id, payload.model)
-            record_agent_run_tokens(usage)
             yield {
                 "type": "final_answer",
                 "output": output,
@@ -531,7 +529,7 @@ async def _stream_agent_run(
 def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        init_metrics()
+        init_telemetry()
         store = SessionStore()
         tracker = ActiveStreamTracker()
         rabbitmq_url = config.rabbitmq_url
@@ -558,7 +556,7 @@ def _create_app() -> FastAPI:
             publisher.close()
             await limit_checker.close()
             store.close()
-            shutdown_metrics()
+            shutdown_telemetry()
 
     app = FastAPI(lifespan=lifespan)
     cors_origins = [origin.strip() for origin in config.cors_origins.split(",") if origin.strip()]
