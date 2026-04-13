@@ -26,6 +26,7 @@ from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
+from ai.chat_retention import run_chat_retention_loop
 from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
@@ -547,9 +548,15 @@ def _create_app() -> FastAPI:
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
+        retention_task = asyncio.create_task(run_chat_retention_loop(store))
         try:
             yield
         finally:
+            retention_task.cancel()
+            try:
+                await retention_task
+            except asyncio.CancelledError:
+                pass
             tracker.begin_shutdown()
             await tracker.wait_for_drain()
             grpc_server.stop()
