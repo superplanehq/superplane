@@ -18,22 +18,22 @@ import (
 func Test__QueryDataSource__Setup(t *testing.T) {
 	component := QueryDataSource{}
 
-	t.Run("data source uid is required", func(t *testing.T) {
+	t.Run("data source is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "",
-				"query":         "up",
+				"dataSource": "",
+				"query":      "up",
 			},
 		})
 
-		require.ErrorContains(t, err, "dataSourceUid is required")
+		require.ErrorContains(t, err, "dataSource is required")
 	})
 
 	t.Run("query is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "",
+				"dataSource": "logs",
+				"query":      "",
 			},
 		})
 
@@ -43,13 +43,14 @@ func Test__QueryDataSource__Setup(t *testing.T) {
 	t.Run("valid configuration passes", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
+				"dataSource": "logs",
+				"query":      "{}",
 			},
 		})
 
 		require.NoError(t, err)
 	})
+
 }
 
 func Test__QueryDataSource__Configuration__UsesIntegrationResourceForDataSource(t *testing.T) {
@@ -58,7 +59,7 @@ func Test__QueryDataSource__Configuration__UsesIntegrationResourceForDataSource(
 
 	var dataSourceField *configuration.Field
 	for i := range fields {
-		if fields[i].Name == "dataSourceUid" {
+		if fields[i].Name == "dataSource" {
 			dataSourceField = &fields[i]
 			break
 		}
@@ -77,8 +78,8 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 	t.Run("invalid configuration returns validation error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "",
-				"query":         "up",
+				"dataSource": "",
+				"query":      "up",
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
@@ -89,7 +90,7 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 			ExecutionState: &contexts.ExecutionStateContext{},
 		})
 
-		require.ErrorContains(t, err, "dataSourceUid is required")
+		require.ErrorContains(t, err, "dataSource is required")
 	})
 
 	t.Run("successful query emits result", func(t *testing.T) {
@@ -109,10 +110,10 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-				"timeFrom":      "now-5m",
-				"timeTo":        "now",
+				"dataSource": "logs",
+				"query":      "{}",
+				"timeFrom":   "now-5m",
+				"timeTo":     "now",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -143,10 +144,10 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "bfcwd2pm79hj4c",
-				"query":         "up",
-				"timeFrom":      "now-5m",
-				"timeTo":        "now",
+				"dataSource": "bfcwd2pm79hj4c",
+				"query":      "up",
+				"timeFrom":   "now-5m",
+				"timeTo":     "now",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -189,11 +190,11 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-				"timeFrom":      "2026-04-01T10:15",
-				"timeTo":        "2026-04-01T11:45",
-				"timezone":      "5",
+				"dataSource": "logs",
+				"query":      "{}",
+				"timeFrom":   "2026-04-01T10:15",
+				"timeTo":     "2026-04-01T11:45",
+				"timezone":   "5",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -225,10 +226,10 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-				"timeFrom":      "2026-04-01T10:15:00+05:00",
-				"timeTo":        "2026-04-01T11:45:00+05:00",
+				"dataSource": "logs",
+				"query":      "{}",
+				"timeFrom":   "2026-04-01T10:15:00+05:00",
+				"timeTo":     "2026-04-01T11:45:00+05:00",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -251,9 +252,9 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 	t.Run("datetime picker values require timezone", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-				"timeFrom":      "2026-04-01T10:15",
+				"dataSource": "logs",
+				"query":      "{}",
+				"timeFrom":   "2026-04-01T10:15",
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
@@ -279,8 +280,8 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
+				"dataSource": "logs",
+				"query":      "{}",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -317,8 +318,8 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
+				"dataSource": "logs",
+				"query":      "{}",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
