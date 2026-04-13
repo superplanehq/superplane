@@ -20,10 +20,15 @@ class AgentUsageLimitChecker(Protocol):
         """Raise AgentTokenLimitExceeded if the org has exceeded its agent token budget."""
         ...
 
+    async def get_org_retention_days(self, organization_id: str) -> int | None:
+        """Return the org's retention window in days, or None if unavailable."""
+        ...
+
     async def close(self) -> None: ...
 
 
 _DESCRIBE_USAGE_METHOD = "/superplane.usage.v1.Usage/DescribeOrganizationUsage"
+_DESCRIBE_LIMITS_METHOD = "/superplane.usage.v1.Usage/DescribeOrganizationLimits"
 
 
 def _format_next_decrease_hint(next_leak_at_unix: int) -> str:
@@ -43,6 +48,11 @@ class UsageLimitChecker:
             _DESCRIBE_USAGE_METHOD,
             request_serializer=usage_pb2.DescribeOrganizationUsageRequest.SerializeToString,  # type: ignore[attr-defined]
             response_deserializer=usage_pb2.DescribeOrganizationUsageResponse.FromString,  # type: ignore[attr-defined]
+        )
+        self._limits_call = self._channel.unary_unary(
+            _DESCRIBE_LIMITS_METHOD,
+            request_serializer=usage_pb2.DescribeOrganizationLimitsRequest.SerializeToString,  # type: ignore[attr-defined]
+            response_deserializer=usage_pb2.DescribeOrganizationLimitsResponse.FromString,  # type: ignore[attr-defined]
         )
 
     async def check_agent_token_limit(self, organization_id: str) -> None:
@@ -70,8 +80,24 @@ class UsageLimitChecker:
             hint = _format_next_decrease_hint(next_leak_at)
             raise AgentTokenLimitExceeded(f"Agent token limit exceeded.{hint}")
 
+    async def get_org_retention_days(self, organization_id: str) -> int | None:
+        try:
+            response = await self._limits_call(
+                usage_pb2.DescribeOrganizationLimitsRequest(organization_id=organization_id),  # type: ignore[attr-defined]
+                timeout=5,
+            )
+        except grpc.RpcError as error:
+            print(f"[web] org retention lookup failed: {error}", flush=True)
+            return None
+
+        limits = response.limits
+        if limits is None:
+            return None
+
+        return int(limits.retention_window_days)
+
     async def close(self) -> None:
-        self._channel.close()
+        await self._channel.close()
 
 
 class NoopUsageLimitChecker:
@@ -79,6 +105,9 @@ class NoopUsageLimitChecker:
 
     async def check_agent_token_limit(self, organization_id: str) -> None:
         pass
+
+    async def get_org_retention_days(self, organization_id: str) -> int | None:
+        return None
 
     async def close(self) -> None:
         pass
