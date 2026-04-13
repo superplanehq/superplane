@@ -86,29 +86,6 @@ function insertAiMessageBefore(
   return trimAiMessages(updated);
 }
 
-function formatToolLabel(toolName: string): string {
-  const normalized = toolName.trim().toLowerCase();
-  const labelByTool: Record<string, string> = {
-    get_canvas: "Reading canvas",
-    get_canvas_shape: "Reading canvas structure",
-    get_canvas_details: "Reading canvas details",
-    get_node_details: "Reading node details",
-    list_node_events: "Listing node events",
-    list_node_executions: "Listing node executions",
-    list_available_blocks: "Listing available components",
-  };
-  if (labelByTool[normalized]) {
-    return labelByTool[normalized];
-  }
-
-  const words = normalized.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-  if (!words) {
-    return "Running tool";
-  }
-
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 function parseChatIdFromUrl(url: string): string | null {
   const match = url.match(/\/agents\/chats\/([^/]+)\/stream\/?$/);
   if (!match || !match[1]) {
@@ -432,7 +409,6 @@ export async function sendChatPrompt({
       setPendingProposal,
       insertAiMessageBefore,
       trimAiMessages,
-      formatToolLabel,
       testModelSentinel: TEST_MODEL_SENTINEL,
       testModeHint: TEST_MODE_HINT,
     });
