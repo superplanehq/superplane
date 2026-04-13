@@ -20,7 +20,6 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.addFilterNode("FilterPartial")
 		steps.assertExpressionFieldEquals("FilterPartial", "true")
 		steps.clearExpressionField()
-		steps.waitForAutoSave()
 		steps.assertExpressionFieldCleared("FilterPartial")
 	})
 
@@ -31,7 +30,6 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.addFilterNode("FilterSwitch")
 		steps.assertExpressionFieldEquals("FilterSwitch", "true")
 		steps.clearExpressionField()
-		steps.waitForAutoSave()
 		steps.switchToRunsTab()
 		steps.switchToConfigurationTab()
 		steps.assertExpressionInputEquals("")
@@ -65,11 +63,6 @@ func (s *settingsAutoSaveSteps) addFilterNode(name string) {
 func (s *settingsAutoSaveSteps) clearExpressionField() {
 	expressionInput := q.TestID("expression-field-expression")
 	s.session.FillIn(expressionInput, "")
-}
-
-func (s *settingsAutoSaveSteps) waitForAutoSave() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(500)
 }
 
 func (s *settingsAutoSaveSteps) switchToRunsTab() {

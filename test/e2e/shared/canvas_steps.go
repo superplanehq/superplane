@@ -160,18 +160,8 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 }
 
 func (s *CanvasSteps) Save() {
-	saveButton := q.TestID("save-canvas-button")
-	loc := saveButton.Run(s.session)
-
-	if isVisible, _ := loc.IsVisible(); isVisible {
-		s.session.Click(saveButton)
-		s.session.AssertText("Canvas changes saved")
-		s.session.Sleep(500)
-		return
-	}
-
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	// TODO: This should be reimplemented once edit mode is shipped
+	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {

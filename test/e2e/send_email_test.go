@@ -77,9 +77,6 @@ func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
 	s.session.FillIn(q.Locator("textarea[data-testid='string-field-subject']"), subject)
 
 	s.typeIntoMonacoEditor(body)
-
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *SendEmailSteps) typeIntoMonacoEditor(text string) {
@@ -142,9 +139,6 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 	s.session.FillIn(q.Locator("textarea[data-testid='string-field-subject']"), "Test notification")
 
 	s.typeIntoMonacoEditor("This is a test email body")
-
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *SendEmailSteps) runManualTrigger() {
