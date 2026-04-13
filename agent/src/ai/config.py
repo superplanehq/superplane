@@ -36,6 +36,7 @@ class Config:
         self.pattern_dir: str = self._parse_str("AGENT_PATTERN_DIR")
         self.rabbitmq_url: str = self._parse_str("RABBITMQ_URL")
         self.usage_grpc_url: str = self._parse_str("USAGE_GRPC_URL")
+        self.otel_enabled: bool = self._parse_bool("OTEL_ENABLED")
 
     @staticmethod
     def _parse_float(env_name: str, *, lower: float, upper: float, default: float) -> float:

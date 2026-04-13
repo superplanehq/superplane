@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 import logging
-import os
+
+from ai.config import config
 
 log = logging.getLogger(__name__)
 
-_initialized = False
-
 
 def init_telemetry() -> None:
-    global _initialized  # noqa: PLW0603
-
-    if os.getenv("OTEL_ENABLED") != "yes":
+    if not config.otel_enabled:
         return
 
-    if _initialized:
+    if getattr(init_telemetry, "_done", False):
         return
 
     try:
@@ -22,7 +19,7 @@ def init_telemetry() -> None:
 
         logfire.configure(send_to_logfire=False)
         logfire.instrument_pydantic_ai()
-        _initialized = True
+        init_telemetry._done = True  # type: ignore[attr-defined]
     except Exception:
         log.warning("Failed to initialize telemetry", exc_info=True)
         return
