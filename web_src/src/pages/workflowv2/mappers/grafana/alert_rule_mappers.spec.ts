@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createAlertRuleMapper } from "./create_alert_rule";
 import { deleteAlertRuleMapper } from "./delete_alert_rule";
 import { getAlertRuleMapper } from "./get_alert_rule";
+import { listAlertRulesMapper } from "./list_alert_rules";
 import { updateAlertRuleMapper } from "./update_alert_rule";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
 
@@ -131,14 +132,34 @@ describe("Grafana alert rule mappers", () => {
     expect(props.metadata).toEqual([expect.objectContaining({ label: "rule-789" })]);
   });
 
+  it("listAlertRulesMapper uses configuration.folder in metadata", () => {
+    const props = listAlertRulesMapper.props(
+      buildComponentContext("grafana.listAlertRules", {
+        configuration: {
+          folder: "folder-123",
+          group: "service-health",
+        },
+      }),
+    );
+
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "folder-123" }),
+        expect.objectContaining({ label: "service-health" }),
+      ]),
+    );
+  });
+
   it("alert rule mappers tolerate missing outputs", () => {
     const createCtx = buildExecutionContext("grafana.createAlertRule", { execution: { outputs: undefined } });
     const getCtx = buildExecutionContext("grafana.getAlertRule", { execution: { outputs: undefined } });
+    const listCtx = buildExecutionContext("grafana.listAlertRules", { execution: { outputs: undefined } });
     const updateCtx = buildExecutionContext("grafana.updateAlertRule", { execution: { outputs: undefined } });
     const deleteCtx = buildExecutionContext("grafana.deleteAlertRule", { execution: { outputs: undefined } });
 
     expect(() => createAlertRuleMapper.getExecutionDetails(createCtx)).not.toThrow();
     expect(() => getAlertRuleMapper.getExecutionDetails(getCtx)).not.toThrow();
+    expect(() => listAlertRulesMapper.getExecutionDetails(listCtx)).not.toThrow();
     expect(() => updateAlertRuleMapper.getExecutionDetails(updateCtx)).not.toThrow();
     expect(() => deleteAlertRuleMapper.getExecutionDetails(deleteCtx)).not.toThrow();
   });

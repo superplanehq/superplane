@@ -77,7 +77,7 @@ function buildListAlertRulesMetadata(
   nodeMetadata: ListAlertRulesNodeMetadata | undefined,
 ): MetadataItem[] {
   const items: MetadataItem[] = [];
-  const folderLabel = nodeMetadata?.folderTitle || config?.folderUID;
+  const folderLabel = nodeMetadata?.folderTitle || config?.folder;
   if (folderLabel) items.push({ icon: "folder", label: folderLabel });
   if (config?.group) items.push({ icon: "layers-3", label: config.group });
   return items;

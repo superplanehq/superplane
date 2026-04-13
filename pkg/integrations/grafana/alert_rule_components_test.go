@@ -305,7 +305,7 @@ func Test__ListAlertRules__Configuration__UsesIntegrationResources(t *testing.T)
 	component := ListAlertRules{}
 	fields := component.Configuration()
 
-	assertIntegrationResourceField(t, fields, "folderUID", resourceTypeFolder)
+	assertIntegrationResourceField(t, fields, "folder", resourceTypeFolder)
 	assertIntegrationResourceField(t, fields, "group", resourceTypeRuleGroup)
 }
 
@@ -324,8 +324,8 @@ func Test__ListAlertRules__Execute__ForwardsFiltersAsQueryParams(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"folderUID": "folder-1",
-			"group":     "service-health",
+			"folder": "folder-1",
+			"group":  "service-health",
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{

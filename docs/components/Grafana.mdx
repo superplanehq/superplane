@@ -17,7 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
   <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
-  <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule by UID" />
+  <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
   <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
   <LinkCard title="Update Alert Rule" href="#update-alert-rule" description="Update an existing Grafana-managed alert rule from structured alert settings" />
@@ -240,7 +240,7 @@ The Delete Alert Rule component deletes a Grafana-managed alert rule using the A
 
 ### Configuration
 
-- **Alert Rule**: The Grafana alert rule UID to delete
+- **Alert Rule**: The Grafana alert rule to delete
 
 ### Output
 
@@ -274,7 +274,7 @@ The Get Alert Rule component fetches a Grafana-managed alert rule using the Aler
 
 ### Configuration
 
-- **Alert Rule**: The Grafana alert rule UID to retrieve
+- **Alert Rule**: The Grafana alert rule to retrieve
 
 ### Output
 
@@ -517,7 +517,7 @@ The Update Alert Rule component updates a Grafana-managed alert rule using the A
 
 ### Configuration
 
-- **Alert Rule**: The Grafana alert rule UID to update
+- **Alert Rule**: The Grafana alert rule to update
 - **All other fields are optional**: only the values you provide will be changed
 - **Folder / Rule Group**: Optional location changes for the rule in Grafana
 - **Data Source / Query**: Optional query details Grafana evaluates

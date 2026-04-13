@@ -13,8 +13,8 @@ import (
 type ListAlertRules struct{}
 
 type ListAlertRulesSpec struct {
-	FolderUID string `json:"folderUID,omitempty" mapstructure:"folderUID"`
-	Group     string `json:"group,omitempty" mapstructure:"group"`
+	Folder string `json:"folder,omitempty" mapstructure:"folder"`
+	Group  string `json:"group,omitempty" mapstructure:"group"`
 }
 
 type ListAlertRulesNodeMetadata struct {
@@ -30,7 +30,7 @@ func decodeListAlertRulesSpec(input any) (ListAlertRulesSpec, error) {
 	if err := decodeAlertRuleSpec(input, &spec); err != nil {
 		return ListAlertRulesSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
-	spec.FolderUID = strings.TrimSpace(spec.FolderUID)
+	spec.Folder = strings.TrimSpace(spec.Folder)
 	spec.Group = strings.TrimSpace(spec.Group)
 	return spec, nil
 }
@@ -85,7 +85,7 @@ func (c *ListAlertRules) OutputChannels(configuration any) []core.OutputChannel 
 func (c *ListAlertRules) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "folderUID",
+			Name:        "folder",
 			Label:       "Folder",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -117,7 +117,7 @@ func (c *ListAlertRules) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if spec.FolderUID == "" || ctx.Metadata == nil || ctx.HTTP == nil {
+	if spec.Folder == "" || ctx.Metadata == nil || ctx.HTTP == nil {
 		return nil
 	}
 
@@ -132,7 +132,7 @@ func (c *ListAlertRules) Setup(ctx core.SetupContext) error {
 	}
 
 	for _, folder := range folders {
-		if strings.TrimSpace(folder.UID) != spec.FolderUID {
+		if strings.TrimSpace(folder.UID) != spec.Folder {
 			continue
 		}
 
@@ -158,7 +158,7 @@ func (c *ListAlertRules) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	rules, err := client.ListAlertRules(spec.FolderUID, spec.Group)
+	rules, err := client.ListAlertRules(spec.Folder, spec.Group)
 	if err != nil {
 		return fmt.Errorf("error listing alert rules: %w", err)
 	}
