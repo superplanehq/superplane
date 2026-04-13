@@ -1,32 +1,10 @@
 import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
 import type { TriggersTrigger, ComponentsComponent, IntegrationsIntegrationDefinition } from "@/api-client";
 
-// Flow control components that control workflow execution flow
-const FLOW_COMPONENT_NAMES = new Set(["if", "filter", "approval", "wait", "timeGate"]);
 const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory", "upsertmemory"]);
 
 function isMemoryBlock(block: BuildingBlock): boolean {
   return MEMORY_COMPONENT_NAMES.has((block.name || "").toLowerCase());
-}
-
-/**
- * Determines the component subtype based on the building block's type and name.
- * - Triggers are always "trigger"
- * - Flow control components (if, filter, approval, wait, timeGate) are "flow"
- * - All other components are "action"
- * - Blueprints default to "action"
- */
-export function getComponentSubtype(block: BuildingBlock): "trigger" | "action" | "flow" {
-  if (block.type === "trigger") {
-    return "trigger";
-  }
-
-  if (block.type === "component" && block.name && FLOW_COMPONENT_NAMES.has(block.name)) {
-    return "flow";
-  }
-
-  // Default to "action" for components and blueprints
-  return "action";
 }
 
 // Build categories of building blocks from live data
@@ -51,9 +29,8 @@ export function buildBuildingBlockCategories(
         configuration: t.configuration,
         icon: t.icon,
         color: t.color,
-        exampleData: t.exampleData,
       };
-      block.componentSubtype = getComponentSubtype(block);
+
       return block;
     }),
     ...filteredComponents.map((c): BuildingBlock => {
@@ -66,9 +43,8 @@ export function buildBuildingBlockCategories(
         configuration: c.configuration,
         icon: c.icon,
         color: c.color,
-        exampleOutput: c.exampleOutput,
       };
-      block.componentSubtype = getComponentSubtype(block);
+
       return block;
     }),
   ];
@@ -96,9 +72,8 @@ export function buildBuildingBlockCategories(
           icon: t.icon,
           color: t.color,
           integrationName: integration.name,
-          exampleData: t.exampleData,
         };
-        block.componentSubtype = getComponentSubtype(block);
+
         blocks.push(block);
       });
     }
@@ -116,9 +91,8 @@ export function buildBuildingBlockCategories(
           icon: c.icon,
           color: c.color,
           integrationName: integration.name,
-          exampleOutput: c.exampleOutput,
         };
-        block.componentSubtype = getComponentSubtype(block);
+
         blocks.push(block);
       });
     }

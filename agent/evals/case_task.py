@@ -17,6 +17,7 @@ from ai.jsonutil import to_jsonable
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from evals.case_logger import CaseLogger
 from evals.case_names import eval_case_name
+from evals.run_tool_registry import record_tool_call
 
 
 def build_case_name_index(
@@ -79,6 +80,8 @@ def build_case_task(
                 user_prompt=build_prompt(payload),
                 deps=deps,
             ):
+                if isinstance(event, FunctionToolCallEvent):
+                    record_tool_call(question, event.part.tool_name)
                 for event_line in _event_lines(event):
                     await case_logger.log_case(case_name, event_line)
                 if isinstance(event, AgentRunResultEvent):
