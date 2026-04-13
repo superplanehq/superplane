@@ -104,6 +104,7 @@ Class | Method | HTTP request | Description
 *CanvasVersionApi* | [**canvases_list_canvas_versions**](superplaneapi/docs/CanvasVersionApi.md#canvases_list_canvas_versions) | **GET** /api/v1/canvases/{canvasId}/versions | List canvas versions
 *CanvasVersionApi* | [**canvases_update_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version) | **PUT** /api/v1/canvases/{canvasId}/versions/{versionId} | Update canvas version
 *CanvasVersionApi* | [**canvases_update_canvas_version2**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version2) | **PUT** /api/v1/canvases/{canvasId}/versions | Update canvas version
+*CanvasVersionApi* | [**canvases_update_canvas_version_through_ops**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version_through_ops) | **PATCH** /api/v1/canvases/{canvasId}/versions/{versionId} | Update canvas version through specific operations
 *ComponentApi* | [**components_describe_component**](superplaneapi/docs/ComponentApi.md#components_describe_component) | **GET** /api/v1/components/{name} | Describe component
 *ComponentApi* | [**components_list_component_actions**](superplaneapi/docs/ComponentApi.md#components_list_component_actions) | **GET** /api/v1/components/{name}/actions | List component actions
 *ComponentApi* | [**components_list_components**](superplaneapi/docs/ComponentApi.md#components_list_components) | **GET** /api/v1/components | List components
@@ -215,6 +216,9 @@ Class | Method | HTTP request | Description
  - [CanvasesCanvasNodeQueueItem](superplaneapi/docs/CanvasesCanvasNodeQueueItem.md)
  - [CanvasesCanvasSpec](superplaneapi/docs/CanvasesCanvasSpec.md)
  - [CanvasesCanvasStatus](superplaneapi/docs/CanvasesCanvasStatus.md)
+ - [CanvasesCanvasUpdateOperation](superplaneapi/docs/CanvasesCanvasUpdateOperation.md)
+ - [CanvasesCanvasUpdateOperationNode](superplaneapi/docs/CanvasesCanvasUpdateOperationNode.md)
+ - [CanvasesCanvasUpdateOperationType](superplaneapi/docs/CanvasesCanvasUpdateOperationType.md)
  - [CanvasesCanvasVersion](superplaneapi/docs/CanvasesCanvasVersion.md)
  - [CanvasesCanvasVersionMetadata](superplaneapi/docs/CanvasesCanvasVersionMetadata.md)
  - [CanvasesCreateCanvasChangeRequestBody](superplaneapi/docs/CanvasesCreateCanvasChangeRequestBody.md)
@@ -247,6 +251,8 @@ Class | Method | HTTP request | Description
  - [CanvasesUpdateCanvasResponse](superplaneapi/docs/CanvasesUpdateCanvasResponse.md)
  - [CanvasesUpdateCanvasVersionBody](superplaneapi/docs/CanvasesUpdateCanvasVersionBody.md)
  - [CanvasesUpdateCanvasVersionResponse](superplaneapi/docs/CanvasesUpdateCanvasVersionResponse.md)
+ - [CanvasesUpdateCanvasVersionThroughOpsBody](superplaneapi/docs/CanvasesUpdateCanvasVersionThroughOpsBody.md)
+ - [CanvasesUpdateCanvasVersionThroughOpsResponse](superplaneapi/docs/CanvasesUpdateCanvasVersionThroughOpsResponse.md)
  - [CanvasesUpdateNodePauseBody](superplaneapi/docs/CanvasesUpdateNodePauseBody.md)
  - [CanvasesUpdateNodePauseResponse](superplaneapi/docs/CanvasesUpdateNodePauseResponse.md)
  - [ComponentsComponent](superplaneapi/docs/ComponentsComponent.md)
@@ -256,7 +262,6 @@ Class | Method | HTTP request | Description
  - [ComponentsIntegrationRef](superplaneapi/docs/ComponentsIntegrationRef.md)
  - [ComponentsListComponentActionsResponse](superplaneapi/docs/ComponentsListComponentActionsResponse.md)
  - [ComponentsListComponentsResponse](superplaneapi/docs/ComponentsListComponentsResponse.md)
- - [ComponentsNode](superplaneapi/docs/ComponentsNode.md)
  - [ComponentsNodeType](superplaneapi/docs/ComponentsNodeType.md)
  - [ComponentsPosition](superplaneapi/docs/ComponentsPosition.md)
  - [ConfigurationAnyPredicateListTypeOptions](superplaneapi/docs/ConfigurationAnyPredicateListTypeOptions.md)
@@ -378,6 +383,7 @@ Class | Method | HTTP request | Description
  - [SuperplaneBlueprintsOutputChannel](superplaneapi/docs/SuperplaneBlueprintsOutputChannel.md)
  - [SuperplaneBlueprintsUserRef](superplaneapi/docs/SuperplaneBlueprintsUserRef.md)
  - [SuperplaneCanvasesUserRef](superplaneapi/docs/SuperplaneCanvasesUserRef.md)
+ - [SuperplaneComponentsNode](superplaneapi/docs/SuperplaneComponentsNode.md)
  - [SuperplaneComponentsOutputChannel](superplaneapi/docs/SuperplaneComponentsOutputChannel.md)
  - [SuperplaneIntegrationsListIntegrationsResponse](superplaneapi/docs/SuperplaneIntegrationsListIntegrationsResponse.md)
  - [SuperplaneMeUser](superplaneapi/docs/SuperplaneMeUser.md)

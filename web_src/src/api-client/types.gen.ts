@@ -78,7 +78,7 @@ export type BlueprintsBlueprint = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
-  nodes?: Array<ComponentsNode>;
+  nodes?: Array<SuperplaneComponentsNode>;
   edges?: Array<ComponentsEdge>;
   configuration?: Array<ConfigurationField>;
   outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
@@ -318,7 +318,7 @@ export type CanvasesCanvasNodeQueueItem = {
 };
 
 export type CanvasesCanvasSpec = {
-  nodes?: Array<ComponentsNode>;
+  nodes?: Array<SuperplaneComponentsNode>;
   edges?: Array<ComponentsEdge>;
 };
 
@@ -326,6 +326,29 @@ export type CanvasesCanvasStatus = {
   lastExecutions?: Array<CanvasesCanvasNodeExecution>;
   lastEvents?: Array<CanvasesCanvasEvent>;
 };
+
+export type CanvasesCanvasUpdateOperation = {
+  type?: CanvasesCanvasUpdateOperationType;
+  target?: CanvasesCanvasUpdateOperationNode;
+  source?: CanvasesCanvasUpdateOperationNode;
+};
+
+export type CanvasesCanvasUpdateOperationNode = {
+  id?: string;
+  name?: string;
+  block?: string;
+  configuration?: {
+    [key: string]: unknown;
+  };
+  channel?: string;
+};
+
+export type CanvasesCanvasUpdateOperationType =
+  | "ADD_NODE"
+  | "DELETE_NODE"
+  | "UPDATE_NODE"
+  | "CONNECT_NODES"
+  | "DISCONNECT_NODES";
 
 export type CanvasesCanvasVersion = {
   metadata?: CanvasesCanvasVersionMetadata;
@@ -527,12 +550,20 @@ export type CanvasesUpdateCanvasVersionResponse = {
   version?: CanvasesCanvasVersion;
 };
 
+export type CanvasesUpdateCanvasVersionThroughOpsBody = {
+  operations?: Array<CanvasesCanvasUpdateOperation>;
+};
+
+export type CanvasesUpdateCanvasVersionThroughOpsResponse = {
+  version?: CanvasesCanvasVersion;
+};
+
 export type CanvasesUpdateNodePauseBody = {
   paused?: boolean;
 };
 
 export type CanvasesUpdateNodePauseResponse = {
-  node?: ComponentsNode;
+  node?: SuperplaneComponentsNode;
 };
 
 export type ComponentsComponent = {
@@ -575,28 +606,6 @@ export type ComponentsListComponentActionsResponse = {
 
 export type ComponentsListComponentsResponse = {
   components?: Array<ComponentsComponent>;
-};
-
-export type ComponentsNode = {
-  id?: string;
-  name?: string;
-  type?: ComponentsNodeType;
-  configuration?: {
-    [key: string]: unknown;
-  };
-  metadata?: {
-    [key: string]: unknown;
-  };
-  position?: ComponentsPosition;
-  component?: NodeComponentRef;
-  blueprint?: NodeBlueprintRef;
-  trigger?: NodeTriggerRef;
-  widget?: NodeWidgetRef;
-  isCollapsed?: boolean;
-  integration?: ComponentsIntegrationRef;
-  errorMessage?: string;
-  warningMessage?: string;
-  paused?: boolean;
 };
 
 export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";
@@ -1299,6 +1308,28 @@ export type SuperplaneBlueprintsUserRef = {
 export type SuperplaneCanvasesUserRef = {
   id?: string;
   name?: string;
+};
+
+export type SuperplaneComponentsNode = {
+  id?: string;
+  name?: string;
+  type?: ComponentsNodeType;
+  configuration?: {
+    [key: string]: unknown;
+  };
+  metadata?: {
+    [key: string]: unknown;
+  };
+  position?: ComponentsPosition;
+  component?: NodeComponentRef;
+  blueprint?: NodeBlueprintRef;
+  trigger?: NodeTriggerRef;
+  widget?: NodeWidgetRef;
+  isCollapsed?: boolean;
+  integration?: ComponentsIntegrationRef;
+  errorMessage?: string;
+  warningMessage?: string;
+  paused?: boolean;
 };
 
 export type SuperplaneComponentsOutputChannel = {
@@ -2481,6 +2512,36 @@ export type CanvasesDescribeCanvasVersionResponses = {
 
 export type CanvasesDescribeCanvasVersionResponse2 =
   CanvasesDescribeCanvasVersionResponses[keyof CanvasesDescribeCanvasVersionResponses];
+
+export type CanvasesUpdateCanvasVersionThroughOpsData = {
+  body: CanvasesUpdateCanvasVersionThroughOpsBody;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+};
+
+export type CanvasesUpdateCanvasVersionThroughOpsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesUpdateCanvasVersionThroughOpsError =
+  CanvasesUpdateCanvasVersionThroughOpsErrors[keyof CanvasesUpdateCanvasVersionThroughOpsErrors];
+
+export type CanvasesUpdateCanvasVersionThroughOpsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesUpdateCanvasVersionThroughOpsResponse;
+};
+
+export type CanvasesUpdateCanvasVersionThroughOpsResponse2 =
+  CanvasesUpdateCanvasVersionThroughOpsResponses[keyof CanvasesUpdateCanvasVersionThroughOpsResponses];
 
 export type CanvasesUpdateCanvasVersionData = {
   body: CanvasesUpdateCanvasVersionBody;

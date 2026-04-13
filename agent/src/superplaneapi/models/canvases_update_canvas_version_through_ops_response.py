@@ -20,16 +20,16 @@ import json
 
 from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.superplane_components_node import SuperplaneComponentsNode
+from superplaneapi.models.canvases_canvas_version import CanvasesCanvasVersion
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesUpdateNodePauseResponse(BaseModel):
+class CanvasesUpdateCanvasVersionThroughOpsResponse(BaseModel):
     """
-    CanvasesUpdateNodePauseResponse
+    CanvasesUpdateCanvasVersionThroughOpsResponse
     """ # noqa: E501
-    node: Optional[SuperplaneComponentsNode] = None
-    __properties: ClassVar[List[str]] = ["node"]
+    version: Optional[CanvasesCanvasVersion] = None
+    __properties: ClassVar[List[str]] = ["version"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +49,7 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesUpdateNodePauseResponse from a JSON string"""
+        """Create an instance of CanvasesUpdateCanvasVersionThroughOpsResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,14 +70,14 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of node
-        if self.node:
-            _dict['node'] = self.node.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of version
+        if self.version:
+            _dict['version'] = self.version.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesUpdateNodePauseResponse from a dict"""
+        """Create an instance of CanvasesUpdateCanvasVersionThroughOpsResponse from a dict"""
         if obj is None:
             return None
 
@@ -85,7 +85,7 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "node": SuperplaneComponentsNode.from_dict(obj["node"]) if obj.get("node") is not None else None
+            "version": CanvasesCanvasVersion.from_dict(obj["version"]) if obj.get("version") is not None else None
         })
         return _obj
 

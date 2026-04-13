@@ -120,6 +120,9 @@ import type {
   CanvasesUpdateCanvasVersionData,
   CanvasesUpdateCanvasVersionErrors,
   CanvasesUpdateCanvasVersionResponses,
+  CanvasesUpdateCanvasVersionThroughOpsData,
+  CanvasesUpdateCanvasVersionThroughOpsErrors,
+  CanvasesUpdateCanvasVersionThroughOpsResponses,
   CanvasesUpdateNodePauseData,
   CanvasesUpdateNodePauseErrors,
   CanvasesUpdateNodePauseResponses,
@@ -898,6 +901,27 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
     CanvasesDescribeCanvasVersionErrors,
     ThrowOnError
   >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
+
+/**
+ * Update canvas version through specific operations
+ *
+ * Update canvas version through specific operations
+ */
+export const canvasesUpdateCanvasVersionThroughOps = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesUpdateCanvasVersionThroughOpsData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesUpdateCanvasVersionThroughOpsResponses,
+    CanvasesUpdateCanvasVersionThroughOpsErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/{versionId}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * Update canvas version

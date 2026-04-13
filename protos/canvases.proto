@@ -123,6 +123,18 @@ service Canvases {
     };
   }
 
+  rpc UpdateCanvasVersionThroughOps(UpdateCanvasVersionThroughOpsRequest) returns (UpdateCanvasVersionThroughOpsResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas version through specific operations";
+      description: "Update canvas version through specific operations";
+      tags: "CanvasVersion";
+    };
+  }
+
   rpc CreateCanvasChangeRequest(CreateCanvasChangeRequestRequest) returns (CreateCanvasChangeRequestResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/change-requests"
@@ -458,6 +470,16 @@ message UpdateCanvasVersionRequest {
 }
 
 message UpdateCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message UpdateCanvasVersionThroughOpsRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  repeated CanvasUpdateOperation operations = 3;
+}
+
+message UpdateCanvasVersionThroughOpsResponse {
   CanvasVersion version = 1;
 }
 
@@ -911,8 +933,9 @@ message CanvasUpdateOperation {
   message Node {
     string id = 1;
     string name = 2;
-    string channel = 3;
+    string block = 3;
     google.protobuf.Struct configuration = 4;
+    string channel = 5;
   }
 
   Type type = 1;

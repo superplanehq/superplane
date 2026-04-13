@@ -37,14 +37,25 @@ func NewDiffer(currentNodes []models.Node, currentEdges []models.Edge, proposedN
 func (d *Differ) Diff() ([]*pb.CanvasUpdateOperation, error) {
 	operations := []*pb.CanvasUpdateOperation{}
 	operations = append(operations, d.computeDeleteNodeOperations()...)
-	operations = append(operations, d.computeAddNodeOperations()...)
-	operations = append(operations, d.computeUpdateNodeOperations()...)
+	addNodeOperations, err := d.computeAddNodeOperations()
+	if err != nil {
+		return nil, err
+	}
+
+	operations = append(operations, addNodeOperations...)
+
+	updateNodeOperations, err := d.computeUpdateNodeOperations()
+	if err != nil {
+		return nil, err
+	}
+
+	operations = append(operations, updateNodeOperations...)
 	operations = append(operations, d.computeDisconnectNodeOperations()...)
 	operations = append(operations, d.computeConnectNodeOperations()...)
 	return operations, nil
 }
 
-func (d *Differ) computeAddNodeOperations() []*pb.CanvasUpdateOperation {
+func (d *Differ) computeAddNodeOperations() ([]*pb.CanvasUpdateOperation, error) {
 	operations := []*pb.CanvasUpdateOperation{}
 
 	//
@@ -58,7 +69,7 @@ func (d *Differ) computeAddNodeOperations() []*pb.CanvasUpdateOperation {
 
 		target, err := nodeToOperationNode(node)
 		if err != nil {
-			continue
+			return nil, err
 		}
 
 		operations = append(operations, &pb.CanvasUpdateOperation{
@@ -71,7 +82,7 @@ func (d *Differ) computeAddNodeOperations() []*pb.CanvasUpdateOperation {
 		//
 	}
 
-	return operations
+	return operations, nil
 }
 
 func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasUpdateOperation {
@@ -97,7 +108,7 @@ func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasUpdateOperation {
 	return operations
 }
 
-func (d *Differ) computeUpdateNodeOperations() []*pb.CanvasUpdateOperation {
+func (d *Differ) computeUpdateNodeOperations() ([]*pb.CanvasUpdateOperation, error) {
 	operations := []*pb.CanvasUpdateOperation{}
 
 	//
@@ -116,7 +127,7 @@ func (d *Differ) computeUpdateNodeOperations() []*pb.CanvasUpdateOperation {
 
 		target, err := nodeToOperationNode(node)
 		if err != nil {
-			continue
+			return nil, err
 		}
 
 		operations = append(operations, &pb.CanvasUpdateOperation{
@@ -125,7 +136,7 @@ func (d *Differ) computeUpdateNodeOperations() []*pb.CanvasUpdateOperation {
 		})
 	}
 
-	return operations
+	return operations, nil
 }
 
 func (d *Differ) computeDisconnectNodeOperations() []*pb.CanvasUpdateOperation {
@@ -200,6 +211,26 @@ func (d *Differ) nodeUpdated(currentNode models.Node, proposedNode models.Node) 
 	return !reflect.DeepEqual(currentNode.Configuration, proposedNode.Configuration)
 }
 
+func blockNameFromNode(node models.Node) string {
+	if node.Ref.Component != nil && node.Ref.Component.Name != "" {
+		return node.Ref.Component.Name
+	}
+
+	if node.Ref.Trigger != nil && node.Ref.Trigger.Name != "" {
+		return node.Ref.Trigger.Name
+	}
+
+	if node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "" {
+		return node.Ref.Blueprint.ID
+	}
+
+	if node.Ref.Widget != nil && node.Ref.Widget.Name != "" {
+		return node.Ref.Widget.Name
+	}
+
+	return ""
+}
+
 func nodeToOperationNode(node models.Node) (*pb.CanvasUpdateOperation_Node, error) {
 	n := &pb.CanvasUpdateOperation_Node{
 		Id:   node.ID,
@@ -215,6 +246,12 @@ func nodeToOperationNode(node models.Node) (*pb.CanvasUpdateOperation_Node, erro
 		n.Configuration = configuration
 	}
 
+	blockName := blockNameFromNode(node)
+	if blockName == "" {
+		return nil, fmt.Errorf("block name is required for node %s", node.ID)
+	}
+
+	n.Block = blockName
 	return n, nil
 }
 

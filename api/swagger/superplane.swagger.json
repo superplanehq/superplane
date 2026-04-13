@@ -1610,6 +1610,50 @@
         "tags": [
           "CanvasVersion"
         ]
+      },
+      "patch": {
+        "summary": "Update canvas version through specific operations",
+        "description": "Update canvas version through specific operations",
+        "operationId": "Canvases_UpdateCanvasVersionThroughOps",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionThroughOpsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasVersionThroughOpsBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
       }
     },
     "/api/v1/canvases/{id}": {
@@ -4160,7 +4204,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
+            "$ref": "#/definitions/SuperplaneComponentsNode"
           }
         },
         "edges": {
@@ -4748,7 +4792,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
+            "$ref": "#/definitions/SuperplaneComponentsNode"
           }
         },
         "edges": {
@@ -4778,6 +4822,51 @@
           }
         }
       }
+    },
+    "CanvasesCanvasUpdateOperation": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/CanvasesCanvasUpdateOperationType"
+        },
+        "target": {
+          "$ref": "#/definitions/CanvasesCanvasUpdateOperationNode"
+        },
+        "source": {
+          "$ref": "#/definitions/CanvasesCanvasUpdateOperationNode"
+        }
+      }
+    },
+    "CanvasesCanvasUpdateOperationNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "block": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "channel": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesCanvasUpdateOperationType": {
+      "type": "string",
+      "enum": [
+        "ADD_NODE",
+        "DELETE_NODE",
+        "UPDATE_NODE",
+        "CONNECT_NODES",
+        "DISCONNECT_NODES"
+      ],
+      "default": "ADD_NODE"
     },
     "CanvasesCanvasVersion": {
       "type": "object",
@@ -5222,6 +5311,26 @@
         }
       }
     },
+    "CanvasesUpdateCanvasVersionThroughOpsBody": {
+      "type": "object",
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasUpdateOperation"
+          }
+        }
+      }
+    },
+    "CanvasesUpdateCanvasVersionThroughOpsResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        }
+      }
+    },
     "CanvasesUpdateNodePauseBody": {
       "type": "object",
       "properties": {
@@ -5234,7 +5343,7 @@
       "type": "object",
       "properties": {
         "node": {
-          "$ref": "#/definitions/ComponentsNode"
+          "$ref": "#/definitions/SuperplaneComponentsNode"
         }
       }
     },
@@ -5347,56 +5456,6 @@
             "type": "object",
             "$ref": "#/definitions/ComponentsComponent"
           }
-        }
-      }
-    },
-    "ComponentsNode": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "type": {
-          "$ref": "#/definitions/ComponentsNodeType"
-        },
-        "configuration": {
-          "type": "object"
-        },
-        "metadata": {
-          "type": "object"
-        },
-        "position": {
-          "$ref": "#/definitions/ComponentsPosition"
-        },
-        "component": {
-          "$ref": "#/definitions/NodeComponentRef"
-        },
-        "blueprint": {
-          "$ref": "#/definitions/NodeBlueprintRef"
-        },
-        "trigger": {
-          "$ref": "#/definitions/NodeTriggerRef"
-        },
-        "widget": {
-          "$ref": "#/definitions/NodeWidgetRef"
-        },
-        "isCollapsed": {
-          "type": "boolean"
-        },
-        "integration": {
-          "$ref": "#/definitions/ComponentsIntegrationRef"
-        },
-        "errorMessage": {
-          "type": "string"
-        },
-        "warningMessage": {
-          "type": "string"
-        },
-        "paused": {
-          "type": "boolean"
         }
       }
     },
@@ -7029,6 +7088,56 @@
         },
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "SuperplaneComponentsNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/ComponentsNodeType"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "position": {
+          "$ref": "#/definitions/ComponentsPosition"
+        },
+        "component": {
+          "$ref": "#/definitions/NodeComponentRef"
+        },
+        "blueprint": {
+          "$ref": "#/definitions/NodeBlueprintRef"
+        },
+        "trigger": {
+          "$ref": "#/definitions/NodeTriggerRef"
+        },
+        "widget": {
+          "$ref": "#/definitions/NodeWidgetRef"
+        },
+        "isCollapsed": {
+          "type": "boolean"
+        },
+        "integration": {
+          "$ref": "#/definitions/ComponentsIntegrationRef"
+        },
+        "errorMessage": {
+          "type": "string"
+        },
+        "warningMessage": {
+          "type": "string"
+        },
+        "paused": {
+          "type": "boolean"
         }
       }
     },

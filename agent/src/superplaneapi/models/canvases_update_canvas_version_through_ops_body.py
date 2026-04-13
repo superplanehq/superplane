@@ -20,16 +20,16 @@ import json
 
 from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.superplane_components_node import SuperplaneComponentsNode
+from superplaneapi.models.canvases_canvas_update_operation import CanvasesCanvasUpdateOperation
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesUpdateNodePauseResponse(BaseModel):
+class CanvasesUpdateCanvasVersionThroughOpsBody(BaseModel):
     """
-    CanvasesUpdateNodePauseResponse
+    CanvasesUpdateCanvasVersionThroughOpsBody
     """ # noqa: E501
-    node: Optional[SuperplaneComponentsNode] = None
-    __properties: ClassVar[List[str]] = ["node"]
+    operations: Optional[List[CanvasesCanvasUpdateOperation]] = None
+    __properties: ClassVar[List[str]] = ["operations"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +49,7 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesUpdateNodePauseResponse from a JSON string"""
+        """Create an instance of CanvasesUpdateCanvasVersionThroughOpsBody from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,14 +70,18 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of node
-        if self.node:
-            _dict['node'] = self.node.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in operations (list)
+        _items = []
+        if self.operations:
+            for _item_operations in self.operations:
+                if _item_operations:
+                    _items.append(_item_operations.to_dict())
+            _dict['operations'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesUpdateNodePauseResponse from a dict"""
+        """Create an instance of CanvasesUpdateCanvasVersionThroughOpsBody from a dict"""
         if obj is None:
             return None
 
@@ -85,7 +89,7 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "node": SuperplaneComponentsNode.from_dict(obj["node"]) if obj.get("node") is not None else None
+            "operations": [CanvasesCanvasUpdateOperation.from_dict(_item) for _item in obj["operations"]] if obj.get("operations") is not None else None
         })
         return _obj
 
