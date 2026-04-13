@@ -386,6 +386,12 @@ func parseAnnotationTime(s string) (time.Time, error) {
 		return time.UnixMilli(ms).UTC(), nil
 	}
 
+	for _, format := range []string{"2006-01-02T15:04:05", grafanaDateTimeFormat} {
+		if _, err := time.Parse(format, trimmed); err == nil {
+			return time.Time{}, errors.New("timezone is required for datetime-local values")
+		}
+	}
+
 	if t, ok, err := parseGrafanaQueryTime(trimmed, nil); err != nil {
 		return time.Time{}, err
 	} else if ok {

@@ -27,12 +27,93 @@ export interface OnAlertFiringConfiguration {
 }
 
 export interface QueryDataSourceConfiguration {
-  dataSourceUid: string;
+  dataSource: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
-  timezone?: string;
   format?: string;
+}
+
+export interface GrafanaAlertRule {
+  uid?: string;
+  title?: string;
+  folderUID?: string;
+  folderTitle?: string;
+  ruleGroup?: string;
+  condition?: string;
+  noDataState?: string;
+  execErrState?: string;
+  for?: string;
+  isPaused?: boolean;
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
+  data?: Array<Record<string, unknown>>;
+}
+
+export interface GrafanaAlertRuleSummary {
+  uid?: string;
+  title?: string;
+}
+
+export interface AlertRuleKeyValuePair {
+  key?: string;
+  value?: string;
+}
+
+export interface AlertRuleNodeMetadata {
+  alertRuleTitle?: string;
+  folderTitle?: string;
+}
+
+export interface CreateAlertRuleConfiguration {
+  title?: string;
+  folder?: string;
+  ruleGroup?: string;
+  dataSource?: string;
+  query?: string;
+  lookbackSeconds?: number;
+  reducer?: string;
+  conditionType?: string;
+  threshold?: number;
+  threshold2?: number;
+  notificationReceiver?: string;
+  for?: string;
+  noDataState?: string;
+  execErrState?: string;
+  labels?: AlertRuleKeyValuePair[];
+  annotations?: AlertRuleKeyValuePair[];
+  isPaused?: boolean;
+}
+
+export interface GetAlertRuleConfiguration {
+  alertRule: string;
+}
+
+export interface UpdateAlertRuleConfiguration extends CreateAlertRuleConfiguration {
+  alertRule: string;
+}
+
+export interface DeleteAlertRuleConfiguration {
+  alertRule: string;
+}
+
+export interface DeleteAlertRuleOutput {
+  uid?: string;
+  title?: string;
+  deleted?: boolean;
+}
+
+export interface ListAlertRulesConfiguration {
+  folder?: string;
+  group?: string;
+}
+
+export interface ListAlertRulesNodeMetadata {
+  folderTitle?: string;
+}
+
+export interface ListAlertRulesOutput {
+  alertRules?: GrafanaAlertRuleSummary[];
 }
 
 export interface Annotation {
