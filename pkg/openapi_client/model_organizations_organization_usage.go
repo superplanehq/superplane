@@ -21,11 +21,15 @@ var _ MappedNullable = &OrganizationsOrganizationUsage{}
 
 // OrganizationsOrganizationUsage struct for OrganizationsOrganizationUsage
 type OrganizationsOrganizationUsage struct {
-	Canvases                  *int32     `json:"canvases,omitempty"`
-	EventBucketLevel          *float64   `json:"eventBucketLevel,omitempty"`
-	EventBucketCapacity       *float64   `json:"eventBucketCapacity,omitempty"`
-	EventBucketLastUpdatedAt  *time.Time `json:"eventBucketLastUpdatedAt,omitempty"`
-	NextEventBucketDecreaseAt *time.Time `json:"nextEventBucketDecreaseAt,omitempty"`
+	Canvases                       *int32     `json:"canvases,omitempty"`
+	EventBucketLevel               *float64   `json:"eventBucketLevel,omitempty"`
+	EventBucketCapacity            *float64   `json:"eventBucketCapacity,omitempty"`
+	EventBucketLastUpdatedAt       *time.Time `json:"eventBucketLastUpdatedAt,omitempty"`
+	NextEventBucketDecreaseAt      *time.Time `json:"nextEventBucketDecreaseAt,omitempty"`
+	AgentTokenBucketLevel          *float64   `json:"agentTokenBucketLevel,omitempty"`
+	AgentTokenBucketCapacity       *float64   `json:"agentTokenBucketCapacity,omitempty"`
+	AgentTokenBucketLastUpdatedAt  *time.Time `json:"agentTokenBucketLastUpdatedAt,omitempty"`
+	NextAgentTokenBucketDecreaseAt *time.Time `json:"nextAgentTokenBucketDecreaseAt,omitempty"`
 }
 
 // NewOrganizationsOrganizationUsage instantiates a new OrganizationsOrganizationUsage object
@@ -205,6 +209,134 @@ func (o *OrganizationsOrganizationUsage) SetNextEventBucketDecreaseAt(v time.Tim
 	o.NextEventBucketDecreaseAt = &v
 }
 
+// GetAgentTokenBucketLevel returns the AgentTokenBucketLevel field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationUsage) GetAgentTokenBucketLevel() float64 {
+	if o == nil || IsNil(o.AgentTokenBucketLevel) {
+		var ret float64
+		return ret
+	}
+	return *o.AgentTokenBucketLevel
+}
+
+// GetAgentTokenBucketLevelOk returns a tuple with the AgentTokenBucketLevel field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationUsage) GetAgentTokenBucketLevelOk() (*float64, bool) {
+	if o == nil || IsNil(o.AgentTokenBucketLevel) {
+		return nil, false
+	}
+	return o.AgentTokenBucketLevel, true
+}
+
+// HasAgentTokenBucketLevel returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationUsage) HasAgentTokenBucketLevel() bool {
+	if o != nil && !IsNil(o.AgentTokenBucketLevel) {
+		return true
+	}
+
+	return false
+}
+
+// SetAgentTokenBucketLevel gets a reference to the given float64 and assigns it to the AgentTokenBucketLevel field.
+func (o *OrganizationsOrganizationUsage) SetAgentTokenBucketLevel(v float64) {
+	o.AgentTokenBucketLevel = &v
+}
+
+// GetAgentTokenBucketCapacity returns the AgentTokenBucketCapacity field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationUsage) GetAgentTokenBucketCapacity() float64 {
+	if o == nil || IsNil(o.AgentTokenBucketCapacity) {
+		var ret float64
+		return ret
+	}
+	return *o.AgentTokenBucketCapacity
+}
+
+// GetAgentTokenBucketCapacityOk returns a tuple with the AgentTokenBucketCapacity field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationUsage) GetAgentTokenBucketCapacityOk() (*float64, bool) {
+	if o == nil || IsNil(o.AgentTokenBucketCapacity) {
+		return nil, false
+	}
+	return o.AgentTokenBucketCapacity, true
+}
+
+// HasAgentTokenBucketCapacity returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationUsage) HasAgentTokenBucketCapacity() bool {
+	if o != nil && !IsNil(o.AgentTokenBucketCapacity) {
+		return true
+	}
+
+	return false
+}
+
+// SetAgentTokenBucketCapacity gets a reference to the given float64 and assigns it to the AgentTokenBucketCapacity field.
+func (o *OrganizationsOrganizationUsage) SetAgentTokenBucketCapacity(v float64) {
+	o.AgentTokenBucketCapacity = &v
+}
+
+// GetAgentTokenBucketLastUpdatedAt returns the AgentTokenBucketLastUpdatedAt field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationUsage) GetAgentTokenBucketLastUpdatedAt() time.Time {
+	if o == nil || IsNil(o.AgentTokenBucketLastUpdatedAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.AgentTokenBucketLastUpdatedAt
+}
+
+// GetAgentTokenBucketLastUpdatedAtOk returns a tuple with the AgentTokenBucketLastUpdatedAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationUsage) GetAgentTokenBucketLastUpdatedAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.AgentTokenBucketLastUpdatedAt) {
+		return nil, false
+	}
+	return o.AgentTokenBucketLastUpdatedAt, true
+}
+
+// HasAgentTokenBucketLastUpdatedAt returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationUsage) HasAgentTokenBucketLastUpdatedAt() bool {
+	if o != nil && !IsNil(o.AgentTokenBucketLastUpdatedAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetAgentTokenBucketLastUpdatedAt gets a reference to the given time.Time and assigns it to the AgentTokenBucketLastUpdatedAt field.
+func (o *OrganizationsOrganizationUsage) SetAgentTokenBucketLastUpdatedAt(v time.Time) {
+	o.AgentTokenBucketLastUpdatedAt = &v
+}
+
+// GetNextAgentTokenBucketDecreaseAt returns the NextAgentTokenBucketDecreaseAt field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationUsage) GetNextAgentTokenBucketDecreaseAt() time.Time {
+	if o == nil || IsNil(o.NextAgentTokenBucketDecreaseAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.NextAgentTokenBucketDecreaseAt
+}
+
+// GetNextAgentTokenBucketDecreaseAtOk returns a tuple with the NextAgentTokenBucketDecreaseAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationUsage) GetNextAgentTokenBucketDecreaseAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.NextAgentTokenBucketDecreaseAt) {
+		return nil, false
+	}
+	return o.NextAgentTokenBucketDecreaseAt, true
+}
+
+// HasNextAgentTokenBucketDecreaseAt returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationUsage) HasNextAgentTokenBucketDecreaseAt() bool {
+	if o != nil && !IsNil(o.NextAgentTokenBucketDecreaseAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetNextAgentTokenBucketDecreaseAt gets a reference to the given time.Time and assigns it to the NextAgentTokenBucketDecreaseAt field.
+func (o *OrganizationsOrganizationUsage) SetNextAgentTokenBucketDecreaseAt(v time.Time) {
+	o.NextAgentTokenBucketDecreaseAt = &v
+}
+
 func (o OrganizationsOrganizationUsage) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -229,6 +361,18 @@ func (o OrganizationsOrganizationUsage) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.NextEventBucketDecreaseAt) {
 		toSerialize["nextEventBucketDecreaseAt"] = o.NextEventBucketDecreaseAt
+	}
+	if !IsNil(o.AgentTokenBucketLevel) {
+		toSerialize["agentTokenBucketLevel"] = o.AgentTokenBucketLevel
+	}
+	if !IsNil(o.AgentTokenBucketCapacity) {
+		toSerialize["agentTokenBucketCapacity"] = o.AgentTokenBucketCapacity
+	}
+	if !IsNil(o.AgentTokenBucketLastUpdatedAt) {
+		toSerialize["agentTokenBucketLastUpdatedAt"] = o.AgentTokenBucketLastUpdatedAt
+	}
+	if !IsNil(o.NextAgentTokenBucketDecreaseAt) {
+		toSerialize["nextAgentTokenBucketDecreaseAt"] = o.NextAgentTokenBucketDecreaseAt
 	}
 	return toSerialize, nil
 }

@@ -1,8 +1,9 @@
 import type { CanvasesCanvas, ComponentsNode } from "@/api-client";
+import { DefaultLayoutEngine } from "@/lib/layout";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode/constants";
-import { estimateNodeSize } from "../autoLayout";
-import { buildChildToGroupMap, collectGroupChildIds, generateNodeId, generateUniqueNodeName } from "../utils";
+import { generateNodeId, generateUniqueNodeName } from "../utils";
+import { buildChildToGroupMap, collectGroupChildIds } from "@/lib/canvas/groups";
 
 const DEFAULT_GROUP_WIDTH = 480;
 const DEFAULT_GROUP_HEIGHT = 320;
@@ -196,7 +197,7 @@ function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[])
     found = true;
     const cx = child.position.x ?? 0;
     const cy = child.position.y ?? 0;
-    const { width, height } = estimateNodeSize(child);
+    const { width, height } = DefaultLayoutEngine.estimateNodeSize(child);
     if (cx + width > maxX) maxX = cx + width;
     if (cy + height > maxY) maxY = cy + height;
   }

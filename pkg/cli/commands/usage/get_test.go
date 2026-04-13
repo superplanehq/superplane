@@ -31,13 +31,17 @@ func TestGetCommandExecuteText(t *testing.T) {
 					"maxUsers": 25,
 					"retentionWindowDays": 30,
 					"maxEventsPerMonth": "100000",
-					"maxIntegrations": -1
+					"maxIntegrations": -1,
+					"maxAgentTokensPerMonth": "50000"
 				},
 				"usage": {
 					"canvases": 3,
 					"eventBucketLevel": 12,
 					"eventBucketCapacity": 100,
-					"eventBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
+					"eventBucketLastUpdatedAt": "2026-03-19T15:04:05Z",
+					"agentTokenBucketLevel": 500,
+					"agentTokenBucketCapacity": 10000,
+					"agentTokenBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
 				}
 			}`))
 		default:
@@ -56,8 +60,12 @@ func TestGetCommandExecuteText(t *testing.T) {
 	require.Contains(t, stdout.String(), "3")
 	require.Contains(t, stdout.String(), "Event bucket")
 	require.Contains(t, stdout.String(), "12 / 100")
+	require.Contains(t, stdout.String(), "Agent token bucket")
+	require.Contains(t, stdout.String(), "500 / 10000")
 	require.Contains(t, stdout.String(), "Max integrations")
 	require.Contains(t, stdout.String(), "unlimited")
+	require.Contains(t, stdout.String(), "Max agent tokens per month")
+	require.Contains(t, stdout.String(), "50000")
 }
 
 func TestGetCommandExecuteJSON(t *testing.T) {
@@ -104,13 +112,17 @@ func TestGetCommandExecuteJSONWithLimits(t *testing.T) {
 					"maxUsers": 25,
 					"retentionWindowDays": 30,
 					"maxEventsPerMonth": "100000",
-					"maxIntegrations": -1
+					"maxIntegrations": -1,
+					"maxAgentTokensPerMonth": "50000"
 				},
 				"usage": {
 					"canvases": 3,
 					"eventBucketLevel": 12,
 					"eventBucketCapacity": 100,
-					"eventBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
+					"eventBucketLastUpdatedAt": "2026-03-19T15:04:05Z",
+					"agentTokenBucketLevel": 500,
+					"agentTokenBucketCapacity": 10000,
+					"agentTokenBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
 				}
 			}`))
 		default:
@@ -129,6 +141,14 @@ func TestGetCommandExecuteJSONWithLimits(t *testing.T) {
 	// maxEventsPerMonth should be numeric, not a string
 	require.Contains(t, output, `"maxEventsPerMonth": 100000`)
 	require.NotContains(t, output, `"maxEventsPerMonth": "100000"`)
+
+	// maxAgentTokensPerMonth should be numeric, not a string
+	require.Contains(t, output, `"maxAgentTokensPerMonth": 50000`)
+	require.NotContains(t, output, `"maxAgentTokensPerMonth": "50000"`)
+
+	// agent token usage fields present
+	require.Contains(t, output, `"agentTokenBucketLevel": 500`)
+	require.Contains(t, output, `"agentTokenBucketCapacity": 10000`)
 
 	// other limits remain numeric
 	require.Contains(t, output, `"maxCanvases": 10`)
@@ -149,7 +169,8 @@ func TestGetCommandExecuteJSONUnlimitedSentinel(t *testing.T) {
 				"enabled": true,
 				"limits": {
 					"maxCanvases": -1,
-					"maxEventsPerMonth": "-1"
+					"maxEventsPerMonth": "-1",
+					"maxAgentTokensPerMonth": "-1"
 				}
 			}`))
 		default:
@@ -165,10 +186,12 @@ func TestGetCommandExecuteJSONUnlimitedSentinel(t *testing.T) {
 
 	output := stdout.String()
 
-	// Both sentinel values should be numeric -1
+	// All sentinel values should be numeric -1
 	require.Contains(t, output, `"maxCanvases": -1`)
 	require.Contains(t, output, `"maxEventsPerMonth": -1`)
 	require.NotContains(t, output, `"maxEventsPerMonth": "-1"`)
+	require.Contains(t, output, `"maxAgentTokensPerMonth": -1`)
+	require.NotContains(t, output, `"maxAgentTokensPerMonth": "-1"`)
 }
 
 func TestGetCommandExecuteRequiresOrganizationID(t *testing.T) {
