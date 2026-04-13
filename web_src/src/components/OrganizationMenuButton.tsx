@@ -32,12 +32,13 @@ interface OrganizationMenuButtonProps {
 export function OrganizationMenuButton({ organizationId, onLogoClick, className }: OrganizationMenuButtonProps) {
   const navigate = useNavigate();
   const { account } = useAccount();
-  const { data: organization } = useOrganization(organizationId || "");
+  // Only enable fetching when organizationId is available
+  const { data: organization } = useOrganization(organizationId || "", !!organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canReadOrg = permissionsLoading || canAct("org", "read");
   const { data: usageStatus, error: usageError } = useOrganizationUsage(
     organizationId || "",
-    !!organizationId && canReadOrg,
+    !!organizationId && canReadOrg && !!organizationId,
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
