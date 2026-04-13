@@ -37,18 +37,21 @@ class ListIntegrationResources:
     ) -> list[dict[str, Any]]:
         if not isinstance(integration_id, str) or not integration_id.strip():
             tool_debug("list_integration_resources skipped: empty integration_id")
-            return []
+            return [{"_hint": "integration_id is required. Do not retry — the user will configure this after applying changes."}]
         if not isinstance(type, str) or not type.strip():
             tool_debug(
                 "list_integration_resources skipped: empty type (resource type is required by API)"
             )
-            return []
+            return [{"_hint": "resource type is required. Check describe_component/describe_trigger for the correct type string. Do not guess — if unsure, skip this lookup."}]
         try:
-            return ctx.deps.client.list_integration_resources(
+            results = ctx.deps.client.list_integration_resources(
                 integration_id=integration_id,
                 type=type,
                 parameters=parameters,
             )
+            if not results:
+                return [{"_hint": f"No results for type '{type}'. Do not retry with different type names — the user will configure this field after applying changes."}]
+            return results
         except Exception as error:
             tool_debug(f"list_integration_resources failed: {error}")
             return [tool_error_entry("list_integration_resources", error)]
