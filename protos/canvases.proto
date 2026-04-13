@@ -899,6 +899,27 @@ message ResolveExecutionErrorsRequest {
 
 message ResolveExecutionErrorsResponse {}
 
+message CanvasUpdateOperation {
+  enum Type {
+    ADD_NODE = 0;
+    DELETE_NODE = 1;
+    UPDATE_NODE = 2;
+    CONNECT_NODES = 3;
+    DISCONNECT_NODES = 4;
+  }
+
+  message Node {
+    string id = 1;
+    string name = 2;
+    string channel = 3;
+    google.protobuf.Struct configuration = 4;
+  }
+
+  Type type = 1;
+  Node target = 2;
+  Node source = 3;
+}
+
 //
 // Standalone messages
 //
