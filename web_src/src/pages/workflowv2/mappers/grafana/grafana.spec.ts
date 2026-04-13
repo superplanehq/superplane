@@ -3,7 +3,13 @@ import { getDashboardMapper } from "./get_dashboard";
 import { renderPanelMapper } from "./render_panel";
 import { queryDataSourceMapper } from "./query_data_source";
 import { onAlertFiringTriggerRenderer } from "./on_alert_firing";
-import type { ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext, TriggerRendererContext } from "../types";
+import type {
+  ExecutionDetailsContext,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+  TriggerRendererContext,
+} from "../types";
 import type { EventInfo } from "../types";
 
 // ===== Test Helpers =====
@@ -108,6 +114,31 @@ describe("getDashboardMapper.getExecutionDetails", () => {
     expect(details.Panels).toBe("2 panels");
   });
 
+  it("prefers folder title over folder UID when both are present", () => {
+    const node = buildNode({ componentName: "getDashboard" });
+    const ctx: ExecutionDetailsContext = {
+      nodes: [node],
+      node,
+      execution: buildExecution({
+        outputs: {
+          default: [
+            {
+              type: "json",
+              timestamp: new Date().toISOString(),
+              data: {
+                title: "Prod",
+                folderTitle: "Platform",
+                folder: "fdg4m1rt63hj8q",
+              },
+            },
+          ],
+        },
+      }),
+    };
+
+    expect(getDashboardMapper.getExecutionDetails(ctx).Folder).toBe("Platform");
+  });
+
   it("returns 0 panels when panels array is absent", () => {
     const node = buildNode({ componentName: "getDashboard" });
     const ctx: ExecutionDetailsContext = {
@@ -187,7 +218,9 @@ describe("renderPanelMapper.getExecutionDetails", () => {
       node,
       execution: buildExecution({
         outputs: {
-          default: [{ type: "json", timestamp: new Date().toISOString(), data: { url: "http://grafana.local/render" } }],
+          default: [
+            { type: "json", timestamp: new Date().toISOString(), data: { url: "http://grafana.local/render" } },
+          ],
         },
       }),
     };
@@ -248,7 +281,12 @@ describe("queryDataSourceMapper.getExecutionDetails", () => {
                     frames: [
                       {
                         schema: { fields: [{ name: "time" }, { name: "value" }] },
-                        data: { values: [["t1", "t2"], [1, 2]] },
+                        data: {
+                          values: [
+                            ["t1", "t2"],
+                            [1, 2],
+                          ],
+                        },
                       },
                     ],
                   },
@@ -290,13 +328,19 @@ describe("onAlertFiringTriggerRenderer.getTitleAndSubtitle", () => {
   });
 
   it("uses event title field as alert name", () => {
-    const ctx = { event: { id: "e1", createdAt: new Date().toISOString(), data: { title: "High CPU", status: "firing" } } };
+    const ctx = {
+      event: { id: "e1", createdAt: new Date().toISOString(), data: { title: "High CPU", status: "firing" } },
+    };
     expect(onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("High CPU");
   });
 
   it("falls back to commonLabels.alertname", () => {
     const ctx = {
-      event: { id: "e1", createdAt: new Date().toISOString(), data: { commonLabels: { alertname: "DiskWarn" }, status: "firing" } },
+      event: {
+        id: "e1",
+        createdAt: new Date().toISOString(),
+        data: { commonLabels: { alertname: "DiskWarn" }, status: "firing" },
+      },
     };
     expect(onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("DiskWarn");
   });
