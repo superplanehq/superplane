@@ -1,7 +1,7 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { Copy, Download, ChevronDown, Palette, Plus, RotateCcw, Undo2, Pencil } from "lucide-react";
+import { Copy, Download, ChevronDown, Palette, Plus, RotateCcw, Pencil } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
@@ -27,8 +27,6 @@ interface HeaderProps {
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
-  onUndo?: () => void;
-  canUndo?: boolean;
   onLogoClick?: () => void;
   organizationId?: string;
   unsavedMessage?: string;
@@ -46,8 +44,6 @@ interface HeaderProps {
   onExportYamlDownload?: () => void;
   memoryItemCount?: number;
   mode?: HeaderMode;
-  /** When true, Revert is disabled while a canvas save is in flight or queued. */
-  canvasSaveInProgress?: boolean;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -60,8 +56,6 @@ export function Header({
   onSave,
   onPublishVersion,
   onDiscardVersion,
-  onUndo,
-  canUndo,
   onLogoClick,
   organizationId,
   unsavedMessage,
@@ -79,7 +73,6 @@ export function Header({
   onExportYamlDownload,
   memoryItemCount,
   mode = "default",
-  canvasSaveInProgress = false,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -388,12 +381,6 @@ export function Header({
                   <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                     {unsavedMessage}
                   </span>
-                ) : null}
-                {onUndo && canUndo ? (
-                  <Button onClick={onUndo} size="sm" variant="outline" disabled={canvasSaveInProgress}>
-                    <Undo2 />
-                    Revert
-                  </Button>
                 ) : null}
                 {onSave && !saveButtonHidden
                   ? wrapWithTooltip(
