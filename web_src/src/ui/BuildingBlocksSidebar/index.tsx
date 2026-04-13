@@ -341,51 +341,6 @@ function OpenBuildingBlocksSidebar({
     setPendingProposal(null);
   }, []);
 
-  const formatOperation = useCallback((operation: CanvasOperation, proposal?: AiBuilderProposal) => {
-    const operationNodeLabels = new Map<string, string>();
-    if (proposal) {
-      for (const op of proposal.operations) {
-        if (op.type === "add_node" && op.nodeKey) {
-          operationNodeLabels.set(op.nodeKey, op.nodeName || op.blockName);
-        }
-      }
-    }
-
-    const resolveRefLabel = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
-      if (!ref) return "step";
-      if (ref.nodeName) return ref.nodeName;
-      if (ref.nodeKey && operationNodeLabels.has(ref.nodeKey)) {
-        return operationNodeLabels.get(ref.nodeKey) || "step";
-      }
-      if (ref.nodeId) return ref.nodeId;
-      return "step";
-    };
-
-    switch (operation.type) {
-      case "add_node":
-        return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
-      case "connect_nodes":
-        return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
-      case "disconnect_nodes":
-        return `Disconnect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
-      case "update_node_config":
-        return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
-      case "delete_node":
-        return `Delete node ${resolveRefLabel(operation.target)}`;
-      default:
-        return "Update canvas";
-    }
-  }, []);
-  const pendingProposalSummaries = useMemo(() => {
-    if (!pendingProposal) {
-      return [];
-    }
-
-    return pendingProposal.operations
-      .filter((operation) => operation.type !== "connect_nodes")
-      .map((operation) => formatOperation(operation, pendingProposal));
-  }, [formatOperation, pendingProposal]);
-
   const handleApplyProposal = useCallback(async () => {
     if (!pendingProposal) return;
 
@@ -851,7 +806,6 @@ function OpenBuildingBlocksSidebar({
             aiMessages={aiMessages}
             isGeneratingResponse={isGeneratingResponse}
             pendingProposal={pendingProposal}
-            pendingProposalSummaries={pendingProposalSummaries}
             applyShortcutHint={applyShortcutHint}
             onApplyProposal={() => void handleApplyProposal()}
             onDiscardProposal={handleDiscardProposal}

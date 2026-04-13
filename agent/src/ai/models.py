@@ -141,7 +141,7 @@ CanvasOperation = Annotated[
 
 
 class CanvasProposal(BaseModel):
-    summary: str = Field(min_length=1, max_length=500)
+    summary: str = Field(min_length=1, max_length=120)
     operations: list[CanvasOperation] = Field(default_factory=list)
 
 
