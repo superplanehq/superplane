@@ -31,6 +31,9 @@ type AiBuilderChatPanelProps = {
   onSelectChat: (chatId: string) => void;
   onStartNewSession: () => void;
   onSendPrompt: () => void;
+  onSendPromptWithValue?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  connectedIntegrationNames?: Set<string>;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
 };
 
@@ -55,6 +58,9 @@ export function AiBuilderChatPanel({
   onSelectChat,
   onStartNewSession,
   onSendPrompt,
+  onSendPromptWithValue,
+  onConnectIntegration,
+  connectedIntegrationNames,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
@@ -137,6 +143,10 @@ export function AiBuilderChatPanel({
               isApplyingProposal={isApplyingProposal}
               aiError={aiError}
               disabled={disabled}
+              onSendPromptWithValue={onSendPromptWithValue}
+              onConnectIntegration={onConnectIntegration}
+              connectedIntegrationNames={connectedIntegrationNames}
+              onFocusInput={() => aiInputRef.current?.focus()}
             />
 
             <InputForm
@@ -169,6 +179,10 @@ type ConversationContentProps = {
   isApplyingProposal: boolean;
   aiError: string | null;
   disabled: boolean;
+  onSendPromptWithValue?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  connectedIntegrationNames?: Set<string>;
+  onFocusInput?: () => void;
 };
 
 function ConversationContent({
@@ -184,11 +198,22 @@ function ConversationContent({
   isApplyingProposal,
   aiError,
   disabled,
+  onSendPromptWithValue,
+  onConnectIntegration,
+  connectedIntegrationNames,
+  onFocusInput,
 }: ConversationContentProps) {
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
-      <AiBuilderConversationMessageList messages={aiMessages} isGeneratingResponse={isGeneratingResponse} />
+      <AiBuilderConversationMessageList
+        messages={aiMessages}
+        isGeneratingResponse={isGeneratingResponse}
+        onSendPrompt={onSendPromptWithValue}
+        onConnectIntegration={onConnectIntegration}
+        connectedIntegrationNames={connectedIntegrationNames}
+        onFocusInput={onFocusInput}
+      />
 
       {isGeneratingResponse ? (
         <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>

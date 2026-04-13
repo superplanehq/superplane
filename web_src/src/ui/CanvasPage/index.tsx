@@ -1254,6 +1254,7 @@ function CanvasPage(props: CanvasPageProps) {
               disabledMessage="You don't have permission to edit this canvas."
               onBlockClick={handleBuildingBlockClick}
               onAddNote={handleAddNote}
+              onConnectIntegration={props.onConnectIntegration}
             />
           )}
 

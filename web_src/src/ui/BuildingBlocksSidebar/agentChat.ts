@@ -24,12 +24,24 @@ import {
 } from "./agentChatUi";
 import type { CanvasOperation } from "@/lib/ai";
 
+export type AiFollowUpOption = {
+  label: string;
+  value: string;
+};
+
+export type AiIntegrationAction = {
+  integrationName: string;
+  label: string;
+};
+
 export type AiBuilderMessage = {
   id: string;
   role: "user" | "assistant" | "tool";
   content: string;
   toolCallId?: string;
   toolStatus?: "running" | "completed";
+  followUpOptions?: AiFollowUpOption[];
+  integrationActions?: AiIntegrationAction[];
 };
 
 export type AiBuilderProposal = {

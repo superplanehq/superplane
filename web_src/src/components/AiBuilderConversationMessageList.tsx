@@ -6,11 +6,19 @@ import { useMemo, type ReactNode } from "react";
 export type AiBuilderConversationMessageListProps = {
   messages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
+  onSendPrompt?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  onFocusInput?: () => void;
+  connectedIntegrationNames?: Set<string>;
 };
 
 export function AiBuilderConversationMessageList({
   messages,
   isGeneratingResponse,
+  onSendPrompt,
+  onConnectIntegration,
+  onFocusInput,
+  connectedIntegrationNames,
 }: AiBuilderConversationMessageListProps) {
   const activeToolTurnBounds = useMemo(() => {
     let lastUserIndex = -1;
@@ -33,8 +41,21 @@ export function AiBuilderConversationMessageList({
         isGeneratingResponse,
         lastUserIndex: activeToolTurnBounds.lastUserIndex,
         lastAssistantIndex: activeToolTurnBounds.lastAssistantIndex,
+        onSendPrompt,
+        onConnectIntegration,
+        onFocusInput,
+        connectedIntegrationNames,
       }),
-    [messages, isGeneratingResponse, activeToolTurnBounds.lastUserIndex, activeToolTurnBounds.lastAssistantIndex],
+    [
+      messages,
+      isGeneratingResponse,
+      activeToolTurnBounds.lastUserIndex,
+      activeToolTurnBounds.lastAssistantIndex,
+      onSendPrompt,
+      onConnectIntegration,
+      onFocusInput,
+      connectedIntegrationNames,
+    ],
   );
 
   return <>{conversationItems}</>;
@@ -65,6 +86,10 @@ type BuildAiConversationItemsParams = {
   isGeneratingResponse: boolean;
   lastUserIndex: number;
   lastAssistantIndex: number;
+  onSendPrompt?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  onFocusInput?: () => void;
+  connectedIntegrationNames?: Set<string>;
 };
 
 function buildAiConversationItems({
@@ -72,6 +97,10 @@ function buildAiConversationItems({
   isGeneratingResponse,
   lastUserIndex,
   lastAssistantIndex,
+  onSendPrompt,
+  onConnectIntegration,
+  onFocusInput,
+  connectedIntegrationNames,
 }: BuildAiConversationItemsParams): ReactNode[] {
   const items: ReactNode[] = [];
   let i = 0;
@@ -107,7 +136,19 @@ function buildAiConversationItems({
       i = j;
       continue;
     }
-    items.push(<AiMessage key={message.id} message={message} />);
+    const isThisLastAssistant = message.role === "assistant" && i === lastAssistantIndex;
+    items.push(
+      <AiMessage
+        key={message.id}
+        message={message}
+        isLastAssistant={isThisLastAssistant}
+        isGeneratingResponse={isGeneratingResponse}
+        onSendPrompt={onSendPrompt}
+        onConnectIntegration={onConnectIntegration}
+        onFocusInput={onFocusInput}
+        connectedIntegrationNames={connectedIntegrationNames}
+      />,
+    );
     i += 1;
   }
   return items;

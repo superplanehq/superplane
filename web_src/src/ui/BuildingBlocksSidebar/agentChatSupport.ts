@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { AiBuilderMessage, AiBuilderProposal } from "./agentChat";
+import type { AiBuilderMessage, AiBuilderProposal, AiFollowUpOption, AiIntegrationAction } from "./agentChat";
 import { normalizeAiProposal } from "./agentChatProposal";
 
 type JsonObject = Record<string, unknown>;
@@ -37,6 +37,8 @@ type StreamOutcome = {
 type StreamState = {
   runModel: string;
   streamedAnyAnswer: boolean;
+  pendingFollowUpOptions: AiFollowUpOption[];
+  pendingIntegrationActions: AiIntegrationAction[];
 };
 
 type StreamController = {
@@ -256,6 +258,32 @@ function createAssistantStreamController({
   };
 }
 
+function normalizeFollowUpOptions(raw: unknown): AiFollowUpOption[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: AiFollowUpOption[] = [];
+  for (const item of raw) {
+    if (isRecord(item) && typeof item.label === "string" && typeof item.value === "string") {
+      result.push({ label: item.label, value: item.value });
+    }
+  }
+  return result;
+}
+
+function normalizeIntegrationActions(raw: unknown): AiIntegrationAction[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const result: AiIntegrationAction[] = [];
+  for (const item of raw) {
+    if (isRecord(item) && typeof item.integration_name === "string" && typeof item.label === "string") {
+      result.push({ integrationName: item.integration_name, label: item.label });
+    }
+  }
+  return result;
+}
+
 function appendFinalAnswerContent({
   output,
   state,
@@ -273,6 +301,9 @@ function appendFinalAnswerContent({
 }): void {
   if (isRecord(output)) {
     setPendingProposal(normalizeAiProposal(output.proposal));
+
+    state.pendingFollowUpOptions = normalizeFollowUpOptions(output.follow_up_options);
+    state.pendingIntegrationActions = normalizeIntegrationActions(output.integration_actions);
   }
 
   if (state.streamedAnyAnswer) {
@@ -412,6 +443,8 @@ export async function consumeChatResponseStream({
   const state: StreamState = {
     runModel: "",
     streamedAnyAnswer: false,
+    pendingFollowUpOptions: [],
+    pendingIntegrationActions: [],
   };
 
   await readResponseEvents(response, async (event) => {
@@ -425,6 +458,20 @@ export async function consumeChatResponseStream({
     });
   });
   await controller.waitForRenderLoopIdle();
+
+  if (state.pendingFollowUpOptions.length > 0 || state.pendingIntegrationActions.length > 0) {
+    setAiMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === assistantMessageId
+          ? {
+              ...msg,
+              followUpOptions: state.pendingFollowUpOptions,
+              integrationActions: state.pendingIntegrationActions,
+            }
+          : msg,
+      ),
+    );
+  }
 
   return {
     assistantContentSnapshot: controller.getAssistantContentSnapshot(),

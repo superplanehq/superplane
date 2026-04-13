@@ -47,6 +47,7 @@ export interface BuildingBlocksSidebarProps {
   disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
+  onConnectIntegration?: (integrationName: string) => void;
 }
 
 export function BuildingBlocksSidebar({
@@ -63,6 +64,7 @@ export function BuildingBlocksSidebar({
   disabledMessage,
   onBlockClick,
   onAddNote,
+  onConnectIntegration,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
 
@@ -90,6 +92,7 @@ export function BuildingBlocksSidebar({
       disabled={disabled}
       disabledTooltip={disabledTooltip}
       onBlockClick={onBlockClick}
+      onConnectIntegration={onConnectIntegration}
     />
   );
 }
@@ -176,6 +179,7 @@ interface OpenBuildingBlocksSidebarProps {
   disabled: boolean;
   disabledTooltip: string;
   onBlockClick?: (block: BuildingBlock) => void;
+  onConnectIntegration?: (integrationName: string) => void;
 }
 
 function OpenBuildingBlocksSidebar({
@@ -190,6 +194,7 @@ function OpenBuildingBlocksSidebar({
   disabled,
   disabledTooltip,
   onBlockClick,
+  onConnectIntegration,
 }: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "component">("all");
@@ -215,6 +220,7 @@ function OpenBuildingBlocksSidebar({
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const skipChatLoadRef = useRef<string | null>(null);
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
@@ -230,6 +236,18 @@ function OpenBuildingBlocksSidebar({
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const connectedIntegrationNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const integration of integrations) {
+      const name = normalizeIntegrationName(integration.spec?.integrationName);
+      if (name) {
+        names.add(name);
+      }
+    }
+    return names;
+  }, [integrations]);
+  const prevConnectedRef = useRef<Set<string>>(connectedIntegrationNames);
+  const pendingAutoSendRef = useRef<string | null>(null);
   const handleSendPrompt = useCallback(
     async (value?: string) => {
       await sendChatPrompt({
@@ -240,7 +258,22 @@ function OpenBuildingBlocksSidebar({
         currentChatId,
         isGeneratingResponse,
         setChatSessions,
-        setCurrentChatId,
+        setCurrentChatId: (idOrUpdater) => {
+          if (typeof idOrUpdater === "function") {
+            setCurrentChatId((prev) => {
+              const next = idOrUpdater(prev);
+              if (next && next !== prev) {
+                skipChatLoadRef.current = next;
+              }
+              return next;
+            });
+          } else {
+            if (idOrUpdater && idOrUpdater !== currentChatId) {
+              skipChatLoadRef.current = idOrUpdater;
+            }
+            setCurrentChatId(idOrUpdater);
+          }
+        },
         setAiMessages,
         setAiInput,
         setAiError,
@@ -251,6 +284,42 @@ function OpenBuildingBlocksSidebar({
     },
     [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
   );
+
+  useEffect(() => {
+    const prev = prevConnectedRef.current;
+    prevConnectedRef.current = connectedIntegrationNames;
+
+    if (isGeneratingResponse || activeTab !== "ai" || !currentChatId) {
+      return;
+    }
+
+    const lastAssistant = [...aiMessages].reverse().find((m) => m.role === "assistant");
+    if (!lastAssistant?.integrationActions?.length) {
+      return;
+    }
+
+    const newlyConnected: string[] = [];
+    for (const action of lastAssistant.integrationActions) {
+      const name = normalizeIntegrationName(action.integrationName);
+      if (name && connectedIntegrationNames.has(name) && !prev.has(name)) {
+        newlyConnected.push(action.label.replace(/^Connect\s+/i, ""));
+      }
+    }
+
+    if (newlyConnected.length > 0) {
+      const label = newlyConnected.join(" and ");
+      pendingAutoSendRef.current = `I connected ${label}`;
+    }
+  }, [connectedIntegrationNames, isGeneratingResponse, activeTab, currentChatId, aiMessages]);
+
+  useEffect(() => {
+    if (!pendingAutoSendRef.current || isGeneratingResponse) {
+      return;
+    }
+    const message = pendingAutoSendRef.current;
+    pendingAutoSendRef.current = null;
+    void handleSendPrompt(message);
+  }, [connectedIntegrationNames, isGeneratingResponse, handleSendPrompt]);
 
   const handleStartNewChatSession = useCallback(() => {
     setCurrentChatId(null);
@@ -466,6 +535,13 @@ function OpenBuildingBlocksSidebar({
         setPendingProposal(null);
       }
       setIsLoadingChatMessages(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (skipChatLoadRef.current === currentChatId) {
+      skipChatLoadRef.current = null;
       return () => {
         cancelled = true;
       };
@@ -788,6 +864,9 @@ function OpenBuildingBlocksSidebar({
             onSelectChat={handleSelectChatSession}
             onStartNewSession={handleStartNewChatSession}
             onSendPrompt={() => void handleSendPrompt()}
+            onSendPromptWithValue={(value: string) => void handleSendPrompt(value)}
+            onConnectIntegration={onConnectIntegration}
+            connectedIntegrationNames={connectedIntegrationNames}
             aiInputRef={aiInputRef}
           />
         )}
