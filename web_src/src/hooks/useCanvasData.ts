@@ -207,7 +207,8 @@ export const useInfiniteCanvasLiveVersions = (
     },
     getNextPageParam: (lastPage, allPages) => {
       const loadedPublishedCount = allPages.reduce(
-        (acc, page) => acc + (page?.versions?.filter((version) => !!version.metadata?.publishedAt).length || 0),
+        (acc, page) =>
+          acc + (page?.versions?.filter((version) => version.metadata?.state === "STATE_PUBLISHED").length || 0),
         0,
       );
       const totalCount = lastPage?.totalCount || 0;

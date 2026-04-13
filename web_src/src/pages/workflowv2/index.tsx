@@ -256,7 +256,7 @@ export function WorkflowPageV2() {
   const liveVersions = useMemo(
     () =>
       visibleCanvasVersions
-        .filter((version) => !!version.metadata?.publishedAt)
+        .filter((version) => version.metadata?.state === "STATE_PUBLISHED")
         .sort((a, b) => versionSortValue(b.metadata?.publishedAt) - versionSortValue(a.metadata?.publishedAt)),
     [visibleCanvasVersions],
   );
@@ -389,7 +389,7 @@ export function WorkflowPageV2() {
   const draftVersions = useMemo(
     () =>
       visibleCanvasVersions
-        .filter((version) => version.metadata?.state !== "STATE_PUBLISHED")
+        .filter((version) => version.metadata?.state === "STATE_DRAFT")
         .sort(
           (a, b) =>
             versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
@@ -414,7 +414,7 @@ export function WorkflowPageV2() {
     if (
       activeCanvasVersionId &&
       selectedCanvasVersion &&
-      selectedCanvasVersion.metadata?.state !== "STATE_PUBLISHED" &&
+      selectedCanvasVersion.metadata?.state === "STATE_DRAFT" &&
       !isPendingApprovalVersion
     ) {
       return selectedCanvasVersion;
@@ -444,7 +444,7 @@ export function WorkflowPageV2() {
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
     !!selectedCanvasVersion &&
-    selectedCanvasVersion.metadata?.state !== "STATE_PUBLISHED" &&
+    selectedCanvasVersion.metadata?.state === "STATE_DRAFT" &&
     !isViewingPendingApprovalVersion;
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
