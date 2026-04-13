@@ -28,6 +28,18 @@ var exampleOutputListAlertRulesBytes []byte
 //go:embed example_data_on_alert_firing.json
 var exampleDataOnAlertFiringBytes []byte
 
+//go:embed example_output_list_silences.json
+var exampleOutputListSilencesBytes []byte
+
+//go:embed example_output_get_silence.json
+var exampleOutputGetSilenceBytes []byte
+
+//go:embed example_output_create_silence.json
+var exampleOutputCreateSilenceBytes []byte
+
+//go:embed example_output_delete_silence.json
+var exampleOutputDeleteSilenceBytes []byte
+
 //go:embed example_output_create_annotation.json
 var exampleOutputCreateAnnotationBytes []byte
 
@@ -57,6 +69,18 @@ var exampleOutputListAlertRules map[string]any
 
 var exampleDataOnAlertFiringOnce sync.Once
 var exampleDataOnAlertFiring map[string]any
+
+var exampleOutputListSilencesOnce sync.Once
+var exampleOutputListSilences map[string]any
+
+var exampleOutputGetSilenceOnce sync.Once
+var exampleOutputGetSilence map[string]any
+
+var exampleOutputCreateSilenceOnce sync.Once
+var exampleOutputCreateSilence map[string]any
+
+var exampleOutputDeleteSilenceOnce sync.Once
+var exampleOutputDeleteSilence map[string]any
 
 var exampleOutputCreateAnnotationOnce sync.Once
 var exampleOutputCreateAnnotation map[string]any
@@ -113,6 +137,22 @@ func (c *ListAlertRules) ExampleOutput() map[string]any {
 
 func (t *OnAlertFiring) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertFiringOnce, exampleDataOnAlertFiringBytes, &exampleDataOnAlertFiring)
+}
+
+func (l *ListSilences) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputListSilencesOnce, exampleOutputListSilencesBytes, &exampleOutputListSilences)
+}
+
+func (g *GetSilence) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetSilenceOnce, exampleOutputGetSilenceBytes, &exampleOutputGetSilence)
+}
+
+func (c *CreateSilence) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSilenceOnce, exampleOutputCreateSilenceBytes, &exampleOutputCreateSilence)
+}
+
+func (d *DeleteSilence) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteSilenceOnce, exampleOutputDeleteSilenceBytes, &exampleOutputDeleteSilence)
 }
 
 func (c *CreateAnnotation) ExampleOutput() map[string]any {

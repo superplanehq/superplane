@@ -51,6 +51,7 @@ func Test__QueryDataSource__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
 }
 
 func Test__QueryDataSource__Configuration__UsesIntegrationResourceForDataSource(t *testing.T) {
