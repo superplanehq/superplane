@@ -110,7 +110,7 @@ test.shell:
 format.go:
 	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -w"
 
-format.go.check:
+check.format.go:
 	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
 
 format.js:
@@ -189,8 +189,8 @@ dev.db.console:
 dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 
-dev.agent.console:
-	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(SUPERPLANE_CANVAS_ID)" --token "$(SUPERPLANE_API_TOKEN)" --org-id "$(SUPERPLANE_ORG_ID)"
+check.example.payloads:
+	$(COMPOSE) run --rm app bash -c "go run scripts/check_example_payloads.go"
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
@@ -305,9 +305,10 @@ gen.components.docs:
 	rm -rf docs/components
 	go run scripts/generate_components_docs.go
 
-gen.components.local.update: gen.components.docs
-	rm -rf ../docs/src/content/docs/components
-	cp -R docs/components ../docs/src/content/docs/components
+check.components.docs:
+	rm -rf docs/components
+	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
+	git diff --exit-code docs/components
 
 MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents

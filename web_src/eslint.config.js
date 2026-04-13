@@ -107,4 +107,16 @@ export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'storybook-static
       }
     ]
   },
+}, {
+  files: ['**/*.{spec,test}.{ts,tsx}'],
+  rules: {
+    'max-lines-per-function': [
+      'warn',
+      {
+        max: 512,
+        skipBlankLines: true,
+        skipComments: true,
+      },
+    ],
+  },
 }, storybook.configs["flat/recommended"]);

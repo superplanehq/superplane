@@ -1,4 +1,4 @@
-import type { AiCanvasOperation } from "./index";
+import type { CanvasOperation } from "@/lib/ai";
 import type { AiBuilderProposal } from "./agentChat";
 
 type JsonObject = Record<string, unknown>;
@@ -26,13 +26,13 @@ function normalizeNodeRef(
   return { nodeKey, nodeId, nodeName, handleId };
 }
 
-function normalizeAddNodeOperation(value: JsonObject): AiCanvasOperation | null {
+function normalizeAddNodeOperation(value: JsonObject): CanvasOperation | null {
   const blockName = typeof value.blockName === "string" ? value.blockName : "";
   if (!blockName) {
     return null;
   }
 
-  const operation: AiCanvasOperation = {
+  const operation: CanvasOperation = {
     type: "add_node",
     blockName,
     nodeKey: typeof value.nodeKey === "string" ? value.nodeKey : undefined,
@@ -56,7 +56,7 @@ function normalizeAddNodeOperation(value: JsonObject): AiCanvasOperation | null 
 function normalizeConnectionOperation(
   value: JsonObject,
   type: "connect_nodes" | "disconnect_nodes",
-): AiCanvasOperation | null {
+): CanvasOperation | null {
   const source = normalizeNodeRef(value.source);
   const target = normalizeNodeRef(value.target);
   if (!source || !target) {
@@ -66,7 +66,7 @@ function normalizeConnectionOperation(
   return { type, source, target };
 }
 
-function normalizeUpdateNodeConfigOperation(value: JsonObject): AiCanvasOperation | null {
+function normalizeUpdateNodeConfigOperation(value: JsonObject): CanvasOperation | null {
   const target = normalizeNodeRef(value.target);
   if (!target) {
     return null;
@@ -80,7 +80,7 @@ function normalizeUpdateNodeConfigOperation(value: JsonObject): AiCanvasOperatio
   };
 }
 
-function normalizeDeleteNodeOperation(value: JsonObject): AiCanvasOperation | null {
+function normalizeDeleteNodeOperation(value: JsonObject): CanvasOperation | null {
   const target = normalizeNodeRef(value.target);
   if (!target) {
     return null;
@@ -92,7 +92,7 @@ function normalizeDeleteNodeOperation(value: JsonObject): AiCanvasOperation | nu
   };
 }
 
-function normalizeAiOperation(value: unknown): AiCanvasOperation | null {
+function normalizeAiOperation(value: unknown): CanvasOperation | null {
   if (!isRecord(value) || typeof value.type !== "string") {
     return null;
   }
@@ -126,7 +126,7 @@ export function normalizeAiProposal(value: unknown): AiBuilderProposal | null {
   const operationsRaw = Array.isArray(value.operations) ? value.operations : [];
   const operations = operationsRaw
     .map((operation) => normalizeAiOperation(operation))
-    .filter((operation): operation is AiCanvasOperation => Boolean(operation));
+    .filter((operation): operation is CanvasOperation => Boolean(operation));
   if (operations.length === 0) {
     return null;
   }

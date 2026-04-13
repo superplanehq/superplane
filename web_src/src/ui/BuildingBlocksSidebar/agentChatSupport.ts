@@ -7,8 +7,13 @@ type JsonObject = Record<string, unknown>;
 export type ChatStreamEvent =
   | { type: "run_started"; model?: string }
   | { type: "model_delta"; content?: string }
-  | { type: "tool_started"; tool_name?: string; tool_call_id?: string }
-  | { type: "tool_finished"; tool_name?: string; tool_call_id?: string; elapsed_ms?: number }
+  | { type: "tool_started"; tool_name?: string; tool_call_id?: string; tool_label?: string }
+  | {
+      type: "tool_finished";
+      tool_name?: string;
+      tool_call_id?: string;
+      tool_label?: string;
+    }
   | { type: "final_answer"; output?: unknown }
   | { type: "run_failed"; error?: string }
   | { type: "run_completed" }
@@ -64,6 +69,7 @@ function normalizeToolStartedEvent(value: JsonObject): ChatStreamEvent {
     type: "tool_started",
     tool_name: typeof value.tool_name === "string" ? value.tool_name : undefined,
     tool_call_id: typeof value.tool_call_id === "string" ? value.tool_call_id : undefined,
+    tool_label: typeof value.tool_label === "string" ? value.tool_label : undefined,
   };
 }
 
@@ -72,7 +78,7 @@ function normalizeToolFinishedEvent(value: JsonObject): ChatStreamEvent {
     type: "tool_finished",
     tool_name: typeof value.tool_name === "string" ? value.tool_name : undefined,
     tool_call_id: typeof value.tool_call_id === "string" ? value.tool_call_id : undefined,
-    elapsed_ms: typeof value.elapsed_ms === "number" ? value.elapsed_ms : undefined,
+    tool_label: typeof value.tool_label === "string" ? value.tool_label : undefined,
   };
 }
 
@@ -163,13 +169,11 @@ function createToolCallId(toolName: string, toolCallId?: string): string {
 
 function createAssistantStreamController({
   assistantMessageId,
-  formatToolLabel,
   insertAiMessageBefore,
   setAiMessages,
   trimAiMessages,
 }: {
   assistantMessageId: string;
-  formatToolLabel: (toolName: string) => string;
   insertAiMessageBefore: InsertAiMessageBefore;
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
   trimAiMessages: TrimAiMessages;
@@ -213,13 +217,8 @@ function createAssistantStreamController({
   const upsertToolMessage = (event: Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>) => {
     const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
     const toolCallId = createToolCallId(toolName, event.tool_call_id);
-    const toolLabel = formatToolLabel(toolName);
-    const content =
-      event.type === "tool_started"
-        ? `${toolLabel}...`
-        : typeof event.elapsed_ms === "number"
-          ? `${toolLabel} (${event.elapsed_ms.toFixed(1)}ms)`
-          : toolLabel;
+    const toolLabel = typeof event.tool_label === "string" ? event.tool_label.trim() : "";
+    const content = event.type === "tool_started" ? `${toolLabel}...` : toolLabel;
     const toolStatus = event.type === "tool_started" ? "running" : "completed";
 
     setAiMessages((previous) => {
@@ -387,7 +386,6 @@ async function readResponseEvents(
 
 export async function consumeChatResponseStream({
   assistantMessageId,
-  formatToolLabel,
   insertAiMessageBefore,
   response,
   setAiMessages,
@@ -397,7 +395,6 @@ export async function consumeChatResponseStream({
   trimAiMessages,
 }: {
   assistantMessageId: string;
-  formatToolLabel: (toolName: string) => string;
   insertAiMessageBefore: InsertAiMessageBefore;
   response: Response;
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
@@ -408,7 +405,6 @@ export async function consumeChatResponseStream({
 }): Promise<StreamOutcome> {
   const controller = createAssistantStreamController({
     assistantMessageId,
-    formatToolLabel,
     insertAiMessageBefore,
     setAiMessages,
     trimAiMessages,
