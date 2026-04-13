@@ -287,8 +287,32 @@ func Test__parseCreateSilenceResponseBody(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "ghi-jkl", id)
 
+	id, err = parseCreateSilenceResponseBody([]byte(`{"SILENCEID":"upper-case"}`))
+	require.NoError(t, err)
+	require.Equal(t, "upper-case", id)
+
 	_, err = parseCreateSilenceResponseBody([]byte(`{}`))
 	require.ErrorContains(t, err, "missing silence id")
+}
+
+func Test__Client__DeleteSilence__returnsErrorForNotFound(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"message":"not found"}`)),
+			},
+		},
+	}
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	err := client.DeleteSilence("missing-silence")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "grafana silence delete")
 }
 
 func Test__Grafana__ListResources(t *testing.T) {

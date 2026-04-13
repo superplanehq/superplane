@@ -657,17 +657,11 @@ func (c *Client) CreateSilence(matchers []SilenceMatcher, startsAt, endsAt, comm
 }
 
 func parseCreateSilenceResponseBody(responseBody []byte) (string, error) {
-	var result struct {
-		SilenceID string `json:"silenceID"`
-		SilenceId string `json:"silenceId"`
-	}
-	if err := json.Unmarshal(responseBody, &result); err != nil {
+	var responseMap map[string]json.RawMessage
+	if err := json.Unmarshal(responseBody, &responseMap); err != nil {
 		return "", fmt.Errorf("error parsing create silence response: %v", err)
 	}
-	if id := strings.TrimSpace(result.SilenceID); id != "" {
-		return id, nil
-	}
-	if id := strings.TrimSpace(result.SilenceId); id != "" {
+	if id := extractCreateSilenceID(responseMap); id != "" {
 		return id, nil
 	}
 
@@ -684,11 +678,42 @@ func (c *Client) DeleteSilence(id string) error {
 		return fmt.Errorf("error deleting silence: %v", err)
 	}
 
-	if status == http.StatusNotFound || status == http.StatusNoContent || (status >= 200 && status < 300) {
+	if status >= 200 && status < 300 {
 		return nil
 	}
 
 	return newAPIStatusError("grafana silence delete", status, responseBody)
+}
+
+func extractCreateSilenceID(responseMap map[string]json.RawMessage) string {
+	for _, key := range []string{"silenceID", "silenceId"} {
+		if id := decodeCreateSilenceID(responseMap[key]); id != "" {
+			return id
+		}
+	}
+
+	for key, rawValue := range responseMap {
+		if strings.EqualFold(key, "silenceID") || strings.EqualFold(key, "silenceId") {
+			if id := decodeCreateSilenceID(rawValue); id != "" {
+				return id
+			}
+		}
+	}
+
+	return ""
+}
+
+func decodeCreateSilenceID(rawValue json.RawMessage) string {
+	if len(rawValue) == 0 {
+		return ""
+	}
+
+	var id string
+	if err := json.Unmarshal(rawValue, &id); err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(id)
 }
 
 func (c *Client) ListDataSources() ([]DataSource, error) {

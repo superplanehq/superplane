@@ -15,7 +15,7 @@ import (
 type GetSilence struct{}
 
 type GetSilenceSpec struct {
-	SilenceID string `json:"silenceId" mapstructure:"silenceId"`
+	Silence string `json:"silence" mapstructure:"silence"`
 }
 
 func (g *GetSilence) Name() string {
@@ -63,7 +63,7 @@ func (g *GetSilence) OutputChannels(configuration any) []core.OutputChannel {
 func (g *GetSilence) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "silenceId",
+			Name:        "silence",
 			Label:       "Silence",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -86,7 +86,7 @@ func (g *GetSilence) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return resolveSilenceNodeMetadata(ctx, spec.SilenceID)
+	return resolveSilenceNodeMetadata(ctx, spec.Silence)
 }
 
 func (g *GetSilence) Execute(ctx core.ExecutionContext) error {
@@ -103,7 +103,7 @@ func (g *GetSilence) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	silence, err := client.GetSilence(strings.TrimSpace(spec.SilenceID))
+	silence, err := client.GetSilence(strings.TrimSpace(spec.Silence))
 	if err != nil {
 		return fmt.Errorf("error getting silence: %w", err)
 	}
@@ -158,12 +158,19 @@ func decodeGetSilenceSpec(config any) (GetSilenceSpec, error) {
 	if err := decoder.Decode(config); err != nil {
 		return GetSilenceSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
+	if strings.TrimSpace(spec.Silence) == "" {
+		if configMap, ok := config.(map[string]any); ok {
+			if legacyValue, ok := configMap["silenceId"]; ok && legacyValue != nil {
+				spec.Silence = strings.TrimSpace(fmt.Sprint(legacyValue))
+			}
+		}
+	}
 	return spec, nil
 }
 
 func validateGetSilenceSpec(spec GetSilenceSpec) error {
-	if strings.TrimSpace(spec.SilenceID) == "" {
-		return errors.New("silenceId is required")
+	if strings.TrimSpace(spec.Silence) == "" {
+		return errors.New("silence is required")
 	}
 	return nil
 }

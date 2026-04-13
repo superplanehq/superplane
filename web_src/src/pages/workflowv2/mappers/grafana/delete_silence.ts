@@ -4,6 +4,7 @@ import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 import { buildSilenceSelectionMetadata, type SilenceSelectionNodeMetadata } from "./silenceMetadata";
 
 interface DeleteSilenceConfiguration {
+  silence?: string;
   silenceId?: string;
 }
 
@@ -11,7 +12,8 @@ export const deleteSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext) {
     const configuration = context.node.configuration as DeleteSilenceConfiguration | undefined;
     const nodeMetadata = context.node.metadata as SilenceSelectionNodeMetadata | undefined;
-    return grafanaComponentBaseProps(context, buildSilenceSelectionMetadata(nodeMetadata, configuration?.silenceId));
+    const silence = configuration?.silence ?? configuration?.silenceId;
+    return grafanaComponentBaseProps(context, buildSilenceSelectionMetadata(nodeMetadata, silence));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {

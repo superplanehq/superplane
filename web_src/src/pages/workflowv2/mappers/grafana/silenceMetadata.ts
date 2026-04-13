@@ -9,19 +9,19 @@ export interface SilenceSelectionNodeMetadata {
 
 export function buildSilenceSelectionMetadata(
   nodeMetadata: SilenceSelectionNodeMetadata | undefined,
-  silenceId: string | undefined,
+  silence: string | undefined,
 ): MetadataItem[] {
   const metadataLabel = nodeMetadata?.comment?.trim() || nodeMetadata?.label?.trim();
   if (metadataLabel) {
     return [{ icon: "bell-off", label: metadataLabel }];
   }
 
-  const trimmedSilenceId = silenceId?.trim();
-  if (!trimmedSilenceId) {
+  const trimmedSilence = silence?.trim();
+  if (!trimmedSilence) {
     return [];
   }
 
-  return [{ icon: "bell-off", label: trimmedSilenceId }];
+  return [{ icon: "bell-off", label: trimmedSilence }];
 }
 
 export function buildSilenceFilterMetadata(filter: string | undefined): MetadataItem[] {
