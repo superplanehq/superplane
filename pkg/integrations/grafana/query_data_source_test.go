@@ -334,6 +334,26 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 	})
 }
 
+func Test__resolveQueryTimeValue(t *testing.T) {
+	t.Run("preserves grafana relative values", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("now-24h", nil)
+		require.NoError(t, err)
+		require.Equal(t, "now-24h", value)
+	})
+
+	t.Run("converts rfc3339 timestamps to unix millis", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("2026-04-09T08:00:00Z", nil)
+		require.NoError(t, err)
+		require.Equal(t, "1775721600000", value)
+	})
+
+	t.Run("strips negative monotonic suffixes from resolved go timestamps", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("2026-04-09 08:00:00 +0000 UTC m=-0.123456789", nil)
+		require.NoError(t, err)
+		require.Equal(t, "1775721600000", value)
+	})
+}
+
 func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
 	for _, offset := range []string{"5.75", "+5.75", "12.75", "-3.5"} {
 		t.Run(offset, func(t *testing.T) {
