@@ -610,13 +610,11 @@ CREATE TABLE public.workflow_versions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     owner_id uuid,
-    is_published boolean DEFAULT false NOT NULL,
-    published_at timestamp without time zone,
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    state character varying(32) DEFAULT 'draft'::character varying NOT NULL
+    state character varying(32) NOT NULL
 );
 
 
@@ -1423,13 +1421,6 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 --
 
 CREATE INDEX idx_workflow_versions_owner ON public.workflow_versions USING btree (owner_id);
-
-
---
--- Name: idx_workflow_versions_published; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_versions_published ON public.workflow_versions USING btree (workflow_id, is_published, created_at DESC);
 
 
 --

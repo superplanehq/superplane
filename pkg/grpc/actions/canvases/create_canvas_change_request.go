@@ -102,7 +102,7 @@ func CreateCanvasChangeRequestWithMetadata(
 		if draftVersion.OwnerID == nil || *draftVersion.OwnerID != userUUID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
-		if draftVersion.IsPublished {
+		if draftVersion.State == models.CanvasVersionStatePublished {
 			return status.Error(codes.FailedPrecondition, "published versions cannot create change requests")
 		}
 

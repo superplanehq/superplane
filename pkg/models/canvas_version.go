@@ -19,16 +19,14 @@ const (
 )
 
 type CanvasVersion struct {
-	ID          uuid.UUID
-	WorkflowID  uuid.UUID
-	OwnerID     *uuid.UUID
-	State       string
-	IsPublished bool
-	PublishedAt *time.Time
-	Nodes       datatypes.JSONSlice[Node]
-	Edges       datatypes.JSONSlice[Edge]
-	CreatedAt   *time.Time
-	UpdatedAt   *time.Time
+	ID         uuid.UUID
+	WorkflowID uuid.UUID
+	OwnerID    *uuid.UUID
+	State      string
+	Nodes      datatypes.JSONSlice[Node]
+	Edges      datatypes.JSONSlice[Edge]
+	CreatedAt  *time.Time
+	UpdatedAt  *time.Time
 }
 
 func (c *CanvasVersion) TableName() string {
@@ -80,11 +78,11 @@ func ListPublishedCanvasVersionsInTransaction(
 ) ([]CanvasVersion, error) {
 	query := tx.
 		Where("workflow_id = ?", workflowID).
-		Where("is_published = ?", true).
-		Order("published_at DESC, created_at DESC")
+		Where("state = ?", CanvasVersionStatePublished).
+		Order("updated_at DESC, created_at DESC")
 
 	if before != nil {
-		query = query.Where("published_at < ?", *before)
+		query = query.Where("updated_at < ?", *before)
 	}
 
 	if limit > 0 {
@@ -104,7 +102,7 @@ func CountPublishedCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID
 	err := tx.
 		Model(&CanvasVersion{}).
 		Where("workflow_id = ?", workflowID).
-		Where("is_published = ?", true).
+		Where("state = ?", CanvasVersionStatePublished).
 		Count(&count).
 		Error
 	if err != nil {
@@ -176,16 +174,14 @@ func CreatePublishedCanvasVersionInTransaction(
 
 	now := time.Now()
 	version := CanvasVersion{
-		ID:          uuid.New(),
-		WorkflowID:  workflowID,
-		OwnerID:     ownerID,
-		State:       CanvasVersionStatePublished,
-		IsPublished: true,
-		PublishedAt: &now,
-		Nodes:       datatypes.NewJSONSlice(nodes),
-		Edges:       datatypes.NewJSONSlice(edges),
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		OwnerID:    ownerID,
+		State:      CanvasVersionStatePublished,
+		Nodes:      datatypes.NewJSONSlice(nodes),
+		Edges:      datatypes.NewJSONSlice(edges),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
 	}
 
 	if err := tx.Create(&version).Error; err != nil {
@@ -232,15 +228,14 @@ func SaveCanvasDraftInTransaction(
 	}
 
 	version := CanvasVersion{
-		ID:          uuid.New(),
-		WorkflowID:  workflowID,
-		OwnerID:     &userID,
-		State:       CanvasVersionStateDraft,
-		IsPublished: false,
-		Nodes:       datatypes.NewJSONSlice(nodes),
-		Edges:       datatypes.NewJSONSlice(edges),
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		OwnerID:    &userID,
+		State:      CanvasVersionStateDraft,
+		Nodes:      datatypes.NewJSONSlice(nodes),
+		Edges:      datatypes.NewJSONSlice(edges),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
 	}
 
 	if err := tx.Create(&version).Error; err != nil {
@@ -263,15 +258,14 @@ func CreateCanvasSnapshotVersionInTransaction(
 
 	now := time.Now()
 	version := CanvasVersion{
-		ID:          uuid.New(),
-		WorkflowID:  workflowID,
-		OwnerID:     &ownerID,
-		State:       CanvasVersionStatePublished,
-		IsPublished: false,
-		Nodes:       datatypes.NewJSONSlice(nodes),
-		Edges:       datatypes.NewJSONSlice(edges),
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		OwnerID:    &ownerID,
+		State:      CanvasVersionStatePublished,
+		Nodes:      datatypes.NewJSONSlice(nodes),
+		Edges:      datatypes.NewJSONSlice(edges),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
 	}
 
 	if err := tx.Create(&version).Error; err != nil {
@@ -301,8 +295,6 @@ func PublishCanvasDraftInTransaction(
 
 	now := time.Now()
 	version.State = CanvasVersionStatePublished
-	version.IsPublished = true
-	version.PublishedAt = &now
 	version.UpdatedAt = &now
 
 	if err := tx.Save(version).Error; err != nil {

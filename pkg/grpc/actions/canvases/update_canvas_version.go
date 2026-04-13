@@ -154,7 +154,7 @@ func UpdateCanvasVersionWithUsage(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
-		if version.IsPublished {
+		if version.State == models.CanvasVersionStatePublished {
 			return status.Error(codes.FailedPrecondition, "published versions are immutable")
 		}
 

@@ -68,7 +68,7 @@ func refreshOpenCanvasChangeRequestsInTransaction(
 			return versionErr
 		}
 
-		if version.IsPublished {
+		if version.State == models.CanvasVersionStatePublished {
 			continue
 		}
 
