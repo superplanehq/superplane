@@ -1,3 +1,5 @@
+import { AiBuilderIntegrationActions } from "@/components/AiBuilderIntegrationActions";
+import { AiBuilderOptionChips } from "@/components/AiBuilderOptionChips";
 import type { AiBuilderMessage } from "@/ui/BuildingBlocksSidebar/agentChat";
 import { Activity } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -7,9 +9,23 @@ import { cn } from "../lib/utils";
 
 export type AiMessageProps = {
   message: AiBuilderMessage;
+  isLastAssistant?: boolean;
+  isGeneratingResponse?: boolean;
+  onSendPrompt?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  onFocusInput?: () => void;
+  connectedIntegrationNames?: Set<string>;
 };
 
-export function AiMessage({ message }: AiMessageProps) {
+export function AiMessage({
+  message,
+  isLastAssistant = false,
+  isGeneratingResponse = false,
+  onSendPrompt,
+  onConnectIntegration,
+  onFocusInput,
+  connectedIntegrationNames,
+}: AiMessageProps) {
   if (message.role === "assistant" && message.content.trim().length === 0) {
     return null;
   }
@@ -20,7 +36,17 @@ export function AiMessage({ message }: AiMessageProps) {
     case "tool":
       return <ToolMessage message={message} />;
     case "assistant":
-      return <AssistantMessage content={message.content} />;
+      return (
+        <AssistantMessage
+          message={message}
+          isLastAssistant={isLastAssistant}
+          isGeneratingResponse={isGeneratingResponse}
+          onSendPrompt={onSendPrompt}
+          onConnectIntegration={onConnectIntegration}
+          onFocusInput={onFocusInput}
+          connectedIntegrationNames={connectedIntegrationNames}
+        />
+      );
     default:
       return null;
   }
@@ -54,11 +80,46 @@ function UserMessage({ content }: { content: string }) {
   );
 }
 
-function AssistantMessage({ content }: { content: string }) {
+function AssistantMessage({
+  message,
+  isLastAssistant,
+  isGeneratingResponse,
+  onSendPrompt,
+  onConnectIntegration,
+  onFocusInput,
+  connectedIntegrationNames,
+}: {
+  message: AiBuilderMessage;
+  isLastAssistant: boolean;
+  isGeneratingResponse: boolean;
+  onSendPrompt?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  onFocusInput?: () => void;
+  connectedIntegrationNames?: Set<string>;
+}) {
+  const hasFollowUpOptions = isLastAssistant && (message.followUpOptions?.length ?? 0) > 0;
+  const hasIntegrationActions = isLastAssistant && (message.integrationActions?.length ?? 0) > 0;
+
   return (
     <div className="w-full">
       <div className="px-2 text-sm text-gray-800">
-        <AiMessageMarkdown content={content} />
+        <AiMessageMarkdown content={message.content} />
+        {hasIntegrationActions && onConnectIntegration ? (
+          <AiBuilderIntegrationActions
+            actions={message.integrationActions!}
+            onConnect={onConnectIntegration}
+            disabled={isGeneratingResponse}
+            connectedIntegrationNames={connectedIntegrationNames}
+          />
+        ) : null}
+        {hasFollowUpOptions && onSendPrompt ? (
+          <AiBuilderOptionChips
+            options={message.followUpOptions!}
+            onSelect={onSendPrompt}
+            onFocusInput={onFocusInput ?? (() => {})}
+            disabled={isGeneratingResponse}
+          />
+        ) : null}
       </div>
     </div>
   );

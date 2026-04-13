@@ -18,7 +18,6 @@ type AiBuilderChatPanelProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  pendingProposalSummaries: string[];
   applyShortcutHint: string;
   onApplyProposal: () => void;
   onDiscardProposal: () => void;
@@ -31,6 +30,9 @@ type AiBuilderChatPanelProps = {
   onSelectChat: (chatId: string) => void;
   onStartNewSession: () => void;
   onSendPrompt: () => void;
+  onSendPromptWithValue?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  connectedIntegrationNames?: Set<string>;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
 };
 
@@ -42,7 +44,6 @@ export function AiBuilderChatPanel({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  pendingProposalSummaries,
   applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
@@ -55,6 +56,9 @@ export function AiBuilderChatPanel({
   onSelectChat,
   onStartNewSession,
   onSendPrompt,
+  onSendPromptWithValue,
+  onConnectIntegration,
+  connectedIntegrationNames,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
@@ -130,13 +134,16 @@ export function AiBuilderChatPanel({
               aiMessages={aiMessages}
               isGeneratingResponse={isGeneratingResponse}
               pendingProposal={pendingProposal}
-              pendingProposalSummaries={pendingProposalSummaries}
               applyShortcutHint={applyShortcutHint}
               onApplyProposal={onApplyProposal}
               onDiscardProposal={onDiscardProposal}
               isApplyingProposal={isApplyingProposal}
               aiError={aiError}
               disabled={disabled}
+              onSendPromptWithValue={onSendPromptWithValue}
+              onConnectIntegration={onConnectIntegration}
+              connectedIntegrationNames={connectedIntegrationNames}
+              onFocusInput={() => aiInputRef.current?.focus()}
             />
 
             <InputForm
@@ -162,13 +169,16 @@ type ConversationContentProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  pendingProposalSummaries: string[];
   applyShortcutHint: string;
   onApplyProposal: () => void;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
   aiError: string | null;
   disabled: boolean;
+  onSendPromptWithValue?: (value: string) => void;
+  onConnectIntegration?: (integrationName: string) => void;
+  connectedIntegrationNames?: Set<string>;
+  onFocusInput?: () => void;
 };
 
 function ConversationContent({
@@ -177,18 +187,28 @@ function ConversationContent({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  pendingProposalSummaries,
   applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
   aiError,
   disabled,
+  onSendPromptWithValue,
+  onConnectIntegration,
+  connectedIntegrationNames,
+  onFocusInput,
 }: ConversationContentProps) {
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
-      <AiBuilderConversationMessageList messages={aiMessages} isGeneratingResponse={isGeneratingResponse} />
+      <AiBuilderConversationMessageList
+        messages={aiMessages}
+        isGeneratingResponse={isGeneratingResponse}
+        onSendPrompt={onSendPromptWithValue}
+        onConnectIntegration={onConnectIntegration}
+        connectedIntegrationNames={connectedIntegrationNames}
+        onFocusInput={onFocusInput}
+      />
 
       {isGeneratingResponse ? (
         <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
@@ -199,7 +219,6 @@ function ConversationContent({
           disabled={disabled}
           pendingProposal={pendingProposal}
           applyShortcutHint={applyShortcutHint}
-          pendingProposalSummaries={pendingProposalSummaries}
           onApplyProposal={onApplyProposal}
           onDiscardProposal={onDiscardProposal}
           isApplyingProposal={isApplyingProposal}

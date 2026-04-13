@@ -141,13 +141,24 @@ CanvasOperation = Annotated[
 
 
 class CanvasProposal(BaseModel):
-    summary: str = Field(min_length=1, max_length=500)
+    summary: str = Field(min_length=1, max_length=120)
     operations: list[CanvasOperation] = Field(default_factory=list)
+
+
+class FollowUpOption(BaseModel):
+    label: str = Field(min_length=1, max_length=100)
+    value: str = Field(min_length=1, max_length=500)
+
+
+class IntegrationAction(BaseModel):
+    integration_name: str = Field(min_length=1, max_length=100)
+    label: str = Field(min_length=1, max_length=100)
 
 
 class CanvasAnswer(BaseModel):
     answer: str = Field(min_length=1, max_length=4000)
     confidence: float = Field(ge=0.0, le=1.0, default=0.5)
     citations: list[AnswerCitation] = Field(default_factory=list)
-    follow_up_questions: list[str] = Field(default_factory=list)
+    follow_up_options: list[FollowUpOption] = Field(default_factory=list)
+    integration_actions: list[IntegrationAction] = Field(default_factory=list)
     proposal: CanvasProposal | None = None
