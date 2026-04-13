@@ -130,7 +130,7 @@ func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
 		return tx.Create(&models.CanvasVersion{
 			ID:          liveVersionID,
 			WorkflowID:  workflow.ID,
-			IsPublished: true,
+			State:       models.CanvasVersionStatePublished,
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
 			Edges:       datatypes.NewJSONSlice([]models.Edge{}),

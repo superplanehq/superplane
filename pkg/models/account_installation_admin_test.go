@@ -214,7 +214,7 @@ func createTestCanvas(t *testing.T, organizationID uuid.UUID, name string) {
 		return tx.Create(&CanvasVersion{
 			ID:          liveVersionID,
 			WorkflowID:  canvas.ID,
-			IsPublished: true,
+			State:       CanvasVersionStatePublished,
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice([]Node{}),
 			Edges:       datatypes.NewJSONSlice([]Edge{}),
