@@ -265,7 +265,7 @@ function createAssistantStreamController({
     setAiMessages((previous) => {
       let existingIndex = previous.findIndex((message) => message.role === "tool" && message.toolCallId === toolCallId);
 
-      if (existingIndex < 0 && event.type === "tool_finished" && !hasExplicitCallId) {
+      if (existingIndex < 0 && event.type === "tool_finished" && !hasExplicitCallId && toolLabel.length > 0) {
         existingIndex = previous.findIndex(
           (message) =>
             message.role === "tool" && message.toolStatus === "running" && message.content.startsWith(toolLabel),
