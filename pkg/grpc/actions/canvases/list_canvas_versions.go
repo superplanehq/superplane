@@ -73,11 +73,7 @@ func ListCanvasVersionsPaginated(
 			return draftErr
 		}
 
-		version, versionErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, draft.VersionID)
-		if versionErr != nil {
-			return versionErr
-		}
-		draftVersion = version
+		draftVersion = draft
 		return nil
 	})
 	if err != nil {
@@ -107,9 +103,9 @@ func getLastCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb
 	}
 
 	lastVersion := versions[len(versions)-1]
-	if lastVersion.PublishedAt == nil {
+	if lastVersion.UpdatedAt == nil {
 		return nil
 	}
 
-	return timestamppb.New(*lastVersion.PublishedAt)
+	return timestamppb.New(*lastVersion.UpdatedAt)
 }

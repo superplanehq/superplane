@@ -1,7 +1,7 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
 
 export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): string | undefined {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.publishedAt || version?.metadata?.createdAt;
+  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
   if (!raw) {
     return undefined;
   }
@@ -15,7 +15,7 @@ export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): 
 }
 
 export function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
-  if (version?.metadata?.isPublished) {
+  if (version?.metadata?.state === "STATE_PUBLISHED") {
     return "Published version";
   }
 

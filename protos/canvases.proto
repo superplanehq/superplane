@@ -569,14 +569,19 @@ message Canvas {
 }
 
 message CanvasVersion {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_DRAFT = 1;
+    STATE_PUBLISHED = 2;
+  }
+
   message Metadata {
     string id = 1;
     string canvas_id = 2;
     UserRef owner = 4;
-    bool is_published = 6;
-    google.protobuf.Timestamp published_at = 7;
-    google.protobuf.Timestamp created_at = 8;
-    google.protobuf.Timestamp updated_at = 9;
+    State state = 5;
+    google.protobuf.Timestamp created_at = 6;
+    google.protobuf.Timestamp updated_at = 7;
   }
 
   Metadata metadata = 1;

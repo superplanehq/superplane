@@ -18,16 +18,21 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		owner = &pb.UserRef{Id: ownerID, Name: ownerName}
 	}
 
-	metadata := &pb.CanvasVersion_Metadata{
-		Id:          version.ID.String(),
-		CanvasId:    version.WorkflowID.String(),
-		Owner:       owner,
-		IsPublished: version.IsPublished,
+	state := pb.CanvasVersion_STATE_UNSPECIFIED
+	switch version.State {
+	case models.CanvasVersionStateDraft:
+		state = pb.CanvasVersion_STATE_DRAFT
+	case models.CanvasVersionStatePublished:
+		state = pb.CanvasVersion_STATE_PUBLISHED
 	}
 
-	if version.PublishedAt != nil {
-		metadata.PublishedAt = timestamppb.New(*version.PublishedAt)
+	metadata := &pb.CanvasVersion_Metadata{
+		Id:       version.ID.String(),
+		CanvasId: version.WorkflowID.String(),
+		Owner:    owner,
+		State:    state,
 	}
+
 	if version.CreatedAt != nil {
 		metadata.CreatedAt = timestamppb.New(*version.CreatedAt)
 	}

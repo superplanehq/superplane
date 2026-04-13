@@ -21,13 +21,12 @@ var _ MappedNullable = &CanvasesCanvasVersionMetadata{}
 
 // CanvasesCanvasVersionMetadata struct for CanvasesCanvasVersionMetadata
 type CanvasesCanvasVersionMetadata struct {
-	Id          *string                    `json:"id,omitempty"`
-	CanvasId    *string                    `json:"canvasId,omitempty"`
-	Owner       *SuperplaneCanvasesUserRef `json:"owner,omitempty"`
-	IsPublished *bool                      `json:"isPublished,omitempty"`
-	PublishedAt *time.Time                 `json:"publishedAt,omitempty"`
-	CreatedAt   *time.Time                 `json:"createdAt,omitempty"`
-	UpdatedAt   *time.Time                 `json:"updatedAt,omitempty"`
+	Id        *string                     `json:"id,omitempty"`
+	CanvasId  *string                     `json:"canvasId,omitempty"`
+	Owner     *SuperplaneCanvasesUserRef  `json:"owner,omitempty"`
+	State     *CanvasesCanvasVersionState `json:"state,omitempty"`
+	CreatedAt *time.Time                  `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time                  `json:"updatedAt,omitempty"`
 }
 
 // NewCanvasesCanvasVersionMetadata instantiates a new CanvasesCanvasVersionMetadata object
@@ -36,6 +35,8 @@ type CanvasesCanvasVersionMetadata struct {
 // will change when the set of required properties is changed
 func NewCanvasesCanvasVersionMetadata() *CanvasesCanvasVersionMetadata {
 	this := CanvasesCanvasVersionMetadata{}
+	var state CanvasesCanvasVersionState = CANVASESCANVASVERSIONSTATE_STATE_UNSPECIFIED
+	this.State = &state
 	return &this
 }
 
@@ -44,6 +45,8 @@ func NewCanvasesCanvasVersionMetadata() *CanvasesCanvasVersionMetadata {
 // but it doesn't guarantee that properties required by API are set
 func NewCanvasesCanvasVersionMetadataWithDefaults() *CanvasesCanvasVersionMetadata {
 	this := CanvasesCanvasVersionMetadata{}
+	var state CanvasesCanvasVersionState = CANVASESCANVASVERSIONSTATE_STATE_UNSPECIFIED
+	this.State = &state
 	return &this
 }
 
@@ -143,68 +146,36 @@ func (o *CanvasesCanvasVersionMetadata) SetOwner(v SuperplaneCanvasesUserRef) {
 	o.Owner = &v
 }
 
-// GetIsPublished returns the IsPublished field value if set, zero value otherwise.
-func (o *CanvasesCanvasVersionMetadata) GetIsPublished() bool {
-	if o == nil || IsNil(o.IsPublished) {
-		var ret bool
+// GetState returns the State field value if set, zero value otherwise.
+func (o *CanvasesCanvasVersionMetadata) GetState() CanvasesCanvasVersionState {
+	if o == nil || IsNil(o.State) {
+		var ret CanvasesCanvasVersionState
 		return ret
 	}
-	return *o.IsPublished
+	return *o.State
 }
 
-// GetIsPublishedOk returns a tuple with the IsPublished field value if set, nil otherwise
+// GetStateOk returns a tuple with the State field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasVersionMetadata) GetIsPublishedOk() (*bool, bool) {
-	if o == nil || IsNil(o.IsPublished) {
+func (o *CanvasesCanvasVersionMetadata) GetStateOk() (*CanvasesCanvasVersionState, bool) {
+	if o == nil || IsNil(o.State) {
 		return nil, false
 	}
-	return o.IsPublished, true
+	return o.State, true
 }
 
-// HasIsPublished returns a boolean if a field has been set.
-func (o *CanvasesCanvasVersionMetadata) HasIsPublished() bool {
-	if o != nil && !IsNil(o.IsPublished) {
+// HasState returns a boolean if a field has been set.
+func (o *CanvasesCanvasVersionMetadata) HasState() bool {
+	if o != nil && !IsNil(o.State) {
 		return true
 	}
 
 	return false
 }
 
-// SetIsPublished gets a reference to the given bool and assigns it to the IsPublished field.
-func (o *CanvasesCanvasVersionMetadata) SetIsPublished(v bool) {
-	o.IsPublished = &v
-}
-
-// GetPublishedAt returns the PublishedAt field value if set, zero value otherwise.
-func (o *CanvasesCanvasVersionMetadata) GetPublishedAt() time.Time {
-	if o == nil || IsNil(o.PublishedAt) {
-		var ret time.Time
-		return ret
-	}
-	return *o.PublishedAt
-}
-
-// GetPublishedAtOk returns a tuple with the PublishedAt field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CanvasesCanvasVersionMetadata) GetPublishedAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.PublishedAt) {
-		return nil, false
-	}
-	return o.PublishedAt, true
-}
-
-// HasPublishedAt returns a boolean if a field has been set.
-func (o *CanvasesCanvasVersionMetadata) HasPublishedAt() bool {
-	if o != nil && !IsNil(o.PublishedAt) {
-		return true
-	}
-
-	return false
-}
-
-// SetPublishedAt gets a reference to the given time.Time and assigns it to the PublishedAt field.
-func (o *CanvasesCanvasVersionMetadata) SetPublishedAt(v time.Time) {
-	o.PublishedAt = &v
+// SetState gets a reference to the given CanvasesCanvasVersionState and assigns it to the State field.
+func (o *CanvasesCanvasVersionMetadata) SetState(v CanvasesCanvasVersionState) {
+	o.State = &v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
@@ -290,11 +261,8 @@ func (o CanvasesCanvasVersionMetadata) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Owner) {
 		toSerialize["owner"] = o.Owner
 	}
-	if !IsNil(o.IsPublished) {
-		toSerialize["isPublished"] = o.IsPublished
-	}
-	if !IsNil(o.PublishedAt) {
-		toSerialize["publishedAt"] = o.PublishedAt
+	if !IsNil(o.State) {
+		toSerialize["state"] = o.State
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt

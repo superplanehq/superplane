@@ -44,7 +44,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	userUUID := uuid.MustParse(userID)
-	if version.IsPublished {
+	if version.State == models.CanvasVersionStatePublished {
 		return &pb.DescribeCanvasVersionResponse{
 			Version: SerializeCanvasVersion(version, organizationID),
 		}, nil
