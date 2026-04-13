@@ -207,7 +207,8 @@ export const useInfiniteCanvasLiveVersions = (
     },
     getNextPageParam: (lastPage, allPages) => {
       const loadedPublishedCount = allPages.reduce(
-        (acc, page) => acc + (page?.versions?.filter((version) => version.metadata?.isPublished).length || 0),
+        (acc, page) =>
+          acc + (page?.versions?.filter((version) => version.metadata?.state === "STATE_PUBLISHED").length || 0),
         0,
       );
       const totalCount = lastPage?.totalCount || 0;
@@ -266,7 +267,7 @@ type PositionedNode = ComponentsNode & {
 };
 
 const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
-  const raw = version?.metadata?.publishedAt || version?.metadata?.updatedAt || version?.metadata?.createdAt;
+  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
   if (!raw) return 0;
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? 0 : parsed;

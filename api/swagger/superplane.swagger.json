@@ -4802,12 +4802,8 @@
         "owner": {
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
         },
-        "isPublished": {
-          "type": "boolean"
-        },
-        "publishedAt": {
-          "type": "string",
-          "format": "date-time"
+        "state": {
+          "$ref": "#/definitions/CanvasesCanvasVersionState"
         },
         "createdAt": {
           "type": "string",
@@ -4818,6 +4814,15 @@
           "format": "date-time"
         }
       }
+    },
+    "CanvasesCanvasVersionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "STATE_DRAFT",
+        "STATE_PUBLISHED"
+      ],
+      "default": "STATE_UNSPECIFIED"
     },
     "CanvasesCreateCanvasChangeRequestBody": {
       "type": "object",

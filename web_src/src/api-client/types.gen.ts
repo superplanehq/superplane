@@ -336,11 +336,12 @@ export type CanvasesCanvasVersionMetadata = {
   id?: string;
   canvasId?: string;
   owner?: SuperplaneCanvasesUserRef;
-  isPublished?: boolean;
-  publishedAt?: string;
+  state?: CanvasesCanvasVersionState;
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type CanvasesCanvasVersionState = "STATE_UNSPECIFIED" | "STATE_DRAFT" | "STATE_PUBLISHED";
 
 export type CanvasesCreateCanvasChangeRequestBody = {
   versionId?: string;
