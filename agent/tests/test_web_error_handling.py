@@ -146,10 +146,12 @@ class TestRunStreamEventsRetry:
 
     @patch("ai.web.asyncio.sleep", new_callable=AsyncMock)
     def test_retries_on_transient_error(self, mock_sleep: AsyncMock) -> None:
-        agent, call_count = self._make_agent([
-            FakeAPIStatusError(529),
-            ["event1"],
-        ])
+        agent, call_count = self._make_agent(
+            [
+                FakeAPIStatusError(529),
+                ["event1"],
+            ]
+        )
         events: list[Any] = []
 
         async def run() -> None:
@@ -176,11 +178,13 @@ class TestRunStreamEventsRetry:
 
     @patch("ai.web.asyncio.sleep", new_callable=AsyncMock)
     def test_raises_after_max_retries(self, mock_sleep: AsyncMock) -> None:
-        agent, call_count = self._make_agent([
-            FakeAPIStatusError(529),
-            FakeAPIStatusError(529),
-            FakeAPIStatusError(529),
-        ])
+        agent, call_count = self._make_agent(
+            [
+                FakeAPIStatusError(529),
+                FakeAPIStatusError(529),
+                FakeAPIStatusError(529),
+            ]
+        )
 
         async def run() -> list[Any]:
             events: list[Any] = []
