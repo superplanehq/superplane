@@ -87,7 +87,7 @@ func CreateCanvasChangeRequestWithMetadata(
 			return status.Error(codes.FailedPrecondition, "canvas live version not found")
 		}
 
-		draft, findDraftErr := models.FindCanvasDraftInTransaction(tx, canvasUUID, userUUID)
+		draftVersion, findDraftErr := models.FindCanvasDraftInTransaction(tx, canvasUUID, userUUID)
 		if findDraftErr != nil {
 			if errors.Is(findDraftErr, gorm.ErrRecordNotFound) {
 				return status.Error(codes.FailedPrecondition, "no edit version found for this user")
@@ -95,17 +95,10 @@ func CreateCanvasChangeRequestWithMetadata(
 			return findDraftErr
 		}
 
-		if requestedVersionUUID != nil && draft.VersionID != *requestedVersionUUID {
+		if requestedVersionUUID != nil && draftVersion.ID != *requestedVersionUUID {
 			return status.Error(codes.FailedPrecondition, "version is not your current edit version")
 		}
 
-		draftVersion, findVersionErr := models.FindCanvasVersionInTransaction(tx, canvasUUID, draft.VersionID)
-		if findVersionErr != nil {
-			if errors.Is(findVersionErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "edit version not found")
-			}
-			return findVersionErr
-		}
 		if draftVersion.OwnerID == nil || *draftVersion.OwnerID != userUUID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
