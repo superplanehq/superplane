@@ -17,10 +17,10 @@ import (
 type QueryTraces struct{}
 
 type QueryTracesSpec struct {
-	DataSourceUID string  `json:"dataSourceUid" mapstructure:"dataSourceUid"`
-	Query         string  `json:"query" mapstructure:"query"`
-	TimeFrom      *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
-	TimeTo        *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
+	DataSource string  `json:"dataSource" mapstructure:"dataSource"`
+	Query      string  `json:"query" mapstructure:"query"`
+	TimeFrom   *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
+	TimeTo     *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
 }
 
 func (q *QueryTraces) Name() string {
@@ -71,7 +71,7 @@ func (q *QueryTraces) OutputChannels(_ any) []core.OutputChannel {
 func (q *QueryTraces) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dataSourceUid",
+			Name:        "dataSource",
 			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -131,21 +131,21 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	dataSourceUID := strings.TrimSpace(spec.DataSourceUID)
+	dataSource := strings.TrimSpace(spec.DataSource)
 
-	source, err := client.GetDataSource(dataSourceUID)
+	source, err := client.GetDataSource(dataSource)
 	if err != nil {
 		return fmt.Errorf("error getting data source: %w", err)
 	}
 	if !strings.EqualFold(strings.TrimSpace(source.Type), "tempo") {
-		return fmt.Errorf("data source %q must be a Tempo data source, got %q", dataSourceUID, source.Type)
+		return fmt.Errorf("data source %q must be a Tempo data source, got %q", dataSource, source.Type)
 	}
 
 	request := map[string]any{
 		"queries": []any{
 			map[string]any{
 				"refId":      "A",
-				"datasource": map[string]string{"uid": dataSourceUID},
+				"datasource": map[string]string{"uid": dataSource},
 				"queryType":  "traceql",
 				"query":      strings.TrimSpace(spec.Query),
 				"filters":    []any{},
@@ -253,8 +253,8 @@ func decodeQueryTracesSpec(config any) (QueryTracesSpec, error) {
 }
 
 func validateQueryTracesSpec(spec QueryTracesSpec) error {
-	if strings.TrimSpace(spec.DataSourceUID) == "" {
-		return errors.New("dataSourceUid is required")
+	if strings.TrimSpace(spec.DataSource) == "" {
+		return errors.New("dataSource is required")
 	}
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")

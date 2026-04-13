@@ -64,12 +64,12 @@ export const getDataSourceMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as GetDataSourceNodeMetadata | undefined;
-  const configuration = node.configuration as { dataSourceUid?: string } | undefined;
+  const configuration = node.configuration as { dataSource?: string } | undefined;
 
   if (nodeMetadata?.dataSourceName) {
     metadata.push({ icon: "database", label: nodeMetadata.dataSourceName });
-  } else if (configuration?.dataSourceUid) {
-    metadata.push({ icon: "database", label: `Data Source: ${configuration.dataSourceUid}` });
+  } else if (configuration?.dataSource) {
+    metadata.push({ icon: "database", label: `Data Source: ${configuration.dataSource}` });
   }
 
   if (nodeMetadata?.dataSourceType) {

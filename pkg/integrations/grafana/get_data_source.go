@@ -15,11 +15,11 @@ import (
 type GetDataSource struct{}
 
 type GetDataSourceSpec struct {
-	DataSourceUID string `json:"dataSourceUid" mapstructure:"dataSourceUid"`
+	DataSource string `json:"dataSource" mapstructure:"dataSource"`
 }
 
 type GetDataSourceNodeMetadata struct {
-	DataSourceUID  string `json:"dataSourceUid" mapstructure:"dataSourceUid"`
+	DataSource     string `json:"dataSource" mapstructure:"dataSource"`
 	DataSourceName string `json:"dataSourceName" mapstructure:"dataSourceName"`
 	DataSourceType string `json:"dataSourceType" mapstructure:"dataSourceType"`
 }
@@ -33,11 +33,11 @@ func (g *GetDataSource) Label() string {
 }
 
 func (g *GetDataSource) Description() string {
-	return "Retrieve details for a specific Grafana data source by UID"
+	return "Retrieve details for a specific Grafana data source"
 }
 
 func (g *GetDataSource) Documentation() string {
-	return `The Get Data Source component fetches the full details of a single Grafana data source by UID.
+	return `The Get Data Source component fetches the full details of a single Grafana data source.
 
 ## Use Cases
 
@@ -70,7 +70,7 @@ func (g *GetDataSource) OutputChannels(_ any) []core.OutputChannel {
 func (g *GetDataSource) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dataSourceUid",
+			Name:        "dataSource",
 			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -98,13 +98,13 @@ func (g *GetDataSource) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	source, err := client.GetDataSource(strings.TrimSpace(spec.DataSourceUID))
+	source, err := client.GetDataSource(strings.TrimSpace(spec.DataSource))
 	if err != nil {
 		return fmt.Errorf("error getting data source: %w", err)
 	}
 
 	return ctx.Metadata.Set(GetDataSourceNodeMetadata{
-		DataSourceUID:  source.UID,
+		DataSource:     source.UID,
 		DataSourceName: source.Name,
 		DataSourceType: source.Type,
 	})
@@ -124,7 +124,7 @@ func (g *GetDataSource) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	source, err := client.GetDataSource(strings.TrimSpace(spec.DataSourceUID))
+	source, err := client.GetDataSource(strings.TrimSpace(spec.DataSource))
 	if err != nil {
 		return fmt.Errorf("error getting data source: %w", err)
 	}
@@ -177,8 +177,8 @@ func decodeGetDataSourceSpec(config any) (GetDataSourceSpec, error) {
 }
 
 func validateGetDataSourceSpec(spec GetDataSourceSpec) error {
-	if strings.TrimSpace(spec.DataSourceUID) == "" {
-		return errors.New("dataSourceUid is required")
+	if strings.TrimSpace(spec.DataSource) == "" {
+		return errors.New("dataSource is required")
 	}
 	return nil
 }

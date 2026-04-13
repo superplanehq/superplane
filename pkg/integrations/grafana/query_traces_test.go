@@ -39,10 +39,10 @@ func Test__QueryTraces__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "tempo-uid",
-				"query":         `{ .http.status_code = 500 }`,
-				"timeFrom":      "now-15m",
-				"timeTo":        "now",
+				"dataSource": "tempo-uid",
+				"query":      `{ .http.status_code = 500 }`,
+				"timeFrom":   "now-15m",
+				"timeTo":     "now",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -100,8 +100,8 @@ func Test__QueryTraces__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "grafanacloud-prom",
-				"query":         `{ .http.status_code = 500 }`,
+				"dataSource": "grafanacloud-prom",
+				"query":      `{ .http.status_code = 500 }`,
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{

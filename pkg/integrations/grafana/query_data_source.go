@@ -18,11 +18,11 @@ import (
 type QueryDataSource struct{}
 
 type QueryDataSourceSpec struct {
-	DataSourceUID string  `json:"dataSourceUid"`
-	Query         string  `json:"query"`
-	TimeFrom      *string `json:"timeFrom,omitempty"`
-	TimeTo        *string `json:"timeTo,omitempty"`
-	Format        *string `json:"format,omitempty"`
+	DataSource string  `json:"dataSource" mapstructure:"dataSource"`
+	Query      string  `json:"query" mapstructure:"query"`
+	TimeFrom   *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
+	TimeTo     *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
+	Format     *string `json:"format,omitempty" mapstructure:"format"`
 }
 
 type grafanaQueryRequest struct {
@@ -93,7 +93,7 @@ func (q *QueryDataSource) OutputChannels(configuration any) []core.OutputChannel
 func (q *QueryDataSource) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dataSourceUid",
+			Name:        "dataSource",
 			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -173,7 +173,7 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 		Queries: []grafanaQuery{
 			{
 				RefID:      "A",
-				Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSourceUID)},
+				Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSource)},
 				Expr:       strings.TrimSpace(spec.Query),
 				Query:      strings.TrimSpace(spec.Query),
 			},
@@ -319,8 +319,8 @@ func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
 }
 
 func validateQueryDataSourceSpec(spec QueryDataSourceSpec) error {
-	if strings.TrimSpace(spec.DataSourceUID) == "" {
-		return errors.New("dataSourceUid is required")
+	if strings.TrimSpace(spec.DataSource) == "" {
+		return errors.New("dataSource is required")
 	}
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")

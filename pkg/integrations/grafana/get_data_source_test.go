@@ -18,12 +18,12 @@ func Test__GetDataSource__Setup(t *testing.T) {
 	t.Run("data source uid is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "",
+				"dataSource": "",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
 
-		require.ErrorContains(t, err, "dataSourceUid is required")
+		require.ErrorContains(t, err, "dataSource is required")
 	})
 
 	t.Run("stores data source metadata", func(t *testing.T) {
@@ -45,7 +45,7 @@ func Test__GetDataSource__Setup(t *testing.T) {
 
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"dataSourceUid": "loki-main",
+				"dataSource": "loki-main",
 			},
 			HTTP:     httpContext,
 			Metadata: metadata,
@@ -59,7 +59,7 @@ func Test__GetDataSource__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, GetDataSourceNodeMetadata{
-			DataSourceUID:  "loki-main",
+			DataSource:     "loki-main",
 			DataSourceName: "Main Loki",
 			DataSourceType: "loki",
 		}, metadata.Get())

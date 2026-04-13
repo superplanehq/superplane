@@ -17,11 +17,11 @@ import (
 type QueryLogs struct{}
 
 type QueryLogsSpec struct {
-	DataSourceUID string  `json:"dataSourceUid" mapstructure:"dataSourceUid"`
-	Query         string  `json:"query" mapstructure:"query"`
-	TimeFrom      *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
-	TimeTo        *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
-	Limit         *int    `json:"limit,omitempty" mapstructure:"limit"`
+	DataSource string  `json:"dataSource" mapstructure:"dataSource"`
+	Query      string  `json:"query" mapstructure:"query"`
+	TimeFrom   *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
+	TimeTo     *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
+	Limit      *int    `json:"limit,omitempty" mapstructure:"limit"`
 }
 
 func (q *QueryLogs) Name() string {
@@ -73,7 +73,7 @@ func (q *QueryLogs) OutputChannels(_ any) []core.OutputChannel {
 func (q *QueryLogs) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dataSourceUid",
+			Name:        "dataSource",
 			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -143,7 +143,7 @@ func (q *QueryLogs) Execute(ctx core.ExecutionContext) error {
 
 	lokiQuery := grafanaQuery{
 		RefID:      "A",
-		Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSourceUID)},
+		Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSource)},
 		Expr:       strings.TrimSpace(spec.Query),
 		Query:      strings.TrimSpace(spec.Query),
 	}
@@ -247,8 +247,8 @@ func decodeQueryLogsSpec(config any) (QueryLogsSpec, error) {
 }
 
 func validateQueryLogsSpec(spec QueryLogsSpec) error {
-	if strings.TrimSpace(spec.DataSourceUID) == "" {
-		return errors.New("dataSourceUid is required")
+	if strings.TrimSpace(spec.DataSource) == "" {
+		return errors.New("dataSource is required")
 	}
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")

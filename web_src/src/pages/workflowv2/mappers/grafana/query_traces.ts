@@ -41,8 +41,8 @@ export const queryTracesMapper: ComponentBaseMapper = {
       "Queried At": formatTimestamp(context.execution.createdAt),
     };
 
-    if (configuration?.dataSourceUid) {
-      details["Data Source"] = configuration.dataSourceUid;
+    if (configuration?.dataSource) {
+      details["Data Source"] = configuration.dataSource;
     }
 
     if (configuration?.query) {
@@ -79,8 +79,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as QueryTracesConfiguration | undefined;
 
-  if (configuration?.dataSourceUid) {
-    metadata.push({ icon: "database", label: `Data Source: ${configuration.dataSourceUid}` });
+  if (configuration?.dataSource) {
+    metadata.push({ icon: "database", label: `Data Source: ${configuration.dataSource}` });
   }
 
   if (configuration?.query) {

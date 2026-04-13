@@ -27,7 +27,7 @@ export interface OnAlertFiringConfiguration {
 }
 
 export interface QueryDataSourceConfiguration {
-  dataSourceUid: string;
+  dataSource: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
@@ -44,7 +44,7 @@ export interface DataSource {
 }
 
 export interface GetDataSourceNodeMetadata {
-  dataSourceUid?: string;
+  dataSource?: string;
   dataSourceName?: string;
   dataSourceType?: string;
 }
@@ -54,7 +54,7 @@ export interface ListDataSourcesOutput {
 }
 
 export interface QueryLogsConfiguration {
-  dataSourceUid: string;
+  dataSource: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
@@ -62,7 +62,7 @@ export interface QueryLogsConfiguration {
 }
 
 export interface QueryTracesConfiguration {
-  dataSourceUid: string;
+  dataSource: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
