@@ -7,7 +7,7 @@ import type { SidebarEvent } from "../types";
 import { TimeAgo } from "@/components/TimeAgo";
 import type {
   CanvasesCanvasNodeExecution,
-  ComponentsNode,
+  SuperplaneComponentsNode as ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,

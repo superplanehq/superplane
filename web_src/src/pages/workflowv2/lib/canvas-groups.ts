@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode/constants";
@@ -9,8 +9,8 @@ const DEFAULT_GROUP_WIDTH = 480;
 const DEFAULT_GROUP_HEIGHT = 320;
 const GROUP_SIZE_PADDING = 10;
 
-function getNodeIdsToDeleteIncludingGroupChildren(nodes: ComponentsNode[], seedIds: string[]): Set<string> {
-  const byId = new Map<string, ComponentsNode>();
+function getNodeIdsToDeleteIncludingGroupChildren(nodes: SuperplaneComponentsNode[], seedIds: string[]): Set<string> {
+  const byId = new Map<string, SuperplaneComponentsNode>();
   for (const node of nodes) {
     if (node.id) {
       byId.set(node.id, node);
@@ -44,7 +44,10 @@ function getNodeIdsToDeleteIncludingGroupChildren(nodes: ComponentsNode[], seedI
  * then cleans up the remaining groups so they no longer reference deleted
  * child IDs.
  */
-export function deleteNodesFromCanvas(nodes: ComponentsNode[], seedIds: string[]): ComponentsNode[] {
+export function deleteNodesFromCanvas(
+  nodes: SuperplaneComponentsNode[],
+  seedIds: string[],
+): SuperplaneComponentsNode[] {
   const removedIds = getNodeIdsToDeleteIncludingGroupChildren(nodes, seedIds);
   const survivingNodes = nodes.filter((node) => !node.id || !removedIds.has(node.id));
 
@@ -110,7 +113,7 @@ export function groupCanvasNodes(
   const uniqueNodeName = generateUniqueNodeName("group", existingNodeNames);
   const newGroupId = generateNodeId("group", uniqueNodeName);
 
-  const groupNode: ComponentsNode = {
+  const groupNode: SuperplaneComponentsNode = {
     id: newGroupId,
     name: uniqueNodeName,
     type: "TYPE_WIDGET",
@@ -166,7 +169,7 @@ export function wireGroupParentChildRelationships(canvas: CanvasesCanvas, nodes:
   ];
 }
 
-function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
+function buildGroupNodeData(node: SuperplaneComponentsNode): CanvasNode["data"] {
   const label = node.name || "Group";
 
   return {
@@ -182,7 +185,10 @@ function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
   };
 }
 
-function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[]): { width: number; height: number } {
+function computeGroupSize(
+  groupNode: SuperplaneComponentsNode,
+  allNodes: SuperplaneComponentsNode[],
+): { width: number; height: number } {
   const childIds = collectGroupChildIds(groupNode);
   if (childIds.length === 0) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
 
@@ -210,7 +216,7 @@ function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[])
   };
 }
 
-export function prepareGroupNode(node: ComponentsNode, allNodes: ComponentsNode[]): CanvasNode {
+export function prepareGroupNode(node: SuperplaneComponentsNode, allNodes: SuperplaneComponentsNode[]): CanvasNode {
   const { width, height } = computeGroupSize(node, allNodes);
 
   return {
