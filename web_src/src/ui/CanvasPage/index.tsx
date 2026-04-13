@@ -170,9 +170,7 @@ export interface CanvasPageProps {
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
+  canvasSaveInProgress?: boolean;
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -1179,9 +1177,7 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
-          saveState={props.saveState}
-          lastSavedAt={props.lastSavedAt}
-          saveErrorMessage={props.saveErrorMessage}
+          canvasSaveInProgress={props.canvasSaveInProgress}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1717,9 +1713,7 @@ function CanvasContentHeader({
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   headerMode,
-  saveState,
-  lastSavedAt,
-  saveErrorMessage,
+  canvasSaveInProgress,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1747,9 +1741,7 @@ function CanvasContentHeader({
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
+  canvasSaveInProgress?: boolean;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1807,9 +1799,7 @@ function CanvasContentHeader({
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
-      saveState={saveState}
-      lastSavedAt={lastSavedAt}
-      saveErrorMessage={saveErrorMessage}
+      canvasSaveInProgress={canvasSaveInProgress}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}

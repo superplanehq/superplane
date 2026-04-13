@@ -615,8 +615,6 @@ export function WorkflowPageV2() {
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const [lastCanvasSaveError, setLastCanvasSaveError] = useState<string | null>(null);
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
@@ -2501,7 +2499,6 @@ export function WorkflowPageV2() {
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
 
       try {
-        setLastCanvasSaveError(null);
         const savingVersionID = activeCanvasVersionId || undefined;
         const result = await enqueueCanvasSave(targetWorkflow, savingVersionID);
         if (result.status !== "saved") {
@@ -2538,7 +2535,6 @@ export function WorkflowPageV2() {
         if (options?.showToast !== false) {
           showSuccessToast("Canvas changes saved");
         }
-        setLastSavedAt(new Date());
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
 
         if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
@@ -2551,7 +2547,6 @@ export function WorkflowPageV2() {
       } catch (error: any) {
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
-        setLastCanvasSaveError(displayMessage);
         showErrorToast(displayMessage);
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
@@ -4250,7 +4245,6 @@ export function WorkflowPageV2() {
         ]);
         showSuccessToast("Canvas changes saved");
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
-        setLastSavedAt(new Date());
 
         if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
           setHasUnsavedChanges(false);
@@ -5192,7 +5186,6 @@ export function WorkflowPageV2() {
       }
       queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
       lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
-      setLastSavedAt(new Date());
 
       if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
         setHasUnsavedChanges(false);
@@ -5436,14 +5429,6 @@ export function WorkflowPageV2() {
     : hasEditableVersion
       ? "version-edit"
       : "version-live";
-  const headerSaveState =
-    hasLocalSaveActivity || holdSavingDisplay
-      ? "saving"
-      : lastCanvasSaveError
-        ? "error"
-        : hasUnsavedChanges
-          ? "unsaved"
-          : "saved";
   const unpublishedDraftChangeCount =
     !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
       ? pendingDraftDiffSummary.items.length
@@ -5622,10 +5607,8 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onUndo={!isReadOnly ? handleRevert : undefined}
           canUndo={canUndo}
-          lastSavedAt={lastSavedAt}
-          saveErrorMessage={lastCanvasSaveError}
           headerMode={headerMode}
-          saveState={headerSaveState}
+          canvasSaveInProgress={hasLocalSaveActivity || holdSavingDisplay}
           onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
