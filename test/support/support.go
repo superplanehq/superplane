@@ -401,7 +401,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			ID:          liveVersionID,
 			WorkflowID:  workflow.ID,
 			OwnerID:     &userID,
-			IsPublished: true,
+			State:       models.CanvasVersionStatePublished,
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice(expandedNodes),
 			Edges:       datatypes.NewJSONSlice(edges),
