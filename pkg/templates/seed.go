@@ -193,13 +193,14 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 	}
 
 	version := models.CanvasVersion{
-		ID:         liveVersionID,
-		WorkflowID: canvas.ID,
-		State:      models.CanvasVersionStatePublished,
-		Nodes:      datatypes.NewJSONSlice(expandedNodes),
-		Edges:      datatypes.NewJSONSlice(edges),
-		CreatedAt:  &now,
-		UpdatedAt:  &now,
+		ID:          liveVersionID,
+		WorkflowID:  canvas.ID,
+		State:       models.CanvasVersionStatePublished,
+		PublishedAt: &now,
+		Nodes:       datatypes.NewJSONSlice(expandedNodes),
+		Edges:       datatypes.NewJSONSlice(edges),
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
 	}
 
 	return tx.Create(&version).Error

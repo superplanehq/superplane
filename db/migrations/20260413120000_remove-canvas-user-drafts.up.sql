@@ -5,9 +5,14 @@ ALTER TABLE public.workflow_versions
 
 UPDATE public.workflow_versions AS v
 SET state = 'published'
-WHERE v.id NOT IN (
-  SELECT d.version_id FROM public.workflow_user_drafts AS d
-);
+WHERE v.is_published = true;
+
+UPDATE public.workflow_versions AS v
+SET state = 'snapshot'
+WHERE v.is_published = false
+  AND v.id NOT IN (
+    SELECT d.version_id FROM public.workflow_user_drafts AS d
+  );
 
 ALTER TABLE public.workflow_versions
   ALTER COLUMN state DROP DEFAULT;
@@ -18,11 +23,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_versions_unique_draft
 
 DROP TABLE IF EXISTS public.workflow_user_drafts;
 
--- Drop the now-redundant is_published/published_at columns and their index.
+-- Drop the now-redundant is_published column and its index.
 DROP INDEX IF EXISTS idx_workflow_versions_published;
 
 ALTER TABLE public.workflow_versions
-  DROP COLUMN IF EXISTS is_published,
-  DROP COLUMN IF EXISTS published_at;
+  DROP COLUMN IF EXISTS is_published;
 
 COMMIT;

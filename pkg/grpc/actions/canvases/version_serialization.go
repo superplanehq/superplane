@@ -24,6 +24,8 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		state = pb.CanvasVersion_STATE_DRAFT
 	case models.CanvasVersionStatePublished:
 		state = pb.CanvasVersion_STATE_PUBLISHED
+	case models.CanvasVersionStateSnapshot:
+		state = pb.CanvasVersion_STATE_SNAPSHOT
 	}
 
 	metadata := &pb.CanvasVersion_Metadata{
@@ -33,6 +35,9 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		State:    state,
 	}
 
+	if version.PublishedAt != nil {
+		metadata.PublishedAt = timestamppb.New(*version.PublishedAt)
+	}
 	if version.CreatedAt != nil {
 		metadata.CreatedAt = timestamppb.New(*version.CreatedAt)
 	}

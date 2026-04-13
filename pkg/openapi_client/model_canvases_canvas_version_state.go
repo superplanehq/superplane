@@ -24,6 +24,7 @@ const (
 	CANVASESCANVASVERSIONSTATE_STATE_UNSPECIFIED CanvasesCanvasVersionState = "STATE_UNSPECIFIED"
 	CANVASESCANVASVERSIONSTATE_STATE_DRAFT       CanvasesCanvasVersionState = "STATE_DRAFT"
 	CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED   CanvasesCanvasVersionState = "STATE_PUBLISHED"
+	CANVASESCANVASVERSIONSTATE_STATE_SNAPSHOT    CanvasesCanvasVersionState = "STATE_SNAPSHOT"
 )
 
 // All allowed values of CanvasesCanvasVersionState enum
@@ -31,6 +32,7 @@ var AllowedCanvasesCanvasVersionStateEnumValues = []CanvasesCanvasVersionState{
 	"STATE_UNSPECIFIED",
 	"STATE_DRAFT",
 	"STATE_PUBLISHED",
+	"STATE_SNAPSHOT",
 }
 
 func (v *CanvasesCanvasVersionState) UnmarshalJSON(src []byte) error {

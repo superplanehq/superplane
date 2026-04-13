@@ -99,13 +99,14 @@ func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
 			return err
 		}
 		return tx.Create(&CanvasVersion{
-			ID:         liveVersionID,
-			WorkflowID: wf.ID,
-			State:      CanvasVersionStatePublished,
-			Nodes:      datatypes.NewJSONSlice([]Node{}),
-			Edges:      datatypes.NewJSONSlice([]Edge{}),
-			CreatedAt:  &now,
-			UpdatedAt:  &now,
+			ID:          liveVersionID,
+			WorkflowID:  wf.ID,
+			State:       CanvasVersionStatePublished,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]Node{}),
+			Edges:       datatypes.NewJSONSlice([]Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
 		}).Error
 	}))
 	s.wf = wf

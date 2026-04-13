@@ -610,6 +610,7 @@ CREATE TABLE public.workflow_versions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     owner_id uuid,
+    published_at timestamp without time zone,
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,

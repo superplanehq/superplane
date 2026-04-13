@@ -34,9 +34,10 @@ class CanvasesCanvasVersionMetadata(BaseModel):
     canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
     owner: Optional[SuperplaneCanvasesUserRef] = None
     state: Optional[CanvasesCanvasVersionState] = CanvasesCanvasVersionState.STATE_UNSPECIFIED
+    published_at: Optional[datetime] = Field(default=None, alias="publishedAt")
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
-    __properties: ClassVar[List[str]] = ["id", "canvasId", "owner", "state", "createdAt", "updatedAt"]
+    __properties: ClassVar[List[str]] = ["id", "canvasId", "owner", "state", "publishedAt", "createdAt", "updatedAt"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -96,6 +97,7 @@ class CanvasesCanvasVersionMetadata(BaseModel):
             "canvasId": obj.get("canvasId"),
             "owner": SuperplaneCanvasesUserRef.from_dict(obj["owner"]) if obj.get("owner") is not None else None,
             "state": obj.get("state") if obj.get("state") is not None else CanvasesCanvasVersionState.STATE_UNSPECIFIED,
+            "publishedAt": obj.get("publishedAt"),
             "createdAt": obj.get("createdAt"),
             "updatedAt": obj.get("updatedAt")
         })

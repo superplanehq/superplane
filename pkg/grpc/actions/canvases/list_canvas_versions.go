@@ -103,9 +103,9 @@ func getLastCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb
 	}
 
 	lastVersion := versions[len(versions)-1]
-	if lastVersion.UpdatedAt == nil {
+	if lastVersion.PublishedAt == nil {
 		return nil
 	}
 
-	return timestamppb.New(*lastVersion.UpdatedAt)
+	return timestamppb.New(*lastVersion.PublishedAt)
 }

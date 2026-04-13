@@ -398,14 +398,15 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 		}
 
 		version := models.CanvasVersion{
-			ID:         liveVersionID,
-			WorkflowID: workflow.ID,
-			OwnerID:    &userID,
-			State:      models.CanvasVersionStatePublished,
-			Nodes:      datatypes.NewJSONSlice(expandedNodes),
-			Edges:      datatypes.NewJSONSlice(edges),
-			CreatedAt:  &now,
-			UpdatedAt:  &now,
+			ID:          liveVersionID,
+			WorkflowID:  workflow.ID,
+			OwnerID:     &userID,
+			State:       models.CanvasVersionStatePublished,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice(expandedNodes),
+			Edges:       datatypes.NewJSONSlice(edges),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
 		}
 
 		return tx.Create(&version).Error

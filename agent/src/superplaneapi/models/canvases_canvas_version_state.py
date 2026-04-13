@@ -30,6 +30,7 @@ class CanvasesCanvasVersionState(str, Enum):
     STATE_UNSPECIFIED = 'STATE_UNSPECIFIED'
     STATE_DRAFT = 'STATE_DRAFT'
     STATE_PUBLISHED = 'STATE_PUBLISHED'
+    STATE_SNAPSHOT = 'STATE_SNAPSHOT'
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:

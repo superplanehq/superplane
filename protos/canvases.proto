@@ -573,13 +573,15 @@ message CanvasVersion {
     STATE_UNSPECIFIED = 0;
     STATE_DRAFT = 1;
     STATE_PUBLISHED = 2;
+    STATE_SNAPSHOT = 3;
   }
 
   message Metadata {
     string id = 1;
     string canvas_id = 2;
-    UserRef owner = 4;
-    State state = 5;
+    UserRef owner = 3;
+    State state = 4;
+    google.protobuf.Timestamp published_at = 5;
     google.protobuf.Timestamp created_at = 6;
     google.protobuf.Timestamp updated_at = 7;
   }

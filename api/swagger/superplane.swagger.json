@@ -4805,6 +4805,10 @@
         "state": {
           "$ref": "#/definitions/CanvasesCanvasVersionState"
         },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -4820,7 +4824,8 @@
       "enum": [
         "STATE_UNSPECIFIED",
         "STATE_DRAFT",
-        "STATE_PUBLISHED"
+        "STATE_PUBLISHED",
+        "STATE_SNAPSHOT"
       ],
       "default": "STATE_UNSPECIFIED"
     },

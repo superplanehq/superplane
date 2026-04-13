@@ -256,8 +256,8 @@ export function WorkflowPageV2() {
   const liveVersions = useMemo(
     () =>
       visibleCanvasVersions
-        .filter((version) => version.metadata?.state === "STATE_PUBLISHED")
-        .sort((a, b) => versionSortValue(b.metadata?.updatedAt) - versionSortValue(a.metadata?.updatedAt)),
+        .filter((version) => !!version.metadata?.publishedAt)
+        .sort((a, b) => versionSortValue(b.metadata?.publishedAt) - versionSortValue(a.metadata?.publishedAt)),
     [visibleCanvasVersions],
   );
   const liveVersionChangeRequestsByVersionId = useMemo(() => {
@@ -304,7 +304,7 @@ export function WorkflowPageV2() {
         return;
       }
 
-      const versionPublishedAt = versionSortValue(version.metadata?.updatedAt);
+      const versionPublishedAt = versionSortValue(version.metadata?.publishedAt);
       if (!versionPublishedAt) {
         return;
       }
