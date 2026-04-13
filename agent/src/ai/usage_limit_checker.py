@@ -91,7 +91,7 @@ class UsageLimitChecker:
             return None
 
         limits = response.limits
-        if limits is None:
+        if limits is None or limits.retention_window_days <= 0:
             return None
 
         return int(limits.retention_window_days)
