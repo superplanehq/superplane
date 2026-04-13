@@ -576,6 +576,36 @@ class SessionStore:
                 (initial_message.strip(), now, chat_id),
             )
 
+    def list_distinct_org_ids(self) -> list[str]:
+        with self._cursor() as cur:
+            cur.execute("SELECT DISTINCT org_id FROM agent_chats")
+            return [str(row["org_id"]) for row in cur.fetchall()]
+
+    def delete_expired_chats_for_org(
+        self, org_id: str, retention_days: int, batch_size: int = 500
+    ) -> int:
+        total = 0
+        while True:
+            with self._cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM agent_chats
+                    WHERE id IN (
+                        SELECT id FROM agent_chats
+                        WHERE org_id = %s
+                          AND updated_at < NOW() - make_interval(days => %s)
+                        LIMIT %s
+                    )
+                    AND updated_at < NOW() - make_interval(days => %s)
+                    """,
+                    (org_id, retention_days, batch_size, retention_days),
+                )
+                deleted = int(cur.rowcount)
+                total += deleted
+                if deleted < batch_size:
+                    break
+        return total
+
     def create_agent_chat_run(self, chat_id: str, model: str) -> str:
         run_id = str(uuid.uuid4())
         now = _utcnow()
