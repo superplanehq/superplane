@@ -180,7 +180,7 @@ func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var timeMS, timeEndMS int64
-	panelID, err := resolveAnnotationPanelID(spec.Panel, spec.PanelID)
+	panelID, err := resolveAnnotationPanelIDForExecute(spec.Panel, spec.PanelID)
 	if err != nil {
 		return err
 	}
@@ -310,7 +310,33 @@ func validateCreateAnnotationSpec(spec CreateAnnotationSpec) error {
 
 func resolveAnnotationPanelID(panel string, legacyPanelID *int64) (*int64, error) {
 	if strings.TrimSpace(panel) != "" {
-		parsed, err := parseAnnotationPanelID(panel)
+		s := strings.TrimSpace(panel)
+		if isExpressionValue(s) {
+			return nil, nil
+		}
+		parsed, err := parseAnnotationPanelID(s)
+		if err != nil {
+			return nil, err
+		}
+		return &parsed, nil
+	}
+
+	if legacyPanelID != nil && *legacyPanelID > 0 {
+		return legacyPanelID, nil
+	}
+
+	return nil, nil
+}
+
+// resolveAnnotationPanelIDForExecute parses the panel after template resolution.
+// Unresolved workflow expressions are rejected (see isExpressionValue).
+func resolveAnnotationPanelIDForExecute(panel string, legacyPanelID *int64) (*int64, error) {
+	if strings.TrimSpace(panel) != "" {
+		s := strings.TrimSpace(panel)
+		if isExpressionValue(s) {
+			return nil, errors.New("panel must resolve to a valid panel resource ID before execution")
+		}
+		parsed, err := parseAnnotationPanelID(s)
 		if err != nil {
 			return nil, err
 		}

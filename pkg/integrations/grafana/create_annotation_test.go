@@ -152,8 +152,32 @@ func Test__resolveAnnotationPanelID(t *testing.T) {
 	require.NotNil(t, panelID)
 	require.Equal(t, int64(9), *panelID)
 
+	panelID, err = resolveAnnotationPanelID(`{{ $['Create'].data.panelId }}`, nil)
+	require.NoError(t, err)
+	require.Nil(t, panelID)
+
 	_, err = resolveAnnotationPanelID("abc", nil)
 	require.ErrorContains(t, err, "panel must be a valid panel resource")
+}
+
+func Test__resolveAnnotationPanelIDForExecute(t *testing.T) {
+	panelID, err := resolveAnnotationPanelIDForExecute("7", nil)
+	require.NoError(t, err)
+	require.NotNil(t, panelID)
+	require.Equal(t, int64(7), *panelID)
+
+	_, err = resolveAnnotationPanelIDForExecute(`{{ $['Create'].data.panelId }}`, nil)
+	require.ErrorContains(t, err, "before execution")
+
+	legacyPanelID := int64(9)
+	panelID, err = resolveAnnotationPanelIDForExecute("", &legacyPanelID)
+	require.NoError(t, err)
+	require.NotNil(t, panelID)
+	require.Equal(t, int64(9), *panelID)
+
+	panelID, err = resolveAnnotationPanelIDForExecute("", nil)
+	require.NoError(t, err)
+	require.Nil(t, panelID)
 }
 
 func Test__validateCreateAnnotationSpec__requiresPanel(t *testing.T) {
@@ -162,6 +186,14 @@ func Test__validateCreateAnnotationSpec__requiresPanel(t *testing.T) {
 	})
 
 	require.ErrorContains(t, err, "panel is required")
+}
+
+func Test__validateCreateAnnotationSpec__acceptsExpressionPanel(t *testing.T) {
+	err := validateCreateAnnotationSpec(CreateAnnotationSpec{
+		Text:  "deploy",
+		Panel: `{{ $['Create'].data.panelId }}`,
+	})
+	require.NoError(t, err)
 }
 
 func Test__buildAnnotationURL(t *testing.T) {
@@ -233,4 +265,19 @@ func Test__CreateAnnotation__Execute__createsAnnotationForSelectedPanel(t *testi
 	output := executionState.Payloads[0].(map[string]any)["data"].(CreateAnnotationOutput)
 	require.Equal(t, int64(41), output.ID)
 	require.NotEmpty(t, output.URL)
+}
+
+func Test__CreateAnnotation__Execute__rejectsUnresolvedExpressionPanel(t *testing.T) {
+	component := &CreateAnnotation{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"panel": `{{ $['Create'].data.panelId }}`,
+			"text":  "deploy",
+		},
+		HTTP:           &contexts.HTTPContext{},
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: &contexts.ExecutionStateContext{},
+	})
+
+	require.ErrorContains(t, err, "before execution")
 }

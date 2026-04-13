@@ -182,7 +182,7 @@ func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var fromMS, toMS int64
-	panelID, err := resolveAnnotationPanelID(spec.Panel, spec.PanelID)
+	panelID, err := resolveAnnotationPanelIDForExecute(spec.Panel, spec.PanelID)
 	if err != nil {
 		return err
 	}
