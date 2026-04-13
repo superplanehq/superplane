@@ -94,10 +94,7 @@ class UsageLimitChecker:
         if limits is None:
             return None
 
-        days = limits.retention_window_days
-        if days <= 0:
-            return None
-        return int(days)
+        return int(limits.retention_window_days)
 
     async def close(self) -> None:
         await self._channel.close()

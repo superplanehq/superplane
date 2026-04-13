@@ -57,6 +57,29 @@ def test_retention_loop_falls_back_to_config_when_usage_unavailable() -> None:
     store.delete_expired_chats_for_org.assert_called_with("org-1", 14)
 
 
+def test_retention_loop_skips_org_with_unlimited_retention() -> None:
+    store = MagicMock()
+    store.list_distinct_org_ids = MagicMock(return_value=["org-1"])
+    store.delete_expired_chats_for_org = MagicMock(return_value=0)
+    checker = _make_limit_checker(retention_days=0)
+
+    async def run() -> None:
+        with patch("ai.chat_retention.CLEANUP_INTERVAL_SECONDS", 0.01):
+            with patch("ai.chat_retention.config") as mock_config:
+                mock_config.chat_retention_days = 14
+                task = asyncio.create_task(run_chat_retention_loop(store, checker))
+                await asyncio.sleep(0.05)
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+    asyncio.run(run())
+    store.list_distinct_org_ids.assert_called()
+    store.delete_expired_chats_for_org.assert_not_called()
+
+
 def test_retention_loop_disabled_when_zero_days() -> None:
     store = MagicMock()
     checker = _make_limit_checker()
