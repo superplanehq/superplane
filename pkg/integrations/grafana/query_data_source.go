@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,12 +18,11 @@ import (
 type QueryDataSource struct{}
 
 type QueryDataSourceSpec struct {
-	DataSourceUID string  `json:"dataSourceUid"`
-	Query         string  `json:"query"`
-	TimeFrom      *string `json:"timeFrom,omitempty"`
-	TimeTo        *string `json:"timeTo,omitempty"`
-	Timezone      *string `json:"timezone,omitempty"`
-	Format        *string `json:"format,omitempty"`
+	DataSource string  `json:"dataSource" mapstructure:"dataSource"`
+	Query      string  `json:"query" mapstructure:"query"`
+	TimeFrom   *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
+	TimeTo     *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
+	Format     *string `json:"format,omitempty" mapstructure:"format"`
 }
 
 type grafanaQueryRequest struct {
@@ -40,6 +37,8 @@ type grafanaQuery struct {
 	Expr       string `json:"expr,omitempty"`
 	Query      string `json:"query,omitempty"`
 	Format     string `json:"format,omitempty"`
+	// MaxLines is used by the Loki datasource (LogQL); omit when zero.
+	MaxLines int `json:"maxLines,omitempty"`
 }
 
 const grafanaDateTimeFormat = "2006-01-02T15:04"
@@ -69,8 +68,7 @@ func (q *QueryDataSource) Documentation() string {
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional datetime picker values for the query range
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Time From / Time To**: Optional datetime picker values for the query range. Datetime values without an explicit offset are interpreted as UTC.
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
@@ -95,7 +93,7 @@ func (q *QueryDataSource) OutputChannels(configuration any) []core.OutputChannel
 func (q *QueryDataSource) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dataSourceUid",
+			Name:        "dataSource",
 			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -139,14 +137,6 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "timezone",
-			Label:       "Timezone",
-			Type:        configuration.FieldTypeTimezone,
-			Required:    false,
-			Default:     "current",
-			Description: "Timezone offset used for Time From / Time To picker values. Relative Grafana values like now-1h ignore this field.",
-		},
-		{
 			Name:        "format",
 			Label:       "Format",
 			Type:        configuration.FieldTypeString,
@@ -183,7 +173,7 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 		Queries: []grafanaQuery{
 			{
 				RefID:      "A",
-				Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSourceUID)},
+				Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSource)},
 				Expr:       strings.TrimSpace(spec.Query),
 				Query:      strings.TrimSpace(spec.Query),
 			},
@@ -191,14 +181,14 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, spec.Timezone)
+		request.From, err = resolveQueryTimeValue(*spec.TimeFrom)
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo, spec.Timezone)
+		request.To, err = resolveQueryTimeValue(*spec.TimeTo)
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}
@@ -274,13 +264,13 @@ func defaultTimeRange() (string, string) {
 	return fmt.Sprintf("%d", from.UnixMilli()), fmt.Sprintf("%d", now.UnixMilli())
 }
 
-func resolveQueryTimeValue(value string, timezone *string) (string, error) {
+func resolveQueryTimeValue(value string) (string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return "", nil
 	}
 
-	if parsed, ok, err := parseGrafanaQueryTime(trimmed, timezone); err != nil {
+	if parsed, ok, err := parseGrafanaQueryTime(trimmed); err != nil {
 		return "", err
 	} else if ok {
 		return fmt.Sprintf("%d", parsed.UTC().UnixMilli()), nil
@@ -290,11 +280,13 @@ func resolveQueryTimeValue(value string, timezone *string) (string, error) {
 	return trimmed, nil
 }
 
-func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, error) {
+func parseGrafanaQueryTime(value string) (time.Time, bool, error) {
 	for _, format := range []string{
 		time.RFC3339Nano,
 		time.RFC3339,
 		"2006-01-02T15:04Z07:00",
+		"2006-01-02 15:04:05.999999999 -0700 MST",
+		"2006-01-02 15:04:05 -0700 MST",
 	} {
 		if parsed, err := time.Parse(format, value); err == nil {
 			return parsed, true, nil
@@ -306,12 +298,7 @@ func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, err
 			continue
 		}
 
-		location, err := parseGrafanaQueryTimezone(timezone)
-		if err != nil {
-			return time.Time{}, false, err
-		}
-
-		parsed, err := time.ParseInLocation(format, value, location)
+		parsed, err := time.ParseInLocation(format, value, time.UTC)
 		if err != nil {
 			return time.Time{}, false, err
 		}
@@ -320,29 +307,6 @@ func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, err
 	}
 
 	return time.Time{}, false, nil
-}
-
-func parseGrafanaQueryTimezone(timezone *string) (*time.Location, error) {
-	if timezone == nil || strings.TrimSpace(*timezone) == "" {
-		return nil, errors.New("timezone is required for datetime-local values")
-	}
-
-	trimmed := strings.TrimSpace(*timezone)
-	if trimmed == "current" {
-		return nil, errors.New("timezone value 'current' must be resolved before execution")
-	}
-
-	offsetHours, err := strconv.ParseFloat(strings.TrimPrefix(trimmed, "+"), 64)
-	if err != nil {
-		return nil, fmt.Errorf("expected numeric offset like -5, 0, 5.5, or +8")
-	}
-
-	if offsetHours < -12 || offsetHours > 14 {
-		return nil, fmt.Errorf("offset must be between -12 and +14 hours")
-	}
-
-	offsetSeconds := int(math.Round(offsetHours * 3600))
-	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds), nil
 }
 
 func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
@@ -355,27 +319,27 @@ func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
 }
 
 func validateQueryDataSourceSpec(spec QueryDataSourceSpec) error {
-	if strings.TrimSpace(spec.DataSourceUID) == "" {
-		return errors.New("dataSourceUid is required")
+	if strings.TrimSpace(spec.DataSource) == "" {
+		return errors.New("dataSource is required")
 	}
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")
 	}
-	if err := validateQueryTimeValue(spec.TimeFrom, spec.Timezone); err != nil {
+	if err := validateQueryTimeValue(spec.TimeFrom); err != nil {
 		return fmt.Errorf("timeFrom: %w", err)
 	}
-	if err := validateQueryTimeValue(spec.TimeTo, spec.Timezone); err != nil {
+	if err := validateQueryTimeValue(spec.TimeTo); err != nil {
 		return fmt.Errorf("timeTo: %w", err)
 	}
 
 	return nil
 }
 
-func validateQueryTimeValue(value *string, timezone *string) error {
+func validateQueryTimeValue(value *string) error {
 	if value == nil || strings.TrimSpace(*value) == "" {
 		return nil
 	}
 
-	_, _, err := parseGrafanaQueryTime(strings.TrimSpace(*value), timezone)
+	_, _, err := parseGrafanaQueryTime(strings.TrimSpace(*value))
 	return err
 }

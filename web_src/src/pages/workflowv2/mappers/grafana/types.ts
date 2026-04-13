@@ -27,10 +27,43 @@ export interface OnAlertFiringConfiguration {
 }
 
 export interface QueryDataSourceConfiguration {
-  dataSourceUid: string;
+  dataSource: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
-  timezone?: string;
   format?: string;
+}
+
+export interface DataSource {
+  id?: number;
+  uid: string;
+  name: string;
+  type: string;
+  url?: string;
+  isDefault?: boolean;
+}
+
+export interface GetDataSourceNodeMetadata {
+  dataSource?: string;
+  dataSourceName?: string;
+  dataSourceType?: string;
+}
+
+export interface ListDataSourcesOutput {
+  dataSources: DataSource[];
+}
+
+export interface QueryLogsConfiguration {
+  dataSource: string;
+  query: string;
+  timeFrom?: string;
+  timeTo?: string;
+  limit?: number;
+}
+
+export interface QueryTracesConfiguration {
+  dataSource: string;
+  query: string;
+  timeFrom?: string;
+  timeTo?: string;
 }
