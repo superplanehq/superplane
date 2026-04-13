@@ -7,9 +7,10 @@ import { cn } from "../lib/utils";
 
 export type AiMessageProps = {
   message: AiBuilderMessage;
+  animate?: boolean;
 };
 
-export function AiMessage({ message }: AiMessageProps) {
+export function AiMessage({ message, animate }: AiMessageProps) {
   if (message.role === "assistant" && message.content.trim().length === 0) {
     return null;
   }
@@ -18,7 +19,7 @@ export function AiMessage({ message }: AiMessageProps) {
     case "user":
       return <UserMessage content={message.content} />;
     case "tool":
-      return <ToolMessage message={message} />;
+      return <ToolMessage message={message} animate={animate} />;
     case "assistant":
       return <AssistantMessage content={message.content} />;
     default:
@@ -26,19 +27,16 @@ export function AiMessage({ message }: AiMessageProps) {
   }
 }
 
-function ToolMessage({ message }: { message: AiBuilderMessage }) {
+function ToolMessage({ message, animate }: { message: AiBuilderMessage; animate?: boolean }) {
   const isRunning = message.toolStatus === "running";
 
-  const className = cn(
-    "flex items-center gap-2 px-2 text-xs leading-relaxed text-gray-500",
-    isRunning ? "sp-ai-thinking" : "",
-  );
-
   return (
-    <div className="w-full">
-      <div className={className}>
+    <div className={cn("w-full", animate && "sp-tool-enter")}>
+      <div className="flex items-center gap-2 px-2 text-xs leading-relaxed text-gray-500">
         <Activity className="h-3 w-3 shrink-0 text-gray-400" aria-hidden="true" />
-        <span className="min-w-0 whitespace-pre-wrap break-words">{message.content}</span>
+        <span className={cn("min-w-0 whitespace-pre-wrap break-words", isRunning && "sp-ai-thinking")}>
+          {message.content}
+        </span>
       </div>
     </div>
   );
