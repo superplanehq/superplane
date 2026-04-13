@@ -19,7 +19,6 @@ func Test__Elastic__Sync(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"kibanaUrl": "https://kibana.example.com",
-				"authType":  "apiKey",
 				"apiKey":    "test-api-key",
 			},
 		}
@@ -35,9 +34,8 @@ func Test__Elastic__Sync(t *testing.T) {
 	t.Run("missing kibanaUrl -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"url":      "https://elastic.example.com",
-				"authType": "apiKey",
-				"apiKey":   "test-api-key",
+				"url":    "https://elastic.example.com",
+				"apiKey": "test-api-key",
 			},
 		}
 
@@ -54,7 +52,6 @@ func Test__Elastic__Sync(t *testing.T) {
 			Configuration: map[string]any{
 				"url":       "https://elastic.example.com",
 				"kibanaUrl": "https://kibana.example.com",
-				"authType":  "apiKey",
 				"apiKey":    "test-api-key",
 			},
 		}
@@ -81,7 +78,6 @@ func Test__Elastic__Sync(t *testing.T) {
 			Configuration: map[string]any{
 				"url":       "https://elastic.example.com",
 				"kibanaUrl": "https://kibana.example.com",
-				"authType":  "apiKey",
 				"apiKey":    "test-api-key",
 			},
 		}
@@ -107,12 +103,11 @@ func Test__Elastic__Sync(t *testing.T) {
 		assert.NotEqual(t, "ready", integrationCtx.State)
 	})
 
-	t.Run("valid api key configuration -> ready", func(t *testing.T) {
+	t.Run("missing connector management permission -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"url":       "https://elastic.example.com",
 				"kibanaUrl": "https://kibana.example.com",
-				"authType":  "apiKey",
 				"apiKey":    "test-api-key",
 			},
 		}
@@ -126,6 +121,51 @@ func Test__Elastic__Sync(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`[]`)),
 				},
+				{
+					StatusCode: http.StatusForbidden,
+					Body:       io.NopCloser(strings.NewReader(`{"message":"forbidden"}`)),
+				},
+			},
+		}
+
+		err := e.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+		})
+		require.ErrorContains(t, err, "invalid Kibana configuration")
+		assert.NotEqual(t, "ready", integrationCtx.State)
+		require.Len(t, httpCtx.Requests, 3)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[2].Method)
+		assert.Equal(t, "https://kibana.example.com/api/actions/connector", httpCtx.Requests[2].URL.String())
+	})
+
+	t.Run("valid api key configuration -> ready", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"url":       "https://elastic.example.com",
+				"kibanaUrl": "https://kibana.example.com",
+				"apiKey":    "test-api-key",
+			},
+		}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cluster_name":"test"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[]`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"connector-validation","name":"SuperPlane Validation"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				},
 			},
 		}
 
@@ -136,9 +176,11 @@ func Test__Elastic__Sync(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
-		require.Len(t, httpCtx.Requests, 2)
+		require.Len(t, httpCtx.Requests, 4)
 		assert.Equal(t, "ApiKey test-api-key", httpCtx.Requests[0].Header.Get("Authorization"))
 		assert.Equal(t, "https://elastic.example.com/", httpCtx.Requests[0].URL.String())
 		assert.Equal(t, "https://kibana.example.com/api/actions/connectors", httpCtx.Requests[1].URL.String())
+		assert.Equal(t, "https://kibana.example.com/api/actions/connector", httpCtx.Requests[2].URL.String())
+		assert.Equal(t, "https://kibana.example.com/api/actions/connector/connector-validation", httpCtx.Requests[3].URL.String())
 	})
 }
