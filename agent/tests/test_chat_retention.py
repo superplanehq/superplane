@@ -57,17 +57,49 @@ def test_retention_loop_falls_back_to_config_when_usage_unavailable() -> None:
     store.delete_expired_chats_for_org.assert_called_with("org-1", 14)
 
 
-def test_retention_loop_disabled_when_zero_days() -> None:
+def test_retention_loop_skips_orgs_when_fallback_zero_and_usage_unset() -> None:
     store = MagicMock()
-    checker = _make_limit_checker()
+    store.list_distinct_org_ids = MagicMock(return_value=["org-1"])
+    store.delete_expired_chats_for_org = MagicMock(return_value=0)
+    checker = _make_limit_checker(retention_days=None)
 
     async def run() -> None:
-        with patch("ai.chat_retention.config") as mock_config:
-            mock_config.chat_retention_days = 0
-            await run_chat_retention_loop(store, checker)
+        with patch("ai.chat_retention.CLEANUP_INTERVAL_SECONDS", 0.01):
+            with patch("ai.chat_retention.config") as mock_config:
+                mock_config.chat_retention_days = 0
+                task = asyncio.create_task(run_chat_retention_loop(store, checker))
+                await asyncio.sleep(0.05)
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
     asyncio.run(run())
-    store.list_distinct_org_ids.assert_not_called()
+    store.list_distinct_org_ids.assert_called()
+    store.delete_expired_chats_for_org.assert_not_called()
+
+
+def test_retention_loop_uses_usage_service_even_when_fallback_zero() -> None:
+    store = MagicMock()
+    store.list_distinct_org_ids = MagicMock(return_value=["org-1"])
+    store.delete_expired_chats_for_org = MagicMock(return_value=3)
+    checker = _make_limit_checker(retention_days=30)
+
+    async def run() -> None:
+        with patch("ai.chat_retention.CLEANUP_INTERVAL_SECONDS", 0.01):
+            with patch("ai.chat_retention.config") as mock_config:
+                mock_config.chat_retention_days = 0
+                task = asyncio.create_task(run_chat_retention_loop(store, checker))
+                await asyncio.sleep(0.05)
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+    asyncio.run(run())
+    store.delete_expired_chats_for_org.assert_called_with("org-1", 30)
 
 
 def test_retention_loop_continues_after_error() -> None:

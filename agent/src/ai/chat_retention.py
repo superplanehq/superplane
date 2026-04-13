@@ -23,12 +23,9 @@ async def run_chat_retention_loop(
     store: SessionStore, limit_checker: AgentUsageLimitChecker
 ) -> None:
     fallback_days = config.chat_retention_days
-    if fallback_days <= 0:
-        logger.info("agent chat retention is disabled (AGENT_CHAT_RETENTION_DAYS=0)")
-        return
 
     logger.info(
-        "agent chat retention started: default %d days, checking every %ds",
+        "agent chat retention started: fallback %d days, checking every %ds",
         fallback_days,
         CLEANUP_INTERVAL_SECONDS,
     )
