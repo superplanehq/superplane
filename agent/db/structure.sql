@@ -149,17 +149,17 @@ CREATE INDEX idx_agent_chat_runs_chat_id ON public.agent_chat_runs USING btree (
 
 
 --
--- Name: idx_agent_chats_owner_canvas_created; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_agent_chats_owner_canvas_created ON public.agent_chats USING btree (org_id, user_id, canvas_id, created_at DESC);
-
-
---
 -- Name: idx_agent_chats_org_updated_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_agent_chats_org_updated_at ON public.agent_chats USING btree (org_id, updated_at);
+
+
+--
+-- Name: idx_agent_chats_owner_canvas_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_chats_owner_canvas_created ON public.agent_chats USING btree (org_id, user_id, canvas_id, created_at DESC);
 
 
 --
