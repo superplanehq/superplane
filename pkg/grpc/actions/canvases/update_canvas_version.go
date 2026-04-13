@@ -174,10 +174,7 @@ func UpdateCanvasVersionWithUsage(
 			return err
 		}
 
-		return tx.Model(&models.CanvasUserDraft{}).
-			Where("workflow_id = ? AND user_id = ? AND version_id = ?", canvasUUID, userUUID, version.ID).
-			Update("updated_at", now).
-			Error
+		return nil
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
