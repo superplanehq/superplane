@@ -27,7 +27,7 @@ export const getDashboardMapper: ComponentBaseMapper = {
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: buildDashboardMetadata(
         context.node,
-        context.node.configuration as GetDashboardConfiguration | undefined,
+        (context.node.configuration as GetDashboardConfiguration | undefined)?.dashboard,
       ),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
