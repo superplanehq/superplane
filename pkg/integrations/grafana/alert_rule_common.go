@@ -3,7 +3,6 @@ package grafana
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -706,7 +705,9 @@ func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (m
 	}
 	if spec.DataSource != nil || spec.Query != nil || spec.LookbackSeconds != nil ||
 		spec.Reducer != nil || spec.ConditionType != nil || spec.Threshold != nil || spec.Threshold2 != nil {
-		queryData, err := mergeAlertRuleQueryData(existing["data"], spec)
+		// Use updated["data"] (from sanitizeExistingAlertRulePayload), not existing["data"], so
+		// mergeAlertRuleQueryData's partial slice reuse does not alias the caller's original rule.
+		queryData, err := mergeAlertRuleQueryData(updated["data"], spec)
 		if err != nil {
 			return nil, err
 		}
@@ -998,10 +999,35 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 	}, nil
 }
 
+// cloneAlertRuleMap returns a deep copy of the alert rule map so merge/update paths can mutate the
+// result without affecting the caller's original map (nested maps, slices, and query data entries).
 func cloneAlertRuleMap(value map[string]any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
 	cloned := make(map[string]any, len(value))
-	maps.Copy(cloned, value)
+	for k, v := range value {
+		cloned[k] = deepCloneAlertRuleValue(v)
+	}
 	return cloned
+}
+
+func deepCloneAlertRuleValue(v any) any {
+	if v == nil {
+		return nil
+	}
+	switch x := v.(type) {
+	case map[string]any:
+		return cloneAlertRuleMap(x)
+	case []any:
+		out := make([]any, len(x))
+		for i, el := range x {
+			out[i] = deepCloneAlertRuleValue(el)
+		}
+		return out
+	default:
+		return v
+	}
 }
 
 func cloneAlertRuleMapFromValue(value any) map[string]any {

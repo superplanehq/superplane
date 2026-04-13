@@ -146,6 +146,66 @@ func Test__mergeAlertRulePayload__clearsNotificationSettingsWhenReceiverEmpty(t 
 	require.NoError(t, err)
 	_, has := merged["notification_settings"]
 	assert.False(t, has)
+
+	// Caller-owned map must keep notification settings (merge must not mutate the input rule).
+	ns, stillHas := existing["notification_settings"].(map[string]any)
+	require.True(t, stillHas)
+	assert.Equal(t, "slack-alerts", ns["receiver"])
+}
+
+func Test__mergeAlertRulePayload__doesNotShareNestedMapsWithExisting(t *testing.T) {
+	existing := map[string]any{
+		"uid":   "rule-1",
+		"title": "Old",
+		"labels": map[string]any{
+			"team": "ops",
+		},
+		"data": []any{
+			map[string]any{
+				"refId":         "A",
+				"datasourceUid": "ds1",
+				"model":         map[string]any{"expr": "up"},
+			},
+			map[string]any{
+				"refId": "B",
+				"model": map[string]any{"type": "reduce", "reducer": "last", "expression": "A"},
+			},
+			map[string]any{
+				"refId": "C",
+				"model": map[string]any{
+					"type": "threshold",
+					"conditions": []any{
+						map[string]any{
+							"evaluator": map[string]any{"type": "gt", "params": []any{float64(0.5)}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := UpdateAlertRuleSpec{
+		AlertRule: "rule-1",
+		Query:     strPtr("sum(rate(http_requests_total[5m]))"),
+	}
+
+	merged, err := mergeAlertRulePayload(existing, spec)
+	require.NoError(t, err)
+
+	mergedLabels := merged["labels"].(map[string]any)
+	mergedLabels["mutated"] = "yes"
+
+	origLabels := existing["labels"].(map[string]any)
+	_, touched := origLabels["mutated"]
+	assert.False(t, touched, "mutating merged labels must not change the caller's map")
+
+	mergedData := merged["data"].([]any)
+	origData := existing["data"].([]any)
+	m1 := mergedData[1].(map[string]any)
+	o1 := origData[1].(map[string]any)
+	m1["probe"] = "isolated"
+	_, leaked := o1["probe"]
+	assert.False(t, leaked, "B query entry must not be shared with caller when only query updates")
 }
 
 func Test__validateUpdateAlertRuleSpec__rejectsInvalidReducerAndConditionType(t *testing.T) {
