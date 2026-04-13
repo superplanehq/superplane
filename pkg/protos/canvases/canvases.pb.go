@@ -543,28 +543,31 @@ func (CanvasNodeExecution_ResultReason) EnumDescriptor() ([]byte, []int) {
 type CanvasChangeset_Change_Type int32
 
 const (
-	CanvasChangeset_Change_ADD_NODE         CanvasChangeset_Change_Type = 0
-	CanvasChangeset_Change_DELETE_NODE      CanvasChangeset_Change_Type = 1
-	CanvasChangeset_Change_UPDATE_NODE      CanvasChangeset_Change_Type = 2
-	CanvasChangeset_Change_CONNECT_NODES    CanvasChangeset_Change_Type = 3
-	CanvasChangeset_Change_DISCONNECT_NODES CanvasChangeset_Change_Type = 4
+	CanvasChangeset_Change_UNSPECIFIED      CanvasChangeset_Change_Type = 0
+	CanvasChangeset_Change_ADD_NODE         CanvasChangeset_Change_Type = 1
+	CanvasChangeset_Change_DELETE_NODE      CanvasChangeset_Change_Type = 2
+	CanvasChangeset_Change_UPDATE_NODE      CanvasChangeset_Change_Type = 3
+	CanvasChangeset_Change_CONNECT_NODES    CanvasChangeset_Change_Type = 4
+	CanvasChangeset_Change_DISCONNECT_NODES CanvasChangeset_Change_Type = 5
 )
 
 // Enum value maps for CanvasChangeset_Change_Type.
 var (
 	CanvasChangeset_Change_Type_name = map[int32]string{
-		0: "ADD_NODE",
-		1: "DELETE_NODE",
-		2: "UPDATE_NODE",
-		3: "CONNECT_NODES",
-		4: "DISCONNECT_NODES",
+		0: "UNSPECIFIED",
+		1: "ADD_NODE",
+		2: "DELETE_NODE",
+		3: "UPDATE_NODE",
+		4: "CONNECT_NODES",
+		5: "DISCONNECT_NODES",
 	}
 	CanvasChangeset_Change_Type_value = map[string]int32{
-		"ADD_NODE":         0,
-		"DELETE_NODE":      1,
-		"UPDATE_NODE":      2,
-		"CONNECT_NODES":    3,
-		"DISCONNECT_NODES": 4,
+		"UNSPECIFIED":      0,
+		"ADD_NODE":         1,
+		"DELETE_NODE":      2,
+		"UPDATE_NODE":      3,
+		"CONNECT_NODES":    4,
+		"DISCONNECT_NODES": 5,
 	}
 )
 
@@ -5718,7 +5721,7 @@ func (x *CanvasChangeset_Change) GetType() CanvasChangeset_Change_Type {
 	if x != nil {
 		return x.Type
 	}
-	return CanvasChangeset_Change_ADD_NODE
+	return CanvasChangeset_Change_UNSPECIFIED
 }
 
 func (x *CanvasChangeset_Change) GetNode() *CanvasChangeset_Change_Node {
@@ -6291,9 +6294,9 @@ const file_canvases_proto_rawDesc = "" +
 	"\x1dResolveExecutionErrorsRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12#\n" +
 	"\rexecution_ids\x18\x02 \x03(\tR\fexecutionIds\" \n" +
-	"\x1eResolveExecutionErrorsResponse\"\x8e\x05\n" +
+	"\x1eResolveExecutionErrorsResponse\"\x9f\x05\n" +
 	"\x0fCanvasChangeset\x12E\n" +
-	"\achanges\x18\x01 \x03(\v2+.Superplane.Canvases.CanvasChangeset.ChangeR\achanges\x1a\xb3\x04\n" +
+	"\achanges\x18\x01 \x03(\v2+.Superplane.Canvases.CanvasChangeset.ChangeR\achanges\x1a\xc4\x04\n" +
 	"\x06Change\x12D\n" +
 	"\x04type\x18\x01 \x01(\x0e20.Superplane.Canvases.CanvasChangeset.Change.TypeR\x04type\x12D\n" +
 	"\x04node\x18\x02 \x01(\v20.Superplane.Canvases.CanvasChangeset.Change.NodeR\x04node\x12D\n" +
@@ -6307,13 +6310,14 @@ const file_canvases_proto_rawDesc = "" +
 	"\x04Edge\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x18\n" +
-	"\achannel\x18\x03 \x01(\tR\achannel\"_\n" +
-	"\x04Type\x12\f\n" +
-	"\bADD_NODE\x10\x00\x12\x0f\n" +
-	"\vDELETE_NODE\x10\x01\x12\x0f\n" +
-	"\vUPDATE_NODE\x10\x02\x12\x11\n" +
-	"\rCONNECT_NODES\x10\x03\x12\x14\n" +
-	"\x10DISCONNECT_NODES\x10\x04\"\xc1\x01\n" +
+	"\achannel\x18\x03 \x01(\tR\achannel\"p\n" +
+	"\x04Type\x12\x0f\n" +
+	"\vUNSPECIFIED\x10\x00\x12\f\n" +
+	"\bADD_NODE\x10\x01\x12\x0f\n" +
+	"\vDELETE_NODE\x10\x02\x12\x0f\n" +
+	"\vUPDATE_NODE\x10\x03\x12\x11\n" +
+	"\rCONNECT_NODES\x10\x04\x12\x14\n" +
+	"\x10DISCONNECT_NODES\x10\x05\"\xc1\x01\n" +
 	"\x16CanvasNodeEventMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +

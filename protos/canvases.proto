@@ -912,11 +912,12 @@ message ResolveExecutionErrorsResponse {}
 message CanvasChangeset {
   message Change {
     enum Type {
-      ADD_NODE = 0;
-      DELETE_NODE = 1;
-      UPDATE_NODE = 2;
-      CONNECT_NODES = 3;
-      DISCONNECT_NODES = 4;
+      UNSPECIFIED = 0;
+      ADD_NODE = 1;
+      DELETE_NODE = 2;
+      UPDATE_NODE = 3;
+      CONNECT_NODES = 4;
+      DISCONNECT_NODES = 5;
     }
 
     message Node {
