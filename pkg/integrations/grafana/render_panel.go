@@ -15,8 +15,8 @@ import (
 type RenderPanel struct{}
 
 type RenderPanelSpec struct {
-	DashboardUID string `json:"dashboardUid" mapstructure:"dashboardUid"`
-	PanelID      int    `json:"panelId" mapstructure:"panelId"`
+	DashboardUID string `json:"dashboard" mapstructure:"dashboard"`
+	PanelID      int    `json:"panel" mapstructure:"panel"`
 	Width        int    `json:"width" mapstructure:"width"`
 	Height       int    `json:"height" mapstructure:"height"`
 	From         string `json:"from" mapstructure:"from"`
@@ -25,8 +25,8 @@ type RenderPanelSpec struct {
 
 type RenderPanelOutput struct {
 	URL          string `json:"url" mapstructure:"url"`
-	DashboardUID string `json:"dashboardUid" mapstructure:"dashboardUid"`
-	PanelID      int    `json:"panelId" mapstructure:"panelId"`
+	DashboardUID string `json:"dashboard" mapstructure:"dashboard"`
+	PanelID      int    `json:"panel" mapstructure:"panel"`
 }
 
 func (c *RenderPanel) Name() string {
@@ -79,7 +79,7 @@ func (c *RenderPanel) OutputChannels(configuration any) []core.OutputChannel {
 func (c *RenderPanel) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dashboardUid",
+			Name:        "dashboard",
 			Label:       "Dashboard",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -91,7 +91,7 @@ func (c *RenderPanel) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "panelId",
+			Name:        "panel",
 			Label:       "Panel",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -100,7 +100,7 @@ func (c *RenderPanel) Configuration() []configuration.Field {
 				Resource: &configuration.ResourceTypeOptions{
 					Type: resourceTypePanel,
 					Parameters: []configuration.ParameterRef{
-						{Name: "dashboardUid", ValueFrom: &configuration.ParameterValueFrom{Field: "dashboardUid"}},
+						{Name: "dashboard", ValueFrom: &configuration.ParameterValueFrom{Field: "dashboard"}},
 					},
 				},
 			},
@@ -259,7 +259,7 @@ func decodeRenderPanelSpec(input any) (RenderPanelSpec, error) {
 
 func validateRenderPanelSpec(spec RenderPanelSpec) error {
 	if spec.DashboardUID == "" {
-		return errors.New("dashboardUid is required")
+		return errors.New("dashboard is required")
 	}
 	if spec.PanelID == 0 {
 		return errors.New("panel is required")

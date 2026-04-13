@@ -47,7 +47,7 @@ export interface DashboardDetails {
   slug?: string;
   url?: string;
   folderTitle?: string;
-  folderUid?: string;
+  folder?: string;
   tags?: string[];
   panels?: PanelSummary[];
 }
@@ -59,12 +59,12 @@ export interface DashboardNodeMetadata {
 }
 
 export interface GetDashboardConfiguration {
-  dashboardUid?: string;
+  dashboard?: string;
 }
 
 export interface RenderPanelConfiguration {
-  dashboardUid?: string;
-  panelId?: string | number;
+  dashboard?: string;
+  panel?: string | number;
   width?: number;
   height?: number;
   from?: string;
@@ -73,6 +73,6 @@ export interface RenderPanelConfiguration {
 
 export interface RenderPanelOutput {
   url?: string;
-  dashboardUid?: string;
-  panelId?: number;
+  dashboard?: string;
+  panel?: number;
 }

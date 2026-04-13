@@ -62,11 +62,11 @@ export const renderPanelMapper: ComponentBaseMapper = {
       return details;
     }
 
-    if (output.dashboardUid) {
-      details["Dashboard UID"] = output.dashboardUid;
+    if (output.dashboard) {
+      details.Dashboard = output.dashboard;
     }
-    if (output.panelId !== undefined) {
-      details.Panel = String(output.panelId);
+    if (output.panel !== undefined) {
+      details.Panel = String(output.panel);
     }
     if (output.url) {
       details.URL = output.url;
@@ -88,7 +88,7 @@ function buildMetadata(node: ComponentBaseContext["node"]) {
     configuration?.width && configuration?.height ? `${configuration.width}x${configuration.height}` : undefined;
 
   return [
-    buildDashboardSelectionMetadata(nodeMetadata, configuration?.dashboardUid),
+    buildDashboardSelectionMetadata(nodeMetadata, configuration?.dashboard),
     buildPanelMetadata(nodeMetadata),
     buildTimeRangeMetadata(configuration?.from, configuration?.to),
     previewMetadataItem("maximize", "Size: ", size),

@@ -145,7 +145,7 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		}
 		return grafanaResourcesFromList(resourceTypeDashboard, dashboards, func(d DashboardSummary) string { return d.UID }, func(d DashboardSummary) string { return d.Title }), nil
 	case resourceTypePanel:
-		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboardUid"])
+		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboard"])
 		if dashboardUID == "" {
 			return []core.IntegrationResource{}, nil
 		}

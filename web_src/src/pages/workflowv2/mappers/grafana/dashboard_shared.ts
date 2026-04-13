@@ -1,3 +1,4 @@
+import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -7,19 +8,19 @@ import type { ExecutionInfo, NodeInfo } from "../types";
 
 const TEXT_PREVIEW_MAX_LENGTH = 40;
 
-export function buildDashboardMetadata(node: NodeInfo, options?: { dashboardUid?: string }): MetadataItem[] {
+export function buildDashboardMetadata(node: NodeInfo, dashboard?: string): MetadataItem[] {
   const nodeMetadata = node.metadata as DashboardNodeMetadata | undefined;
 
-  const items: (MetadataItem | undefined)[] = [buildDashboardSelectionMetadata(nodeMetadata, options?.dashboardUid)];
+  const items: (MetadataItem | undefined)[] = [buildDashboardSelectionMetadata(nodeMetadata, dashboard)];
 
   return items.filter((item): item is MetadataItem => item !== undefined).slice(0, 3);
 }
 
 export function buildDashboardSelectionMetadata(
   nodeMetadata: DashboardNodeMetadata | undefined,
-  dashboardUid: string | undefined,
+  dashboard: string | undefined,
 ): MetadataItem | undefined {
-  const label = nodeMetadata?.dashboardTitle?.trim() || dashboardUid?.trim();
+  const label = nodeMetadata?.dashboardTitle?.trim() || dashboard?.trim();
   if (!label) {
     return undefined;
   }
@@ -95,22 +96,29 @@ export function buildGrafanaEventSections(
   const rootTriggerRenderer = getTriggerRenderer(triggerName);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const subtitleTimestamp = legacy ? execution.createdAt : execution.updatedAt || execution.createdAt;
-  const emptySubtitle = legacy ? "-" : "";
-  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : emptySubtitle;
-
-  const receivedAtRaw = legacy ? execution.createdAt : execution.createdAt || execution.updatedAt;
-  const receivedAt = receivedAtRaw ? new Date(receivedAtRaw) : undefined;
-
-  const eventId = legacy ? (execution.rootEvent?.id ?? "") : (execution.rootEvent?.id ?? execution.id);
-
   return [
     {
-      receivedAt,
+      receivedAt: resolveReceivedAt(execution, legacy),
       eventTitle: title || "Trigger event",
-      eventSubtitle,
+      eventSubtitle: resolveEventSubtitle(execution, legacy),
       eventState: getState(componentName)(execution),
-      eventId,
+      eventId: resolveEventId(execution, legacy),
     },
   ];
+}
+
+function resolveEventSubtitle(execution: ExecutionInfo, legacy: boolean): string | React.ReactNode {
+  const timestamp = legacy ? execution.createdAt : execution.updatedAt || execution.createdAt;
+  const empty = legacy ? "-" : "";
+  return timestamp ? renderTimeAgo(new Date(timestamp)) : empty;
+}
+
+function resolveReceivedAt(execution: ExecutionInfo, legacy: boolean): Date | undefined {
+  const raw = legacy ? execution.createdAt : execution.createdAt || execution.updatedAt;
+  return raw ? new Date(raw) : undefined;
+}
+
+function resolveEventId(execution: ExecutionInfo, legacy: boolean): string {
+  if (legacy) return execution.rootEvent?.id ?? "";
+  return execution.rootEvent?.id ?? execution.id;
 }

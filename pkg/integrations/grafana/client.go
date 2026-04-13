@@ -61,7 +61,7 @@ type DashboardDetails struct {
 	Slug        string         `json:"slug"`
 	URL         string         `json:"url"`
 	FolderTitle string         `json:"folderTitle"`
-	FolderUID   string         `json:"folderUid"`
+	FolderUID   string         `json:"folder"`
 	Tags        []string       `json:"tags"`
 	Panels      []PanelSummary `json:"panels"`
 }

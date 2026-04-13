@@ -15,7 +15,7 @@ import (
 type GetDashboard struct{}
 
 type GetDashboardSpec struct {
-	DashboardUID string `json:"dashboardUid" mapstructure:"dashboardUid"`
+	DashboardUID string `json:"dashboard" mapstructure:"dashboard"`
 }
 
 func (c *GetDashboard) Name() string {
@@ -63,7 +63,7 @@ func (c *GetDashboard) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetDashboard) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dashboardUid",
+			Name:        "dashboard",
 			Label:       "Dashboard",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -162,7 +162,7 @@ func decodeGetDashboardSpec(input any) (GetDashboardSpec, error) {
 
 func validateGetDashboardSpec(spec GetDashboardSpec) error {
 	if spec.DashboardUID == "" {
-		return errors.New("dashboardUid is required")
+		return errors.New("dashboard is required")
 	}
 
 	return nil

@@ -465,7 +465,7 @@ func Test__Grafana__ListResources(t *testing.T) {
 					"apiToken": "token",
 				},
 			},
-			Parameters: map[string]string{"dashboardUid": "abc123"},
+			Parameters: map[string]string{"dashboard": "abc123"},
 		})
 		require.NoError(t, err)
 		require.Len(t, resources, 2)

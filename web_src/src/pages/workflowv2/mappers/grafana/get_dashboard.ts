@@ -27,7 +27,7 @@ export const getDashboardMapper: ComponentBaseMapper = {
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: buildDashboardMetadata(
         context.node,
-        context.node.configuration as GetDashboardConfiguration | undefined,
+        (context.node.configuration as GetDashboardConfiguration | undefined)?.dashboard,
       ),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -67,6 +67,9 @@ export const getDashboardMapper: ComponentBaseMapper = {
     }
     if (dashboard.folderTitle) {
       details.Folder = dashboard.folderTitle;
+    }
+    if (dashboard.folder) {
+      details.Folder = dashboard.folder;
     }
     const panelCount = dashboard.panels?.length ?? 0;
     details.Panels = `${panelCount} panels`;

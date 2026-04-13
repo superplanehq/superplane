@@ -5,7 +5,7 @@
     "slug": "production-overview",
     "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview",
     "folderTitle": "Platform",
-    "folderUid": "fdg4m1rt63hj8q",
+    "folder": "fdg4m1rt63hj8q",
     "tags": ["production", "platform"],
     "panels": [
       {"id": 1, "title": "Request Rate", "type": "timeseries"},
