@@ -6,8 +6,8 @@ import type {
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
   ComponentsComponent,
-  ComponentsEdge,
-  ComponentsNode,
+  SuperplaneComponentsEdge as ComponentsEdge,
+  SuperplaneComponentsNode as ComponentsNode,
   SuperplaneMeUser,
 } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";

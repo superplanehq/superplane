@@ -3,7 +3,7 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
-  ComponentsNode,
+  SuperplaneComponentsNode,
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
@@ -26,7 +26,7 @@ export function RunRowHeader({
   onToggle,
 }: {
   event: CanvasesCanvasEventWithExecutions;
-  triggerNode: ComponentsNode | undefined;
+  triggerNode: SuperplaneComponentsNode | undefined;
   componentIconMap: Record<string, string>;
   executions: CanvasesCanvasNodeExecutionRef[];
   queueItemCount: number;

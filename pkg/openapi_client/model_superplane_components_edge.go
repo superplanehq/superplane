@@ -15,35 +15,35 @@ import (
 	"encoding/json"
 )
 
-// checks if the ComponentsEdge type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ComponentsEdge{}
+// checks if the SuperplaneComponentsEdge type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneComponentsEdge{}
 
-// ComponentsEdge struct for ComponentsEdge
-type ComponentsEdge struct {
+// SuperplaneComponentsEdge struct for SuperplaneComponentsEdge
+type SuperplaneComponentsEdge struct {
 	SourceId *string `json:"sourceId,omitempty"`
 	TargetId *string `json:"targetId,omitempty"`
 	Channel  *string `json:"channel,omitempty"`
 }
 
-// NewComponentsEdge instantiates a new ComponentsEdge object
+// NewSuperplaneComponentsEdge instantiates a new SuperplaneComponentsEdge object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewComponentsEdge() *ComponentsEdge {
-	this := ComponentsEdge{}
+func NewSuperplaneComponentsEdge() *SuperplaneComponentsEdge {
+	this := SuperplaneComponentsEdge{}
 	return &this
 }
 
-// NewComponentsEdgeWithDefaults instantiates a new ComponentsEdge object
+// NewSuperplaneComponentsEdgeWithDefaults instantiates a new SuperplaneComponentsEdge object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewComponentsEdgeWithDefaults() *ComponentsEdge {
-	this := ComponentsEdge{}
+func NewSuperplaneComponentsEdgeWithDefaults() *SuperplaneComponentsEdge {
+	this := SuperplaneComponentsEdge{}
 	return &this
 }
 
 // GetSourceId returns the SourceId field value if set, zero value otherwise.
-func (o *ComponentsEdge) GetSourceId() string {
+func (o *SuperplaneComponentsEdge) GetSourceId() string {
 	if o == nil || IsNil(o.SourceId) {
 		var ret string
 		return ret
@@ -53,7 +53,7 @@ func (o *ComponentsEdge) GetSourceId() string {
 
 // GetSourceIdOk returns a tuple with the SourceId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsEdge) GetSourceIdOk() (*string, bool) {
+func (o *SuperplaneComponentsEdge) GetSourceIdOk() (*string, bool) {
 	if o == nil || IsNil(o.SourceId) {
 		return nil, false
 	}
@@ -61,7 +61,7 @@ func (o *ComponentsEdge) GetSourceIdOk() (*string, bool) {
 }
 
 // HasSourceId returns a boolean if a field has been set.
-func (o *ComponentsEdge) HasSourceId() bool {
+func (o *SuperplaneComponentsEdge) HasSourceId() bool {
 	if o != nil && !IsNil(o.SourceId) {
 		return true
 	}
@@ -70,12 +70,12 @@ func (o *ComponentsEdge) HasSourceId() bool {
 }
 
 // SetSourceId gets a reference to the given string and assigns it to the SourceId field.
-func (o *ComponentsEdge) SetSourceId(v string) {
+func (o *SuperplaneComponentsEdge) SetSourceId(v string) {
 	o.SourceId = &v
 }
 
 // GetTargetId returns the TargetId field value if set, zero value otherwise.
-func (o *ComponentsEdge) GetTargetId() string {
+func (o *SuperplaneComponentsEdge) GetTargetId() string {
 	if o == nil || IsNil(o.TargetId) {
 		var ret string
 		return ret
@@ -85,7 +85,7 @@ func (o *ComponentsEdge) GetTargetId() string {
 
 // GetTargetIdOk returns a tuple with the TargetId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsEdge) GetTargetIdOk() (*string, bool) {
+func (o *SuperplaneComponentsEdge) GetTargetIdOk() (*string, bool) {
 	if o == nil || IsNil(o.TargetId) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *ComponentsEdge) GetTargetIdOk() (*string, bool) {
 }
 
 // HasTargetId returns a boolean if a field has been set.
-func (o *ComponentsEdge) HasTargetId() bool {
+func (o *SuperplaneComponentsEdge) HasTargetId() bool {
 	if o != nil && !IsNil(o.TargetId) {
 		return true
 	}
@@ -102,12 +102,12 @@ func (o *ComponentsEdge) HasTargetId() bool {
 }
 
 // SetTargetId gets a reference to the given string and assigns it to the TargetId field.
-func (o *ComponentsEdge) SetTargetId(v string) {
+func (o *SuperplaneComponentsEdge) SetTargetId(v string) {
 	o.TargetId = &v
 }
 
 // GetChannel returns the Channel field value if set, zero value otherwise.
-func (o *ComponentsEdge) GetChannel() string {
+func (o *SuperplaneComponentsEdge) GetChannel() string {
 	if o == nil || IsNil(o.Channel) {
 		var ret string
 		return ret
@@ -117,7 +117,7 @@ func (o *ComponentsEdge) GetChannel() string {
 
 // GetChannelOk returns a tuple with the Channel field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsEdge) GetChannelOk() (*string, bool) {
+func (o *SuperplaneComponentsEdge) GetChannelOk() (*string, bool) {
 	if o == nil || IsNil(o.Channel) {
 		return nil, false
 	}
@@ -125,7 +125,7 @@ func (o *ComponentsEdge) GetChannelOk() (*string, bool) {
 }
 
 // HasChannel returns a boolean if a field has been set.
-func (o *ComponentsEdge) HasChannel() bool {
+func (o *SuperplaneComponentsEdge) HasChannel() bool {
 	if o != nil && !IsNil(o.Channel) {
 		return true
 	}
@@ -134,11 +134,11 @@ func (o *ComponentsEdge) HasChannel() bool {
 }
 
 // SetChannel gets a reference to the given string and assigns it to the Channel field.
-func (o *ComponentsEdge) SetChannel(v string) {
+func (o *SuperplaneComponentsEdge) SetChannel(v string) {
 	o.Channel = &v
 }
 
-func (o ComponentsEdge) MarshalJSON() ([]byte, error) {
+func (o SuperplaneComponentsEdge) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,7 +146,7 @@ func (o ComponentsEdge) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ComponentsEdge) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneComponentsEdge) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.SourceId) {
 		toSerialize["sourceId"] = o.SourceId
@@ -160,38 +160,38 @@ func (o ComponentsEdge) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableComponentsEdge struct {
-	value *ComponentsEdge
+type NullableSuperplaneComponentsEdge struct {
+	value *SuperplaneComponentsEdge
 	isSet bool
 }
 
-func (v NullableComponentsEdge) Get() *ComponentsEdge {
+func (v NullableSuperplaneComponentsEdge) Get() *SuperplaneComponentsEdge {
 	return v.value
 }
 
-func (v *NullableComponentsEdge) Set(val *ComponentsEdge) {
+func (v *NullableSuperplaneComponentsEdge) Set(val *SuperplaneComponentsEdge) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableComponentsEdge) IsSet() bool {
+func (v NullableSuperplaneComponentsEdge) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableComponentsEdge) Unset() {
+func (v *NullableSuperplaneComponentsEdge) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableComponentsEdge(val *ComponentsEdge) *NullableComponentsEdge {
-	return &NullableComponentsEdge{value: val, isSet: true}
+func NewNullableSuperplaneComponentsEdge(val *SuperplaneComponentsEdge) *NullableSuperplaneComponentsEdge {
+	return &NullableSuperplaneComponentsEdge{value: val, isSet: true}
 }
 
-func (v NullableComponentsEdge) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneComponentsEdge) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableComponentsEdge) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneComponentsEdge) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
