@@ -12,6 +12,7 @@ import (
 
 const (
 	resourceTypeDataSource   = "data-source"
+	resourceTypeSilence      = "silence"
 	resourceTypeAlertRule    = "alert-rule"
 	resourceTypeContactPoint = "contact-point"
 	resourceTypeRuleGroup    = "rule-group"
@@ -39,7 +40,7 @@ func (g *Grafana) Icon() string {
 }
 
 func (g *Grafana) Description() string {
-	return "Connect Grafana alerts, alert rules, annotations, and data queries to SuperPlane workflows"
+	return "Connect Grafana alerts, alert rules, annotations, silences, and data queries to SuperPlane workflows"
 }
 
 func (g *Grafana) Instructions() string {
@@ -71,7 +72,7 @@ func (g *Grafana) Configuration() []configuration.Field {
 			Name:        "apiToken",
 			Label:       "Service Account Token",
 			Type:        configuration.FieldTypeString,
-			Description: "Grafana service account token with access to query data sources and manage alerting webhooks",
+			Description: "Grafana service account token with access to query data sources, unified alerting webhooks, annotations, and Alertmanager silences",
 			Sensitive:   true,
 			Required:    false,
 		},
@@ -97,6 +98,10 @@ func (g *Grafana) Components() []core.Component {
 		&CreateAnnotation{},
 		&ListAnnotations{},
 		&DeleteAnnotation{},
+		&CreateSilence{},
+		&DeleteSilence{},
+		&GetSilence{},
+		&ListSilences{},
 	}
 }
 
@@ -126,7 +131,7 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule, resourceTypeContactPoint, resourceTypeRuleGroup,
-		resourceTypeDashboard, resourceTypePanel, resourceTypeAnnotation:
+		resourceTypeDashboard, resourceTypePanel, resourceTypeAnnotation, resourceTypeSilence:
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -230,6 +235,32 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		}
 
 		return resources, nil
+	case resourceTypeSilence:
+		silences, err := client.ListSilences("")
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(silences))
+		for _, silence := range silences {
+			id := strings.TrimSpace(silence.ID)
+			if id == "" {
+				continue
+			}
+
+			label := formatSilenceResourceLabel(silence)
+			if label == "" {
+				label = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeSilence,
+				Name: label,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
 	default:
 		return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
 	}
@@ -271,4 +302,26 @@ func grafanaResourcesFromList[T any](resourceType string, items []T, idOf func(T
 	}
 
 	return resources
+}
+
+func formatSilenceResourceLabel(s Silence) string {
+	comment := strings.TrimSpace(s.Comment)
+	state := strings.TrimSpace(s.Status.State)
+
+	id := strings.TrimSpace(s.ID)
+	idShort := id
+	if len(idShort) > 8 {
+		idShort = idShort[:8]
+	}
+
+	if comment == "" && state == "" {
+		return id
+	}
+	if comment == "" {
+		return fmt.Sprintf("%s (%s)", idShort, state)
+	}
+	if state == "" {
+		return fmt.Sprintf("%s (%s)", comment, idShort)
+	}
+	return fmt.Sprintf("%s [%s] (%s)", comment, state, idShort)
 }
