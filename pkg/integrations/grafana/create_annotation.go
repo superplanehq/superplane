@@ -392,7 +392,7 @@ func parseAnnotationTime(s string) (time.Time, error) {
 		}
 	}
 
-	if t, ok, err := parseGrafanaQueryTime(trimmed, nil); err != nil {
+	if t, ok, err := parseGrafanaQueryTime(trimmed); err != nil {
 		return time.Time{}, err
 	} else if ok {
 		return t, nil
