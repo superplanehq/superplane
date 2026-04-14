@@ -379,6 +379,10 @@ export type CanvasesDeleteCanvasResponse = {
   [key: string]: unknown;
 };
 
+export type CanvasesDeleteCanvasVersionResponse = {
+  [key: string]: unknown;
+};
+
 export type CanvasesDeleteNodeQueueItemResponse = {
   [key: string]: unknown;
 };
@@ -2453,6 +2457,36 @@ export type CanvasesUpdateCanvasVersion2Responses = {
 
 export type CanvasesUpdateCanvasVersion2Response =
   CanvasesUpdateCanvasVersion2Responses[keyof CanvasesUpdateCanvasVersion2Responses];
+
+export type CanvasesDeleteCanvasVersionData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+};
+
+export type CanvasesDeleteCanvasVersionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDeleteCanvasVersionError =
+  CanvasesDeleteCanvasVersionErrors[keyof CanvasesDeleteCanvasVersionErrors];
+
+export type CanvasesDeleteCanvasVersionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDeleteCanvasVersionResponse;
+};
+
+export type CanvasesDeleteCanvasVersionResponse2 =
+  CanvasesDeleteCanvasVersionResponses[keyof CanvasesDeleteCanvasVersionResponses];
 
 export type CanvasesDescribeCanvasVersionData = {
   body?: never;
