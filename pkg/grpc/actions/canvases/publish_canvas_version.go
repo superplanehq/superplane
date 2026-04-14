@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -18,7 +17,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -128,23 +126,7 @@ func publishDraftVersionInTransaction(
 			return applyErr
 		}
 
-		now := time.Now()
-		version.State = models.CanvasVersionStatePublished
-		version.PublishedAt = &now
-		version.UpdatedAt = &now
-		version.Nodes = datatypes.NewJSONSlice(nodes)
-		version.Edges = datatypes.NewJSONSlice(edges)
-		if err := tx.Save(version).Error; err != nil {
-			return err
-		}
-
-		canvas, err := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
-		if err != nil {
-			return err
-		}
-		canvas.LiveVersionID = &version.ID
-		canvas.UpdatedAt = &now
-		if err := tx.Save(canvas).Error; err != nil {
+		if err := models.PromoteToLiveInTransaction(tx, version, nodes, edges); err != nil {
 			return err
 		}
 
