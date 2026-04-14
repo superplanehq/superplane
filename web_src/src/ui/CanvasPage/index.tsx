@@ -269,7 +269,6 @@ export interface CanvasPageProps {
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
-  onToggleCollapse?: () => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   // Building blocks for adding new nodes
@@ -403,7 +402,6 @@ type CanvasNodeRendererCallbacks = {
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
-  onToggleCollapse: React.MutableRefObject<CanvasPageProps["onToggleCollapse"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
   onGroupUpdate: React.MutableRefObject<CanvasPageProps["onGroupUpdate"] | undefined>;
@@ -523,7 +521,6 @@ function buildInteractiveNodeBlockProps(
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
-    onToggleCollapse: getVoidAction(callbacks.onToggleCollapse),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
     onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
   };
@@ -1302,7 +1299,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onAutoLayoutNodes={props.onAutoLayoutNodes}
                 onEdgeCreate={props.onEdgeCreate}
                 onToggleView={handleToggleView}
-                onToggleCollapse={props.onToggleCollapse}
                 onRun={(nodeId) => handleNodeRun(nodeId)}
                 onDuplicate={props.onDuplicate}
                 onDeactivate={props.onDeactivate}
@@ -1844,7 +1840,6 @@ function CanvasContent({
   onDeactivate,
   onTogglePause,
   onToggleView,
-  onToggleCollapse,
   onAnnotationUpdate,
   onAnnotationBlur,
   onGroupUpdate,
@@ -1902,7 +1897,6 @@ function CanvasContent({
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
-  onToggleCollapse?: () => void;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -2182,8 +2176,6 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
-  const onToggleCollapseRef = useRef(onToggleCollapse);
-  onToggleCollapseRef.current = onToggleCollapse;
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
@@ -2260,8 +2252,7 @@ function CanvasContent({
 
   const handleToggleCollapse = useCallback(() => {
     state.toggleCollapse();
-    onToggleCollapse?.();
-  }, [state.toggleCollapse, onToggleCollapse]);
+  }, [state.toggleCollapse]);
 
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
@@ -2385,7 +2376,6 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
-    onToggleCollapse: onToggleCollapseRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
@@ -2404,7 +2394,6 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
-    onToggleCollapse: onToggleCollapseRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
