@@ -3,13 +3,11 @@ import { Copy, Download, ChevronDown, MoreVertical, RotateCcw, Pencil, Settings 
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-import { cn } from "@/lib/utils";
-
 export interface BreadcrumbItem {
   label: string;
   onClick?: () => void;
@@ -20,6 +18,8 @@ export interface BreadcrumbItem {
 }
 
 type HeaderMode = "default" | "version-live" | "version-edit" | "versioning-disabled";
+
+type CanvasTopViewTab = "canvas" | "yaml" | "cli" | "memory";
 
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
@@ -37,8 +37,8 @@ interface HeaderProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
+  topViewMode?: CanvasTopViewTab;
+  onTopViewModeChange?: (mode: CanvasTopViewTab) => void;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
   memoryItemCount?: number;
@@ -48,6 +48,8 @@ interface HeaderProps {
   enterEditModeDisabledTooltip?: string;
   /** When &gt; 0 (unpublished draft diff items), shown as "Propose Change (n)" in version edit mode. */
   unpublishedDraftChangeCount?: number;
+  /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
+  showCanvasSettingsMenu?: boolean;
 }
 
 export function Header({
@@ -76,7 +78,9 @@ export function Header({
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
   unpublishedDraftChangeCount = 0,
+  showCanvasSettingsMenu = true,
 }: HeaderProps) {
+  const navigate = useNavigate();
   const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
   const activeCanvasId = canvasIdParam || workflowId;
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
@@ -115,15 +119,7 @@ export function Header({
   const proposeChangeLabel =
     unpublishedDraftChangeCount > 0 ? `Propose Change (${unpublishedDraftChangeCount})` : "Propose Change";
 
-  const settingsViewOpen = topViewMode === "settings";
-  const hasDefaultModeHeaderActions =
-    isDefaultMode &&
-    ((isVersioningDisabledMode && !!onExportYamlCopy && !!onExportYamlDownload) ||
-      (!isVersioningDisabledMode && !!onExportYamlCopy && !!onExportYamlDownload) ||
-      (!isVersioningDisabledMode && !!unsavedMessage) ||
-      (!!onSave && !saveButtonHidden));
-
-  const showSecondaryHeaderRow = !settingsViewOpen || showVersionEditActions || hasDefaultModeHeaderActions;
+  const showSecondaryHeaderRow = true;
 
   return (
     <header className="border-b border-slate-950/15 bg-white">
@@ -138,7 +134,7 @@ export function Header({
           </span>
         </div>
         <div className="relative z-10 ml-auto flex shrink-0 items-center">
-          {onTopViewModeChange ? (
+          {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <UIButton
@@ -152,10 +148,7 @@ export function Header({
                 </UIButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={() => onTopViewModeChange("settings")}
-                  className={cn(topViewMode === "settings" && "bg-slate-100")}
-                >
+                <DropdownMenuItem onClick={() => navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`)}>
                   <Settings className="h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
@@ -170,7 +163,7 @@ export function Header({
           <div className="min-w-0 justify-self-start" aria-hidden />
 
           <div className="justify-self-center">
-            {topViewMode && topViewMode !== "settings" && onTopViewModeChange && (
+            {topViewMode && onTopViewModeChange && (
               <div className="flex items-center rounded-md border border-slate-950/15 p-0.5 text-[13px] font-medium">
                 <button
                   type="button"
@@ -352,7 +345,7 @@ export function Header({
               </div>
             ) : null}
 
-            {showEditButton && topViewMode !== "settings"
+            {showEditButton
               ? wrapWithTooltip(
                   enterEditModeDisabled,
                   enterEditModeDisabledTooltip,

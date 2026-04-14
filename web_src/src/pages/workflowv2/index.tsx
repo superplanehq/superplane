@@ -10,7 +10,7 @@ import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import type {
   BlueprintsBlueprint,
@@ -30,7 +30,7 @@ import type {
   TriggersTrigger,
 } from "@/api-client";
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
-import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -53,7 +53,6 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
-  useUpdateCanvas,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -85,7 +84,6 @@ import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConfli
 import { CanvasCliView } from "./CanvasCliView";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasPageModals } from "./CanvasPageModals";
-import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlView } from "./CanvasYamlView";
@@ -121,6 +119,7 @@ import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import type { User } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useCanvasWorkflowTopView, type CanvasWorkflowTopViewTab } from "./useCanvasWorkflowTopView";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import {
@@ -187,7 +186,6 @@ export function WorkflowPageV2() {
   }>();
 
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
@@ -461,7 +459,6 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
-  const canReadOrg = canAct("org", "read");
   const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
   const showVersioningUI = !isVersioningDisabled;
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
@@ -499,69 +496,21 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
-  const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
-  const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
-  const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "cli" | "memory" | "settings">("canvas");
-  const canvasBasePath = useMemo(() => {
-    if (!organizationId || !canvasId) {
-      return "";
-    }
-    return location.pathname.includes("/templates/")
-      ? `/${organizationId}/templates/${canvasId}`
-      : `/${organizationId}/canvases/${canvasId}`;
-  }, [organizationId, canvasId, location.pathname]);
-  const isCanvasSettingsRoute = useMemo(
-    () => /\/(canvases|templates)\/[^/]+\/settings\/?$/.test(location.pathname),
-    [location.pathname],
-  );
-  const resolvedTopViewMode: "canvas" | "yaml" | "cli" | "memory" | "settings" = isCanvasSettingsRoute
-    ? "settings"
-    : topViewMode;
-
-  useEffect(() => {
-    if (!isCanvasSettingsRoute) {
-      setTopViewMode((prev) => (prev === "settings" ? "canvas" : prev));
-    }
-  }, [isCanvasSettingsRoute]);
-
-  const goToCanvasEditorView = useCallback(() => {
-    setTopViewMode("canvas");
-    if (isCanvasSettingsRoute && canvasBasePath) {
-      navigate(canvasBasePath);
-    }
-  }, [isCanvasSettingsRoute, canvasBasePath, navigate]);
-
+  const { resolvedTopViewMode, applyTopViewMode, goToCanvasEditorView } = useCanvasWorkflowTopView();
   const handleTopViewModeChange = useCallback(
-    (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => {
+    (mode: CanvasWorkflowTopViewTab) => {
       setIsCreateChangeRequestMode(false);
-      if (!organizationId || !canvasId) {
-        setTopViewMode(mode);
-        return;
-      }
-      const base = location.pathname.includes("/templates/")
-        ? `/${organizationId}/templates/${canvasId}`
-        : `/${organizationId}/canvases/${canvasId}`;
-      if (mode === "settings") {
-        setTopViewMode("settings");
-        navigate(`${base}/settings`);
-        return;
-      }
-      setTopViewMode(mode);
-      if (isCanvasSettingsRoute) {
-        navigate(base);
-      }
+      applyTopViewMode(mode);
     },
-    [organizationId, canvasId, location.pathname, navigate, isCanvasSettingsRoute],
+    [applyTopViewMode],
   );
-
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -602,7 +551,7 @@ export function WorkflowPageV2() {
   // user IDs as emails and role names as display names.
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
-  const { data: organizationRoles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
+  useOrganizationRoles(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -4785,99 +4734,6 @@ export function WorkflowPageV2() {
     [canvas],
   );
 
-  const canvasSettingsInitialValues = useMemo(
-    () => ({
-      name: liveCanvas?.metadata?.name || "",
-      description: liveCanvas?.metadata?.description || "",
-      versioningEnabled: liveCanvas?.metadata?.versioningEnabled ?? false,
-      changeRequestApprovalConfig: {
-        items: (liveCanvas?.metadata?.changeRequestApprovalConfig?.items || [])
-          .map((item) => {
-            if (!item.type || (item.type !== "TYPE_ANYONE" && item.type !== "TYPE_USER" && item.type !== "TYPE_ROLE")) {
-              return null;
-            }
-
-            return {
-              type: item.type,
-              userId: item.userId,
-              roleName: item.roleName,
-            };
-          })
-          .filter(
-            (
-              item,
-            ): item is {
-              type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
-              userId: string | undefined;
-              roleName: string | undefined;
-            } => !!item,
-          ),
-      },
-    }),
-    [
-      liveCanvas?.metadata?.versioningEnabled,
-      liveCanvas?.metadata?.changeRequestApprovalConfig?.items,
-      liveCanvas?.metadata?.description,
-      liveCanvas?.metadata?.name,
-    ],
-  );
-  const canvasSettingsApproverUsers = useMemo(
-    () =>
-      organizationUsers
-        .map((user) => {
-          const id = user.metadata?.id || "";
-          if (!id) {
-            return null;
-          }
-
-          return {
-            id,
-            name: user.spec?.displayName || user.metadata?.email || id,
-          };
-        })
-        .filter((item): item is { id: string; name: string } => !!item),
-    [organizationUsers],
-  );
-  const canvasSettingsApproverRoles = useMemo(
-    () =>
-      organizationRoles
-        .map((role) => {
-          const name = role.metadata?.name || "";
-          if (!name) {
-            return null;
-          }
-
-          return {
-            name,
-            label: role.spec?.displayName || name,
-          };
-        })
-        .filter((item): item is { name: string; label: string } => !!item),
-    [organizationRoles],
-  );
-  const handleSaveCanvasSettings = useCallback(
-    async (values: {
-      name: string;
-      description: string;
-      versioningEnabled?: boolean;
-      changeRequestApprovalConfig?: {
-        items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
-      };
-    }) => {
-      if (!canvasId) {
-        return;
-      }
-
-      await updateCanvasMutation.mutateAsync({
-        name: values.name,
-        description: values.description,
-        versioningEnabled: values.versioningEnabled,
-        changeRequestApprovalConfig: values.changeRequestApprovalConfig,
-      });
-    },
-    [canvasId, updateCanvasMutation],
-  );
-
   const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
     nodes,
     getYamlExportPayload,
@@ -4932,13 +4788,7 @@ export function WorkflowPageV2() {
 
   const isInitialCanvasBootstrapLoading =
     !canvas &&
-    (canvasLoading ||
-      triggersLoading ||
-      blueprintsLoading ||
-      componentsLoading ||
-      widgetsLoading ||
-      usersLoading ||
-      rolesLoading);
+    (canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || widgetsLoading || usersLoading);
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
@@ -5223,17 +5073,6 @@ export function WorkflowPageV2() {
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
       />
-    ) : resolvedTopViewMode === "settings" ? (
-      <CanvasSettingsView
-        initialValues={canvasSettingsInitialValues}
-        canUpdateCanvas={canUpdateCanvas && !isTemplate}
-        orgVersioningEnabled={isOrgVersioningEnabled}
-        isSaving={updateCanvasMutation.isPending}
-        availableUsers={canvasSettingsApproverUsers}
-        availableRoles={canvasSettingsApproverRoles}
-        onSave={handleSaveCanvasSettings}
-        onBackToCanvas={() => handleTopViewModeChange("canvas")}
-      />
     ) : null;
 
   return (
@@ -5254,6 +5093,7 @@ export function WorkflowPageV2() {
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
           onTopViewModeChange={handleTopViewModeChange}
+          showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
           onOpenVersionControl={
             showVersioningUI && !hasEditableVersion && resolvedTopViewMode === "canvas"
