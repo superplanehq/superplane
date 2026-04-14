@@ -1,11 +1,10 @@
 import pytest
 from pydantic import ValidationError
 
-from ai.web import (
+from ai.agent_stream_context import (
     AgentContext,
     AgentStreamRequest,
-    compose_agent_user_prompt,
-    derive_agent_editor_fields,
+    build_agent_context_state,
 )
 
 
@@ -41,23 +40,25 @@ def test_agent_stream_request_nested_agent_context() -> None:
     assert body.agent_context.mode == "build"
 
 
-def test_derive_agent_editor_fields_disabled() -> None:
-    assert derive_agent_editor_fields(None) == (None, None)
-    assert derive_agent_editor_fields(AgentContext(enabled=False)) == (None, None)
+def test_build_agent_context_state() -> None:
+    empty = build_agent_context_state(None)
+    assert empty == build_agent_context_state(None)
+    assert empty.enabled is False
+    assert empty.mode == "inspect"
+    assert empty.canvas_version is None
 
+    disabled = build_agent_context_state(AgentContext(enabled=False, mode="build", canvas_version="x"))
+    assert disabled.enabled is False
+    assert disabled.canvas_version == "x"
 
-def test_derive_agent_editor_fields_inspect_and_build() -> None:
-    assert derive_agent_editor_fields(AgentContext(enabled=True, mode="inspect")) == (None, "inspect")
-    assert derive_agent_editor_fields(
+    inspect_on = build_agent_context_state(AgentContext(enabled=True, mode="inspect"))
+    assert inspect_on.enabled is True
+    assert inspect_on.mode == "inspect"
+    assert inspect_on.canvas_version is None
+
+    build_on = build_agent_context_state(
         AgentContext(enabled=True, mode="build", canvas_version="d-v"),
-    ) == ("d-v", "build")
-
-
-def test_compose_agent_user_prompt_includes_build_context() -> None:
-    out = compose_agent_user_prompt("Do X", "build")
-    assert out.startswith("[Editor context:")
-    assert out.endswith("Do X")
-
-
-def test_compose_agent_user_prompt_omits_prefix_when_surface_unset() -> None:
-    assert compose_agent_user_prompt("Hi", None) == "Hi"
+    )
+    assert build_on.enabled is True
+    assert build_on.mode == "build"
+    assert build_on.canvas_version == "d-v"

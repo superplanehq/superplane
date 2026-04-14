@@ -3,14 +3,11 @@ import json
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal
-
-from typing_extensions import Self
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
     FinalResultEvent,
@@ -27,8 +24,8 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.usage import RunUsage
 
-from ai.agent import AgentContextState, AgentDeps, build_agent
-from ai.agent_deps import AgentCanvasSurface
+from ai.agent import AgentDeps, build_agent
+from ai.agent_stream_context import AgentStreamRequest, build_agent_context_state
 from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
@@ -57,73 +54,6 @@ from ai.usage_limit_checker import (
     UsageLimitChecker,
 )
 from ai.usage_publisher import AgentUsagePublisher, NoopUsagePublisher, UsagePublisher
-
-
-def _editor_context_prefix(surface: AgentCanvasSurface | None) -> str:
-    if surface == "build":
-        return (
-            "[Editor context: The user is in **build** mode on an unpublished draft version. "
-            "Graph tools reflect that draft. Proposals apply to their in-progress edits; "
-            "nothing is published until they ship the version.]\n\n"
-        )
-    if surface == "inspect":
-        return (
-            "[Editor context: The user is **inspecting** the published canvas. "
-            "Graph tools reflect the current published graph.]\n\n"
-        )
-    return ""
-
-
-def compose_agent_user_prompt(question: str, surface: AgentCanvasSurface | None) -> str:
-    return _editor_context_prefix(surface) + question
-
-
-class AgentContext(BaseModel):
-    """Structured editor state sent with each agent stream request (from the UI)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    enabled: bool = False
-    mode: Literal["inspect", "build"] = "inspect"
-    canvas_version: str | None = Field(
-        default=None,
-        max_length=200,
-        description="Draft canvas version id for tool reads; only used when mode is build.",
-    )
-
-    @model_validator(mode="after")
-    def canvas_version_matches_mode(self) -> Self:
-        version = normalize_optional(self.canvas_version)
-        if self.mode == "inspect" and version is not None:
-            raise ValueError("canvas_version must not be set when mode is inspect")
-        if self.enabled and self.mode == "build" and version is None:
-            raise ValueError("canvas_version is required when enabled is true and mode is build")
-        return self
-
-
-class AgentStreamRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=2000)
-    model: str = Field(
-        default=config.ai_model,
-        min_length=1,
-        max_length=200,
-    )
-    base_url: str | None = None
-    agent_context: AgentContext | None = Field(
-        default=None,
-        description="Dedicated agent contract: enabled, inspect vs build; canvas_version only for build.",
-    )
-
-
-def derive_agent_editor_fields(
-    agent_context: AgentContext | None,
-) -> tuple[str | None, AgentCanvasSurface | None]:
-    """Map request ``agent_context`` to (canvas_version_id_for_tools, prompt_surface)."""
-    if agent_context is None or not agent_context.enabled:
-        return None, None
-    if agent_context.mode == "build":
-        return normalize_optional(agent_context.canvas_version), "build"
-    return None, "inspect"
 
 
 def _debug_enabled() -> bool:
@@ -246,16 +176,6 @@ def _load_message_history(store: SessionStore, chat_id: str) -> Any:
     return ModelMessagesTypeAdapter.validate_python(history)
 
 
-def _agent_context_state(ctx: AgentContext | None) -> AgentContextState:
-    if ctx is None:
-        return AgentContextState()
-    return AgentContextState(
-        enabled=ctx.enabled,
-        mode=ctx.mode,
-        canvas_version=normalize_optional(ctx.canvas_version),
-    )
-
-
 def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
     api_token = _resolve_required_bearer_token(request)
     jwt_validator = JwtValidator.from_env()
@@ -286,7 +206,7 @@ def _build_deps(
             organization_id=claims.org_id,
         )
     )
-    agent_context = _agent_context_state(payload.agent_context)
+    agent_context = build_agent_context_state(payload.agent_context)
     _debug_log(
         "resolved non-test deps",
         model=payload.model,
@@ -361,9 +281,7 @@ async def _stream_agent_run(
         "canvas_id": resolved_canvas_id,
     }
 
-    _, prompt_surface = derive_agent_editor_fields(payload.agent_context)
-    user_prompt = compose_agent_user_prompt(payload.question, prompt_surface)
-    run_kwargs: dict[str, Any] = {"user_prompt": user_prompt}
+    run_kwargs: dict[str, Any] = {"user_prompt": payload.question}
     if message_history is not None:
         run_kwargs["message_history"] = message_history
 
