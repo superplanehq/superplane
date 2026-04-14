@@ -237,7 +237,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
-  onToggleCollapse,
   onRun,
   runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
@@ -371,7 +370,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           iconSlug={iconSlug}
           iconColor={iconColor}
           title={title}
-          onDoubleClick={onToggleCollapse}
           isCompactView={isCompactView}
           statusBadgeColor={compactStatusBadgeColor}
         />
