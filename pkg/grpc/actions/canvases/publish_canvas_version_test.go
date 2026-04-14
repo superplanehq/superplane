@@ -124,16 +124,18 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Version)
 		assert.Equal(t, pb.CanvasVersion_STATE_PUBLISHED, resp.Version.Metadata.State)
-		assert.NotEqual(t, draftVersionID, resp.Version.Metadata.Id)
+		assert.Equal(t, draftVersionID, resp.Version.Metadata.Id)
+		assert.NotNil(t, resp.Version.Metadata.PublishedAt)
 
-		// The old draft should be deleted
-		_, err = models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
-		assert.Error(t, err)
+		// The same version should now be published (not deleted)
+		version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasVersionStatePublished, version.State)
 
-		// The canvas live version should point to the new published version
+		// The canvas live version should point to it
 		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
 		require.NoError(t, err)
-		assert.Equal(t, resp.Version.Metadata.Id, canvas.LiveVersionID.String())
+		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
 	})
 
 	t.Run("versioning disabled -> error", func(t *testing.T) {
