@@ -87,6 +87,42 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertGraphIsValid()
 	})
 
+	t.Run("builds deterministic node and edge ordering", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{ID: "node-c", Name: "Node C"},
+				{ID: "node-a", Name: "Node A"},
+				{ID: "node-b", Name: "Node B"},
+			},
+			[]models.Edge{
+				{SourceID: "node-c", TargetID: "node-a", Channel: "default"},
+				{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
+				{SourceID: "node-a", TargetID: "node-b", Channel: "alpha"},
+			},
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:   "node-a",
+						Name: "Node A Updated",
+					},
+				},
+			},
+		})
+
+		steps.assertNoError()
+		steps.assertNodeOrder([]string{"node-a", "node-b", "node-c"})
+		steps.assertEdgeOrder([]models.Edge{
+			{SourceID: "node-a", TargetID: "node-b", Channel: "alpha"},
+			{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
+			{SourceID: "node-c", TargetID: "node-a", Channel: "default"},
+		})
+	})
+
 	t.Run("update node -> no configuration provided, previous configuration is preserved", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
@@ -387,6 +423,19 @@ func (s *CanvasPatcherSteps) assertHasEdge(sourceID string, targetID string, cha
 
 func (s *CanvasPatcherSteps) assertEdgeCount(count int) {
 	require.Len(s.t, s.finalVersion.Edges, count)
+}
+
+func (s *CanvasPatcherSteps) assertNodeOrder(nodeIDs []string) {
+	orderedNodeIDs := make([]string, 0, len(s.finalVersion.Nodes))
+	for _, node := range s.finalVersion.Nodes {
+		orderedNodeIDs = append(orderedNodeIDs, node.ID)
+	}
+
+	require.Equal(s.t, nodeIDs, orderedNodeIDs)
+}
+
+func (s *CanvasPatcherSteps) assertEdgeOrder(edges []models.Edge) {
+	require.Equal(s.t, datatypes.NewJSONSlice(edges), s.finalVersion.Edges)
 }
 
 func (s *CanvasPatcherSteps) assertGraphIsValid() {

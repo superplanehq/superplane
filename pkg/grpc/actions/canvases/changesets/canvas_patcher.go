@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -60,14 +61,26 @@ func (p *CanvasPatcher) buildFinalVersion() *models.CanvasVersion {
 		UpdatedAt:   p.originalVersion.UpdatedAt,
 	}
 
+	nodeIDs := make([]string, 0, len(p.nodes))
+	for nodeID := range p.nodes {
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+	sort.Strings(nodeIDs)
+
 	v.Nodes = make([]models.Node, 0, len(p.nodes))
-	for _, node := range p.nodes {
-		v.Nodes = append(v.Nodes, node)
+	for _, nodeID := range nodeIDs {
+		v.Nodes = append(v.Nodes, p.nodes[nodeID])
 	}
 
+	edgeKeys := make([]string, 0, len(p.edges))
+	for edgeKey := range p.edges {
+		edgeKeys = append(edgeKeys, edgeKey)
+	}
+	sort.Strings(edgeKeys)
+
 	v.Edges = make([]models.Edge, 0, len(p.edges))
-	for _, edge := range p.edges {
-		v.Edges = append(v.Edges, edge)
+	for _, edgeKey := range edgeKeys {
+		v.Edges = append(v.Edges, p.edges[edgeKey])
 	}
 
 	return v
