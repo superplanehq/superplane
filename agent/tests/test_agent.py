@@ -20,21 +20,34 @@ def test_canvas_answer_serializes_proposal_with_aliases() -> None:
         confidence=0.8,
         proposal=CanvasProposal(
             summary="Add a webhook trigger and connect to Slack.",
-            operations=[
-                {  # type: ignore[list-item]
-                    "type": "add_node",
-                    "blockName": "webhook.inbound",
-                    "nodeKey": "trigger_1",
-                    "nodeName": "Inbound Webhook",
-                },
-                {  # type: ignore[list-item]
-                    "type": "add_node",
-                    "blockName": "slack.send_message",
-                    "nodeKey": "slack_1",
-                    "nodeName": "Send Slack Message",
-                    "source": {"nodeKey": "trigger_1"},
-                },
-            ],
+            changeset={
+                "changes": [
+                    {
+                        "type": "ADD_NODE",
+                        "node": {
+                            "id": "trigger_1",
+                            "name": "Inbound Webhook",
+                            "block": "webhook.inbound",
+                        },
+                    },
+                    {
+                        "type": "ADD_NODE",
+                        "node": {
+                            "id": "slack_1",
+                            "name": "Send Slack Message",
+                            "block": "slack.send_message",
+                        },
+                    },
+                    {
+                        "type": "ADD_EDGE",
+                        "edge": {
+                            "sourceId": "trigger_1",
+                            "targetId": "slack_1",
+                            "channel": "default",
+                        },
+                    },
+                ]
+            },
         ),
     )
 
@@ -42,10 +55,13 @@ def test_canvas_answer_serializes_proposal_with_aliases() -> None:
     assert isinstance(payload, dict)
     proposal = payload.get("proposal")
     assert isinstance(proposal, dict)
-    operations = proposal.get("operations")
-    assert isinstance(operations, list)
-    assert operations[0]["blockName"] == "webhook.inbound"
-    assert operations[0]["nodeKey"] == "trigger_1"
+    changeset = proposal.get("changeset")
+    assert isinstance(changeset, dict)
+    changes = changeset.get("changes")
+    assert isinstance(changes, list)
+    assert changes[0]["type"] == "ADD_NODE"
+    assert changes[0]["node"]["block"] == "webhook.inbound"
+    assert changes[0]["node"]["id"] == "trigger_1"
 
 
 def test_catalog_list_cache_key_normalizes_provider_and_query() -> None:

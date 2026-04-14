@@ -15,7 +15,7 @@ class CanvasHasNode(Evaluator):
     def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
         if ctx.output.proposal is None:
             return EvaluationReason(value=False, reason="No proposal in output")
-        wf = process_operations(ctx.output.proposal.operations)
+        wf = process_operations(ctx.output.proposal.changeset.changes or [])
         count = wf.nodes.count(self.node)
 
         if count == self.count:

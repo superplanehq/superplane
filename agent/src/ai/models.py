@@ -1,6 +1,9 @@
-from typing import Annotated, Any, Literal
-
 from pydantic import BaseModel, Field
+from superplaneapi.models.canvas_changeset_change import CanvasChangesetChange
+from superplaneapi.models.canvas_changeset_change_edge import CanvasChangesetChangeEdge
+from superplaneapi.models.canvas_changeset_change_node import CanvasChangesetChangeNode
+from superplaneapi.models.canvas_changeset_change_type import CanvasChangesetChangeType
+from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
 
 
 class CanvasQuestionRequest(BaseModel):
@@ -84,65 +87,16 @@ class AnswerCitation(BaseModel):
     note: str | None = None
 
 
-class CanvasOperationNodeRef(BaseModel):
-    node_key: str | None = Field(default=None, alias="nodeKey")
-    node_id: str | None = Field(default=None, alias="nodeId")
-    node_name: str | None = Field(default=None, alias="nodeName")
-    handle_id: str | None = Field(default=None, alias="handleId")
-
-
-class CanvasOperationPosition(BaseModel):
-    x: float
-    y: float
-
-
-class AddNodeOperation(BaseModel):
-    type: Literal["add_node"]
-    block_name: str = Field(alias="blockName")
-    node_key: str | None = Field(default=None, alias="nodeKey")
-    node_name: str | None = Field(default=None, alias="nodeName")
-    configuration: dict[str, Any] = Field(default_factory=dict)
-    position: CanvasOperationPosition | None = None
-    source: CanvasOperationNodeRef | None = None
-
-
-class ConnectNodesOperation(BaseModel):
-    type: Literal["connect_nodes"]
-    source: CanvasOperationNodeRef
-    target: CanvasOperationNodeRef
-
-
-class DisconnectNodesOperation(BaseModel):
-    type: Literal["disconnect_nodes"]
-    source: CanvasOperationNodeRef
-    target: CanvasOperationNodeRef
-
-
-class UpdateNodeConfigOperation(BaseModel):
-    type: Literal["update_node_config"]
-    target: CanvasOperationNodeRef
-    configuration: dict[str, Any] = Field(default_factory=dict)
-    node_name: str | None = Field(default=None, alias="nodeName")
-
-
-class DeleteNodeOperation(BaseModel):
-    type: Literal["delete_node"]
-    target: CanvasOperationNodeRef
-
-
-CanvasOperation = Annotated[
-    AddNodeOperation
-    | ConnectNodesOperation
-    | DisconnectNodesOperation
-    | UpdateNodeConfigOperation
-    | DeleteNodeOperation,
-    Field(discriminator="type"),
-]
+CanvasChangeType = CanvasChangesetChangeType
+CanvasChangeNode = CanvasChangesetChangeNode
+CanvasChangeEdge = CanvasChangesetChangeEdge
+CanvasChange = CanvasChangesetChange
+CanvasChangeset = CanvasesCanvasChangeset
 
 
 class CanvasProposal(BaseModel):
     summary: str = Field(min_length=1, max_length=500)
-    operations: list[CanvasOperation] = Field(default_factory=list)
+    changeset: CanvasChangeset = Field(default_factory=CanvasChangeset)
 
 
 class CanvasAnswer(BaseModel):

@@ -29,7 +29,7 @@ def test_tool_called_passes_when_tool_invoked() -> None:
         answer = CanvasAnswer(
             answer="ok",
             confidence=0.5,
-            proposal=CanvasProposal(summary="s", operations=[]),
+            proposal=CanvasProposal(summary="s", changeset={"changes": []}),
         )
         result = ToolCalled("describe_component").evaluate(_ctx(q, answer))
         assert result.value is True

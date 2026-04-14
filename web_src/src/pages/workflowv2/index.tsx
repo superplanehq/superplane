@@ -27,10 +27,11 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  CanvasChangesetChange,
   OrganizationsIntegration,
   SuperplaneMeUser,
 } from "@/api-client";
-import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
@@ -83,7 +84,6 @@ import { useCanvasYaml } from "./useCanvasYaml";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
@@ -3064,43 +3064,81 @@ export function WorkflowPageV2() {
   );
 
   const handleApplyAiOperations = useCallback(
-    async (operations: CanvasOperation[]) => {
-      if (!operations.length || !organizationId || !canvasId) {
+    async (changes: CanvasChangesetChange[]) => {
+      if (!changes.length || !organizationId || !canvasId) {
         return;
       }
 
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-      if (!latestWorkflow) {
-        throw new Error("Canvas not found.");
+      const targetVersionId = activeCanvasVersionId || liveCanvasVersionId;
+      if (!targetVersionId) {
+        throw new Error("No editable canvas version available.");
       }
 
-      const builder = new CanvasBuilder({
-        canvas: latestWorkflow,
-        buildingBlocks,
-        integrations,
-        components,
-        blueprints,
-      });
-      const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
+      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(targetVersionId);
+      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
+      try {
+        const response = await canvasesApplyCanvasVersionChangeset(
+          withOrganizationHeader({
+            path: {
+              canvasId,
+              versionId: targetVersionId,
+            },
+            body: {
+              changeset: {
+                changes,
+              },
+            },
+          }),
+        );
 
-      if (!isReadOnly) {
-        await handleSaveWorkflow(finalWorkflow, { showToast: false });
+        const updatedVersion = response.data?.version;
+        if (!updatedVersion) {
+          throw new Error("Canvas version update returned no version.");
+        }
+
+        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, targetVersionId), updatedVersion);
+        if (targetVersionId && activeCanvasVersionIdRef.current === targetVersionId) {
+          setActiveCanvasVersion(updatedVersion);
+        }
+
+        queryClient.setQueryData(
+          canvasKeys.detail(organizationId, canvasId),
+          (current: CanvasesCanvas | undefined): CanvasesCanvas | undefined => {
+            if (!current) {
+              return current;
+            }
+
+            return {
+              ...current,
+              spec: updatedVersion.spec || current.spec,
+            };
+          },
+        );
+
+        const nextCanvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+        if (nextCanvas) {
+          lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(nextCanvas));
+        }
+
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+        invalidateCanvasVersionData(canvasId, targetVersionId);
+      } catch (error) {
+        releaseCanvasUpdatedEcho();
+        releaseCanvasVersionUpdatedEcho();
+        throw error;
       }
     },
     [
-      buildingBlocks,
-      isReadOnly,
-      canvas,
+      activeCanvasVersionId,
       canvasId,
-      handleSaveWorkflow,
-      components,
-      blueprints,
-      integrations,
+      invalidateCanvasVersionData,
+      liveCanvasVersionId,
       organizationId,
       queryClient,
+      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasVersionUpdatedEcho,
     ],
   );
 

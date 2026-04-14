@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -56,7 +57,8 @@ func CreateCanvasWithAutoLayoutAndUsage(
 		return nil, err
 	}
 
-	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
+	engine := layout.NewLayoutEngine(autoLayout)
+	nodes, edges, err = engine.Apply(nodes, edges)
 	if err != nil {
 		return nil, err
 	}

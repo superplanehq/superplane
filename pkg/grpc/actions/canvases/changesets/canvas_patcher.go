@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -82,6 +83,18 @@ func (p *CanvasPatcher) buildFinalVersion() *models.CanvasVersion {
 	for _, edgeKey := range edgeKeys {
 		v.Edges = append(v.Edges, p.edges[edgeKey])
 	}
+
+	layoutEngine := layout.NewLayoutEngine(&pb.CanvasAutoLayout{
+		Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+	})
+
+	nodes, edges, err := layoutEngine.Apply(v.Nodes, v.Edges)
+	if err != nil {
+		return nil
+	}
+
+	v.Nodes = nodes
+	v.Edges = edges
 
 	return v
 }
