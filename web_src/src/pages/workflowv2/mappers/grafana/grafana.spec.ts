@@ -237,7 +237,7 @@ describe("queryDataSourceMapper.getExecutionDetails", () => {
   it("includes datasource and query from configuration", () => {
     const node = buildNode({
       componentName: "queryDataSource",
-      configuration: { dataSourceUid: "prom-uid-123", query: "node_cpu_seconds_total", format: "table" },
+      configuration: { dataSource: "prom-uid-123", query: "node_cpu_seconds_total", format: "table" },
     });
     const ctx: ExecutionDetailsContext = {
       nodes: [node],

@@ -27,7 +27,7 @@ export interface OnAlertFiringConfiguration {
 }
 
 export interface QueryDataSourceConfiguration {
-  dataSourceUid: string;
+  dataSource: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
