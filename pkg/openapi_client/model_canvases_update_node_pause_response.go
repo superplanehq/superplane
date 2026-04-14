@@ -20,7 +20,7 @@ var _ MappedNullable = &CanvasesUpdateNodePauseResponse{}
 
 // CanvasesUpdateNodePauseResponse struct for CanvasesUpdateNodePauseResponse
 type CanvasesUpdateNodePauseResponse struct {
-	Node *ComponentsNode `json:"node,omitempty"`
+	Node *SuperplaneComponentsNode `json:"node,omitempty"`
 }
 
 // NewCanvasesUpdateNodePauseResponse instantiates a new CanvasesUpdateNodePauseResponse object
@@ -41,9 +41,9 @@ func NewCanvasesUpdateNodePauseResponseWithDefaults() *CanvasesUpdateNodePauseRe
 }
 
 // GetNode returns the Node field value if set, zero value otherwise.
-func (o *CanvasesUpdateNodePauseResponse) GetNode() ComponentsNode {
+func (o *CanvasesUpdateNodePauseResponse) GetNode() SuperplaneComponentsNode {
 	if o == nil || IsNil(o.Node) {
-		var ret ComponentsNode
+		var ret SuperplaneComponentsNode
 		return ret
 	}
 	return *o.Node
@@ -51,7 +51,7 @@ func (o *CanvasesUpdateNodePauseResponse) GetNode() ComponentsNode {
 
 // GetNodeOk returns a tuple with the Node field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesUpdateNodePauseResponse) GetNodeOk() (*ComponentsNode, bool) {
+func (o *CanvasesUpdateNodePauseResponse) GetNodeOk() (*SuperplaneComponentsNode, bool) {
 	if o == nil || IsNil(o.Node) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *CanvasesUpdateNodePauseResponse) HasNode() bool {
 	return false
 }
 
-// SetNode gets a reference to the given ComponentsNode and assigns it to the Node field.
-func (o *CanvasesUpdateNodePauseResponse) SetNode(v ComponentsNode) {
+// SetNode gets a reference to the given SuperplaneComponentsNode and assigns it to the Node field.
+func (o *CanvasesUpdateNodePauseResponse) SetNode(v SuperplaneComponentsNode) {
 	o.Node = &v
 }
 

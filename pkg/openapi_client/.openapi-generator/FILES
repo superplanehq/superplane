@@ -117,11 +117,9 @@ docs/ComponentAPI.md
 docs/ComponentsComponent.md
 docs/ComponentsComponentAction.md
 docs/ComponentsDescribeComponentResponse.md
-docs/ComponentsEdge.md
 docs/ComponentsIntegrationRef.md
 docs/ComponentsListComponentActionsResponse.md
 docs/ComponentsListComponentsResponse.md
-docs/ComponentsNode.md
 docs/ComponentsNodeType.md
 docs/ComponentsPosition.md
 docs/ConfigurationAnyPredicateListTypeOptions.md
@@ -250,6 +248,8 @@ docs/ServiceAccountsUpdateServiceAccountResponse.md
 docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneCanvasesUserRef.md
+docs/SuperplaneComponentsEdge.md
+docs/SuperplaneComponentsNode.md
 docs/SuperplaneComponentsOutputChannel.md
 docs/SuperplaneIntegrationsListIntegrationsResponse.md
 docs/SuperplaneMeUser.md
@@ -355,11 +355,9 @@ model_canvases_update_node_pause_response.go
 model_components_component.go
 model_components_component_action.go
 model_components_describe_component_response.go
-model_components_edge.go
 model_components_integration_ref.go
 model_components_list_component_actions_response.go
 model_components_list_components_response.go
-model_components_node.go
 model_components_node_type.go
 model_components_position.go
 model_configuration_any_predicate_list_type_options.go
@@ -481,6 +479,8 @@ model_service_accounts_update_service_account_response.go
 model_superplane_blueprints_output_channel.go
 model_superplane_blueprints_user_ref.go
 model_superplane_canvases_user_ref.go
+model_superplane_components_edge.go
+model_superplane_components_node.go
 model_superplane_components_output_channel.go
 model_superplane_integrations_list_integrations_response.go
 model_superplane_me_user.go

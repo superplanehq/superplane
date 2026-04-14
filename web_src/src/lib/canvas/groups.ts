@@ -1,6 +1,6 @@
-import type { ComponentsNode } from "@/api-client";
+import type { SuperplaneComponentsNode } from "@/api-client";
 
-export function collectGroupChildIds(node: ComponentsNode): string[] {
+export function collectGroupChildIds(node: SuperplaneComponentsNode): string[] {
   if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") {
     return [];
   }
@@ -8,7 +8,7 @@ export function collectGroupChildIds(node: ComponentsNode): string[] {
   return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);
 }
 
-export function buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
+export function buildChildToGroupMap(nodes: SuperplaneComponentsNode[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const node of nodes) {
     if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group" || !node.id) continue;

@@ -1,6 +1,10 @@
 import React, { useMemo } from "react";
 import { CircleX } from "lucide-react";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef, ComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeExecutionRef,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
