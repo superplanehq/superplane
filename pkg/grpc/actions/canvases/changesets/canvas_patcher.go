@@ -27,6 +27,10 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 }
 
 func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset) error {
+	if changeset == nil || len(changeset.Changes) == 0 {
+		return nil
+	}
+
 	for _, change := range changeset.Changes {
 		err := p.handleChange(change)
 		if err != nil {
@@ -142,13 +146,14 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("node %s not found", nodeID)
 	}
 
-	var configuration map[string]any
-	if node.GetConfiguration() != nil {
-		configuration = node.GetConfiguration().AsMap()
-	}
-
 	p.canvas.Nodes[nodeIndex].Name = node.GetName()
-	p.canvas.Nodes[nodeIndex].Configuration = configuration
+
+	//
+	// We only update the configuration if it is provided
+	//
+	if node.GetConfiguration() != nil {
+		p.canvas.Nodes[nodeIndex].Configuration = node.GetConfiguration().AsMap()
+	}
 
 	return nil
 }

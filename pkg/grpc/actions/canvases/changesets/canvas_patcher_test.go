@@ -70,6 +70,26 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertGraphIsValid()
 	})
 
+	t.Run("update node -> no configuration provided, previous configuration is preserved", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{{ID: "node-a", Name: "Node A", Configuration: map[string]any{"foo": "before"}}},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{Id: "node-a", Name: "Node A Updated"},
+				},
+			},
+		})
+
+		steps.assertNoError()
+		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"foo": "before"})
+	})
+
 	t.Run("rejects self-loop edge", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
@@ -90,7 +110,7 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		})
 		steps.assertHasError()
-		steps.assertErrorContains("canvas contains a cycle")
+		steps.assertErrorContains("self-loop edges are not allowed")
 	})
 
 	t.Run("rejects block that does not exist", func(t *testing.T) {
@@ -111,7 +131,7 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 
 		steps.assertHasError()
-		steps.assertErrorContains("block 'core.hello' not found in registry")
+		steps.assertErrorContains("block core.hello not found in registry")
 	})
 
 	t.Run("rejects unknown operation type", func(t *testing.T) {
