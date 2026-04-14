@@ -28,7 +28,9 @@ export const getDashboardMapper: ComponentBaseMapper = {
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: buildDashboardMetadata(
         context.node,
-        (context.node.configuration as GetDashboardConfiguration | undefined)?.dashboard,
+        typeof context.node.configuration === "object" && context.node.configuration !== null
+          ? (context.node.configuration as GetDashboardConfiguration).dashboard
+          : undefined,
       ),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -36,12 +38,12 @@ export const getDashboardMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const defaultOutputs = context.execution.outputs?.["default"];
     const details: Record<string, string> = {
       "Fetched At": formatTimestamp(context.execution.createdAt),
     };
 
-    const payload = outputs?.default?.[0];
+    const payload = (Array.isArray(defaultOutputs) ? defaultOutputs[0] : undefined) as OutputPayload | undefined;
     if (!payload) {
       details.Response = "No data returned";
       return details;
@@ -54,7 +56,7 @@ export const getDashboardMapper: ComponentBaseMapper = {
       }
     }
 
-    const dashboard = payload.data as DashboardDetails | undefined;
+    const dashboard: DashboardDetails | undefined = payload.data;
     if (!dashboard) {
       details.Response = "No data returned";
       return details;

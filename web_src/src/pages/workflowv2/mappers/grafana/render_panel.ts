@@ -12,12 +12,7 @@ import type {
 } from "../types";
 import { formatTimestamp } from "../utils";
 import { buildGrafanaEventSections } from "./base";
-import {
-  buildDashboardSelectionMetadata,
-  buildPanelMetadata,
-  buildTimeRangeMetadata,
-  previewMetadataItem,
-} from "./dashboard_shared";
+import { buildDashboardSelectionMetadata, buildPanelMetadata, buildTimeRangeMetadata } from "./dashboard_shared";
 import type { DashboardNodeMetadata, RenderPanelConfiguration, RenderPanelOutput } from "./types";
 
 export const renderPanelMapper: ComponentBaseMapper = {
@@ -38,12 +33,12 @@ export const renderPanelMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const defaultOutputs = context.execution.outputs?.["default"];
     const details: Record<string, string> = {
       "Rendered At": formatTimestamp(context.execution.createdAt),
     };
 
-    const payload = outputs?.default?.[0];
+    const payload = (Array.isArray(defaultOutputs) ? defaultOutputs[0] : undefined) as OutputPayload | undefined;
     if (!payload) {
       details.Response = "No data returned";
       return details;
@@ -56,7 +51,7 @@ export const renderPanelMapper: ComponentBaseMapper = {
       }
     }
 
-    const output = payload.data as RenderPanelOutput | undefined;
+    const output: RenderPanelOutput | undefined = payload.data;
     if (!output) {
       details.Response = "No data returned";
       return details;
@@ -82,17 +77,15 @@ export const renderPanelMapper: ComponentBaseMapper = {
 };
 
 function buildMetadata(node: ComponentBaseContext["node"]) {
-  const configuration = node.configuration as RenderPanelConfiguration | undefined;
-  const nodeMetadata = node.metadata as DashboardNodeMetadata | undefined;
-  const size =
-    configuration?.width && configuration?.height ? `${configuration.width}x${configuration.height}` : undefined;
-
+  const configuration =
+    typeof node.configuration === "object" && node.configuration !== null
+      ? (node.configuration as RenderPanelConfiguration)
+      : undefined;
+  const nodeMetadata =
+    typeof node.metadata === "object" && node.metadata !== null ? (node.metadata as DashboardNodeMetadata) : undefined;
   return [
     buildDashboardSelectionMetadata(nodeMetadata, configuration?.dashboard),
     buildPanelMetadata(nodeMetadata),
     buildTimeRangeMetadata(configuration?.from, configuration?.to),
-    previewMetadataItem("maximize", "Size: ", size),
-  ]
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .slice(0, 3);
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 }

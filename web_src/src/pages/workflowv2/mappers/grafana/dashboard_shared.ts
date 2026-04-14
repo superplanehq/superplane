@@ -5,7 +5,8 @@ import type { NodeInfo } from "../types";
 const TEXT_PREVIEW_MAX_LENGTH = 40;
 
 export function buildDashboardMetadata(node: NodeInfo, dashboard?: string): MetadataItem[] {
-  const nodeMetadata = node.metadata as DashboardNodeMetadata | undefined;
+  const nodeMetadata =
+    typeof node.metadata === "object" && node.metadata !== null ? (node.metadata as DashboardNodeMetadata) : undefined;
 
   const items: (MetadataItem | undefined)[] = [buildDashboardSelectionMetadata(nodeMetadata, dashboard)];
 
