@@ -168,10 +168,10 @@ describe("queryLogsMapper", () => {
     const node = makeNode("queryLogs", { dataSource: "loki", query: longQuery });
 
     const metadata = queryLogsMapper.props(makeComponentContext(node)).metadata ?? [];
-    const queryItem = metadata[1];
+    const label = metadata[1].label as string;
 
-    expect(queryItem.label.length).toBeLessThanOrEqual(53); // 50 + "..."
-    expect(queryItem.label.endsWith("...")).toBe(true);
+    expect(label.length).toBeLessThanOrEqual(53); // 50 + "..."
+    expect(label.endsWith("...")).toBe(true);
   });
 
   it("truncates long queries to 80 chars in execution details", () => {
@@ -223,10 +223,10 @@ describe("queryTracesMapper", () => {
     const node = makeNode("queryTraces", { dataSource: "tempo", query: longQuery });
 
     const metadata = queryTracesMapper.props(makeComponentContext(node)).metadata ?? [];
-    const queryItem = metadata[1];
+    const label = metadata[1].label as string;
 
-    expect(queryItem.label.length).toBeLessThanOrEqual(53);
-    expect(queryItem.label.endsWith("...")).toBe(true);
+    expect(label.length).toBeLessThanOrEqual(53);
+    expect(label.endsWith("...")).toBe(true);
   });
 
   it("truncates long queries to 80 chars in execution details", () => {

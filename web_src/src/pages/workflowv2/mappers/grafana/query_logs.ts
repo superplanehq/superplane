@@ -44,11 +44,12 @@ export const queryLogsMapper: ComponentBaseMapper = {
     }
 
     const responseData = payload?.data as Record<string, unknown> | undefined;
-    if (responseData) {
-      details["Log Lines"] = String(countGrafanaQueryResponseRows(responseData));
-    } else {
+    if (!responseData) {
       details["Log Lines"] = "No data returned";
+      return details;
     }
+
+    details["Log Lines"] = String(countGrafanaQueryResponseRows(responseData));
 
     return details;
   },

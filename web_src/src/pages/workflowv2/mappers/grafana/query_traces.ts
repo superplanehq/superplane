@@ -44,11 +44,12 @@ export const queryTracesMapper: ComponentBaseMapper = {
     }
 
     const responseData = payload?.data as Record<string, unknown> | undefined;
-    if (responseData) {
-      details["Traces"] = String(countGrafanaQueryResponseRows(responseData));
-    } else {
+    if (!responseData) {
       details["Traces"] = "No data returned";
+      return details;
     }
+
+    details["Traces"] = String(countGrafanaQueryResponseRows(responseData));
 
     return details;
   },
