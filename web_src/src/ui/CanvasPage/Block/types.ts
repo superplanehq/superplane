@@ -61,7 +61,6 @@ export type ComponentActionKeys =
   | "onEdit"
   | "onDuplicate"
   | "onDeactivate"
-  | "onToggleCollapse"
   | "onToggleView"
   | "onDelete";
 
