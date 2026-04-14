@@ -63,7 +63,7 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -273,7 +273,7 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  showAiBuilderTab?: boolean;
+  agentContext: AgentContext;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
@@ -1229,7 +1229,7 @@ function CanvasPage(props: CanvasPageProps) {
               isOpen={isBuildingBlocksSidebarOpen}
               onToggle={handleSidebarToggle}
               blocks={props.buildingBlocks || []}
-              showAiBuilderTab={props.showAiBuilderTab}
+              agentContext={props.agentContext}
               canvasId={props.canvasId}
               organizationId={props.organizationId}
               canvasNodes={canvasNodesForAiContext}
@@ -3014,6 +3014,6 @@ function CanvasContent({
   );
 }
 
-export type { BuildingBlock } from "../BuildingBlocksSidebar";
+export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
 export { CanvasPage };

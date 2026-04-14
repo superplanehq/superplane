@@ -2,6 +2,9 @@ from typing import Any
 
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_describe_canvas_version_response import (
+    CanvasesDescribeCanvasVersionResponse,
+)
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.canvases_list_node_executions_response import (
     CanvasesListNodeExecutionsResponse,
@@ -27,6 +30,26 @@ class FakeCanvasApi:
         if payload is None:
             raise ValueError(f"Missing payload for canvas: {canvas_id}")
         result = CanvasesDescribeCanvasResponse.from_dict(payload)
+        assert result is not None
+        return result
+
+
+class FakeCanvasVersionApi:
+    def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
+        self._payloads = payloads
+
+    def canvases_describe_canvas_version(
+        self,
+        canvas_id: str,
+        version_id: str,
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> CanvasesDescribeCanvasVersionResponse:
+        _ = _request_timeout
+        key = f"/api/v1/canvases/{canvas_id}/versions/{version_id}"
+        payload = self._payloads.get(key)
+        if payload is None:
+            raise ValueError(f"Missing payload for canvas version: {canvas_id}/{version_id}")
+        result = CanvasesDescribeCanvasVersionResponse.from_dict(payload)
         assert result is not None
         return result
 
@@ -128,6 +151,7 @@ class FakeSuperplaneClient(SuperplaneClient):
             )
         )
         self._canvas_api = FakeCanvasApi(payloads)  # type: ignore[assignment]
+        self._canvas_version_api = FakeCanvasVersionApi(payloads)  # type: ignore[assignment]
         self._canvas_node_api = FakeCanvasNodeApi(payloads)  # type: ignore[assignment]
         self._component_api = FakeComponentApi(payloads)  # type: ignore[assignment]
         self._trigger_api = FakeTriggerApi(payloads)  # type: ignore[assignment]
@@ -175,6 +199,52 @@ def test_describe_canvas_maps_nodes_and_edges() -> None:
     assert len(summary.nodes) == 2
     assert summary.nodes[0].block_name == "github.onPush"
     assert len(summary.edges) == 1
+
+
+def test_describe_editing_canvas_prefers_version_nodes_and_live_metadata_name() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/canvases/canvas-1": {
+                "canvas": {
+                    "metadata": {"id": "canvas-1", "name": "Production name"},
+                    "spec": {
+                        "nodes": [
+                            {
+                                "id": "live-only",
+                                "name": "Live node",
+                                "type": "TYPE_COMPONENT",
+                                "component": {"name": "noop"},
+                            }
+                        ],
+                        "edges": [],
+                    },
+                }
+            },
+            "/api/v1/canvases/canvas-1/versions/draft-ver": {
+                "version": {
+                    "metadata": {"id": "draft-ver", "canvasId": "canvas-1"},
+                    "spec": {
+                        "nodes": [
+                            {
+                                "id": "draft-only",
+                                "name": "Draft node",
+                                "type": "TYPE_COMPONENT",
+                                "component": {"name": "slack.sendTextMessage"},
+                            }
+                        ],
+                        "edges": [],
+                    },
+                }
+            },
+        }
+    )
+
+    summary = client.describe_editing_canvas("canvas-1", "draft-ver")
+
+    assert summary.name == "Production name"
+    assert len(summary.nodes) == 1
+    assert summary.nodes[0].id == "draft-only"
+    assert summary.nodes[0].name == "Draft node"
 
 
 def test_get_node_details_includes_recent_events() -> None:
