@@ -120,6 +120,8 @@ docs/CanvasesUpdateCanvasVersionBody.md
 docs/CanvasesUpdateCanvasVersionResponse.md
 docs/CanvasesUpdateNodePauseBody.md
 docs/CanvasesUpdateNodePauseResponse.md
+docs/CanvasesValidateCanvasVersionChangesetBody.md
+docs/CanvasesValidateCanvasVersionChangesetResponse.md
 docs/ComponentAPI.md
 docs/ComponentsComponent.md
 docs/ComponentsComponentAction.md
@@ -366,6 +368,8 @@ model_canvases_update_canvas_version_body.go
 model_canvases_update_canvas_version_response.go
 model_canvases_update_node_pause_body.go
 model_canvases_update_node_pause_response.go
+model_canvases_validate_canvas_version_changeset_body.go
+model_canvases_validate_canvas_version_changeset_response.go
 model_components_component.go
 model_components_component_action.go
 model_components_describe_component_response.go

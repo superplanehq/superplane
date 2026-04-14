@@ -165,7 +165,6 @@ export type CanvasesActOnCanvasChangeRequestResponse = {
 
 export type CanvasesApplyCanvasVersionChangesetBody = {
   changeset?: CanvasesCanvasChangeset;
-  dryRun?: boolean;
 };
 
 export type CanvasesApplyCanvasVersionChangesetResponse = {
@@ -584,6 +583,14 @@ export type CanvasesUpdateNodePauseBody = {
 
 export type CanvasesUpdateNodePauseResponse = {
   node?: SuperplaneComponentsNode;
+};
+
+export type CanvasesValidateCanvasVersionChangesetBody = {
+  changeset?: CanvasesCanvasChangeset;
+};
+
+export type CanvasesValidateCanvasVersionChangesetResponse = {
+  version?: CanvasesCanvasVersion;
 };
 
 export type ComponentsComponent = {
@@ -2622,6 +2629,36 @@ export type CanvasesUpdateCanvasVersionResponses = {
 
 export type CanvasesUpdateCanvasVersionResponse2 =
   CanvasesUpdateCanvasVersionResponses[keyof CanvasesUpdateCanvasVersionResponses];
+
+export type CanvasesValidateCanvasVersionChangesetData = {
+  body: CanvasesValidateCanvasVersionChangesetBody;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}/validate";
+};
+
+export type CanvasesValidateCanvasVersionChangesetErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesValidateCanvasVersionChangesetError =
+  CanvasesValidateCanvasVersionChangesetErrors[keyof CanvasesValidateCanvasVersionChangesetErrors];
+
+export type CanvasesValidateCanvasVersionChangesetResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesValidateCanvasVersionChangesetResponse;
+};
+
+export type CanvasesValidateCanvasVersionChangesetResponse2 =
+  CanvasesValidateCanvasVersionChangesetResponses[keyof CanvasesValidateCanvasVersionChangesetResponses];
 
 export type CanvasesDeleteCanvasData = {
   body?: never;

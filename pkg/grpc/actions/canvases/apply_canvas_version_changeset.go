@@ -26,7 +26,6 @@ func ApplyCanvasVersionChangeset(
 	canvasID uuid.UUID,
 	versionID uuid.UUID,
 	changeset *pb.CanvasChangeset,
-	dryRun bool,
 ) (*pb.ApplyCanvasVersionChangesetResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
@@ -45,14 +44,7 @@ func ApplyCanvasVersionChangeset(
 	var newVersion *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		var version *models.CanvasVersion
-
-		if dryRun {
-			version, err = models.FindCanvasVersionInTransaction(tx, canvasID, versionID)
-		} else {
-			version, err = models.FindCanvasVersionForUpdateInTransaction(tx, canvasID, versionID)
-		}
-
+		version, err := models.FindCanvasVersionForUpdateInTransaction(tx, canvasID, versionID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return status.Error(codes.NotFound, "version not found")
@@ -79,16 +71,8 @@ func ApplyCanvasVersionChangeset(
 			return status.Errorf(codes.InvalidArgument, "failed to update canvas version: %v", err)
 		}
 
-		newVersion = patcher.GetVersion()
-
-		//
-		// If dry run is used, we do not persist the change to the database.
-		//
-		if dryRun {
-			return nil
-		}
-
 		now := time.Now()
+		newVersion = patcher.GetVersion()
 		newVersion.UpdatedAt = &now
 		err = tx.Save(newVersion).Error
 		if err != nil {
@@ -101,15 +85,6 @@ func ApplyCanvasVersionChangeset(
 
 	if err != nil {
 		return nil, err
-	}
-
-	//
-	// if we didn't persist the change, we don't send the RabbitMQ message.
-	//
-	if dryRun {
-		return &pb.ApplyCanvasVersionChangesetResponse{
-			Version: SerializeCanvasVersion(newVersion, organizationID.String()),
-		}, nil
 	}
 
 	err = messages.NewCanvasVersionUpdatedMessage(canvasID.String(), newVersion.ID.String()).PublishVersionUpdated()

@@ -129,6 +129,9 @@ import type {
   CanvasesUpdateNodePauseData,
   CanvasesUpdateNodePauseErrors,
   CanvasesUpdateNodePauseResponses,
+  CanvasesValidateCanvasVersionChangesetData,
+  CanvasesValidateCanvasVersionChangesetErrors,
+  CanvasesValidateCanvasVersionChangesetResponses,
   ComponentsDescribeComponentData,
   ComponentsDescribeComponentErrors,
   ComponentsDescribeComponentResponses,
@@ -958,6 +961,27 @@ export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>
       },
     },
   );
+
+/**
+ * Validate a canvas version changeset
+ *
+ * Validate a canvas version changeset
+ */
+export const canvasesValidateCanvasVersionChangeset = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesValidateCanvasVersionChangesetData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesValidateCanvasVersionChangesetResponses,
+    CanvasesValidateCanvasVersionChangesetErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/{versionId}/validate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * Delete canvas

@@ -21,7 +21,6 @@ var _ MappedNullable = &CanvasesApplyCanvasVersionChangesetBody{}
 // CanvasesApplyCanvasVersionChangesetBody struct for CanvasesApplyCanvasVersionChangesetBody
 type CanvasesApplyCanvasVersionChangesetBody struct {
 	Changeset *CanvasesCanvasChangeset `json:"changeset,omitempty"`
-	DryRun    *bool                    `json:"dryRun,omitempty"`
 }
 
 // NewCanvasesApplyCanvasVersionChangesetBody instantiates a new CanvasesApplyCanvasVersionChangesetBody object
@@ -73,38 +72,6 @@ func (o *CanvasesApplyCanvasVersionChangesetBody) SetChangeset(v CanvasesCanvasC
 	o.Changeset = &v
 }
 
-// GetDryRun returns the DryRun field value if set, zero value otherwise.
-func (o *CanvasesApplyCanvasVersionChangesetBody) GetDryRun() bool {
-	if o == nil || IsNil(o.DryRun) {
-		var ret bool
-		return ret
-	}
-	return *o.DryRun
-}
-
-// GetDryRunOk returns a tuple with the DryRun field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CanvasesApplyCanvasVersionChangesetBody) GetDryRunOk() (*bool, bool) {
-	if o == nil || IsNil(o.DryRun) {
-		return nil, false
-	}
-	return o.DryRun, true
-}
-
-// HasDryRun returns a boolean if a field has been set.
-func (o *CanvasesApplyCanvasVersionChangesetBody) HasDryRun() bool {
-	if o != nil && !IsNil(o.DryRun) {
-		return true
-	}
-
-	return false
-}
-
-// SetDryRun gets a reference to the given bool and assigns it to the DryRun field.
-func (o *CanvasesApplyCanvasVersionChangesetBody) SetDryRun(v bool) {
-	o.DryRun = &v
-}
-
 func (o CanvasesApplyCanvasVersionChangesetBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -117,9 +84,6 @@ func (o CanvasesApplyCanvasVersionChangesetBody) ToMap() (map[string]interface{}
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Changeset) {
 		toSerialize["changeset"] = o.Changeset
-	}
-	if !IsNil(o.DryRun) {
-		toSerialize["dryRun"] = o.DryRun
 	}
 	return toSerialize, nil
 }
