@@ -11,7 +11,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import type { AiChatSession, AiBuilderMessage, AiBuilderProposal } from "./agentChat";
-import { loadChatConversation, loadChatSessions, pushAiMessages, sendChatPrompt } from "./agentChat";
+import {
+  loadChatConversation,
+  loadChatSessions,
+  pushAiMessages,
+  sendChatPrompt,
+  stopRunningChatPrompt,
+} from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import { CategorySection } from "./CategorySection";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
@@ -196,6 +202,7 @@ function OpenBuildingBlocksSidebar({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
+  const chatAbortControllerRef = useRef<AbortController | null>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") {
@@ -246,6 +253,7 @@ function OpenBuildingBlocksSidebar({
         setAiError,
         setIsGeneratingResponse,
         setPendingProposal,
+        chatAbortControllerRef,
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
@@ -270,6 +278,10 @@ function OpenBuildingBlocksSidebar({
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
+  }, []);
+
+  const handleStopPrompt = useCallback(() => {
+    stopRunningChatPrompt({ chatAbortControllerRef });
   }, []);
 
   const formatOperation = useCallback((operation: CanvasOperation, proposal?: AiBuilderProposal) => {
@@ -384,6 +396,7 @@ function OpenBuildingBlocksSidebar({
   }, [showAiBuilderTab, activeTab]);
 
   useEffect(() => {
+    stopRunningChatPrompt({ chatAbortControllerRef });
     setActiveTab("components");
     setCurrentChatId(null);
     setAiMessages([]);
@@ -391,6 +404,12 @@ function OpenBuildingBlocksSidebar({
     setAiError(null);
     setAiInput("");
   }, [canvasId]);
+
+  useEffect(() => {
+    return () => {
+      stopRunningChatPrompt({ chatAbortControllerRef });
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -788,6 +807,7 @@ function OpenBuildingBlocksSidebar({
             onSelectChat={handleSelectChatSession}
             onStartNewSession={handleStartNewChatSession}
             onSendPrompt={() => void handleSendPrompt()}
+            onStopPrompt={handleStopPrompt}
             aiInputRef={aiInputRef}
           />
         )}
