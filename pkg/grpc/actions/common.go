@@ -931,59 +931,6 @@ func ProtoToPosition(position *componentpb.Position) models.Position {
 	}
 }
 
-// Verify if the workflow is acyclic using
-// topological sort algorithm - kahn's - to detect cycles
-func CheckForCycles(nodes []*componentpb.Node, edges []*componentpb.Edge) error {
-
-	//
-	// Build adjacency list
-	//
-	graph := make(map[string][]string)
-	inDegree := make(map[string]int)
-
-	//
-	// Initialize all nodesm and build the graph
-	//
-	for _, node := range nodes {
-		graph[node.Id] = []string{}
-		inDegree[node.Id] = 0
-	}
-
-	for _, edge := range edges {
-		graph[edge.SourceId] = append(graph[edge.SourceId], edge.TargetId)
-		inDegree[edge.TargetId]++
-	}
-
-	// Kahn's algorithm for topological sort
-	queue := []string{}
-	for nodeID, degree := range inDegree {
-		if degree == 0 {
-			queue = append(queue, nodeID)
-		}
-	}
-
-	visited := 0
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		visited++
-
-		for _, neighbor := range graph[current] {
-			inDegree[neighbor]--
-			if inDegree[neighbor] == 0 {
-				queue = append(queue, neighbor)
-			}
-		}
-	}
-
-	// If we visited all nodes, the graph is acyclic
-	if visited != len(nodes) {
-		return status.Error(codes.InvalidArgument, "graph contains a cycle")
-	}
-
-	return nil
-}
-
 func defaultValueToProto(value any) *string {
 	// We are converting the "default value" of a configuration
 	// field to its protobuf representation.
