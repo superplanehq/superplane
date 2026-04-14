@@ -1,37 +1,19 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
-  SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { QueryTracesConfiguration } from "./types";
-import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
 import { countGrafanaQueryResponseRows } from "./queryResponse";
+import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 
 export const queryTracesMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const componentName = context.componentDefinition.name || "unknown";
-
-    return {
-      iconSrc: grafanaIcon,
-      collapsedBackground: "bg-white",
-      collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(context.node),
-      includeEmptyState: !lastExecution,
-      eventStateMap: getStateMap(componentName),
-    };
+  props(context: ComponentBaseContext) {
+    return grafanaComponentBaseProps(context, metadataList(context.node));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
@@ -64,15 +46,14 @@ export const queryTracesMapper: ComponentBaseMapper = {
     const responseData = payload?.data as Record<string, unknown> | undefined;
     if (responseData) {
       details["Traces"] = String(countGrafanaQueryResponseRows(responseData));
+    } else {
+      details["Traces"] = "No data returned";
     }
 
     return details;
   },
 
-  subtitle(context: SubtitleContext): string | React.ReactNode {
-    if (!context.execution.createdAt) return "-";
-    return renderTimeAgo(new Date(context.execution.createdAt));
-  },
+  subtitle: grafanaCreatedAtSubtitle,
 };
 
 function metadataList(node: NodeInfo): MetadataItem[] {
@@ -90,21 +71,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Trigger event";
-
-  return [
-    {
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id || "",
-    },
-  ];
 }

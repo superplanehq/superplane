@@ -121,4 +121,34 @@ describe("grafana data source mappers", () => {
     expect(queryTracesMapper.getExecutionDetails(context)["Data Source"]).toBe("tempo-main");
     expect(queryTracesMapper.getExecutionDetails(context).Traces).toBe("0");
   });
+
+  it("queryLogsMapper reports no data when output exists but payload data is missing", () => {
+    const node = makeNode("queryLogs", { dataSource: "loki-main", query: "{}" });
+    const context = makeExecutionContext(node, {
+      default: [
+        {
+          type: "grafana.logs.result",
+          timestamp: new Date().toISOString(),
+          data: null,
+        },
+      ],
+    });
+
+    expect(queryLogsMapper.getExecutionDetails(context)["Log Lines"]).toBe("No data returned");
+  });
+
+  it("queryTracesMapper reports no data when output exists but payload data is missing", () => {
+    const node = makeNode("queryTraces", { dataSource: "tempo-main", query: "{}" });
+    const context = makeExecutionContext(node, {
+      default: [
+        {
+          type: "grafana.traces.result",
+          timestamp: new Date().toISOString(),
+          data: null,
+        },
+      ],
+    });
+
+    expect(queryTracesMapper.getExecutionDetails(context).Traces).toBe("No data returned");
+  });
 });
