@@ -44,6 +44,7 @@ import {
   useCreateCanvas,
   useUpdateCanvas,
   useCreateCanvasVersion,
+  useDeleteCanvasVersion,
   useCreateCanvasChangeRequest,
   useActOnCanvasChangeRequest,
   useResolveCanvasChangeRequest,
@@ -197,6 +198,7 @@ export function WorkflowPageV2() {
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
+  const deleteCanvasVersionMutation = useDeleteCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
@@ -4600,17 +4602,13 @@ export function WorkflowPageV2() {
       return;
     }
 
-    if (!hasEditableVersion) {
-      showErrorToast("Enable edit mode before resetting draft changes");
+    if (!hasEditableVersion || !activeCanvasVersionId) {
+      showErrorToast("Enable edit mode before discarding draft");
       return;
     }
 
-    const shouldReset = window.confirm(
-      hasUnsavedChanges
-        ? "Discard local unsaved changes and reset your draft to current live?"
-        : "Reset your draft to current live and discard draft changes?",
-    );
-    if (!shouldReset) {
+    const shouldDiscard = window.confirm("Discard this draft? You will be redirected to the live canvas.");
+    if (!shouldDiscard) {
       return;
     }
 
@@ -4618,45 +4616,40 @@ export function WorkflowPageV2() {
 
     try {
       setIsResetDraftPending(true);
-      const response = await createCanvasVersionMutation.mutateAsync();
-      const version = response?.data?.version;
-      if (!version) {
-        showErrorToast("Failed to reset draft");
-        return;
-      }
+      await deleteCanvasVersionMutation.mutateAsync(activeCanvasVersionId);
 
       setIsCreateChangeRequestMode(false);
       setSelectedChangeRequestId("");
-      setActiveCanvasVersion(version);
+      setActiveCanvasVersion(null);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       lastSavedWorkflowRef.current = null;
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
-        if (version.metadata?.id) {
-          next.set("version", version.metadata.id);
-        }
+        next.delete("version");
         return next;
       });
 
-      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-        if (!current || !version.spec) {
-          return current;
-        }
+      if (liveCanvasVersion?.spec) {
+        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+          if (!current) {
+            return current;
+          }
 
-        return {
-          ...current,
-          spec: version.spec,
-        };
-      });
+          return {
+            ...current,
+            spec: liveCanvasVersion.spec,
+          };
+        });
+      }
 
-      showSuccessToast("Draft reset to current live");
+      showSuccessToast("Draft discarded");
     } catch (error) {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (error as { message?: string })?.message ||
-        "Failed to reset draft";
-      showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+        "Failed to discard draft";
+      showErrorToast(errorMessage);
     } finally {
       setIsResetDraftPending(false);
     }
@@ -4667,8 +4660,9 @@ export function WorkflowPageV2() {
     isTemplate,
     isVersioningDisabled,
     hasEditableVersion,
-    hasUnsavedChanges,
-    createCanvasVersionMutation,
+    activeCanvasVersionId,
+    deleteCanvasVersionMutation,
+    liveCanvasVersion,
     queryClient,
     setSearchParams,
     clearPendingAutoSaveWork,
@@ -5180,11 +5174,10 @@ export function WorkflowPageV2() {
     !hasEditableVersion ||
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
-    createCanvasVersionMutation.isPending ||
+    deleteCanvasVersionMutation.isPending ||
     hasLocalSaveActivity ||
     isResetDraftPending ||
-    !activeCanvasVersionId ||
-    !liveCanvasVersion?.spec;
+    !activeCanvasVersionId;
   const resetDraftDisabledTooltip = isVersioningDisabled
     ? versioningDisabledTooltip
     : !canUpdateCanvas
@@ -5193,11 +5186,9 @@ export function WorkflowPageV2() {
         ? "This canvas was deleted in another session."
         : !activeCanvasVersionId
           ? "Draft version not found."
-          : !liveCanvasVersion?.spec
-            ? "No live version available."
-            : !hasEditableVersion
-              ? "Enable edit mode before resetting draft changes."
-              : undefined;
+          : !hasEditableVersion
+            ? "Enable edit mode before discarding draft."
+            : undefined;
   const createChangeRequestDisabled =
     isVersioningDisabled ||
     !hasEditableVersion ||
