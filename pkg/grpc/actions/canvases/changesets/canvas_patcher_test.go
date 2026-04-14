@@ -1,4 +1,4 @@
-package operations
+package changesets
 
 import (
 	"testing"
@@ -208,12 +208,12 @@ type CanvasPatcherSteps struct {
 }
 
 func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []models.Edge) {
-	s.patcher = NewCanvasPatcher(&models.CanvasVersion{
+	s.patcher = NewCanvasPatcher(s.registry, &models.CanvasVersion{
 		ID:         uuid.New(),
 		WorkflowID: uuid.New(),
 		Nodes:      datatypes.NewJSONSlice(nodes),
 		Edges:      datatypes.NewJSONSlice(edges),
-	}, s.registry)
+	})
 }
 
 func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset) {

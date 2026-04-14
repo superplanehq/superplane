@@ -1,4 +1,4 @@
-package operations
+package changesets
 
 import (
 	"fmt"
@@ -14,19 +14,19 @@ import (
  * to the canvas to go from the current to the proposed version.
  * It makes snapshot-like updates a lot more efficient.
  */
-type Differ struct {
+type ChangesetBuilder struct {
 	currentNodes  map[string]models.Node
 	currentEdges  map[string]models.Edge
 	proposedNodes map[string]models.Node
 	proposedEdges map[string]models.Edge
 }
 
-func NewDiffer(currentNodes []models.Node, currentEdges []models.Edge, proposedNodes []models.Node, proposedEdges []models.Edge) *Differ {
+func NewChangesetBuilder(currentNodes []models.Node, currentEdges []models.Edge, proposedNodes []models.Node, proposedEdges []models.Edge) *ChangesetBuilder {
 	edgeKeyFn := func(edge models.Edge) string {
 		return edge.SourceID + "|" + edge.TargetID + "|" + edge.Channel
 	}
 
-	return &Differ{
+	return &ChangesetBuilder{
 		currentNodes:  buildNodeMap(currentNodes),
 		currentEdges:  buildEdgeMap(currentEdges, edgeKeyFn),
 		proposedNodes: buildNodeMap(proposedNodes),
@@ -34,36 +34,36 @@ func NewDiffer(currentNodes []models.Node, currentEdges []models.Edge, proposedN
 	}
 }
 
-func (d *Differ) Diff() (*pb.CanvasChangeset, error) {
+func (b *ChangesetBuilder) Build() (*pb.CanvasChangeset, error) {
 	allChanges := []*pb.CanvasChangeset_Change{}
-	allChanges = append(allChanges, d.computeDeleteNodeOperations()...)
-	changes, err := d.computeAddNodeOperations()
+	allChanges = append(allChanges, b.computeDeleteNodeChanges()...)
+	changes, err := b.computeAddNodeChanges()
 	if err != nil {
 		return nil, err
 	}
 
 	allChanges = append(allChanges, changes...)
 
-	changes, err = d.computeUpdateNodeOperations()
+	changes, err = b.computeUpdateNodeChanges()
 	if err != nil {
 		return nil, err
 	}
 
 	allChanges = append(allChanges, changes...)
-	allChanges = append(allChanges, d.computeDisconnectNodeOperations()...)
-	allChanges = append(allChanges, d.computeConnectNodeOperations()...)
+	allChanges = append(allChanges, b.computeDisconnectNodeChanges()...)
+	allChanges = append(allChanges, b.computeConnectNodeChanges()...)
 	return &pb.CanvasChangeset{Changes: allChanges}, nil
 }
 
-func (d *Differ) computeAddNodeOperations() ([]*pb.CanvasChangeset_Change, error) {
+func (b *ChangesetBuilder) computeAddNodeChanges() ([]*pb.CanvasChangeset_Change, error) {
 	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If a node exists in the proposed, but not in the current,
 	// we need an ADD_NODE operation for it.
 	//
-	for _, node := range d.proposedNodes {
-		if _, ok := d.currentNodes[node.ID]; ok {
+	for _, node := range b.proposedNodes {
+		if _, ok := b.currentNodes[node.ID]; ok {
 			continue
 		}
 
@@ -81,15 +81,15 @@ func (d *Differ) computeAddNodeOperations() ([]*pb.CanvasChangeset_Change, error
 	return changes, nil
 }
 
-func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasChangeset_Change {
+func (b *ChangesetBuilder) computeDeleteNodeChanges() []*pb.CanvasChangeset_Change {
 	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If a node exists in the current, but not in the proposed,
 	// we need a DELETE_NODE operation for it.
 	//
-	for nodeID := range d.currentNodes {
-		if _, ok := d.proposedNodes[nodeID]; ok {
+	for nodeID := range b.currentNodes {
+		if _, ok := b.proposedNodes[nodeID]; ok {
 			continue
 		}
 
@@ -104,20 +104,20 @@ func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasChangeset_Change {
 	return changes
 }
 
-func (d *Differ) computeUpdateNodeOperations() ([]*pb.CanvasChangeset_Change, error) {
+func (b *ChangesetBuilder) computeUpdateNodeChanges() ([]*pb.CanvasChangeset_Change, error) {
 	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If a node exists in both the current and the proposed,
 	// but it's not the exactly same node, we need an UPDATE_NODE operation for it.
 	//
-	for _, node := range d.proposedNodes {
-		currentNode, ok := d.currentNodes[node.ID]
+	for _, node := range b.proposedNodes {
+		currentNode, ok := b.currentNodes[node.ID]
 		if !ok {
 			continue
 		}
 
-		if !d.nodeUpdated(currentNode, node) {
+		if !b.nodeUpdated(currentNode, node) {
 			continue
 		}
 
@@ -135,15 +135,15 @@ func (d *Differ) computeUpdateNodeOperations() ([]*pb.CanvasChangeset_Change, er
 	return changes, nil
 }
 
-func (d *Differ) computeDisconnectNodeOperations() []*pb.CanvasChangeset_Change {
+func (b *ChangesetBuilder) computeDisconnectNodeChanges() []*pb.CanvasChangeset_Change {
 	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If an edge exists in the current, but not in the proposed,
 	// we need a DISCONNECT_NODES operation for it.
 	//
-	for edgeKey, edge := range d.currentEdges {
-		if _, ok := d.proposedEdges[edgeKey]; ok {
+	for edgeKey, edge := range b.currentEdges {
+		if _, ok := b.proposedEdges[edgeKey]; ok {
 			continue
 		}
 
@@ -160,15 +160,15 @@ func (d *Differ) computeDisconnectNodeOperations() []*pb.CanvasChangeset_Change 
 	return changes
 }
 
-func (d *Differ) computeConnectNodeOperations() []*pb.CanvasChangeset_Change {
+func (b *ChangesetBuilder) computeConnectNodeChanges() []*pb.CanvasChangeset_Change {
 	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If an edge exists in the proposed but not in the current,
 	// we need a CONNECT_NODES operation.
 	//
-	for edgeKey, edge := range d.proposedEdges {
-		if _, ok := d.currentEdges[edgeKey]; ok {
+	for edgeKey, edge := range b.proposedEdges {
+		if _, ok := b.currentEdges[edgeKey]; ok {
 			continue
 		}
 
@@ -185,7 +185,7 @@ func (d *Differ) computeConnectNodeOperations() []*pb.CanvasChangeset_Change {
 	return changes
 }
 
-func (d *Differ) nodeUpdated(currentNode models.Node, proposedNode models.Node) bool {
+func (b *ChangesetBuilder) nodeUpdated(currentNode models.Node, proposedNode models.Node) bool {
 	if currentNode.Name != proposedNode.Name {
 		return true
 	}

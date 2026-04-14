@@ -1,4 +1,4 @@
-package operations
+package changesets
 
 import (
 	"fmt"
@@ -11,14 +11,14 @@ import (
 )
 
 type CanvasPatcher struct {
-	canvas   *models.CanvasVersion
 	registry *registry.Registry
+	canvas   *models.CanvasVersion
 }
 
-func NewCanvasPatcher(canvas *models.CanvasVersion, registry *registry.Registry) *CanvasPatcher {
+func NewCanvasPatcher(registry *registry.Registry, canvas *models.CanvasVersion) *CanvasPatcher {
 	return &CanvasPatcher{
-		canvas:   canvas,
 		registry: registry,
+		canvas:   canvas,
 	}
 }
 

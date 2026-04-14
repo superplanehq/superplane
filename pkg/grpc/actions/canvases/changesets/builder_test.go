@@ -1,4 +1,4 @@
-package operations
+package changesets
 
 import (
 	"testing"
@@ -9,12 +9,12 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__Differ(t *testing.T) {
+func Test__ChangesetBuilder(t *testing.T) {
 	support.Setup(t)
 
 	t.Run("no changes", func(t *testing.T) {
-		steps := &DifferSteps{t: t}
-		steps.whenDiffing(
+		steps := &ChangesetBuilderSteps{t: t}
+		steps.whenBuilding(
 			[]models.Node{
 				{
 					ID:   "node-a",
@@ -63,9 +63,9 @@ func Test__Differ(t *testing.T) {
 		steps.assertOperationCount(0)
 	})
 
-	t.Run("mixed operations", func(t *testing.T) {
-		steps := &DifferSteps{t: t}
-		steps.whenDiffing(
+	t.Run("mixed changes", func(t *testing.T) {
+		steps := &ChangesetBuilderSteps{t: t}
+		steps.whenBuilding(
 			[]models.Node{
 				{
 					ID:   "node-a",
@@ -124,8 +124,8 @@ func Test__Differ(t *testing.T) {
 	})
 
 	t.Run("invalid configuration for added node returns error", func(t *testing.T) {
-		steps := &DifferSteps{t: t}
-		steps.whenDiffing(
+		steps := &ChangesetBuilderSteps{t: t}
+		steps.whenBuilding(
 			nil,
 			nil,
 			[]models.Node{
@@ -147,8 +147,8 @@ func Test__Differ(t *testing.T) {
 	})
 
 	t.Run("invalid configuration for updated node returns error", func(t *testing.T) {
-		steps := &DifferSteps{t: t}
-		steps.whenDiffing(
+		steps := &ChangesetBuilderSteps{t: t}
+		steps.whenBuilding(
 			[]models.Node{
 				{
 					ID:   "node-a",
@@ -180,38 +180,38 @@ func Test__Differ(t *testing.T) {
 	})
 }
 
-type DifferSteps struct {
+type ChangesetBuilderSteps struct {
 	t         *testing.T
 	changeset *pb.CanvasChangeset
 	err       error
 }
 
-func (s *DifferSteps) whenDiffing(currentNodes []models.Node, currentEdges []models.Edge, proposedNodes []models.Node, proposedEdges []models.Edge) {
-	s.changeset, s.err = NewDiffer(currentNodes, currentEdges, proposedNodes, proposedEdges).Diff()
+func (s *ChangesetBuilderSteps) whenBuilding(currentNodes []models.Node, currentEdges []models.Edge, proposedNodes []models.Node, proposedEdges []models.Edge) {
+	s.changeset, s.err = NewChangesetBuilder(currentNodes, currentEdges, proposedNodes, proposedEdges).Build()
 }
 
-func (s *DifferSteps) assertNoError() {
+func (s *ChangesetBuilderSteps) assertNoError() {
 	require.NoError(s.t, s.err)
 }
 
-func (s *DifferSteps) assertHasError() {
+func (s *ChangesetBuilderSteps) assertHasError() {
 	require.Error(s.t, s.err)
 }
 
-func (s *DifferSteps) assertHasNoOperations() {
+func (s *ChangesetBuilderSteps) assertHasNoOperations() {
 	require.Nil(s.t, s.changeset)
 }
 
-func (s *DifferSteps) assertOperationCount(count int) {
+func (s *ChangesetBuilderSteps) assertOperationCount(count int) {
 	require.Len(s.t, s.changeset.Changes, count)
 }
 
-func (s *DifferSteps) assertHasDeleteNode(nodeID string) {
+func (s *ChangesetBuilderSteps) assertHasDeleteNode(nodeID string) {
 	op := s.findNodeOperation(pb.CanvasChangeset_Change_DELETE_NODE, nodeID)
 	require.NotNil(s.t, op, "expected DELETE_NODE operation for %s", nodeID)
 }
 
-func (s *DifferSteps) assertHasAddNode(nodeID string, name string, block string, configuration map[string]any) {
+func (s *ChangesetBuilderSteps) assertHasAddNode(nodeID string, name string, block string, configuration map[string]any) {
 	op := s.findNodeOperation(pb.CanvasChangeset_Change_ADD_NODE, nodeID)
 	require.NotNil(s.t, op, "expected ADD_NODE operation for %s", nodeID)
 	require.Equal(s.t, name, op.GetNode().GetName())
@@ -219,7 +219,7 @@ func (s *DifferSteps) assertHasAddNode(nodeID string, name string, block string,
 	require.Equal(s.t, configuration, op.GetNode().GetConfiguration().AsMap())
 }
 
-func (s *DifferSteps) assertHasUpdateNode(nodeID string, name string, block string, configuration map[string]any) {
+func (s *ChangesetBuilderSteps) assertHasUpdateNode(nodeID string, name string, block string, configuration map[string]any) {
 	op := s.findNodeOperation(pb.CanvasChangeset_Change_UPDATE_NODE, nodeID)
 	require.NotNil(s.t, op, "expected UPDATE_NODE operation for %s", nodeID)
 	require.Equal(s.t, name, op.GetNode().GetName())
@@ -227,17 +227,17 @@ func (s *DifferSteps) assertHasUpdateNode(nodeID string, name string, block stri
 	require.Equal(s.t, configuration, op.GetNode().GetConfiguration().AsMap())
 }
 
-func (s *DifferSteps) assertHasDisconnect(sourceID string, targetID string, channel string) {
+func (s *ChangesetBuilderSteps) assertHasDisconnect(sourceID string, targetID string, channel string) {
 	op := s.findEdgeOperation(pb.CanvasChangeset_Change_DELETE_EDGE, sourceID, targetID, channel)
 	require.NotNil(s.t, op, "expected DISCONNECT_NODES from %s to %s on channel %s", sourceID, targetID, channel)
 }
 
-func (s *DifferSteps) assertHasConnect(sourceID string, targetID string, channel string) {
+func (s *ChangesetBuilderSteps) assertHasConnect(sourceID string, targetID string, channel string) {
 	op := s.findEdgeOperation(pb.CanvasChangeset_Change_ADD_EDGE, sourceID, targetID, channel)
 	require.NotNil(s.t, op, "expected CONNECT_NODES from %s to %s on channel %s", sourceID, targetID, channel)
 }
 
-func (s *DifferSteps) findNodeOperation(operationType pb.CanvasChangeset_Change_Type, nodeID string) *pb.CanvasChangeset_Change {
+func (s *ChangesetBuilderSteps) findNodeOperation(operationType pb.CanvasChangeset_Change_Type, nodeID string) *pb.CanvasChangeset_Change {
 	for _, change := range s.changeset.Changes {
 		if change.GetType() != operationType {
 			continue
@@ -256,7 +256,7 @@ func (s *DifferSteps) findNodeOperation(operationType pb.CanvasChangeset_Change_
 	return nil
 }
 
-func (s *DifferSteps) findEdgeOperation(operationType pb.CanvasChangeset_Change_Type, sourceID string, targetID string, channel string) *pb.CanvasChangeset_Change {
+func (s *ChangesetBuilderSteps) findEdgeOperation(operationType pb.CanvasChangeset_Change_Type, sourceID string, targetID string, channel string) *pb.CanvasChangeset_Change {
 	for _, change := range s.changeset.Changes {
 		if change.GetType() != operationType {
 			continue

@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/operations"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -44,7 +44,7 @@ func ApplyCanvasVersionChangeset(
 	//
 	// Apply operations to version.
 	//
-	patcher := operations.NewCanvasPatcher(version, registry)
+	patcher := changesets.NewCanvasPatcher(registry, version)
 	err = patcher.ApplyChangeset(changeset)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to update canvas version: %v", err)
