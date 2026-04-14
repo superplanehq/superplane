@@ -45,6 +45,9 @@ class Config:
         self.usage_grpc_url: str = self._parse_str("USAGE_GRPC_URL")
         self.otel_enabled: bool = self._parse_bool("OTEL_ENABLED")
 
+        self.sentry_dsn: str = self._parse_str("SENTRY_DSN")
+        self.sentry_environment: str = self._parse_str("SENTRY_ENVIRONMENT")
+
     @staticmethod
     def _parse_float(env_name: str, *, lower: float, upper: float, default: float) -> float:
         raw = os.getenv(env_name, "").strip()

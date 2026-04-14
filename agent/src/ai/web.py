@@ -46,7 +46,7 @@ from ai.session_store import (
 )
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from ai.telemetry import init_telemetry, shutdown_telemetry
+from ai.telemetry import init_sentry, init_telemetry, shutdown_sentry, shutdown_telemetry
 from ai.text import normalize_optional
 from ai.tools import format_tool_display_label
 from ai.usage_limit_checker import (
@@ -530,6 +530,7 @@ async def _stream_agent_run(
 def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        init_sentry()
         init_telemetry()
         store = SessionStore()
         tracker = ActiveStreamTracker()
@@ -560,6 +561,7 @@ def _create_app() -> FastAPI:
             await limit_checker.close()
             store.close()
             shutdown_telemetry()
+            shutdown_sentry()
 
     app = FastAPI(lifespan=lifespan)
     cors_origins = [origin.strip() for origin in config.cors_origins.split(",") if origin.strip()]
@@ -611,6 +613,9 @@ def _create_app() -> FastAPI:
                             break
                         yield _encode_sse_event(event)
                 except Exception as error:
+                    import sentry_sdk
+
+                    sentry_sdk.capture_exception(error)
                     _debug_log("stream failed", chat_id=chat_id, error=str(error))
                     yield _encode_sse_event(
                         {
