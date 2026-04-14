@@ -20,8 +20,24 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
 			[]models.Node{
-				{ID: "node-a", Name: "Node A", Configuration: map[string]any{"foo": "before"}},
-				{ID: "node-b", Name: "Node B", Configuration: map[string]any{"bar": "value"}},
+				{
+					ID:            "node-a",
+					Name:          "Node A",
+					Configuration: map[string]any{"expression": "true"},
+					Type:          models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "if"},
+					},
+				},
+				{
+					ID:            "node-b",
+					Name:          "Node B",
+					Configuration: map[string]any{"expression": "false"},
+					Type:          models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "if"},
+					},
+				},
 			},
 			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
 		)
@@ -34,7 +50,7 @@ func Test__CanvasPatcher(t *testing.T) {
 						Id:            "node-c",
 						Name:          "Node C",
 						Block:         "noop",
-						Configuration: structFromMap(t, map[string]any{"baz": "value"}),
+						Configuration: structFromMap(t, map[string]any{}),
 					},
 				},
 				{
@@ -42,7 +58,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Node: &pb.CanvasChangeset_Change_Node{
 						Id:            "node-a",
 						Name:          "Node A Updated",
-						Configuration: structFromMap(t, map[string]any{"foo": "after"}),
+						Configuration: structFromMap(t, map[string]any{"expression": "false"}),
 					},
 				},
 				{
@@ -61,8 +77,8 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 
 		steps.assertNoError()
-		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"foo": "after"})
-		steps.assertHasNode("node-c", "Node C", map[string]any{"baz": "value"})
+		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "false"})
+		steps.assertHasNode("node-c", "Node C", map[string]any{})
 		steps.assertHasNodeBlock("node-c", "noop")
 		steps.assertNodeCount(2)
 		steps.assertHasEdge("node-a", "node-c", "default")
@@ -73,7 +89,15 @@ func Test__CanvasPatcher(t *testing.T) {
 	t.Run("update node -> no configuration provided, previous configuration is preserved", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
-			[]models.Node{{ID: "node-a", Name: "Node A", Configuration: map[string]any{"foo": "before"}}},
+			[]models.Node{{
+				ID:            "node-a",
+				Name:          "Node A",
+				Configuration: map[string]any{"expression": "true"},
+				Type:          models.NodeTypeComponent,
+				Ref: models.NodeRef{
+					Component: &models.ComponentRef{Name: "if"},
+				},
+			}},
 			nil,
 		)
 
@@ -87,7 +111,41 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 
 		steps.assertNoError()
-		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"foo": "before"})
+		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "true"})
+	})
+
+	t.Run("update node -> configuration is validated against block schema", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{
+					ID:            "node-a",
+					Name:          "Node A",
+					Configuration: map[string]any{"expression": "true"},
+					Type:          models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "if"},
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-a",
+						Name:          "Node A",
+						Configuration: structFromMap(t, map[string]any{"expression": nil}),
+					},
+				},
+			},
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("field 'expression' is required")
 	})
 
 	t.Run("rejects self-loop edge", func(t *testing.T) {

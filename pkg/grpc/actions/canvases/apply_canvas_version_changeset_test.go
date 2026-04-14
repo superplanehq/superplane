@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -87,6 +88,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		)
 
 		otherUser := support.CreateUser(t, r, r.Organization.ID)
+		draftVersion := createCanvasDraftVersionFromLive(t, canvas.ID, *canvas.LiveVersionID, otherUser.ID)
 		ctx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
 		response, err := ApplyCanvasVersionChangeset(
@@ -94,7 +96,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
-			*canvas.LiveVersionID,
+			draftVersion.ID,
 			&pb.CanvasChangeset{
 				Changes: []*pb.CanvasChangeset_Change{
 					{
@@ -161,7 +163,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		assert.Equal(t, "node-c", edge.TargetId)
 		assert.Equal(t, "default", edge.Channel)
 
-		version, findErr := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
+		version, findErr := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
 		require.NoError(t, findErr)
 		require.NotNil(t, version.OwnerID)
 		assert.Equal(t, otherUser.ID, *version.OwnerID)
@@ -181,8 +183,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
 		)
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		draftVersion := createCanvasDraftVersionFromLive(t, canvas.ID, *canvas.LiveVersionID, r.User)
 
-		versionBefore, err := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
+		versionBefore, err := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
 		require.NoError(t, err)
 		require.Len(t, versionBefore.Nodes, 2)
 		require.Len(t, versionBefore.Edges, 1)
@@ -192,7 +195,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
-			*canvas.LiveVersionID,
+			draftVersion.ID,
 			&pb.CanvasChangeset{
 				Changes: []*pb.CanvasChangeset_Change{
 					{
@@ -257,7 +260,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		//
 		// But, data in the database remains unchanged
 		//
-		versionAfter, err := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
+		versionAfter, err := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
 		require.NoError(t, err)
 		require.Len(t, versionAfter.Nodes, 2)
 		require.Len(t, versionAfter.Edges, 1)
@@ -293,13 +296,14 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
 		)
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		draftVersion := createCanvasDraftVersionFromLive(t, canvas.ID, *canvas.LiveVersionID, r.User)
 
 		_, err := ApplyCanvasVersionChangeset(
 			ctx,
 			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
-			*canvas.LiveVersionID,
+			draftVersion.ID,
 			&pb.CanvasChangeset{
 				Changes: []*pb.CanvasChangeset_Change{
 					{
@@ -319,7 +323,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 		assert.Contains(t, err.Error(), "canvas contains a cycle")
 
-		version, findErr := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
+		version, findErr := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
 		require.NoError(t, findErr)
 		require.Len(t, version.Edges, 1)
 		assert.Equal(t, "node-a", version.Edges[0].SourceID)
@@ -367,4 +371,22 @@ func findCanvasNode(nodes datatypes.JSONSlice[models.Node], nodeID string) *mode
 	}
 
 	return nil
+}
+
+func createCanvasDraftVersionFromLive(t *testing.T, canvasID uuid.UUID, liveVersionID uuid.UUID, userID uuid.UUID) *models.CanvasVersion {
+	t.Helper()
+
+	liveVersion, err := models.FindCanvasVersion(canvasID, liveVersionID)
+	require.NoError(t, err)
+
+	draftVersion, err := models.SaveCanvasDraftInTransaction(
+		database.Conn(),
+		canvasID,
+		userID,
+		liveVersion.Nodes,
+		liveVersion.Edges,
+	)
+	require.NoError(t, err)
+
+	return draftVersion
 }

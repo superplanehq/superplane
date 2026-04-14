@@ -81,14 +81,24 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("node %s already exists", nodeID)
 	}
 
-	nodeType, nodeRef, err := p.findAndValidateBlock(node)
+	nodeType, nodeRef, err := p.findBlock(node)
 	if err != nil {
 		return err
 	}
 
-	var configuration map[string]any
+	schema, err := p.findConfigurationSchemaForNode(nodeType, *nodeRef)
+	if err != nil {
+		return err
+	}
+
+	err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
+	if err != nil {
+		return err
+	}
+
+	var nodeConfiguration map[string]any
 	if node.GetConfiguration() != nil {
-		configuration = node.GetConfiguration().AsMap()
+		nodeConfiguration = node.GetConfiguration().AsMap()
 	}
 
 	p.canvas.Nodes = append(p.canvas.Nodes, models.Node{
@@ -96,7 +106,7 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		Name:          node.GetName(),
 		Type:          nodeType,
 		Ref:           *nodeRef,
-		Configuration: configuration,
+		Configuration: nodeConfiguration,
 	})
 
 	return nil
@@ -152,10 +162,52 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 	// We only update the configuration if it is provided
 	//
 	if node.GetConfiguration() != nil {
+		currentNode := p.canvas.Nodes[nodeIndex]
+		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
+		if err != nil {
+			return err
+		}
+
+		err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
+		if err != nil {
+			return err
+		}
+
 		p.canvas.Nodes[nodeIndex].Configuration = node.GetConfiguration().AsMap()
 	}
 
 	return nil
+}
+
+func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef models.NodeRef) ([]configuration.Field, error) {
+	switch nodeType {
+	case models.NodeTypeComponent:
+		component, err := p.registry.GetComponent(nodeRef.Component.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		return component.Configuration(), nil
+
+	case models.NodeTypeTrigger:
+		trigger, err := p.registry.GetTrigger(nodeRef.Trigger.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		return trigger.Configuration(), nil
+
+	case models.NodeTypeWidget:
+		widget, err := p.registry.GetWidget(nodeRef.Widget.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		return widget.Configuration(), nil
+
+	default:
+		return nil, fmt.Errorf("unknown node type: %s", nodeType)
+	}
 }
 
 func (p *CanvasPatcher) addEdge(change *pb.CanvasChangeset_Change) error {
@@ -246,7 +298,7 @@ func (p *CanvasPatcher) findEdge(sourceID, targetID, channel string) (int, bool)
 	return index, index >= 0
 }
 
-func (p *CanvasPatcher) findAndValidateBlock(node *pb.CanvasChangeset_Change_Node) (string, *models.NodeRef, error) {
+func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string, *models.NodeRef, error) {
 	if node.GetBlock() == "" {
 		return "", nil, fmt.Errorf("block is required")
 	}
@@ -254,13 +306,8 @@ func (p *CanvasPatcher) findAndValidateBlock(node *pb.CanvasChangeset_Change_Nod
 	//
 	// Check if the block is a component
 	//
-	component, err := p.registry.GetComponent(node.GetBlock())
+	_, err := p.registry.GetComponent(node.GetBlock())
 	if err == nil {
-		err = configuration.ValidateConfiguration(component.Configuration(), node.GetConfiguration().AsMap())
-		if err != nil {
-			return "", nil, err
-		}
-
 		return models.NodeTypeComponent, &models.NodeRef{
 			Component: &models.ComponentRef{Name: node.GetBlock()},
 		}, nil
@@ -269,13 +316,8 @@ func (p *CanvasPatcher) findAndValidateBlock(node *pb.CanvasChangeset_Change_Nod
 	//
 	// Otherwise, check if the block is a trigger
 	//
-	trigger, err := p.registry.GetTrigger(node.GetBlock())
+	_, err = p.registry.GetTrigger(node.GetBlock())
 	if err == nil {
-		err = configuration.ValidateConfiguration(trigger.Configuration(), node.GetConfiguration().AsMap())
-		if err != nil {
-			return "", nil, err
-		}
-
 		return models.NodeTypeTrigger, &models.NodeRef{
 			Trigger: &models.TriggerRef{Name: node.GetBlock()},
 		}, nil
@@ -284,13 +326,8 @@ func (p *CanvasPatcher) findAndValidateBlock(node *pb.CanvasChangeset_Change_Nod
 	//
 	// Otherwise, check if the block is a widget
 	//
-	widget, err := p.registry.GetWidget(node.GetBlock())
+	_, err = p.registry.GetWidget(node.GetBlock())
 	if err == nil {
-		err = configuration.ValidateConfiguration(widget.Configuration(), node.GetConfiguration().AsMap())
-		if err != nil {
-			return "", nil, err
-		}
-
 		return models.NodeTypeWidget, &models.NodeRef{
 			Widget: &models.WidgetRef{Name: node.GetBlock()},
 		}, nil
