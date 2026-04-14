@@ -1567,6 +1567,42 @@
           "CanvasVersion"
         ]
       },
+      "delete": {
+        "summary": "Discard draft canvas version",
+        "description": "Discards a user-owned draft canvas version",
+        "operationId": "Canvases_DeleteCanvasVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDeleteCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      },
       "put": {
         "summary": "Update canvas version",
         "description": "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled",
@@ -4885,6 +4921,9 @@
       "type": "object"
     },
     "CanvasesDeleteCanvasResponse": {
+      "type": "object"
+    },
+    "CanvasesDeleteCanvasVersionResponse": {
       "type": "object"
     },
     "CanvasesDeleteNodeQueueItemResponse": {

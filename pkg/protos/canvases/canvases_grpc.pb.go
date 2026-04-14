@@ -27,6 +27,7 @@ const (
 	Canvases_ListCanvasVersions_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasVersions"
 	Canvases_DescribeCanvasVersion_FullMethodName       = "/Superplane.Canvases.Canvases/DescribeCanvasVersion"
 	Canvases_UpdateCanvasVersion_FullMethodName         = "/Superplane.Canvases.Canvases/UpdateCanvasVersion"
+	Canvases_DeleteCanvasVersion_FullMethodName         = "/Superplane.Canvases.Canvases/DeleteCanvasVersion"
 	Canvases_CreateCanvasChangeRequest_FullMethodName   = "/Superplane.Canvases.Canvases/CreateCanvasChangeRequest"
 	Canvases_ListCanvasChangeRequests_FullMethodName    = "/Superplane.Canvases.Canvases/ListCanvasChangeRequests"
 	Canvases_DescribeCanvasChangeRequest_FullMethodName = "/Superplane.Canvases.Canvases/DescribeCanvasChangeRequest"
@@ -62,6 +63,7 @@ type CanvasesClient interface {
 	ListCanvasVersions(ctx context.Context, in *ListCanvasVersionsRequest, opts ...grpc.CallOption) (*ListCanvasVersionsResponse, error)
 	DescribeCanvasVersion(ctx context.Context, in *DescribeCanvasVersionRequest, opts ...grpc.CallOption) (*DescribeCanvasVersionResponse, error)
 	UpdateCanvasVersion(ctx context.Context, in *UpdateCanvasVersionRequest, opts ...grpc.CallOption) (*UpdateCanvasVersionResponse, error)
+	DeleteCanvasVersion(ctx context.Context, in *DeleteCanvasVersionRequest, opts ...grpc.CallOption) (*DeleteCanvasVersionResponse, error)
 	CreateCanvasChangeRequest(ctx context.Context, in *CreateCanvasChangeRequestRequest, opts ...grpc.CallOption) (*CreateCanvasChangeRequestResponse, error)
 	ListCanvasChangeRequests(ctx context.Context, in *ListCanvasChangeRequestsRequest, opts ...grpc.CallOption) (*ListCanvasChangeRequestsResponse, error)
 	DescribeCanvasChangeRequest(ctx context.Context, in *DescribeCanvasChangeRequestRequest, opts ...grpc.CallOption) (*DescribeCanvasChangeRequestResponse, error)
@@ -167,6 +169,16 @@ func (c *canvasesClient) UpdateCanvasVersion(ctx context.Context, in *UpdateCanv
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateCanvasVersionResponse)
 	err := c.cc.Invoke(ctx, Canvases_UpdateCanvasVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) DeleteCanvasVersion(ctx context.Context, in *DeleteCanvasVersionRequest, opts ...grpc.CallOption) (*DeleteCanvasVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteCanvasVersionResponse)
+	err := c.cc.Invoke(ctx, Canvases_DeleteCanvasVersion_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -395,6 +407,7 @@ type CanvasesServer interface {
 	ListCanvasVersions(context.Context, *ListCanvasVersionsRequest) (*ListCanvasVersionsResponse, error)
 	DescribeCanvasVersion(context.Context, *DescribeCanvasVersionRequest) (*DescribeCanvasVersionResponse, error)
 	UpdateCanvasVersion(context.Context, *UpdateCanvasVersionRequest) (*UpdateCanvasVersionResponse, error)
+	DeleteCanvasVersion(context.Context, *DeleteCanvasVersionRequest) (*DeleteCanvasVersionResponse, error)
 	CreateCanvasChangeRequest(context.Context, *CreateCanvasChangeRequestRequest) (*CreateCanvasChangeRequestResponse, error)
 	ListCanvasChangeRequests(context.Context, *ListCanvasChangeRequestsRequest) (*ListCanvasChangeRequestsResponse, error)
 	DescribeCanvasChangeRequest(context.Context, *DescribeCanvasChangeRequestRequest) (*DescribeCanvasChangeRequestResponse, error)
@@ -448,6 +461,9 @@ func (UnimplementedCanvasesServer) DescribeCanvasVersion(context.Context, *Descr
 }
 func (UnimplementedCanvasesServer) UpdateCanvasVersion(context.Context, *UpdateCanvasVersionRequest) (*UpdateCanvasVersionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateCanvasVersion not implemented")
+}
+func (UnimplementedCanvasesServer) DeleteCanvasVersion(context.Context, *DeleteCanvasVersionRequest) (*DeleteCanvasVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteCanvasVersion not implemented")
 }
 func (UnimplementedCanvasesServer) CreateCanvasChangeRequest(context.Context, *CreateCanvasChangeRequestRequest) (*CreateCanvasChangeRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateCanvasChangeRequest not implemented")
@@ -672,6 +688,24 @@ func _Canvases_UpdateCanvasVersion_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CanvasesServer).UpdateCanvasVersion(ctx, req.(*UpdateCanvasVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_DeleteCanvasVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteCanvasVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).DeleteCanvasVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_DeleteCanvasVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).DeleteCanvasVersion(ctx, req.(*DeleteCanvasVersionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1092,6 +1126,10 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateCanvasVersion",
 			Handler:    _Canvases_UpdateCanvasVersion_Handler,
+		},
+		{
+			MethodName: "DeleteCanvasVersion",
+			Handler:    _Canvases_DeleteCanvasVersion_Handler,
 		},
 		{
 			MethodName: "CreateCanvasChangeRequest",
