@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -9,6 +10,8 @@ import grpc  # type: ignore[import-untyped]
 import grpc.aio  # type: ignore[import-untyped]
 
 import usage_pb2
+
+logger = logging.getLogger("agent.usage_limit_checker")
 
 
 class AgentTokenLimitExceeded(Exception):
@@ -87,7 +90,7 @@ class UsageLimitChecker:
                 timeout=5,
             )
         except grpc.RpcError as error:
-            print(f"[web] org retention lookup failed: {error}", flush=True)
+            logger.warning("org retention lookup failed: %s", error)
             return None
 
         limits = response.limits

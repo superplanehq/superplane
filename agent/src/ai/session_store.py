@@ -587,6 +587,12 @@ class SessionStore:
         total = 0
         while True:
             with self._cursor() as cur:
+                # The outer updated_at re-check guards against a concurrent
+                # update (e.g. a new message) that commits between the subquery
+                # materializing IDs and the DELETE locking rows. Under READ
+                # COMMITTED, PostgreSQL re-evaluates only the outer WHERE after
+                # acquiring the row lock, so without this the chat could be
+                # deleted despite having just been refreshed.
                 cur.execute(
                     """
                     DELETE FROM agent_chats
