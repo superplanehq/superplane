@@ -20,16 +20,10 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get baseURL: %w", err)
 	}
-	if len(baseURL) == 0 {
-		return nil, fmt.Errorf("baseURL is required")
-	}
 
 	token, err := ctx.GetConfig("token")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token: %w", err)
-	}
-	if len(token) == 0 {
-		return nil, fmt.Errorf("token is required")
 	}
 
 	namespace, _ := ctx.GetConfig("namespace")
