@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Field, Fieldset, Label } from "@/components/Fieldset/fieldset";
 import { Input } from "@/components/Input/input";
@@ -122,6 +123,8 @@ interface CanvasSettingsViewProps {
       items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
     };
   }) => Promise<void>;
+  /** When set, shows a control above the form to return to the canvas editor. */
+  onBackToCanvas?: () => void;
 }
 
 function normalizeApprovers(items?: CanvasSettingsApprover[]): CanvasSettingsApprover[] {
@@ -145,6 +148,7 @@ export function CanvasSettingsView({
   availableUsers,
   availableRoles,
   onSave,
+  onBackToCanvas,
 }: CanvasSettingsViewProps) {
   const [name, setName] = useState(initialValues.name);
   const [description, setDescription] = useState(initialValues.description);
@@ -306,6 +310,18 @@ export function CanvasSettingsView({
   return (
     <div className="px-4 py-6">
       <div className="mx-auto w-full max-w-3xl space-y-6">
+        {onBackToCanvas ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="-ml-2 gap-1 px-2 text-slate-600 hover:text-slate-900"
+            onClick={onBackToCanvas}
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+            Back to canvas
+          </Button>
+        ) : null}
         <Fieldset className="space-y-6 rounded-lg border border-slate-950/15 bg-white p-6">
           <Field className="space-y-3">
             <Label htmlFor="canvas-settings-name-input" className="block text-sm font-medium text-gray-700">

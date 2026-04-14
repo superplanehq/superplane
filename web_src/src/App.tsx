@@ -97,8 +97,16 @@ function AppRouter() {
               <Route path=":organizationId" element={<OrganizationScope />}>
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
                 <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
+                <Route
+                  path="canvases/:canvasId/settings"
+                  element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")}
+                />
                 <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
+                <Route
+                  path="templates/:canvasId/settings"
+                  element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")}
+                />
                 <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>

@@ -10,7 +10,7 @@ import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import type {
   BlueprintsBlueprint,
@@ -187,6 +187,7 @@ export function WorkflowPageV2() {
   }>();
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
@@ -509,6 +510,58 @@ export function WorkflowPageV2() {
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "cli" | "memory" | "settings">("canvas");
+  const canvasBasePath = useMemo(() => {
+    if (!organizationId || !canvasId) {
+      return "";
+    }
+    return location.pathname.includes("/templates/")
+      ? `/${organizationId}/templates/${canvasId}`
+      : `/${organizationId}/canvases/${canvasId}`;
+  }, [organizationId, canvasId, location.pathname]);
+  const isCanvasSettingsRoute = useMemo(
+    () => /\/(canvases|templates)\/[^/]+\/settings\/?$/.test(location.pathname),
+    [location.pathname],
+  );
+  const resolvedTopViewMode: "canvas" | "yaml" | "cli" | "memory" | "settings" = isCanvasSettingsRoute
+    ? "settings"
+    : topViewMode;
+
+  useEffect(() => {
+    if (!isCanvasSettingsRoute) {
+      setTopViewMode((prev) => (prev === "settings" ? "canvas" : prev));
+    }
+  }, [isCanvasSettingsRoute]);
+
+  const goToCanvasEditorView = useCallback(() => {
+    setTopViewMode("canvas");
+    if (isCanvasSettingsRoute && canvasBasePath) {
+      navigate(canvasBasePath);
+    }
+  }, [isCanvasSettingsRoute, canvasBasePath, navigate]);
+
+  const handleTopViewModeChange = useCallback(
+    (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => {
+      setIsCreateChangeRequestMode(false);
+      if (!organizationId || !canvasId) {
+        setTopViewMode(mode);
+        return;
+      }
+      const base = location.pathname.includes("/templates/")
+        ? `/${organizationId}/templates/${canvasId}`
+        : `/${organizationId}/canvases/${canvasId}`;
+      if (mode === "settings") {
+        setTopViewMode("settings");
+        navigate(`${base}/settings`);
+        return;
+      }
+      setTopViewMode(mode);
+      if (isCanvasSettingsRoute) {
+        navigate(base);
+      }
+    },
+    [organizationId, canvasId, location.pathname, navigate, isCanvasSettingsRoute],
+  );
+
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -4060,11 +4113,11 @@ export function WorkflowPageV2() {
             next.delete("version");
             return next;
           });
-          setTopViewMode("canvas");
+          goToCanvasEditorView();
         },
       });
     },
-    [handleActOnChangeRequest, setSearchParams],
+    [handleActOnChangeRequest, setSearchParams, goToCanvasEditorView],
   );
 
   const handleRejectChangeRequest = useCallback(
@@ -4091,13 +4144,16 @@ export function WorkflowPageV2() {
     [handleActOnChangeRequest],
   );
 
-  const handleGoToVersioningToResolveConflicts = useCallback((changeRequestId: string) => {
-    setVersionNodeDiffContext(null);
-    setSelectedChangeRequestId(changeRequestId);
-    setResolvingConflictChangeRequestId(changeRequestId);
-    setIsVersionControlOpen(true);
-    setTopViewMode("canvas");
-  }, []);
+  const handleGoToVersioningToResolveConflicts = useCallback(
+    (changeRequestId: string) => {
+      setVersionNodeDiffContext(null);
+      setSelectedChangeRequestId(changeRequestId);
+      setResolvingConflictChangeRequestId(changeRequestId);
+      setIsVersionControlOpen(true);
+      goToCanvasEditorView();
+    },
+    [goToCanvasEditorView],
+  );
 
   const handlePreviewPreviousVersionViewDetails = useCallback(() => {
     if (!selectedCanvasVersionID || !selectedCanvasVersion) {
@@ -4172,7 +4228,7 @@ export function WorkflowPageV2() {
       onOpenVersioningTab: () => {
         setSelectedChangeRequestId(changeRequestId);
         setIsVersionControlOpen(true);
-        setTopViewMode("canvas");
+        goToCanvasEditorView();
       },
       onViewNodeDiff: handleOpenAwaitingApprovalNodeDiff,
       canAct: canUpdateCanvas && !isTemplate && !canvasDeletedRemotely,
@@ -4192,6 +4248,7 @@ export function WorkflowPageV2() {
     isTemplate,
     canvasDeletedRemotely,
     actOnCanvasChangeRequestMutation.isPending,
+    goToCanvasEditorView,
   ]);
 
   const handleResolveChangeRequest = useCallback(
@@ -4388,7 +4445,7 @@ export function WorkflowPageV2() {
 
         await queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
         setIsCreateChangeRequestMode(false);
-        setTopViewMode("canvas");
+        goToCanvasEditorView();
         if (liveCanvasVersionId) {
           handleUseVersion(liveCanvasVersionId);
         }
@@ -4413,6 +4470,7 @@ export function WorkflowPageV2() {
       queryClient,
       liveCanvasVersionId,
       handleUseVersion,
+      goToCanvasEditorView,
     ],
   );
 
@@ -4445,7 +4503,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    setTopViewMode("canvas");
+    goToCanvasEditorView();
     setSuppressUnpublishedChangesBadge(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;
@@ -4466,6 +4524,7 @@ export function WorkflowPageV2() {
     draftVersions,
     handleUseVersion,
     handleCreateVersion,
+    goToCanvasEditorView,
   ]);
 
   const handleResetDraftChanges = useCallback(async () => {
@@ -5141,7 +5200,7 @@ export function WorkflowPageV2() {
               : undefined;
 
   const dataViewContent =
-    topViewMode === "yaml" && yamlPayload ? (
+    resolvedTopViewMode === "yaml" && yamlPayload ? (
       <CanvasYamlView
         yamlText={yamlPayload.yamlText}
         filename={yamlPayload.filename}
@@ -5150,9 +5209,9 @@ export function WorkflowPageV2() {
         onImport={!isReadOnly ? handleImportYaml : undefined}
         isImporting={hasLocalSaveActivity}
       />
-    ) : topViewMode === "cli" ? (
+    ) : resolvedTopViewMode === "cli" ? (
       <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
-    ) : topViewMode === "memory" ? (
+    ) : resolvedTopViewMode === "memory" ? (
       <CanvasMemoryView
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
         isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
@@ -5164,7 +5223,7 @@ export function WorkflowPageV2() {
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
       />
-    ) : topViewMode === "settings" ? (
+    ) : resolvedTopViewMode === "settings" ? (
       <CanvasSettingsView
         initialValues={canvasSettingsInitialValues}
         canUpdateCanvas={canUpdateCanvas && !isTemplate}
@@ -5173,6 +5232,7 @@ export function WorkflowPageV2() {
         availableUsers={canvasSettingsApproverUsers}
         availableRoles={canvasSettingsApproverRoles}
         onSave={handleSaveCanvasSettings}
+        onBackToCanvas={() => handleTopViewModeChange("canvas")}
       />
     ) : null;
 
@@ -5189,17 +5249,14 @@ export function WorkflowPageV2() {
           onSidebarChange={handleSidebarChange}
           title={canvas?.metadata?.name || "Canvas"}
           headerBanner={headerBanner}
-          topViewMode={topViewMode}
+          topViewMode={resolvedTopViewMode}
           canvasStateMode={canvasStateMode}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          onTopViewModeChange={(mode) => {
-            setIsCreateChangeRequestMode(false);
-            setTopViewMode(mode);
-          }}
+          onTopViewModeChange={handleTopViewModeChange}
           isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
           onOpenVersionControl={
-            showVersioningUI && !hasEditableVersion && topViewMode === "canvas"
+            showVersioningUI && !hasEditableVersion && resolvedTopViewMode === "canvas"
               ? () => setIsVersionControlOpen(true)
               : undefined
           }
@@ -5325,7 +5382,7 @@ export function WorkflowPageV2() {
             },
           ]}
           versionControlSidebar={
-            showVersioningUI && !hasEditableVersion && topViewMode === "canvas" ? (
+            showVersioningUI && !hasEditableVersion && resolvedTopViewMode === "canvas" ? (
               <CanvasVersionControlSidebar
                 isOpen={isVersionControlOpen}
                 onToggle={setIsVersionControlOpen}
