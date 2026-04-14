@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComponentsComponent, ComponentsNode } from "@/api-client";
+import type { ComponentsComponent, SuperplaneComponentsNode } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
@@ -21,7 +21,7 @@ type FallbackComponentData = {
   };
 };
 
-function makeNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
+function makeNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {
   return makeComponentsNode({
     id: "node-1",
     name: "Broken Component",
@@ -46,7 +46,7 @@ function makeComponent(overrides: Partial<ComponentsComponent> = {}): Components
   } as ComponentsComponent;
 }
 
-function makeTriggerNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
+function makeTriggerNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {
   return makeComponentsNode({
     id: "trigger-1",
     name: "Incoming Event",

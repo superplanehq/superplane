@@ -1,4 +1,4 @@
-import type { OrganizationsIntegration, ComponentsNode } from "@/api-client";
+import type { OrganizationsIntegration, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { CustomFieldRenderer } from "../mappers/types";
 import { buildNodeInfo } from "../utils";
 

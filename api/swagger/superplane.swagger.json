@@ -4196,14 +4196,14 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
+            "$ref": "#/definitions/SuperplaneComponentsNode"
           }
         },
         "edges": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
+            "$ref": "#/definitions/SuperplaneComponentsEdge"
           }
         },
         "configuration": {
@@ -4784,14 +4784,14 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
+            "$ref": "#/definitions/SuperplaneComponentsNode"
           }
         },
         "edges": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
+            "$ref": "#/definitions/SuperplaneComponentsEdge"
           }
         }
       }
@@ -5283,7 +5283,7 @@
       "type": "object",
       "properties": {
         "node": {
-          "$ref": "#/definitions/ComponentsNode"
+          "$ref": "#/definitions/SuperplaneComponentsNode"
         }
       }
     },
@@ -5350,20 +5350,6 @@
         }
       }
     },
-    "ComponentsEdge": {
-      "type": "object",
-      "properties": {
-        "sourceId": {
-          "type": "string"
-        },
-        "targetId": {
-          "type": "string"
-        },
-        "channel": {
-          "type": "string"
-        }
-      }
-    },
     "ComponentsIntegrationRef": {
       "type": "object",
       "properties": {
@@ -5396,56 +5382,6 @@
             "type": "object",
             "$ref": "#/definitions/ComponentsComponent"
           }
-        }
-      }
-    },
-    "ComponentsNode": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "type": {
-          "$ref": "#/definitions/ComponentsNodeType"
-        },
-        "configuration": {
-          "type": "object"
-        },
-        "metadata": {
-          "type": "object"
-        },
-        "position": {
-          "$ref": "#/definitions/ComponentsPosition"
-        },
-        "component": {
-          "$ref": "#/definitions/NodeComponentRef"
-        },
-        "blueprint": {
-          "$ref": "#/definitions/NodeBlueprintRef"
-        },
-        "trigger": {
-          "$ref": "#/definitions/NodeTriggerRef"
-        },
-        "widget": {
-          "$ref": "#/definitions/NodeWidgetRef"
-        },
-        "isCollapsed": {
-          "type": "boolean"
-        },
-        "integration": {
-          "$ref": "#/definitions/ComponentsIntegrationRef"
-        },
-        "errorMessage": {
-          "type": "string"
-        },
-        "warningMessage": {
-          "type": "string"
-        },
-        "paused": {
-          "type": "boolean"
         }
       }
     },
@@ -7078,6 +7014,70 @@
         },
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "SuperplaneComponentsEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneComponentsNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/ComponentsNodeType"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "position": {
+          "$ref": "#/definitions/ComponentsPosition"
+        },
+        "component": {
+          "$ref": "#/definitions/NodeComponentRef"
+        },
+        "blueprint": {
+          "$ref": "#/definitions/NodeBlueprintRef"
+        },
+        "trigger": {
+          "$ref": "#/definitions/NodeTriggerRef"
+        },
+        "widget": {
+          "$ref": "#/definitions/NodeWidgetRef"
+        },
+        "isCollapsed": {
+          "type": "boolean"
+        },
+        "integration": {
+          "$ref": "#/definitions/ComponentsIntegrationRef"
+        },
+        "errorMessage": {
+          "type": "string"
+        },
+        "warningMessage": {
+          "type": "string"
+        },
+        "paused": {
+          "type": "boolean"
         }
       }
     },

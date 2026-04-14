@@ -32,7 +32,7 @@ import {
 import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
-  ComponentsNode,
+  SuperplaneComponentsNode,
   ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
@@ -262,7 +262,7 @@ type CanvasGraphData = {
   edges?: unknown[];
 };
 
-type PositionedNode = ComponentsNode & {
+type PositionedNode = SuperplaneComponentsNode & {
   id: string;
   position: ComponentsPosition;
 };
