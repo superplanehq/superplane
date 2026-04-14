@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { getDataSourceMapper } from "./get_data_source";
 import { queryDataSourceMapper } from "./query_data_source";
 import { queryLogsMapper } from "./query_logs";
 import { queryTracesMapper } from "./query_traces";
@@ -61,14 +60,6 @@ function makeExecutionContext(node: NodeInfo, outputs?: { default?: OutputPayloa
 }
 
 describe("grafana data source mappers", () => {
-  it("getDataSourceMapper uses renamed dataSource configuration for metadata fallback", () => {
-    const node = makeNode("getDataSource", { dataSource: "loki-main" });
-
-    const metadata = getDataSourceMapper.props(makeComponentContext(node)).metadata ?? [];
-
-    expect(metadata).toEqual([{ icon: "database", label: "Data Source: loki-main" }]);
-  });
-
   it("queryDataSourceMapper uses renamed dataSource field in metadata and execution details", () => {
     const node = makeNode("queryDataSource", {
       dataSource: "prom-main",
@@ -150,5 +141,127 @@ describe("grafana data source mappers", () => {
     });
 
     expect(queryTracesMapper.getExecutionDetails(context).Traces).toBe("No data returned");
+  });
+});
+
+function makeGrafanaQueryResponse(rowsPerFrame: number[]): Record<string, unknown> {
+  return {
+    results: {
+      A: {
+        frames: rowsPerFrame.map((n) => ({
+          data: { values: [Array.from({ length: n }, (_, i) => i)] },
+        })),
+      },
+    },
+  };
+}
+
+describe("queryLogsMapper", () => {
+  it("returns empty metadata when configuration is missing", () => {
+    const node = makeNode("queryLogs");
+
+    expect(queryLogsMapper.props(makeComponentContext(node)).metadata).toEqual([]);
+  });
+
+  it("truncates long queries to 50 chars in metadata", () => {
+    const longQuery = `{app="api"} |= "` + "e".repeat(60) + '"';
+    const node = makeNode("queryLogs", { dataSource: "loki", query: longQuery });
+
+    const metadata = queryLogsMapper.props(makeComponentContext(node)).metadata ?? [];
+    const queryItem = metadata[1];
+
+    expect(queryItem.label.length).toBeLessThanOrEqual(53); // 50 + "..."
+    expect(queryItem.label.endsWith("...")).toBe(true);
+  });
+
+  it("truncates long queries to 80 chars in execution details", () => {
+    const longQuery = "{app=" + "a".repeat(100) + "}";
+    const node = makeNode("queryLogs", { dataSource: "loki", query: longQuery });
+    const details = queryLogsMapper.getExecutionDetails(makeExecutionContext(node));
+
+    expect(details["Query"].length).toBeLessThanOrEqual(83); // 80 + "..."
+    expect(details["Query"].endsWith("...")).toBe(true);
+  });
+
+  it("returns '0' log lines when outputs is undefined", () => {
+    const node = makeNode("queryLogs", { dataSource: "loki", query: "{}" });
+    const details = queryLogsMapper.getExecutionDetails(makeExecutionContext(node));
+
+    expect(details["Log Lines"]).toBe("0");
+  });
+
+  it("counts log lines from response data frames", () => {
+    const node = makeNode("queryLogs", { dataSource: "loki", query: "{}" });
+    const responseData = makeGrafanaQueryResponse([5, 3]);
+    const context = makeExecutionContext(node, {
+      default: [{ type: "grafana.logs.result", timestamp: new Date().toISOString(), data: responseData }],
+    });
+
+    expect(queryLogsMapper.getExecutionDetails(context)["Log Lines"]).toBe("8");
+  });
+
+  it("updates 'Queried At' from payload timestamp", () => {
+    const payloadTs = "2024-06-01T12:00:00.000Z";
+    const node = makeNode("queryLogs", { dataSource: "loki", query: "{}" });
+    const context = makeExecutionContext(node, {
+      default: [{ type: "grafana.logs.result", timestamp: payloadTs, data: makeGrafanaQueryResponse([1]) }],
+    });
+
+    expect(queryLogsMapper.getExecutionDetails(context)["Queried At"]).not.toBe("-");
+  });
+});
+
+describe("queryTracesMapper", () => {
+  it("returns empty metadata when configuration is missing", () => {
+    const node = makeNode("queryTraces");
+
+    expect(queryTracesMapper.props(makeComponentContext(node)).metadata).toEqual([]);
+  });
+
+  it("truncates long queries to 50 chars in metadata", () => {
+    const longQuery = "{ .http.method = " + '"' + "G".repeat(60) + '" }';
+    const node = makeNode("queryTraces", { dataSource: "tempo", query: longQuery });
+
+    const metadata = queryTracesMapper.props(makeComponentContext(node)).metadata ?? [];
+    const queryItem = metadata[1];
+
+    expect(queryItem.label.length).toBeLessThanOrEqual(53);
+    expect(queryItem.label.endsWith("...")).toBe(true);
+  });
+
+  it("truncates long queries to 80 chars in execution details", () => {
+    const longQuery = "{ .service.name = " + '"' + "x".repeat(100) + '" }';
+    const node = makeNode("queryTraces", { dataSource: "tempo", query: longQuery });
+    const details = queryTracesMapper.getExecutionDetails(makeExecutionContext(node));
+
+    expect(details["Query"].length).toBeLessThanOrEqual(83);
+    expect(details["Query"].endsWith("...")).toBe(true);
+  });
+
+  it("returns '0' traces when outputs is undefined", () => {
+    const node = makeNode("queryTraces", { dataSource: "tempo", query: "{}" });
+    const details = queryTracesMapper.getExecutionDetails(makeExecutionContext(node));
+
+    expect(details["Traces"]).toBe("0");
+  });
+
+  it("counts traces from response data frames", () => {
+    const node = makeNode("queryTraces", { dataSource: "tempo", query: "{}" });
+    const responseData = makeGrafanaQueryResponse([10]);
+    const context = makeExecutionContext(node, {
+      default: [{ type: "grafana.traces.result", timestamp: new Date().toISOString(), data: responseData }],
+    });
+
+    expect(queryTracesMapper.getExecutionDetails(context)["Traces"]).toBe("10");
+  });
+
+  it("updates 'Queried At' from payload timestamp", () => {
+    const payloadTs = "2024-06-01T12:00:00.000Z";
+    const node = makeNode("queryTraces", { dataSource: "tempo", query: "{}" });
+    const context = makeExecutionContext(node, {
+      default: [{ type: "grafana.traces.result", timestamp: payloadTs, data: makeGrafanaQueryResponse([1]) }],
+    });
+
+    expect(queryTracesMapper.getExecutionDetails(context)["Queried At"]).not.toBe("-");
   });
 });

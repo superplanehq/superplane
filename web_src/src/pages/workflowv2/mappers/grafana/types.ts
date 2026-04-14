@@ -34,25 +34,6 @@ export interface QueryDataSourceConfiguration {
   format?: string;
 }
 
-export interface DataSource {
-  id?: number;
-  uid: string;
-  name: string;
-  type: string;
-  url?: string;
-  isDefault?: boolean;
-}
-
-export interface GetDataSourceNodeMetadata {
-  dataSource?: string;
-  dataSourceName?: string;
-  dataSourceType?: string;
-}
-
-export interface ListDataSourcesOutput {
-  dataSources: DataSource[];
-}
-
 export interface QueryLogsConfiguration {
   dataSource: string;
   query: string;
