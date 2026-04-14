@@ -1648,6 +1648,52 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/versions/{versionId}/publish": {
+      "patch": {
+        "summary": "Publish draft canvas version",
+        "description": "Publishes a user-owned draft canvas version directly to live",
+        "operationId": "Canvases_PublishCanvasVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesPublishCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesPublishCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
     "/api/v1/canvases/{id}": {
       "get": {
         "summary": "Describe canvas",
@@ -5185,6 +5231,17 @@
         "lastTimestamp": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "CanvasesPublishCanvasVersionBody": {
+      "type": "object"
+    },
+    "CanvasesPublishCanvasVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
     },
