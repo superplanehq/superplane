@@ -47,6 +47,9 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
             )
         ),
         canvas_id=env["canvas_id"],
+        # No agent Postgres: evals must not read or write canvas markdown memory (or chats).
+        # Memory curation only runs from the web REPL after a completed stream, not here.
+        session_store=None,
     )
     agent = build_agent(env["model"])
     # Keyed by case ``inputs`` string so usage matches when cases run concurrently.

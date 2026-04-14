@@ -20,12 +20,12 @@ import (
 type QueryDataSource struct{}
 
 type QueryDataSourceSpec struct {
-	DataSource string  `json:"dataSource"`
-	Query      string  `json:"query"`
-	TimeFrom   *string `json:"timeFrom,omitempty"`
-	TimeTo     *string `json:"timeTo,omitempty"`
-	Timezone   *string `json:"timezone,omitempty"`
-	Format     *string `json:"format,omitempty"`
+	DataSource string  `json:"dataSource" mapstructure:"dataSource"`
+	Query      string  `json:"query" mapstructure:"query"`
+	TimeFrom   *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
+	TimeTo     *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
+	Timezone   *string `json:"timezone,omitempty" mapstructure:"timezone"`
+	Format     *string `json:"format,omitempty" mapstructure:"format"`
 }
 
 type grafanaQueryRequest struct {
@@ -278,7 +278,6 @@ func resolveQueryTimeValue(value string, timezone *string) (string, error) {
 		return fmt.Sprintf("%d", parsed.UTC().UnixMilli()), nil
 	}
 
-	// Preserve Grafana-supported raw values like "now-2h".
 	return trimmed, nil
 }
 
@@ -289,13 +288,6 @@ func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, err
 		time.RFC3339Nano,
 		time.RFC3339,
 		"2006-01-02T15:04Z07:00",
-	} {
-		if parsed, err := time.Parse(format, normalizedValue); err == nil {
-			return parsed, true, nil
-		}
-	}
-
-	for _, format := range []string{
 		"2006-01-02 15:04:05.999999999 -0700 MST",
 		"2006-01-02 15:04:05.999999999 -0700",
 		"2006-01-02 15:04:05 -0700 MST",
@@ -342,7 +334,7 @@ func normalizeResolvedGoTimeString(value string) string {
 
 func parseGrafanaQueryTimezone(timezone *string) (*time.Location, error) {
 	if timezone == nil || strings.TrimSpace(*timezone) == "" {
-		return nil, errors.New("timezone is required for datetime-local values")
+		return time.UTC, nil
 	}
 
 	trimmed := strings.TrimSpace(*timezone)

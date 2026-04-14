@@ -33,7 +33,11 @@ class OrganizationsOrganizationUsage(BaseModel):
     event_bucket_capacity: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, alias="eventBucketCapacity")
     event_bucket_last_updated_at: Optional[datetime] = Field(default=None, alias="eventBucketLastUpdatedAt")
     next_event_bucket_decrease_at: Optional[datetime] = Field(default=None, alias="nextEventBucketDecreaseAt")
-    __properties: ClassVar[List[str]] = ["canvases", "eventBucketLevel", "eventBucketCapacity", "eventBucketLastUpdatedAt", "nextEventBucketDecreaseAt"]
+    agent_token_bucket_level: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, alias="agentTokenBucketLevel")
+    agent_token_bucket_capacity: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, alias="agentTokenBucketCapacity")
+    agent_token_bucket_last_updated_at: Optional[datetime] = Field(default=None, alias="agentTokenBucketLastUpdatedAt")
+    next_agent_token_bucket_decrease_at: Optional[datetime] = Field(default=None, alias="nextAgentTokenBucketDecreaseAt")
+    __properties: ClassVar[List[str]] = ["canvases", "eventBucketLevel", "eventBucketCapacity", "eventBucketLastUpdatedAt", "nextEventBucketDecreaseAt", "agentTokenBucketLevel", "agentTokenBucketCapacity", "agentTokenBucketLastUpdatedAt", "nextAgentTokenBucketDecreaseAt"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -90,7 +94,11 @@ class OrganizationsOrganizationUsage(BaseModel):
             "eventBucketLevel": obj.get("eventBucketLevel"),
             "eventBucketCapacity": obj.get("eventBucketCapacity"),
             "eventBucketLastUpdatedAt": obj.get("eventBucketLastUpdatedAt"),
-            "nextEventBucketDecreaseAt": obj.get("nextEventBucketDecreaseAt")
+            "nextEventBucketDecreaseAt": obj.get("nextEventBucketDecreaseAt"),
+            "agentTokenBucketLevel": obj.get("agentTokenBucketLevel"),
+            "agentTokenBucketCapacity": obj.get("agentTokenBucketCapacity"),
+            "agentTokenBucketLastUpdatedAt": obj.get("agentTokenBucketLastUpdatedAt"),
+            "nextAgentTokenBucketDecreaseAt": obj.get("nextAgentTokenBucketDecreaseAt")
         })
         return _obj
 

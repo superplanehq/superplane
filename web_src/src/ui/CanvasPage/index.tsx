@@ -63,7 +63,7 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import type { AiCanvasOperation, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -83,6 +83,7 @@ import { IntegrationStatusIndicator, type MissingIntegration } from "../Integrat
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { Sentry } from "@/sentry";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import type { CanvasOperation } from "@/lib/ai";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -169,9 +170,6 @@ export interface CanvasPageProps {
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -205,9 +203,6 @@ export interface CanvasPageProps {
   canUpdateIntegrations?: boolean;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
-  // Undo functionality
-  onUndo?: () => void;
-  canUndo?: boolean;
   // Disable running nodes when there are unsaved changes (with tooltip)
   runDisabled?: boolean;
   runDisabledTooltip?: string;
@@ -281,7 +276,7 @@ export interface CanvasPageProps {
   buildingBlocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
-  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId: string;
@@ -1157,14 +1152,12 @@ function CanvasPage(props: CanvasPageProps) {
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
-    <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
+    <div ref={canvasWrapperRef} className="h-full w-full overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
       <div className="relative z-30">
         <CanvasContentHeader
           state={state}
           onSave={props.onSave}
-          onUndo={props.onUndo}
-          canUndo={props.canUndo}
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
@@ -1178,9 +1171,6 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
-          saveState={props.saveState}
-          lastSavedAt={props.lastSavedAt}
-          saveErrorMessage={props.saveErrorMessage}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1701,8 +1691,6 @@ function Sidebar({
 function CanvasContentHeader({
   state,
   onSave,
-  onUndo,
-  canUndo,
   organizationId,
   unsavedMessage,
   saveIsPrimary,
@@ -1716,9 +1704,6 @@ function CanvasContentHeader({
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   headerMode,
-  saveState,
-  lastSavedAt,
-  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1731,8 +1716,6 @@ function CanvasContentHeader({
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
-  onUndo?: () => void;
-  canUndo?: boolean;
   organizationId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
@@ -1746,9 +1729,6 @@ function CanvasContentHeader({
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1790,8 +1770,6 @@ function CanvasContentHeader({
     <Header
       breadcrumbs={state.breadcrumbs}
       onSave={onSave ? handleSave : undefined}
-      onUndo={onUndo}
-      canUndo={canUndo}
       onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
       unsavedMessage={unsavedMessage}
@@ -1806,9 +1784,6 @@ function CanvasContentHeader({
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
-      saveState={saveState}
-      lastSavedAt={lastSavedAt}
-      saveErrorMessage={saveErrorMessage}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}

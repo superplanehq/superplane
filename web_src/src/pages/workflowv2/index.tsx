@@ -62,7 +62,6 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
@@ -80,12 +79,11 @@ import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
 import { CanvasCliView } from "./CanvasCliView";
 import { useCanvasYaml } from "./useCanvasYaml";
-import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
-import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
+import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
+import { DefaultLayoutEngine } from "@/lib/layout";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   buildRunEntryFromEvent,
@@ -101,7 +99,6 @@ import {
   mapWorkflowEventsToRunLogEntries,
   summarizeWorkflowChanges,
   buildExecutionInfo,
-  buildChildToGroupMap,
   buildUserInfo,
 } from "./utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -116,7 +113,14 @@ import { CanvasPageModals } from "./CanvasPageModals";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-node-preparation";
-import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
+import {
+  formatVersionLabelWithTimestamp,
+  isDraftVersion,
+  isPublishedVersion,
+  sortDraftVersionsDesc,
+  sortPublishedVersionsDesc,
+  versionSortValue,
+} from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
@@ -128,6 +132,7 @@ import {
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
 import type { User } from "./mappers/types";
+import { buildChildToGroupMap } from "@/lib/canvas/groups";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -195,7 +200,6 @@ export function WorkflowPageV2() {
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
-  const holdSavingDisplay = useMinSavingDisplayHold(isCanvasSaveInFlight || isCanvasSaveQueued);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
@@ -224,13 +228,12 @@ export function WorkflowPageV2() {
     [paginatedVersionPages],
   );
   const liveCanvasVersion = useMemo(() => {
-    const publishedVersions = paginatedVersions.filter((version) => version.metadata?.isPublished);
+    const publishedVersions = paginatedVersions.filter(isPublishedVersion);
     if (publishedVersions.length > 0) {
       return publishedVersions[0];
     }
 
-    const fallbackPublishedVersions = canvasVersions.filter((version) => version.metadata?.isPublished);
-    return fallbackPublishedVersions[0];
+    return canvasVersions.filter(isPublishedVersion)[0];
   }, [paginatedVersions, canvasVersions]);
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
@@ -246,25 +249,14 @@ export function WorkflowPageV2() {
     paginatedVersions.forEach(addVersion);
 
     return Array.from(versionMap.values()).filter((version) => {
-      if (version.metadata?.isPublished) {
+      if (isPublishedVersion(version)) {
         return true;
       }
 
-      const isOwner = version.metadata?.owner?.id === currentUserId;
-      return isOwner;
+      return version.metadata?.owner?.id === currentUserId;
     });
   }, [canvasVersions, paginatedVersions, currentUserId]);
-  const liveVersions = useMemo(
-    () =>
-      visibleCanvasVersions
-        .filter((version) => version.metadata?.isPublished)
-        .sort(
-          (a, b) =>
-            versionSortValue(b.metadata?.publishedAt || b.metadata?.updatedAt) -
-            versionSortValue(a.metadata?.publishedAt || a.metadata?.updatedAt),
-        ),
-    [visibleCanvasVersions],
-  );
+  const liveVersions = useMemo(() => sortPublishedVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const liveVersionChangeRequestsByVersionId = useMemo(() => {
     const publishedChangeRequests = canvasChangeRequests.filter(
       (changeRequest) => changeRequest.metadata?.status === "STATUS_PUBLISHED",
@@ -309,7 +301,7 @@ export function WorkflowPageV2() {
         return;
       }
 
-      const versionPublishedAt = versionSortValue(version.metadata?.publishedAt || version.metadata?.updatedAt);
+      const versionPublishedAt = versionSortValue(version.metadata?.publishedAt);
       if (!versionPublishedAt) {
         return;
       }
@@ -391,17 +383,7 @@ export function WorkflowPageV2() {
     });
     return indexedVersions;
   }, [visibleCanvasVersions, pendingApprovalVersions]);
-  const draftVersions = useMemo(
-    () =>
-      visibleCanvasVersions
-        .filter((version) => !version.metadata?.isPublished)
-        .sort(
-          (a, b) =>
-            versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
-            versionSortValue(a.metadata?.updatedAt || a.metadata?.createdAt),
-        ),
-    [visibleCanvasVersions],
-  );
+  const draftVersions = useMemo(() => sortDraftVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
@@ -419,7 +401,7 @@ export function WorkflowPageV2() {
     if (
       activeCanvasVersionId &&
       selectedCanvasVersion &&
-      !selectedCanvasVersion.metadata?.isPublished &&
+      isDraftVersion(selectedCanvasVersion) &&
       !isPendingApprovalVersion
     ) {
       return selectedCanvasVersion;
@@ -448,7 +430,7 @@ export function WorkflowPageV2() {
   const isViewingPendingApprovalVersion =
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
-    !!selectedCanvasVersion && !selectedCanvasVersion.metadata?.isPublished && !isViewingPendingApprovalVersion;
+    !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion) && !isViewingPendingApprovalVersion;
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
@@ -616,8 +598,6 @@ export function WorkflowPageV2() {
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const [lastCanvasSaveError, setLastCanvasSaveError] = useState<string | null>(null);
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
@@ -701,8 +681,6 @@ export function WorkflowPageV2() {
     setIsVersionControlOpen(false);
   }, [hasEditableVersion, isVersionControlOpen]);
 
-  // Revert functionality - track initial workflow snapshot
-  const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<CanvasesCanvas | null>(null);
   const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
   const lastAppliedVersionSnapshotRef = useRef("");
   const canvasRef = useRef<CanvasesCanvas | null>(canvas ?? null);
@@ -799,7 +777,6 @@ export function WorkflowPageV2() {
 
     setHasUnsavedChanges(false);
     setHasNonPositionalUnsavedChanges(false);
-    setInitialWorkflowSnapshot(null);
     setActiveCanvasVersion(null);
     setSelectedChangeRequestId("");
     hasSyncedVersionFromURLRef.current = false;
@@ -846,11 +823,11 @@ export function WorkflowPageV2() {
       return;
     }
 
-    const isPublishedVersion = !!requestedVersion.metadata?.isPublished;
-    const isOwnedDraft = !isPublishedVersion && requestedVersion.metadata?.owner?.id === currentUserId;
+    const isPublished = isPublishedVersion(requestedVersion);
+    const isOwnedDraft = !isPublished && requestedVersion.metadata?.owner?.id === currentUserId;
     const isPendingApprovalVersion = pendingApprovalVersionIds.has(requestedVersion.metadata?.id || "");
     const isCurrentLive = requestedVersion.metadata?.id === liveCanvasVersionId;
-    if (!isOwnedDraft && !isPublishedVersion && !isPendingApprovalVersion) {
+    if (!isOwnedDraft && !isPublished && !isPendingApprovalVersion) {
       hasSyncedVersionFromURLRef.current = true;
       return;
     }
@@ -1025,15 +1002,6 @@ export function WorkflowPageV2() {
 
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(canvasId!, queryClient, canvas);
-
-  const saveWorkflowSnapshot = useCallback(
-    (currentWorkflow: CanvasesCanvas) => {
-      if (!initialWorkflowSnapshot) {
-        setInitialWorkflowSnapshot(JSON.parse(JSON.stringify(currentWorkflow)));
-      }
-    },
-    [initialWorkflowSnapshot],
-  );
 
   const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
     const saveSession = canvasSaveSessionRef.current;
@@ -1331,7 +1299,6 @@ export function WorkflowPageV2() {
     });
   }, []);
 
-  // Revert to initial state
   const markUnsavedChange = useCallback((kind: UnsavedChangeKind) => {
     setHasUnsavedChanges(true);
     if (kind === "structural") {
@@ -1379,7 +1346,6 @@ export function WorkflowPageV2() {
       setActiveCanvasVersion(version);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
-      setInitialWorkflowSnapshot(null);
       lastSavedWorkflowRef.current = null;
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
@@ -1421,20 +1387,6 @@ export function WorkflowPageV2() {
     isVersioningDisabled,
   ]);
 
-  const handleRevert = useCallback(() => {
-    if (initialWorkflowSnapshot && organizationId && canvasId) {
-      // Restore the initial state
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), initialWorkflowSnapshot);
-
-      // Clear the snapshot since we're back to the initial state
-      setInitialWorkflowSnapshot(null);
-
-      // Mark as no unsaved changes since we're back to the saved state
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
-    }
-  }, [initialWorkflowSnapshot, organizationId, canvasId, queryClient]);
-
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     const newValue = !isAutoLayoutOnUpdateEnabled;
     setIsAutoLayoutOnUpdateEnabled(newValue);
@@ -1454,10 +1406,11 @@ export function WorkflowPageV2() {
         return workflow;
       }
 
-      return applyHorizontalAutoLayout(workflow, {
+      return DefaultLayoutEngine.apply(workflow, {
         scope: "connected-component",
         nodeIds: [nodeID],
-        channelsByNodeId: buildChannelsByNodeId(workflow, components, blueprints),
+        components,
+        blueprints,
       });
     },
     [isAutoLayoutOnUpdateEnabled, components, blueprints],
@@ -2501,7 +2454,6 @@ export function WorkflowPageV2() {
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
 
       try {
-        setLastCanvasSaveError(null);
         const savingVersionID = activeCanvasVersionId || undefined;
         const result = await enqueueCanvasSave(targetWorkflow, savingVersionID);
         if (result.status !== "saved") {
@@ -2538,20 +2490,17 @@ export function WorkflowPageV2() {
         if (options?.showToast !== false) {
           showSuccessToast("Canvas changes saved");
         }
-        setLastSavedAt(new Date());
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
 
         if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
           setHasUnsavedChanges(false);
           setHasNonPositionalUnsavedChanges(false);
-          setInitialWorkflowSnapshot(null);
         }
 
         return result;
       } catch (error: any) {
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
-        setLastCanvasSaveError(displayMessage);
         showErrorToast(displayMessage);
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
@@ -2745,8 +2694,6 @@ export function WorkflowPageV2() {
         });
       }, 2000);
 
-      saveWorkflowSnapshot(canvas);
-
       const integrationRef: ComponentsIntegrationRef = {
         id: integrationId,
         name: instanceName,
@@ -2780,7 +2727,6 @@ export function WorkflowPageV2() {
       integrationDialogName,
       availableIntegrations,
       queryClient,
-      saveWorkflowSnapshot,
       handleSaveWorkflow,
       canAutoSave,
       markUnsavedChange,
@@ -2797,7 +2743,6 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) return;
 
       // Save snapshot before making changes
-      saveWorkflowSnapshot(canvas);
 
       // Update the node's configuration, name, and app installation ref in local cache only
       const updatedNodes = canvas?.spec?.nodes?.map((node) => {
@@ -2838,16 +2783,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const debouncedAnnotationAutoSave = useMemo(
@@ -2951,8 +2887,6 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) return;
       if (Object.keys(updates).length === 0) return;
 
-      saveWorkflowSnapshot(canvas);
-
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
 
@@ -3026,7 +2960,6 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       queryClient,
-      saveWorkflowSnapshot,
       debouncedAnnotationAutoSave,
       debouncedAutoSave,
       canAutoSave,
@@ -3041,8 +2974,6 @@ export function WorkflowPageV2() {
 
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-
-      saveWorkflowSnapshot(latestWorkflow);
 
       const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
         if (node.id !== nodeId || node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") {
@@ -3077,16 +3008,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      debouncedAnnotationAutoSave,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, canAutoSave, markUnsavedChange],
   );
 
   const handleNodeAdd = useCallback(
@@ -3098,7 +3020,6 @@ export function WorkflowPageV2() {
       if (!latestWorkflow) return "";
 
       // Save snapshot before making changes
-      saveWorkflowSnapshot(latestWorkflow);
 
       const { buildingBlock, configuration, position, sourceConnection, integrationRef } = newNodeData;
 
@@ -3195,7 +3116,6 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       queryClient,
-      saveWorkflowSnapshot,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       canAutoSave,
@@ -3204,7 +3124,7 @@ export function WorkflowPageV2() {
   );
 
   const handleApplyAiOperations = useCallback(
-    async (operations: AiCanvasOperation[]) => {
+    async (operations: CanvasOperation[]) => {
       if (!operations.length || !organizationId || !canvasId) {
         return;
       }
@@ -3215,25 +3135,19 @@ export function WorkflowPageV2() {
         throw new Error("Canvas not found.");
       }
 
-      saveWorkflowSnapshot(latestWorkflow);
-      const updatedWorkflow = applyAiOperationsToWorkflow({
-        workflow: latestWorkflow,
-        operations,
+      const builder = new CanvasBuilder({
+        canvas: latestWorkflow,
         buildingBlocks,
         integrations,
+        components,
+        blueprints,
       });
+      const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
 
       const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
-      const aiAddedNodeIds = (updatedWorkflow.spec?.nodes || [])
+      const aiAddedNodeIds = (finalWorkflow.spec?.nodes || [])
         .map((node) => node.id)
         .filter((nodeId): nodeId is string => typeof nodeId === "string" && !previousNodeIds.has(nodeId));
-
-      let finalWorkflow = updatedWorkflow;
-      if (aiAddedNodeIds.length > 0) {
-        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow, {
-          channelsByNodeId: buildChannelsByNodeId(updatedWorkflow, components, blueprints),
-        });
-      }
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
@@ -3249,14 +3163,13 @@ export function WorkflowPageV2() {
       canAutoSave,
       canvas,
       canvasId,
+      handleSaveWorkflow,
       components,
       blueprints,
-      handleSaveWorkflow,
       markUnsavedChange,
       integrations,
       organizationId,
       queryClient,
-      saveWorkflowSnapshot,
     ],
   );
 
@@ -3271,8 +3184,6 @@ export function WorkflowPageV2() {
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
       if (!latestWorkflow) return "";
-
-      saveWorkflowSnapshot(latestWorkflow);
 
       const placeholderName = "New Component";
       const newNodeId = generateNodeId("component", "node");
@@ -3323,7 +3234,6 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       queryClient,
-      saveWorkflowSnapshot,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       canAutoSave,
@@ -3342,8 +3252,6 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) {
         return;
       }
-
-      saveWorkflowSnapshot(canvas);
 
       const nodeIndex = canvas.spec?.nodes?.findIndex((n) => n.id === data.placeholderId);
       if (nodeIndex === undefined || nodeIndex === -1) {
@@ -3432,16 +3340,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleEdgeCreate = useCallback(
@@ -3449,7 +3348,6 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) return;
 
       // Save snapshot before making changes
-      saveWorkflowSnapshot(canvas);
 
       // Create the new edge
       const newEdge: ComponentsEdge = {
@@ -3478,16 +3376,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleNodeDelete = useCallback(
@@ -3495,7 +3384,6 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) return;
 
       // Save snapshot before making changes
-      saveWorkflowSnapshot(canvas);
 
       const specNodes = canvas.spec?.nodes || [];
       const updatedNodes = deleteNodesFromCanvas(specNodes, [nodeId]);
@@ -3525,23 +3413,12 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
-
-      saveWorkflowSnapshot(canvas);
 
       const specNodes = canvas.spec?.nodes || [];
       const updatedNodes = deleteNodesFromCanvas(specNodes, nodeIds);
@@ -3569,28 +3446,18 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      saveWorkflowSnapshot(canvas);
-
-      const updatedWorkflow = await applyHorizontalAutoLayout(canvas, {
+      const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
         nodeIds,
         scope: "connected-component",
-        channelsByNodeId: buildChannelsByNodeId(canvas, components, blueprints),
+        components,
+        blueprints,
       });
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
@@ -3608,7 +3475,6 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       queryClient,
-      saveWorkflowSnapshot,
       handleSaveWorkflow,
       canAutoSave,
       markUnsavedChange,
@@ -3625,8 +3491,6 @@ export function WorkflowPageV2() {
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
 
-      saveWorkflowSnapshot(latestWorkflow);
-
       const updatedWorkflow = groupCanvasNodes(latestWorkflow, bounds, nodePositions);
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
@@ -3636,16 +3500,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleUngroupNodes = useCallback(
@@ -3654,8 +3509,6 @@ export function WorkflowPageV2() {
 
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-
-      saveWorkflowSnapshot(latestWorkflow);
 
       const updatedWorkflow = ungroupCanvasNode(latestWorkflow, groupNodeId);
       if (!updatedWorkflow) return;
@@ -3668,23 +3521,12 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleNodesDuplicate = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
-
-      saveWorkflowSnapshot(canvas);
 
       const specNodes = canvas.spec?.nodes || [];
       const childToGroup = buildChildToGroupMap(specNodes);
@@ -3773,17 +3615,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      blueprints,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, blueprints, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleEdgeDelete = useCallback(
@@ -3791,7 +3623,6 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) return;
 
       // Save snapshot before making changes
-      saveWorkflowSnapshot(canvas);
 
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
@@ -3832,16 +3663,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   /**
@@ -3884,20 +3706,10 @@ export function WorkflowPageV2() {
         setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
       } else {
-        saveWorkflowSnapshot(canvas);
         markUnsavedChange("position");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      debouncedAutoSave,
-      canAutoSave,
-      saveWorkflowSnapshot,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, canAutoSave, markUnsavedChange],
   );
 
   const handleNodesPositionChange = useCallback(
@@ -3943,20 +3755,10 @@ export function WorkflowPageV2() {
         setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
       } else {
-        saveWorkflowSnapshot(canvas);
         markUnsavedChange("position");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      debouncedAutoSave,
-      canAutoSave,
-      saveWorkflowSnapshot,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, canAutoSave, markUnsavedChange],
   );
 
   const handleNodeCollapseChange = useCallback(
@@ -3964,7 +3766,6 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) return;
 
       // Save snapshot before making changes
-      saveWorkflowSnapshot(canvas);
 
       // Find the current node to determine its collapsed state
       const currentNode = canvas.spec?.nodes?.find((node) => node.id === nodeId);
@@ -3998,16 +3799,7 @@ export function WorkflowPageV2() {
         markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      saveWorkflowSnapshot,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
   );
 
   const handleRun = useCallback(
@@ -4108,8 +3900,6 @@ export function WorkflowPageV2() {
       const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
       if (!nodeToDuplicate) return;
 
-      saveWorkflowSnapshot(canvas);
-
       const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
       let baseName = nodeToDuplicate.name?.trim() || "";
@@ -4174,7 +3964,6 @@ export function WorkflowPageV2() {
       canvasId,
       blueprints,
       queryClient,
-      saveWorkflowSnapshot,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       canAutoSave,
@@ -4254,12 +4043,10 @@ export function WorkflowPageV2() {
         ]);
         showSuccessToast("Canvas changes saved");
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
-        setLastSavedAt(new Date());
 
         if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
           setHasUnsavedChanges(false);
           setHasNonPositionalUnsavedChanges(false);
-          setInitialWorkflowSnapshot(null);
         }
       } catch (error) {
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
@@ -4577,11 +4364,11 @@ export function WorkflowPageV2() {
 
       setIsCreateChangeRequestMode(false);
 
-      const isPublishedVersion = !!version.metadata?.isPublished;
-      const isOwnedDraft = !isPublishedVersion && version.metadata?.owner?.id === currentUserId;
+      const isPublished = isPublishedVersion(version);
+      const isOwnedDraft = !isPublished && version.metadata?.owner?.id === currentUserId;
       const isPendingApprovalVersion = pendingApprovalVersionIds.has(version.metadata?.id || "");
       const isCurrentLive = version.metadata?.id === liveCanvasVersionId;
-      if (!isOwnedDraft && !isPublishedVersion && !isPendingApprovalVersion) {
+      if (!isOwnedDraft && !isPublished && !isPendingApprovalVersion) {
         showErrorToast("You can only use your edit version, open change requests, or published live history");
         return;
       }
@@ -4602,7 +4389,6 @@ export function WorkflowPageV2() {
       lastAppliedVersionSnapshotRef.current = "";
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
-      setInitialWorkflowSnapshot(null);
       lastSavedWorkflowRef.current = null;
 
       setSearchParams((current) => {
@@ -4844,7 +4630,6 @@ export function WorkflowPageV2() {
       setActiveCanvasVersion(version);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
-      setInitialWorkflowSnapshot(null);
       lastSavedWorkflowRef.current = null;
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
@@ -5196,12 +4981,10 @@ export function WorkflowPageV2() {
       }
       queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
       lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
-      setLastSavedAt(new Date());
 
       if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
-        setInitialWorkflowSnapshot(null);
       }
       showSuccessToast("Canvas changes saved");
     },
@@ -5255,7 +5038,6 @@ export function WorkflowPageV2() {
     clearPendingAutoSaveWork();
     setHasUnsavedChanges(false);
     setHasNonPositionalUnsavedChanges(false);
-    setInitialWorkflowSnapshot(null);
     setRemoteCanvasUpdatePending(false);
     lastSavedWorkflowRef.current = null;
 
@@ -5377,8 +5159,6 @@ export function WorkflowPageV2() {
     !hasUnsavedChanges ||
     (canAutoSave && isAutoSaveQueued);
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas && !(canAutoSave && isAutoSaveQueued);
-  const canUndo =
-    !isTemplate && canUpdateCanvas && hasEditableVersion && hasUnsavedChanges && initialWorkflowSnapshot !== null;
   const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||
@@ -5440,14 +5220,6 @@ export function WorkflowPageV2() {
     : hasEditableVersion
       ? "version-edit"
       : "version-live";
-  const headerSaveState =
-    hasLocalSaveActivity || holdSavingDisplay
-      ? "saving"
-      : lastCanvasSaveError
-        ? "error"
-        : hasUnsavedChanges
-          ? "unsaved"
-          : "saved";
   const unpublishedDraftChangeCount =
     !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
       ? pendingDraftDiffSummary.items.length
@@ -5624,12 +5396,7 @@ export function WorkflowPageV2() {
           onDiscardVersion={showVersioningUI ? handleResetDraftChanges : undefined}
           discardVersionDisabled={resetDraftDisabled}
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
-          onUndo={!isReadOnly ? handleRevert : undefined}
-          canUndo={canUndo}
-          lastSavedAt={lastSavedAt}
-          saveErrorMessage={lastCanvasSaveError}
           headerMode={headerMode}
-          saveState={headerSaveState}
           onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}

@@ -39,7 +39,7 @@ func resolveGrafanaTimeInput(value string, timezone *string, expressions core.Ex
 			return normalizeEvaluatedGrafanaTime(resolved, timezone)
 		}
 
-		if looksLikeBareExpression(trimmed) {
+		if looksLikeGrafanaTimeExpression(trimmed) {
 			resolved, err := expressions.Run(trimmed)
 			if err != nil {
 				return "", err
@@ -70,7 +70,7 @@ func looksLikeGrafanaRelativeTime(value string) bool {
 	return grafanaRelativeTimePattern.MatchString(strings.TrimSpace(value))
 }
 
-func looksLikeBareExpression(value string) bool {
+func looksLikeGrafanaTimeExpression(value string) bool {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return false
