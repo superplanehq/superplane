@@ -22,11 +22,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
   <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
   <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
-  <LinkCard title="Get Data Source" href="#get-data-source" description="Retrieve details for a specific Grafana data source" />
   <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
   <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
   <LinkCard title="List Annotations" href="#list-annotations" description="List Grafana annotations filtered by tag, dashboard, or time range" />
-  <LinkCard title="List Data Sources" href="#list-data-sources" description="List available Grafana data sources and their basic metadata" />
   <LinkCard title="List Silences" href="#list-silences" description="List active and pending silences from the Grafana Alertmanager" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
   <LinkCard title="Query Logs" href="#query-logs" description="Run a LogQL query against a Loki data source and return structured log results" />
@@ -538,43 +536,6 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
 }
 ```
 
-<a id="get-data-source"></a>
-
-## Get Data Source
-
-The Get Data Source component fetches the full details of a single Grafana data source.
-
-### Use Cases
-
-- **Inspect source type**: Confirm the datasource type (Prometheus, Loki, Tempo, etc.) before deciding how to query it
-- **Validate connectivity**: Confirm the data source URL and configuration are present before running downstream queries
-- **Workflow routing**: Branch on datasource type to select the appropriate query component
-
-### Configuration
-
-- **Data Source**: The Grafana data source to inspect (required)
-
-### Output
-
-Returns the data source object including UID, name, type, URL, and whether it is the default.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "id": 2,
-    "isDefault": false,
-    "name": "Loki",
-    "type": "loki",
-    "uid": "loki-uid",
-    "url": "http://loki:3100"
-  },
-  "timestamp": "2026-02-12T16:18:03.362582388Z",
-  "type": "grafana.data-source"
-}
-```
-
 <a id="get-silence"></a>
 
 ## Get Silence
@@ -735,59 +696,6 @@ Returns a list of annotation objects including ID, text, tags, time, and dashboa
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.annotations"
-}
-```
-
-<a id="list-data-sources"></a>
-
-## List Data Sources
-
-The List Data Sources component retrieves all data sources configured in your Grafana instance.
-
-### Use Cases
-
-- **Discover sources**: Find the correct metrics, logs, or traces data source before running targeted queries
-- **Validate sources**: Confirm a required data source exists before executing a query workflow
-- **Dynamic routing**: Branch workflow logic based on the type or presence of a specific data source
-
-### Output
-
-Returns a list of data source objects including UID, name, type, and whether the source is the default.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "dataSources": [
-      {
-        "id": 1,
-        "isDefault": true,
-        "name": "Prometheus",
-        "type": "prometheus",
-        "uid": "prometheus-uid",
-        "url": "http://prometheus:9090"
-      },
-      {
-        "id": 2,
-        "isDefault": false,
-        "name": "Loki",
-        "type": "loki",
-        "uid": "loki-uid",
-        "url": "http://loki:3100"
-      },
-      {
-        "id": 3,
-        "isDefault": false,
-        "name": "Tempo",
-        "type": "tempo",
-        "uid": "tempo-uid",
-        "url": "http://tempo:3200"
-      }
-    ]
-  },
-  "timestamp": "2026-02-12T16:18:03.362582388Z",
-  "type": "grafana.data-sources"
 }
 ```
 
