@@ -53,7 +53,7 @@ func ApplyCanvasVersionChangeset(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
-		if version.State == models.CanvasVersionStatePublished {
+		if version.State == models.CanvasVersionStatePublished || version.State == models.CanvasVersionStateSnapshot {
 			return status.Error(codes.FailedPrecondition, "published versions are immutable")
 		}
 
