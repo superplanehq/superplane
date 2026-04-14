@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
 
 const GENERIC_FAILURE_MESSAGE = "I couldn't generate changes right now. Please try again.";
+const CANCELLATION_MESSAGE = "Stopped.";
 
 type SendChatPromptUiArgs = {
   focusInput: () => void;
@@ -112,6 +113,44 @@ export function applyChatPromptFailure({
       role: "assistant",
       content: GENERIC_FAILURE_MESSAGE,
     });
+  });
+}
+
+export function applyChatPromptCancellation({
+  assistantMessageId,
+  pushAiMessages,
+  setAiError,
+  setAiMessages,
+  trimAiMessages,
+}: {
+  assistantMessageId: string;
+  pushAiMessages: (previous: AiBuilderMessage[], next: AiBuilderMessage | AiBuilderMessage[]) => AiBuilderMessage[];
+  setAiError: Dispatch<SetStateAction<string | null>>;
+  setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
+  trimAiMessages: (messages: AiBuilderMessage[]) => AiBuilderMessage[];
+}): void {
+  setAiError(null);
+  setAiMessages((previous) => {
+    const existingIndex = previous.findIndex((message) => message.id === assistantMessageId);
+    if (existingIndex < 0) {
+      return pushAiMessages(previous, {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: CANCELLATION_MESSAGE,
+      });
+    }
+
+    const existingMessage = previous[existingIndex];
+    if (existingMessage.role === "assistant" && existingMessage.content.trim().length === 0) {
+      const updated = [...previous];
+      updated[existingIndex] = {
+        ...existingMessage,
+        content: CANCELLATION_MESSAGE,
+      };
+      return trimAiMessages(updated);
+    }
+
+    return previous;
   });
 }
 

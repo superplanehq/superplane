@@ -31,6 +31,7 @@ type AiBuilderChatPanelProps = {
   onSelectChat: (chatId: string) => void;
   onStartNewSession: () => void;
   onSendPrompt: () => void;
+  onStopPrompt: () => void;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
 };
 
@@ -55,6 +56,7 @@ export function AiBuilderChatPanel({
   onSelectChat,
   onStartNewSession,
   onSendPrompt,
+  onStopPrompt,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +94,7 @@ export function AiBuilderChatPanel({
               aiInput={aiInput}
               onAiInputChange={onAiInputChange}
               onSendPrompt={onSendPrompt}
+              onStopPrompt={onStopPrompt}
               disabled={disabled}
               canvasId={canvasId}
               isGeneratingResponse={isGeneratingResponse}
@@ -144,6 +147,7 @@ export function AiBuilderChatPanel({
               aiInput={aiInput}
               onAiInputChange={onAiInputChange}
               onSendPrompt={onSendPrompt}
+              onStopPrompt={onStopPrompt}
               disabled={disabled}
               canvasId={canvasId}
               isGeneratingResponse={isGeneratingResponse}

@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import {
   agentsCreateAgentChat,
   agentsListAgentChatMessages,
@@ -16,6 +16,7 @@ import type {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { consumeChatResponseStream } from "./agentChatSupport";
 import {
+  applyChatPromptCancellation,
   addLocalPromptMessages,
   applyChatPromptFailure,
   applyStreamOutcome,
@@ -161,6 +162,18 @@ function requireChatSessionPayload(payload: AgentsCreateAgentChatResponse | Agen
   return { token, url };
 }
 
+function isAbortError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  return "name" in error && (error as { name?: string }).name === "AbortError";
+}
+
 export async function loadChatSessions({
   canvasId,
   organizationId,
@@ -226,6 +239,7 @@ type SendChatPromptArgs = {
   setAiError: Dispatch<SetStateAction<string | null>>;
   setIsGeneratingResponse: Dispatch<SetStateAction<boolean>>;
   setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
+  chatAbortControllerRef?: MutableRefObject<AbortController | null>;
   focusInput: () => void;
 };
 
@@ -290,13 +304,16 @@ async function fetchChatStreamResponse({
   nextPrompt,
   token,
   url,
+  signal,
 }: {
   nextPrompt: string;
   token: string;
   url: string;
+  signal?: AbortSignal;
 }): Promise<Response> {
   const response = await fetch(url, {
     method: "POST",
+    signal,
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
@@ -348,6 +365,7 @@ export async function sendChatPrompt({
   setAiError,
   setIsGeneratingResponse,
   setPendingProposal,
+  chatAbortControllerRef,
   focusInput,
 }: SendChatPromptArgs): Promise<void> {
   const nextPrompt = (value ?? aiInput).trim();
@@ -380,6 +398,8 @@ export async function sendChatPrompt({
     focusInput,
   });
   let pendingNewChatId: string | null = null;
+  let streamAbortController: AbortController | null = null;
+  let wasAborted = false;
 
   try {
     setPendingProposal(null);
@@ -396,10 +416,16 @@ export async function sendChatPrompt({
       pendingNewChatId = session.chatId;
     }
 
+    streamAbortController = new AbortController();
+    if (chatAbortControllerRef) {
+      chatAbortControllerRef.current = streamAbortController;
+    }
+
     const response = await fetchChatStreamResponse({
       nextPrompt,
       token: session.token,
       url: session.url,
+      signal: streamAbortController.signal,
     });
 
     const { assistantContentSnapshot, streamedAnyAnswer, runModel } = await consumeChatResponseStream({
@@ -425,18 +451,40 @@ export async function sendChatPrompt({
 
     refreshChatSessions({ canvasId, organizationId, setChatSessions });
   } catch (error) {
-    applyChatPromptFailure({
-      assistantMessageId,
-      error,
-      pushAiMessages,
-      setAiError,
-      setAiMessages,
-      trimAiMessages,
-    });
+    if (isAbortError(error)) {
+      wasAborted = true;
+      applyChatPromptCancellation({
+        assistantMessageId,
+        pushAiMessages,
+        setAiError,
+        setAiMessages,
+        trimAiMessages,
+      });
+    } else {
+      applyChatPromptFailure({
+        assistantMessageId,
+        error,
+        pushAiMessages,
+        setAiError,
+        setAiMessages,
+        trimAiMessages,
+      });
+    }
   } finally {
+    if (chatAbortControllerRef?.current === streamAbortController) {
+      chatAbortControllerRef.current = null;
+    }
     setIsGeneratingResponse(false);
-    if (pendingNewChatId) {
+    if (!wasAborted && pendingNewChatId) {
       setCurrentChatId(pendingNewChatId);
     }
   }
+}
+
+export function stopRunningChatPrompt({
+  chatAbortControllerRef,
+}: {
+  chatAbortControllerRef?: MutableRefObject<AbortController | null>;
+}): void {
+  chatAbortControllerRef?.current?.abort();
 }

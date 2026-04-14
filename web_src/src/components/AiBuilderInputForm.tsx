@@ -1,6 +1,6 @@
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import type { FormEvent, KeyboardEvent, RefObject } from "react";
 
 export type InputFormProps = {
@@ -8,6 +8,7 @@ export type InputFormProps = {
   aiInput: string;
   onAiInputChange: (value: string) => void;
   onSendPrompt: () => void;
+  onStopPrompt: () => void;
   disabled: boolean;
   canvasId?: string;
   isGeneratingResponse: boolean;
@@ -28,18 +29,25 @@ const SUBMIT_BUTTON_CLASSNAME = cn(
   "flex items-center justify-center",
 );
 
+const STOP_BUTTON_CLASSNAME = cn(
+  "p-1 rounded-full bg-slate-600 text-white hover:bg-slate-700",
+  "cursor-pointer",
+  "flex items-center justify-center",
+);
+
 export function InputForm({
   aiInputRef,
   aiInput,
   onAiInputChange,
   onSendPrompt,
+  onStopPrompt,
   disabled,
   canvasId,
   isGeneratingResponse,
   maxAiInputHeight,
   expanded = false,
 }: InputFormProps) {
-  const isDisabled = disabled || isGeneratingResponse || !canvasId || !aiInput.trim();
+  const isSendDisabled = disabled || isGeneratingResponse || !canvasId || !aiInput.trim();
 
   const keyDownHandler = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -72,9 +80,26 @@ export function InputForm({
         />
 
         <div className="flex items-center justify-end">
-          <button type="submit" className={SUBMIT_BUTTON_CLASSNAME} disabled={isDisabled} aria-label="Send prompt">
-            <ArrowUp size={14} />
-          </button>
+          {isGeneratingResponse ? (
+            <button
+              type="button"
+              className={STOP_BUTTON_CLASSNAME}
+              onClick={onStopPrompt}
+              aria-label="Stop prompt"
+              title="Stop prompt"
+            >
+              <Square size={14} />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className={SUBMIT_BUTTON_CLASSNAME}
+              disabled={isSendDisabled}
+              aria-label="Send prompt"
+            >
+              <ArrowUp size={14} />
+            </button>
+          )}
         </div>
       </form>
     </div>
