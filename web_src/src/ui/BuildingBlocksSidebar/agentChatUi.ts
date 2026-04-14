@@ -1,7 +1,23 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
 
-const GENERIC_FAILURE_MESSAGE = "I couldn't generate changes right now. Please try again.";
+export const GENERIC_FAILURE_MESSAGE = "I couldn't generate changes right now. Please try again.";
+
+/**
+ * Ensures only clean, human-readable messages reach the UI.
+ * Rejects strings that look like raw exception reprs (contain braces, tracebacks,
+ * or exceed a reasonable display length) since those are never actionable for users.
+ */
+export function sanitizeErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return GENERIC_FAILURE_MESSAGE;
+
+  const message = error.message;
+  if (!message || message.length > 200 || message.includes("{") || message.includes("Traceback")) {
+    return GENERIC_FAILURE_MESSAGE;
+  }
+
+  return message;
+}
 
 type SendChatPromptUiArgs = {
   focusInput: () => void;
@@ -86,7 +102,7 @@ export function applyChatPromptFailure({
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
   trimAiMessages: (messages: AiBuilderMessage[]) => AiBuilderMessage[];
 }): void {
-  setAiError(error instanceof Error ? error.message : GENERIC_FAILURE_MESSAGE);
+  setAiError(sanitizeErrorMessage(error));
   setAiMessages((previous) => {
     const existingIndex = previous.findIndex((message) => message.id === assistantMessageId);
     if (existingIndex < 0) {

@@ -20,16 +20,16 @@ import json
 
 from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
+from superplaneapi.models.canvases_canvas_version import CanvasesCanvasVersion
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesApplyCanvasVersionChangesetBody(BaseModel):
+class CanvasesPublishCanvasVersionResponse(BaseModel):
     """
-    CanvasesApplyCanvasVersionChangesetBody
+    CanvasesPublishCanvasVersionResponse
     """ # noqa: E501
-    changeset: Optional[CanvasesCanvasChangeset] = None
-    __properties: ClassVar[List[str]] = ["changeset"]
+    version: Optional[CanvasesCanvasVersion] = None
+    __properties: ClassVar[List[str]] = ["version"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +49,7 @@ class CanvasesApplyCanvasVersionChangesetBody(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesApplyCanvasVersionChangesetBody from a JSON string"""
+        """Create an instance of CanvasesPublishCanvasVersionResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,14 +70,14 @@ class CanvasesApplyCanvasVersionChangesetBody(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of changeset
-        if self.changeset:
-            _dict['changeset'] = self.changeset.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of version
+        if self.version:
+            _dict['version'] = self.version.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesApplyCanvasVersionChangesetBody from a dict"""
+        """Create an instance of CanvasesPublishCanvasVersionResponse from a dict"""
         if obj is None:
             return None
 
@@ -85,7 +85,7 @@ class CanvasesApplyCanvasVersionChangesetBody(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "changeset": CanvasesCanvasChangeset.from_dict(obj["changeset"]) if obj.get("changeset") is not None else None
+            "version": CanvasesCanvasVersion.from_dict(obj["version"]) if obj.get("version") is not None else None
         })
         return _obj
 
