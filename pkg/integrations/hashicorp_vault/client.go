@@ -1,6 +1,7 @@
 package hashicorp_vault
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -69,4 +70,43 @@ func (c *Client) execRequest(method, path string, body io.Reader) ([]byte, error
 	}
 
 	return responseBody, nil
+}
+
+// KVSecretMetadata holds version info returned by the KV v2 API.
+type KVSecretMetadata struct {
+	Version      int    `json:"version"`
+	CreatedTime  string `json:"created_time"`
+	DeletionTime string `json:"deletion_time"`
+	Destroyed    bool   `json:"destroyed"`
+}
+
+// KVSecret is the parsed result of a KV v2 GET request.
+type KVSecret struct {
+	Data     map[string]any   `json:"data"`
+	Metadata KVSecretMetadata `json:"metadata"`
+}
+
+type kvSecretResponse struct {
+	Data struct {
+		Data     map[string]any   `json:"data"`
+		Metadata KVSecretMetadata `json:"metadata"`
+	} `json:"data"`
+}
+
+func (c *Client) GetKVSecret(mount, path string) (*KVSecret, error) {
+	endpoint := fmt.Sprintf("/v1/%s/data/%s", mount, path)
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response kvSecretResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &KVSecret{
+		Data:     response.Data.Data,
+		Metadata: response.Data.Metadata,
+	}, nil
 }

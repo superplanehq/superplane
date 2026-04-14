@@ -54,7 +54,11 @@ func (v *HashicorpVault) Configuration() []configuration.Field {
 	}
 }
 
-func (v *HashicorpVault) Components() []core.Component  { return []core.Component{} }
+func (v *HashicorpVault) Components() []core.Component {
+	return []core.Component{
+		&getSecret{},
+	}
+}
 func (v *HashicorpVault) Triggers() []core.Trigger      { return []core.Trigger{} }
 func (v *HashicorpVault) Actions() []core.Action        { return []core.Action{} }
 func (v *HashicorpVault) HandleRequest(ctx core.HTTPRequestContext) {}
