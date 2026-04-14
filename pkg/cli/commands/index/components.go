@@ -254,7 +254,7 @@ func (c *componentsCommand) findComponentByName(ctx core.CommandContext, name st
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.ComponentsComponent{}, err
+			return openapi_client.ComponentsComponent{}, fmt.Errorf("component %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationComponent(integration, componentName)
 	}

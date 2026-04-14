@@ -336,11 +336,13 @@ export type CanvasesCanvasVersionMetadata = {
   id?: string;
   canvasId?: string;
   owner?: SuperplaneCanvasesUserRef;
-  isPublished?: boolean;
+  state?: CanvasesCanvasVersionState;
   publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type CanvasesCanvasVersionState = "STATE_UNSPECIFIED" | "STATE_DRAFT" | "STATE_PUBLISHED" | "STATE_SNAPSHOT";
 
 export type CanvasesCreateCanvasChangeRequestBody = {
   versionId?: string;
@@ -1006,6 +1008,7 @@ export type OrganizationsOrganizationLimits = {
   retentionWindowDays?: number;
   maxEventsPerMonth?: string;
   maxIntegrations?: number;
+  maxAgentTokensPerMonth?: string;
 };
 
 export type OrganizationsOrganizationMetadata = {
@@ -1023,6 +1026,10 @@ export type OrganizationsOrganizationUsage = {
   eventBucketCapacity?: number;
   eventBucketLastUpdatedAt?: string;
   nextEventBucketDecreaseAt?: string;
+  agentTokenBucketLevel?: number;
+  agentTokenBucketCapacity?: number;
+  agentTokenBucketLastUpdatedAt?: string;
+  nextAgentTokenBucketDecreaseAt?: string;
 };
 
 export type OrganizationsRemoveInvitationResponse = {

@@ -37,8 +37,7 @@ type grafanaQuery struct {
 	Expr       string `json:"expr,omitempty"`
 	Query      string `json:"query,omitempty"`
 	Format     string `json:"format,omitempty"`
-	// MaxLines is used by the Loki datasource (LogQL); omit when zero.
-	MaxLines int `json:"maxLines,omitempty"`
+	MaxLines   int    `json:"maxLines,omitempty"`
 }
 
 const grafanaDateTimeFormat = "2006-01-02T15:04"
@@ -276,7 +275,6 @@ func resolveQueryTimeValue(value string) (string, error) {
 		return fmt.Sprintf("%d", parsed.UTC().UnixMilli()), nil
 	}
 
-	// Preserve Grafana-supported raw values like "now-2h".
 	return trimmed, nil
 }
 

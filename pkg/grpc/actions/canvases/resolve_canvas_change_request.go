@@ -103,7 +103,7 @@ func ResolveCanvasChangeRequest(
 			}
 			return err
 		}
-		if version.IsPublished {
+		if version.State == models.CanvasVersionStatePublished {
 			return status.Error(codes.FailedPrecondition, "published versions are immutable")
 		}
 		if version.OwnerID == nil || *version.OwnerID != userUUID {

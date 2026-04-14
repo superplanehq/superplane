@@ -131,8 +131,12 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-the-cake-is-a-lie}
       DB_SSLMODE: ${DB_SSLMODE:-disable}
       APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
-      REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
+      AGENT_HTTP_DEBUG: ${AGENT_HTTP_DEBUG:-true}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
+      OTEL_ENABLED: "yes"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4318"
+      OTEL_SERVICE_NAME: "superplane-agent-dev"
     command: >-
       bash -lc "uv run python -m uvicorn ai.web:create_app
       --factory
@@ -146,7 +150,7 @@ services:
     tty: true
     stdin_open: true
     ports:
-      - ${AGENT_REPL_WEB_PORT:-8090}:8090
+      - ${AGENT_HTTP_PORT:-${AGENT_REPL_WEB_PORT:-8090}}:8090
     volumes:
       - .:/app
       - ./tmp/agent/evals:/app/tmp/agent/evals

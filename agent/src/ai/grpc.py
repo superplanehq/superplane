@@ -98,6 +98,22 @@ class AgentsServicer:
             messages=[_serialize_message(message) for message in messages]
         )
 
+    def DescribeOrganizationAgentUsage(self, request: Any, context: Any) -> Any:  # noqa: N802
+        try:
+            usage = self._store.get_org_usage(org_id=request.org_id)
+        except Exception as error:
+            print(f"[agent] failed to load org usage for org {request.org_id}: {error}", flush=True)
+            context.abort(grpc.StatusCode.UNAVAILABLE, "failed to load organization usage")
+            raise error
+
+        return agents_pb2.DescribeOrganizationAgentUsageResponse(  # type: ignore[attr-defined]
+            usage=agents_pb2.ChatUsage(  # type: ignore[attr-defined]
+                total_input_tokens=usage.total_input_tokens,
+                total_output_tokens=usage.total_output_tokens,
+                total_tokens=usage.total_tokens,
+            )
+        )
+
 
 def add_agents_servicer_to_server(servicer: AgentsServicer, server: grpc.Server) -> None:
     rpc_method_handlers = {
@@ -120,6 +136,11 @@ def add_agents_servicer_to_server(servicer: AgentsServicer, server: grpc.Server)
             servicer.ListAgentChatMessages,
             request_deserializer=agents_pb2.ListAgentChatMessagesRequest.FromString,  # type: ignore[attr-defined]
             response_serializer=agents_pb2.ListAgentChatMessagesResponse.SerializeToString,  # type: ignore[attr-defined]
+        ),
+        "DescribeOrganizationAgentUsage": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeOrganizationAgentUsage,
+            request_deserializer=agents_pb2.DescribeOrganizationAgentUsageRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.DescribeOrganizationAgentUsageResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
     }
 

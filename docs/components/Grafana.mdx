@@ -2,7 +2,7 @@
 title: "Grafana"
 ---
 
-Connect Grafana alerts and data queries to SuperPlane workflows
+Connect Grafana alerts, alert rules, annotations, silences, and data queries to SuperPlane workflows
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -15,11 +15,23 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
+  <LinkCard title="Create Annotation" href="#create-annotation" description="Create an annotation in Grafana to mark deploys, incidents, or other operational events on timelines" />
+  <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
+  <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
+  <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
+  <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
+  <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
   <LinkCard title="Get Data Source" href="#get-data-source" description="Retrieve details for a specific Grafana data source" />
+  <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
+  <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
+  <LinkCard title="List Annotations" href="#list-annotations" description="List Grafana annotations filtered by tag, dashboard, or time range" />
   <LinkCard title="List Data Sources" href="#list-data-sources" description="List available Grafana data sources and their basic metadata" />
+  <LinkCard title="List Silences" href="#list-silences" description="List active and pending silences from the Grafana Alertmanager" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
   <LinkCard title="Query Logs" href="#query-logs" description="Run a LogQL query against a Loki data source and return structured log results" />
   <LinkCard title="Query Traces" href="#query-traces" description="Run a TraceQL query against a Tempo data source and return matching traces" />
+  <LinkCard title="Update Alert Rule" href="#update-alert-rule" description="Update an existing Grafana-managed alert rule from structured alert settings" />
 </CardGrid>
 
 ## Instructions
@@ -45,7 +57,7 @@ The On Alert Firing trigger starts a workflow when Grafana Unified Alerting send
 
 1. SuperPlane automatically creates or updates a Grafana Webhook contact point and notification policy route for this trigger when provisioning succeeds.
 2. SuperPlane manages webhook bearer authentication automatically.
-3. If Grafana provisioning is unavailable or rejected, manual setup may still be required.
+3. Provisioning requires a Grafana integration with **Base URL** and **Service Account Token** and sufficient permissions for alerting and provisioning APIs.
 
 ### Configuration
 
@@ -89,6 +101,443 @@ The trigger emits the full Grafana webhook payload, including:
 }
 ```
 
+<a id="create-alert-rule"></a>
+
+## Create Alert Rule
+
+The Create Alert Rule component creates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Monitoring onboarding**: create baseline alerts when a new service or environment is provisioned
+- **Incident automation**: create temporary alert rules during an incident or validation workflow
+- **Policy rollout**: standardize alert coverage across teams using a shared rule definition
+
+### Configuration
+
+- **Title**: Human-readable alert name shown in Grafana
+- **Folder**: Existing Grafana folder that should contain the rule
+- **Rule Group**: Grafana rule group to create the rule in
+- **Data Source**: Existing Grafana data source the query should use
+- **Query**: Expression Grafana evaluates when checking the alert
+- **Lookback Window**: How far back to query when evaluating the rule
+- **Reducer / Condition / Threshold(s)**: How the series is reduced, how it is compared to thresholds, and optional upper bound for range conditions
+- **For**: How long the condition must hold before firing
+- **No Data / Execution Error State**: Grafana behavior when the query returns no data or errors
+- **Contact Point**: Optional Grafana contact point for notifications when the rule fires
+- **Labels / Annotations**: Optional routing and context metadata attached to the rule
+- **Paused**: Whether the rule starts paused
+
+### Output
+
+Returns the created Grafana alert rule object, including identifiers and evaluation metadata.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "C",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
+```
+
+<a id="create-annotation"></a>
+
+## Create Annotation
+
+The Create Annotation component writes an annotation into Grafana, marking operational events on dashboard timelines.
+
+### Use Cases
+
+- **Deploy tracking**: Annotate graphs at the exact moment a deployment is triggered or completes
+- **Incident markers**: Place a marker when an incident is opened or resolved for post-incident correlation
+- **Maintenance windows**: Mark the start and end of a maintenance window as a region annotation
+- **Change correlation**: Record configuration changes, feature flag toggles, or rollbacks directly on the timeline
+
+### Configuration
+
+	- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
+	- **Panel**: Required — choose the panel within the selected dashboard to attach the annotation to
+	- **Text**: The annotation message (required)
+	- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
+	- **Time**: Optional start time value. Examples: `{{ now() }}` or `{{ now() - duration("5m") }}`
+	- **Time End**: Optional end time value for a region annotation. Examples: `{{ now() }}` or `{{ now() + duration("24h") }}`
+
+### Output
+
+Returns the ID of the newly created annotation.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 42,
+    "url": "https://grafana.example.com/d/production-overview/production-overview?from=1739376783362\u0026to=1739377383362"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotation.created"
+}
+```
+
+<a id="create-silence"></a>
+
+## Create Silence
+
+The Create Silence component creates a new Alertmanager silence in Grafana, suppressing alert notifications that match the configured matchers during the specified time window.
+
+### Use Cases
+
+- **Deploy window**: Suppress noisy alerts during a planned maintenance or deployment window
+- **Incident management**: Prevent alert storms from flooding on-call channels while an incident is being worked on
+- **Testing**: Silence alerts during load tests or chaos experiments
+
+### Configuration
+
+- **Matchers**: One or more label matchers that identify which alerts to silence (required). Each matcher uses an operator: equal (=), not equal (!=), regex match (=~), or regex does not match (!~), matching Grafana Alertmanager semantics.
+- **Starts At**: The start of the silence window (required)
+- **Ends At**: The end of the silence window (required)
+- **Comment**: A description of why the silence is being created (required)
+  - The createdBy field sent to Grafana is set automatically to SuperPlane-&lt;org_name&gt; and is not configurable
+
+### Output
+
+Returns the ID of the newly created silence.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "endsAt": "2026-04-01T10:24:30Z",
+    "silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+    "startsAt": "2026-03-31T10:24:30Z"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence.created"
+}
+```
+
+<a id="delete-alert-rule"></a>
+
+## Delete Alert Rule
+
+The Delete Alert Rule component deletes a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Alert cleanup**: remove temporary or obsolete rules after a rollout or incident
+- **Service retirement**: delete rules that are no longer needed when an environment is decommissioned
+- **Controlled cleanup**: pair deletions with approvals, notifications, or audit workflows
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule to delete
+
+### Output
+
+Returns a confirmation object with the deleted alert rule UID, title, and deletion status.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRuleDeleted"
+}
+```
+
+<a id="delete-annotation"></a>
+
+## Delete Annotation
+
+The Delete Annotation component removes an annotation from Grafana by ID.
+
+### Use Cases
+
+- **Cleanup incorrect markers**: Remove an annotation that was created with wrong text or tags
+- **Automated lifecycle**: Delete temporary markers (e.g. maintenance window start) once the event is complete
+- **Idempotent workflows**: Allow re-runs to clean up previously created annotations before re-creating them
+
+### Configuration
+
+- **Annotation**: The annotation to delete, chosen from your Grafana instance (required)
+
+### Output
+
+Returns the annotation ID and a confirmation that the annotation was deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": 42
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotation.deleted"
+}
+```
+
+<a id="delete-silence"></a>
+
+## Delete Silence
+
+The Delete Silence component expires an existing silence in Grafana Alertmanager.
+
+### Use Cases
+
+- **End a maintenance window early**: Remove a silence once deployment or maintenance completes ahead of schedule
+- **Automated cleanup**: Expire silences created by automation after the condition they covered has resolved
+
+### Configuration
+
+- **Silence**: The silence to expire (required)
+
+### Output
+
+Returns the silence ID and a confirmation that the silence was deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence.deleted"
+}
+```
+
+<a id="get-alert-rule"></a>
+
+## Get Alert Rule
+
+The Get Alert Rule component fetches a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Configuration review**: inspect the current source of truth before changing a rule
+- **Workflow enrichment**: include alert rule details in notifications, tickets, or approvals
+- **Drift checks**: compare the current Grafana rule against an expected configuration
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule to retrieve
+
+### Output
+
+Returns the full Grafana alert rule object, including title, folder, group, condition, queries, labels, and annotations.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "C",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
+```
+
 <a id="get-data-source"></a>
 
 ## Get Data Source
@@ -123,6 +572,169 @@ Returns the data source object including UID, name, type, URL, and whether it is
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.data-source"
+}
+```
+
+<a id="get-silence"></a>
+
+## Get Silence
+
+The Get Silence component fetches the details of a single silence from Grafana Alertmanager using its ID.
+
+### Use Cases
+
+- **Inspect a silence**: Retrieve full details of a silence including state, comment, matchers, and times
+- **Verify a silence**: Confirm a silence is still active before taking action in a workflow
+
+### Configuration
+
+- **Silence**: The silence to retrieve (required)
+
+### Output
+
+Returns the silence object including ID, state, comment, matchers, start/end times, and the author.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Deploy window for v2.1.0",
+    "createdBy": "devops-bot",
+    "endsAt": "2026-03-31T11:00:00.000Z",
+    "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "env",
+        "value": "production"
+      }
+    ],
+    "startsAt": "2026-03-31T10:00:00.000Z",
+    "status": {
+      "state": "active"
+    },
+    "updatedAt": "2026-03-31T10:00:00.000Z"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence"
+}
+```
+
+<a id="list-alert-rules"></a>
+
+## List Alert Rules
+
+The List Alert Rules component lists Grafana-managed alert rules using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Alert audits**: review which Grafana alert rules currently exist
+- **Workflow enrichment**: send alert inventories to Slack, Jira, or documentation steps
+- **Follow-up automation**: feed alert rule summaries into downstream review or cleanup workflows
+
+### Configuration
+
+All fields are optional:
+
+- **Folder**: When set, only alert rules in this Grafana folder are listed
+- **Rule Group**: When set, only rules in this Grafana rule group are listed
+
+When both are omitted, the component lists alert rules across the instance (subject to Grafana permissions).
+
+### Output
+
+Returns an object containing the list of Grafana alert rule summaries, including each rule UID and title.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertRules": [
+      {
+        "title": "High error rate",
+        "uid": "cergr5pm79hj4d"
+      },
+      {
+        "title": "High latency",
+        "uid": "aer9k2pm71sh2b"
+      },
+      {
+        "title": "Service unavailable",
+        "uid": "bfg4m1rt63hj8q"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRules"
+}
+```
+
+<a id="list-annotations"></a>
+
+## List Annotations
+
+The List Annotations component retrieves annotations from Grafana, optionally filtered by tag, dashboard, or time range.
+
+### Use Cases
+
+- **Audit operational events**: Review recent deploy, incident, or change markers on a timeline
+- **Correlate incidents**: Retrieve annotations from around an incident time window for post-incident analysis
+- **Workflow branching**: Check for existing markers before creating duplicate annotations
+
+### Configuration
+
+	- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
+	- **Panel**: Optional — filter to annotations on a specific panel within the selected dashboard
+	- **Text**: Optional — filter annotations whose text contains this value
+	- **Tags**: Filter to annotations matching all of the specified tags (optional)
+	- **From / To**: Time range filter values (optional). Examples: `{{ now() - duration("1h") }}` and `{{ now() }}`
+	- **Limit**: Maximum number of annotations to return (optional)
+
+### Output
+
+Returns a list of annotation objects including ID, text, tags, time, and dashboard/panel references.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": [
+      {
+        "dashboardUID": "abc123",
+        "id": 42,
+        "panelId": 3,
+        "tags": [
+          "deploy",
+          "production"
+        ],
+        "text": "Deploy v1.2.3 to production",
+        "time": 1739376000000,
+        "timeEnd": 1739376000000,
+        "type": "annotation"
+      },
+      {
+        "dashboardUID": "abc123",
+        "id": 41,
+        "panelId": 3,
+        "tags": [
+          "rollback",
+          "production"
+        ],
+        "text": "Rollback to v1.2.2",
+        "time": 1739289600000,
+        "timeEnd": 1739289600000,
+        "type": "annotation"
+      }
+    ],
+    "from": "2026-02-12T15:18:03.362582388Z",
+    "to": "2026-02-12T16:18:03.362582388Z"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotations"
 }
 ```
 
@@ -176,6 +788,58 @@ Returns a list of data source objects including UID, name, type, and whether the
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.data-sources"
+}
+```
+
+<a id="list-silences"></a>
+
+## List Silences
+
+The List Silences component retrieves silences from Grafana Alertmanager.
+
+### Use Cases
+
+- **Audit**: Review all currently active or pending silences in your Grafana instance
+- **Detect if already muted**: Check whether a specific alert or label set is already silenced before creating a duplicate
+- **Workflow logic**: Branch on silence state — e.g. skip escalation if an alert is already silenced
+
+### Configuration
+
+- **Filter**: Optional label matcher string to filter silences (e.g. `alertname=~"High.*"`)
+
+### Output
+
+Returns a list of silence objects, each including ID, state, comment, matchers, start/end times, and the author.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "silences": [
+      {
+        "comment": "Deploy window for v2.1.0",
+        "createdBy": "devops-bot",
+        "endsAt": "2026-03-31T11:00:00.000Z",
+        "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+        "matchers": [
+          {
+            "isEqual": true,
+            "isRegex": false,
+            "name": "env",
+            "value": "production"
+          }
+        ],
+        "startsAt": "2026-03-31T10:00:00.000Z",
+        "status": {
+          "state": "active"
+        },
+        "updatedAt": "2026-03-31T10:00:00.000Z"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silences"
 }
 ```
 
@@ -407,6 +1071,137 @@ Returns the Grafana query API response containing matching trace frames.
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.traces.result"
+}
+```
+
+<a id="update-alert-rule"></a>
+
+## Update Alert Rule
+
+The Update Alert Rule component updates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Threshold tuning**: refine alert conditions after incidents or noisy periods
+- **Ownership changes**: update labels and annotations used for routing and context
+- **Rollout safety**: adjust alert rules during migrations or environment transitions
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule to update
+- **All other fields are optional**: only the values you provide will be changed
+- **Folder / Rule Group**: Optional location changes for the rule in Grafana
+- **Data Source / Query**: Optional query details Grafana evaluates
+- **Lookback / Reducer / Condition / Threshold(s)**: Optional changes to evaluation and thresholds
+- **Contact Point**: Set to a contact point to attach notifications; clear the value to remove notification settings from the rule
+- **Labels / Annotations**: Optional metadata to update alongside the rule
+
+### Output
+
+Returns the updated Grafana alert rule object after the provisioning API applies the change.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "C",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
 }
 ```
 

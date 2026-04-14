@@ -4,26 +4,23 @@ import { resolveIcon } from "@/lib/utils";
 import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
 import { useState } from "react";
 import { toTestId } from "../../lib/testID";
-import { getComponentSubtype } from "../buildingBlocks";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
-const SUBTYPE_HOVER_BG: Record<string, string> = {
+const TYPE_HOVER_BG: Record<string, string> = {
   trigger: "hover:bg-sky-100 dark:hover:bg-sky-900/20",
-  flow: "hover:bg-purple-100 dark:hover:bg-purple-900/20",
-  action: "hover:bg-green-100 dark:hover:bg-green-900/20",
+  component: "hover:bg-green-100 dark:hover:bg-green-900/20",
 };
 
-const SUBTYPE_BADGE_COLOR: Record<string, string> = {
+const TYPE_BADGE_COLOR: Record<string, string> = {
   trigger: "text-sky-600 dark:text-sky-400",
-  flow: "text-purple-600 dark:text-purple-400",
-  action: "text-green-600 dark:text-green-400",
+  component: "text-green-600 dark:text-green-400",
 };
 
-const SUBTYPE_LABEL: Record<string, string> = {
+const TYPE_LABEL: Record<string, string> = {
   trigger: "Trigger",
-  flow: "Flow",
-  action: "Action",
+  component: "Action",
+  blueprint: "Blueprint",
 };
 
 function resolveIconSlug(block: BuildingBlock): string {
@@ -76,9 +73,8 @@ function BlockItem({
 }: BlockItemProps) {
   const appIconSrc = getHeaderIconSrc(block.name);
   const IconComponent = resolveIcon(resolveIconSlug(block));
-  const subtype = block.componentSubtype || getComponentSubtype(block);
-  const hoverBg = SUBTYPE_HOVER_BG[subtype] || SUBTYPE_HOVER_BG.action;
-  const badgeColor = SUBTYPE_BADGE_COLOR[subtype] || SUBTYPE_BADGE_COLOR.action;
+  const hoverBg = TYPE_HOVER_BG[block.type] || TYPE_HOVER_BG.component;
+  const badgeColor = TYPE_BADGE_COLOR[block.type] || TYPE_BADGE_COLOR.component;
 
   return (
     <Item
@@ -122,13 +118,8 @@ function BlockItem({
           <span
             className={`inline-block text-left px-1.5 py-0.5 text-[11px] font-medium ${badgeColor} rounded whitespace-nowrap flex-shrink-0 ml-auto`}
           >
-            {SUBTYPE_LABEL[subtype] || "Action"}
+            {TYPE_LABEL[block.type] || "Action"}
           </span>
-          {block.deprecated && (
-            <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
-              Deprecated
-            </span>
-          )}
         </div>
       </ItemContent>
 
@@ -143,7 +134,7 @@ export interface CategorySectionProps {
   showIntegrationSetupStatus: boolean;
   canvasZoom: number;
   searchTerm?: string;
-  typeFilter?: "all" | "trigger" | "action" | "flow";
+  typeFilter?: "all" | "trigger" | "component";
   isDraggingRef: React.RefObject<boolean>;
   setHoveredBlock: (block: BuildingBlock | null) => void;
   dragPreviewRef: React.RefObject<HTMLDivElement | null>;
@@ -179,8 +170,7 @@ export function CategorySection({
 
   if (typeFilter !== "all") {
     allBlocks = allBlocks.filter((block) => {
-      const subtype = block.componentSubtype || getComponentSubtype(block);
-      return subtype === typeFilter;
+      return block.type === typeFilter;
     });
   }
 
@@ -241,18 +231,18 @@ export function CategorySection({
 
   let sortedBlocks: BuildingBlock[] = [];
   if (isOpen) {
-    const subtypeOrder: Record<"trigger" | "action" | "flow", number> = {
+    const typeOrder: Record<"trigger" | "component" | "blueprint", number> = {
       trigger: 0,
-      action: 1,
-      flow: 2,
+      component: 1,
+      blueprint: 2,
     };
 
     sortedBlocks = [...allBlocks].sort((a, b) => {
-      const aSubtype = a.componentSubtype || getComponentSubtype(a);
-      const bSubtype = b.componentSubtype || getComponentSubtype(b);
-      const subtypeComparison = subtypeOrder[aSubtype] - subtypeOrder[bSubtype];
-      if (subtypeComparison !== 0) {
-        return subtypeComparison;
+      const aType = a.type;
+      const bType = b.type;
+      const typeComparison = typeOrder[aType] - typeOrder[bType];
+      if (typeComparison !== 0) {
+        return typeComparison;
       }
 
       const aName = (a.label || a.name || "").toLowerCase();

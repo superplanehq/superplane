@@ -71,11 +71,6 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 		return nil, err
 	}
 
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
 	return agents.ResumeAgentChat(
 		ctx,
 		s.authService,
