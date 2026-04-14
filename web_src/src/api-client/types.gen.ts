@@ -78,8 +78,8 @@ export type BlueprintsBlueprint = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
-  nodes?: Array<ComponentsNode>;
-  edges?: Array<ComponentsEdge>;
+  nodes?: Array<SuperplaneComponentsNode>;
+  edges?: Array<SuperplaneComponentsEdge>;
   configuration?: Array<ConfigurationField>;
   outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
   icon?: string;
@@ -318,8 +318,8 @@ export type CanvasesCanvasNodeQueueItem = {
 };
 
 export type CanvasesCanvasSpec = {
-  nodes?: Array<ComponentsNode>;
-  edges?: Array<ComponentsEdge>;
+  nodes?: Array<SuperplaneComponentsNode>;
+  edges?: Array<SuperplaneComponentsEdge>;
 };
 
 export type CanvasesCanvasStatus = {
@@ -534,7 +534,7 @@ export type CanvasesUpdateNodePauseBody = {
 };
 
 export type CanvasesUpdateNodePauseResponse = {
-  node?: ComponentsNode;
+  node?: SuperplaneComponentsNode;
 };
 
 export type ComponentsComponent = {
@@ -560,12 +560,6 @@ export type ComponentsDescribeComponentResponse = {
   component?: ComponentsComponent;
 };
 
-export type ComponentsEdge = {
-  sourceId?: string;
-  targetId?: string;
-  channel?: string;
-};
-
 export type ComponentsIntegrationRef = {
   id?: string;
   name?: string;
@@ -577,28 +571,6 @@ export type ComponentsListComponentActionsResponse = {
 
 export type ComponentsListComponentsResponse = {
   components?: Array<ComponentsComponent>;
-};
-
-export type ComponentsNode = {
-  id?: string;
-  name?: string;
-  type?: ComponentsNodeType;
-  configuration?: {
-    [key: string]: unknown;
-  };
-  metadata?: {
-    [key: string]: unknown;
-  };
-  position?: ComponentsPosition;
-  component?: NodeComponentRef;
-  blueprint?: NodeBlueprintRef;
-  trigger?: NodeTriggerRef;
-  widget?: NodeWidgetRef;
-  isCollapsed?: boolean;
-  integration?: ComponentsIntegrationRef;
-  errorMessage?: string;
-  warningMessage?: string;
-  paused?: boolean;
 };
 
 export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";
@@ -1301,6 +1273,34 @@ export type SuperplaneBlueprintsUserRef = {
 export type SuperplaneCanvasesUserRef = {
   id?: string;
   name?: string;
+};
+
+export type SuperplaneComponentsEdge = {
+  sourceId?: string;
+  targetId?: string;
+  channel?: string;
+};
+
+export type SuperplaneComponentsNode = {
+  id?: string;
+  name?: string;
+  type?: ComponentsNodeType;
+  configuration?: {
+    [key: string]: unknown;
+  };
+  metadata?: {
+    [key: string]: unknown;
+  };
+  position?: ComponentsPosition;
+  component?: NodeComponentRef;
+  blueprint?: NodeBlueprintRef;
+  trigger?: NodeTriggerRef;
+  widget?: NodeWidgetRef;
+  isCollapsed?: boolean;
+  integration?: ComponentsIntegrationRef;
+  errorMessage?: string;
+  warningMessage?: string;
+  paused?: boolean;
 };
 
 export type SuperplaneComponentsOutputChannel = {

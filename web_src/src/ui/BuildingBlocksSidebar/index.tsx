@@ -1,4 +1,8 @@
-import type { ComponentsEdge, ComponentsNode, OrganizationsIntegration } from "@/api-client";
+import type {
+  SuperplaneComponentsEdge as ComponentsEdge,
+  SuperplaneComponentsNode as ComponentsNode,
+  OrganizationsIntegration,
+} from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
