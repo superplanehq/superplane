@@ -37,6 +37,8 @@ func TestGetSecret_Execute_AllData(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+	assert.True(t, execState.Finished)
+	assert.True(t, execState.Passed)
 	assert.Equal(t, SecretPayloadType, execState.Type)
 	require.Len(t, execState.Payloads, 1)
 	wrapped := execState.Payloads[0].(map[string]any)
@@ -65,6 +67,7 @@ func TestGetSecret_Execute_SpecificKey(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+	require.Len(t, execState.Payloads, 1)
 	wrapped := execState.Payloads[0].(map[string]any)
 	payload := wrapped["data"].(secretPayload)
 	assert.Equal(t, "admin", payload.Value)
