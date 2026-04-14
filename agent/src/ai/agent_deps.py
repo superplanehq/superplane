@@ -6,12 +6,17 @@ from ai.session_store import SessionStore
 from ai.superplane_client import SuperplaneClient
 
 CatalogListKind = Literal["components", "triggers"]
+AgentCanvasSurface = Literal["inspect", "build"]
 
 
 @dataclass
 class AgentDeps:
     client: SuperplaneClient
     canvas_id: str
+    # When set, canvas graph reads use this version (draft or published), not only the live summary.
+    editing_version_id: str | None = None
+    # What the user is viewing in the editor (from the UI); complements editing_version_id.
+    canvas_surface: AgentCanvasSurface | None = None
     session_store: SessionStore | None = None
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
     catalog_list_cache: dict[tuple[str, str, str], list[dict[str, Any]]] = field(

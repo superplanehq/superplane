@@ -62,6 +62,7 @@ import {
   canvasKeys,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
+import type { AgentContext } from "@/ui/BuildingBlocksSidebar";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
@@ -458,6 +459,29 @@ export function WorkflowPageV2() {
   const canReadOrg = canAct("org", "read");
   const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
   const showVersioningUI = !isVersioningDisabled;
+  const agentFeatureEnabled = isAgentEnabled();
+  const agentContext = useMemo((): AgentContext => {
+    if (!agentFeatureEnabled) {
+      return { enabled: false, mode: "inspect" };
+    }
+    if (!showVersioningUI) {
+      return { enabled: true, mode: "inspect" };
+    }
+    const versionId = activeCanvasVersionId || undefined;
+    if (isViewingDraftVersion || isViewingPendingApprovalVersion) {
+      if (!versionId) {
+        return { enabled: true, mode: "inspect" };
+      }
+      return { enabled: true, mode: "build", canvasVersion: versionId };
+    }
+    return { enabled: true, mode: "inspect" };
+  }, [
+    agentFeatureEnabled,
+    showVersioningUI,
+    activeCanvasVersionId,
+    isViewingDraftVersion,
+    isViewingPendingApprovalVersion,
+  ]);
   const hasEditableVersion =
     (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
@@ -495,8 +519,6 @@ export function WorkflowPageV2() {
   const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
   const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
-  const showAiBuilderTab = isAgentEnabled();
-
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
@@ -5237,7 +5259,7 @@ export function WorkflowPageV2() {
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
-          showAiBuilderTab={showAiBuilderTab}
+          agentContext={agentContext}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
           onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}

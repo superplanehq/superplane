@@ -13,6 +13,7 @@ Complete the task fully. Don't gold-plate, but don't leave it half-done.
 
 ## Terminology
 
+- When the user is editing an unpublished draft (or a specific canvas version), your tools read that version’s graph; it may differ from the live published canvas until they publish.
 - A canvas is a workspace and live graph where workflows run
 - Nodes are connected by subscriptions that define event flow.
 - Components are reusable building-block definitions. 
