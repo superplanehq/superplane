@@ -135,6 +135,18 @@ service Canvases {
     };
   }
 
+  rpc ValidateCanvasVersionChangeset(ValidateCanvasVersionChangesetRequest) returns (ValidateCanvasVersionChangesetResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Validate a canvas version changeset";
+      description: "Validate a canvas version changeset";
+      tags: "CanvasVersion";
+    };
+  }
+
   rpc DeleteCanvasVersion(DeleteCanvasVersionRequest) returns (DeleteCanvasVersionResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
@@ -142,6 +154,18 @@ service Canvases {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Discard draft canvas version";
       description: "Discards a user-owned draft canvas version";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc PublishCanvasVersion(PublishCanvasVersionRequest) returns (PublishCanvasVersionResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Publish draft canvas version";
+      description: "Publishes a user-owned draft canvas version directly to live";
       tags: "CanvasVersion";
     };
   }
@@ -488,10 +512,19 @@ message ApplyCanvasVersionChangesetRequest {
   string canvas_id = 1;
   string version_id = 2;
   CanvasChangeset changeset = 3;
-  bool dry_run = 4;
 }
 
 message ApplyCanvasVersionChangesetResponse {
+  CanvasVersion version = 1;
+}
+
+message ValidateCanvasVersionChangesetRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  CanvasChangeset changeset = 3;
+}
+
+message ValidateCanvasVersionChangesetResponse {
   CanvasVersion version = 1;
 }
 
@@ -501,6 +534,15 @@ message DeleteCanvasVersionRequest {
 }
 
 message DeleteCanvasVersionResponse {}
+
+message PublishCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message PublishCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
 
 message CreateCanvasChangeRequestRequest {
   string canvas_id = 1;
