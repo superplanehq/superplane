@@ -663,14 +663,10 @@ def _create_app() -> FastAPI:
                             break
                         yield _encode_sse_event(event)
                 except Exception as error:
-<<<<<<< fix/agent-overloaded-error
-                    print(f"[web] stream failed chat_id={chat_id} error={error}", flush=True)
-=======
                     import sentry_sdk
 
                     sentry_sdk.capture_exception(error)
-                    _debug_log("stream failed", chat_id=chat_id, error=str(error))
->>>>>>> main
+                    print(f"[web] stream failed chat_id={chat_id} error={error}", flush=True)
                     yield _encode_sse_event(
                         {
                             "type": "run_failed",
