@@ -94,8 +94,6 @@ func (g *Grafana) Components() []core.Component {
 		&GetAlertRule{},
 		&ListAlertRules{},
 		&QueryDataSource{},
-		&ListDataSources{},
-		&GetDataSource{},
 		&QueryLogs{},
 		&QueryTraces{},
 		&UpdateAlertRule{},
