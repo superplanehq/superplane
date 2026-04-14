@@ -133,7 +133,7 @@ export function CanvasSettingsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-100">
-      <PageHeader organizationId={organizationId} centerTitle={`${canvas.metadata?.name || "Canvas"} · Settings`} />
+      <PageHeader organizationId={organizationId} title={`${canvas.metadata?.name || "Canvas"} · Settings`} />
       <div className="min-h-0 flex-1 overflow-auto">
         <SettingsView
           initialValues={initialValues}
