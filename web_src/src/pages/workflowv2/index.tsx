@@ -603,7 +603,6 @@ export function WorkflowPageV2() {
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
-  const canAutoSave = !isTemplate && hasEditableVersion;
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
   const hasPendingLocalCanvasState = hasUnsavedChanges || hasLocalSaveActivity;
@@ -1433,8 +1432,8 @@ export function WorkflowPageV2() {
 
   /**
    * Debounced auto-save function for node position changes.
-   * Waits 100ms after the last position change when auto-save is enabled,
-   * or 5s when auto-save is disabled to avoid disrupting editing.
+   * Uses a short delay while the canvas is editable; a longer delay when read-only
+   * so stray timers from a mode switch do not fire too aggressively.
    * Only saves position changes, not structural modifications (deletions, additions, etc).
    * If there are unsaved structural changes, position auto-save is skipped.
    */
@@ -1450,17 +1449,13 @@ export function WorkflowPageV2() {
           const focusedNoteId = getActiveNoteId();
 
           try {
-            if (!canAutoSave) {
+            if (isReadOnly) {
               return;
             }
 
             // Check if there are unsaved structural changes
             // If so, skip auto-save to avoid saving those changes accidentally
             if (hasNonPositionalUnsavedChanges) {
-              return;
-            }
-
-            if (isTemplate) {
               return;
             }
 
@@ -1587,7 +1582,7 @@ export function WorkflowPageV2() {
             }
           }
         },
-        canAutoSave ? 100 : 2000,
+        isReadOnly ? 2000 : 100,
       ),
     [
       organizationId,
@@ -1595,8 +1590,7 @@ export function WorkflowPageV2() {
       activeCanvasVersionId,
       queryClient,
       hasNonPositionalUnsavedChanges,
-      canAutoSave,
-      isTemplate,
+      isReadOnly,
       isVersioningDisabled,
       enqueueCanvasSave,
     ],
@@ -2716,10 +2710,8 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
     [
@@ -2730,8 +2722,7 @@ export function WorkflowPageV2() {
       availableIntegrations,
       queryClient,
       handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
+      isReadOnly,
     ],
   );
 
@@ -2779,13 +2770,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const debouncedAnnotationAutoSave = useMemo(
@@ -2798,15 +2787,11 @@ export function WorkflowPageV2() {
           const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
           if (annotationUpdates.size === 0) return;
 
-          if (!canAutoSave) {
+          if (isReadOnly) {
             return;
           }
 
           if (hasNonPositionalUnsavedChanges) {
-            return;
-          }
-
-          if (isTemplate) {
             return;
           }
 
@@ -2851,26 +2836,18 @@ export function WorkflowPageV2() {
             }
           });
         },
-        canAutoSave ? 100 : 2000,
+        isReadOnly ? 2000 : 100,
       ),
-    [
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      hasNonPositionalUnsavedChanges,
-      canAutoSave,
-      isTemplate,
-    ],
+    [organizationId, canvasId, queryClient, handleSaveWorkflow, hasNonPositionalUnsavedChanges, isReadOnly],
   );
 
   const handleAnnotationBlur = useCallback(() => {
-    if (!canAutoSave) {
+    if (isReadOnly) {
       return;
     }
 
     debouncedAnnotationAutoSave.flush();
-  }, [canAutoSave, debouncedAnnotationAutoSave]);
+  }, [isReadOnly, debouncedAnnotationAutoSave]);
 
   const clearPendingAutoSaveWork = useCallback(() => {
     debouncedAutoSave.cancel();
@@ -2932,41 +2909,24 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (hasConfigurationUpdate) {
-        if (canAutoSave) {
-          const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
-          pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...configurationUpdates });
-          setIsAnnotationAutoSaveQueued(true);
-          debouncedAnnotationAutoSave();
-        } else {
-          markUnsavedChange("structural");
-        }
+      if (hasConfigurationUpdate && !isReadOnly) {
+        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
+        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...configurationUpdates });
+        setIsAnnotationAutoSaveQueued(true);
+        debouncedAnnotationAutoSave();
       }
 
-      if (canAutoSave) {
+      if (!isReadOnly && hasPositionUpdate) {
         // Queue position updates for auto-save
-        if (hasPositionUpdate) {
-          pendingPositionUpdatesRef.current.set(nodeId, {
-            x: x !== undefined ? x : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.x || 0,
-            y: y !== undefined ? y : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.y || 0,
-          });
-          setIsPositionAutoSaveQueued(true);
-          debouncedAutoSave();
-        }
-      } else if (hasPositionUpdate) {
-        markUnsavedChange("position");
+        pendingPositionUpdatesRef.current.set(nodeId, {
+          x: x !== undefined ? x : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.x || 0,
+          y: y !== undefined ? y : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.y || 0,
+        });
+        setIsPositionAutoSaveQueued(true);
+        debouncedAutoSave();
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      debouncedAnnotationAutoSave,
-      debouncedAutoSave,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, debouncedAutoSave, isReadOnly],
   );
 
   const handleGroupUpdate = useCallback(
@@ -3001,16 +2961,14 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
         pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
         setIsAnnotationAutoSaveQueued(true);
         debouncedAnnotationAutoSave();
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, isReadOnly],
   );
 
   const handleNodeAdd = useCallback(
@@ -3104,25 +3062,14 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
 
       // Return the new node ID
       return newNodeId;
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      applyAutoLayoutOnAddedNode,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, applyAutoLayoutOnAddedNode, isReadOnly],
   );
 
   const handleApplyAiOperations = useCallback(
@@ -3146,29 +3093,20 @@ export function WorkflowPageV2() {
       });
       const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
 
-      const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
-      const aiAddedNodeIds = (finalWorkflow.spec?.nodes || [])
-        .map((node) => node.id)
-        .filter((nodeId): nodeId is string => typeof nodeId === "string" && !previousNodeIds.has(nodeId));
-
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        const changeKind = aiAddedNodeIds.length > 0 ? "position" : "structural";
-        markUnsavedChange(changeKind);
       }
     },
     [
       buildingBlocks,
-      canAutoSave,
+      isReadOnly,
       canvas,
       canvasId,
       handleSaveWorkflow,
       components,
       blueprints,
-      markUnsavedChange,
       integrations,
       organizationId,
       queryClient,
@@ -3223,24 +3161,13 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
 
       return newNodeId;
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      applyAutoLayoutOnAddedNode,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, applyAutoLayoutOnAddedNode, isReadOnly],
   );
 
   const handlePlaceholderConfigure = useCallback(
@@ -3336,13 +3263,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleEdgeCreate = useCallback(
@@ -3372,13 +3297,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleNodeDelete = useCallback(
@@ -3409,13 +3332,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleNodesDelete = useCallback(
@@ -3442,13 +3363,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleAutoLayoutNodes = useCallback(
@@ -3464,23 +3383,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      components,
-      blueprints,
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, components, blueprints, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleGroupNodes = useCallback(
@@ -3496,13 +3403,11 @@ export function WorkflowPageV2() {
       const updatedWorkflow = groupCanvasNodes(latestWorkflow, bounds, nodePositions);
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleUngroupNodes = useCallback(
@@ -3517,13 +3422,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleNodesDuplicate = useCallback(
@@ -3611,13 +3514,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, blueprints, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, blueprints, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleEdgeDelete = useCallback(
@@ -3659,13 +3560,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   /**
@@ -3703,15 +3602,13 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
         setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
-      } else {
-        markUnsavedChange("position");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, isReadOnly],
   );
 
   const handleNodesPositionChange = useCallback(
@@ -3749,18 +3646,16 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         // Add all position updates to pending updates
         positionMap.forEach((position, nodeId) => {
           pendingPositionUpdatesRef.current.set(nodeId, position);
         });
         setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
-      } else {
-        markUnsavedChange("position");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, isReadOnly],
   );
 
   const handleNodeCollapseChange = useCallback(
@@ -3795,13 +3690,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleRun = useCallback(
@@ -3954,10 +3847,8 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
     [
@@ -3968,8 +3859,7 @@ export function WorkflowPageV2() {
       queryClient,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
-      canAutoSave,
-      markUnsavedChange,
+      isReadOnly,
     ],
   );
 
@@ -5151,8 +5041,8 @@ export function WorkflowPageV2() {
     !canUpdateCanvas ||
     !hasEditableVersion ||
     !hasUnsavedChanges ||
-    (canAutoSave && isAutoSaveQueued);
-  const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas && !(canAutoSave && isAutoSaveQueued);
+    (!isReadOnly && isAutoSaveQueued);
+  const saveIsPrimary = hasUnsavedChanges && !isReadOnly && !isAutoSaveQueued;
   const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||
@@ -5375,7 +5265,7 @@ export function WorkflowPageV2() {
           viewportRef={viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           unsavedMessage={
-            hasUnsavedChanges && !(canAutoSave && isAutoSaveQueued) ? "You have unsaved changes" : undefined
+            hasUnsavedChanges && (isReadOnly || !isAutoSaveQueued) ? "You have unsaved changes" : undefined
           }
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
