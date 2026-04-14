@@ -36,6 +36,9 @@ import type {
   CanvasesActOnCanvasChangeRequestData,
   CanvasesActOnCanvasChangeRequestErrors,
   CanvasesActOnCanvasChangeRequestResponses,
+  CanvasesApplyCanvasVersionChangesetData,
+  CanvasesApplyCanvasVersionChangesetErrors,
+  CanvasesApplyCanvasVersionChangesetResponses,
   CanvasesCancelExecutionData,
   CanvasesCancelExecutionErrors,
   CanvasesCancelExecutionResponses,
@@ -54,6 +57,9 @@ import type {
   CanvasesDeleteCanvasMemoryErrors,
   CanvasesDeleteCanvasMemoryResponses,
   CanvasesDeleteCanvasResponses,
+  CanvasesDeleteCanvasVersionData,
+  CanvasesDeleteCanvasVersionErrors,
+  CanvasesDeleteCanvasVersionResponses,
   CanvasesDeleteNodeQueueItemData,
   CanvasesDeleteNodeQueueItemErrors,
   CanvasesDeleteNodeQueueItemResponses,
@@ -886,6 +892,20 @@ export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true
   });
 
 /**
+ * Discard draft canvas version
+ *
+ * Discards a user-owned draft canvas version
+ */
+export const canvasesDeleteCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDeleteCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    CanvasesDeleteCanvasVersionResponses,
+    CanvasesDeleteCanvasVersionErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
+
+/**
  * Describe canvas version
  *
  * Returns one canvas version by ID
@@ -898,6 +918,27 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
     CanvasesDescribeCanvasVersionErrors,
     ThrowOnError
   >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
+
+/**
+ * Update canvas version with a changeset
+ *
+ * Update canvas version with a changeset
+ */
+export const canvasesApplyCanvasVersionChangeset = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesApplyCanvasVersionChangesetData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesApplyCanvasVersionChangesetResponses,
+    CanvasesApplyCanvasVersionChangesetErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/{versionId}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * Update canvas version

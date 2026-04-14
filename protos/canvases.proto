@@ -123,6 +123,29 @@ service Canvases {
     };
   }
 
+  rpc ApplyCanvasVersionChangeset(ApplyCanvasVersionChangesetRequest) returns (ApplyCanvasVersionChangesetResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas version with a changeset";
+      description: "Update canvas version with a changeset";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc DeleteCanvasVersion(DeleteCanvasVersionRequest) returns (DeleteCanvasVersionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Discard draft canvas version";
+      description: "Discards a user-owned draft canvas version";
+      tags: "CanvasVersion";
+    };
+  }
+
   rpc CreateCanvasChangeRequest(CreateCanvasChangeRequestRequest) returns (CreateCanvasChangeRequestResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/change-requests"
@@ -460,6 +483,24 @@ message UpdateCanvasVersionRequest {
 message UpdateCanvasVersionResponse {
   CanvasVersion version = 1;
 }
+
+message ApplyCanvasVersionChangesetRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+  CanvasChangeset changeset = 3;
+  bool dry_run = 4;
+}
+
+message ApplyCanvasVersionChangesetResponse {
+  CanvasVersion version = 1;
+}
+
+message DeleteCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message DeleteCanvasVersionResponse {}
 
 message CreateCanvasChangeRequestRequest {
   string canvas_id = 1;
@@ -940,7 +981,7 @@ message CanvasChangeset {
     Node node = 2;
 
     //
-    // Required for DISCONNECT_NODES and CONNECT_NODES
+    // Required for ADD_EDGE and DELETE_EDGE
     //
     Edge edge = 3;
   }

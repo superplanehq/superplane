@@ -15,6 +15,7 @@ import {
   canvasesListCanvasChangeRequests,
   canvasesDescribeCanvasChangeRequest,
   canvasesDeleteCanvas,
+  canvasesDeleteCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
   canvasesListCanvasMemories,
@@ -449,6 +450,25 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
         withOrganizationHeader({
           path: { canvasId },
           body: {},
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    },
+  });
+};
+
+export const useDeleteCanvasVersion = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (versionId: string) => {
+      return await canvasesDeleteCanvasVersion(
+        withOrganizationHeader({
+          path: { canvasId, versionId },
         }),
       );
     },
