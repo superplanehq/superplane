@@ -52,16 +52,17 @@ func (c *RenderPanel) Documentation() string {
 
 ## Configuration
 
-- **Dashboard**: The Grafana dashboard containing the panel to render
-- **Panel**: The panel to render
-- **Width**: Image width in pixels (default 1000)
-- **Height**: Image height in pixels (default 500)
-- **From**: Optional expression for the start of the time range (e.g. ` + "`now() - duration(\"1h\")`" + `)
-- **To**: Optional expression for the end of the time range (e.g. ` + "`now()`" + `)
+	- **Dashboard**: The Grafana dashboard containing the panel to render
+	- **Panel**: The panel to render
+	- **Width**: Image width in pixels (default 1000)
+	- **Height**: Image height in pixels (default 500)
+	- **From**: Optional start of the time range. Examples: ` + "`{{ now() - duration(\"1h\") }}`" + ` or ` + "`now-1h`" + `
+	- **To**: Optional end of the time range. Examples: ` + "`{{ now() }}`" + ` or ` + "`now`" + `
 
 ## Output
 
-Returns the Grafana render URL along with the dashboard UID and panel.`
+Returns the Grafana render URL along with the dashboard UID and panel.
+`
 }
 
 func (c *RenderPanel) Icon() string {
@@ -122,18 +123,18 @@ func (c *RenderPanel) Configuration() []configuration.Field {
 		{
 			Name:        "from",
 			Label:       "From",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Start of the time range",
-			Placeholder: "e.g. now() - duration(\"1h\")",
+			Description: "Start of the time range (expression text)",
+			Placeholder: `{{ now() - duration("1h") }}`,
 		},
 		{
 			Name:        "to",
 			Label:       "To",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "End of the time range",
-			Placeholder: "e.g. now()",
+			Description: "End of the time range (expression text)",
+			Placeholder: `{{ now() }}`,
 		},
 	}
 }
@@ -263,6 +264,12 @@ func validateRenderPanelSpec(spec RenderPanelSpec) error {
 	}
 	if spec.PanelID == 0 {
 		return errors.New("panel is required")
+	}
+	if spec.Width < 0 {
+		return errors.New("width must be greater than or equal to 0")
+	}
+	if spec.Height < 0 {
+		return errors.New("height must be greater than or equal to 0")
 	}
 
 	return nil

@@ -11,9 +11,9 @@ import type {
   SubtitleContext,
 } from "../types";
 import { formatTimestamp } from "../utils";
+import { buildGrafanaEventSections } from "./base";
 import {
   buildDashboardSelectionMetadata,
-  buildGrafanaEventSections,
   buildPanelMetadata,
   buildTimeRangeMetadata,
   previewMetadataItem,

@@ -1,10 +1,6 @@
-import type React from "react";
-import { renderTimeAgo } from "@/components/TimeAgo";
-import type { EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getState, getTriggerRenderer } from "..";
 import type { DashboardNodeMetadata } from "./types";
-import type { ExecutionInfo, NodeInfo } from "../types";
+import type { NodeInfo } from "../types";
 
 const TEXT_PREVIEW_MAX_LENGTH = 40;
 
@@ -76,49 +72,4 @@ export function previewMetadataItem(
   const preview =
     text.length > TEXT_PREVIEW_MAX_LENGTH ? `${text.slice(0, TEXT_PREVIEW_MAX_LENGTH).trimEnd()}...` : text;
   return { icon, label: `${prefix}${preview}` };
-}
-
-/** When set, matches the historical Query Data Source node event strip (subtitle + id fallbacks). */
-export type BuildGrafanaEventSectionsOptions = {
-  legacyQueryDataSource?: boolean;
-};
-
-export function buildGrafanaEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-  options?: BuildGrafanaEventSectionsOptions,
-): EventSection[] {
-  const legacy = options?.legacyQueryDataSource === true;
-
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  const triggerName = rootTriggerNode?.componentName ?? "";
-  const rootTriggerRenderer = getTriggerRenderer(triggerName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: resolveReceivedAt(execution, legacy),
-      eventTitle: title || "Trigger event",
-      eventSubtitle: resolveEventSubtitle(execution, legacy),
-      eventState: getState(componentName)(execution),
-      eventId: resolveEventId(execution, legacy),
-    },
-  ];
-}
-
-function resolveEventSubtitle(execution: ExecutionInfo, legacy: boolean): string | React.ReactNode {
-  const timestamp = legacy ? execution.createdAt : execution.updatedAt || execution.createdAt;
-  const empty = legacy ? "-" : "";
-  return timestamp ? renderTimeAgo(new Date(timestamp)) : empty;
-}
-
-function resolveReceivedAt(execution: ExecutionInfo, legacy: boolean): Date | undefined {
-  const raw = legacy ? execution.createdAt : execution.createdAt || execution.updatedAt;
-  return raw ? new Date(raw) : undefined;
-}
-
-function resolveEventId(execution: ExecutionInfo, legacy: boolean): string {
-  if (legacy) return execution.rootEvent?.id ?? "";
-  return execution.rootEvent?.id ?? execution.id;
 }

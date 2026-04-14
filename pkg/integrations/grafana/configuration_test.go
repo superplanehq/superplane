@@ -10,8 +10,12 @@ import (
 func Test__Grafana__timeRangeFieldsUseExpectedInputs(t *testing.T) {
 	t.Run("render panel", func(t *testing.T) {
 		fields := (&RenderPanel{}).Configuration()
-		require.Equal(t, configuration.FieldTypeExpression, fieldByName(fields, "from").Type)
-		require.Equal(t, configuration.FieldTypeExpression, fieldByName(fields, "to").Type)
+		require.Equal(t, configuration.FieldTypeString, fieldByName(fields, "from").Type)
+		require.Equal(t, configuration.FieldTypeString, fieldByName(fields, "to").Type)
+		require.Nil(t, fieldByName(fields, "from").Default)
+		require.Nil(t, fieldByName(fields, "to").Default)
+		require.Equal(t, `{{ now() - duration("1h") }}`, fieldByName(fields, "from").Placeholder)
+		require.Equal(t, `{{ now() }}`, fieldByName(fields, "to").Placeholder)
 	})
 
 	t.Run("query data source", func(t *testing.T) {

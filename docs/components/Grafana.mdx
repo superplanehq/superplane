@@ -891,12 +891,12 @@ The Render Panel component constructs a Grafana image render URL for a dashboard
 
 ### Configuration
 
-- **Dashboard**: The Grafana dashboard containing the panel to render
-- **Panel**: The panel to render
-- **Width**: Image width in pixels (default 1000)
-- **Height**: Image height in pixels (default 500)
-- **From**: Optional expression for the start of the time range (e.g. `now() - duration("1h")`)
-- **To**: Optional expression for the end of the time range (e.g. `now()`)
+	- **Dashboard**: The Grafana dashboard containing the panel to render
+	- **Panel**: The panel to render
+	- **Width**: Image width in pixels (default 1000)
+	- **Height**: Image height in pixels (default 500)
+	- **From**: Optional start of the time range. Examples: `{{ now() - duration("1h") }}` or `now-1h`
+	- **To**: Optional end of the time range. Examples: `{{ now() }}` or `now`
 
 ### Output
 
