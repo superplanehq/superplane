@@ -8,7 +8,6 @@ approval_defaults:
 policy:
   approval:
     - db_changes_require_core_reviewer
-    - agent_superplaneapi_changes_do_not_require_approval
     - agent_changes_require_agent_reviewer
     - protos_changes_require_platform_reviewer
     - rbac_changes_require_security_reviewer
@@ -34,14 +33,6 @@ approval_rules:
         - lucaspin
         - shiroyasha
         - forestileao
-
-  - name: agent_superplaneapi_changes_do_not_require_approval
-    if:
-      changed_files:
-        paths:
-          - "^agent/src/superplaneapi/.*$"
-    requires:
-      count: 0
 
   - name: agent_changes_require_agent_reviewer
     if:
