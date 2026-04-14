@@ -77,7 +77,13 @@ func ApplyCanvasVersionChangeset(
 
 		now := time.Now()
 		newVersion.UpdatedAt = &now
-		return tx.Save(newVersion).Error
+		err = tx.Save(newVersion).Error
+		if err != nil {
+			log.WithError(err).Errorf("failed to save canvas version - canvas=%s, version=%s", canvasID.String(), newVersion.ID.String())
+			return status.Error(codes.Internal, "failed to save canvas version")
+		}
+
+		return nil
 	})
 
 	if err != nil {
