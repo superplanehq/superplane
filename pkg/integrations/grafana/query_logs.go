@@ -141,9 +141,19 @@ func (q *QueryLogs) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
+	dataSource := strings.TrimSpace(spec.DataSource)
+
+	source, err := client.GetDataSource(dataSource)
+	if err != nil {
+		return fmt.Errorf("error getting data source: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(source.Type), "loki") {
+		return fmt.Errorf("data source %q must be a Loki data source, got %q", dataSource, source.Type)
+	}
+
 	lokiQuery := grafanaQuery{
 		RefID:      "A",
-		Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSource)},
+		Datasource: map[string]string{"uid": dataSource},
 		Expr:       strings.TrimSpace(spec.Query),
 		Query:      strings.TrimSpace(spec.Query),
 	}
