@@ -260,7 +260,9 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 	usageService, err := usage.NewServiceFromEnv()
 	if err != nil {
-		log.Panicf("failed to initialize usage service for public api: %v", err)
+		// Usage is an optional dependency; if it can't be initialized, continue with usage disabled.
+		log.Warnf("failed to initialize usage service for public api, continuing with usage disabled: %v", err)
+		usageService = usage.NewDisabledService()
 	}
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
