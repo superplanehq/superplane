@@ -20,8 +20,8 @@ var _ MappedNullable = &CanvasesCanvasSpec{}
 
 // CanvasesCanvasSpec struct for CanvasesCanvasSpec
 type CanvasesCanvasSpec struct {
-	Nodes []ComponentsNode `json:"nodes,omitempty"`
-	Edges []ComponentsEdge `json:"edges,omitempty"`
+	Nodes []SuperplaneComponentsNode `json:"nodes,omitempty"`
+	Edges []SuperplaneComponentsEdge `json:"edges,omitempty"`
 }
 
 // NewCanvasesCanvasSpec instantiates a new CanvasesCanvasSpec object
@@ -42,9 +42,9 @@ func NewCanvasesCanvasSpecWithDefaults() *CanvasesCanvasSpec {
 }
 
 // GetNodes returns the Nodes field value if set, zero value otherwise.
-func (o *CanvasesCanvasSpec) GetNodes() []ComponentsNode {
+func (o *CanvasesCanvasSpec) GetNodes() []SuperplaneComponentsNode {
 	if o == nil || IsNil(o.Nodes) {
-		var ret []ComponentsNode
+		var ret []SuperplaneComponentsNode
 		return ret
 	}
 	return o.Nodes
@@ -52,7 +52,7 @@ func (o *CanvasesCanvasSpec) GetNodes() []ComponentsNode {
 
 // GetNodesOk returns a tuple with the Nodes field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasSpec) GetNodesOk() ([]ComponentsNode, bool) {
+func (o *CanvasesCanvasSpec) GetNodesOk() ([]SuperplaneComponentsNode, bool) {
 	if o == nil || IsNil(o.Nodes) {
 		return nil, false
 	}
@@ -68,15 +68,15 @@ func (o *CanvasesCanvasSpec) HasNodes() bool {
 	return false
 }
 
-// SetNodes gets a reference to the given []ComponentsNode and assigns it to the Nodes field.
-func (o *CanvasesCanvasSpec) SetNodes(v []ComponentsNode) {
+// SetNodes gets a reference to the given []SuperplaneComponentsNode and assigns it to the Nodes field.
+func (o *CanvasesCanvasSpec) SetNodes(v []SuperplaneComponentsNode) {
 	o.Nodes = v
 }
 
 // GetEdges returns the Edges field value if set, zero value otherwise.
-func (o *CanvasesCanvasSpec) GetEdges() []ComponentsEdge {
+func (o *CanvasesCanvasSpec) GetEdges() []SuperplaneComponentsEdge {
 	if o == nil || IsNil(o.Edges) {
-		var ret []ComponentsEdge
+		var ret []SuperplaneComponentsEdge
 		return ret
 	}
 	return o.Edges
@@ -84,7 +84,7 @@ func (o *CanvasesCanvasSpec) GetEdges() []ComponentsEdge {
 
 // GetEdgesOk returns a tuple with the Edges field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasSpec) GetEdgesOk() ([]ComponentsEdge, bool) {
+func (o *CanvasesCanvasSpec) GetEdgesOk() ([]SuperplaneComponentsEdge, bool) {
 	if o == nil || IsNil(o.Edges) {
 		return nil, false
 	}
@@ -100,8 +100,8 @@ func (o *CanvasesCanvasSpec) HasEdges() bool {
 	return false
 }
 
-// SetEdges gets a reference to the given []ComponentsEdge and assigns it to the Edges field.
-func (o *CanvasesCanvasSpec) SetEdges(v []ComponentsEdge) {
+// SetEdges gets a reference to the given []SuperplaneComponentsEdge and assigns it to the Edges field.
+func (o *CanvasesCanvasSpec) SetEdges(v []SuperplaneComponentsEdge) {
 	o.Edges = v
 }
 

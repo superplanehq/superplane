@@ -6,7 +6,7 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { SuperplaneComponentsNode as ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";

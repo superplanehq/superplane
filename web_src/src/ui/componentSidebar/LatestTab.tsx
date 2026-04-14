@@ -2,7 +2,11 @@ import { TextAlignStart } from "lucide-react";
 import { SidebarEventItem } from "./SidebarEventItem";
 import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
-import type { ComponentsComponent, ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type {
+  ComponentsComponent,
+  SuperplaneComponentsNode as ComponentsNode,
+  CanvasesCanvasNodeExecution,
+} from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
