@@ -1,5 +1,6 @@
 import asyncio
 import json
+import random
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -231,9 +232,61 @@ def _build_deps(
     )
 
 
+_TRANSIENT_STATUS_CODES = {429, 502, 503, 504, 529}
+_MAX_ATTEMPTS = 3
+_BASE_DELAY_SECONDS = 1.0
+_JITTER_SECONDS = 0.5
+
+
+def _extract_status_code(error: BaseException) -> int | None:
+    status_code = getattr(error, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    cause = error.__cause__ or error.__context__
+    if cause is not None:
+        cause_status = getattr(cause, "status_code", None)
+        if isinstance(cause_status, int):
+            return cause_status
+    return None
+
+
+def _is_transient_error(error: Exception) -> bool:
+    status_code = _extract_status_code(error)
+    return status_code is not None and status_code in _TRANSIENT_STATUS_CODES
+
+
+def _friendly_error_message(error: Exception) -> str:
+    status_code = _extract_status_code(error)
+    if status_code == 529:
+        return "The AI service is temporarily overloaded. Please try again in a moment."
+    if status_code == 429:
+        return "Rate limit reached. Please wait a moment and try again."
+    if status_code in {502, 503, 504}:
+        return "The AI service is temporarily unavailable. Please try again in a moment."
+    if isinstance(status_code, int) and 400 <= status_code < 500:
+        return "AI service configuration error. Please contact support."
+    return "An unexpected error occurred. Please try again."
+
+
 async def _run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[Any]:
-    async for event in agent.run_stream_events(**kwargs):
-        yield event
+    yielded_any = False
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            async for event in agent.run_stream_events(**kwargs):
+                yielded_any = True
+                yield event
+            return
+        except Exception as error:
+            if yielded_any or not _is_transient_error(error) or attempt == _MAX_ATTEMPTS - 1:
+                raise
+            delay = _BASE_DELAY_SECONDS * (2**attempt) + random.uniform(0, _JITTER_SECONDS)
+            _debug_log(
+                "transient LLM error, retrying",
+                attempt=attempt + 1,
+                delay=delay,
+                error=str(error),
+            )
+            await asyncio.sleep(delay)
 
 
 async def _stream_agent_run(
@@ -613,11 +666,11 @@ def _create_app() -> FastAPI:
                     import sentry_sdk
 
                     sentry_sdk.capture_exception(error)
-                    _debug_log("stream failed", chat_id=chat_id, error=str(error))
+                    print(f"[web] stream failed chat_id={chat_id} error={error}", flush=True)
                     yield _encode_sse_event(
                         {
                             "type": "run_failed",
-                            "error": str(error),
+                            "error": _friendly_error_message(error),
                         }
                     )
                     yield _encode_sse_event({"type": "done"})
