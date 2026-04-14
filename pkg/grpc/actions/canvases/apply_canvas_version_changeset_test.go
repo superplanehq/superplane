@@ -169,7 +169,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		require.Len(t, version.Edges, 1)
 	})
 
-	t.Run("applies operations in dry run without persisting patched version", func(t *testing.T) {
+	t.Run("applies changeset in dry run without persisting patched version", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
@@ -213,12 +213,8 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 						},
 					},
 					{
-						Type: pb.CanvasChangeset_Change_DELETE_EDGE,
-						Edge: &pb.CanvasChangeset_Change_Edge{
-							SourceId: "node-a",
-							TargetId: "node-b",
-							Channel:  "default",
-						},
+						Type: pb.CanvasChangeset_Change_DELETE_NODE,
+						Node: &pb.CanvasChangeset_Change_Node{Id: "node-b"},
 					},
 					{
 						Type: pb.CanvasChangeset_Change_ADD_EDGE,
@@ -233,6 +229,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			true,
 		)
 
+		//
+		// Response returns the the updated canvas version structure
+		//
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Version)
@@ -255,6 +254,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		assert.Equal(t, "node-c", edge.TargetId)
 		assert.Equal(t, "default", edge.Channel)
 
+		//
+		// But, data in the database remains unchanged
+		//
 		versionAfter, err := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
 		require.NoError(t, err)
 		require.Len(t, versionAfter.Nodes, 2)
@@ -315,7 +317,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
-		assert.Contains(t, err.Error(), "graph contains a cycle")
+		assert.Contains(t, err.Error(), "canvas contains a cycle")
 
 		version, findErr := models.FindCanvasVersion(canvas.ID, *canvas.LiveVersionID)
 		require.NoError(t, findErr)

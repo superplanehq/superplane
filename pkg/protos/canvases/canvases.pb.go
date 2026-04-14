@@ -5793,7 +5793,7 @@ type CanvasChangeset_Change struct {
 	Type  CanvasChangeset_Change_Type `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.Canvases.CanvasChangeset_Change_Type" json:"type,omitempty"`
 	// Required for ADD_NODE, UPDATE_NODE, DELETE_NODE
 	Node *CanvasChangeset_Change_Node `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
-	// Required for DISCONNECT_NODES and CONNECT_NODES
+	// Required for ADD_EDGE and DELETE_EDGE
 	Edge          *CanvasChangeset_Change_Edge `protobuf:"bytes,3,opt,name=edge,proto3" json:"edge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

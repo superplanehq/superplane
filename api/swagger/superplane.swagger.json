@@ -4323,7 +4323,7 @@
         },
         "edge": {
           "$ref": "#/definitions/CanvasChangesetChangeEdge",
-          "title": "Required for DISCONNECT_NODES and CONNECT_NODES"
+          "title": "Required for ADD_EDGE and DELETE_EDGE"
         }
       }
     },

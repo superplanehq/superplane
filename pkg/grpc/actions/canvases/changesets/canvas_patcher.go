@@ -363,7 +363,7 @@ func (p *CanvasPatcher) validateCanvasGraph() error {
 	}
 
 	if visitedCount != len(p.canvas.Nodes) {
-		return fmt.Errorf("graph contains a cycle")
+		return fmt.Errorf("canvas contains a cycle")
 	}
 
 	return nil

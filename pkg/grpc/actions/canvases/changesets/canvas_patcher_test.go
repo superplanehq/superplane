@@ -59,8 +59,8 @@ func Test__CanvasPatcher(t *testing.T) {
 				},
 			},
 		})
-		steps.assertNoError()
 
+		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"foo": "after"})
 		steps.assertHasNode("node-c", "Node C", map[string]any{"baz": "value"})
 		steps.assertHasNodeBlock("node-c", "noop")
@@ -90,6 +90,28 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		})
 		steps.assertHasError()
+		steps.assertErrorContains("canvas contains a cycle")
+	})
+
+	t.Run("rejects block that does not exist", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:    "node-a",
+						Name:  "Node A",
+						Block: "core.hello",
+					},
+				},
+			},
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("block 'core.hello' not found in registry")
 	})
 
 	t.Run("rejects unknown operation type", func(t *testing.T) {
@@ -247,8 +269,24 @@ func (s *CanvasPatcherSteps) assertHasNodeBlock(nodeID string, block string) {
 	index, found := s.patcher.findNode(nodeID)
 	require.True(s.t, found, "expected node %s", nodeID)
 
-	nodeBlock := blockNameFromNode(s.patcher.canvas.Nodes[index])
+	nodeBlock := s.findBlockName(s.patcher.canvas.Nodes[index])
 	require.Equal(s.t, block, nodeBlock)
+}
+
+func (s *CanvasPatcherSteps) findBlockName(node models.Node) string {
+	if node.Ref.Component != nil && node.Ref.Component.Name != "" {
+		return node.Ref.Component.Name
+	}
+
+	if node.Ref.Trigger != nil && node.Ref.Trigger.Name != "" {
+		return node.Ref.Trigger.Name
+	}
+
+	if node.Ref.Widget != nil && node.Ref.Widget.Name != "" {
+		return node.Ref.Widget.Name
+	}
+
+	return ""
 }
 
 func (s *CanvasPatcherSteps) assertHasEdge(sourceID string, targetID string, channel string) {
