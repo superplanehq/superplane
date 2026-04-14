@@ -43,8 +43,7 @@ class AgentStreamRequest(BaseModel):
     agent_context: AgentContext | None = Field(
         default=None,
         description=(
-            "Dedicated agent contract: enabled, inspect vs build; "
-            "canvas_version only for build."
+            "Dedicated agent contract: enabled, inspect vs build; canvas_version only for build."
         ),
     )
 
