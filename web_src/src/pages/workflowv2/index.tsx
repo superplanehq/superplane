@@ -138,8 +138,6 @@ const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-e
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 
-type UnsavedChangeKind = "position" | "structural";
-
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
 
 type CanvasSaveResult = {
@@ -1298,13 +1296,6 @@ export function WorkflowPageV2() {
       matchesCurrentCanvas: false,
       hasQueuedFollowUp: false,
     });
-  }, []);
-
-  const markUnsavedChange = useCallback((kind: UnsavedChangeKind) => {
-    setHasUnsavedChanges(true);
-    if (kind === "structural") {
-      setHasNonPositionalUnsavedChanges(true);
-    }
   }, []);
 
   const handleCreateVersion = useCallback(async () => {
@@ -5242,7 +5233,6 @@ export function WorkflowPageV2() {
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
-          onToggleCollapse={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
