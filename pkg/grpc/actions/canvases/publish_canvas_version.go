@@ -137,7 +137,11 @@ func publishDraftVersionInTransaction(
 			return createErr
 		}
 
-		return tx.Delete(version).Error
+		if err := tx.Delete(version).Error; err != nil {
+			return err
+		}
+
+		return refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
 	})
 	if err != nil {
 		return nil, err
