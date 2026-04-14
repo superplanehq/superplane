@@ -10,18 +10,30 @@ AgentCanvasSurface = Literal["inspect", "build"]
 
 
 @dataclass
+class AgentContextState:
+    enabled: bool = False
+    mode: Literal["inspect", "build"] = "inspect"
+    canvas_version: str | None = None
+
+
+@dataclass
 class AgentDeps:
     client: SuperplaneClient
     canvas_id: str
-    # When set, canvas graph reads use this version (draft or published), not only the live summary.
-    editing_version_id: str | None = None
-    # What the user is viewing in the editor (from the UI); complements editing_version_id.
-    canvas_surface: AgentCanvasSurface | None = None
+    agent_context: AgentContextState = field(default_factory=AgentContextState)
     session_store: SessionStore | None = None
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
     catalog_list_cache: dict[tuple[str, str, str], list[dict[str, Any]]] = field(
         default_factory=dict
     )
+
+    @property
+    def canvas_version_id(self) -> str | None:
+        """Draft canvas version id for SuperPlane version-scoped reads; set only in enabled + build mode."""
+        ac = self.agent_context
+        if not ac.enabled or ac.mode != "build":
+            return None
+        return ac.canvas_version
 
 
 def _catalog_list_cache_key(

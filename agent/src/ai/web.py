@@ -27,7 +27,7 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.usage import RunUsage
 
-from ai.agent import AgentDeps, build_agent
+from ai.agent import AgentContextState, AgentDeps, build_agent
 from ai.agent_deps import AgentCanvasSurface
 from ai.config import config
 from ai.grpc import InternalAgentServer
@@ -118,7 +118,7 @@ class AgentStreamRequest(BaseModel):
 def derive_agent_editor_fields(
     agent_context: AgentContext | None,
 ) -> tuple[str | None, AgentCanvasSurface | None]:
-    """Map agent_context to (editing_version_id, canvas_surface) for tools and prompt prefix."""
+    """Map request ``agent_context`` to (canvas_version_id_for_tools, prompt_surface)."""
     if agent_context is None or not agent_context.enabled:
         return None, None
     if agent_context.mode == "build":
@@ -246,6 +246,16 @@ def _load_message_history(store: SessionStore, chat_id: str) -> Any:
     return ModelMessagesTypeAdapter.validate_python(history)
 
 
+def _agent_context_state(ctx: AgentContext | None) -> AgentContextState:
+    if ctx is None:
+        return AgentContextState()
+    return AgentContextState(
+        enabled=ctx.enabled,
+        mode=ctx.mode,
+        canvas_version=normalize_optional(ctx.canvas_version),
+    )
+
+
 def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
     api_token = _resolve_required_bearer_token(request)
     jwt_validator = JwtValidator.from_env()
@@ -276,7 +286,7 @@ def _build_deps(
             organization_id=claims.org_id,
         )
     )
-    editing_version_id, canvas_surface = derive_agent_editor_fields(payload.agent_context)
+    agent_context = _agent_context_state(payload.agent_context)
     _debug_log(
         "resolved non-test deps",
         model=payload.model,
@@ -284,14 +294,14 @@ def _build_deps(
         base_url=base_url,
         organization_id=claims.org_id,
         has_token=bool(api_token),
-        editing_version_id=editing_version_id,
-        canvas_surface=canvas_surface,
+        agent_context_enabled=agent_context.enabled,
+        agent_context_mode=agent_context.mode,
+        agent_context_canvas_version=agent_context.canvas_version,
     )
     return AgentDeps(
         client=client,
         canvas_id=canvas_id,
-        editing_version_id=editing_version_id,
-        canvas_surface=canvas_surface,
+        agent_context=agent_context,
         session_store=session_store,
     )
 
@@ -546,7 +556,7 @@ async def _stream_agent_run(
             recorder.save_authoritative_messages(messages)
             resolved_output = result.output
             if isinstance(resolved_output, CanvasAnswer):
-                cache_key = f"{deps.canvas_id}:{deps.editing_version_id or 'live'}"
+                cache_key = f"{deps.canvas_id}:{deps.canvas_version_id or 'inspect'}"
                 canvas_summary = deps.canvas_cache.get(cache_key)
                 resolved_output = coerce_canvas_answer_proposal(
                     deps.client,

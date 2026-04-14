@@ -15,7 +15,7 @@ class GetCanvas:
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> CanvasSummary:
         resolved_canvas_id = ctx.deps.canvas_id
-        version_id = ctx.deps.editing_version_id
+        version_id = ctx.deps.canvas_version_id
         cache_key = f"{resolved_canvas_id}:{version_id or 'live'}"
         cached_summary = ctx.deps.canvas_cache.get(cache_key)
         if cached_summary is not None:

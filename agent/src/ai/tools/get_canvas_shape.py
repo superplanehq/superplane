@@ -25,7 +25,7 @@ class GetCanvasShape:
     def run(ctx: RunContext[AgentDeps]) -> CanvasShape | dict[str, Any]:
         try:
             return ctx.deps.client.get_canvas_shape(
-                ctx.deps.canvas_id, ctx.deps.editing_version_id
+                ctx.deps.canvas_id, ctx.deps.canvas_version_id
             )
         except Exception as error:
             tool_debug(f"get_canvas_shape failed: {error}")

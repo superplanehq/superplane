@@ -270,9 +270,9 @@ class SuperplaneClient:
         return self._build_canvas_summary(resolved_id, None, None, version.spec)
 
     def _load_editing_canvas_bundle(
-        self, canvas_id: str, editing_version_id: str
+        self, canvas_id: str, canvas_version_id: str
     ) -> tuple[CanvasSummary, CanvasesCanvasVersion]:
-        vresp = self._fetch_describe_canvas_version_response(canvas_id, editing_version_id)
+        vresp = self._fetch_describe_canvas_version_response(canvas_id, canvas_version_id)
         version = vresp.version
         if version is None:
             raise ValueError("Canvas version response is missing 'version'.")
@@ -287,10 +287,10 @@ class SuperplaneClient:
         )
         return merged, version
 
-    def describe_editing_canvas(self, canvas_id: str, editing_version_id: str | None) -> CanvasSummary:
-        if not editing_version_id:
+    def describe_editing_canvas(self, canvas_id: str, canvas_version_id: str | None) -> CanvasSummary:
+        if not canvas_version_id:
             return self.describe_canvas(canvas_id)
-        summary, _version = self._load_editing_canvas_bundle(canvas_id, editing_version_id)
+        summary, _version = self._load_editing_canvas_bundle(canvas_id, canvas_version_id)
         return summary
 
     def describe_canvas(self, canvas_id: str) -> CanvasSummary:
@@ -746,8 +746,8 @@ class SuperplaneClient:
             if resource is not None
         ]
 
-    def get_canvas_shape(self, canvas_id: str, editing_version_id: str | None = None) -> CanvasShape:
-        summary = self.describe_editing_canvas(canvas_id, editing_version_id)
+    def get_canvas_shape(self, canvas_id: str, canvas_version_id: str | None = None) -> CanvasShape:
+        summary = self.describe_editing_canvas(canvas_id, canvas_version_id)
         node_kind_by_type = {
             "TYPE_TRIGGER": "trigger",
             "TYPE_COMPONENT": "component",
@@ -820,10 +820,10 @@ class SuperplaneClient:
         canvas_id: str,
         node_id: str,
         include_recent_events: bool = True,
-        editing_version_id: str | None = None,
+        canvas_version_id: str | None = None,
     ) -> NodeDetails:
-        if editing_version_id:
-            canvas, version = self._load_editing_canvas_bundle(canvas_id, editing_version_id)
+        if canvas_version_id:
+            canvas, version = self._load_editing_canvas_bundle(canvas_id, canvas_version_id)
             node = next((current for current in canvas.nodes if current.id == node_id), None)
             if node is None:
                 raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")

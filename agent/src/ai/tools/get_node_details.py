@@ -36,7 +36,7 @@ class GetNodeDetails:
                 ctx.deps.canvas_id,
                 node_id,
                 include_recent_events=include_recent_events,
-                editing_version_id=ctx.deps.editing_version_id,
+                canvas_version_id=ctx.deps.canvas_version_id,
             )
         except Exception as error:
             tool_debug(f"get_node_details failed for {node_id}: {error}")
