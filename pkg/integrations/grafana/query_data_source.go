@@ -37,6 +37,7 @@ type grafanaQuery struct {
 	Expr       string `json:"expr,omitempty"`
 	Query      string `json:"query,omitempty"`
 	Format     string `json:"format,omitempty"`
+	MaxLines   int    `json:"maxLines,omitempty"`
 }
 
 const grafanaDateTimeFormat = "2006-01-02T15:04"
@@ -179,14 +180,14 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, nil)
+		request.From, err = resolveQueryTimeValue(*spec.TimeFrom)
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo, nil)
+		request.To, err = resolveQueryTimeValue(*spec.TimeTo)
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}
@@ -262,13 +263,13 @@ func defaultTimeRange() (string, string) {
 	return fmt.Sprintf("%d", from.UnixMilli()), fmt.Sprintf("%d", now.UnixMilli())
 }
 
-func resolveQueryTimeValue(value string, timezone *string) (string, error) {
+func resolveQueryTimeValue(value string) (string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return "", nil
 	}
 
-	if parsed, ok, err := parseGrafanaQueryTime(trimmed, timezone); err != nil {
+	if parsed, ok, err := parseGrafanaQueryTime(trimmed); err != nil {
 		return "", err
 	} else if ok {
 		return fmt.Sprintf("%d", parsed.UTC().UnixMilli()), nil
@@ -277,7 +278,7 @@ func resolveQueryTimeValue(value string, timezone *string) (string, error) {
 	return trimmed, nil
 }
 
-func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, error) {
+func parseGrafanaQueryTime(value string) (time.Time, bool, error) {
 	for _, format := range []string{
 		time.RFC3339Nano,
 		time.RFC3339,
@@ -322,21 +323,21 @@ func validateQueryDataSourceSpec(spec QueryDataSourceSpec) error {
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")
 	}
-	if err := validateQueryTimeValue(spec.TimeFrom, nil); err != nil {
+	if err := validateQueryTimeValue(spec.TimeFrom); err != nil {
 		return fmt.Errorf("timeFrom: %w", err)
 	}
-	if err := validateQueryTimeValue(spec.TimeTo, nil); err != nil {
+	if err := validateQueryTimeValue(spec.TimeTo); err != nil {
 		return fmt.Errorf("timeTo: %w", err)
 	}
 
 	return nil
 }
 
-func validateQueryTimeValue(value *string, timezone *string) error {
+func validateQueryTimeValue(value *string) error {
 	if value == nil || strings.TrimSpace(*value) == "" {
 		return nil
 	}
 
-	_, _, err := parseGrafanaQueryTime(strings.TrimSpace(*value), timezone)
+	_, _, err := parseGrafanaQueryTime(strings.TrimSpace(*value))
 	return err
 }

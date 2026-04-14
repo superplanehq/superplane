@@ -34,6 +34,21 @@ export interface QueryDataSourceConfiguration {
   format?: string;
 }
 
+export interface QueryLogsConfiguration {
+  dataSource: string;
+  query: string;
+  timeFrom?: string;
+  timeTo?: string;
+  limit?: number;
+}
+
+export interface QueryTracesConfiguration {
+  dataSource: string;
+  query: string;
+  timeFrom?: string;
+  timeTo?: string;
+}
+
 export interface SilenceMatcher {
   name?: string;
   value?: string;

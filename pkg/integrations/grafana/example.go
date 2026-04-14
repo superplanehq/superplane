@@ -28,6 +28,12 @@ var exampleOutputListAlertRulesBytes []byte
 //go:embed example_data_on_alert_firing.json
 var exampleDataOnAlertFiringBytes []byte
 
+//go:embed example_output_query_logs.json
+var exampleOutputQueryLogsBytes []byte
+
+//go:embed example_output_query_traces.json
+var exampleOutputQueryTracesBytes []byte
+
 //go:embed example_output_list_silences.json
 var exampleOutputListSilencesBytes []byte
 
@@ -69,6 +75,12 @@ var exampleOutputListAlertRules map[string]any
 
 var exampleDataOnAlertFiringOnce sync.Once
 var exampleDataOnAlertFiring map[string]any
+
+var exampleOutputQueryLogsOnce sync.Once
+var exampleOutputQueryLogs map[string]any
+
+var exampleOutputQueryTracesOnce sync.Once
+var exampleOutputQueryTraces map[string]any
 
 var exampleOutputListSilencesOnce sync.Once
 var exampleOutputListSilences map[string]any
@@ -137,6 +149,14 @@ func (c *ListAlertRules) ExampleOutput() map[string]any {
 
 func (t *OnAlertFiring) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertFiringOnce, exampleDataOnAlertFiringBytes, &exampleDataOnAlertFiring)
+}
+
+func (q *QueryLogs) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryLogsOnce, exampleOutputQueryLogsBytes, &exampleOutputQueryLogs)
+}
+
+func (q *QueryTraces) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryTracesOnce, exampleOutputQueryTracesBytes, &exampleOutputQueryTraces)
 }
 
 func (l *ListSilences) ExampleOutput() map[string]any {
