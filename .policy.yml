@@ -3,6 +3,7 @@ approval_defaults:
     request_review:
       enabled: true
       mode: all-users
+    ignore_update_merges: true
 
 policy:
   approval:
