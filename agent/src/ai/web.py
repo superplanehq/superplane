@@ -26,6 +26,7 @@ from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
+from ai.chat_retention import start_chat_retention_scheduler
 from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
@@ -548,9 +549,11 @@ def _create_app() -> FastAPI:
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
+        retention_scheduler = start_chat_retention_scheduler(store, limit_checker)
         try:
             yield
         finally:
+            retention_scheduler.shutdown(wait=False)
             tracker.begin_shutdown()
             await tracker.wait_for_drain()
             grpc_server.stop()
