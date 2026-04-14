@@ -16,7 +16,7 @@ import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
-import { CanvasSettingsPage } from "./pages/canvas/Settings";
+import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import HomePage from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
