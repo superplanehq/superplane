@@ -47,6 +47,10 @@ func NewServiceFromEnv() (Service, error) {
 	}, nil
 }
 
+func NewDisabledService() Service {
+	return disabledService{}
+}
+
 func (disabledService) Enabled() bool {
 	return false
 }
