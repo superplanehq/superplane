@@ -3,7 +3,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
-  ComponentsNode,
+  SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { formatDuration } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
