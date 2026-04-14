@@ -104,6 +104,7 @@ Class | Method | HTTP request | Description
 *CanvasVersionApi* | [**canvases_delete_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_delete_canvas_version) | **DELETE** /api/v1/canvases/{canvasId}/versions/{versionId} | Discard draft canvas version
 *CanvasVersionApi* | [**canvases_describe_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_describe_canvas_version) | **GET** /api/v1/canvases/{canvasId}/versions/{versionId} | Describe canvas version
 *CanvasVersionApi* | [**canvases_list_canvas_versions**](superplaneapi/docs/CanvasVersionApi.md#canvases_list_canvas_versions) | **GET** /api/v1/canvases/{canvasId}/versions | List canvas versions
+*CanvasVersionApi* | [**canvases_publish_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_publish_canvas_version) | **PATCH** /api/v1/canvases/{canvasId}/versions/{versionId}/publish | Publish draft canvas version
 *CanvasVersionApi* | [**canvases_update_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version) | **PUT** /api/v1/canvases/{canvasId}/versions/{versionId} | Update canvas version
 *CanvasVersionApi* | [**canvases_update_canvas_version2**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version2) | **PUT** /api/v1/canvases/{canvasId}/versions | Update canvas version
 *ComponentApi* | [**components_describe_component**](superplaneapi/docs/ComponentApi.md#components_describe_component) | **GET** /api/v1/components/{name} | Describe component
@@ -250,6 +251,7 @@ Class | Method | HTTP request | Description
  - [CanvasesListNodeEventsResponse](superplaneapi/docs/CanvasesListNodeEventsResponse.md)
  - [CanvasesListNodeExecutionsResponse](superplaneapi/docs/CanvasesListNodeExecutionsResponse.md)
  - [CanvasesListNodeQueueItemsResponse](superplaneapi/docs/CanvasesListNodeQueueItemsResponse.md)
+ - [CanvasesPublishCanvasVersionResponse](superplaneapi/docs/CanvasesPublishCanvasVersionResponse.md)
  - [CanvasesResolveCanvasChangeRequestBody](superplaneapi/docs/CanvasesResolveCanvasChangeRequestBody.md)
  - [CanvasesResolveCanvasChangeRequestResponse](superplaneapi/docs/CanvasesResolveCanvasChangeRequestResponse.md)
  - [CanvasesResolveExecutionErrorsBody](superplaneapi/docs/CanvasesResolveExecutionErrorsBody.md)

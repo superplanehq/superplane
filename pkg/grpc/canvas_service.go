@@ -134,6 +134,20 @@ func (s *CanvasService) DeleteCanvasVersion(ctx context.Context, req *pb.DeleteC
 	return canvases.DeleteCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
 }
 
+func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.PublishCanvasVersion(
+		ctx,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		s.webhookBaseURL,
+		s.authService,
+	)
+}
+
 func (s *CanvasService) CreateCanvasChangeRequest(ctx context.Context, req *pb.CreateCanvasChangeRequestRequest) (*pb.CreateCanvasChangeRequestResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.CreateCanvasChangeRequestWithMetadata(
