@@ -63,7 +63,6 @@ export interface CompositeProps extends ComponentActionsProps {
   warning?: string;
   paused?: boolean;
 
-  onToggleCollapse?: () => void;
   onViewMoreEvents?: () => void;
 }
 
@@ -81,7 +80,6 @@ export const Composite: React.FC<CompositeProps> = ({
   nextInQueue,
   collapsed = false,
   collapsedBackground,
-  onToggleCollapse,
   onViewMoreEvents,
   selected = false,
   isMissing = false,
@@ -204,7 +202,6 @@ export const Composite: React.FC<CompositeProps> = ({
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
       selected={selected}
-      onToggleCollapse={onToggleCollapse}
       onRun={onRun}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
