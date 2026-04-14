@@ -25,7 +25,10 @@ class SearchDecisionPatterns:
         limit: int = 3,
     ) -> list[dict[str, Any]]:
         try:
-            return search_markdown_patterns(query=query, limit=limit)
+            results = search_markdown_patterns(query=query, limit=limit)
+            if not results:
+                return [{"_hint": "No matching patterns found. Do not retry with rephrased queries — proceed without patterns."}]
+            return results
         except Exception as error:
             tool_debug(f"search_decision_patterns failed: {error}")
             return [tool_error_entry("search_decision_patterns", error)]
