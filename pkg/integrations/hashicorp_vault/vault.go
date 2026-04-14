@@ -15,7 +15,7 @@ func init() {
 
 type HashicorpVault struct{}
 
-type vaultConfig struct {
+type vaultSettings struct {
 	BaseURL   string `mapstructure:"baseURL"`
 	Namespace string `mapstructure:"namespace"`
 	Token     string `mapstructure:"token"`
@@ -63,9 +63,9 @@ func (v *HashicorpVault) Cleanup(ctx core.IntegrationCleanupContext) error    { 
 func (v *HashicorpVault) HandleAction(ctx core.IntegrationActionContext) error { return nil }
 
 func (v *HashicorpVault) Sync(ctx core.SyncContext) error {
-	cfg := vaultConfig{}
+	cfg := vaultSettings{}
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return fmt.Errorf("failed to decode configuration: %v", err)
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if cfg.BaseURL == "" {
