@@ -1,4 +1,9 @@
-import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, ComponentsNode } from "@/api-client";
+import type {
+  BlueprintsBlueprint,
+  CanvasesCanvas,
+  ComponentsComponent,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
 import { buildChildToGroupMap } from "@/lib/canvas/groups";
