@@ -137,6 +137,8 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4318"
       OTEL_SERVICE_NAME: "superplane-agent"
+      SENTRY_DSN: ""
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
     command: >-
       bash -lc "uv run python -m uvicorn ai.web:create_app
       --factory
