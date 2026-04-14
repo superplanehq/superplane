@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from ai.config import config
 
@@ -17,6 +18,7 @@ def init_telemetry() -> None:
     try:
         import logfire
 
+        os.environ.setdefault("OTEL_LOGS_EXPORTER", "none")
         logfire.configure(send_to_logfire=False)
         logfire.instrument_pydantic_ai()
         init_telemetry._done = True  # type: ignore[attr-defined]

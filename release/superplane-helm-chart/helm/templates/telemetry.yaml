@@ -14,7 +14,6 @@ data:
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ $endpoint }}
   OTEL_EXPORTER_OTLP_PROTOCOL: {{ $protocol }}
   OTEL_EXPORTER_OTLP_HEADERS: {{ $headers }}
-  OTEL_LOGS_EXPORTER: {{ "none" | b64enc }}
   OTEL_SERVICE_NAME: {{ $serviceName }}
 {{ end }}
 {{- end }}
