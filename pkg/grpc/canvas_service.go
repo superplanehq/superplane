@@ -125,7 +125,28 @@ func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb
 		canvasID,
 		versionID,
 		req.Changeset,
-		req.DryRun,
+	)
+}
+
+func (s *CanvasService) ValidateCanvasVersionChangeset(ctx context.Context, req *pb.ValidateCanvasVersionChangesetRequest) (*pb.ValidateCanvasVersionChangesetResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+	}
+
+	versionID, err := uuid.Parse(req.VersionId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+	}
+
+	return canvases.ValidateCanvasVersionChangeset(
+		ctx,
+		s.registry,
+		uuid.MustParse(organizationID),
+		canvasID,
+		versionID,
+		req.Changeset,
 	)
 }
 

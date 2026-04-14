@@ -107,6 +107,7 @@ Class | Method | HTTP request | Description
 *CanvasVersionApi* | [**canvases_publish_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_publish_canvas_version) | **PATCH** /api/v1/canvases/{canvasId}/versions/{versionId}/publish | Publish draft canvas version
 *CanvasVersionApi* | [**canvases_update_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version) | **PUT** /api/v1/canvases/{canvasId}/versions/{versionId} | Update canvas version
 *CanvasVersionApi* | [**canvases_update_canvas_version2**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version2) | **PUT** /api/v1/canvases/{canvasId}/versions | Update canvas version
+*CanvasVersionApi* | [**canvases_validate_canvas_version_changeset**](superplaneapi/docs/CanvasVersionApi.md#canvases_validate_canvas_version_changeset) | **PATCH** /api/v1/canvases/{canvasId}/versions/{versionId}/validate | Validate a canvas version changeset
 *ComponentApi* | [**components_describe_component**](superplaneapi/docs/ComponentApi.md#components_describe_component) | **GET** /api/v1/components/{name} | Describe component
 *ComponentApi* | [**components_list_component_actions**](superplaneapi/docs/ComponentApi.md#components_list_component_actions) | **GET** /api/v1/components/{name}/actions | List component actions
 *ComponentApi* | [**components_list_components**](superplaneapi/docs/ComponentApi.md#components_list_components) | **GET** /api/v1/components | List components
@@ -261,6 +262,8 @@ Class | Method | HTTP request | Description
  - [CanvasesUpdateCanvasVersionResponse](superplaneapi/docs/CanvasesUpdateCanvasVersionResponse.md)
  - [CanvasesUpdateNodePauseBody](superplaneapi/docs/CanvasesUpdateNodePauseBody.md)
  - [CanvasesUpdateNodePauseResponse](superplaneapi/docs/CanvasesUpdateNodePauseResponse.md)
+ - [CanvasesValidateCanvasVersionChangesetBody](superplaneapi/docs/CanvasesValidateCanvasVersionChangesetBody.md)
+ - [CanvasesValidateCanvasVersionChangesetResponse](superplaneapi/docs/CanvasesValidateCanvasVersionChangesetResponse.md)
  - [ComponentsComponent](superplaneapi/docs/ComponentsComponent.md)
  - [ComponentsComponentAction](superplaneapi/docs/ComponentsComponentAction.md)
  - [ComponentsDescribeComponentResponse](superplaneapi/docs/ComponentsDescribeComponentResponse.md)
