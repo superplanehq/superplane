@@ -53,11 +53,11 @@ export type AgentContext = { enabled: boolean } & AgentMode;
 export function useAgentContext(isEditing: boolean, canvasVersion: string): AgentContext {
   const enabled = isAgentEnabled();
 
-  if(!enabled) {
+  if (!enabled) {
     return { enabled: false, mode: "inspect" };
   }
 
-  if(!isEditing) {
+  if (!isEditing) {
     return { enabled: true, mode: "build", canvasVersion };
   }
 

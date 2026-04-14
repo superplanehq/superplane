@@ -47,7 +47,9 @@ def test_build_agent_context_state() -> None:
     assert empty.mode == "inspect"
     assert empty.canvas_version is None
 
-    disabled = build_agent_context_state(AgentContext(enabled=False, mode="build", canvas_version="x"))
+    disabled = build_agent_context_state(
+        AgentContext(enabled=False, mode="build", canvas_version="x")
+    )
     assert disabled.enabled is False
     assert disabled.canvas_version == "x"
 

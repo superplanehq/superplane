@@ -256,7 +256,9 @@ class SuperplaneClient:
         )
         name = metadata.name if metadata is not None and isinstance(metadata.name, str) else None
         description = (
-            metadata.description if metadata is not None and isinstance(metadata.description, str) else None
+            metadata.description
+            if metadata is not None and isinstance(metadata.description, str)
+            else None
         )
         return self._build_canvas_summary(resolved_id, name, description, spec)
 
@@ -287,7 +289,9 @@ class SuperplaneClient:
         )
         return merged, version
 
-    def describe_editing_canvas(self, canvas_id: str, canvas_version_id: str | None) -> CanvasSummary:
+    def describe_editing_canvas(
+        self, canvas_id: str, canvas_version_id: str | None
+    ) -> CanvasSummary:
         if not canvas_version_id:
             return self.describe_canvas(canvas_id)
         summary, _version = self._load_editing_canvas_bundle(canvas_id, canvas_version_id)

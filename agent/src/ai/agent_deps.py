@@ -29,7 +29,7 @@ class AgentDeps:
 
     @property
     def canvas_version_id(self) -> str | None:
-        """Draft canvas version id for SuperPlane version-scoped reads; set only in enabled + build mode."""
+        """Canvas draft version id for scoped reads; only when enabled and mode is build."""
         ac = self.agent_context
         if not ac.enabled or ac.mode != "build":
             return None

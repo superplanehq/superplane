@@ -1,9 +1,8 @@
 """Stream request body models and UI ``agent_context`` mapping for the HTTP agent."""
 
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Self
 
 from ai.agent import AgentContextState
 from ai.config import config
@@ -43,7 +42,10 @@ class AgentStreamRequest(BaseModel):
     base_url: str | None = None
     agent_context: AgentContext | None = Field(
         default=None,
-        description="Dedicated agent contract: enabled, inspect vs build; canvas_version only for build.",
+        description=(
+            "Dedicated agent contract: enabled, inspect vs build; "
+            "canvas_version only for build."
+        ),
     )
 
 
