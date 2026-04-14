@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	compb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -329,12 +330,9 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 	}
 
-	if err := actions.CheckForCycles(canvas.Spec.Nodes, canvas.Spec.Edges); err != nil {
-		return nil, nil, err
-	}
-
 	// Convert proto nodes to models, adding validation errors and warnings where applicable
 	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
+	edges := actions.ProtoToEdges(canvas.Spec.Edges)
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
 			nodes[i].ErrorMessage = &errorMsg
@@ -349,7 +347,14 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 	}
 
-	return nodes, actions.ProtoToEdges(canvas.Spec.Edges), nil
+	//
+	// Check for cycles in the canvas
+	//
+	if err := changesets.CheckForCycles(nodes, edges); err != nil {
+		return nil, nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	return nodes, edges, nil
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {
