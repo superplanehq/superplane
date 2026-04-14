@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_AGENT_CONTEXT } from "./agentChat";
 import { BuildingBlocksSidebar } from "./index";
 
 const defaultProps = {
@@ -7,6 +8,7 @@ const defaultProps = {
   onToggle: vi.fn(),
   blocks: [],
   canvasZoom: 1,
+  agentContext: DEFAULT_AGENT_CONTEXT,
 };
 
 describe("BuildingBlocksSidebar", () => {

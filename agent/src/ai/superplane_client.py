@@ -29,6 +29,7 @@ from ai.models import (
 )
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_node_api import CanvasNodeApi
+from superplaneapi.api.canvas_version_api import CanvasVersionApi
 from superplaneapi.api.component_api import ComponentApi
 from superplaneapi.api.integration_api import IntegrationApi
 from superplaneapi.api.organization_api import OrganizationApi
@@ -36,7 +37,11 @@ from superplaneapi.api.trigger_api import TriggerApi
 from superplaneapi.api_client import ApiClient
 from superplaneapi.configuration import Configuration
 from superplaneapi.exceptions import ApiException
+from superplaneapi.models.canvases_canvas_version import CanvasesCanvasVersion
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_describe_canvas_version_response import (
+    CanvasesDescribeCanvasVersionResponse,
+)
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.canvases_list_node_executions_response import (
     CanvasesListNodeExecutionsResponse,
@@ -99,6 +104,7 @@ class SuperplaneClient:
         self._api_client.set_default_header("User-Agent", app_config.superplane_user_agent)  # type: ignore[no-untyped-call]
         self._canvas_api = CanvasApi(self._api_client)
         self._canvas_node_api = CanvasNodeApi(self._api_client)
+        self._canvas_version_api = CanvasVersionApi(self._api_client)
         self._component_api = ComponentApi(self._api_client)
         self._trigger_api = TriggerApi(self._api_client)
         self._integration_api = IntegrationApi(self._api_client)
@@ -143,6 +149,22 @@ class SuperplaneClient:
             raise ValueError("Expected typed response from Superplane API.")
         return response
 
+    def _fetch_describe_canvas_version_response(
+        self, canvas_id: str, version_id: str
+    ) -> CanvasesDescribeCanvasVersionResponse:
+        response = self._api_request(
+            lambda: self._canvas_version_api.canvases_describe_canvas_version(
+                canvas_id,
+                version_id,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_describe_canvas_version",
+            fields={"canvas_id": canvas_id, "version_id": version_id},
+        )
+        if not isinstance(response, CanvasesDescribeCanvasVersionResponse):
+            raise ValueError("Expected typed response from Superplane API.")
+        return response
+
     @staticmethod
     def _canvas_node_from_components_item(item: ComponentsNode) -> CanvasNode | None:
         node_id = item.id
@@ -183,14 +205,13 @@ class SuperplaneClient:
             out["name"] = ref.name
         return out if out else None
 
-    def _canvas_summary_from_describe_response(
-        self, response: CanvasesDescribeCanvasResponse, canvas_id: str
+    def _build_canvas_summary(
+        self,
+        canvas_id: str,
+        name: str | None,
+        description: str | None,
+        spec: Any,
     ) -> CanvasSummary:
-        raw_canvas = response.canvas
-        if raw_canvas is None:
-            raise ValueError("Canvas response is missing 'canvas'.")
-        metadata = raw_canvas.metadata
-        spec = raw_canvas.spec
         raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
         nodes: list[CanvasNode] = []
         for item in raw_nodes:
@@ -215,16 +236,62 @@ class SuperplaneClient:
             )
 
         return CanvasSummary(
-            canvas_id=(
-                metadata.id if metadata is not None and isinstance(metadata.id, str) else canvas_id
-            ),
-            name=metadata.name if metadata is not None and isinstance(metadata.name, str) else None,
-            description=metadata.description
-            if metadata is not None and isinstance(metadata.description, str)
-            else None,
+            canvas_id=canvas_id,
+            name=name,
+            description=description,
             nodes=nodes,
             edges=edges,
         )
+
+    def _canvas_summary_from_describe_response(
+        self, response: CanvasesDescribeCanvasResponse, canvas_id: str
+    ) -> CanvasSummary:
+        raw_canvas = response.canvas
+        if raw_canvas is None:
+            raise ValueError("Canvas response is missing 'canvas'.")
+        metadata = raw_canvas.metadata
+        spec = raw_canvas.spec
+        resolved_id = (
+            metadata.id if metadata is not None and isinstance(metadata.id, str) else canvas_id
+        )
+        name = metadata.name if metadata is not None and isinstance(metadata.name, str) else None
+        description = (
+            metadata.description if metadata is not None and isinstance(metadata.description, str) else None
+        )
+        return self._build_canvas_summary(resolved_id, name, description, spec)
+
+    def _canvas_summary_from_version_object(
+        self, version: CanvasesCanvasVersion, canvas_id: str
+    ) -> CanvasSummary:
+        meta = version.metadata
+        resolved_id = canvas_id
+        if meta is not None and isinstance(meta.canvas_id, str) and meta.canvas_id:
+            resolved_id = meta.canvas_id
+        return self._build_canvas_summary(resolved_id, None, None, version.spec)
+
+    def _load_editing_canvas_bundle(
+        self, canvas_id: str, canvas_version_id: str
+    ) -> tuple[CanvasSummary, CanvasesCanvasVersion]:
+        vresp = self._fetch_describe_canvas_version_response(canvas_id, canvas_version_id)
+        version = vresp.version
+        if version is None:
+            raise ValueError("Canvas version response is missing 'version'.")
+        from_version = self._canvas_summary_from_version_object(version, canvas_id)
+        meta = self.describe_canvas(canvas_id)
+        merged = CanvasSummary(
+            canvas_id=from_version.canvas_id,
+            name=meta.name,
+            description=meta.description,
+            nodes=from_version.nodes,
+            edges=from_version.edges,
+        )
+        return merged, version
+
+    def describe_editing_canvas(self, canvas_id: str, canvas_version_id: str | None) -> CanvasSummary:
+        if not canvas_version_id:
+            return self.describe_canvas(canvas_id)
+        summary, _version = self._load_editing_canvas_bundle(canvas_id, canvas_version_id)
+        return summary
 
     def describe_canvas(self, canvas_id: str) -> CanvasSummary:
         return self._canvas_summary_from_describe_response(
@@ -679,8 +746,8 @@ class SuperplaneClient:
             if resource is not None
         ]
 
-    def get_canvas_shape(self, canvas_id: str) -> CanvasShape:
-        summary = self.describe_canvas(canvas_id)
+    def get_canvas_shape(self, canvas_id: str, canvas_version_id: str | None = None) -> CanvasShape:
+        summary = self.describe_editing_canvas(canvas_id, canvas_version_id)
         node_kind_by_type = {
             "TYPE_TRIGGER": "trigger",
             "TYPE_COMPONENT": "component",
@@ -749,25 +816,42 @@ class SuperplaneClient:
         return events
 
     def get_node_details(
-        self, canvas_id: str, node_id: str, include_recent_events: bool = True
+        self,
+        canvas_id: str,
+        node_id: str,
+        include_recent_events: bool = True,
+        canvas_version_id: str | None = None,
     ) -> NodeDetails:
-        response = self._fetch_describe_canvas_response(canvas_id)
-        canvas = self._canvas_summary_from_describe_response(response, canvas_id)
-        node = next((current for current in canvas.nodes if current.id == node_id), None)
-        if node is None:
-            raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
-
-        raw_canvas = response.canvas
-        if raw_canvas is None:
-            raise ValueError("Canvas response is missing 'canvas'.")
-        spec = raw_canvas.spec
-        raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
-        raw_item = next(
-            (n for n in raw_nodes if isinstance(n.id, str) and n.id == node_id),
-            None,
-        )
-        if raw_item is None:
-            raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+        if canvas_version_id:
+            canvas, version = self._load_editing_canvas_bundle(canvas_id, canvas_version_id)
+            node = next((current for current in canvas.nodes if current.id == node_id), None)
+            if node is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+            spec = version.spec
+            raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
+            raw_item = next(
+                (n for n in raw_nodes if isinstance(n.id, str) and n.id == node_id),
+                None,
+            )
+            if raw_item is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+        else:
+            response = self._fetch_describe_canvas_response(canvas_id)
+            canvas = self._canvas_summary_from_describe_response(response, canvas_id)
+            node = next((current for current in canvas.nodes if current.id == node_id), None)
+            if node is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+            raw_canvas = response.canvas
+            if raw_canvas is None:
+                raise ValueError("Canvas response is missing 'canvas'.")
+            spec = raw_canvas.spec
+            raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
+            raw_item = next(
+                (n for n in raw_nodes if isinstance(n.id, str) and n.id == node_id),
+                None,
+            )
+            if raw_item is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
 
         configuration = self._configuration_dict_from_components_node(raw_item)
         integration = self._integration_summary_from_components_node(raw_item)
