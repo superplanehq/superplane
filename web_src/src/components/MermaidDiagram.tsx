@@ -1,5 +1,5 @@
 import mermaid from "mermaid";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 mermaid.initialize({
   startOnLoad: false,
@@ -8,6 +8,8 @@ mermaid.initialize({
   securityLevel: "loose",
 });
 
+let idCounter = 0;
+
 export type MermaidDiagramProps = {
   definition: string;
   className?: string;
@@ -15,7 +17,6 @@ export type MermaidDiagramProps = {
 
 export function MermaidDiagram({ definition, className }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const uniqueId = useId().replace(/:/g, "_");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,10 +26,11 @@ export function MermaidDiagram({ definition, className }: MermaidDiagramProps) {
     }
 
     let cancelled = false;
+    const renderingId = `mermaid-${++idCounter}`;
 
     void (async () => {
       try {
-        const { svg } = await mermaid.render(`mermaid-${uniqueId}`, definition);
+        const { svg } = await mermaid.render(renderingId, definition);
         if (!cancelled && container) {
           container.innerHTML = svg;
           setError(null);
@@ -38,16 +40,25 @@ export function MermaidDiagram({ definition, className }: MermaidDiagramProps) {
           setError(err instanceof Error ? err.message : "Failed to render diagram");
           container.innerHTML = "";
         }
+        const orphan = document.getElementById("d" + renderingId);
+        orphan?.remove();
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [definition, uniqueId]);
+  }, [definition]);
 
   if (error) {
-    return <div className="text-xs text-muted-foreground italic px-2 py-3">Could not render diagram preview.</div>;
+    return (
+      <div className="my-1 rounded-md bg-slate-50 text-xs">
+        <div className="px-2 py-1.5 text-muted-foreground italic">Could not render diagram.</div>
+        <pre className="overflow-auto border-t border-slate-200 px-2 py-2 text-[10px] leading-relaxed text-slate-500">
+          <code>{definition}</code>
+        </pre>
+      </div>
+    );
   }
 
   return <div ref={containerRef} className={className} />;
