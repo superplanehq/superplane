@@ -8,7 +8,8 @@ approval_defaults:
 policy:
   approval:
     - db_changes_require_core_reviewer
-    - agent_changes_require_shiroyasha
+    - agent_openai_specs_changes_do_not_require_approval
+    - agent_changes_require_agent_reviewer
     - protos_changes_require_platform_reviewer
     - rbac_changes_require_security_reviewer
     - release_changes_require_release_reviewer
@@ -34,11 +35,35 @@ approval_rules:
         - shiroyasha
         - forestileao
 
-  - name: agent_changes_require_shiroyasha
+  - name: agent_openai_specs_changes_do_not_require_approval
+    if:
+      only_changed_files:
+        paths:
+          - "^agent/src/superplaneapi/api/organization_api\\.py$"
+          - "^agent/src/superplaneapi/models/__init__\\.py$"
+          - "^agent/src/superplaneapi/__init__\\.py$"
+          - "^agent/src/superplaneapi/superplaneapi_README\\.md$"
+          - "^agent/src/superplaneapi/models/organizations_agent_open_ai_key\\.py$"
+          - "^agent/src/superplaneapi/models/organizations_delete_agent_open_ai_key_response\\.py$"
+          - "^agent/src/superplaneapi/models/organizations_set_agent_open_ai_key_body\\.py$"
+          - "^agent/src/superplaneapi/models/organizations_set_agent_open_ai_key_response\\.py$"
+    requires:
+      count: 0
+
+  - name: agent_changes_require_agent_reviewer
     if:
       changed_files:
         paths:
           - "^agent/.*$"
+        ignore:
+          - "^agent/src/superplaneapi/api/organization_api\\.py$"
+          - "^agent/src/superplaneapi/models/__init__\\.py$"
+          - "^agent/src/superplaneapi/__init__\\.py$"
+          - "^agent/src/superplaneapi/superplaneapi_README\\.md$"
+          - "^agent/src/superplaneapi/models/organizations_agent_open_ai_key\\.py$"
+          - "^agent/src/superplaneapi/models/organizations_delete_agent_open_ai_key_response\\.py$"
+          - "^agent/src/superplaneapi/models/organizations_set_agent_open_ai_key_body\\.py$"
+          - "^agent/src/superplaneapi/models/organizations_set_agent_open_ai_key_response\\.py$"
     options:
       allow_author: true
       allow_contributor: true
@@ -46,6 +71,7 @@ approval_rules:
       count: 1
       users:
         - shiroyasha
+        - lucaspin
 
   - name: protos_changes_require_platform_reviewer
     if:
