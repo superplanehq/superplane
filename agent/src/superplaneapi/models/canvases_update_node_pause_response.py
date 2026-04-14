@@ -20,7 +20,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.components_node import ComponentsNode
+from superplaneapi.models.superplane_components_node import SuperplaneComponentsNode
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -28,7 +28,7 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
     """
     CanvasesUpdateNodePauseResponse
     """ # noqa: E501
-    node: Optional[ComponentsNode] = None
+    node: Optional[SuperplaneComponentsNode] = None
     __properties: ClassVar[List[str]] = ["node"]
 
     model_config = ConfigDict(
@@ -85,7 +85,7 @@ class CanvasesUpdateNodePauseResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "node": ComponentsNode.from_dict(obj["node"]) if obj.get("node") is not None else None
+            "node": SuperplaneComponentsNode.from_dict(obj["node"]) if obj.get("node") is not None else None
         })
         return _obj
 

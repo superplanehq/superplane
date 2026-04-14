@@ -31,7 +31,7 @@ import type {
   AuthorizationDomainType,
   ConfigurationField,
   CanvasesCanvasNodeExecution,
-  ComponentsNode,
+  SuperplaneComponentsNode as ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,

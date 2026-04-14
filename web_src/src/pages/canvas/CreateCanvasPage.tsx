@@ -19,7 +19,7 @@ import { showErrorToast } from "../../lib/toast";
 import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
 import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
 import { ImportYamlDialog } from "./ImportYamlDialog";
-import type { CanvasesCanvas, ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { LayoutTemplate, Monitor, Rainbow, Sparkles, Terminal, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
@@ -382,8 +382,8 @@ function IntegrationIcons({ integrations }: { integrations: string[] }) {
 export function TemplateCard({ template, organizationId, showTags = false }: TemplateCardProps) {
   const metadata = template.metadata;
   const nodes = template.spec?.nodes;
-  const previewNodes = (nodes ?? []) as ComponentsNode[];
-  const previewEdges = (template.spec?.edges ?? []) as ComponentsEdge[];
+  const previewNodes = (nodes ?? []) as SuperplaneComponentsNode[];
+  const previewEdges = (template.spec?.edges ?? []) as SuperplaneComponentsEdge[];
   const templateId = metadata?.id;
 
   if (!templateId) return null;
@@ -437,14 +437,14 @@ export function TemplateCard({ template, organizationId, showTags = false }: Tem
 }
 
 interface CanvasMiniMapProps {
-  nodes?: ComponentsNode[];
-  edges?: ComponentsEdge[];
+  nodes?: SuperplaneComponentsNode[];
+  edges?: SuperplaneComponentsEdge[];
 }
 
 function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   const positionedNodes = nodes.filter(
     (node) => typeof node.position?.x === "number" && typeof node.position?.y === "number",
-  ) as Array<ComponentsNode & { position: { x: number; y: number } }>;
+  ) as Array<SuperplaneComponentsNode & { position: { x: number; y: number } }>;
 
   if (!positionedNodes.length) {
     return (

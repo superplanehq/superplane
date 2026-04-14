@@ -82,7 +82,7 @@ func CreateCanvasRequestFromCanvas(resource Canvas) openapi_client.CanvasesCreat
 
 func EmptyCanvasSpec() *openapi_client.CanvasesCanvasSpec {
 	return &openapi_client.CanvasesCanvasSpec{
-		Nodes: []openapi_client.ComponentsNode{},
-		Edges: []openapi_client.ComponentsEdge{},
+		Nodes: []openapi_client.SuperplaneComponentsNode{},
+		Edges: []openapi_client.SuperplaneComponentsEdge{},
 	}
 }
