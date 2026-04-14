@@ -321,7 +321,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
-		assert.Contains(t, err.Error(), "canvas contains a cycle")
+		assert.Contains(t, err.Error(), "graph contains a cycle")
 
 		version, findErr := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
 		require.NoError(t, findErr)

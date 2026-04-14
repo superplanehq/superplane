@@ -61,6 +61,7 @@ func ApplyCanvasVersionChangeset(
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "failed to update canvas version: %v", err)
 		}
+
 		newVersion = patcher.GetVersion()
 
 		//

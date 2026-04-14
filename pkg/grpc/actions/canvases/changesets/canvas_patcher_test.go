@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
@@ -253,7 +254,6 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'expression' is required")
-		steps.assertNodeCount(0)
 	})
 
 	t.Run("rejects add trigger node when configuration does not match schema", func(t *testing.T) {
@@ -275,7 +275,6 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'type' is required")
-		steps.assertNodeCount(0)
 	})
 
 	t.Run("rejects add widget node when configuration does not match schema", func(t *testing.T) {
@@ -296,15 +295,15 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 		steps.assertHasError()
 		steps.assertErrorContains("field 'text' is required")
-		steps.assertNodeCount(0)
 	})
 }
 
 type CanvasPatcherSteps struct {
-	t        *testing.T
-	registry *registry.Registry
-	patcher  *CanvasPatcher
-	err      error
+	t            *testing.T
+	registry     *registry.Registry
+	patcher      *CanvasPatcher
+	err          error
+	finalVersion *models.CanvasVersion
 }
 
 func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []models.Edge) {
@@ -318,6 +317,7 @@ func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []mod
 
 func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset) {
 	s.err = s.patcher.ApplyChangeset(operations)
+	s.finalVersion = s.patcher.GetVersion()
 }
 
 func (s *CanvasPatcherSteps) assertNoError() {
@@ -333,21 +333,28 @@ func (s *CanvasPatcherSteps) assertErrorContains(text string) {
 }
 
 func (s *CanvasPatcherSteps) assertHasNode(nodeID string, name string, configuration map[string]any) {
-	index, found := s.patcher.findNode(nodeID)
-	require.True(s.t, found, "expected node %s", nodeID)
-	require.Equal(s.t, name, s.patcher.canvas.Nodes[index].Name)
-	require.Equal(s.t, configuration, s.patcher.canvas.Nodes[index].Configuration)
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.Equal(s.t, name, s.finalVersion.Nodes[i].Name)
+	require.Equal(s.t, configuration, s.finalVersion.Nodes[i].Configuration)
 }
 
 func (s *CanvasPatcherSteps) assertNodeCount(count int) {
-	require.Len(s.t, s.patcher.canvas.Nodes, count)
+	require.NotNil(s.t, s.finalVersion)
+	require.Len(s.t, s.finalVersion.Nodes, count)
 }
 
 func (s *CanvasPatcherSteps) assertHasNodeBlock(nodeID string, block string) {
-	index, found := s.patcher.findNode(nodeID)
-	require.True(s.t, found, "expected node %s", nodeID)
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
 
-	nodeBlock := s.findBlockName(s.patcher.canvas.Nodes[index])
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+
+	nodeBlock := s.findBlockName(s.finalVersion.Nodes[i])
 	require.Equal(s.t, block, nodeBlock)
 }
 
@@ -368,16 +375,22 @@ func (s *CanvasPatcherSteps) findBlockName(node models.Node) string {
 }
 
 func (s *CanvasPatcherSteps) assertHasEdge(sourceID string, targetID string, channel string) {
-	_, found := s.patcher.findEdge(sourceID, targetID, channel)
-	require.True(s.t, found, "expected edge %s -> %s on channel %s", sourceID, targetID, channel)
+	i := slices.IndexFunc(s.finalVersion.Edges, func(edge models.Edge) bool {
+		return edge.SourceID == sourceID && edge.TargetID == targetID && edge.Channel == channel
+	})
+
+	require.True(s.t, i != -1, "expected edge %s -> %s on channel %s", sourceID, targetID, channel)
+	require.Equal(s.t, sourceID, s.finalVersion.Edges[i].SourceID)
+	require.Equal(s.t, targetID, s.finalVersion.Edges[i].TargetID)
+	require.Equal(s.t, channel, s.finalVersion.Edges[i].Channel)
 }
 
 func (s *CanvasPatcherSteps) assertEdgeCount(count int) {
-	require.Len(s.t, s.patcher.canvas.Edges, count)
+	require.Len(s.t, s.finalVersion.Edges, count)
 }
 
 func (s *CanvasPatcherSteps) assertGraphIsValid() {
-	require.NoError(s.t, s.patcher.validateCanvasGraph())
+	require.NoError(s.t, CheckForCycles(s.finalVersion.Nodes, s.finalVersion.Edges))
 }
 
 func structFromMap(t *testing.T, value map[string]any) *structpb.Struct {

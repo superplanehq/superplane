@@ -2,7 +2,6 @@ package changesets
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -12,18 +11,66 @@ import (
 
 type CanvasPatcher struct {
 	registry *registry.Registry
-	canvas   *models.CanvasVersion
+
+	originalVersion *models.CanvasVersion
+	finalVersion    *models.CanvasVersion
+
+	//
+	// Using maps to keep lookup operations fast
+	//
+	nodes map[string]models.Node
+	edges map[string]models.Edge
 }
 
 func NewCanvasPatcher(registry *registry.Registry, canvas *models.CanvasVersion) *CanvasPatcher {
-	return &CanvasPatcher{
-		registry: registry,
-		canvas:   canvas,
+	p := &CanvasPatcher{
+		registry:        registry,
+		originalVersion: canvas,
+		nodes:           make(map[string]models.Node),
+		edges:           make(map[string]models.Edge),
 	}
+
+	for _, node := range p.originalVersion.Nodes {
+		p.nodes[node.ID] = node
+	}
+
+	for _, edge := range p.originalVersion.Edges {
+		p.edges[p.edgeKey(edge.SourceID, edge.TargetID, edge.Channel)] = edge
+	}
+
+	return p
+}
+
+func (p *CanvasPatcher) edgeKey(sourceID, targetID, channel string) string {
+	return sourceID + "|" + targetID + "|" + channel
 }
 
 func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
-	return p.canvas
+	return p.finalVersion
+}
+
+func (p *CanvasPatcher) buildFinalVersion() *models.CanvasVersion {
+	v := &models.CanvasVersion{
+		ID:          p.originalVersion.ID,
+		WorkflowID:  p.originalVersion.WorkflowID,
+		OwnerID:     p.originalVersion.OwnerID,
+		State:       p.originalVersion.State,
+		PublishedAt: p.originalVersion.PublishedAt,
+		CreatedAt:   p.originalVersion.CreatedAt,
+		UpdatedAt:   p.originalVersion.UpdatedAt,
+	}
+
+	v.Nodes = make([]models.Node, 0, len(p.nodes))
+	for _, node := range p.nodes {
+		v.Nodes = append(v.Nodes, node)
+	}
+
+	v.Edges = make([]models.Edge, 0, len(p.edges))
+	for _, edge := range p.edges {
+		v.Edges = append(v.Edges, edge)
+	}
+
+	return v
 }
 
 func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset) error {
@@ -38,7 +85,8 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset) error {
 		}
 	}
 
-	return p.validateCanvasGraph()
+	p.finalVersion = p.buildFinalVersion()
+	return CheckForCycles(p.finalVersion.Nodes, p.finalVersion.Edges)
 }
 
 func (p *CanvasPatcher) handleChange(change *pb.CanvasChangeset_Change) error {
@@ -77,7 +125,7 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("target node name is required for %s", change.Type)
 	}
 
-	if _, found := p.findNode(nodeID); found {
+	if _, exists := p.nodes[nodeID]; exists {
 		return fmt.Errorf("node %s already exists", nodeID)
 	}
 
@@ -101,13 +149,13 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		nodeConfiguration = node.GetConfiguration().AsMap()
 	}
 
-	p.canvas.Nodes = append(p.canvas.Nodes, models.Node{
+	p.nodes[nodeID] = models.Node{
 		ID:            nodeID,
 		Name:          node.GetName(),
 		Type:          nodeType,
 		Ref:           *nodeRef,
 		Configuration: nodeConfiguration,
-	})
+	}
 
 	return nil
 }
@@ -123,15 +171,18 @@ func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("target node id is required for %s", change.Type)
 	}
 
-	nodeIndex, found := p.findNode(nodeID)
-	if !found {
+	currentNode, exists := p.nodes[nodeID]
+	if !exists {
 		return fmt.Errorf("node %s not found", nodeID)
 	}
 
-	p.canvas.Nodes = slices.Delete(p.canvas.Nodes, nodeIndex, nodeIndex+1)
-	p.canvas.Edges = slices.DeleteFunc(p.canvas.Edges, func(edge models.Edge) bool {
-		return edge.SourceID == nodeID || edge.TargetID == nodeID
-	})
+	delete(p.nodes, nodeID)
+
+	for edgeKey, edge := range p.edges {
+		if edge.SourceID == currentNode.ID || edge.TargetID == currentNode.ID {
+			delete(p.edges, edgeKey)
+		}
+	}
 
 	return nil
 }
@@ -151,18 +202,17 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("node name is required for %s", change.Type)
 	}
 
-	nodeIndex, found := p.findNode(nodeID)
-	if !found {
+	currentNode, exists := p.nodes[nodeID]
+	if !exists {
 		return fmt.Errorf("node %s not found", nodeID)
 	}
 
-	p.canvas.Nodes[nodeIndex].Name = node.GetName()
+	currentNode.Name = node.GetName()
 
 	//
 	// We only update the configuration if it is provided
 	//
 	if node.GetConfiguration() != nil {
-		currentNode := p.canvas.Nodes[nodeIndex]
 		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
 		if err != nil {
 			return err
@@ -173,9 +223,10 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 			return err
 		}
 
-		p.canvas.Nodes[nodeIndex].Configuration = node.GetConfiguration().AsMap()
+		currentNode.Configuration = node.GetConfiguration().AsMap()
 	}
 
+	p.nodes[nodeID] = currentNode
 	return nil
 }
 
@@ -232,23 +283,24 @@ func (p *CanvasPatcher) addEdge(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("self-loop edges are not allowed")
 	}
 
-	if _, found := p.findNode(edge.GetSourceId()); !found {
+	if _, exists := p.nodes[edge.GetSourceId()]; !exists {
 		return fmt.Errorf("source node %s not found", edge.GetSourceId())
 	}
 
-	if _, found := p.findNode(edge.GetTargetId()); !found {
+	if _, exists := p.nodes[edge.GetTargetId()]; !exists {
 		return fmt.Errorf("target node %s not found", edge.GetTargetId())
 	}
 
-	if _, found := p.findEdge(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel()); found {
+	edgeKey := p.edgeKey(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel())
+	if _, exists := p.edges[edgeKey]; exists {
 		return nil
 	}
 
-	p.canvas.Edges = append(p.canvas.Edges, models.Edge{
+	p.edges[edgeKey] = models.Edge{
 		SourceID: edge.GetSourceId(),
 		TargetID: edge.GetTargetId(),
 		Channel:  edge.GetChannel(),
-	})
+	}
 
 	return nil
 }
@@ -271,31 +323,13 @@ func (p *CanvasPatcher) deleteEdge(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("channel is required for %s", change.Type)
 	}
 
-	edgeIndex, found := p.findEdge(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel())
-	if !found {
+	edgeKey := p.edgeKey(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel())
+	if _, exists := p.edges[edgeKey]; !exists {
 		return nil
 	}
 
-	p.canvas.Edges = slices.Delete(p.canvas.Edges, edgeIndex, edgeIndex+1)
+	delete(p.edges, edgeKey)
 	return nil
-}
-
-func (p *CanvasPatcher) findNode(nodeID string) (int, bool) {
-	index := slices.IndexFunc(p.canvas.Nodes, func(node models.Node) bool {
-		return node.ID == nodeID
-	})
-
-	return index, index >= 0
-}
-
-func (p *CanvasPatcher) findEdge(sourceID, targetID, channel string) (int, bool) {
-	index := slices.IndexFunc(p.canvas.Edges, func(edge models.Edge) bool {
-		return edge.SourceID == sourceID &&
-			edge.TargetID == targetID &&
-			edge.Channel == channel
-	})
-
-	return index, index >= 0
 }
 
 func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string, *models.NodeRef, error) {
@@ -337,76 +371,4 @@ func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string,
 	// If the block is not any of the above, return an error
 	//
 	return "", nil, fmt.Errorf("block %s not found in registry", node.GetBlock())
-}
-
-func (p *CanvasPatcher) validateCanvasGraph() error {
-	nodeIDs := make(map[string]bool, len(p.canvas.Nodes))
-	inDegree := make(map[string]int, len(p.canvas.Nodes))
-	adjacency := make(map[string][]string, len(p.canvas.Nodes))
-
-	for _, node := range p.canvas.Nodes {
-		if node.ID == "" {
-			return fmt.Errorf("node id is required")
-		}
-
-		if node.Name == "" {
-			return fmt.Errorf("node %s name is required", node.ID)
-		}
-
-		if nodeIDs[node.ID] {
-			return fmt.Errorf("duplicate node id: %s", node.ID)
-		}
-
-		nodeIDs[node.ID] = true
-		adjacency[node.ID] = []string{}
-		inDegree[node.ID] = 0
-	}
-
-	for _, edge := range p.canvas.Edges {
-		if edge.SourceID == "" || edge.TargetID == "" {
-			return fmt.Errorf("source and target node ids are required")
-		}
-
-		if edge.SourceID == edge.TargetID {
-			return fmt.Errorf("self-loop edges are not allowed")
-		}
-
-		if !nodeIDs[edge.SourceID] {
-			return fmt.Errorf("source node %s not found", edge.SourceID)
-		}
-
-		if !nodeIDs[edge.TargetID] {
-			return fmt.Errorf("target node %s not found", edge.TargetID)
-		}
-
-		adjacency[edge.SourceID] = append(adjacency[edge.SourceID], edge.TargetID)
-		inDegree[edge.TargetID]++
-	}
-
-	queue := make([]string, 0, len(p.canvas.Nodes))
-	for nodeID, degree := range inDegree {
-		if degree == 0 {
-			queue = append(queue, nodeID)
-		}
-	}
-
-	visitedCount := 0
-	for len(queue) > 0 {
-		nodeID := queue[0]
-		queue = queue[1:]
-		visitedCount++
-
-		for _, childNodeID := range adjacency[nodeID] {
-			inDegree[childNodeID]--
-			if inDegree[childNodeID] == 0 {
-				queue = append(queue, childNodeID)
-			}
-		}
-	}
-
-	if visitedCount != len(p.canvas.Nodes) {
-		return fmt.Errorf("canvas contains a cycle")
-	}
-
-	return nil
 }
