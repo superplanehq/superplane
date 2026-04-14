@@ -57,6 +57,25 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
 
+	t.Run("returns invalid argument for empty changeset", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+		_, err := ApplyCanvasVersionChangeset(
+			ctx,
+			r.Registry,
+			r.Organization.ID,
+			canvas.ID,
+			*canvas.LiveVersionID,
+			&pb.CanvasChangeset{},
+			false,
+		)
+
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		assert.Contains(t, err.Error(), "changeset is required")
+	})
+
 	t.Run("returns not found when version does not exist", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -67,7 +86,16 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			r.Organization.ID,
 			canvas.ID,
 			uuid.New(),
-			nil,
+			&pb.CanvasChangeset{
+				Changes: []*pb.CanvasChangeset_Change{
+					{
+						Type: pb.CanvasChangeset_Change_ADD_NODE,
+						Node: &pb.CanvasChangeset_Change_Node{
+							Id: "node-a",
+						},
+					},
+				},
+			},
 			false,
 		)
 

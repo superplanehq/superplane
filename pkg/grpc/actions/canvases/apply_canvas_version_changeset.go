@@ -37,6 +37,10 @@ func ApplyCanvasVersionChangeset(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
 	}
 
+	if changeset == nil || len(changeset.Changes) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "changeset is required")
+	}
+
 	var newVersion *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {

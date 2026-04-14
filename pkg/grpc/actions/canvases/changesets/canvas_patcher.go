@@ -75,7 +75,7 @@ func (p *CanvasPatcher) buildFinalVersion() *models.CanvasVersion {
 
 func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset) error {
 	if changeset == nil || len(changeset.Changes) == 0 {
-		return nil
+		return fmt.Errorf("changeset is required")
 	}
 
 	for _, change := range changeset.Changes {
