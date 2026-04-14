@@ -12,10 +12,10 @@ import type {
 } from "../types";
 import { formatTimestamp } from "../utils";
 import { buildGrafanaEventSections } from "./base";
-import { buildAlertRuleMetadata } from "./alert_rule_shared";
-import type { DeleteAlertRuleOutput } from "./types";
+import { buildDashboardMetadata } from "./dashboard_shared";
+import type { DashboardDetails, GetDashboardConfiguration } from "./types";
 
-export const deleteAlertRuleMapper: ComponentBaseMapper = {
+export const getDashboardMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name || "unknown";
@@ -25,10 +25,11 @@ export const deleteAlertRuleMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution
-        ? buildGrafanaEventSections(context.nodes, lastExecution, componentName, { strict: true })
-        : undefined,
-      metadata: buildAlertRuleMetadata(context.node, { includeUid: true }),
+      eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: buildDashboardMetadata(
+        context.node,
+        (context.node.configuration as GetDashboardConfiguration | undefined)?.dashboard,
+      ),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -37,31 +38,47 @@ export const deleteAlertRuleMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {
-      "Deleted At": formatTimestamp(context.execution.createdAt),
+      "Fetched At": formatTimestamp(context.execution.createdAt),
     };
 
-    const response = outputs?.default?.[0]?.data as DeleteAlertRuleOutput | undefined;
-    if (!response) {
+    const payload = outputs?.default?.[0];
+    if (!payload) {
       details.Response = "No data returned";
       return details;
     }
 
-    if (response.title) {
-      details.Title = response.title;
+    if (payload.timestamp) {
+      const ts = formatTimestamp(payload.timestamp);
+      if (ts !== "-") {
+        details["Fetched At"] = ts;
+      }
     }
 
-    if (response.deleted) {
-      details.Deleted = "Yes";
+    const dashboard = payload.data as DashboardDetails | undefined;
+    if (!dashboard) {
+      details.Response = "No data returned";
+      return details;
     }
+
+    if (dashboard.title) {
+      details.Title = dashboard.title;
+    }
+    if (dashboard.url) {
+      details["Dashboard URL"] = dashboard.url;
+    }
+    if (dashboard.folderTitle) {
+      details.Folder = dashboard.folderTitle;
+    } else if (dashboard.folder) {
+      details.Folder = dashboard.folder;
+    }
+    const panelCount = dashboard.panels?.length ?? 0;
+    details.Panels = `${panelCount} panels`;
 
     return details;
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "-";
-
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const response = outputs?.default?.[0]?.data as DeleteAlertRuleOutput | undefined;
-    return [response?.title, renderTimeAgo(new Date(context.execution.createdAt))].filter(Boolean).join(" · ");
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
