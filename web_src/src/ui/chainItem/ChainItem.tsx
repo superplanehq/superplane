@@ -3,11 +3,7 @@ import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import type {
-  CanvasesCanvasNodeExecution,
-  SuperplaneComponentsNode as ComponentsNode,
-  CanvasesCanvasEvent,
-} from "@/api-client";
+import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode, CanvasesCanvasEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
@@ -38,7 +34,7 @@ export interface ChainItemData {
   originalExecution?: CanvasesCanvasNodeExecution; // Add execution data
   originalEvent?: CanvasesCanvasEvent; // Add event data for trigger events
   childExecutions?: ChildExecution[]; // Add child executions for composite components
-  workflowNode?: ComponentsNode; // Add workflow node for subtitle generation
+  workflowNode?: SuperplaneComponentsNode; // Add workflow node for subtitle generation
   tabData?: {
     current?: Record<string, any>;
     payload?: any;
