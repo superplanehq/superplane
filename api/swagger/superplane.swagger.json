@@ -1738,6 +1738,52 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/versions/{versionId}/validate": {
+      "patch": {
+        "summary": "Validate a canvas version changeset",
+        "description": "Validate a canvas version changeset",
+        "operationId": "Canvases_ValidateCanvasVersionChangeset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesValidateCanvasVersionChangesetResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesValidateCanvasVersionChangesetBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
     "/api/v1/canvases/{id}": {
       "get": {
         "summary": "Describe canvas",
@@ -4492,9 +4538,6 @@
       "properties": {
         "changeset": {
           "$ref": "#/definitions/CanvasesCanvasChangeset"
-        },
-        "dryRun": {
-          "type": "boolean"
         }
       }
     },
@@ -5476,6 +5519,22 @@
       "properties": {
         "node": {
           "$ref": "#/definitions/SuperplaneComponentsNode"
+        }
+      }
+    },
+    "CanvasesValidateCanvasVersionChangesetBody": {
+      "type": "object",
+      "properties": {
+        "changeset": {
+          "$ref": "#/definitions/CanvasesCanvasChangeset"
+        }
+      }
+    },
+    "CanvasesValidateCanvasVersionChangesetResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
     },
