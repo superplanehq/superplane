@@ -233,7 +233,7 @@ def _build_deps(
 
 
 _TRANSIENT_STATUS_CODES = {429, 502, 503, 504, 529}
-_MAX_RETRIES = 3
+_MAX_ATTEMPTS = 3
 _BASE_DELAY_SECONDS = 1.0
 _JITTER_SECONDS = 0.5
 
@@ -270,14 +270,14 @@ def _friendly_error_message(error: Exception) -> str:
 
 async def _run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[Any]:
     yielded_any = False
-    for attempt in range(_MAX_RETRIES):
+    for attempt in range(_MAX_ATTEMPTS):
         try:
             async for event in agent.run_stream_events(**kwargs):
                 yielded_any = True
                 yield event
             return
         except Exception as error:
-            if yielded_any or not _is_transient_error(error) or attempt == _MAX_RETRIES - 1:
+            if yielded_any or not _is_transient_error(error) or attempt == _MAX_ATTEMPTS - 1:
                 raise
             delay = _BASE_DELAY_SECONDS * (2**attempt) + random.uniform(0, _JITTER_SECONDS)
             _debug_log(
