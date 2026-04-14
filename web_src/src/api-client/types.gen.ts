@@ -119,6 +119,35 @@ export type CanvasAutoLayoutAlgorithm = "ALGORITHM_UNSPECIFIED" | "ALGORITHM_HOR
 
 export type CanvasAutoLayoutScope = "SCOPE_UNSPECIFIED" | "SCOPE_FULL_CANVAS" | "SCOPE_CONNECTED_COMPONENT";
 
+export type CanvasChangesetChange = {
+  type?: CanvasChangesetChangeType;
+  node?: CanvasChangesetChangeNode;
+  edge?: CanvasChangesetChangeEdge;
+};
+
+export type CanvasChangesetChangeEdge = {
+  sourceId?: string;
+  targetId?: string;
+  channel?: string;
+};
+
+export type CanvasChangesetChangeNode = {
+  id?: string;
+  name?: string;
+  block?: string;
+  configuration?: {
+    [key: string]: unknown;
+  };
+};
+
+export type CanvasChangesetChangeType =
+  | "UNSPECIFIED"
+  | "ADD_NODE"
+  | "DELETE_NODE"
+  | "UPDATE_NODE"
+  | "ADD_EDGE"
+  | "DELETE_EDGE";
+
 export type CanvasNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
 
 export type CanvasNodeExecutionResultReason =
@@ -132,6 +161,15 @@ export type CanvasesActOnCanvasChangeRequestBody = {
 
 export type CanvasesActOnCanvasChangeRequestResponse = {
   changeRequest?: CanvasesCanvasChangeRequest;
+};
+
+export type CanvasesApplyCanvasVersionChangesetBody = {
+  changeset?: CanvasesCanvasChangeset;
+  dryRun?: boolean;
+};
+
+export type CanvasesApplyCanvasVersionChangesetResponse = {
+  version?: CanvasesCanvasVersion;
 };
 
 export type CanvasesCancelExecutionBody = {
@@ -212,6 +250,13 @@ export type CanvasesCanvasChangeRequestStatus =
   | "STATUS_OPEN"
   | "STATUS_PUBLISHED"
   | "STATUS_REJECTED";
+
+/**
+ * CanvasChangeset describes a unit of change for a canvas version.
+ */
+export type CanvasesCanvasChangeset = {
+  changes?: Array<CanvasChangesetChange>;
+};
 
 export type CanvasesCanvasEvent = {
   id?: string;
@@ -2525,6 +2570,36 @@ export type CanvasesDescribeCanvasVersionResponses = {
 
 export type CanvasesDescribeCanvasVersionResponse2 =
   CanvasesDescribeCanvasVersionResponses[keyof CanvasesDescribeCanvasVersionResponses];
+
+export type CanvasesApplyCanvasVersionChangesetData = {
+  body: CanvasesApplyCanvasVersionChangesetBody;
+  path: {
+    canvasId: string;
+    versionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+};
+
+export type CanvasesApplyCanvasVersionChangesetErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesApplyCanvasVersionChangesetError =
+  CanvasesApplyCanvasVersionChangesetErrors[keyof CanvasesApplyCanvasVersionChangesetErrors];
+
+export type CanvasesApplyCanvasVersionChangesetResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesApplyCanvasVersionChangesetResponse;
+};
+
+export type CanvasesApplyCanvasVersionChangesetResponse2 =
+  CanvasesApplyCanvasVersionChangesetResponses[keyof CanvasesApplyCanvasVersionChangesetResponses];
 
 export type CanvasesUpdateCanvasVersionData = {
   body: CanvasesUpdateCanvasVersionBody;

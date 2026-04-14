@@ -36,6 +36,9 @@ import type {
   CanvasesActOnCanvasChangeRequestData,
   CanvasesActOnCanvasChangeRequestErrors,
   CanvasesActOnCanvasChangeRequestResponses,
+  CanvasesApplyCanvasVersionChangesetData,
+  CanvasesApplyCanvasVersionChangesetErrors,
+  CanvasesApplyCanvasVersionChangesetResponses,
   CanvasesCancelExecutionData,
   CanvasesCancelExecutionErrors,
   CanvasesCancelExecutionResponses,
@@ -918,6 +921,27 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
     CanvasesDescribeCanvasVersionErrors,
     ThrowOnError
   >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
+
+/**
+ * Update canvas version with a changeset
+ *
+ * Update canvas version with a changeset
+ */
+export const canvasesApplyCanvasVersionChangeset = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesApplyCanvasVersionChangesetData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesApplyCanvasVersionChangesetResponses,
+    CanvasesApplyCanvasVersionChangesetErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/{versionId}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * Update canvas version

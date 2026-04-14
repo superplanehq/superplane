@@ -99,6 +99,7 @@ Class | Method | HTTP request | Description
 *CanvasNodeExecutionApi* | [**canvases_invoke_node_execution_action**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_invoke_node_execution_action) | **POST** /api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName} | Invoke execution action
 *CanvasNodeExecutionApi* | [**canvases_list_child_executions**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_list_child_executions) | **POST** /api/v1/canvases/{canvasId}/executions/{executionId}/children | List child executions for an execution
 *CanvasNodeExecutionApi* | [**canvases_resolve_execution_errors**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_resolve_execution_errors) | **PATCH** /api/v1/canvases/{canvasId}/executions/resolve | Resolve execution errors
+*CanvasVersionApi* | [**canvases_apply_canvas_version_changeset**](superplaneapi/docs/CanvasVersionApi.md#canvases_apply_canvas_version_changeset) | **PATCH** /api/v1/canvases/{canvasId}/versions/{versionId} | Update canvas version with a changeset
 *CanvasVersionApi* | [**canvases_create_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_create_canvas_version) | **POST** /api/v1/canvases/{canvasId}/versions | Create canvas version
 *CanvasVersionApi* | [**canvases_delete_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_delete_canvas_version) | **DELETE** /api/v1/canvases/{canvasId}/versions/{versionId} | Discard draft canvas version
 *CanvasVersionApi* | [**canvases_describe_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_describe_canvas_version) | **GET** /api/v1/canvases/{canvasId}/versions/{versionId} | Describe canvas version
@@ -192,10 +193,16 @@ Class | Method | HTTP request | Description
  - [BlueprintsUpdateBlueprintResponse](superplaneapi/docs/BlueprintsUpdateBlueprintResponse.md)
  - [CanvasAutoLayoutAlgorithm](superplaneapi/docs/CanvasAutoLayoutAlgorithm.md)
  - [CanvasAutoLayoutScope](superplaneapi/docs/CanvasAutoLayoutScope.md)
+ - [CanvasChangesetChange](superplaneapi/docs/CanvasChangesetChange.md)
+ - [CanvasChangesetChangeEdge](superplaneapi/docs/CanvasChangesetChangeEdge.md)
+ - [CanvasChangesetChangeNode](superplaneapi/docs/CanvasChangesetChangeNode.md)
+ - [CanvasChangesetChangeType](superplaneapi/docs/CanvasChangesetChangeType.md)
  - [CanvasNodeExecutionResult](superplaneapi/docs/CanvasNodeExecutionResult.md)
  - [CanvasNodeExecutionResultReason](superplaneapi/docs/CanvasNodeExecutionResultReason.md)
  - [CanvasesActOnCanvasChangeRequestBody](superplaneapi/docs/CanvasesActOnCanvasChangeRequestBody.md)
  - [CanvasesActOnCanvasChangeRequestResponse](superplaneapi/docs/CanvasesActOnCanvasChangeRequestResponse.md)
+ - [CanvasesApplyCanvasVersionChangesetBody](superplaneapi/docs/CanvasesApplyCanvasVersionChangesetBody.md)
+ - [CanvasesApplyCanvasVersionChangesetResponse](superplaneapi/docs/CanvasesApplyCanvasVersionChangesetResponse.md)
  - [CanvasesCanvas](superplaneapi/docs/CanvasesCanvas.md)
  - [CanvasesCanvasAutoLayout](superplaneapi/docs/CanvasesCanvasAutoLayout.md)
  - [CanvasesCanvasChangeRequest](superplaneapi/docs/CanvasesCanvasChangeRequest.md)
@@ -207,6 +214,7 @@ Class | Method | HTTP request | Description
  - [CanvasesCanvasChangeRequestDiff](superplaneapi/docs/CanvasesCanvasChangeRequestDiff.md)
  - [CanvasesCanvasChangeRequestMetadata](superplaneapi/docs/CanvasesCanvasChangeRequestMetadata.md)
  - [CanvasesCanvasChangeRequestStatus](superplaneapi/docs/CanvasesCanvasChangeRequestStatus.md)
+ - [CanvasesCanvasChangeset](superplaneapi/docs/CanvasesCanvasChangeset.md)
  - [CanvasesCanvasEvent](superplaneapi/docs/CanvasesCanvasEvent.md)
  - [CanvasesCanvasEventWithExecutions](superplaneapi/docs/CanvasesCanvasEventWithExecutions.md)
  - [CanvasesCanvasMemory](superplaneapi/docs/CanvasesCanvasMemory.md)

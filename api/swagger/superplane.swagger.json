@@ -1646,6 +1646,50 @@
         "tags": [
           "CanvasVersion"
         ]
+      },
+      "patch": {
+        "summary": "Update canvas version with a changeset",
+        "description": "Update canvas version with a changeset",
+        "operationId": "Canvases_ApplyCanvasVersionChangeset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesApplyCanvasVersionChangesetResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesApplyCanvasVersionChangesetBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
       }
     },
     "/api/v1/canvases/{canvasId}/versions/{versionId}/publish": {
@@ -4349,6 +4393,65 @@
       ],
       "default": "SCOPE_UNSPECIFIED"
     },
+    "CanvasChangesetChange": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/CanvasChangesetChangeType"
+        },
+        "node": {
+          "$ref": "#/definitions/CanvasChangesetChangeNode",
+          "title": "Required for ADD_NODE, UPDATE_NODE, DELETE_NODE"
+        },
+        "edge": {
+          "$ref": "#/definitions/CanvasChangesetChangeEdge",
+          "title": "Required for ADD_EDGE and DELETE_EDGE"
+        }
+      }
+    },
+    "CanvasChangesetChangeEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasChangesetChangeNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "block": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "CanvasChangesetChangeType": {
+      "type": "string",
+      "enum": [
+        "UNSPECIFIED",
+        "ADD_NODE",
+        "DELETE_NODE",
+        "UPDATE_NODE",
+        "ADD_EDGE",
+        "DELETE_EDGE"
+      ],
+      "default": "UNSPECIFIED"
+    },
     "CanvasNodeExecutionResult": {
       "type": "string",
       "enum": [
@@ -4381,6 +4484,25 @@
       "properties": {
         "changeRequest": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequest"
+        }
+      }
+    },
+    "CanvasesApplyCanvasVersionChangesetBody": {
+      "type": "object",
+      "properties": {
+        "changeset": {
+          "$ref": "#/definitions/CanvasesCanvasChangeset"
+        },
+        "dryRun": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CanvasesApplyCanvasVersionChangesetResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
     },
@@ -4580,6 +4702,19 @@
         "STATUS_REJECTED"
       ],
       "default": "STATUS_UNSPECIFIED"
+    },
+    "CanvasesCanvasChangeset": {
+      "type": "object",
+      "properties": {
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasChangesetChange"
+          }
+        }
+      },
+      "description": "CanvasChangeset describes a unit of change for a canvas version."
     },
     "CanvasesCanvasEvent": {
       "type": "object",
