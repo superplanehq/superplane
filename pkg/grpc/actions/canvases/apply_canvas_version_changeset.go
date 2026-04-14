@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,9 +45,21 @@ func ApplyCanvasVersionChangeset(
 	var newVersion *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		version, err := models.FindCanvasVersionInTransaction(tx, canvasID, versionID)
+		var version *models.CanvasVersion
+
+		if dryRun {
+			version, err = models.FindCanvasVersionInTransaction(tx, canvasID, versionID)
+		} else {
+			version, err = models.FindCanvasVersionForUpdateInTransaction(tx, canvasID, versionID)
+		}
+
 		if err != nil {
-			return status.Errorf(codes.NotFound, "version not found: %v", err)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return status.Error(codes.NotFound, "version not found")
+			}
+
+			log.WithError(err).Errorf("failed to find canvas version - canvas=%s, version=%s", canvasID.String(), versionID.String())
+			return status.Error(codes.Internal, "failed to find canvas version")
 		}
 
 		if version.OwnerID == nil || *version.OwnerID != user {
