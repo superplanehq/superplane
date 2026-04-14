@@ -10,6 +10,7 @@ import type { QueryLogsConfiguration } from "./types";
 import { formatTimestamp } from "../utils";
 import { countGrafanaQueryResponseRows } from "./queryResponse";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
+import { truncate } from "../safeMappers";
 
 export const queryLogsMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext) {
@@ -28,8 +29,7 @@ export const queryLogsMapper: ComponentBaseMapper = {
     }
 
     if (configuration?.query) {
-      details["Query"] =
-        configuration.query.length > 80 ? configuration.query.substring(0, 80) + "..." : configuration.query;
+      details["Query"] = truncate(configuration.query, 80);
     }
 
     if (!outputs || !outputs.default || outputs.default.length === 0) {
@@ -66,9 +66,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   if (configuration?.query) {
-    const preview =
-      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
-    metadata.push({ icon: "code", label: preview });
+    metadata.push({ icon: "code", label: truncate(configuration.query, 50) });
   }
 
   return metadata;
