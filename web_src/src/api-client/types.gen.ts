@@ -119,6 +119,35 @@ export type CanvasAutoLayoutAlgorithm = "ALGORITHM_UNSPECIFIED" | "ALGORITHM_HOR
 
 export type CanvasAutoLayoutScope = "SCOPE_UNSPECIFIED" | "SCOPE_FULL_CANVAS" | "SCOPE_CONNECTED_COMPONENT";
 
+export type CanvasChangesetChange = {
+  type?: CanvasChangesetChangeType;
+  node?: CanvasChangesetChangeNode;
+  edge?: CanvasChangesetChangeEdge;
+};
+
+export type CanvasChangesetChangeEdge = {
+  sourceId?: string;
+  targetId?: string;
+  channel?: string;
+};
+
+export type CanvasChangesetChangeNode = {
+  id?: string;
+  name?: string;
+  block?: string;
+  configuration?: {
+    [key: string]: unknown;
+  };
+};
+
+export type CanvasChangesetChangeType =
+  | "UNSPECIFIED"
+  | "ADD_NODE"
+  | "DELETE_NODE"
+  | "UPDATE_NODE"
+  | "ADD_EDGE"
+  | "DELETE_EDGE";
+
 export type CanvasNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
 
 export type CanvasNodeExecutionResultReason =
@@ -132,6 +161,15 @@ export type CanvasesActOnCanvasChangeRequestBody = {
 
 export type CanvasesActOnCanvasChangeRequestResponse = {
   changeRequest?: CanvasesCanvasChangeRequest;
+};
+
+export type CanvasesApplyCanvasVersionChangesetBody = {
+  changeset?: CanvasesCanvasChangeset;
+  dryRun?: boolean;
+};
+
+export type CanvasesApplyCanvasVersionChangesetResponse = {
+  version?: CanvasesCanvasVersion;
 };
 
 export type CanvasesCancelExecutionBody = {
@@ -212,6 +250,13 @@ export type CanvasesCanvasChangeRequestStatus =
   | "STATUS_OPEN"
   | "STATUS_PUBLISHED"
   | "STATUS_REJECTED";
+
+/**
+ * CanvasChangeset describes a unit of change for a canvas version.
+ */
+export type CanvasesCanvasChangeset = {
+  changes?: Array<CanvasChangesetChange>;
+};
 
 export type CanvasesCanvasEvent = {
   id?: string;
@@ -336,11 +381,13 @@ export type CanvasesCanvasVersionMetadata = {
   id?: string;
   canvasId?: string;
   owner?: SuperplaneCanvasesUserRef;
-  isPublished?: boolean;
+  state?: CanvasesCanvasVersionState;
   publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type CanvasesCanvasVersionState = "STATE_UNSPECIFIED" | "STATE_DRAFT" | "STATE_PUBLISHED" | "STATE_SNAPSHOT";
 
 export type CanvasesCreateCanvasChangeRequestBody = {
   versionId?: string;
@@ -488,35 +535,6 @@ export type CanvasesListNodeQueueItemsResponse = {
   lastTimestamp?: string;
 };
 
-export type CanvasesPatchOperation = {
-  type?: CanvasesPatchOperationType;
-  node?: CanvasesPatchOperationNode;
-  edge?: CanvasesPatchOperationEdge;
-};
-
-export type CanvasesPatchOperationEdge = {
-  sourceId?: string;
-  targetId?: string;
-  channel?: string;
-};
-
-export type CanvasesPatchOperationNode = {
-  id?: string;
-  name?: string;
-  block?: string;
-  configuration?: {
-    [key: string]: unknown;
-  };
-  channel?: string;
-};
-
-export type CanvasesPatchOperationType =
-  | "ADD_NODE"
-  | "DELETE_NODE"
-  | "UPDATE_NODE"
-  | "CONNECT_NODES"
-  | "DISCONNECT_NODES";
-
 export type CanvasesResolveCanvasChangeRequestBody = {
   canvas?: CanvasesCanvas;
   autoLayout?: CanvasesCanvasAutoLayout;
@@ -553,15 +571,6 @@ export type CanvasesUpdateCanvasVersionBody = {
 };
 
 export type CanvasesUpdateCanvasVersionResponse = {
-  version?: CanvasesCanvasVersion;
-};
-
-export type CanvasesUpdateCanvasVersionThroughOpsBody = {
-  operations?: Array<CanvasesPatchOperation>;
-  dryRun?: boolean;
-};
-
-export type CanvasesUpdateCanvasVersionThroughOpsResponse = {
   version?: CanvasesCanvasVersion;
 };
 
@@ -2520,8 +2529,8 @@ export type CanvasesDescribeCanvasVersionResponses = {
 export type CanvasesDescribeCanvasVersionResponse2 =
   CanvasesDescribeCanvasVersionResponses[keyof CanvasesDescribeCanvasVersionResponses];
 
-export type CanvasesUpdateCanvasVersionThroughOpsData = {
-  body: CanvasesUpdateCanvasVersionThroughOpsBody;
+export type CanvasesApplyCanvasVersionChangesetData = {
+  body: CanvasesApplyCanvasVersionChangesetBody;
   path: {
     canvasId: string;
     versionId: string;
@@ -2530,25 +2539,25 @@ export type CanvasesUpdateCanvasVersionThroughOpsData = {
   url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
 };
 
-export type CanvasesUpdateCanvasVersionThroughOpsErrors = {
+export type CanvasesApplyCanvasVersionChangesetErrors = {
   /**
    * An unexpected error response.
    */
   default: GooglerpcStatus;
 };
 
-export type CanvasesUpdateCanvasVersionThroughOpsError =
-  CanvasesUpdateCanvasVersionThroughOpsErrors[keyof CanvasesUpdateCanvasVersionThroughOpsErrors];
+export type CanvasesApplyCanvasVersionChangesetError =
+  CanvasesApplyCanvasVersionChangesetErrors[keyof CanvasesApplyCanvasVersionChangesetErrors];
 
-export type CanvasesUpdateCanvasVersionThroughOpsResponses = {
+export type CanvasesApplyCanvasVersionChangesetResponses = {
   /**
    * A successful response.
    */
-  200: CanvasesUpdateCanvasVersionThroughOpsResponse;
+  200: CanvasesApplyCanvasVersionChangesetResponse;
 };
 
-export type CanvasesUpdateCanvasVersionThroughOpsResponse2 =
-  CanvasesUpdateCanvasVersionThroughOpsResponses[keyof CanvasesUpdateCanvasVersionThroughOpsResponses];
+export type CanvasesApplyCanvasVersionChangesetResponse2 =
+  CanvasesApplyCanvasVersionChangesetResponses[keyof CanvasesApplyCanvasVersionChangesetResponses];
 
 export type CanvasesUpdateCanvasVersionData = {
   body: CanvasesUpdateCanvasVersionBody;

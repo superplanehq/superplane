@@ -52,7 +52,7 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  ComponentsNode,
+  SuperplaneComponentsNode as ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
@@ -170,9 +170,6 @@ export interface CanvasPageProps {
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -206,9 +203,6 @@ export interface CanvasPageProps {
   canUpdateIntegrations?: boolean;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
-  // Undo functionality
-  onUndo?: () => void;
-  canUndo?: boolean;
   // Disable running nodes when there are unsaved changes (with tooltip)
   runDisabled?: boolean;
   runDisabledTooltip?: string;
@@ -1164,8 +1158,6 @@ function CanvasPage(props: CanvasPageProps) {
         <CanvasContentHeader
           state={state}
           onSave={props.onSave}
-          onUndo={props.onUndo}
-          canUndo={props.canUndo}
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
@@ -1179,9 +1171,6 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
-          saveState={props.saveState}
-          lastSavedAt={props.lastSavedAt}
-          saveErrorMessage={props.saveErrorMessage}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1702,8 +1691,6 @@ function Sidebar({
 function CanvasContentHeader({
   state,
   onSave,
-  onUndo,
-  canUndo,
   organizationId,
   unsavedMessage,
   saveIsPrimary,
@@ -1717,9 +1704,6 @@ function CanvasContentHeader({
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   headerMode,
-  saveState,
-  lastSavedAt,
-  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1732,8 +1716,6 @@ function CanvasContentHeader({
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
-  onUndo?: () => void;
-  canUndo?: boolean;
   organizationId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
@@ -1747,9 +1729,6 @@ function CanvasContentHeader({
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1791,8 +1770,6 @@ function CanvasContentHeader({
     <Header
       breadcrumbs={state.breadcrumbs}
       onSave={onSave ? handleSave : undefined}
-      onUndo={onUndo}
-      canUndo={canUndo}
       onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
       unsavedMessage={unsavedMessage}
@@ -1807,9 +1784,6 @@ function CanvasContentHeader({
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
-      saveState={saveState}
-      lastSavedAt={lastSavedAt}
-      saveErrorMessage={saveErrorMessage}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}

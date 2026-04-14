@@ -1,4 +1,4 @@
-import type { ComponentsNode } from "@/api-client";
+import type { SuperplaneComponentsNode } from "@/api-client";
 import { INTEGRATION_APP_LOGO_MAP } from "@/ui/componentSidebar/integrationIcons";
 
 const TEMPLATE_TAG_MAP: Record<string, string[]> = {
@@ -23,7 +23,7 @@ export function getTemplateTags(templateName: string | undefined): string[] {
  * the block type name (e.g. "github.runWorkflow" -> "github").
  * Only returns integrations that have a known icon in INTEGRATION_APP_LOGO_MAP.
  */
-export function extractIntegrations(nodes: ComponentsNode[] | undefined): string[] {
+export function extractIntegrations(nodes: SuperplaneComponentsNode[] | undefined): string[] {
   if (!nodes) return [];
 
   const integrations = new Set<string>();
@@ -44,7 +44,7 @@ export function extractIntegrations(nodes: ComponentsNode[] | undefined): string
   return [...integrations].sort();
 }
 
-export function countNodesByType(nodes: ComponentsNode[] | undefined): {
+export function countNodesByType(nodes: SuperplaneComponentsNode[] | undefined): {
   components: number;
   triggers: number;
 } {

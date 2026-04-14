@@ -2,9 +2,9 @@ import type {
   BlueprintsBlueprint,
   CanvasesCanvas,
   ComponentsComponent,
-  ComponentsEdge,
+  SuperplaneComponentsEdge,
   ComponentsIntegrationRef,
-  ComponentsNode,
+  SuperplaneComponentsNode,
   ComponentsNodeType,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -48,8 +48,8 @@ export class CanvasBuilder {
   private createdNodeIdsByKey: Map<string, string>;
   private addedNodeBlockNameByKey: Map<string, string>;
   private addedNodeIds: Set<string>;
-  private updatedNodes: ComponentsNode[];
-  private updatedEdges: ComponentsEdge[];
+  private updatedNodes: SuperplaneComponentsNode[];
+  private updatedEdges: SuperplaneComponentsEdge[];
 
   constructor(options: CanvasBuilderOptions) {
     this.options = options;
@@ -322,7 +322,7 @@ export class CanvasBuilder {
     const uniqueNodeName = generateUniqueNodeName(operation.nodeName || block.name || "node", existingNodeNames);
     const newNodeId = generateNodeId(block.name || "node", uniqueNodeName);
 
-    const newNode: ComponentsNode = {
+    const newNode: SuperplaneComponentsNode = {
       id: newNodeId,
       name: uniqueNodeName,
       type: this.blockTypeFromBlock(block),

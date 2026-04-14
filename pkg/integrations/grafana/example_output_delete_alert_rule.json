@@ -1,0 +1,9 @@
+{
+  "data": {
+    "uid": "cergr5pm79hj4d",
+    "title": "High error rate",
+    "deleted": true
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRuleDeleted"
+}

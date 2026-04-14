@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanvasesCanvas, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
 import { deleteNodesFromCanvas, groupCanvasNodes, ungroupCanvasNode } from "./canvas-groups";
 
 describe("deleteNodesFromCanvas", () => {
   it("deletes groups recursively and removes stale child references from surviving groups", () => {
-    const nodes: ComponentsNode[] = [
+    const nodes: SuperplaneComponentsNode[] = [
       {
         id: "group-root",
         type: "TYPE_WIDGET",

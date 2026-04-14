@@ -154,7 +154,7 @@ func UpdateCanvasVersionWithUsage(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
-		if version.IsPublished {
+		if version.State == models.CanvasVersionStatePublished {
 			return status.Error(codes.FailedPrecondition, "published versions are immutable")
 		}
 
@@ -170,14 +170,7 @@ func UpdateCanvasVersionWithUsage(
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
 
-		if err := tx.Save(version).Error; err != nil {
-			return err
-		}
-
-		return tx.Model(&models.CanvasUserDraft{}).
-			Where("workflow_id = ? AND user_id = ? AND version_id = ?", canvasUUID, userUUID, version.ID).
-			Update("updated_at", now).
-			Error
+		return tx.Save(version).Error
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {

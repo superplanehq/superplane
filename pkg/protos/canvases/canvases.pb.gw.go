@@ -417,9 +417,9 @@ func local_request_Canvases_UpdateCanvasVersion_1(ctx context.Context, marshaler
 	return msg, metadata, err
 }
 
-func request_Canvases_UpdateCanvasVersionThroughOps_0(ctx context.Context, marshaler runtime.Marshaler, client CanvasesClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_Canvases_ApplyCanvasVersionChangeset_0(ctx context.Context, marshaler runtime.Marshaler, client CanvasesClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq UpdateCanvasVersionThroughOpsRequest
+		protoReq ApplyCanvasVersionChangesetRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -442,13 +442,13 @@ func request_Canvases_UpdateCanvasVersionThroughOps_0(ctx context.Context, marsh
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version_id", err)
 	}
-	msg, err := client.UpdateCanvasVersionThroughOps(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.ApplyCanvasVersionChangeset(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_Canvases_UpdateCanvasVersionThroughOps_0(ctx context.Context, marshaler runtime.Marshaler, server CanvasesServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_Canvases_ApplyCanvasVersionChangeset_0(ctx context.Context, marshaler runtime.Marshaler, server CanvasesServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq UpdateCanvasVersionThroughOpsRequest
+		protoReq ApplyCanvasVersionChangesetRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -471,7 +471,7 @@ func local_request_Canvases_UpdateCanvasVersionThroughOps_0(ctx context.Context,
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "version_id", err)
 	}
-	msg, err := server.UpdateCanvasVersionThroughOps(ctx, &protoReq)
+	msg, err := server.ApplyCanvasVersionChangeset(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -1846,25 +1846,25 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		}
 		forward_Canvases_UpdateCanvasVersion_1(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPatch, pattern_Canvases_UpdateCanvasVersionThroughOps_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_Canvases_ApplyCanvasVersionChangeset_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersionThroughOps", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ApplyCanvasVersionChangeset", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_Canvases_UpdateCanvasVersionThroughOps_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_Canvases_ApplyCanvasVersionChangeset_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Canvases_UpdateCanvasVersionThroughOps_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Canvases_ApplyCanvasVersionChangeset_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_Canvases_CreateCanvasChangeRequest_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -2479,22 +2479,22 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		}
 		forward_Canvases_UpdateCanvasVersion_1(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPatch, pattern_Canvases_UpdateCanvasVersionThroughOps_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_Canvases_ApplyCanvasVersionChangeset_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersionThroughOps", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ApplyCanvasVersionChangeset", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_Canvases_UpdateCanvasVersionThroughOps_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_Canvases_ApplyCanvasVersionChangeset_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Canvases_UpdateCanvasVersionThroughOps_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Canvases_ApplyCanvasVersionChangeset_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_Canvases_CreateCanvasChangeRequest_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -2857,69 +2857,69 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 }
 
 var (
-	pattern_Canvases_ListCanvases_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
-	pattern_Canvases_CreateCanvas_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
-	pattern_Canvases_DescribeCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
-	pattern_Canvases_UpdateCanvas_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
-	pattern_Canvases_CreateCanvasVersion_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
-	pattern_Canvases_ListCanvasVersions_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
-	pattern_Canvases_DescribeCanvasVersion_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
-	pattern_Canvases_UpdateCanvasVersion_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
-	pattern_Canvases_UpdateCanvasVersion_1           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
-	pattern_Canvases_UpdateCanvasVersionThroughOps_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
-	pattern_Canvases_CreateCanvasChangeRequest_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "change-requests"}, ""))
-	pattern_Canvases_ListCanvasChangeRequests_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "change-requests"}, ""))
-	pattern_Canvases_DescribeCanvasChangeRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id"}, ""))
-	pattern_Canvases_ActOnCanvasChangeRequest_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id", "actions"}, ""))
-	pattern_Canvases_ResolveCanvasChangeRequest_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id", "resolve"}, ""))
-	pattern_Canvases_DeleteCanvas_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
-	pattern_Canvases_ListNodeQueueItems_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "queue"}, ""))
-	pattern_Canvases_DeleteNodeQueueItem_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "queue", "item_id"}, ""))
-	pattern_Canvases_UpdateNodePause_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "pause"}, ""))
-	pattern_Canvases_ListNodeExecutions_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "executions"}, ""))
-	pattern_Canvases_ListNodeEvents_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
-	pattern_Canvases_EmitNodeEvent_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
-	pattern_Canvases_InvokeNodeExecutionAction_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "actions", "action_name"}, ""))
-	pattern_Canvases_InvokeNodeTriggerAction_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "triggers", "node_id", "actions", "action_name"}, ""))
-	pattern_Canvases_ListChildExecutions_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "children"}, ""))
-	pattern_Canvases_CancelExecution_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "cancel"}, ""))
-	pattern_Canvases_ResolveExecutionErrors_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "canvases", "canvas_id", "executions", "resolve"}, ""))
-	pattern_Canvases_ListCanvasEvents_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "events"}, ""))
-	pattern_Canvases_ListCanvasMemories_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "memory"}, ""))
-	pattern_Canvases_DeleteCanvasMemory_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "memory", "memory_id"}, ""))
-	pattern_Canvases_ListEventExecutions_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "events", "event_id", "executions"}, ""))
+	pattern_Canvases_ListCanvases_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
+	pattern_Canvases_CreateCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
+	pattern_Canvases_DescribeCanvas_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
+	pattern_Canvases_UpdateCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
+	pattern_Canvases_CreateCanvasVersion_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
+	pattern_Canvases_ListCanvasVersions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
+	pattern_Canvases_DescribeCanvasVersion_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
+	pattern_Canvases_UpdateCanvasVersion_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
+	pattern_Canvases_UpdateCanvasVersion_1         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
+	pattern_Canvases_ApplyCanvasVersionChangeset_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
+	pattern_Canvases_CreateCanvasChangeRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "change-requests"}, ""))
+	pattern_Canvases_ListCanvasChangeRequests_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "change-requests"}, ""))
+	pattern_Canvases_DescribeCanvasChangeRequest_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id"}, ""))
+	pattern_Canvases_ActOnCanvasChangeRequest_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id", "actions"}, ""))
+	pattern_Canvases_ResolveCanvasChangeRequest_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id", "resolve"}, ""))
+	pattern_Canvases_DeleteCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
+	pattern_Canvases_ListNodeQueueItems_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "queue"}, ""))
+	pattern_Canvases_DeleteNodeQueueItem_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "queue", "item_id"}, ""))
+	pattern_Canvases_UpdateNodePause_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "pause"}, ""))
+	pattern_Canvases_ListNodeExecutions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "executions"}, ""))
+	pattern_Canvases_ListNodeEvents_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
+	pattern_Canvases_EmitNodeEvent_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
+	pattern_Canvases_InvokeNodeExecutionAction_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "actions", "action_name"}, ""))
+	pattern_Canvases_InvokeNodeTriggerAction_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "triggers", "node_id", "actions", "action_name"}, ""))
+	pattern_Canvases_ListChildExecutions_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "children"}, ""))
+	pattern_Canvases_CancelExecution_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "cancel"}, ""))
+	pattern_Canvases_ResolveExecutionErrors_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "canvases", "canvas_id", "executions", "resolve"}, ""))
+	pattern_Canvases_ListCanvasEvents_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "events"}, ""))
+	pattern_Canvases_ListCanvasMemories_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "memory"}, ""))
+	pattern_Canvases_DeleteCanvasMemory_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "memory", "memory_id"}, ""))
+	pattern_Canvases_ListEventExecutions_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "events", "event_id", "executions"}, ""))
 )
 
 var (
-	forward_Canvases_ListCanvases_0                  = runtime.ForwardResponseMessage
-	forward_Canvases_CreateCanvas_0                  = runtime.ForwardResponseMessage
-	forward_Canvases_DescribeCanvas_0                = runtime.ForwardResponseMessage
-	forward_Canvases_UpdateCanvas_0                  = runtime.ForwardResponseMessage
-	forward_Canvases_CreateCanvasVersion_0           = runtime.ForwardResponseMessage
-	forward_Canvases_ListCanvasVersions_0            = runtime.ForwardResponseMessage
-	forward_Canvases_DescribeCanvasVersion_0         = runtime.ForwardResponseMessage
-	forward_Canvases_UpdateCanvasVersion_0           = runtime.ForwardResponseMessage
-	forward_Canvases_UpdateCanvasVersion_1           = runtime.ForwardResponseMessage
-	forward_Canvases_UpdateCanvasVersionThroughOps_0 = runtime.ForwardResponseMessage
-	forward_Canvases_CreateCanvasChangeRequest_0     = runtime.ForwardResponseMessage
-	forward_Canvases_ListCanvasChangeRequests_0      = runtime.ForwardResponseMessage
-	forward_Canvases_DescribeCanvasChangeRequest_0   = runtime.ForwardResponseMessage
-	forward_Canvases_ActOnCanvasChangeRequest_0      = runtime.ForwardResponseMessage
-	forward_Canvases_ResolveCanvasChangeRequest_0    = runtime.ForwardResponseMessage
-	forward_Canvases_DeleteCanvas_0                  = runtime.ForwardResponseMessage
-	forward_Canvases_ListNodeQueueItems_0            = runtime.ForwardResponseMessage
-	forward_Canvases_DeleteNodeQueueItem_0           = runtime.ForwardResponseMessage
-	forward_Canvases_UpdateNodePause_0               = runtime.ForwardResponseMessage
-	forward_Canvases_ListNodeExecutions_0            = runtime.ForwardResponseMessage
-	forward_Canvases_ListNodeEvents_0                = runtime.ForwardResponseMessage
-	forward_Canvases_EmitNodeEvent_0                 = runtime.ForwardResponseMessage
-	forward_Canvases_InvokeNodeExecutionAction_0     = runtime.ForwardResponseMessage
-	forward_Canvases_InvokeNodeTriggerAction_0       = runtime.ForwardResponseMessage
-	forward_Canvases_ListChildExecutions_0           = runtime.ForwardResponseMessage
-	forward_Canvases_CancelExecution_0               = runtime.ForwardResponseMessage
-	forward_Canvases_ResolveExecutionErrors_0        = runtime.ForwardResponseMessage
-	forward_Canvases_ListCanvasEvents_0              = runtime.ForwardResponseMessage
-	forward_Canvases_ListCanvasMemories_0            = runtime.ForwardResponseMessage
-	forward_Canvases_DeleteCanvasMemory_0            = runtime.ForwardResponseMessage
-	forward_Canvases_ListEventExecutions_0           = runtime.ForwardResponseMessage
+	forward_Canvases_ListCanvases_0                = runtime.ForwardResponseMessage
+	forward_Canvases_CreateCanvas_0                = runtime.ForwardResponseMessage
+	forward_Canvases_DescribeCanvas_0              = runtime.ForwardResponseMessage
+	forward_Canvases_UpdateCanvas_0                = runtime.ForwardResponseMessage
+	forward_Canvases_CreateCanvasVersion_0         = runtime.ForwardResponseMessage
+	forward_Canvases_ListCanvasVersions_0          = runtime.ForwardResponseMessage
+	forward_Canvases_DescribeCanvasVersion_0       = runtime.ForwardResponseMessage
+	forward_Canvases_UpdateCanvasVersion_0         = runtime.ForwardResponseMessage
+	forward_Canvases_UpdateCanvasVersion_1         = runtime.ForwardResponseMessage
+	forward_Canvases_ApplyCanvasVersionChangeset_0 = runtime.ForwardResponseMessage
+	forward_Canvases_CreateCanvasChangeRequest_0   = runtime.ForwardResponseMessage
+	forward_Canvases_ListCanvasChangeRequests_0    = runtime.ForwardResponseMessage
+	forward_Canvases_DescribeCanvasChangeRequest_0 = runtime.ForwardResponseMessage
+	forward_Canvases_ActOnCanvasChangeRequest_0    = runtime.ForwardResponseMessage
+	forward_Canvases_ResolveCanvasChangeRequest_0  = runtime.ForwardResponseMessage
+	forward_Canvases_DeleteCanvas_0                = runtime.ForwardResponseMessage
+	forward_Canvases_ListNodeQueueItems_0          = runtime.ForwardResponseMessage
+	forward_Canvases_DeleteNodeQueueItem_0         = runtime.ForwardResponseMessage
+	forward_Canvases_UpdateNodePause_0             = runtime.ForwardResponseMessage
+	forward_Canvases_ListNodeExecutions_0          = runtime.ForwardResponseMessage
+	forward_Canvases_ListNodeEvents_0              = runtime.ForwardResponseMessage
+	forward_Canvases_EmitNodeEvent_0               = runtime.ForwardResponseMessage
+	forward_Canvases_InvokeNodeExecutionAction_0   = runtime.ForwardResponseMessage
+	forward_Canvases_InvokeNodeTriggerAction_0     = runtime.ForwardResponseMessage
+	forward_Canvases_ListChildExecutions_0         = runtime.ForwardResponseMessage
+	forward_Canvases_CancelExecution_0             = runtime.ForwardResponseMessage
+	forward_Canvases_ResolveExecutionErrors_0      = runtime.ForwardResponseMessage
+	forward_Canvases_ListCanvasEvents_0            = runtime.ForwardResponseMessage
+	forward_Canvases_ListCanvasMemories_0          = runtime.ForwardResponseMessage
+	forward_Canvases_DeleteCanvasMemory_0          = runtime.ForwardResponseMessage
+	forward_Canvases_ListEventExecutions_0         = runtime.ForwardResponseMessage
 )

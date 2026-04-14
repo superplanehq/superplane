@@ -123,14 +123,14 @@ service Canvases {
     };
   }
 
-  rpc UpdateCanvasVersionThroughOps(UpdateCanvasVersionThroughOpsRequest) returns (UpdateCanvasVersionThroughOpsResponse) {
+  rpc ApplyCanvasVersionChangeset(ApplyCanvasVersionChangesetRequest) returns (ApplyCanvasVersionChangesetResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas version through specific operations";
-      description: "Update canvas version through specific operations";
+      summary: "Update canvas version with a changeset";
+      description: "Update canvas version with a changeset";
       tags: "CanvasVersion";
     };
   }
@@ -473,14 +473,14 @@ message UpdateCanvasVersionResponse {
   CanvasVersion version = 1;
 }
 
-message UpdateCanvasVersionThroughOpsRequest {
+message ApplyCanvasVersionChangesetRequest {
   string canvas_id = 1;
   string version_id = 2;
-  repeated PatchOperation operations = 3;
+  CanvasChangeset changeset = 3;
   bool dry_run = 4;
 }
 
-message UpdateCanvasVersionThroughOpsResponse {
+message ApplyCanvasVersionChangesetResponse {
   CanvasVersion version = 1;
 }
 
@@ -592,14 +592,21 @@ message Canvas {
 }
 
 message CanvasVersion {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_DRAFT = 1;
+    STATE_PUBLISHED = 2;
+    STATE_SNAPSHOT = 3;
+  }
+
   message Metadata {
     string id = 1;
     string canvas_id = 2;
-    UserRef owner = 4;
-    bool is_published = 6;
-    google.protobuf.Timestamp published_at = 7;
-    google.protobuf.Timestamp created_at = 8;
-    google.protobuf.Timestamp updated_at = 9;
+    UserRef owner = 3;
+    State state = 4;
+    google.protobuf.Timestamp published_at = 5;
+    google.protobuf.Timestamp created_at = 6;
+    google.protobuf.Timestamp updated_at = 7;
   }
 
   Metadata metadata = 1;
@@ -922,40 +929,46 @@ message ResolveExecutionErrorsRequest {
 
 message ResolveExecutionErrorsResponse {}
 
-message PatchOperation {
-  enum Type {
-    ADD_NODE = 0;
-    DELETE_NODE = 1;
-    UPDATE_NODE = 2;
-    CONNECT_NODES = 3;
-    DISCONNECT_NODES = 4;
+//
+// CanvasChangeset describes a unit of change for a canvas version.
+//
+message CanvasChangeset {
+  message Change {
+    enum Type {
+      UNSPECIFIED = 0;
+      ADD_NODE = 1;
+      DELETE_NODE = 2;
+      UPDATE_NODE = 3;
+      ADD_EDGE = 4;
+      DELETE_EDGE = 5;
+    }
+
+    message Node {
+      string id = 1;
+      string name = 2;
+      string block = 3;
+      google.protobuf.Struct configuration = 4;
+    }
+
+    message Edge {
+      string source_id = 1;
+      string target_id = 2;
+      string channel = 3;
+    }
+    Type type = 1;
+
+    //
+    // Required for ADD_NODE, UPDATE_NODE, DELETE_NODE
+    //
+    Node node = 2;
+
+    //
+    // Required for DISCONNECT_NODES and CONNECT_NODES
+    //
+    Edge edge = 3;
   }
 
-  message Node {
-    string id = 1;
-    string name = 2;
-    string block = 3;
-    google.protobuf.Struct configuration = 4;
-    string channel = 5;
-  }
-
-  message Edge {
-    string source_id = 1;
-    string target_id = 2;
-    string channel = 3;
-  }
-
-  Type type = 1;
-
-  //
-  // Required for ADD_NODE, UPDATE_NODE, DELETE_NODE
-  //
-  Node node = 2;
-
-  //
-  // Required for DISCONNECT_NODES and CONNECT_NODES
-  //
-  Edge edge = 3;
+  repeated Change changes = 1;
 }
 
 //

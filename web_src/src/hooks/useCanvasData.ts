@@ -31,10 +31,11 @@ import {
 import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
-  ComponentsNode,
+  SuperplaneComponentsNode,
   ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
+import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
 
 // Query Keys
 export const canvasKeys = {
@@ -207,7 +208,7 @@ export const useInfiniteCanvasLiveVersions = (
     },
     getNextPageParam: (lastPage, allPages) => {
       const loadedPublishedCount = allPages.reduce(
-        (acc, page) => acc + (page?.versions?.filter((version) => version.metadata?.isPublished).length || 0),
+        (acc, page) => acc + (page?.versions?.filter((version) => isPublishedVersion(version)).length || 0),
         0,
       );
       const totalCount = lastPage?.totalCount || 0;
@@ -260,13 +261,13 @@ type CanvasGraphData = {
   edges?: unknown[];
 };
 
-type PositionedNode = ComponentsNode & {
+type PositionedNode = SuperplaneComponentsNode & {
   id: string;
   position: ComponentsPosition;
 };
 
 const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
-  const raw = version?.metadata?.publishedAt || version?.metadata?.updatedAt || version?.metadata?.createdAt;
+  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
   if (!raw) return 0;
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? 0 : parsed;

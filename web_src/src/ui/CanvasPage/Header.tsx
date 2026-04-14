@@ -1,25 +1,12 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import {
-  CloudAlert,
-  CloudCheck,
-  Copy,
-  Download,
-  ChevronDown,
-  Palette,
-  Plus,
-  RefreshCw,
-  RotateCcw,
-  Undo2,
-  Pencil,
-} from "lucide-react";
+import { Copy, Download, ChevronDown, Palette, Plus, RotateCcw, Pencil } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -34,15 +21,12 @@ export interface BreadcrumbItem {
 }
 
 type HeaderMode = "default" | "version-live" | "version-edit" | "versioning-disabled";
-type SaveState = "saved" | "saving" | "unsaved" | "error";
 
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
-  onUndo?: () => void;
-  canUndo?: boolean;
   onLogoClick?: () => void;
   organizationId?: string;
   unsavedMessage?: string;
@@ -60,151 +44,11 @@ interface HeaderProps {
   onExportYamlDownload?: () => void;
   memoryItemCount?: number;
   mode?: HeaderMode;
-  saveState?: SaveState;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   /** When &gt; 0 (unpublished draft diff items), shown as "Propose Change (n)" in version edit mode. */
   unpublishedDraftChangeCount?: number;
-  lastSavedAt?: Date | string | null;
-  /** Shown in tooltip when saveState is error (last failed save message). */
-  saveErrorMessage?: string | null;
-}
-
-function formatLastSavedTooltip(at: Date | string | null | undefined): string {
-  if (at == null) return "No save time recorded yet.";
-  const d = at instanceof Date ? at : new Date(at);
-  if (Number.isNaN(d.getTime())) return "No save time recorded yet.";
-  return `Last saved: ${d.toLocaleString()}`;
-}
-
-const SAVED_LABEL_MS = 1000;
-const SAVED_LABEL_FADE_MS = 150;
-
-type SavedLabelStage = "off" | "on" | "exiting";
-
-function CanvasSaveStatusIndicator({
-  saveState,
-  lastSavedAt,
-  saveErrorMessage,
-}: {
-  saveState: SaveState;
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
-}) {
-  const prevSaveStateRef = useRef<SaveState | undefined>(undefined);
-  const [savedLabelStage, setSavedLabelStage] = useState<SavedLabelStage>("off");
-
-  useEffect(() => {
-    if (saveState === "saving") {
-      setSavedLabelStage("off");
-    } else if (saveState === "unsaved" || saveState === "error") {
-      setSavedLabelStage("off");
-    } else if (saveState === "saved" && prevSaveStateRef.current === "saving") {
-      setSavedLabelStage("on");
-      const t = window.setTimeout(() => setSavedLabelStage("exiting"), SAVED_LABEL_MS);
-      prevSaveStateRef.current = saveState;
-      return () => window.clearTimeout(t);
-    }
-    prevSaveStateRef.current = saveState;
-  }, [saveState]);
-
-  if (saveState === "saving") {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 tabular-nums"
-        data-testid="canvas-save-status"
-        data-state="saving"
-        aria-live="polite"
-        aria-busy="true"
-      >
-        <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin text-gray-500" aria-hidden />
-        Saving…
-      </span>
-    );
-  }
-  if (saveState === "saved") {
-    const savedLabelVisible = savedLabelStage !== "off";
-    const iconGreen = savedLabelStage === "on";
-
-    return (
-      <div
-        className="inline-flex items-center gap-0.5 min-h-8"
-        data-testid="canvas-save-status"
-        data-state="saved"
-        data-saved-label={savedLabelVisible ? "visible" : "hidden"}
-      >
-        {savedLabelVisible ? (
-          <span
-            className={cn(
-              "text-xs font-medium tabular-nums text-green-600 dark:text-green-500 transition-opacity ease-out",
-              savedLabelStage === "exiting" ? "opacity-0" : "opacity-100",
-            )}
-            style={{ transitionDuration: `${SAVED_LABEL_FADE_MS}ms` }}
-            aria-live="polite"
-            onTransitionEnd={(e) => {
-              if (e.target !== e.currentTarget || e.propertyName !== "opacity") return;
-              setSavedLabelStage((prev) => (prev === "exiting" ? "off" : prev));
-            }}
-          >
-            Saved
-          </span>
-        ) : null}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <UIButton
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className={cn(
-                "shrink-0 p-0 hover:!bg-transparent dark:hover:!bg-transparent transition-colors ease-out",
-                iconGreen
-                  ? "text-green-600 hover:!text-green-600 dark:hover:!text-green-500"
-                  : "text-gray-800 hover:!text-gray-800 dark:text-gray-200 dark:hover:!text-gray-200",
-              )}
-              style={{ transitionDuration: `${SAVED_LABEL_FADE_MS}ms` }}
-              aria-label="Saved"
-            >
-              <CloudCheck className="size-5" strokeWidth={1.75} aria-hidden />
-            </UIButton>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{formatLastSavedTooltip(lastSavedAt)}</TooltipContent>
-        </Tooltip>
-      </div>
-    );
-  }
-  if (saveState === "error") {
-    const errText = saveErrorMessage?.trim() || "Could not save changes.";
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <UIButton
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0 p-0 text-orange-600 hover:!bg-transparent hover:!text-orange-600 dark:hover:!bg-transparent dark:hover:!text-orange-600"
-            data-testid="canvas-save-status"
-            data-state="error"
-            aria-label="Save failed"
-          >
-            <CloudAlert className="size-5" strokeWidth={2} aria-hidden />
-          </UIButton>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-sm">
-          {errText}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-  return (
-    <span
-      className="text-xs font-medium text-amber-800 hidden sm:inline max-w-[5rem] truncate"
-      data-testid="canvas-save-status"
-      data-state="unsaved"
-    >
-      Unsaved
-    </span>
-  );
 }
 
 export function Header({
@@ -212,8 +56,6 @@ export function Header({
   onSave,
   onPublishVersion,
   onDiscardVersion,
-  onUndo,
-  canUndo,
   onLogoClick,
   organizationId,
   unsavedMessage,
@@ -231,9 +73,6 @@ export function Header({
   onExportYamlDownload,
   memoryItemCount,
   mode = "default",
-  saveState = "saved",
-  lastSavedAt = null,
-  saveErrorMessage = null,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -543,19 +382,6 @@ export function Header({
                     {unsavedMessage}
                   </span>
                 ) : null}
-                {topViewMode === "canvas" || topViewMode === undefined ? (
-                  <CanvasSaveStatusIndicator
-                    saveState={saveState}
-                    lastSavedAt={lastSavedAt}
-                    saveErrorMessage={saveErrorMessage}
-                  />
-                ) : null}
-                {onUndo && canUndo ? (
-                  <Button onClick={onUndo} size="sm" variant="outline" disabled={saveState === "saving"}>
-                    <Undo2 />
-                    Revert
-                  </Button>
-                ) : null}
                 {onSave && !saveButtonHidden
                   ? wrapWithTooltip(
                       saveDisabled,
@@ -576,11 +402,6 @@ export function Header({
 
             {showVersionEditActions ? (
               <div className="flex items-center gap-2">
-                <CanvasSaveStatusIndicator
-                  saveState={saveState}
-                  lastSavedAt={lastSavedAt}
-                  saveErrorMessage={saveErrorMessage}
-                />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="inline-flex">

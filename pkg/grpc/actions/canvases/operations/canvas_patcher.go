@@ -26,9 +26,9 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 	return p.canvas
 }
 
-func (p *CanvasPatcher) Patch(operations []*pb.PatchOperation) error {
-	for _, operation := range operations {
-		err := p.handleOperation(operation)
+func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset) error {
+	for _, change := range changeset.Changes {
+		err := p.handleChange(change)
 		if err != nil {
 			return err
 		}
@@ -37,40 +37,40 @@ func (p *CanvasPatcher) Patch(operations []*pb.PatchOperation) error {
 	return p.validateCanvasGraph()
 }
 
-func (p *CanvasPatcher) handleOperation(operation *pb.PatchOperation) error {
-	if operation == nil {
-		return fmt.Errorf("operation is required")
+func (p *CanvasPatcher) handleChange(change *pb.CanvasChangeset_Change) error {
+	if change == nil {
+		return fmt.Errorf("change is required")
 	}
 
-	switch operation.Type {
-	case pb.PatchOperation_ADD_NODE:
-		return p.addNode(operation)
-	case pb.PatchOperation_DELETE_NODE:
-		return p.deleteNode(operation)
-	case pb.PatchOperation_UPDATE_NODE:
-		return p.updateNode(operation)
-	case pb.PatchOperation_CONNECT_NODES:
-		return p.connectNodes(operation)
-	case pb.PatchOperation_DISCONNECT_NODES:
-		return p.disconnectNodes(operation)
+	switch change.Type {
+	case pb.CanvasChangeset_Change_ADD_NODE:
+		return p.addNode(change)
+	case pb.CanvasChangeset_Change_DELETE_NODE:
+		return p.deleteNode(change)
+	case pb.CanvasChangeset_Change_UPDATE_NODE:
+		return p.updateNode(change)
+	case pb.CanvasChangeset_Change_ADD_EDGE:
+		return p.addEdge(change)
+	case pb.CanvasChangeset_Change_DELETE_EDGE:
+		return p.deleteEdge(change)
 	}
 
-	return fmt.Errorf("unknown operation type: %s", operation.Type)
+	return fmt.Errorf("unknown change type: %s", change.Type)
 }
 
-func (p *CanvasPatcher) addNode(operation *pb.PatchOperation) error {
-	node := operation.GetNode()
+func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
+	node := change.GetNode()
 	if node == nil {
-		return fmt.Errorf("node is required for %s", operation.Type)
+		return fmt.Errorf("node is required for %s", change.Type)
 	}
 
 	nodeID := node.GetId()
 	if nodeID == "" {
-		return fmt.Errorf("target node id is required for %s", operation.Type)
+		return fmt.Errorf("target node id is required for %s", change.Type)
 	}
 
 	if node.GetName() == "" {
-		return fmt.Errorf("target node name is required for %s", operation.Type)
+		return fmt.Errorf("target node name is required for %s", change.Type)
 	}
 
 	if _, found := p.findNode(nodeID); found {
@@ -98,15 +98,15 @@ func (p *CanvasPatcher) addNode(operation *pb.PatchOperation) error {
 	return nil
 }
 
-func (p *CanvasPatcher) deleteNode(operation *pb.PatchOperation) error {
-	node := operation.GetNode()
+func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
+	node := change.GetNode()
 	if node == nil {
-		return fmt.Errorf("target is required for %s", operation.Type)
+		return fmt.Errorf("target is required for %s", change.Type)
 	}
 
 	nodeID := node.GetId()
 	if nodeID == "" {
-		return fmt.Errorf("target node id is required for %s", operation.Type)
+		return fmt.Errorf("target node id is required for %s", change.Type)
 	}
 
 	nodeIndex, found := p.findNode(nodeID)
@@ -122,19 +122,19 @@ func (p *CanvasPatcher) deleteNode(operation *pb.PatchOperation) error {
 	return nil
 }
 
-func (p *CanvasPatcher) updateNode(operation *pb.PatchOperation) error {
-	node := operation.GetNode()
+func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
+	node := change.GetNode()
 	if node == nil {
-		return fmt.Errorf("node is required for %s", operation.Type)
+		return fmt.Errorf("node is required for %s", change.Type)
 	}
 
 	nodeID := node.GetId()
 	if nodeID == "" {
-		return fmt.Errorf("node id is required for %s", operation.Type)
+		return fmt.Errorf("node id is required for %s", change.Type)
 	}
 
 	if node.GetName() == "" {
-		return fmt.Errorf("node name is required for %s", operation.Type)
+		return fmt.Errorf("node name is required for %s", change.Type)
 	}
 
 	nodeIndex, found := p.findNode(nodeID)
@@ -153,22 +153,22 @@ func (p *CanvasPatcher) updateNode(operation *pb.PatchOperation) error {
 	return nil
 }
 
-func (p *CanvasPatcher) connectNodes(operation *pb.PatchOperation) error {
-	edge := operation.GetEdge()
+func (p *CanvasPatcher) addEdge(change *pb.CanvasChangeset_Change) error {
+	edge := change.GetEdge()
 	if edge == nil {
-		return fmt.Errorf("edge is required for %s", operation.Type)
+		return fmt.Errorf("edge is required for %s", change.Type)
 	}
 
 	if edge.GetSourceId() == "" {
-		return fmt.Errorf("source id is required for %s", operation.Type)
+		return fmt.Errorf("source id is required for %s", change.Type)
 	}
 
 	if edge.GetTargetId() == "" {
-		return fmt.Errorf("target id is required for %s", operation.Type)
+		return fmt.Errorf("target id is required for %s", change.Type)
 	}
 
 	if edge.GetChannel() == "" {
-		return fmt.Errorf("channel is required for %s", operation.Type)
+		return fmt.Errorf("channel is required for %s", change.Type)
 	}
 
 	if edge.GetSourceId() == edge.GetTargetId() {
@@ -196,22 +196,22 @@ func (p *CanvasPatcher) connectNodes(operation *pb.PatchOperation) error {
 	return nil
 }
 
-func (p *CanvasPatcher) disconnectNodes(operation *pb.PatchOperation) error {
-	edge := operation.GetEdge()
+func (p *CanvasPatcher) deleteEdge(change *pb.CanvasChangeset_Change) error {
+	edge := change.GetEdge()
 	if edge == nil {
-		return fmt.Errorf("edge is required for %s", operation.Type)
+		return fmt.Errorf("edge is required for %s", change.Type)
 	}
 
 	if edge.GetSourceId() == "" {
-		return fmt.Errorf("source id is required for %s", operation.Type)
+		return fmt.Errorf("source id is required for %s", change.Type)
 	}
 
 	if edge.GetTargetId() == "" {
-		return fmt.Errorf("target id is required for %s", operation.Type)
+		return fmt.Errorf("target id is required for %s", change.Type)
 	}
 
 	if edge.GetChannel() == "" {
-		return fmt.Errorf("channel is required for %s", operation.Type)
+		return fmt.Errorf("channel is required for %s", change.Type)
 	}
 
 	edgeIndex, found := p.findEdge(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel())
@@ -241,7 +241,7 @@ func (p *CanvasPatcher) findEdge(sourceID, targetID, channel string) (int, bool)
 	return index, index >= 0
 }
 
-func (p *CanvasPatcher) findAndValidateBlock(node *pb.PatchOperation_Node) (string, *models.NodeRef, error) {
+func (p *CanvasPatcher) findAndValidateBlock(node *pb.CanvasChangeset_Change_Node) (string, *models.NodeRef, error) {
 	if node.GetBlock() == "" {
 		return "", nil, fmt.Errorf("block is required")
 	}

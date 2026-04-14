@@ -1,6 +1,6 @@
 import type {
   ComponentsComponent,
-  ComponentsNode,
+  SuperplaneComponentsNode as ComponentsNode,
   IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
   TriggersTrigger,

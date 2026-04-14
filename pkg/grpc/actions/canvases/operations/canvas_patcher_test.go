@@ -26,44 +26,36 @@ func Test__CanvasPatcher(t *testing.T) {
 			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
 		)
 
-		steps.whenHandling([]*pb.PatchOperation{
-			{
-				Type: pb.PatchOperation_ADD_NODE,
-				Node: &pb.PatchOperation_Node{
-					Id:            "node-c",
-					Name:          "Node C",
-					Block:         "noop",
-					Configuration: structFromMap(t, map[string]any{"baz": "value"}),
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-c",
+						Name:          "Node C",
+						Block:         "noop",
+						Configuration: structFromMap(t, map[string]any{"baz": "value"}),
+					},
 				},
-			},
-			{
-				Type: pb.PatchOperation_UPDATE_NODE,
-				Node: &pb.PatchOperation_Node{
-					Id:            "node-a",
-					Name:          "Node A Updated",
-					Configuration: structFromMap(t, map[string]any{"foo": "after"}),
+				{
+					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-a",
+						Name:          "Node A Updated",
+						Configuration: structFromMap(t, map[string]any{"foo": "after"}),
+					},
 				},
-			},
-			{
-				Type: pb.PatchOperation_DISCONNECT_NODES,
-				Edge: &pb.PatchOperation_Edge{
-					SourceId: "node-a",
-					TargetId: "node-b",
-					Channel:  "default",
+				{
+					Type: pb.CanvasChangeset_Change_ADD_EDGE,
+					Edge: &pb.CanvasChangeset_Change_Edge{
+						SourceId: "node-a",
+						TargetId: "node-c",
+						Channel:  "default",
+					},
 				},
-			},
-			{
-				Type: pb.PatchOperation_CONNECT_NODES,
-				Edge: &pb.PatchOperation_Edge{
-					SourceId: "node-a",
-					TargetId: "node-c",
-					Channel:  "default",
-				},
-			},
-			{
-				Type: pb.PatchOperation_DELETE_NODE,
-				Node: &pb.PatchOperation_Node{
-					Id: "node-b",
+				{
+					Type: pb.CanvasChangeset_Change_DELETE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{Id: "node-b"},
 				},
 			},
 		})
@@ -85,13 +77,15 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling([]*pb.PatchOperation{
-			{
-				Type: pb.PatchOperation_CONNECT_NODES,
-				Edge: &pb.PatchOperation_Edge{
-					SourceId: "node-a",
-					TargetId: "node-a",
-					Channel:  "default",
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_EDGE,
+					Edge: &pb.CanvasChangeset_Change_Edge{
+						SourceId: "node-a",
+						TargetId: "node-a",
+						Channel:  "default",
+					},
 				},
 			},
 		})
@@ -102,9 +96,11 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.PatchOperation{
-			{
-				Type: pb.PatchOperation_Type(999),
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_UNSPECIFIED,
+				},
 			},
 		})
 
@@ -120,11 +116,21 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 			[]models.Edge{
 				{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
-				{SourceID: "node-b", TargetID: "node-a", Channel: "default"},
 			},
 		)
 
-		steps.whenHandling([]*pb.PatchOperation{})
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_EDGE,
+					Edge: &pb.CanvasChangeset_Change_Edge{
+						SourceId: "node-b",
+						TargetId: "node-a",
+						Channel:  "default",
+					},
+				},
+			},
+		})
 		steps.assertHasError()
 	})
 
@@ -132,13 +138,15 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.PatchOperation{
-			{
-				Type: pb.PatchOperation_ADD_NODE,
-				Node: &pb.PatchOperation_Node{
-					Id:    "node-a",
-					Name:  "Node A",
-					Block: "if",
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:    "node-a",
+						Name:  "Node A",
+						Block: "if",
+					},
 				},
 			},
 		})
@@ -152,13 +160,15 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.PatchOperation{
-			{
-				Type: pb.PatchOperation_ADD_NODE,
-				Node: &pb.PatchOperation_Node{
-					Id:    "node-a",
-					Name:  "Node A",
-					Block: "schedule",
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:    "node-a",
+						Name:  "Node A",
+						Block: "schedule",
+					},
 				},
 			},
 		})
@@ -172,17 +182,18 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.PatchOperation{
-			{
-				Type: pb.PatchOperation_ADD_NODE,
-				Node: &pb.PatchOperation_Node{
-					Id:    "node-a",
-					Name:  "Node A",
-					Block: "annotation",
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:    "node-a",
+						Name:  "Node A",
+						Block: "annotation",
+					},
 				},
 			},
 		})
-
 		steps.assertHasError()
 		steps.assertErrorContains("field 'text' is required")
 		steps.assertNodeCount(0)
@@ -205,8 +216,8 @@ func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []mod
 	}, s.registry)
 }
 
-func (s *CanvasPatcherSteps) whenHandling(operations []*pb.PatchOperation) {
-	s.err = s.patcher.Patch(operations)
+func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset) {
+	s.err = s.patcher.ApplyChangeset(operations)
 }
 
 func (s *CanvasPatcherSteps) assertNoError() {

@@ -36,6 +36,9 @@ import type {
   CanvasesActOnCanvasChangeRequestData,
   CanvasesActOnCanvasChangeRequestErrors,
   CanvasesActOnCanvasChangeRequestResponses,
+  CanvasesApplyCanvasVersionChangesetData,
+  CanvasesApplyCanvasVersionChangesetErrors,
+  CanvasesApplyCanvasVersionChangesetResponses,
   CanvasesCancelExecutionData,
   CanvasesCancelExecutionErrors,
   CanvasesCancelExecutionResponses,
@@ -120,9 +123,6 @@ import type {
   CanvasesUpdateCanvasVersionData,
   CanvasesUpdateCanvasVersionErrors,
   CanvasesUpdateCanvasVersionResponses,
-  CanvasesUpdateCanvasVersionThroughOpsData,
-  CanvasesUpdateCanvasVersionThroughOpsErrors,
-  CanvasesUpdateCanvasVersionThroughOpsResponses,
   CanvasesUpdateNodePauseData,
   CanvasesUpdateNodePauseErrors,
   CanvasesUpdateNodePauseResponses,
@@ -903,16 +903,16 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
   >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
 
 /**
- * Update canvas version through specific operations
+ * Update canvas version with a changeset
  *
- * Update canvas version through specific operations
+ * Update canvas version with a changeset
  */
-export const canvasesUpdateCanvasVersionThroughOps = <ThrowOnError extends boolean = true>(
-  options: Options<CanvasesUpdateCanvasVersionThroughOpsData, ThrowOnError>,
+export const canvasesApplyCanvasVersionChangeset = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesApplyCanvasVersionChangesetData, ThrowOnError>,
 ) =>
   (options.client ?? client).patch<
-    CanvasesUpdateCanvasVersionThroughOpsResponses,
-    CanvasesUpdateCanvasVersionThroughOpsErrors,
+    CanvasesApplyCanvasVersionChangesetResponses,
+    CanvasesApplyCanvasVersionChangesetErrors,
     ThrowOnError
   >({
     url: "/api/v1/canvases/{canvasId}/versions/{versionId}",

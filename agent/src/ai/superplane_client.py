@@ -48,12 +48,18 @@ from superplaneapi.models.components_describe_component_response import (
 from superplaneapi.models.components_list_components_response import (
     ComponentsListComponentsResponse,
 )
+<<<<<<< HEAD
 from superplaneapi.models.superplane_components_node import SuperplaneComponentsNode as ComponentsNode
+=======
+>>>>>>> main
 from superplaneapi.models.components_node_type import ComponentsNodeType
 from superplaneapi.models.configuration_field import ConfigurationField
 from superplaneapi.models.organizations_integration import OrganizationsIntegration
 from superplaneapi.models.organizations_list_integration_resources_response import (
     OrganizationsListIntegrationResourcesResponse,
+)
+from superplaneapi.models.superplane_components_node import (
+    SuperplaneComponentsNode as ComponentsNode,
 )
 from superplaneapi.models.superplane_integrations_list_integrations_response import (
     SuperplaneIntegrationsListIntegrationsResponse,

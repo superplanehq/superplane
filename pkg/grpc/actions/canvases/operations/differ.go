@@ -34,29 +34,29 @@ func NewDiffer(currentNodes []models.Node, currentEdges []models.Edge, proposedN
 	}
 }
 
-func (d *Differ) Diff() ([]*pb.PatchOperation, error) {
-	operations := []*pb.PatchOperation{}
-	operations = append(operations, d.computeDeleteNodeOperations()...)
-	addNodeOperations, err := d.computeAddNodeOperations()
+func (d *Differ) Diff() (*pb.CanvasChangeset, error) {
+	allChanges := []*pb.CanvasChangeset_Change{}
+	allChanges = append(allChanges, d.computeDeleteNodeOperations()...)
+	changes, err := d.computeAddNodeOperations()
 	if err != nil {
 		return nil, err
 	}
 
-	operations = append(operations, addNodeOperations...)
+	allChanges = append(allChanges, changes...)
 
-	updateNodeOperations, err := d.computeUpdateNodeOperations()
+	changes, err = d.computeUpdateNodeOperations()
 	if err != nil {
 		return nil, err
 	}
 
-	operations = append(operations, updateNodeOperations...)
-	operations = append(operations, d.computeDisconnectNodeOperations()...)
-	operations = append(operations, d.computeConnectNodeOperations()...)
-	return operations, nil
+	allChanges = append(allChanges, changes...)
+	allChanges = append(allChanges, d.computeDisconnectNodeOperations()...)
+	allChanges = append(allChanges, d.computeConnectNodeOperations()...)
+	return &pb.CanvasChangeset{Changes: allChanges}, nil
 }
 
-func (d *Differ) computeAddNodeOperations() ([]*pb.PatchOperation, error) {
-	operations := []*pb.PatchOperation{}
+func (d *Differ) computeAddNodeOperations() ([]*pb.CanvasChangeset_Change, error) {
+	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If a node exists in the proposed, but not in the current,
@@ -72,17 +72,17 @@ func (d *Differ) computeAddNodeOperations() ([]*pb.PatchOperation, error) {
 			return nil, err
 		}
 
-		operations = append(operations, &pb.PatchOperation{
-			Type: pb.PatchOperation_ADD_NODE,
+		changes = append(changes, &pb.CanvasChangeset_Change{
+			Type: pb.CanvasChangeset_Change_ADD_NODE,
 			Node: node,
 		})
 	}
 
-	return operations, nil
+	return changes, nil
 }
 
-func (d *Differ) computeDeleteNodeOperations() []*pb.PatchOperation {
-	operations := []*pb.PatchOperation{}
+func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasChangeset_Change {
+	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If a node exists in the current, but not in the proposed,
@@ -93,19 +93,19 @@ func (d *Differ) computeDeleteNodeOperations() []*pb.PatchOperation {
 			continue
 		}
 
-		operations = append(operations, &pb.PatchOperation{
-			Type: pb.PatchOperation_DELETE_NODE,
-			Node: &pb.PatchOperation_Node{
+		changes = append(changes, &pb.CanvasChangeset_Change{
+			Type: pb.CanvasChangeset_Change_DELETE_NODE,
+			Node: &pb.CanvasChangeset_Change_Node{
 				Id: nodeID,
 			},
 		})
 	}
 
-	return operations
+	return changes
 }
 
-func (d *Differ) computeUpdateNodeOperations() ([]*pb.PatchOperation, error) {
-	operations := []*pb.PatchOperation{}
+func (d *Differ) computeUpdateNodeOperations() ([]*pb.CanvasChangeset_Change, error) {
+	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If a node exists in both the current and the proposed,
@@ -126,17 +126,17 @@ func (d *Differ) computeUpdateNodeOperations() ([]*pb.PatchOperation, error) {
 			return nil, err
 		}
 
-		operations = append(operations, &pb.PatchOperation{
-			Type: pb.PatchOperation_UPDATE_NODE,
+		changes = append(changes, &pb.CanvasChangeset_Change{
+			Type: pb.CanvasChangeset_Change_UPDATE_NODE,
 			Node: n,
 		})
 	}
 
-	return operations, nil
+	return changes, nil
 }
 
-func (d *Differ) computeDisconnectNodeOperations() []*pb.PatchOperation {
-	operations := []*pb.PatchOperation{}
+func (d *Differ) computeDisconnectNodeOperations() []*pb.CanvasChangeset_Change {
+	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If an edge exists in the current, but not in the proposed,
@@ -147,9 +147,9 @@ func (d *Differ) computeDisconnectNodeOperations() []*pb.PatchOperation {
 			continue
 		}
 
-		operations = append(operations, &pb.PatchOperation{
-			Type: pb.PatchOperation_DISCONNECT_NODES,
-			Edge: &pb.PatchOperation_Edge{
+		changes = append(changes, &pb.CanvasChangeset_Change{
+			Type: pb.CanvasChangeset_Change_DELETE_EDGE,
+			Edge: &pb.CanvasChangeset_Change_Edge{
 				SourceId: edge.SourceID,
 				TargetId: edge.TargetID,
 				Channel:  edge.Channel,
@@ -157,11 +157,11 @@ func (d *Differ) computeDisconnectNodeOperations() []*pb.PatchOperation {
 		})
 	}
 
-	return operations
+	return changes
 }
 
-func (d *Differ) computeConnectNodeOperations() []*pb.PatchOperation {
-	operations := []*pb.PatchOperation{}
+func (d *Differ) computeConnectNodeOperations() []*pb.CanvasChangeset_Change {
+	changes := []*pb.CanvasChangeset_Change{}
 
 	//
 	// If an edge exists in the proposed but not in the current,
@@ -172,9 +172,9 @@ func (d *Differ) computeConnectNodeOperations() []*pb.PatchOperation {
 			continue
 		}
 
-		operations = append(operations, &pb.PatchOperation{
-			Type: pb.PatchOperation_CONNECT_NODES,
-			Edge: &pb.PatchOperation_Edge{
+		changes = append(changes, &pb.CanvasChangeset_Change{
+			Type: pb.CanvasChangeset_Change_ADD_EDGE,
+			Edge: &pb.CanvasChangeset_Change_Edge{
 				SourceId: edge.SourceID,
 				TargetId: edge.TargetID,
 				Channel:  edge.Channel,
@@ -182,7 +182,7 @@ func (d *Differ) computeConnectNodeOperations() []*pb.PatchOperation {
 		})
 	}
 
-	return operations
+	return changes
 }
 
 func (d *Differ) nodeUpdated(currentNode models.Node, proposedNode models.Node) bool {
@@ -213,8 +213,8 @@ func blockNameFromNode(node models.Node) string {
 	return ""
 }
 
-func nodeToOperationNode(node models.Node) (*pb.PatchOperation_Node, error) {
-	n := &pb.PatchOperation_Node{
+func nodeToOperationNode(node models.Node) (*pb.CanvasChangeset_Change_Node, error) {
+	n := &pb.CanvasChangeset_Change_Node{
 		Id:   node.ID,
 		Name: node.Name,
 	}
