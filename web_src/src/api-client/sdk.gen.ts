@@ -54,6 +54,9 @@ import type {
   CanvasesDeleteCanvasMemoryErrors,
   CanvasesDeleteCanvasMemoryResponses,
   CanvasesDeleteCanvasResponses,
+  CanvasesDeleteCanvasVersionData,
+  CanvasesDeleteCanvasVersionErrors,
+  CanvasesDeleteCanvasVersionResponses,
   CanvasesDeleteNodeQueueItemData,
   CanvasesDeleteNodeQueueItemErrors,
   CanvasesDeleteNodeQueueItemResponses,
@@ -884,6 +887,20 @@ export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true
       ...options.headers,
     },
   });
+
+/**
+ * Discard draft canvas version
+ *
+ * Discards a user-owned draft canvas version
+ */
+export const canvasesDeleteCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDeleteCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    CanvasesDeleteCanvasVersionResponses,
+    CanvasesDeleteCanvasVersionErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
 
 /**
  * Describe canvas version
