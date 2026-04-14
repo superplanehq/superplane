@@ -39,7 +39,15 @@ type OnAlertFiresMetadata struct {
 
 // Tags must use unquoted {{rule.tags}} so Kibana injects a JSON array; a string field
 // ("tags":"{{rule.tags}}") often yields an empty or non-JSON value and breaks tag filters.
-const kibanaAlertWebhookActionBody = `{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","tags":{{rule.tags}},"severity":"{{context.severity}}","status":"{{rule.status}}"}`
+const kibanaAlertWebhookActionBody = `{
+  "eventType": "alert_fired",
+  "ruleId": "{{rule.id}}",
+  "ruleName": "{{rule.name}}",
+  "spaceId": "{{rule.spaceId}}",
+  "tags": {{rule.tags}},
+  "severity": "{{context.severity}}",
+  "status": "{{rule.status}}"
+}`
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
 func (t *OnAlertFires) Label() string { return "When Alert Fires" }
@@ -299,7 +307,10 @@ func (t *OnAlertFires) checkConnectorAndAttachRule(ctx core.TriggerActionContext
 	}
 
 	if err := client.EnsureKibanaRuleHasConnector(meta.RuleID, connector.ID); err != nil {
-		return err
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to attach connector to rule %s: %v", meta.RuleID, err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
 	}
 
 	if meta.PreviousRuleID != "" {
