@@ -133,91 +133,12 @@ func PublishCanvasChangeRequest(
 			request.ChangedNodeIDs,
 		)
 
-		existingNodesUnscoped, findNodesErr := models.FindCanvasNodesUnscopedInTransaction(tx, canvasUUID)
-		if findNodesErr != nil {
-			return findNodesErr
-		}
-
-		mergedNodes, mergedEdges, _ = remapNodeIDsForConflicts(canvasUUID, mergedNodes, mergedEdges, existingNodesUnscoped)
-
-		parentNodesByNodeID := make(map[string]*models.Node)
-		for i := range mergedNodes {
-			parentNodesByNodeID[mergedNodes[i].ID] = &mergedNodes[i]
-		}
-
-		expandedNodes, expandErr := expandNodes(organizationID, mergedNodes)
-		if expandErr != nil {
-			return expandErr
-		}
-
-		now := time.Now()
-
-		existingNodes, findErr := models.FindCanvasNodesInTransaction(tx, canvasUUID)
-		if findErr != nil {
-			return findErr
-		}
-
-		for _, node := range expandedNodes {
-			if node.Type == models.NodeTypeWidget {
-				continue
-			}
-
-			workflowNode, nodeLevelErrorMessage, upsertErr := upsertNode(tx, existingNodes, node, canvasUUID)
-			if upsertErr != nil {
-				return upsertErr
-			}
-
-			if nodeLevelErrorMessage != nil {
-				errorNodeID := node.ID
-				if workflowNode.ParentNodeID != nil {
-					errorNodeID = *workflowNode.ParentNodeID
-				}
-				parentNode, ok := parentNodesByNodeID[errorNodeID]
-				if !ok {
-					log.Errorf("Parent node %s not found for node-level error", errorNodeID)
-				} else {
-					parentNode.ErrorMessage = nodeLevelErrorMessage
-				}
-			}
-
-			if workflowNode.State == models.CanvasNodeStateReady {
-				setupErr := setupNode(ctx, tx, encryptor, registry, workflowNode, organizationUUID, authService, webhookBaseURL)
-				if setupErr != nil {
-					workflowNode.State = models.CanvasNodeStateError
-					errorMsg := setupErr.Error()
-					workflowNode.StateReason = &errorMsg
-					if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
-						return saveErr
-					}
-
-					errorNodeID := node.ID
-					if workflowNode.ParentNodeID != nil {
-						errorNodeID = *workflowNode.ParentNodeID
-					}
-
-					parentNode, ok := parentNodesByNodeID[errorNodeID]
-					if !ok {
-						log.Errorf("Parent node %s not found for node setup error", errorNodeID)
-					} else {
-						parentNode.ErrorMessage = &errorMsg
-					}
-				}
-			}
-
-			if workflowNode.ParentNodeID != nil {
-				continue
-			}
-
-			parentNode, exists := parentNodesByNodeID[workflowNode.NodeID]
-			if !exists {
-				log.Errorf("Parent node %s not found", workflowNode.NodeID)
-				return status.Errorf(codes.Internal, "It was not possible to find the parent node %s", workflowNode.NodeID)
-			}
-			parentNode.Metadata = workflowNode.Metadata.Data()
-		}
-
-		if deleteErr := deleteNodes(tx, existingNodes, expandedNodes); deleteErr != nil {
-			return deleteErr
+		mergedNodes, mergedEdges, applyErr := applyCanvasSpecInTransaction(
+			ctx, tx, encryptor, registry, organizationID, organizationUUID,
+			canvasUUID, mergedNodes, mergedEdges, authService, webhookBaseURL,
+		)
+		if applyErr != nil {
+			return applyErr
 		}
 
 		liveVersion, err = models.CreatePublishedCanvasVersionInTransaction(
@@ -233,6 +154,7 @@ func PublishCanvasChangeRequest(
 		canvasForUpdate.LiveVersionID = &liveVersion.ID
 		canvasForUpdate.UpdatedAt = liveVersion.UpdatedAt
 
+		now := time.Now()
 		request.Status = models.CanvasChangeRequestStatusPublished
 		request.PublishedAt = &now
 		request.UpdatedAt = &now
