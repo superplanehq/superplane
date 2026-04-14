@@ -195,6 +195,7 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 				"query":      "{}",
 				"timeFrom":   "2026-04-01T10:15",
 				"timeTo":     "2026-04-01T11:45",
+				"timezone":   "5",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -210,8 +211,8 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 
 		body := decodeJSONBody(t, httpContext.Requests[0].Body)
-		assert.Equal(t, "1775038500000", body["from"])
-		assert.Equal(t, "1775043900000", body["to"])
+		assert.Equal(t, "1775020500000", body["from"])
+		assert.Equal(t, "1775025900000", body["to"])
 	})
 
 	t.Run("timezone aware timestamps are converted without timezone field", func(t *testing.T) {
@@ -352,6 +353,36 @@ func Test__parseGrafanaQueryTime__acceptsGoTimeStringOutput(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, time.Date(2026, time.April, 8, 11, 53, 5, 866556510, time.UTC), parsed.UTC())
+}
+
+func Test__resolveQueryTimeValue(t *testing.T) {
+	t.Run("preserves grafana relative values", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("now-24h", nil)
+		require.NoError(t, err)
+		require.Equal(t, "now-24h", value)
+	})
+
+	t.Run("converts rfc3339 timestamps to unix millis", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("2026-04-09T08:00:00Z", nil)
+		require.NoError(t, err)
+		require.Equal(t, "1775721600000", value)
+	})
+
+	t.Run("strips negative monotonic suffixes from resolved go timestamps", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("2026-04-09 08:00:00 +0000 UTC m=-0.123456789", nil)
+		require.NoError(t, err)
+		require.Equal(t, "1775721600000", value)
+	})
+}
+
+func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
+	for _, offset := range []string{"5.75", "+5.75", "12.75", "-3.5"} {
+		t.Run(offset, func(t *testing.T) {
+			loc, err := parseGrafanaQueryTimezone(&offset)
+			require.NoError(t, err)
+			require.NotNil(t, loc)
+		})
+	}
 }
 
 func decodeJSONBody(t *testing.T, body io.ReadCloser) map[string]any {
