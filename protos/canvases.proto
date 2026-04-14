@@ -916,8 +916,8 @@ message CanvasChangeset {
       ADD_NODE = 1;
       DELETE_NODE = 2;
       UPDATE_NODE = 3;
-      CONNECT_NODES = 4;
-      DISCONNECT_NODES = 5;
+      ADD_EDGE = 4;
+      DELETE_EDGE = 5;
     }
 
     message Node {
@@ -925,7 +925,6 @@ message CanvasChangeset {
       string name = 2;
       string block = 3;
       google.protobuf.Struct configuration = 4;
-      string channel = 5;
     }
 
     message Edge {
