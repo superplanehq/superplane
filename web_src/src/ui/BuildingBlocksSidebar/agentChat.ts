@@ -1,3 +1,5 @@
+import { isAgentEnabled } from "@/lib/env";
+
 import type {
   AgentsAgentChatInfo,
   AgentsAgentChatMessage,
@@ -47,6 +49,20 @@ export type AiChatSession = {
 
 export type AgentMode = { mode: "inspect" } | { mode: "build"; canvasVersion: string };
 export type AgentContext = { enabled: boolean } & AgentMode;
+
+export function useAgentContext(isEditing: boolean, canvasVersion: string): AgentContext {
+  const enabled = isAgentEnabled();
+
+  if(!enabled) {
+    return { enabled: false, mode: "inspect" };
+  }
+
+  if(!isEditing) {
+    return { enabled: true, mode: "build", canvasVersion };
+  }
+
+  return { enabled: true, mode: "inspect" };
+}
 
 export const DEFAULT_AGENT_CONTEXT: AgentContext = {
   enabled: false,

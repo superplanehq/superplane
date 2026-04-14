@@ -1,120 +1,111 @@
-import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import { Badge } from "@/components/ui/badge";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { isAgentEnabled } from "@/lib/env";
+import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
+import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
-import { extractIntegrations, getTemplateTags, countNodesByType } from "@/pages/canvas/templateMetadata";
 
 import type {
   BlueprintsBlueprint,
-  ComponentsIntegrationRef,
-  ComponentsComponent,
-  SuperplaneComponentsEdge as ComponentsEdge,
-  SuperplaneComponentsNode as ComponentsNode,
-  TriggersTrigger,
-  CanvasesListEventExecutionsResponse,
   CanvasesCanvas,
-  CanvasesCanvasVersion,
   CanvasesCanvasChangeRequest,
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasVersion,
+  CanvasesListEventExecutionsResponse,
+  ComponentsComponent,
+  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsIntegrationRef,
+  SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
   SuperplaneMeUser,
+  TriggersTrigger,
 } from "@/api-client";
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
+import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import {
+  canvasKeys,
+  eventExecutionsQueryOptions,
+  useActOnCanvasChangeRequest,
+  useCanvas,
+  useCanvasChangeRequests,
+  useCanvasMemoryEntries,
+  useCanvasVersion,
+  useCanvasVersions,
+  useCreateCanvas,
+  useCreateCanvasChangeRequest,
+  useCreateCanvasVersion,
+  useDeleteCanvasMemoryEntry,
+  useDeleteCanvasVersion,
+  useInfiniteCanvasEvents,
+  useInfiniteCanvasLiveVersions,
+  useResolveCanvasChangeRequest,
+  useTriggers,
+  useUpdateCanvas,
+  useUpdateCanvasVersion,
+  useWidgets,
+} from "@/hooks/useCanvasData";
+import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
-import { useMe } from "@/hooks/useMe";
-import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
-import {
-  eventExecutionsQueryOptions,
-  useCreateCanvas,
-  useUpdateCanvas,
-  useCreateCanvasVersion,
-  useDeleteCanvasVersion,
-  useCreateCanvasChangeRequest,
-  useActOnCanvasChangeRequest,
-  useResolveCanvasChangeRequest,
-  useUpdateCanvasVersion,
-  useCanvasChangeRequests,
-  useTriggers,
-  useCanvas,
-  useInfiniteCanvasEvents,
-  useCanvasMemoryEntries,
-  useDeleteCanvasMemoryEntry,
-  useCanvasVersion,
-  useCanvasVersions,
-  useInfiniteCanvasLiveVersions,
-  useWidgets,
-  canvasKeys,
-} from "@/hooks/useCanvasData";
-import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
-import type { AgentContext } from "@/ui/BuildingBlocksSidebar";
-import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { CanvasBuilder, type CanvasOperation } from "@/lib/ai";
+import { buildChildToGroupMap } from "@/lib/canvas/groups";
+import { getColorClass } from "@/lib/colors";
+import { filterVisibleConfiguration } from "@/lib/components";
+import { getApiErrorMessage } from "@/lib/errors";
+import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
+import { DefaultLayoutEngine } from "@/lib/layout";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
+import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { useAgentContext } from "@/ui/BuildingBlocksSidebar/agentChat";
+import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
-import { getColorClass } from "@/lib/colors";
-import { getApiErrorMessage } from "@/lib/errors";
-import { filterVisibleConfiguration } from "@/lib/components";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
-import { Button } from "@/components/ui/button";
-import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
-import { resolveExecutionErrors } from "./mappers/dash0";
-import { CanvasMemoryView } from "./CanvasMemoryView";
-import { CanvasYamlView } from "./CanvasYamlView";
-import { CanvasCliView } from "./CanvasCliView";
-import { useCanvasYaml } from "./useCanvasYaml";
-import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
-import { DefaultLayoutEngine } from "@/lib/layout";
-import { usePermissions } from "@/contexts/PermissionsContext";
-import {
-  buildRunEntryFromEvent,
-  buildRunItemFromExecution,
-  buildCanvasStatusLogEntry,
-  buildTabData,
-  generateNodeId,
-  generateUniqueNodeName,
-  mapCanvasNodesToLogEntries,
-  mapExecutionsToSidebarEvents,
-  mapQueueItemsToSidebarEvents,
-  mapTriggerEventsToSidebarEvents,
-  mapWorkflowEventsToRunLogEntries,
-  summarizeWorkflowChanges,
-  buildExecutionInfo,
-  buildUserInfo,
-} from "./utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
+import { CanvasCliView } from "./CanvasCliView";
+import { CanvasMemoryView } from "./CanvasMemoryView";
+import { CanvasPageModals } from "./CanvasPageModals";
+import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
+import { CanvasYamlView } from "./CanvasYamlView";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
-import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
-import { CanvasSettingsView } from "./CanvasSettingsView";
-import { CanvasPageModals } from "./CanvasPageModals";
-import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
-import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-node-preparation";
+import {
+  deleteNodesFromCanvas,
+  groupCanvasNodes,
+  prepareGroupNode,
+  ungroupCanvasNode,
+  wireGroupParentChildRelationships,
+} from "./lib/canvas-groups";
+import {
+  CANVAS_BUNDLE_COLOR,
+  CANVAS_BUNDLE_ICON_SLUG,
+  prepareComponentNode,
+  prepareCompositeNode,
+  prepareTriggerNode,
+} from "./lib/canvas-node-preparation";
 import {
   formatVersionLabelWithTimestamp,
   isDraftVersion,
@@ -123,18 +114,31 @@ import {
   sortPublishedVersionsDesc,
   versionSortValue,
 } from "./lib/canvas-versions";
+import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
-import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
-import {
-  deleteNodesFromCanvas,
-  groupCanvasNodes,
-  prepareGroupNode,
-  ungroupCanvasNode,
-  wireGroupParentChildRelationships,
-} from "./lib/canvas-groups";
+import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
+import { resolveExecutionErrors } from "./mappers/dash0";
 import type { User } from "./mappers/types";
-import { buildChildToGroupMap } from "@/lib/canvas/groups";
+import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useCanvasYaml } from "./useCanvasYaml";
+import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import {
+  buildCanvasStatusLogEntry,
+  buildExecutionInfo,
+  buildRunEntryFromEvent,
+  buildRunItemFromExecution,
+  buildTabData,
+  buildUserInfo,
+  generateNodeId,
+  generateUniqueNodeName,
+  mapCanvasNodesToLogEntries,
+  mapExecutionsToSidebarEvents,
+  mapQueueItemsToSidebarEvents,
+  mapTriggerEventsToSidebarEvents,
+  mapWorkflowEventsToRunLogEntries,
+  summarizeWorkflowChanges,
+} from "./utils";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -459,29 +463,8 @@ export function WorkflowPageV2() {
   const canReadOrg = canAct("org", "read");
   const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
   const showVersioningUI = !isVersioningDisabled;
-  const agentFeatureEnabled = isAgentEnabled();
-  const agentContext = useMemo((): AgentContext => {
-    if (!agentFeatureEnabled) {
-      return { enabled: false, mode: "inspect" };
-    }
-    if (!showVersioningUI) {
-      return { enabled: true, mode: "inspect" };
-    }
-    const versionId = activeCanvasVersionId || undefined;
-    if (isViewingDraftVersion || isViewingPendingApprovalVersion) {
-      if (!versionId) {
-        return { enabled: true, mode: "inspect" };
-      }
-      return { enabled: true, mode: "build", canvasVersion: versionId };
-    }
-    return { enabled: true, mode: "inspect" };
-  }, [
-    agentFeatureEnabled,
-    showVersioningUI,
-    activeCanvasVersionId,
-    isViewingDraftVersion,
-    isViewingPendingApprovalVersion,
-  ]);
+  const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
+  const agentContext = useAgentContext(isEditing, activeCanvasVersionId);
   const hasEditableVersion =
     (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
