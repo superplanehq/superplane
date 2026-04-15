@@ -24,6 +24,7 @@ type CanvasChangesetChangeNode struct {
 	Name          *string                `json:"name,omitempty"`
 	Block         *string                `json:"block,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	IntegrationId *string                `json:"integrationId,omitempty"`
 }
 
 // NewCanvasChangesetChangeNode instantiates a new CanvasChangesetChangeNode object
@@ -171,6 +172,38 @@ func (o *CanvasChangesetChangeNode) SetConfiguration(v map[string]interface{}) {
 	o.Configuration = v
 }
 
+// GetIntegrationId returns the IntegrationId field value if set, zero value otherwise.
+func (o *CanvasChangesetChangeNode) GetIntegrationId() string {
+	if o == nil || IsNil(o.IntegrationId) {
+		var ret string
+		return ret
+	}
+	return *o.IntegrationId
+}
+
+// GetIntegrationIdOk returns a tuple with the IntegrationId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasChangesetChangeNode) GetIntegrationIdOk() (*string, bool) {
+	if o == nil || IsNil(o.IntegrationId) {
+		return nil, false
+	}
+	return o.IntegrationId, true
+}
+
+// HasIntegrationId returns a boolean if a field has been set.
+func (o *CanvasChangesetChangeNode) HasIntegrationId() bool {
+	if o != nil && !IsNil(o.IntegrationId) {
+		return true
+	}
+
+	return false
+}
+
+// SetIntegrationId gets a reference to the given string and assigns it to the IntegrationId field.
+func (o *CanvasChangesetChangeNode) SetIntegrationId(v string) {
+	o.IntegrationId = &v
+}
+
 func (o CanvasChangesetChangeNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -192,6 +225,9 @@ func (o CanvasChangesetChangeNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
+	}
+	if !IsNil(o.IntegrationId) {
+		toSerialize["integrationId"] = o.IntegrationId
 	}
 	return toSerialize, nil
 }
