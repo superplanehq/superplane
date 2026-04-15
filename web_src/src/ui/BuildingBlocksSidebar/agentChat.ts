@@ -10,6 +10,7 @@ import type {
 } from "@/api-client";
 import {
   agentsCreateAgentChat,
+  agentsDeleteAgentChat,
   agentsListAgentChatMessages,
   agentsListAgentChats,
   agentsResumeAgentChat,
@@ -240,6 +241,24 @@ export async function loadChatConversation({
   );
 
   return normalizePersistedMessages(messagesResponse.data);
+}
+
+export async function deleteAgentChatSession({
+  chatId,
+  canvasId,
+  organizationId,
+}: {
+  chatId: string;
+  canvasId: string;
+  organizationId: string;
+}): Promise<void> {
+  await agentsDeleteAgentChat(
+    withOrganizationHeader({
+      organizationId,
+      path: { chatId },
+      query: { canvasId },
+    }),
+  );
 }
 
 type SendChatPromptArgs = {
