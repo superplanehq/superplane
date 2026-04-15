@@ -19,7 +19,6 @@ from ai.skills import skill_index_markdown
 from ai.tools import default_tools
 
 __all__ = [
-    "Agent",
     "AgentContextState",
     "AgentDeps",
     "CatalogListKind",

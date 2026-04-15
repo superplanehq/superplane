@@ -313,7 +313,7 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 
 	//
 	// From here on out, we don't return errors,
-	// we just save the error message in the currentNode.ErrorMessage field.
+	// we save the error message alongside the new invalid configuration.
 	// This still allows the changeset to be applied, but
 	// node will be in an error state.
 	//

@@ -61,10 +61,6 @@ def process_changes(changes: list[CanvasChange]) -> CanvasShape:
     return CanvasShape(nodes, edges)
 
 
-def process_operations(changes: list[CanvasChange]) -> CanvasShape:
-    return process_changes(changes)
-
-
 def iter_config_strings_from_changes(
     changes: list[CanvasChange],
 ) -> Iterator[str]:
@@ -77,12 +73,6 @@ def iter_config_strings_from_changes(
 
         if isinstance(change.node.configuration, dict):
             yield from _iter_strings_in_value(change.node.configuration)
-
-
-def iter_config_strings_from_operations(
-    changes: list[CanvasChange],
-) -> Iterator[str]:
-    yield from iter_config_strings_from_changes(changes)
 
 
 def _iter_strings_in_value(value: Any) -> Iterator[str]:

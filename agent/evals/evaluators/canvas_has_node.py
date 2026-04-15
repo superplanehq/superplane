@@ -4,7 +4,7 @@ from typing import Any
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
 from ai.models import CanvasAnswer
-from evals.evaluators.workflow_utils import process_operations
+from evals.evaluators.workflow_utils import process_changes
 
 
 @dataclass
@@ -15,7 +15,7 @@ class CanvasHasNode(Evaluator):
     def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
         if ctx.output.proposal is None:
             return EvaluationReason(value=False, reason="No proposal in output")
-        wf = process_operations(ctx.output.proposal.changeset.changes or [])
+        wf = process_changes(ctx.output.proposal.changeset.changes or [])
         count = wf.nodes.count(self.node)
 
         if count == self.count:

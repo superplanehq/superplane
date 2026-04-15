@@ -39,12 +39,12 @@ from superplaneapi.api_client import ApiClient
 from superplaneapi.configuration import Configuration
 from superplaneapi.exceptions import ApiException
 from superplaneapi.models.canvases_canvas_version import CanvasesCanvasVersion
+from superplaneapi.models.canvases_create_canvas_version_response import (
+    CanvasesCreateCanvasVersionResponse,
+)
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_describe_canvas_version_response import (
     CanvasesDescribeCanvasVersionResponse,
-)
-from superplaneapi.models.canvases_create_canvas_version_response import (
-    CanvasesCreateCanvasVersionResponse,
 )
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.canvases_list_node_executions_response import (

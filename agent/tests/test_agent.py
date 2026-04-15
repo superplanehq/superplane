@@ -3,9 +3,9 @@ from types import SimpleNamespace
 from typing import cast
 
 import pytest
+from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai import ModelRetry
 
-import ai.agent as agent_module
 from ai.agent import (
     AgentContextState,
     AgentDeps,
@@ -119,7 +119,7 @@ def _build_proposal_validator(
         captured["validator"] = func
         return func
 
-    monkeypatch.setattr(agent_module.Agent, "output_validator", _capture_output_validator)
+    monkeypatch.setattr(PydanticAgent, "output_validator", _capture_output_validator)
     build_agent()
     validator = captured.get("validator")
     assert callable(validator)
