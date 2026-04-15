@@ -12,6 +12,8 @@ auto_cancel:
 blocks:
   - name: "License Check"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
@@ -23,6 +25,8 @@ blocks:
 
   - name: "Backend Tests"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -70,6 +74,8 @@ blocks:
 
   - name: "Agent Tests"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -98,6 +104,8 @@ blocks:
 
   - name: "Frondend Tests"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       prologue:
         commands:
