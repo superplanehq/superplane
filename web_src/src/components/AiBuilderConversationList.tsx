@@ -184,19 +184,20 @@ export function ConversationList({
                   </div>
                 </button>
                 {onDeleteChat ? (
-                  <button
-                    type="button"
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
                     onClick={(event) => {
                       event.stopPropagation();
                       setPendingDeleteId(session.id);
                     }}
                     disabled={isGeneratingResponse}
-                    className="absolute top-1/2 right-2 hidden -translate-y-1/2 rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-red-500 group-hover:block"
+                    className="absolute top-1/2 right-2 hidden -translate-y-1/2 text-slate-400 hover:text-red-500 group-hover:block"
                     aria-label="Delete conversation"
                     title="Delete"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             );
