@@ -1,5 +1,5 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { ChevronDown, Loader2, MoreVertical, RotateCcw, Pencil, Settings } from "lucide-react";
+import { ChevronDown, MoreVertical, RotateCcw, Pencil, Settings } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
@@ -118,7 +118,6 @@ export function Header({
   const showEditButton = mode === "version-live";
   const showVersionEditActions = mode === "version-edit";
   const hasChanges = unpublishedDraftChangeCount > 0;
-  const isSyncing = publishVersionDisabled && hasChanges;
   const publishButtonLabel = hasChanges
     ? `${publishVersionLabel} (${unpublishedDraftChangeCount})`
     : publishVersionLabel;
@@ -303,23 +302,16 @@ export function Header({
                   </Tooltip>
                 ) : null}
                 {wrapWithTooltip(
-                  publishVersionDisabled && !isSyncing,
+                  publishVersionDisabled,
                   publishVersionDisabledTooltip,
                   <UIButton
                     type="button"
                     variant="default"
                     size="sm"
                     onClick={() => onPublishVersion?.()}
-                    disabled={publishVersionDisabled || !onPublishVersion || !hasChanges}
+                    disabled={publishVersionDisabled || !onPublishVersion}
                   >
-                    {isSyncing ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Syncing…
-                      </>
-                    ) : (
-                      publishButtonLabel
-                    )}
+                    {publishButtonLabel}
                   </UIButton>,
                 )}
               </div>

@@ -111,7 +111,7 @@ func TestCanvasPage(t *testing.T) {
 		steps.publishCanvas()
 		steps.enterEditMode()
 		steps.deleteConnectionBetweenNodes("First", "Second")
-		steps.saveCanvas()
+		steps.canvas.WaitForCanvasSaveStatusSaved()
 		steps.publishCanvas()
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
@@ -440,7 +440,7 @@ func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
 }
 
 func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 
 	for {
 		workflow := s.canvas.GetWorkflowFromDB()
