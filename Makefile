@@ -12,7 +12,7 @@ AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
-GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
+GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger/superplane.swagger.json agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
 #
 # Long sausage command to run tests with gotestsum
@@ -380,7 +380,7 @@ openapi.client.gen:
 openapi.web.client.gen:
 	$(MAKE) compose.setup
 	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm ci && npm run generate:api"
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm ci && npm run generate:api"
 
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi

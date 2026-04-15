@@ -27,4 +27,5 @@ CLAUDE.local.md
 /agent/src/usage_pb2.py
 /agent/src/private/agents_pb2.py
 /agent/src/private/agents_pb2_grpc.py
-/api/swagger/
+/api/swagger/*
+!/api/swagger/swagger-ui.html
