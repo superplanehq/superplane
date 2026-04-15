@@ -33,13 +33,15 @@ func Test__UpdateOrganization(t *testing.T) {
 	})
 
 	t.Run("update organization by ID -> success", func(t *testing.T) {
-		versioningEnabled := true
+		changeManagementEnabled := true
 
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
-				Name:              "updated-org",
-				Description:       "Updated description",
-				VersioningEnabled: &versioningEnabled,
+				Name:        "updated-org",
+				Description: "Updated description",
+			},
+			Spec: &protos.Organization_Spec{
+				ChangeManagementEnabled: &changeManagementEnabled,
 			},
 		}
 
@@ -53,12 +55,13 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, "Updated description", response.Organization.Metadata.Description)
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.True(t, response.Organization.Metadata.UpdatedAt.AsTime().After(*r.Organization.UpdatedAt))
-		require.NotNil(t, response.Organization.Metadata.VersioningEnabled)
-		assert.Equal(t, versioningEnabled, response.Organization.Metadata.GetVersioningEnabled())
+		require.NotNil(t, response.Organization.Spec)
+		require.NotNil(t, response.Organization.Spec.ChangeManagementEnabled)
+		assert.Equal(t, changeManagementEnabled, response.Organization.Spec.GetChangeManagementEnabled())
 
 		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, versioningEnabled, organization.VersioningEnabled)
+		assert.Equal(t, changeManagementEnabled, organization.ChangeManagementEnabled)
 	})
 
 	t.Run("nil organization -> error", func(t *testing.T) {

@@ -21,7 +21,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	var updateName string
 	var updateDescription string
-	var updateVersioningEnabled bool
+	var updateChangeManagementEnabled bool
 	updateCmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update the current organization",
@@ -29,11 +29,11 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	updateCmd.Flags().StringVar(&updateName, "name", "", "organization name")
 	updateCmd.Flags().StringVar(&updateDescription, "description", "", "organization description")
-	updateCmd.Flags().BoolVar(&updateVersioningEnabled, "versioning-enabled", false, "enable or disable global versioning")
+	updateCmd.Flags().BoolVar(&updateChangeManagementEnabled, "change-management-enabled", false, "enable or disable global change management")
 	core.Bind(updateCmd, &updateCommand{
-		name:              &updateName,
-		description:       &updateDescription,
-		versioningEnabled: &updateVersioningEnabled,
+		name:                    &updateName,
+		description:             &updateDescription,
+		changeManagementEnabled: &updateChangeManagementEnabled,
 	}, options)
 
 	root.AddCommand(getCmd)

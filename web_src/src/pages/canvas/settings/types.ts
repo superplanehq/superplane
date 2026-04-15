@@ -9,10 +9,8 @@ export type SettingsApprover = {
 export type SettingsValues = {
   name: string;
   description: string;
-  versioningEnabled: boolean;
-  changeRequestApprovalConfig?: {
-    items?: SettingsApprover[];
-  };
+  changeManagementEnabled: boolean;
+  approvers?: SettingsApprover[];
 };
 
 export type ApproverFieldErrors = {
@@ -29,16 +27,16 @@ export type ApproverValidationResult = {
 export type SettingsSavePayload = {
   name: string;
   description: string;
-  versioningEnabled?: boolean;
-  changeRequestApprovalConfig?: {
-    items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
+  changeManagement?: {
+    enabled?: boolean;
+    approvals?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
   };
 };
 
 export interface SettingsViewProps {
   initialValues: SettingsValues;
   canUpdateCanvas: boolean;
-  orgVersioningEnabled?: boolean;
+  orgChangeManagementEnabled?: boolean;
   isSaving: boolean;
   availableUsers: Array<{ id: string; name: string }>;
   availableRoles: Array<{ name: string; label: string }>;

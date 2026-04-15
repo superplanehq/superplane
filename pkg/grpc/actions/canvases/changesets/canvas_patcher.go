@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -13,10 +14,9 @@ import (
 )
 
 type CanvasPatcher struct {
-	tx       *gorm.DB
-	orgID    uuid.UUID
-	registry *registry.Registry
-
+	tx              *gorm.DB
+	orgID           uuid.UUID
+	registry        *registry.Registry
 	originalVersion *models.CanvasVersion
 	finalVersion    *models.CanvasVersion
 
@@ -56,7 +56,7 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 	return p.finalVersion
 }
 
-func (p *CanvasPatcher) buildFinalVersion() *models.CanvasVersion {
+func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*models.CanvasVersion, error) {
 	v := &models.CanvasVersion{
 		ID:          p.originalVersion.ID,
 		WorkflowID:  p.originalVersion.WorkflowID,
@@ -89,22 +89,33 @@ func (p *CanvasPatcher) buildFinalVersion() *models.CanvasVersion {
 		v.Edges = append(v.Edges, p.edges[edgeKey])
 	}
 
-	return v
+	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, autoLayout)
+	if err != nil {
+		return nil, err
+	}
+
+	v.Nodes = nodes
+	v.Edges = edges
+	return v, nil
 }
 
-func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset) error {
+func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, autoLayout *pb.CanvasAutoLayout) error {
 	if changeset == nil || len(changeset.Changes) == 0 {
 		return fmt.Errorf("changeset is required")
 	}
 
 	for _, change := range changeset.Changes {
-		err := p.handleChange(change)
-		if err != nil {
+		if err := p.handleChange(change); err != nil {
 			return err
 		}
 	}
 
-	p.finalVersion = p.buildFinalVersion()
+	finalVersion, err := p.buildFinalVersion(autoLayout)
+	if err != nil {
+		return err
+	}
+
+	p.finalVersion = finalVersion
 	return CheckForCycles(p.finalVersion.Nodes, p.finalVersion.Edges)
 }
 

@@ -57,8 +57,7 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 		req.Id,
 		req.Name,
 		req.Description,
-		req.VersioningEnabled,
-		req.ChangeRequestApprovalConfig,
+		req.ChangeManagement,
 	)
 }
 
@@ -125,6 +124,7 @@ func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb
 		canvasID,
 		versionID,
 		req.Changeset,
+		req.AutoLayout,
 	)
 }
 
