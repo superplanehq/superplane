@@ -92,7 +92,7 @@ func UpdateCanvasVersionWithUsage(
 
 	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
 	}
 
 	expandedNodes, err := expandNodes(organizationID, nodes)

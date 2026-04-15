@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -9,8 +10,6 @@ import (
 	"github.com/nulab/autog/graph"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const (
@@ -28,7 +27,7 @@ func ApplyLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAuto
 
 	switch layout.Algorithm {
 	case pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED:
-		return nil, nil, status.Error(codes.InvalidArgument, "layout.algorithm is required")
+		return nil, nil, fmt.Errorf("layout.algorithm is required")
 	case pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL:
 		layoutedNodes, err := applyHorizontalLayout(nodes, edges, layout)
 		if err != nil {
@@ -36,7 +35,7 @@ func ApplyLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAuto
 		}
 		return layoutedNodes, edges, nil
 	default:
-		return nil, nil, status.Errorf(codes.InvalidArgument, "unsupported layout algorithm: %s", layout.Algorithm.String())
+		return nil, nil, fmt.Errorf("unsupported layout algorithm: %s", layout.Algorithm.String())
 	}
 }
 
@@ -521,7 +520,7 @@ func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[s
 	seedNodeIDs := make([]string, 0, len(autoLayout.NodeIds))
 	for _, nodeID := range autoLayout.NodeIds {
 		if _, exists := flowNodeSet[nodeID]; !exists {
-			return nil, status.Errorf(codes.InvalidArgument, "auto_layout.node_ids contains unknown node: %s", nodeID)
+			return nil, fmt.Errorf("auto_layout.node_ids contains unknown node: %s", nodeID)
 		}
 		if _, exists := seen[nodeID]; exists {
 			continue
@@ -561,7 +560,7 @@ func resolveScopedNodeIDs(
 	case pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT:
 		return resolveConnectedComponentNodeIDs(seedNodeIDs, flowNodeIDs, flowNodeSet, edges), nil
 	default:
-		return nil, status.Errorf(codes.InvalidArgument, "unsupported auto layout scope: %s", scope.String())
+		return nil, fmt.Errorf("unsupported auto layout scope: %s", scope.String())
 	}
 }
 
