@@ -1,7 +1,7 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { Copy, Download, ChevronDown, Palette, Plus, RotateCcw, Pencil } from "lucide-react";
+import { ChevronDown, Palette, Plus, RotateCcw, Pencil } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
@@ -9,7 +9,6 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface BreadcrumbItem {
   label: string;
@@ -20,7 +19,7 @@ export interface BreadcrumbItem {
   iconColor?: string;
 }
 
-type HeaderMode = "default" | "version-live" | "version-edit" | "versioning-disabled";
+type HeaderMode = "default" | "version-live" | "version-edit";
 
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
@@ -47,7 +46,9 @@ interface HeaderProps {
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
-  /** When &gt; 0 (unpublished draft diff items), shown as "Propose Change (n)" in version edit mode. */
+  /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
+  publishVersionLabel?: string;
+  /** When &gt; 0 (unpublished draft diff items), shown as badge count on the publish button in version edit mode. */
   unpublishedDraftChangeCount?: number;
 }
 
@@ -76,6 +77,7 @@ export function Header({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  publishVersionLabel = "Publish",
   unpublishedDraftChangeCount = 0,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
@@ -84,7 +86,6 @@ export function Header({
   const canCreateCanvas = permissionsLoading || canAct("canvases", "create");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
-  const [exportAction, setExportAction] = useState<string>("");
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Get the workflow name from the workflows list if workflowId is available
@@ -145,12 +146,11 @@ export function Header({
     );
   };
 
-  const isVersioningDisabledMode = mode === "versioning-disabled";
-  const isDefaultMode = mode === "default" || isVersioningDisabledMode;
+  const isDefaultMode = mode === "default";
   const showEditButton = mode === "version-live";
   const showVersionEditActions = mode === "version-edit";
-  const proposeChangeLabel =
-    unpublishedDraftChangeCount > 0 ? `Propose Change (${unpublishedDraftChangeCount})` : "Propose Change";
+  const publishButtonLabel =
+    unpublishedDraftChangeCount > 0 ? `${publishVersionLabel} (${unpublishedDraftChangeCount})` : publishVersionLabel;
 
   return (
     <>
@@ -308,40 +308,7 @@ export function Header({
           <div className="flex items-center gap-2 justify-self-end">
             {isDefaultMode ? (
               <>
-                {isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
-                  <Select
-                    value={exportAction || undefined}
-                    onValueChange={(value) => {
-                      setExportAction(value);
-                      if (value === "copy") {
-                        onExportYamlCopy();
-                      }
-                      if (value === "download") {
-                        onExportYamlDownload();
-                      }
-                      setExportAction("");
-                    }}
-                  >
-                    <SelectTrigger className="h-5 w-fit min-w-0 rounded-md border-gray-300 px-1 py-0 text-xs font-mono text-gray-500 data-[placeholder]:text-gray-500 shadow-none [&>svg]:hidden">
-                      <SelectValue placeholder=".yaml" />
-                    </SelectTrigger>
-                    <SelectContent align="end">
-                      <SelectItem value="copy">
-                        <span className="flex items-center gap-2">
-                          <Copy className="h-3.5 w-3.5" />
-                          Copy to Clipboard
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="download">
-                        <span className="flex items-center gap-2">
-                          <Download className="h-3.5 w-3.5" />
-                          Download File
-                        </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                {!isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
+                {onExportYamlCopy && onExportYamlDownload ? (
                   <DropdownMenu open={isYamlMenuOpen} onOpenChange={setIsYamlMenuOpen}>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-mono">
@@ -377,7 +344,7 @@ export function Header({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : null}
-                {!isVersioningDisabledMode && unsavedMessage ? (
+                {unsavedMessage ? (
                   <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                     {unsavedMessage}
                   </span>
@@ -434,7 +401,7 @@ export function Header({
                     onClick={() => onPublishVersion?.()}
                     disabled={publishVersionDisabled || !onPublishVersion}
                   >
-                    {proposeChangeLabel}
+                    {publishButtonLabel}
                   </UIButton>,
                 )}
               </div>

@@ -49,6 +49,7 @@ import {
   useCreateCanvasVersion,
   useDeleteCanvasMemoryEntry,
   useDeleteCanvasVersion,
+  usePublishCanvasVersion,
   useInfiniteCanvasEvents,
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
@@ -202,6 +203,7 @@ export function WorkflowPageV2() {
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const deleteCanvasVersionMutation = useDeleteCanvasVersion(organizationId!, canvasId!);
+  const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
@@ -461,12 +463,10 @@ export function WorkflowPageV2() {
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
   const canReadOrg = canAct("org", "read");
-  const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
-  const showVersioningUI = !isVersioningDisabled;
+  const isChangeManagementDisabled = !(liveCanvas?.metadata?.changeManagementEnabled ?? false);
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const agentContext = useAgentContext(isEditing, activeCanvasVersionId);
-  const hasEditableVersion =
-    (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
+  const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {
     const pages = infiniteEventsQuery.data?.pages || [];
@@ -499,7 +499,7 @@ export function WorkflowPageV2() {
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
-  const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
+  const isOrgChangeManagementEnabled = organization?.metadata?.changeManagementEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
   const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
@@ -640,44 +640,6 @@ export function WorkflowPageV2() {
   }, [isCreateChangeRequestMode, canvasChangeRequests.length]);
 
   useEffect(() => {
-    if (!isVersioningDisabled) {
-      return;
-    }
-
-    if (isVersionControlOpen) {
-      setIsVersionControlOpen(false);
-    }
-    if (selectedChangeRequestId) {
-      setSelectedChangeRequestId("");
-    }
-    if (resolvingConflictChangeRequestId) {
-      setResolvingConflictChangeRequestId("");
-    }
-    if (isCreateChangeRequestMode) {
-      setIsCreateChangeRequestMode(false);
-    }
-    if (activeCanvasVersionId) {
-      setActiveCanvasVersion(null);
-    }
-    if (searchParams.get("version")) {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("version");
-        return next;
-      });
-    }
-  }, [
-    isVersioningDisabled,
-    isVersionControlOpen,
-    selectedChangeRequestId,
-    resolvingConflictChangeRequestId,
-    isCreateChangeRequestMode,
-    activeCanvasVersionId,
-    searchParams,
-    setSearchParams,
-  ]);
-
-  useEffect(() => {
     if (!hasEditableVersion || !isVersionControlOpen) {
       return;
     }
@@ -802,12 +764,7 @@ export function WorkflowPageV2() {
   }, [isTemplate, canvasId]);
 
   useEffect(() => {
-    if (
-      isVersioningDisabled ||
-      hasSyncedVersionFromURLRef.current ||
-      selectableVersionsById.size === 0 ||
-      activeCanvasVersionId
-    ) {
+    if (hasSyncedVersionFromURLRef.current || selectableVersionsById.size === 0 || activeCanvasVersionId) {
       return;
     }
 
@@ -867,7 +824,6 @@ export function WorkflowPageV2() {
     currentUserId,
     pendingApprovalVersionIds,
     liveCanvasVersionId,
-    isVersioningDisabled,
     setSearchParams,
     queryClient,
     organizationId,
@@ -1318,11 +1274,6 @@ export function WorkflowPageV2() {
       return;
     }
 
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
-      return;
-    }
-
     if (hasEditableVersion && hasUnsavedChanges) {
       const shouldCreate = window.confirm(
         "You have unsaved changes in the current draft. Create a new draft from live anyway?",
@@ -1381,7 +1332,6 @@ export function WorkflowPageV2() {
     createCanvasVersionMutation,
     queryClient,
     setSearchParams,
-    isVersioningDisabled,
   ]);
 
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
@@ -1494,7 +1444,7 @@ export function WorkflowPageV2() {
               : "Canvas changes saved";
 
             // Save the workflow with updated positions
-            if (!activeCanvasVersionId && !isVersioningDisabled) {
+            if (!activeCanvasVersionId) {
               return;
             }
             const savingVersionID = activeCanvasVersionId || undefined;
@@ -1587,7 +1537,6 @@ export function WorkflowPageV2() {
       queryClient,
       hasNonPositionalUnsavedChanges,
       isReadOnly,
-      isVersioningDisabled,
       enqueueCanvasSave,
     ],
   );
@@ -2436,7 +2385,7 @@ export function WorkflowPageV2() {
         }
         return;
       }
-      if (!activeCanvasVersionId && !isVersioningDisabled) {
+      if (!activeCanvasVersionId) {
         if (options?.showToast !== false) {
           showErrorToast("Enable edit mode before saving changes");
         }
@@ -2518,7 +2467,6 @@ export function WorkflowPageV2() {
       activeCanvasVersionId,
       isTemplate,
       canUpdateCanvas,
-      isVersioningDisabled,
       enqueueCanvasSave,
       handleLogNodeSelect,
     ],
@@ -3866,7 +3814,7 @@ export function WorkflowPageV2() {
         showErrorToast("Template canvases are read-only");
         return;
       }
-      if (!activeCanvasVersionId && !isVersioningDisabled) {
+      if (!activeCanvasVersionId) {
         showErrorToast("Enable edit mode before saving changes");
         return;
       }
@@ -3941,16 +3889,11 @@ export function WorkflowPageV2() {
         showErrorToast(errorMessage);
       }
     },
-    [canvas, organizationId, canvasId, activeCanvasVersionId, isTemplate, isVersioningDisabled, enqueueCanvasSave],
+    [canvas, organizationId, canvasId, activeCanvasVersionId, isTemplate, enqueueCanvasSave],
   );
 
   const handleCreateChangeRequest = useCallback(async () => {
     if (!organizationId || !canvasId) {
-      return;
-    }
-
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -3977,13 +3920,37 @@ export function WorkflowPageV2() {
 
     setSelectedChangeRequestId("");
     setIsCreateChangeRequestMode(true);
+  }, [organizationId, canvasId, activeCanvasVersionId, createChangeRequestVersion, hasUnsavedChanges, setSearchParams]);
+
+  const handlePublishVersion = useCallback(async () => {
+    if (!organizationId || !canvasId || !activeCanvasVersionId) {
+      return;
+    }
+
+    if (hasUnsavedChanges) {
+      showErrorToast("Save your version before publishing");
+      return;
+    }
+
+    try {
+      await publishCanvasVersionMutation.mutateAsync(activeCanvasVersionId);
+      setActiveCanvasVersion(null);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("version");
+        return next;
+      });
+      setTopViewMode("canvas");
+      showSuccessToast("Version published");
+    } catch (error) {
+      showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to publish version")));
+    }
   }, [
     organizationId,
     canvasId,
     activeCanvasVersionId,
-    createChangeRequestVersion,
     hasUnsavedChanges,
-    isVersioningDisabled,
+    publishCanvasVersionMutation,
     setSearchParams,
   ]);
 
@@ -4361,8 +4328,8 @@ export function WorkflowPageV2() {
         return;
       }
 
-      if (isVersioningDisabled) {
-        showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+      if (isChangeManagementDisabled) {
+        showErrorToast("Change management is disabled for this canvas.");
         return;
       }
 
@@ -4405,7 +4372,7 @@ export function WorkflowPageV2() {
     [
       organizationId,
       canvasId,
-      isVersioningDisabled,
+      isChangeManagementDisabled,
       activeCanvasVersionId,
       createChangeRequestVersion,
       hasUnsavedChanges,
@@ -4428,11 +4395,6 @@ export function WorkflowPageV2() {
 
     if (isTemplate) {
       showErrorToast("Template canvases are read-only");
-      return;
-    }
-
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -4460,7 +4422,6 @@ export function WorkflowPageV2() {
     canvasId,
     canUpdateCanvas,
     isTemplate,
-    isVersioningDisabled,
     hasEditableVersion,
     liveCanvasVersionId,
     draftVersions,
@@ -4480,11 +4441,6 @@ export function WorkflowPageV2() {
 
     if (isTemplate) {
       showErrorToast("Template canvases are read-only");
-      return;
-    }
-
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -4544,7 +4500,6 @@ export function WorkflowPageV2() {
     canvasId,
     canUpdateCanvas,
     isTemplate,
-    isVersioningDisabled,
     hasEditableVersion,
     activeCanvasVersionId,
     deleteCanvasVersionMutation,
@@ -4730,7 +4685,7 @@ export function WorkflowPageV2() {
     () => ({
       name: liveCanvas?.metadata?.name || "",
       description: liveCanvas?.metadata?.description || "",
-      versioningEnabled: liveCanvas?.metadata?.versioningEnabled ?? false,
+      changeManagementEnabled: liveCanvas?.metadata?.changeManagementEnabled ?? false,
       changeRequestApprovalConfig: {
         items: (liveCanvas?.metadata?.changeRequestApprovalConfig?.items || [])
           .map((item) => {
@@ -4756,7 +4711,7 @@ export function WorkflowPageV2() {
       },
     }),
     [
-      liveCanvas?.metadata?.versioningEnabled,
+      liveCanvas?.metadata?.changeManagementEnabled,
       liveCanvas?.metadata?.changeRequestApprovalConfig?.items,
       liveCanvas?.metadata?.description,
       liveCanvas?.metadata?.name,
@@ -4800,7 +4755,7 @@ export function WorkflowPageV2() {
     async (values: {
       name: string;
       description: string;
-      versioningEnabled?: boolean;
+      changeManagementEnabled?: boolean;
       changeRequestApprovalConfig?: {
         items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
       };
@@ -4812,7 +4767,7 @@ export function WorkflowPageV2() {
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        versioningEnabled: values.versioningEnabled,
+        changeManagementEnabled: values.changeManagementEnabled,
         changeRequestApprovalConfig: values.changeRequestApprovalConfig,
       });
     },
@@ -4831,7 +4786,7 @@ export function WorkflowPageV2() {
         ? "You don't have permission to update this canvas"
         : isTemplate
           ? "Template canvases are read-only"
-          : !activeCanvasVersionId && !isVersioningDisabled
+          : !activeCanvasVersionId
             ? "Enable edit mode before saving changes"
             : null;
 
@@ -5032,31 +4987,21 @@ export function WorkflowPageV2() {
       ? "Enable edit mode to save changes."
       : undefined;
   const saveButtonHidden =
-    isVersioningDisabled ||
-    isTemplate ||
-    !canUpdateCanvas ||
-    !hasEditableVersion ||
-    !hasUnsavedChanges ||
-    (!isReadOnly && isAutoSaveQueued);
+    isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges || (!isReadOnly && isAutoSaveQueued);
   const saveIsPrimary = hasUnsavedChanges && !isReadOnly && !isAutoSaveQueued;
-  const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
   const toggleEditModeDisabled =
-    isVersioningDisabled ||
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     createCanvasVersionMutation.isPending ||
     (hasEditableVersion && !liveCanvasVersionId);
   const toggleEditModeDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
-    : isVersioningDisabled
-      ? versioningDisabledTooltip
-      : canvasDeletedRemotely
-        ? "This canvas was deleted in another session."
-        : hasEditableVersion && !liveCanvasVersionId
-          ? "No live version available."
-          : undefined;
+    : canvasDeletedRemotely
+      ? "This canvas was deleted in another session."
+      : hasEditableVersion && !liveCanvasVersionId
+        ? "No live version available."
+        : undefined;
   const resetDraftDisabled =
-    isVersioningDisabled ||
     !hasEditableVersion ||
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
@@ -5064,27 +5009,25 @@ export function WorkflowPageV2() {
     hasLocalSaveActivity ||
     isResetDraftPending ||
     !activeCanvasVersionId;
-  const resetDraftDisabledTooltip = isVersioningDisabled
-    ? versioningDisabledTooltip
-    : !canUpdateCanvas
-      ? "You don't have permission to edit this canvas."
-      : canvasDeletedRemotely
-        ? "This canvas was deleted in another session."
-        : !activeCanvasVersionId
-          ? "Draft version not found."
-          : !hasEditableVersion
-            ? "Enable edit mode before discarding draft."
-            : undefined;
+  const resetDraftDisabledTooltip = !canUpdateCanvas
+    ? "You don't have permission to edit this canvas."
+    : canvasDeletedRemotely
+      ? "This canvas was deleted in another session."
+      : !activeCanvasVersionId
+        ? "Draft version not found."
+        : !hasEditableVersion
+          ? "Enable edit mode before discarding draft."
+          : undefined;
   const createChangeRequestDisabled =
-    isVersioningDisabled ||
+    isChangeManagementDisabled ||
     !hasEditableVersion ||
     hasPendingLocalCanvasState ||
     createCanvasChangeRequestMutation.isPending ||
     canvasDeletedRemotely;
   const createChangeRequestDisabledTooltip = canvasDeletedRemotely
     ? "This canvas was deleted in another session."
-    : isVersioningDisabled
-      ? versioningDisabledTooltip
+    : isChangeManagementDisabled
+      ? "Change management is disabled for this canvas."
       : !hasEditableVersion
         ? "Enable edit mode before creating a change request."
         : hasLocalSaveActivity
@@ -5092,24 +5035,30 @@ export function WorkflowPageV2() {
           : hasUnsavedChanges
             ? "Save your version before creating a change request."
             : undefined;
-  const headerMode = isVersioningDisabled
-    ? "versioning-disabled"
-    : hasEditableVersion
-      ? "version-edit"
-      : "version-live";
+  const publishVersionDisabled =
+    !hasEditableVersion ||
+    hasPendingLocalCanvasState ||
+    publishCanvasVersionMutation.isPending ||
+    canvasDeletedRemotely;
+  const publishVersionDisabledTooltip = canvasDeletedRemotely
+    ? "This canvas was deleted in another session."
+    : !hasEditableVersion
+      ? "Enable edit mode before publishing."
+      : hasLocalSaveActivity
+        ? "Wait for the current save to finish."
+        : hasUnsavedChanges
+          ? "Save your version before publishing."
+          : undefined;
+  const headerMode = hasEditableVersion ? "version-edit" : "version-live";
   const unpublishedDraftChangeCount =
-    !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
-      ? pendingDraftDiffSummary.items.length
-      : 0;
-  const canvasStateMode = !showVersioningUI
-    ? "default"
-    : hasEditableVersion
-      ? "editing"
-      : isViewingPendingApprovalVersion
-        ? "awaiting-approval"
-        : !isViewingCurrentLiveVersion
-          ? "previewing-previous-version"
-          : "default";
+    !suppressUnpublishedChangesBadge && !!latestDraftVersion ? pendingDraftDiffSummary.items.length : 0;
+  const canvasStateMode = hasEditableVersion
+    ? "editing"
+    : isViewingPendingApprovalVersion
+      ? "awaiting-approval"
+      : !isViewingCurrentLiveVersion
+        ? "previewing-previous-version"
+        : "default";
   const exitEditModeDisabled =
     !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
   const exitEditModeDisabledTooltip = !canUpdateCanvas
@@ -5168,7 +5117,7 @@ export function WorkflowPageV2() {
       <CanvasSettingsView
         initialValues={canvasSettingsInitialValues}
         canUpdateCanvas={canUpdateCanvas && !isTemplate}
-        orgVersioningEnabled={isOrgVersioningEnabled}
+        orgChangeManagementEnabled={isOrgChangeManagementEnabled}
         isSaving={updateCanvasMutation.isPending}
         availableUsers={canvasSettingsApproverUsers}
         availableRoles={canvasSettingsApproverRoles}
@@ -5197,11 +5146,9 @@ export function WorkflowPageV2() {
             setIsCreateChangeRequestMode(false);
             setTopViewMode(mode);
           }}
-          isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
+          isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={
-            showVersioningUI && !hasEditableVersion && topViewMode === "canvas"
-              ? () => setIsVersionControlOpen(true)
-              : undefined
+            !hasEditableVersion && topViewMode === "canvas" ? () => setIsVersionControlOpen(true) : undefined
           }
           versionControlButtonTooltip="Open versions"
           versionControlNotificationCount={pendingApprovalVersions.length}
@@ -5266,17 +5213,20 @@ export function WorkflowPageV2() {
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
           saveDisabledTooltip={saveDisabledTooltip}
-          onPublishVersion={showVersioningUI ? handleCreateChangeRequest : undefined}
-          publishVersionDisabled={createChangeRequestDisabled}
-          publishVersionDisabledTooltip={createChangeRequestDisabledTooltip}
-          onDiscardVersion={showVersioningUI ? handleResetDraftChanges : undefined}
+          onPublishVersion={isChangeManagementDisabled ? handlePublishVersion : handleCreateChangeRequest}
+          publishVersionLabel={isChangeManagementDisabled ? "Publish" : "Propose Change"}
+          publishVersionDisabled={isChangeManagementDisabled ? publishVersionDisabled : createChangeRequestDisabled}
+          publishVersionDisabledTooltip={
+            isChangeManagementDisabled ? publishVersionDisabledTooltip : createChangeRequestDisabledTooltip
+          }
+          onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           headerMode={headerMode}
-          onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+          onEnterEditMode={handleToggleEditMode}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
-          onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+          onExitEditMode={handleToggleEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           unpublishedDraftChangeCount={unpublishedDraftChangeCount}
@@ -5325,7 +5275,7 @@ export function WorkflowPageV2() {
             },
           ]}
           versionControlSidebar={
-            showVersioningUI && !hasEditableVersion && topViewMode === "canvas" ? (
+            !hasEditableVersion && topViewMode === "canvas" ? (
               <CanvasVersionControlSidebar
                 isOpen={isVersionControlOpen}
                 onToggle={setIsVersionControlOpen}

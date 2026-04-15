@@ -13,107 +13,107 @@ import (
 	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
-func TestCanvasVersioningEnforcement(t *testing.T) {
-	t.Run("organization versioning enabled enforces effective canvas versioning enabled", func(t *testing.T) {
-		steps := &canvasVersioningEnforcementSteps{t: t}
+func TestCanvasChangeManagementEnforcement(t *testing.T) {
+	t.Run("organization change management enabled enforces effective canvas change management enabled", func(t *testing.T) {
+		steps := &canvasChangeManagementEnforcementSteps{t: t}
 		steps.start()
-		steps.givenACanvasExists("E2E Canvas Versioning Org On")
+		steps.givenACanvasExists("E2E Canvas Change Mgmt Org On")
 
-		steps.setCanvasVersioningInDB(false)
-		steps.setOrganizationVersioningInDB(true)
+		steps.setCanvasChangeManagementInDB(false)
+		steps.setOrganizationChangeManagementInDB(true)
 
 		steps.visitCanvasSettings()
-		steps.assertCanvasVersioningToggleChecked(true)
-		steps.assertCanvasVersioningToggleDisabled()
-		steps.session.AssertText("Versioning is enabled by your organization settings for all canvases.")
+		steps.assertCanvasChangeManagementToggleChecked(true)
+		steps.assertCanvasChangeManagementToggleDisabled()
+		steps.session.AssertText("Change management is enabled by your organization settings for all canvases.")
 
 		// Enforcement must not require mutating every canvas row.
-		steps.assertCanvasVersioningInDB(false)
+		steps.assertCanvasChangeManagementInDB(false)
 	})
 
-	t.Run("organization versioning disabled allows per-canvas on and off", func(t *testing.T) {
-		steps := &canvasVersioningEnforcementSteps{t: t}
+	t.Run("organization change management disabled allows per-canvas on and off", func(t *testing.T) {
+		steps := &canvasChangeManagementEnforcementSteps{t: t}
 		steps.start()
-		steps.givenACanvasExists("E2E Canvas Versioning Org Off")
+		steps.givenACanvasExists("E2E Canvas Change Mgmt Org Off")
 
-		steps.setOrganizationVersioningInDB(false)
-		steps.setCanvasVersioningInDB(false)
+		steps.setOrganizationChangeManagementInDB(false)
+		steps.setCanvasChangeManagementInDB(false)
 
 		steps.visitCanvasSettings()
-		steps.assertCanvasVersioningToggleEnabled()
-		steps.assertCanvasVersioningToggleChecked(false)
-		steps.session.AssertText("This toggle controls versioning for this canvas.")
+		steps.assertCanvasChangeManagementToggleEnabled()
+		steps.assertCanvasChangeManagementToggleChecked(false)
+		steps.session.AssertText("This toggle controls change management for this canvas.")
 
-		steps.setCanvasVersioningToggle(true)
+		steps.setCanvasChangeManagementToggle(true)
 		steps.saveCanvasSettings()
-		steps.assertCanvasVersioningInDB(true)
+		steps.assertCanvasChangeManagementInDB(true)
 
-		steps.setCanvasVersioningToggle(false)
+		steps.setCanvasChangeManagementToggle(false)
 		steps.saveCanvasSettings()
-		steps.assertCanvasVersioningInDB(false)
+		steps.assertCanvasChangeManagementInDB(false)
 	})
 }
 
-type canvasVersioningEnforcementSteps struct {
+type canvasChangeManagementEnforcementSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
 }
 
-func (s *canvasVersioningEnforcementSteps) start() {
+func (s *canvasChangeManagementEnforcementSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	s.session.Login()
 }
 
-func (s *canvasVersioningEnforcementSteps) givenACanvasExists(name string) {
+func (s *canvasChangeManagementEnforcementSteps) givenACanvasExists(name string) {
 	s.canvas = shared.NewCanvasSteps(name, s.t, s.session)
 	s.canvas.Create()
 }
 
-func (s *canvasVersioningEnforcementSteps) setOrganizationVersioningInDB(enabled bool) {
+func (s *canvasChangeManagementEnforcementSteps) setOrganizationChangeManagementInDB(enabled bool) {
 	err := database.Conn().
 		Model(&models.Organization{}).
 		Where("id = ?", s.session.OrgID).
-		Update("versioning_enabled", enabled).
+		Update("change_management_enabled", enabled).
 		Error
 	require.NoError(s.t, err)
 }
 
-func (s *canvasVersioningEnforcementSteps) setCanvasVersioningInDB(enabled bool) {
+func (s *canvasChangeManagementEnforcementSteps) setCanvasChangeManagementInDB(enabled bool) {
 	err := database.Conn().
 		Model(&models.Canvas{}).
 		Where("id = ?", s.canvas.WorkflowID).
-		Update("versioning_enabled", enabled).
+		Update("change_management_enabled", enabled).
 		Error
 	require.NoError(s.t, err)
 }
 
-func (s *canvasVersioningEnforcementSteps) visitCanvasSettings() {
+func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
 	s.canvas.Visit()
 	s.session.AssertVisible(q.Locator(`header button:has-text("Settings")`))
 	s.session.Click(q.Locator(`header button:has-text("Settings")`))
 	s.session.AssertText("Canvas Name")
-	s.session.AssertVisible(canvasVersioningSwitchQuery())
+	s.session.AssertVisible(canvasChangeManagementSwitchQuery())
 }
 
-func (s *canvasVersioningEnforcementSteps) saveCanvasSettings() {
+func (s *canvasChangeManagementEnforcementSteps) saveCanvasSettings() {
 	s.session.Click(q.Locator(`button:has-text("Save Changes")`))
 	s.session.AssertText("Canvas updated successfully")
 }
 
-func (s *canvasVersioningEnforcementSteps) assertCanvasVersioningToggleDisabled() {
-	s.session.AssertDisabled(canvasVersioningSwitchQuery())
+func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementToggleDisabled() {
+	s.session.AssertDisabled(canvasChangeManagementSwitchQuery())
 }
 
-func (s *canvasVersioningEnforcementSteps) assertCanvasVersioningToggleEnabled() {
-	disabled, err := canvasVersioningSwitchQuery().Run(s.session).IsDisabled()
+func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementToggleEnabled() {
+	disabled, err := canvasChangeManagementSwitchQuery().Run(s.session).IsDisabled()
 	require.NoError(s.t, err)
 	require.False(s.t, disabled)
 }
 
-func (s *canvasVersioningEnforcementSteps) assertCanvasVersioningToggleChecked(expected bool) {
-	attr, err := canvasVersioningSwitchQuery().Run(s.session).GetAttribute("aria-checked")
+func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementToggleChecked(expected bool) {
+	attr, err := canvasChangeManagementSwitchQuery().Run(s.session).GetAttribute("aria-checked")
 	require.NoError(s.t, err)
 
 	expectedString := "false"
@@ -124,10 +124,10 @@ func (s *canvasVersioningEnforcementSteps) assertCanvasVersioningToggleChecked(e
 	require.Equal(s.t, expectedString, attr)
 }
 
-func (s *canvasVersioningEnforcementSteps) setCanvasVersioningToggle(enabled bool) {
-	s.assertCanvasVersioningToggleEnabled()
+func (s *canvasChangeManagementEnforcementSteps) setCanvasChangeManagementToggle(enabled bool) {
+	s.assertCanvasChangeManagementToggleEnabled()
 
-	attr, err := canvasVersioningSwitchQuery().Run(s.session).GetAttribute("aria-checked")
+	attr, err := canvasChangeManagementSwitchQuery().Run(s.session).GetAttribute("aria-checked")
 	require.NoError(s.t, err)
 
 	currentlyEnabled := attr == "true"
@@ -135,28 +135,28 @@ func (s *canvasVersioningEnforcementSteps) setCanvasVersioningToggle(enabled boo
 		return
 	}
 
-	s.session.Click(canvasVersioningSwitchQuery())
-	s.assertCanvasVersioningToggleChecked(enabled)
+	s.session.Click(canvasChangeManagementSwitchQuery())
+	s.assertCanvasChangeManagementToggleChecked(enabled)
 }
 
-func (s *canvasVersioningEnforcementSteps) assertCanvasVersioningInDB(expected bool) {
+func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementInDB(expected bool) {
 	deadline := time.Now().Add(3 * time.Second)
 
 	for {
 		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
 		require.NoError(s.t, err)
-		if canvas.VersioningEnabled == expected {
+		if canvas.ChangeManagementEnabled == expected {
 			return
 		}
 
 		if time.Now().After(deadline) {
-			s.t.Fatalf("expected versioning_enabled=%t, got %t", expected, canvas.VersioningEnabled)
+			s.t.Fatalf("expected change_management_enabled=%t, got %t", expected, canvas.ChangeManagementEnabled)
 		}
 
 		time.Sleep(200 * time.Millisecond)
 	}
 }
 
-func canvasVersioningSwitchQuery() q.Query {
-	return q.Locator(`button[role="switch"][aria-label="Toggle canvas versioning"]`)
+func canvasChangeManagementSwitchQuery() q.Query {
+	return q.Locator(`button[role="switch"][aria-label="Toggle canvas change management"]`)
 }

@@ -359,7 +359,7 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    versioning_enabled boolean DEFAULT false NOT NULL,
+    change_management_enabled boolean DEFAULT false NOT NULL,
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone
@@ -634,7 +634,7 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
-    versioning_enabled boolean DEFAULT false NOT NULL,
+    change_management_enabled boolean DEFAULT false NOT NULL,
     change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL
 );
 
@@ -1928,7 +1928,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260413120000	f
+20260414233443	f
 \.
 
 
