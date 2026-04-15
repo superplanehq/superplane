@@ -1232,11 +1232,10 @@ function CanvasPage(props: CanvasPageProps) {
           {props.versionControlSidebar}
 
           <RightSideControls
-            readOnly={readOnly}
+            mode={readOnly ? "live" : "edit"}
             onSidebarOpen={() => handleSidebarToggle(true)}
             onAddNote={handleAddNote}
             onMemoryOpen={props.onMemoryOpen}
-            memoryItemCount={props.memoryItemCount}
             onYamlOpen={props.onYamlOpen}
           />
 
