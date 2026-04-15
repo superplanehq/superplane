@@ -109,6 +109,22 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, codes.PermissionDenied, s.Code())
 	})
 
+	t.Run("version not found -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-missing-version")
+
+		_, err := PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvasID, uuid.New().String(),
+			testWebhookBaseURL, r.AuthService,
+		)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Contains(t, s.Message(), "version not found")
+	})
+
 	t.Run("draft version -> publishes and deletes draft", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-draft")
