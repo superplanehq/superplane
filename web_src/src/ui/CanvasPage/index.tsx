@@ -185,14 +185,15 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "cli" | "memory";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory") => void;
+  topViewMode?: "canvas" | "yaml" | "cli";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli") => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
   showCanvasSettingsMenu?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   onYamlOpen: () => void;
+  onMemoryOpen: () => void;
   dataViewContent?: React.ReactNode;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
@@ -1180,7 +1181,6 @@ function CanvasPage(props: CanvasPageProps) {
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
@@ -1221,7 +1221,7 @@ function CanvasPage(props: CanvasPageProps) {
         </div>
       ) : null}
 
-      {/* Main content area with sidebar and canvas/memory/settings views */}
+      {/* Main content area with sidebar and canvas/CLI/settings views */}
       {props.topViewMode && props.topViewMode !== "canvas" ? (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
@@ -1235,6 +1235,8 @@ function CanvasPage(props: CanvasPageProps) {
             readOnly={readOnly}
             onSidebarOpen={() => handleSidebarToggle(true)}
             onAddNote={handleAddNote}
+            onMemoryOpen={props.onMemoryOpen}
+            memoryItemCount={props.memoryItemCount}
             onYamlOpen={props.onYamlOpen}
           />
 
@@ -1721,7 +1723,6 @@ function CanvasContentHeader({
   topViewMode,
   onTopViewModeChange,
   showCanvasSettingsMenu,
-  memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1745,10 +1746,9 @@ function CanvasContentHeader({
   enterEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
   unpublishedDraftChangeCount?: number;
-  topViewMode?: "canvas" | "yaml" | "cli" | "memory";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory") => void;
+  topViewMode?: "canvas" | "yaml" | "cli";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli") => void;
   showCanvasSettingsMenu?: boolean;
-  memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1805,7 +1805,6 @@ function CanvasContentHeader({
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />

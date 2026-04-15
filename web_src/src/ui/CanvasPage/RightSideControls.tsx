@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Code2, Plus, StickyNote } from "lucide-react";
+import { Code2, Database, Plus, StickyNote } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type RightSideControlsProps = {
@@ -8,9 +8,18 @@ export type RightSideControlsProps = {
   onSidebarOpen: () => void;
   onAddNote: () => void | Promise<void>;
   onYamlOpen: () => void;
+  onMemoryOpen: () => void;
+  memoryItemCount?: number;
 };
 
-export function RightSideControls({ readOnly, onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {
+export function RightSideControls({
+  readOnly,
+  onSidebarOpen,
+  onAddNote,
+  onYamlOpen,
+  onMemoryOpen,
+  memoryItemCount,
+}: RightSideControlsProps) {
   if (readOnly) {
     return null;
   }
@@ -20,6 +29,16 @@ export function RightSideControls({ readOnly, onSidebarOpen, onAddNote, onYamlOp
       <ControlButton tooltip="Add component" onClick={onSidebarOpen} testId="open-sidebar-button" icon={<Plus />} />
       <ControlButton tooltip="Add note" onClick={onAddNote} testId="add-note-button" icon={<StickyNote />} />
       <ControlButton tooltip="YAML" onClick={onYamlOpen} testId="open-yaml-modal-button" icon={<Code2 />} />
+      <ControlButton
+        tooltip={
+          memoryItemCount && memoryItemCount > 0
+            ? `Canvas memory (${memoryItemCount} ${memoryItemCount === 1 ? "entry" : "entries"})`
+            : "Canvas memory"
+        }
+        onClick={onMemoryOpen}
+        testId="open-memory-modal-button"
+        icon={<Database />}
+      />
     </div>
   );
 }
