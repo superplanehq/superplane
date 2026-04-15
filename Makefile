@@ -20,7 +20,7 @@ COMPOSE=docker compose -f docker-compose.dev.yml
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
+GOTESTSUM=$(COMPOSE) run --rm --no-deps -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment
@@ -38,7 +38,7 @@ test.setup.build:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
 	$(MAKE) gen.code
-	$(COMPOSE) run --rm app go mod download
+	$(COMPOSE) run --rm --no-deps app go mod download
 
 test.setup.db:
 	$(MAKE) db.create DB_NAME=superplane_test
@@ -70,7 +70,7 @@ test:
 
 test.coverage:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
-	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
+	$(COMPOSE) run --rm --no-deps app go tool cover -func=coverage-go.out | grep '^total:'
 
 test.coverage.check:
 	$(MAKE) test.coverage
@@ -138,8 +138,8 @@ dev.setup:
 	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.setup.app:
-	$(COMPOSE) run --rm app go mod download
-	$(COMPOSE) run --rm app go build cmd/server/main.go
+	$(COMPOSE) run --rm --no-deps app go mod download
+	$(COMPOSE) run --rm --no-deps app go build cmd/server/main.go
 
 dev.setup.agent:
 	$(COMPOSE) run --rm agent uv sync --frozen || $(COMPOSE) run --rm agent uv sync
@@ -238,10 +238,11 @@ ui.start:
 #
 
 db.create:
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	$(COMPOSE) up -d db
+	-$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
+	-$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
+	-$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
 db.migration.create:
 	$(COMPOSE) run --rm app mkdir -p db/migrations
@@ -254,13 +255,14 @@ db.data_migration.create:
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
+	$(COMPOSE) up -d db
 	rm -f db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
 	# echo dump schema to db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
