@@ -9,7 +9,6 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
     FinalResultEvent,
@@ -27,6 +26,7 @@ from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
+from ai.agent_stream_context import AgentStreamRequest, build_agent_context_state
 from ai.chat_retention import start_chat_retention_scheduler
 from ai.config import config
 from ai.grpc import InternalAgentServer
@@ -47,7 +47,13 @@ from ai.session_store import (
 )
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from ai.telemetry import init_sentry, init_telemetry, shutdown_sentry, shutdown_telemetry
+from ai.telemetry import (
+    init_sentry,
+    init_telemetry,
+    record_first_token_duration,
+    shutdown_sentry,
+    shutdown_telemetry,
+)
 from ai.text import normalize_optional
 from ai.tools import format_tool_display_label
 from ai.usage_limit_checker import (
@@ -56,16 +62,6 @@ from ai.usage_limit_checker import (
     UsageLimitChecker,
 )
 from ai.usage_publisher import AgentUsagePublisher, NoopUsagePublisher, UsagePublisher
-
-
-class AgentStreamRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=2000)
-    model: str = Field(
-        default=config.ai_model,
-        min_length=1,
-        max_length=200,
-    )
-    base_url: str | None = None
 
 
 def _debug_enabled() -> bool:
@@ -218,6 +214,7 @@ def _build_deps(
             organization_id=claims.org_id,
         )
     )
+    agent_context = build_agent_context_state(payload.agent_context)
     _debug_log(
         "resolved non-test deps",
         model=payload.model,
@@ -225,10 +222,14 @@ def _build_deps(
         base_url=base_url,
         organization_id=claims.org_id,
         has_token=bool(api_token),
+        agent_context_enabled=agent_context.enabled,
+        agent_context_mode=agent_context.mode,
+        agent_context_canvas_version=agent_context.canvas_version,
     )
     return AgentDeps(
         client=client,
         canvas_id=canvas_id,
+        agent_context=agent_context,
         session_store=session_store,
     )
 
@@ -331,6 +332,7 @@ async def _stream_agent_run(
         canvas_id=resolved_canvas_id,
         question_preview=payload.question[:120],
         has_history=message_history is not None,
+        agent_context=_to_jsonable(payload.agent_context),
     )
     yield {
         "type": "run_started",
@@ -415,6 +417,8 @@ async def _stream_agent_run(
             return None
         delta = answer[already_streamed:]
         streamed_answer_length_by_call_id[call_id] = len(answer)
+        if not streamed_any_answer_delta:
+            record_first_token_duration(time.perf_counter() - started_at)
         streamed_any_answer_delta = True
         recorder.append_assistant_content(delta)
         return {
@@ -532,7 +536,8 @@ async def _stream_agent_run(
             recorder.save_authoritative_messages(messages)
             resolved_output = result.output
             if isinstance(resolved_output, CanvasAnswer):
-                canvas_summary = deps.canvas_cache.get(deps.canvas_id)
+                cache_key = f"{deps.canvas_id}:{deps.canvas_version_id or 'inspect'}"
+                canvas_summary = deps.canvas_cache.get(cache_key)
                 resolved_output = coerce_canvas_answer_proposal(
                     deps.client,
                     resolved_output,

@@ -6,17 +6,34 @@ from ai.session_store import SessionStore
 from ai.superplane_client import SuperplaneClient
 
 CatalogListKind = Literal["components", "triggers"]
+AgentCanvasSurface = Literal["inspect", "build"]
+
+
+@dataclass
+class AgentContextState:
+    enabled: bool = False
+    mode: Literal["inspect", "build"] = "inspect"
+    canvas_version: str | None = None
 
 
 @dataclass
 class AgentDeps:
     client: SuperplaneClient
     canvas_id: str
+    agent_context: AgentContextState = field(default_factory=AgentContextState)
     session_store: SessionStore | None = None
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
     catalog_list_cache: dict[tuple[str, str, str], list[dict[str, Any]]] = field(
         default_factory=dict
     )
+
+    @property
+    def canvas_version_id(self) -> str | None:
+        """Canvas draft version id for scoped reads; only when enabled and mode is build."""
+        ac = self.agent_context
+        if not ac.enabled or ac.mode != "build":
+            return None
+        return ac.canvas_version
 
 
 def _catalog_list_cache_key(
