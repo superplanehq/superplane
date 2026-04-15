@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -11,6 +11,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
+GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
 #
 # Long sausage command to run tests with gotestsum
@@ -38,6 +39,12 @@ test.setup.build:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
+	$(MAKE) gen.setup.backend
+
+test.setup:
+	$(MAKE) test.setup.build
+	$(MAKE) test.setup.db
+	$(MAKE) test.start
 
 test.setup.db:
 	$(MAKE) db.create DB_NAME=superplane_test
@@ -92,6 +99,7 @@ test.agent.evals:
 test.agent.setup:
 	@touch agent/.env
 	$(COMPOSE) build app agent
+	$(MAKE) gen.setup.agent
 	$(COMPOSE) up -d db
 	sleep 5
 	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
@@ -127,6 +135,7 @@ dev.setup:
 	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
+	$(MAKE) gen.setup
 	$(MAKE) dev.setup.app
 	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
@@ -145,6 +154,7 @@ dev.setup.no.cache:
 	rm -rf tmp
 	$(COMPOSE) down -v --remove-orphans
 	$(COMPOSE) build --no-cache
+	$(MAKE) gen.setup
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
@@ -212,6 +222,14 @@ check.lint.ui.baseline.update:
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
+
+check.generated.artifacts:
+	@tracked="$$(git ls-files -- $(GENERATED_ARTIFACT_PATHS))"; \
+	if [ -n "$$tracked" ]; then \
+		echo "Tracked generated artifacts found:"; \
+		echo "$$tracked"; \
+		exit 1; \
+	fi
 
 check.coverage.go:
 	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out
@@ -291,12 +309,29 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-gen:
+gen.setup:
 	$(MAKE) pb.gen
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
 	$(MAKE) openapi.python.client.gen
+
+gen.setup.backend:
+	$(MAKE) pb.gen
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+
+gen.setup.ui:
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.web.client.gen
+
+gen.setup.agent:
+	$(MAKE) pb.gen
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.python.client.gen
+
+gen:
+	$(MAKE) gen.setup
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
@@ -337,7 +372,7 @@ openapi.client.gen:
 
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm ci && npm run generate:api"
 
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi
@@ -361,6 +396,7 @@ openapi.python.client.gen:
 CLI_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
 cli.build:
+	$(MAKE) gen.setup.backend
 	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
 
 cli.build.m1:
@@ -371,9 +407,11 @@ AGENT_IMAGE?=superplane-agent
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
 image.build:
+	$(MAKE) gen.setup
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 agent.image.build:
+	$(MAKE) gen.setup.agent
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f agent/Dockerfile --target runner --progress plain -t $(AGENT_IMAGE):$(IMAGE_TAG) agent
 
 image.auth:
