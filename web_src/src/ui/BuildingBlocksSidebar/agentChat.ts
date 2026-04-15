@@ -15,7 +15,7 @@ import {
   agentsListAgentChats,
   agentsResumeAgentChat,
 } from "@/api-client";
-import type { CanvasOperation } from "@/lib/ai";
+
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { Dispatch, SetStateAction } from "react";
 import { consumeChatResponseStream } from "./agentChatSupport";
