@@ -32,6 +32,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			canvas.ID,
 			*canvas.LiveVersionID,
 			nil,
+			nil,
 		)
 
 		require.Error(t, err)
@@ -48,6 +49,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			r.Organization.ID,
 			canvas.ID,
 			*canvas.LiveVersionID,
+			nil,
 			nil,
 		)
 
@@ -66,6 +68,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			canvas.ID,
 			*canvas.LiveVersionID,
 			&pb.CanvasChangeset{},
+			nil,
 		)
 
 		require.Error(t, err)
@@ -93,6 +96,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 					},
 				},
 			},
+			nil,
 		)
 
 		require.Error(t, err)
@@ -162,6 +166,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 					},
 				},
 			},
+			nil,
 		)
 
 		require.NoError(t, err)
@@ -226,6 +231,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 					},
 				},
 			},
+			nil,
 		)
 
 		require.Error(t, err)
@@ -237,6 +243,68 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		require.Len(t, version.Edges, 1)
 		assert.Equal(t, "node-a", version.Edges[0].SourceID)
 		assert.Equal(t, "node-b", version.Edges[0].TargetID)
+	})
+
+	t.Run("applies auto layout when requested", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				testCanvasNode("node-a", "Node A", map[string]any{"foo": "value"}),
+				testCanvasNode("node-b", "Node B", map[string]any{"bar": "value"}),
+			},
+			nil,
+		)
+
+		draftVersion := createCanvasDraftVersionFromLive(t, canvas.ID, *canvas.LiveVersionID, r.User)
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+		response, err := ApplyCanvasVersionChangeset(
+			ctx,
+			r.Registry,
+			r.Organization.ID,
+			canvas.ID,
+			draftVersion.ID,
+			&pb.CanvasChangeset{
+				Changes: []*pb.CanvasChangeset_Change{
+					{
+						Type: pb.CanvasChangeset_Change_ADD_EDGE,
+						Edge: &pb.CanvasChangeset_Change_Edge{
+							SourceId: "node-a",
+							TargetId: "node-b",
+							Channel:  "default",
+						},
+					},
+				},
+			},
+			&pb.CanvasAutoLayout{
+				Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+				Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
+			},
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Version)
+		require.NotNil(t, response.Version.Spec)
+
+		nodeA := findProtoNode(response.Version.Spec.Nodes, "node-a")
+		nodeB := findProtoNode(response.Version.Spec.Nodes, "node-b")
+		require.NotNil(t, nodeA)
+		require.NotNil(t, nodeB)
+		require.NotNil(t, nodeA.Position)
+		require.NotNil(t, nodeB.Position)
+		assert.Greater(t, nodeB.Position.X, nodeA.Position.X)
+
+		version, findErr := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
+		require.NoError(t, findErr)
+
+		storedNodeA := findModelNode(version.Nodes, "node-a")
+		storedNodeB := findModelNode(version.Nodes, "node-b")
+		require.NotNil(t, storedNodeA)
+		require.NotNil(t, storedNodeB)
+		assert.Greater(t, storedNodeB.Position.X, storedNodeA.Position.X)
 	})
 }
 
@@ -266,6 +334,16 @@ func findProtoNode(nodes []*componentpb.Node, nodeID string) *componentpb.Node {
 	for _, node := range nodes {
 		if node.GetId() == nodeID {
 			return node
+		}
+	}
+
+	return nil
+}
+
+func findModelNode(nodes []models.Node, nodeID string) *models.Node {
+	for i := range nodes {
+		if nodes[i].ID == nodeID {
+			return &nodes[i]
 		}
 	}
 
