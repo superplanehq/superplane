@@ -2,6 +2,7 @@
 
 export {
   agentsCreateAgentChat,
+  agentsDeleteAgentChat,
   agentsDescribeAgentChat,
   agentsListAgentChatMessages,
   agentsListAgentChats,
@@ -119,6 +120,12 @@ export type {
   AgentsCreateAgentChatResponse,
   AgentsCreateAgentChatResponse2,
   AgentsCreateAgentChatResponses,
+  AgentsDeleteAgentChatData,
+  AgentsDeleteAgentChatError,
+  AgentsDeleteAgentChatErrors,
+  AgentsDeleteAgentChatResponse,
+  AgentsDeleteAgentChatResponse2,
+  AgentsDeleteAgentChatResponses,
   AgentsDescribeAgentChatData,
   AgentsDescribeAgentChatError,
   AgentsDescribeAgentChatErrors,

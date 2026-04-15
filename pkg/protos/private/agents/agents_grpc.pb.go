@@ -23,6 +23,7 @@ const (
 	Agents_ListAgentChats_FullMethodName                 = "/Superplane.Internal.Agents.Agents/ListAgentChats"
 	Agents_DescribeAgentChat_FullMethodName              = "/Superplane.Internal.Agents.Agents/DescribeAgentChat"
 	Agents_ListAgentChatMessages_FullMethodName          = "/Superplane.Internal.Agents.Agents/ListAgentChatMessages"
+	Agents_DeleteAgentChat_FullMethodName                = "/Superplane.Internal.Agents.Agents/DeleteAgentChat"
 	Agents_DescribeOrganizationAgentUsage_FullMethodName = "/Superplane.Internal.Agents.Agents/DescribeOrganizationAgentUsage"
 )
 
@@ -38,6 +39,7 @@ type AgentsClient interface {
 	ListAgentChats(ctx context.Context, in *ListAgentChatsRequest, opts ...grpc.CallOption) (*ListAgentChatsResponse, error)
 	DescribeAgentChat(ctx context.Context, in *DescribeAgentChatRequest, opts ...grpc.CallOption) (*DescribeAgentChatResponse, error)
 	ListAgentChatMessages(ctx context.Context, in *ListAgentChatMessagesRequest, opts ...grpc.CallOption) (*ListAgentChatMessagesResponse, error)
+	DeleteAgentChat(ctx context.Context, in *DeleteAgentChatRequest, opts ...grpc.CallOption) (*DeleteAgentChatResponse, error)
 	DescribeOrganizationAgentUsage(ctx context.Context, in *DescribeOrganizationAgentUsageRequest, opts ...grpc.CallOption) (*DescribeOrganizationAgentUsageResponse, error)
 }
 
@@ -89,6 +91,16 @@ func (c *agentsClient) ListAgentChatMessages(ctx context.Context, in *ListAgentC
 	return out, nil
 }
 
+func (c *agentsClient) DeleteAgentChat(ctx context.Context, in *DeleteAgentChatRequest, opts ...grpc.CallOption) (*DeleteAgentChatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAgentChatResponse)
+	err := c.cc.Invoke(ctx, Agents_DeleteAgentChat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentsClient) DescribeOrganizationAgentUsage(ctx context.Context, in *DescribeOrganizationAgentUsageRequest, opts ...grpc.CallOption) (*DescribeOrganizationAgentUsageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DescribeOrganizationAgentUsageResponse)
@@ -111,6 +123,7 @@ type AgentsServer interface {
 	ListAgentChats(context.Context, *ListAgentChatsRequest) (*ListAgentChatsResponse, error)
 	DescribeAgentChat(context.Context, *DescribeAgentChatRequest) (*DescribeAgentChatResponse, error)
 	ListAgentChatMessages(context.Context, *ListAgentChatMessagesRequest) (*ListAgentChatMessagesResponse, error)
+	DeleteAgentChat(context.Context, *DeleteAgentChatRequest) (*DeleteAgentChatResponse, error)
 	DescribeOrganizationAgentUsage(context.Context, *DescribeOrganizationAgentUsageRequest) (*DescribeOrganizationAgentUsageResponse, error)
 }
 
@@ -132,6 +145,9 @@ func (UnimplementedAgentsServer) DescribeAgentChat(context.Context, *DescribeAge
 }
 func (UnimplementedAgentsServer) ListAgentChatMessages(context.Context, *ListAgentChatMessagesRequest) (*ListAgentChatMessagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAgentChatMessages not implemented")
+}
+func (UnimplementedAgentsServer) DeleteAgentChat(context.Context, *DeleteAgentChatRequest) (*DeleteAgentChatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAgentChat not implemented")
 }
 func (UnimplementedAgentsServer) DescribeOrganizationAgentUsage(context.Context, *DescribeOrganizationAgentUsageRequest) (*DescribeOrganizationAgentUsageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DescribeOrganizationAgentUsage not implemented")
@@ -228,6 +244,24 @@ func _Agents_ListAgentChatMessages_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agents_DeleteAgentChat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAgentChatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentsServer).DeleteAgentChat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agents_DeleteAgentChat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentsServer).DeleteAgentChat(ctx, req.(*DeleteAgentChatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Agents_DescribeOrganizationAgentUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DescribeOrganizationAgentUsageRequest)
 	if err := dec(in); err != nil {
@@ -268,6 +302,10 @@ var Agents_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAgentChatMessages",
 			Handler:    _Agents_ListAgentChatMessages_Handler,
+		},
+		{
+			MethodName: "DeleteAgentChat",
+			Handler:    _Agents_DeleteAgentChat_Handler,
 		},
 		{
 			MethodName: "DescribeOrganizationAgentUsage",

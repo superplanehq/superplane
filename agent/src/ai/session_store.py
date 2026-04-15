@@ -371,6 +371,11 @@ class SessionStore:
 
         return [self._row_to_agent_chat(row) for row in rows]
 
+    def delete_agent_chat(self, org_id: str, user_id: str, canvas_id: str, chat_id: str) -> None:
+        self.describe_agent_chat(org_id, user_id, canvas_id, chat_id)
+        with self._cursor() as cur:
+            cur.execute("DELETE FROM agent_chats WHERE id = %s", (chat_id,))
+
     def describe_agent_chat(
         self, org_id: str, user_id: str, canvas_id: str, chat_id: str
     ) -> StoredAgentChat:
