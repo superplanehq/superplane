@@ -454,10 +454,13 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      if (response?.data?.version?.metadata?.id) {
+        analytics.canvasPublished(canvasId, organizationId);
+      }
     },
   });
 };
