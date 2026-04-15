@@ -4556,6 +4556,9 @@
       "properties": {
         "changeset": {
           "$ref": "#/definitions/CanvasesCanvasChangeset"
+        },
+        "autoLayout": {
+          "$ref": "#/definitions/CanvasesCanvasAutoLayout"
         }
       }
     },

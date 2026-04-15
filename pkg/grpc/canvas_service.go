@@ -124,6 +124,7 @@ func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb
 		canvasID,
 		versionID,
 		req.Changeset,
+		req.AutoLayout,
 	)
 }
 

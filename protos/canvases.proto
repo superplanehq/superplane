@@ -511,6 +511,7 @@ message ApplyCanvasVersionChangesetRequest {
   string canvas_id = 1;
   string version_id = 2;
   CanvasChangeset changeset = 3;
+  CanvasAutoLayout auto_layout = 4;
 }
 
 message ApplyCanvasVersionChangesetResponse {
