@@ -1,10 +1,10 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { MoreVertical, RotateCcw, Pencil, Settings } from "lucide-react";
-import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
-import { useNavigate, useParams } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { MoreVertical, Pencil, RotateCcw, Settings } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Button } from "../button";
 
 type HeaderMode = "default" | "version-live" | "version-edit";
 
@@ -70,7 +70,7 @@ export function Header({
     : publishVersionLabel;
 
   return (
-    <header className="border-b border-slate-950/15 bg-white">
+    <header>
       <PageHeader
         organizationId={organizationId}
         onLogoClick={onLogoClick}
@@ -195,7 +195,7 @@ function SecondaryHeader({
   onEnterEditMode?: () => void;
 }) {
   return (
-    <div className="relative flex h-12 items-center justify-end gap-2 px-4">
+    <div className="relative flex h-12 items-center justify-end gap-2 px-4 bg-slate-100 border-b border-slate-950/15">
       {isDefaultMode && onSave && !saveButtonHidden ? (
         <SaveButton
           onSave={onSave}
