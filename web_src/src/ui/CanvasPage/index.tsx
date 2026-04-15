@@ -81,7 +81,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
-import { Header, type BreadcrumbItem } from "./Header";
+import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -154,8 +154,8 @@ export interface CanvasPageProps {
   edges: CanvasEdge[];
 
   startCollapsed?: boolean;
+  /** Display name for the canvas header (center title). */
   title?: string;
-  breadcrumbs?: BreadcrumbItem[];
   headerBanner?: React.ReactNode;
   organizationId?: string;
   canvasId?: string;
@@ -1156,6 +1156,7 @@ function CanvasPage(props: CanvasPageProps) {
       <div className="relative z-30">
         <CanvasContentHeader
           state={state}
+          canvasName={props.title ?? ""}
           onSave={props.onSave}
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}
@@ -1686,6 +1687,7 @@ function Sidebar({
 
 function CanvasContentHeader({
   state,
+  canvasName,
   onSave,
   organizationId,
   unsavedMessage,
@@ -1710,6 +1712,7 @@ function CanvasContentHeader({
   onExportYamlDownload,
 }: {
   state: CanvasPageState;
+  canvasName: string;
   onSave?: (nodes: CanvasNode[]) => void;
   organizationId?: string;
   unsavedMessage?: string;
@@ -1762,7 +1765,7 @@ function CanvasContentHeader({
 
   return (
     <Header
-      breadcrumbs={state.breadcrumbs}
+      canvasName={canvasName}
       onSave={onSave ? handleSave : undefined}
       onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}

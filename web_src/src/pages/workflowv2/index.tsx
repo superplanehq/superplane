@@ -4982,7 +4982,7 @@ export function WorkflowPageV2() {
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
-          title={canvas?.metadata?.name || "Canvas"}
+          title={canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas")}
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
@@ -5123,15 +5123,6 @@ export function WorkflowPageV2() {
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
-          breadcrumbs={[
-            {
-              label: isTemplate ? "Templates" : "Canvases",
-              href: isTemplate ? `/${organizationId}/templates` : `/${organizationId}`,
-            },
-            {
-              label: canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
-            },
-          ]}
           versionControlSidebar={
             !hasEditableVersion ? (
               <CanvasVersionControlSidebar

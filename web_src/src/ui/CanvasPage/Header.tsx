@@ -2,27 +2,18 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { ChevronDown, MoreVertical, RotateCcw, Pencil, Settings } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
-import { useCanvases } from "@/hooks/useCanvasData";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-
-export interface BreadcrumbItem {
-  label: string;
-  onClick?: () => void;
-  href?: string;
-  iconSrc?: string;
-  iconSlug?: string;
-  iconColor?: string;
-}
 
 type HeaderMode = "default" | "version-live" | "version-edit";
 
 type CanvasTopViewTab = "canvas" | "yaml" | "cli";
 
 interface HeaderProps {
-  breadcrumbs: BreadcrumbItem[];
+  /** Shown centered in the top bar (canvas or template display name). */
+  canvasName: string;
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
@@ -54,7 +45,7 @@ interface HeaderProps {
 }
 
 export function Header({
-  breadcrumbs,
+  canvasName,
   onSave,
   onPublishVersion,
   onDiscardVersion,
@@ -84,21 +75,9 @@ export function Header({
   const navigate = useNavigate();
   const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
   const activeCanvasId = canvasIdParam || workflowId;
-  const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
 
-  const currentWorkflowName = (() => {
-    if (activeCanvasId) {
-      const workflow = workflows.find((w) => w.metadata?.id === activeCanvasId);
-      if (workflow?.metadata?.name) {
-        return workflow.metadata.name;
-      }
-    }
-    if (breadcrumbs.length > 1 && breadcrumbs[1]?.label) {
-      return breadcrumbs[1].label;
-    }
-    return breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : "";
-  })();
+  const headerTitle = canvasName.trim() || "Canvas";
 
   const isDefaultMode = mode === "default";
   const showEditButton = mode === "version-live";
@@ -118,9 +97,7 @@ export function Header({
           <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
         </div>
         <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
-          <span className="truncate text-center text-sm font-medium text-slate-900">
-            {currentWorkflowName || (workflowsLoading ? "Loading…" : "Canvas")}
-          </span>
+          <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
         </div>
         <div className="relative z-10 ml-auto flex shrink-0 items-center">
           {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
