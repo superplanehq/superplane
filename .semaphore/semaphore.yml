@@ -75,7 +75,7 @@ blocks:
   - name: "Agent Tests"
     dependencies: []
     run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'}) OR change_in('/agent/**/*.md', {default_branch: 'main'}) OR change_in('/agent/**/*.mdx', {default_branch: 'main'})"
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
