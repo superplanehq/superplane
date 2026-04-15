@@ -13,12 +13,11 @@ import logging
 from typing import Any
 
 from ai.models import (
-    AddNodeOperation,
     CanvasAnswer,
-    CanvasOperation,
-    CanvasOperationNodeRef,
+    CanvasChange,
+    CanvasChangeNode,
+    CanvasChangeType,
     CanvasSummary,
-    UpdateNodeConfigOperation,
 )
 from ai.superplane_client import SuperplaneClient
 
@@ -180,13 +179,13 @@ def _cached_block_fields(
     return fields
 
 
-def _block_name_from_canvas(ref: CanvasOperationNodeRef, canvas: CanvasSummary) -> str | None:
-    node_id = ref.node_id
+def _block_name_from_canvas(node_ref: CanvasChangeNode, canvas: CanvasSummary) -> str | None:
+    node_id = node_ref.id
     if isinstance(node_id, str) and node_id:
         for node in canvas.nodes:
             if node.id == node_id:
                 return node.block_name
-    node_name = ref.node_name
+    node_name = node_ref.name
     if isinstance(node_name, str) and node_name:
         for node in canvas.nodes:
             if node.name == node_name or node.id == node_name:
@@ -195,55 +194,68 @@ def _block_name_from_canvas(ref: CanvasOperationNodeRef, canvas: CanvasSummary) 
 
 
 def _resolve_block_name_for_update(
-    op: UpdateNodeConfigOperation,
-    block_by_node_key: dict[str, str],
+    change: CanvasChange,
+    block_by_node_id: dict[str, str],
     canvas: CanvasSummary | None,
 ) -> str | None:
-    key = op.target.node_key
-    if isinstance(key, str) and key:
-        resolved = block_by_node_key.get(key)
+    node_ref = change.node
+    if node_ref is None:
+        return None
+
+    if isinstance(node_ref.block, str) and node_ref.block:
+        return node_ref.block
+
+    node_id = node_ref.id
+    if isinstance(node_id, str) and node_id:
+        resolved = block_by_node_id.get(node_id)
         if resolved:
             return resolved
     if canvas is not None:
-        return _block_name_from_canvas(op.target, canvas)
+        return _block_name_from_canvas(node_ref, canvas)
     return None
 
 
-def _coerce_operations(
+def _coerce_changes(
     client: SuperplaneClient,
-    operations: list[CanvasOperation],
+    changes: list[CanvasChange],
     canvas: CanvasSummary | None,
     schema_cache: dict[str, list[dict[str, Any]] | None],
-) -> list[CanvasOperation]:
-    block_by_node_key: dict[str, str] = {}
-    new_ops: list[CanvasOperation] = []
+) -> list[CanvasChange]:
+    block_by_node_id: dict[str, str] = {}
+    new_changes: list[CanvasChange] = []
 
-    for op in operations:
-        if isinstance(op, AddNodeOperation):
-            if op.node_key:
-                block_by_node_key[op.node_key] = op.block_name
-            fields = _cached_block_fields(client, op.block_name, schema_cache)
-            if fields:
-                new_config = coerce_configuration(dict(op.configuration), fields)
-                new_ops.append(op.model_copy(update={"configuration": new_config}))
-            else:
-                new_ops.append(op)
+    for change in changes:
+        if change.type == CanvasChangeType.ADD_NODE and change.node is not None:
+            node = change.node
+            if isinstance(node.id, str) and node.id and isinstance(node.block, str) and node.block:
+                block_by_node_id[node.id] = node.block
+
+            if isinstance(node.block, str) and node.block and isinstance(node.configuration, dict):
+                fields = _cached_block_fields(client, node.block, schema_cache)
+                if fields:
+                    new_config = coerce_configuration(dict(node.configuration), fields)
+                    new_node = node.model_copy(update={"configuration": new_config})
+                    new_changes.append(change.model_copy(update={"node": new_node}))
+                    continue
+
+            new_changes.append(change)
             continue
 
-        if isinstance(op, UpdateNodeConfigOperation):
-            block_name = _resolve_block_name_for_update(op, block_by_node_key, canvas)
-            if block_name:
+        if change.type == CanvasChangeType.UPDATE_NODE and change.node is not None:
+            block_name = _resolve_block_name_for_update(change, block_by_node_id, canvas)
+            if block_name and isinstance(change.node.configuration, dict):
                 fields = _cached_block_fields(client, block_name, schema_cache)
                 if fields:
-                    new_config = coerce_configuration(dict(op.configuration), fields)
-                    new_ops.append(op.model_copy(update={"configuration": new_config}))
+                    new_config = coerce_configuration(dict(change.node.configuration), fields)
+                    new_node = change.node.model_copy(update={"configuration": new_config})
+                    new_changes.append(change.model_copy(update={"node": new_node}))
                     continue
-            new_ops.append(op)
+            new_changes.append(change)
             continue
 
-        new_ops.append(op)
+        new_changes.append(change)
 
-    return new_ops
+    return new_changes
 
 
 def coerce_canvas_answer_proposal(
@@ -251,15 +263,20 @@ def coerce_canvas_answer_proposal(
     answer: CanvasAnswer,
     canvas: CanvasSummary | None = None,
 ) -> CanvasAnswer:
-    if answer.proposal is None or not answer.proposal.operations:
+    if (
+        answer.proposal is None
+        or answer.proposal.changeset is None
+        or not answer.proposal.changeset.changes
+    ):
         return answer
 
     schema_cache: dict[str, list[dict[str, Any]] | None] = {}
-    new_operations = _coerce_operations(
+    new_changes = _coerce_changes(
         client,
-        list(answer.proposal.operations),
+        list(answer.proposal.changeset.changes),
         canvas,
         schema_cache,
     )
-    new_proposal = answer.proposal.model_copy(update={"operations": new_operations})
+    new_changeset = answer.proposal.changeset.model_copy(update={"changes": new_changes})
+    new_proposal = answer.proposal.model_copy(update={"changeset": new_changeset})
     return answer.model_copy(update={"proposal": new_proposal})
