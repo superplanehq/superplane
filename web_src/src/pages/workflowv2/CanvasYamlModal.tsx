@@ -71,9 +71,9 @@ function YamlEditor(props: CanvasYamlModalProps) {
 }
 
 function ImportButton(props: CanvasYamlModalProps) {
-  if (!props.onImport) return null;
-
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+
+  if (!props.onImport) return null;
 
   return (
     <>
@@ -95,7 +95,7 @@ function CopyButton(props: CanvasYamlModalProps) {
   if (!props.onCopy) return null;
 
   return (
-    <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(text)}>
+    <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(props.yamlText)}>
       <Copy />
       Copy
     </Button>
