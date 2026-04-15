@@ -1,8 +1,9 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { MoreVertical, Pencil, RotateCcw, Settings } from "lucide-react";
+import { MoreVertical, RotateCcw, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 
@@ -28,6 +29,9 @@ interface HeaderProps {
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When &gt; 0 (unpublished draft diff items), shown as badge count on the publish button in version edit mode. */
@@ -55,6 +59,9 @@ export function Header({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
   publishVersionLabel = "Publish",
   unpublishedDraftChangeCount = 0,
   showCanvasSettingsMenu = true,
@@ -62,7 +69,6 @@ export function Header({
   const headerTitle = canvasName.trim() || "Canvas";
 
   const isDefaultMode = mode === "default";
-  const showEditButton = mode === "version-live";
   const showVersionEditActions = mode === "version-edit";
   const hasChanges = unpublishedDraftChangeCount > 0;
   const publishButtonLabel = hasChanges
@@ -85,6 +91,7 @@ export function Header({
         saveDisabled={saveDisabled}
         saveDisabledTooltip={saveDisabledTooltip}
         saveIsPrimary={saveIsPrimary}
+        headerMode={mode}
         showVersionEditActions={showVersionEditActions}
         hasChanges={hasChanges}
         onDiscardVersion={onDiscardVersion}
@@ -94,10 +101,12 @@ export function Header({
         publishVersionDisabledTooltip={publishVersionDisabledTooltip}
         onPublishVersion={onPublishVersion}
         publishButtonLabel={publishButtonLabel}
-        showEditButton={showEditButton}
+        onEnterEditMode={onEnterEditMode}
         enterEditModeDisabled={enterEditModeDisabled}
         enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-        onEnterEditMode={onEnterEditMode}
+        onExitEditMode={onExitEditMode}
+        exitEditModeDisabled={exitEditModeDisabled}
+        exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       />
     </header>
   );
@@ -160,6 +169,7 @@ function SecondaryHeader({
   saveDisabled,
   saveDisabledTooltip,
   saveIsPrimary,
+  headerMode,
   showVersionEditActions,
   hasChanges,
   onDiscardVersion,
@@ -169,10 +179,12 @@ function SecondaryHeader({
   publishVersionDisabledTooltip,
   onPublishVersion,
   publishButtonLabel,
-  showEditButton,
+  onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
-  onEnterEditMode,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
 }: {
   isDefaultMode: boolean;
   onSave?: () => void;
@@ -180,6 +192,7 @@ function SecondaryHeader({
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
   saveIsPrimary?: boolean;
+  headerMode: HeaderMode;
   showVersionEditActions: boolean;
   hasChanges: boolean;
   onDiscardVersion?: () => void;
@@ -189,48 +202,63 @@ function SecondaryHeader({
   publishVersionDisabledTooltip?: string;
   onPublishVersion?: () => void;
   publishButtonLabel: string;
-  showEditButton: boolean;
+  onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
-  onEnterEditMode?: () => void;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
 }) {
-  return (
-    <div className="relative flex h-12 items-center justify-end gap-2 px-4 bg-slate-100 border-b border-slate-950/15">
-      {isDefaultMode && onSave && !saveButtonHidden ? (
-        <SaveButton
-          onSave={onSave}
-          saveDisabled={saveDisabled}
-          saveDisabledTooltip={saveDisabledTooltip}
-          saveIsPrimary={saveIsPrimary}
-        />
-      ) : null}
+  const showCanvasViewModeToggle = headerMode === "version-live" || headerMode === "version-edit";
+  const canvasViewMode = headerMode === "version-edit" ? "version-edit" : "version-live";
 
-      {showVersionEditActions ? (
-        <div className="flex items-center gap-2">
-          {hasChanges ? (
-            <DiscardDraftButton
-              onDiscard={() => onDiscardVersion?.()}
-              disabled={discardVersionDisabled || !onDiscardVersion}
-              disabledTooltip={discardVersionDisabledTooltip}
+  return (
+    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4">
+      <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
+        <div className="pointer-events-auto">
+          {showCanvasViewModeToggle && onEnterEditMode && onExitEditMode ? (
+            <CanvasViewModeToggle
+              mode={canvasViewMode}
+              onSelectEditor={onEnterEditMode}
+              onSelectLive={onExitEditMode}
+              enterEditorDisabled={!!enterEditModeDisabled}
+              enterEditorDisabledTooltip={enterEditModeDisabledTooltip}
+              exitEditorDisabled={!!exitEditModeDisabled}
+              exitEditorDisabledTooltip={exitEditModeDisabledTooltip}
             />
           ) : null}
-          <PublishVersionButton
-            onPublish={() => onPublishVersion?.()}
-            label={publishButtonLabel}
-            disabled={publishVersionDisabled || !onPublishVersion}
-            publishVersionDisabled={!!publishVersionDisabled}
-            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-          />
         </div>
-      ) : null}
+      </div>
 
-      {showEditButton ? (
-        <EnterEditModeButton
-          onClick={onEnterEditMode}
-          disabled={enterEditModeDisabled}
-          disabledTooltip={enterEditModeDisabledTooltip}
-        />
-      ) : null}
+      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
+        {isDefaultMode && onSave && !saveButtonHidden ? (
+          <SaveButton
+            onSave={onSave}
+            saveDisabled={saveDisabled}
+            saveDisabledTooltip={saveDisabledTooltip}
+            saveIsPrimary={saveIsPrimary}
+          />
+        ) : null}
+
+        {showVersionEditActions ? (
+          <div className="flex items-center gap-2">
+            {hasChanges ? (
+              <DiscardDraftButton
+                onDiscard={() => onDiscardVersion?.()}
+                disabled={discardVersionDisabled || !onDiscardVersion}
+                disabledTooltip={discardVersionDisabledTooltip}
+              />
+            ) : null}
+            <PublishVersionButton
+              onPublish={() => onPublishVersion?.()}
+              label={publishButtonLabel}
+              disabled={publishVersionDisabled || !onPublishVersion}
+              publishVersionDisabled={!!publishVersionDisabled}
+              publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -349,35 +377,78 @@ function PublishVersionButton({
   );
 }
 
-function EnterEditModeButton({
-  onClick,
-  disabled,
-  disabledTooltip,
+type CanvasViewMode = "version-live" | "version-edit";
+
+function CanvasViewModeToggle({
+  mode,
+  onSelectEditor,
+  onSelectLive,
+  enterEditorDisabled,
+  enterEditorDisabledTooltip,
+  exitEditorDisabled,
+  exitEditorDisabledTooltip,
 }: {
-  onClick?: () => void;
-  disabled?: boolean;
-  disabledTooltip?: string;
+  mode: CanvasViewMode;
+  onSelectEditor: () => void;
+  onSelectLive: () => void;
+  enterEditorDisabled: boolean;
+  enterEditorDisabledTooltip?: string;
+  exitEditorDisabled: boolean;
+  exitEditorDisabledTooltip?: string;
 }) {
-  if (disabled && disabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <UIButton type="button" variant="outline" size="sm" onClick={onClick} disabled={disabled}>
-              <Pencil className="size-3.5" />
-              Edit
-            </UIButton>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
+  const handleValueChange = (next: string) => {
+    if (next === "version-edit" && mode === "version-live") {
+      void onSelectEditor();
+    } else if (next === "version-live" && mode === "version-edit") {
+      void onSelectLive();
+    }
+  };
+
+  const editorDisabled = mode === "version-live" && enterEditorDisabled;
+  const liveDisabled = mode === "version-edit" && exitEditorDisabled;
+
+  const editorTrigger = (
+    <TabsTrigger
+      value="version-edit"
+      disabled={editorDisabled}
+      data-testid="canvas-view-mode-editor"
+      aria-label="Editor"
+    >
+      Editor
+    </TabsTrigger>
+  );
+
+  const liveTrigger = (
+    <TabsTrigger
+      value="version-live"
+      disabled={liveDisabled}
+      data-testid="canvas-view-mode-live"
+      aria-label="Live Canvas"
+    >
+      Live Canvas
+    </TabsTrigger>
+  );
 
   return (
-    <UIButton type="button" variant="outline" size="sm" onClick={onClick} disabled={disabled}>
-      <Pencil className="size-3.5" />
-      Edit
-    </UIButton>
+    <Tabs value={mode} onValueChange={handleValueChange} className="inline-flex w-auto" aria-label="Canvas view">
+      <TabsList className="h-8 w-fit gap-0">
+        {editorDisabled && enterEditorDisabledTooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{editorTrigger}</TooltipTrigger>
+            <TooltipContent side="top">{enterEditorDisabledTooltip}</TooltipContent>
+          </Tooltip>
+        ) : (
+          editorTrigger
+        )}
+        {liveDisabled && exitEditorDisabledTooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{liveTrigger}</TooltipTrigger>
+            <TooltipContent side="top">{exitEditorDisabledTooltip}</TooltipContent>
+          </Tooltip>
+        ) : (
+          liveTrigger
+        )}
+      </TabsList>
+    </Tabs>
   );
 }
