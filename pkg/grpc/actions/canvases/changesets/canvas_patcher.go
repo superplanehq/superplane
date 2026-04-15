@@ -56,7 +56,7 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 	return p.finalVersion
 }
 
-func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) *models.CanvasVersion {
+func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*models.CanvasVersion, error) {
 	v := &models.CanvasVersion{
 		ID:          p.originalVersion.ID,
 		WorkflowID:  p.originalVersion.WorkflowID,
@@ -91,12 +91,12 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) *mode
 
 	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, autoLayout)
 	if err != nil {
-		return v
+		return nil, err
 	}
 
 	v.Nodes = nodes
 	v.Edges = edges
-	return v
+	return v, nil
 }
 
 func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, layout *pb.CanvasAutoLayout) error {
@@ -105,13 +105,17 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, layout *pb
 	}
 
 	for _, change := range changeset.Changes {
-		err := p.handleChange(change)
-		if err != nil {
+		if err := p.handleChange(change); err != nil {
 			return err
 		}
 	}
 
-	p.finalVersion = p.buildFinalVersion(layout)
+	finalVersion, err := p.buildFinalVersion(layout)
+	if err != nil {
+		return err
+	}
+
+	p.finalVersion = finalVersion
 	return CheckForCycles(p.finalVersion.Nodes, p.finalVersion.Edges)
 }
 

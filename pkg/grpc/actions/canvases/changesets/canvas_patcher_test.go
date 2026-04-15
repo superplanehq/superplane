@@ -125,6 +125,41 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 	})
 
+	t.Run("returns error when auto layout is invalid", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{
+					ID:   "node-a",
+					Name: "Node A",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:   "node-a",
+						Name: "Node A Updated",
+					},
+				},
+			},
+		}, &pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED,
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("layout.algorithm is required")
+		require.Nil(t, steps.finalVersion)
+	})
+
 	t.Run("update node -> no configuration provided, previous configuration is preserved", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
