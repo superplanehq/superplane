@@ -83,7 +83,7 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasCliView } from "./CanvasCliView";
-import { CanvasMemoryView } from "./CanvasMemoryView";
+import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
@@ -520,6 +520,7 @@ export function WorkflowPageV2() {
   );
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
+  const [isMemoryViewModalOpen, setIsMemoryViewModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
       return true;
@@ -4994,21 +4995,7 @@ export function WorkflowPageV2() {
               : undefined;
 
   const dataViewContent =
-    resolvedTopViewMode === "cli" ? (
-      <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
-    ) : resolvedTopViewMode === "memory" ? (
-      <CanvasMemoryView
-        entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
-        isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
-        errorMessage={
-          isViewingDraftVersion ? undefined : canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined
-        }
-        onDeleteEntry={
-          canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
-        }
-        deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
-      />
-    ) : null;
+    resolvedTopViewMode === "cli" ? <CanvasCliView canvasId={canvasId} organizationId={organizationId} /> : null;
 
   return (
     <>
@@ -5039,6 +5026,7 @@ export function WorkflowPageV2() {
           hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           dataViewContent={dataViewContent}
+          onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
           edges={edges}
@@ -5212,6 +5200,19 @@ export function WorkflowPageV2() {
           isImporting={hasLocalSaveActivity}
         />
       ) : null}
+      <CanvasMemoryModal
+        open={isMemoryViewModalOpen}
+        onOpenChange={setIsMemoryViewModalOpen}
+        entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
+        isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
+        errorMessage={
+          isViewingDraftVersion ? undefined : canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined
+        }
+        onDeleteEntry={
+          canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
+        }
+        deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+      />
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver
