@@ -175,6 +175,17 @@ def validate_value_for_field(field: dict[str, Any], value: Any) -> str | None:
     return None
 
 
+def _go_fmt_value(value: Any) -> str:
+    """Format *value* the way Go's ``fmt.Sprintf("%v", ...)`` would.
+
+    Python's ``str(True)`` gives ``"True"`` while Go gives ``"true"``.
+    Schema condition values follow Go conventions, so we must match them.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 def _is_required_by_condition(
     field: dict[str, Any],
     configuration: dict[str, Any],
@@ -190,7 +201,7 @@ def _is_required_by_condition(
         if not isinstance(cond_field, str) or not isinstance(cond_values, list):
             continue
         cond_value = configuration.get(cond_field)
-        if cond_value is not None and str(cond_value) in [str(v) for v in cond_values]:
+        if cond_value is not None and _go_fmt_value(cond_value) in [str(v) for v in cond_values]:
             return True
     return False
 
@@ -229,10 +240,12 @@ def validate_proposal_operations(
     client: SuperplaneClient,
     operations: list[CanvasOperation],
     canvas: CanvasSummary | None,
+    schema_cache: dict[str, list[dict[str, Any]] | None] | None = None,
 ) -> list[str]:
     """Validate all operations in a proposal. Return error messages."""
     errors: list[str] = []
-    schema_cache: dict[str, list[dict[str, Any]] | None] = {}
+    if schema_cache is None:
+        schema_cache = {}
     block_by_node_key: dict[str, str] = {}
 
     for op in operations:

@@ -423,3 +423,20 @@ def test_validate_configuration_conditional_required_not_met() -> None:
     ]
     errors = validate_configuration({"method": "GET"}, fields)
     assert errors == []
+
+
+def test_validate_configuration_conditional_required_with_boolean() -> None:
+    """Python str(True) gives 'True' but Go gives 'true'; condition values use Go convention."""
+    fields = [
+        _field(name="enabled", ftype="boolean"),
+        _field(
+            name="target",
+            ftype="string",
+            required=False,
+            required_conditions=[{"field": "enabled", "values": ["true"]}],
+        ),
+    ]
+    errors = validate_configuration({"enabled": True}, fields)
+    assert len(errors) == 1
+    assert "required" in errors[0]
+    assert "target" in errors[0]
