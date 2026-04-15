@@ -86,7 +86,7 @@ import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
-import { CanvasYamlView } from "./CanvasYamlView";
+import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
@@ -512,6 +512,7 @@ export function WorkflowPageV2() {
     [applyTopViewMode],
   );
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
+  const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
       return true;
@@ -5050,16 +5051,7 @@ export function WorkflowPageV2() {
               : undefined;
 
   const dataViewContent =
-    resolvedTopViewMode === "yaml" && yamlPayload ? (
-      <CanvasYamlView
-        yamlText={yamlPayload.yamlText}
-        filename={yamlPayload.filename}
-        onCopy={handleYamlViewCopy}
-        onDownload={handleYamlViewDownload}
-        onImport={!isReadOnly ? handleImportYaml : undefined}
-        isImporting={hasLocalSaveActivity}
-      />
-    ) : resolvedTopViewMode === "cli" ? (
+    resolvedTopViewMode === "cli" ? (
       <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
     ) : resolvedTopViewMode === "memory" ? (
       <CanvasMemoryView
@@ -5106,18 +5098,7 @@ export function WorkflowPageV2() {
           hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           dataViewContent={dataViewContent}
-          yamlEditorModalBody={
-            yamlPayload ? (
-              <CanvasYamlView
-                yamlText={yamlPayload.yamlText}
-                filename={yamlPayload.filename}
-                onCopy={handleYamlViewCopy}
-                onDownload={handleYamlViewDownload}
-                onImport={!isReadOnly ? handleImportYaml : undefined}
-                isImporting={hasLocalSaveActivity}
-              />
-            ) : undefined
-          }
+          onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
           edges={edges}
           organizationId={organizationId}
@@ -5258,6 +5239,18 @@ export function WorkflowPageV2() {
           }
         />
       </div>
+      {yamlPayload ? (
+        <CanvasYamlModal
+          open={isYamlViewModalOpen}
+          onOpenChange={setIsYamlViewModalOpen}
+          yamlText={yamlPayload.yamlText}
+          filename={yamlPayload.filename}
+          onCopy={handleYamlViewCopy}
+          onDownload={handleYamlViewDownload}
+          onImport={!isReadOnly ? handleImportYaml : undefined}
+          isImporting={hasLocalSaveActivity}
+        />
+      ) : null}
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver

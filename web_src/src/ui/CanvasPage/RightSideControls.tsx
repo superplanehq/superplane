@@ -7,10 +7,10 @@ export type RightSideControlsProps = {
   readOnly: boolean;
   onSidebarOpen: () => void;
   onAddNote: () => void | Promise<void>;
-  onOpenYamlModal: () => void;
+  onYamlOpen: () => void;
 };
 
-export function RightSideControls({ readOnly, onSidebarOpen, onAddNote, onOpenYamlModal }: RightSideControlsProps) {
+export function RightSideControls({ readOnly, onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {
   if (readOnly) {
     return null;
   }
@@ -19,7 +19,7 @@ export function RightSideControls({ readOnly, onSidebarOpen, onAddNote, onOpenYa
     <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
       <ControlButton tooltip="Add component" onClick={onSidebarOpen} testId="open-sidebar-button" icon={<Plus />} />
       <ControlButton tooltip="Add note" onClick={onAddNote} testId="add-note-button" icon={<StickyNote />} />
-      <ControlButton tooltip="YAML" onClick={onOpenYamlModal} testId="open-yaml-modal-button" icon={<Code2 />} />
+      <ControlButton tooltip="YAML" onClick={onYamlOpen} testId="open-yaml-modal-button" icon={<Code2 />} />
     </div>
   );
 }
