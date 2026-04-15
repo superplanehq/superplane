@@ -36,49 +36,49 @@ export function validateApproverConfig(
   const seenRoles = new Set<string>();
 
   approvers.forEach((approver, index) => {
-    if (approver.type === "TYPE_ANYONE") {
-      if (hasAnyUserApprover) {
-        itemErrors[index].type = "Duplicate any-user approver is not allowed";
+    switch (approver.type) {
+      case "TYPE_ANYONE": {
+        if (hasAnyUserApprover) {
+          itemErrors[index].type = "Duplicate any-user approver is not allowed";
+        } else {
+          hasAnyUserApprover = true;
+        }
+        break;
       }
-      hasAnyUserApprover = true;
-      return;
-    }
 
-    if (approver.type === "TYPE_USER") {
-      const userId = (approver.userId || "").trim();
-      if (!userId) {
-        itemErrors[index].userId = "User is required";
-        return;
+      case "TYPE_USER": {
+        const userId = (approver.userId || "").trim();
+        if (!userId) {
+          itemErrors[index].userId = "User is required";
+        } else if (!availableUserIDs.has(userId)) {
+          itemErrors[index].userId = "Selected user was not found in this organization";
+        } else if (seenUsers.has(userId)) {
+          itemErrors[index].userId = "Duplicate user approver is not allowed";
+        } else {
+          seenUsers.add(userId);
+        }
+        break;
       }
-      if (!availableUserIDs.has(userId)) {
-        itemErrors[index].userId = "Selected user was not found in this organization";
-      }
-      if (seenUsers.has(userId)) {
-        itemErrors[index].userId = "Duplicate user approver is not allowed";
-        return;
-      }
-      seenUsers.add(userId);
-      return;
-    }
 
-    if (approver.type === "TYPE_ROLE") {
-      const roleName = (approver.roleName || "").trim();
-      if (!roleName) {
-        itemErrors[index].roleName = "Role is required";
-        return;
+      case "TYPE_ROLE": {
+        const roleName = (approver.roleName || "").trim();
+        if (!roleName) {
+          itemErrors[index].roleName = "Role is required";
+        } else if (!availableRoleNames.has(roleName)) {
+          itemErrors[index].roleName = "Selected role was not found in this organization";
+        } else if (seenRoles.has(roleName)) {
+          itemErrors[index].roleName = "Duplicate role approver is not allowed";
+        } else {
+          seenRoles.add(roleName);
+        }
+        break;
       }
-      if (!availableRoleNames.has(roleName)) {
-        itemErrors[index].roleName = "Selected role was not found in this organization";
-      }
-      if (seenRoles.has(roleName)) {
-        itemErrors[index].roleName = "Duplicate role approver is not allowed";
-        return;
-      }
-      seenRoles.add(roleName);
-      return;
-    }
 
-    itemErrors[index].type = "Unsupported approver type";
+      default: {
+        itemErrors[index].type = "Unsupported approver type";
+        return;
+      }
+    }
   });
 
   return { formErrors, itemErrors };
