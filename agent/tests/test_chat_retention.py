@@ -78,6 +78,22 @@ def test_run_cleanup_does_not_propagate_errors() -> None:
     store.delete_expired_chats_for_org.assert_not_called()
 
 
+def test_run_cleanup_continues_after_per_org_error() -> None:
+    store = MagicMock()
+    store.list_distinct_org_ids = MagicMock(return_value=["org-bad", "org-good"])
+    store.delete_expired_chats_for_org = MagicMock(
+        side_effect=[RuntimeError("lock timeout"), 3]
+    )
+    checker = _make_limit_checker(retention_days=14)
+
+    with patch("ai.chat_retention.config") as mock_config:
+        mock_config.chat_retention_days = 14
+        asyncio.run(run_cleanup(store, checker))
+
+    assert store.delete_expired_chats_for_org.call_count == 2
+    store.delete_expired_chats_for_org.assert_any_call("org-good", 14)
+
+
 def test_start_chat_retention_scheduler_returns_running_scheduler() -> None:
     store = MagicMock()
     store.list_distinct_org_ids = MagicMock(return_value=[])

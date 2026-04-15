@@ -26,8 +26,13 @@ async def run_cleanup(store: SessionStore, limit_checker: AgentUsageLimitChecker
     fallback_days = config.chat_retention_days
     try:
         org_ids = await asyncio.to_thread(store.list_distinct_org_ids)
-        total = 0
-        for org_id in org_ids:
+    except Exception:
+        logger.exception("agent chat retention: failed to list orgs")
+        return
+
+    total = 0
+    for org_id in org_ids:
+        try:
             retention_days = await _resolve_retention_days(limit_checker, org_id, fallback_days)
             if retention_days <= 0:
                 continue
@@ -35,10 +40,11 @@ async def run_cleanup(store: SessionStore, limit_checker: AgentUsageLimitChecker
                 store.delete_expired_chats_for_org, org_id, retention_days
             )
             total += deleted
-        if total > 0:
-            logger.info("agent chat retention: deleted %d expired chat(s)", total)
-    except Exception:
-        logger.exception("agent chat retention: error during cleanup")
+        except Exception:
+            logger.exception("agent chat retention: error cleaning up org %s", org_id)
+
+    if total > 0:
+        logger.info("agent chat retention: deleted %d expired chat(s)", total)
 
 
 def start_chat_retention_scheduler(
