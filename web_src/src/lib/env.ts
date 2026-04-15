@@ -9,3 +9,7 @@ export function isAgentEnabled(): boolean {
 export const isUsagePageForced = () => {
   return import.meta.env.VITE_FORCE_USAGE_PAGE === "true";
 };
+
+export const isChangeManagementSettingsEnabled = () => {
+  return import.meta.env.VITE_CHANGE_MANAGEMENT_SETTINGS === "true";
+};
