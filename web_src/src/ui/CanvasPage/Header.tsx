@@ -72,9 +72,6 @@ export function Header({
   unpublishedDraftChangeCount = 0,
   showCanvasSettingsMenu = true,
 }: HeaderProps) {
-  const navigate = useNavigate();
-  const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
-  const activeCanvasId = canvasIdParam || workflowId;
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
 
   const headerTitle = canvasName.trim() || "Canvas";
@@ -91,38 +88,12 @@ export function Header({
 
   return (
     <header className="border-b border-slate-950/15 bg-white">
-      {/* Top bar: nav + title + canvas menu */}
-      <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
-        <div className="relative z-10 flex min-w-0 shrink-0 items-center">
-          <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
-          <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
-        </div>
-        <div className="relative z-10 ml-auto flex shrink-0 items-center">
-          {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <UIButton
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-slate-600"
-                  aria-label="Canvas menu"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </UIButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`)}>
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
-      </div>
+      <PageHeader
+        organizationId={organizationId}
+        onLogoClick={onLogoClick}
+        headerTitle={headerTitle}
+        showCanvasSettingsMenu={showCanvasSettingsMenu}
+      />
 
       {showSecondaryHeaderRow ? (
         <div className="relative grid h-12 grid-cols-3 items-center px-4">
@@ -323,5 +294,55 @@ export function Header({
         </div>
       ) : null}
     </header>
+  );
+}
+
+function PageHeader({
+  organizationId,
+  onLogoClick,
+  headerTitle,
+  showCanvasSettingsMenu = true,
+}: {
+  organizationId?: string;
+  onLogoClick?: () => void;
+  headerTitle: string;
+  showCanvasSettingsMenu?: boolean;
+}) {
+  const navigate = useNavigate();
+  const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
+  const activeCanvasId = canvasIdParam || workflowId;
+
+  return (
+    <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
+      <div className="relative z-10 flex min-w-0 shrink-0 items-center">
+        <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
+        <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
+      </div>
+      <div className="relative z-10 ml-auto flex shrink-0 items-center">
+        {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <UIButton
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-slate-600"
+                aria-label="Canvas menu"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </UIButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`)}>
+                <Settings className="h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </div>
+    </div>
   );
 }
