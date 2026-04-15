@@ -72,8 +72,6 @@ export function Header({
   unpublishedDraftChangeCount = 0,
   showCanvasSettingsMenu = true,
 }: HeaderProps) {
-  const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
-
   const headerTitle = canvasName.trim() || "Canvas";
 
   const isDefaultMode = mode === "default";
@@ -93,202 +91,32 @@ export function Header({
         showCanvasSettingsMenu={showCanvasSettingsMenu}
       />
 
-      <div className="relative grid h-12 grid-cols-3 items-center px-4">
-        <div className="min-w-0 justify-self-start" aria-hidden />
-
-        <div className="justify-self-center">
-          {topViewMode && onTopViewModeChange && (
-            <div className="flex items-center rounded-md border border-slate-950/15 p-0.5 text-[13px] font-medium">
-              <button
-                type="button"
-                onClick={() => onTopViewModeChange("canvas")}
-                className={`rounded-sm px-2 py-0.5 ${
-                  topViewMode === "canvas" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Canvas
-              </button>
-              <button
-                type="button"
-                onClick={() => onTopViewModeChange("cli")}
-                className={`rounded-sm px-2 py-0.5 ${
-                  topViewMode === "cli" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                CLI
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 justify-self-end">
-          {isDefaultMode ? (
-            <>
-              {onExportYamlCopy && onExportYamlDownload ? (
-                <DropdownMenu open={isYamlMenuOpen} onOpenChange={setIsYamlMenuOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-mono">
-                      .yaml
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44 p-2">
-                    <UIButton
-                      type="button"
-                      variant="ghost"
-                      className="w-full justify-start"
-                      size="sm"
-                      onClick={() => {
-                        onExportYamlCopy();
-                        setIsYamlMenuOpen(false);
-                      }}
-                    >
-                      Copy to clipboard
-                    </UIButton>
-                    <UIButton
-                      type="button"
-                      variant="ghost"
-                      className="w-full justify-start"
-                      size="sm"
-                      onClick={() => {
-                        onExportYamlDownload();
-                        setIsYamlMenuOpen(false);
-                      }}
-                    >
-                      Download file
-                    </UIButton>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
-              {unsavedMessage ? (
-                <span className="hidden rounded bg-orange-100 px-2 py-1 text-xs font-medium text-yellow-700 sm:inline">
-                  {unsavedMessage}
-                </span>
-              ) : null}
-              {onSave && !saveButtonHidden ? (
-                saveDisabled && saveDisabledTooltip ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="inline-flex">
-                        <Button
-                          onClick={onSave}
-                          size="sm"
-                          variant={saveIsPrimary ? "default" : "outline"}
-                          data-testid="save-canvas-button"
-                          disabled={saveDisabled}
-                        >
-                          Save
-                        </Button>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <Button
-                    onClick={onSave}
-                    size="sm"
-                    variant={saveIsPrimary ? "default" : "outline"}
-                    data-testid="save-canvas-button"
-                    disabled={saveDisabled}
-                  >
-                    Save
-                  </Button>
-                )
-              ) : null}
-            </>
-          ) : null}
-
-          {showVersionEditActions ? (
-            <div className="flex items-center gap-2">
-              {hasChanges ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex">
-                      <UIButton
-                        type="button"
-                        variant="outline"
-                        size="icon-xs"
-                        className="shrink-0"
-                        onClick={() => onDiscardVersion?.()}
-                        disabled={discardVersionDisabled || !onDiscardVersion}
-                        aria-label="Discard draft"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </UIButton>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {discardVersionDisabled && discardVersionDisabledTooltip
-                      ? discardVersionDisabledTooltip
-                      : "Discard draft changes and reset to the current live version."}
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-              {publishVersionDisabled && publishVersionDisabledTooltip ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="inline-flex">
-                      <UIButton
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        onClick={() => onPublishVersion?.()}
-                        disabled={publishVersionDisabled || !onPublishVersion}
-                      >
-                        {publishButtonLabel}
-                      </UIButton>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
-                </Tooltip>
-              ) : (
-                <UIButton
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => onPublishVersion?.()}
-                  disabled={publishVersionDisabled || !onPublishVersion}
-                >
-                  {publishButtonLabel}
-                </UIButton>
-              )}
-            </div>
-          ) : null}
-
-          {showEditButton ? (
-            enterEditModeDisabled && enterEditModeDisabledTooltip ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex">
-                    <UIButton
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={onEnterEditMode}
-                      disabled={enterEditModeDisabled}
-                    >
-                      <Pencil className="size-3.5" />
-                      Edit
-                    </UIButton>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">{enterEditModeDisabledTooltip}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <UIButton
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onEnterEditMode}
-                disabled={enterEditModeDisabled}
-              >
-                <Pencil className="size-3.5" />
-                Edit
-              </UIButton>
-            )
-          ) : null}
-        </div>
-      </div>
+      <SecondaryHeader
+        topViewMode={topViewMode}
+        onTopViewModeChange={onTopViewModeChange}
+        isDefaultMode={isDefaultMode}
+        onExportYamlCopy={onExportYamlCopy}
+        onExportYamlDownload={onExportYamlDownload}
+        unsavedMessage={unsavedMessage}
+        onSave={onSave}
+        saveButtonHidden={saveButtonHidden}
+        saveDisabled={saveDisabled}
+        saveDisabledTooltip={saveDisabledTooltip}
+        saveIsPrimary={saveIsPrimary}
+        showVersionEditActions={showVersionEditActions}
+        hasChanges={hasChanges}
+        onDiscardVersion={onDiscardVersion}
+        discardVersionDisabled={discardVersionDisabled}
+        discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+        publishVersionDisabled={publishVersionDisabled}
+        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+        onPublishVersion={onPublishVersion}
+        publishButtonLabel={publishButtonLabel}
+        showEditButton={showEditButton}
+        enterEditModeDisabled={enterEditModeDisabled}
+        enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+        onEnterEditMode={onEnterEditMode}
+      />
     </header>
   );
 }
@@ -337,6 +165,259 @@ function PageHeader({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SecondaryHeader({
+  topViewMode,
+  onTopViewModeChange,
+  isDefaultMode,
+  onExportYamlCopy,
+  onExportYamlDownload,
+  unsavedMessage,
+  onSave,
+  saveButtonHidden,
+  saveDisabled,
+  saveDisabledTooltip,
+  saveIsPrimary,
+  showVersionEditActions,
+  hasChanges,
+  onDiscardVersion,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  onPublishVersion,
+  publishButtonLabel,
+  showEditButton,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+  onEnterEditMode,
+}: {
+  topViewMode?: CanvasTopViewTab;
+  onTopViewModeChange?: (mode: CanvasTopViewTab) => void;
+  isDefaultMode: boolean;
+  onExportYamlCopy?: () => void;
+  onExportYamlDownload?: () => void;
+  unsavedMessage?: string;
+  onSave?: () => void;
+  saveButtonHidden?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledTooltip?: string;
+  saveIsPrimary?: boolean;
+  showVersionEditActions: boolean;
+  hasChanges: boolean;
+  onDiscardVersion?: () => void;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  onPublishVersion?: () => void;
+  publishButtonLabel: string;
+  showEditButton: boolean;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onEnterEditMode?: () => void;
+}) {
+  const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
+
+  return (
+    <div className="relative grid h-12 grid-cols-3 items-center px-4">
+      <div className="min-w-0 justify-self-start" aria-hidden />
+
+      <div className="justify-self-center">
+        {topViewMode && onTopViewModeChange && (
+          <div className="flex items-center rounded-md border border-slate-950/15 p-0.5 text-[13px] font-medium">
+            <button
+              type="button"
+              onClick={() => onTopViewModeChange("canvas")}
+              className={`rounded-sm px-2 py-0.5 ${
+                topViewMode === "canvas" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              Canvas
+            </button>
+            <button
+              type="button"
+              onClick={() => onTopViewModeChange("cli")}
+              className={`rounded-sm px-2 py-0.5 ${
+                topViewMode === "cli" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              CLI
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 justify-self-end">
+        {isDefaultMode ? (
+          <>
+            {onExportYamlCopy && onExportYamlDownload ? (
+              <DropdownMenu open={isYamlMenuOpen} onOpenChange={setIsYamlMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-mono">
+                    .yaml
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 p-2">
+                  <UIButton
+                    type="button"
+                    variant="ghost"
+                    className="w-full justify-start"
+                    size="sm"
+                    onClick={() => {
+                      onExportYamlCopy();
+                      setIsYamlMenuOpen(false);
+                    }}
+                  >
+                    Copy to clipboard
+                  </UIButton>
+                  <UIButton
+                    type="button"
+                    variant="ghost"
+                    className="w-full justify-start"
+                    size="sm"
+                    onClick={() => {
+                      onExportYamlDownload();
+                      setIsYamlMenuOpen(false);
+                    }}
+                  >
+                    Download file
+                  </UIButton>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            {unsavedMessage ? (
+              <span className="hidden rounded bg-orange-100 px-2 py-1 text-xs font-medium text-yellow-700 sm:inline">
+                {unsavedMessage}
+              </span>
+            ) : null}
+            {onSave && !saveButtonHidden ? (
+              saveDisabled && saveDisabledTooltip ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex">
+                      <Button
+                        onClick={onSave}
+                        size="sm"
+                        variant={saveIsPrimary ? "default" : "outline"}
+                        data-testid="save-canvas-button"
+                        disabled={saveDisabled}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  onClick={onSave}
+                  size="sm"
+                  variant={saveIsPrimary ? "default" : "outline"}
+                  data-testid="save-canvas-button"
+                  disabled={saveDisabled}
+                >
+                  Save
+                </Button>
+              )
+            ) : null}
+          </>
+        ) : null}
+
+        {showVersionEditActions ? (
+          <div className="flex items-center gap-2">
+            {hasChanges ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <UIButton
+                      type="button"
+                      variant="outline"
+                      size="icon-xs"
+                      className="shrink-0"
+                      onClick={() => onDiscardVersion?.()}
+                      disabled={discardVersionDisabled || !onDiscardVersion}
+                      aria-label="Discard draft"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </UIButton>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {discardVersionDisabled && discardVersionDisabledTooltip
+                    ? discardVersionDisabledTooltip
+                    : "Discard draft changes and reset to the current live version."}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
+            {publishVersionDisabled && publishVersionDisabledTooltip ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="inline-flex">
+                    <UIButton
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={() => onPublishVersion?.()}
+                      disabled={publishVersionDisabled || !onPublishVersion}
+                    >
+                      {publishButtonLabel}
+                    </UIButton>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <UIButton
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={() => onPublishVersion?.()}
+                disabled={publishVersionDisabled || !onPublishVersion}
+              >
+                {publishButtonLabel}
+              </UIButton>
+            )}
+          </div>
+        ) : null}
+
+        {showEditButton ? (
+          enterEditModeDisabled && enterEditModeDisabledTooltip ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="inline-flex">
+                  <UIButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onEnterEditMode}
+                    disabled={enterEditModeDisabled}
+                  >
+                    <Pencil className="size-3.5" />
+                    Edit
+                  </UIButton>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">{enterEditModeDisabledTooltip}</TooltipContent>
+            </Tooltip>
+          ) : (
+            <UIButton
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onEnterEditMode}
+              disabled={enterEditModeDisabled}
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </UIButton>
+          )
         ) : null}
       </div>
     </div>
