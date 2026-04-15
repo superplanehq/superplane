@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.anthropic import AnthropicModelSettings
@@ -74,16 +74,19 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
 
         cache_key = f"{ctx.deps.canvas_id}:{ctx.deps.canvas_version_id or 'inspect'}"
         canvas = ctx.deps.canvas_cache.get(cache_key)
+        schema_cache: dict[str, list[dict[str, Any]] | None] = {}
         coerced = coerce_canvas_answer_proposal(
             ctx.deps.client,
             answer,
             canvas,
+            schema_cache=schema_cache,
         )
 
         errors = validate_proposal_operations(
             ctx.deps.client,
             list(coerced.proposal.operations),  # type: ignore[union-attr]
             canvas,
+            schema_cache=schema_cache,
         )
         if errors:
             raise ModelRetry(
