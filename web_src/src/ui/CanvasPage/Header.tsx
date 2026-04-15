@@ -197,125 +197,187 @@ function SecondaryHeader({
   return (
     <div className="relative flex h-12 items-center justify-end gap-2 px-4">
       {isDefaultMode && onSave && !saveButtonHidden ? (
-        saveDisabled && saveDisabledTooltip ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="inline-flex">
-                <Button
-                  onClick={onSave}
-                  size="sm"
-                  variant={saveIsPrimary ? "default" : "outline"}
-                  data-testid="save-canvas-button"
-                  disabled={saveDisabled}
-                >
-                  Save
-                </Button>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Button
-            onClick={onSave}
-            size="sm"
-            variant={saveIsPrimary ? "default" : "outline"}
-            data-testid="save-canvas-button"
-            disabled={saveDisabled}
-          >
-            Save
-          </Button>
-        )
+        <SaveButton
+          onSave={onSave}
+          saveDisabled={saveDisabled}
+          saveDisabledTooltip={saveDisabledTooltip}
+          saveIsPrimary={saveIsPrimary}
+        />
       ) : null}
 
       {showVersionEditActions ? (
         <div className="flex items-center gap-2">
           {hasChanges ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex">
-                  <UIButton
-                    type="button"
-                    variant="outline"
-                    size="icon-xs"
-                    className="shrink-0"
-                    onClick={() => onDiscardVersion?.()}
-                    disabled={discardVersionDisabled || !onDiscardVersion}
-                    aria-label="Discard draft"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </UIButton>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {discardVersionDisabled && discardVersionDisabledTooltip
-                  ? discardVersionDisabledTooltip
-                  : "Discard draft changes and reset to the current live version."}
-              </TooltipContent>
-            </Tooltip>
+            <DiscardDraftButton
+              onDiscard={() => onDiscardVersion?.()}
+              disabled={discardVersionDisabled || !onDiscardVersion}
+              disabledTooltip={discardVersionDisabledTooltip}
+            />
           ) : null}
-          {publishVersionDisabled && publishVersionDisabledTooltip ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="inline-flex">
-                  <UIButton
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    onClick={() => onPublishVersion?.()}
-                    disabled={publishVersionDisabled || !onPublishVersion}
-                  >
-                    {publishButtonLabel}
-                  </UIButton>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
-            </Tooltip>
-          ) : (
-            <UIButton
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={() => onPublishVersion?.()}
-              disabled={publishVersionDisabled || !onPublishVersion}
-            >
-              {publishButtonLabel}
-            </UIButton>
-          )}
+          <PublishVersionButton
+            onPublish={() => onPublishVersion?.()}
+            label={publishButtonLabel}
+            disabled={publishVersionDisabled || !onPublishVersion}
+            publishVersionDisabled={!!publishVersionDisabled}
+            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          />
         </div>
       ) : null}
 
       {showEditButton ? (
-        enterEditModeDisabled && enterEditModeDisabledTooltip ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="inline-flex">
-                <UIButton
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onEnterEditMode}
-                  disabled={enterEditModeDisabled}
-                >
-                  <Pencil className="size-3.5" />
-                  Edit
-                </UIButton>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top">{enterEditModeDisabledTooltip}</TooltipContent>
-          </Tooltip>
-        ) : (
+        <EnterEditModeButton
+          onClick={onEnterEditMode}
+          disabled={enterEditModeDisabled}
+          disabledTooltip={enterEditModeDisabledTooltip}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SaveButton({
+  onSave,
+  saveDisabled,
+  saveDisabledTooltip,
+  saveIsPrimary,
+}: {
+  onSave: () => void;
+  saveDisabled?: boolean;
+  saveDisabledTooltip?: string;
+  saveIsPrimary?: boolean;
+}) {
+  if (saveDisabled && saveDisabledTooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">
+            <Button
+              onClick={onSave}
+              size="sm"
+              variant={saveIsPrimary ? "default" : "outline"}
+              data-testid="save-canvas-button"
+              disabled={saveDisabled}
+            >
+              Save
+            </Button>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button
+      onClick={onSave}
+      size="sm"
+      variant={saveIsPrimary ? "default" : "outline"}
+      data-testid="save-canvas-button"
+      disabled={saveDisabled}
+    >
+      Save
+    </Button>
+  );
+}
+
+function DiscardDraftButton({
+  onDiscard,
+  disabled,
+  disabledTooltip,
+}: {
+  onDiscard: () => void;
+  disabled: boolean;
+  disabledTooltip?: string;
+}) {
+  const tooltipText =
+    disabled && disabledTooltip ? disabledTooltip : "Discard draft changes and reset to the current live version.";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">
           <UIButton
             type="button"
             variant="outline"
-            size="sm"
-            onClick={onEnterEditMode}
-            disabled={enterEditModeDisabled}
+            size="icon-xs"
+            className="shrink-0"
+            onClick={onDiscard}
+            disabled={disabled}
+            aria-label="Discard draft"
           >
-            <Pencil className="size-3.5" />
-            Edit
+            <RotateCcw className="h-3.5 w-3.5" />
           </UIButton>
-        )
-      ) : null}
-    </div>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltipText}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function PublishVersionButton({
+  onPublish,
+  label,
+  disabled,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+}: {
+  onPublish: () => void;
+  label: string;
+  disabled: boolean;
+  publishVersionDisabled: boolean;
+  publishVersionDisabledTooltip?: string;
+}) {
+  if (publishVersionDisabled && publishVersionDisabledTooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">
+            <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
+              {label}
+            </UIButton>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
+      {label}
+    </UIButton>
+  );
+}
+
+function EnterEditModeButton({
+  onClick,
+  disabled,
+  disabledTooltip,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  disabledTooltip?: string;
+}) {
+  if (disabled && disabledTooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">
+            <UIButton type="button" variant="outline" size="sm" onClick={onClick} disabled={disabled}>
+              <Pencil className="size-3.5" />
+              Edit
+            </UIButton>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <UIButton type="button" variant="outline" size="sm" onClick={onClick} disabled={disabled}>
+      <Pencil className="size-3.5" />
+      Edit
+    </UIButton>
   );
 }
