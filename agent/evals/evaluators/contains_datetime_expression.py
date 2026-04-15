@@ -85,7 +85,9 @@ class ContainsDatetimeExpression(Evaluator):
         if ctx.output.proposal is None:
             return EvaluationReason(value=False, reason="No proposal to check")
 
-        texts = list(iter_config_strings_from_operations(ctx.output.proposal.operations))
+        texts = list(
+            iter_config_strings_from_operations(ctx.output.proposal.changeset.changes or [])
+        )
         if not texts:
             return EvaluationReason(
                 value=False, reason="No configuration strings in proposal operations"
