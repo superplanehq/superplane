@@ -29,7 +29,7 @@ type CanvasesCanvasMetadata struct {
 	UpdatedAt                   *time.Time                                 `json:"updatedAt,omitempty"`
 	CreatedBy                   *SuperplaneCanvasesUserRef                 `json:"createdBy,omitempty"`
 	IsTemplate                  *bool                                      `json:"isTemplate,omitempty"`
-	VersioningEnabled           *bool                                      `json:"versioningEnabled,omitempty"`
+	ChangeManagementEnabled     *bool                                      `json:"changeManagementEnabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
 }
 
@@ -306,36 +306,36 @@ func (o *CanvasesCanvasMetadata) SetIsTemplate(v bool) {
 	o.IsTemplate = &v
 }
 
-// GetVersioningEnabled returns the VersioningEnabled field value if set, zero value otherwise.
-func (o *CanvasesCanvasMetadata) GetVersioningEnabled() bool {
-	if o == nil || IsNil(o.VersioningEnabled) {
+// GetChangeManagementEnabled returns the ChangeManagementEnabled field value if set, zero value otherwise.
+func (o *CanvasesCanvasMetadata) GetChangeManagementEnabled() bool {
+	if o == nil || IsNil(o.ChangeManagementEnabled) {
 		var ret bool
 		return ret
 	}
-	return *o.VersioningEnabled
+	return *o.ChangeManagementEnabled
 }
 
-// GetVersioningEnabledOk returns a tuple with the VersioningEnabled field value if set, nil otherwise
+// GetChangeManagementEnabledOk returns a tuple with the ChangeManagementEnabled field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasMetadata) GetVersioningEnabledOk() (*bool, bool) {
-	if o == nil || IsNil(o.VersioningEnabled) {
+func (o *CanvasesCanvasMetadata) GetChangeManagementEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.ChangeManagementEnabled) {
 		return nil, false
 	}
-	return o.VersioningEnabled, true
+	return o.ChangeManagementEnabled, true
 }
 
-// HasVersioningEnabled returns a boolean if a field has been set.
-func (o *CanvasesCanvasMetadata) HasVersioningEnabled() bool {
-	if o != nil && !IsNil(o.VersioningEnabled) {
+// HasChangeManagementEnabled returns a boolean if a field has been set.
+func (o *CanvasesCanvasMetadata) HasChangeManagementEnabled() bool {
+	if o != nil && !IsNil(o.ChangeManagementEnabled) {
 		return true
 	}
 
 	return false
 }
 
-// SetVersioningEnabled gets a reference to the given bool and assigns it to the VersioningEnabled field.
-func (o *CanvasesCanvasMetadata) SetVersioningEnabled(v bool) {
-	o.VersioningEnabled = &v
+// SetChangeManagementEnabled gets a reference to the given bool and assigns it to the ChangeManagementEnabled field.
+func (o *CanvasesCanvasMetadata) SetChangeManagementEnabled(v bool) {
+	o.ChangeManagementEnabled = &v
 }
 
 // GetChangeRequestApprovalConfig returns the ChangeRequestApprovalConfig field value if set, zero value otherwise.
@@ -404,8 +404,8 @@ func (o CanvasesCanvasMetadata) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.IsTemplate) {
 		toSerialize["isTemplate"] = o.IsTemplate
 	}
-	if !IsNil(o.VersioningEnabled) {
-		toSerialize["versioningEnabled"] = o.VersioningEnabled
+	if !IsNil(o.ChangeManagementEnabled) {
+		toSerialize["changeManagementEnabled"] = o.ChangeManagementEnabled
 	}
 	if !IsNil(o.ChangeRequestApprovalConfig) {
 		toSerialize["changeRequestApprovalConfig"] = o.ChangeRequestApprovalConfig

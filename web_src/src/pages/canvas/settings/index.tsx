@@ -70,7 +70,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const resolvedCanvasId = canvas.metadata!.id!;
   const canvasName = canvas.metadata?.name || "Canvas";
   const baseCanvasPath = `/${orgId}/canvases/${resolvedCanvasId}`;
-  const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled ?? false;
+  const isOrgChangeManagementEnabled = organization?.metadata?.changeManagementEnabled ?? false;
 
   usePageTitle([`${canvasName} · Settings`]);
 
@@ -95,7 +95,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
         <SettingsView
           initialValues={initialValues}
           canUpdateCanvas={canUpdateCanvas}
-          orgVersioningEnabled={isOrgVersioningEnabled}
+          orgChangeManagementEnabled={isOrgChangeManagementEnabled}
           isSaving={updateCanvasMutation.isPending}
           availableUsers={approverUsers}
           availableRoles={approverRoles}
@@ -156,7 +156,7 @@ function useSaveCallback(canvasId: string, organizationId: string): (values: Set
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        versioningEnabled: values.versioningEnabled,
+        changeManagementEnabled: values.changeManagementEnabled,
         changeRequestApprovalConfig: values.changeRequestApprovalConfig,
       });
     },

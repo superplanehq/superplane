@@ -30,9 +30,9 @@ class CanvasesUpdateCanvasBody(BaseModel):
     """ # noqa: E501
     name: Optional[StrictStr] = None
     description: Optional[StrictStr] = None
-    versioning_enabled: Optional[StrictBool] = Field(default=None, alias="versioningEnabled")
+    change_management_enabled: Optional[StrictBool] = Field(default=None, alias="changeManagementEnabled")
     change_request_approval_config: Optional[CanvasesCanvasChangeRequestApprovalConfig] = Field(default=None, alias="changeRequestApprovalConfig")
-    __properties: ClassVar[List[str]] = ["name", "description", "versioningEnabled", "changeRequestApprovalConfig"]
+    __properties: ClassVar[List[str]] = ["name", "description", "changeManagementEnabled", "changeRequestApprovalConfig"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -90,7 +90,7 @@ class CanvasesUpdateCanvasBody(BaseModel):
         _obj = cls.model_validate({
             "name": obj.get("name"),
             "description": obj.get("description"),
-            "versioningEnabled": obj.get("versioningEnabled"),
+            "changeManagementEnabled": obj.get("changeManagementEnabled"),
             "changeRequestApprovalConfig": CanvasesCanvasChangeRequestApprovalConfig.from_dict(obj["changeRequestApprovalConfig"]) if obj.get("changeRequestApprovalConfig") is not None else None
         })
         return _obj

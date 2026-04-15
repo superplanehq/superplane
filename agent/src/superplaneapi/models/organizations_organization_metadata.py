@@ -33,8 +33,8 @@ class OrganizationsOrganizationMetadata(BaseModel):
     description: Optional[StrictStr] = None
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
-    versioning_enabled: Optional[StrictBool] = Field(default=None, alias="versioningEnabled")
-    __properties: ClassVar[List[str]] = ["id", "name", "description", "createdAt", "updatedAt", "versioningEnabled"]
+    change_management_enabled: Optional[StrictBool] = Field(default=None, alias="changeManagementEnabled")
+    __properties: ClassVar[List[str]] = ["id", "name", "description", "createdAt", "updatedAt", "changeManagementEnabled"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -92,7 +92,7 @@ class OrganizationsOrganizationMetadata(BaseModel):
             "description": obj.get("description"),
             "createdAt": obj.get("createdAt"),
             "updatedAt": obj.get("updatedAt"),
-            "versioningEnabled": obj.get("versioningEnabled")
+            "changeManagementEnabled": obj.get("changeManagementEnabled")
         })
         return _obj
 

@@ -91,16 +91,16 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 	require.Equal(t, codes.AlreadyExists, status.Code(err))
 }
 
-func TestCreateCanvasInheritsOrganizationVersioningWhenEnabled(t *testing.T) {
+func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	nowEnabled := true
-	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", nowEnabled).Error)
+	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("change_management_enabled", nowEnabled).Error)
 
 	workflow := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name: "Versioning default canvas",
+			Name: "Change management default canvas",
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{},
@@ -113,15 +113,15 @@ func TestCreateCanvasInheritsOrganizationVersioningWhenEnabled(t *testing.T) {
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
 	require.NotNil(t, response.Canvas.Metadata)
-	// New canvases inherit organization versioning.
-	require.True(t, response.Canvas.Metadata.VersioningEnabled)
+	// New canvases inherit organization change management setting.
+	require.True(t, response.Canvas.Metadata.ChangeManagementEnabled)
 
 	require.NotEmpty(t, response.Canvas.Metadata.Id)
 	createdCanvasUUID, parseErr := uuid.Parse(response.Canvas.Metadata.Id)
 	require.NoError(t, parseErr)
 	createdCanvas, findErr := models.FindCanvas(r.Organization.ID, createdCanvasUUID)
 	require.NoError(t, findErr)
-	require.True(t, createdCanvas.VersioningEnabled)
+	require.True(t, createdCanvas.ChangeManagementEnabled)
 }
 
 func TestCreateCanvasOnFreshOrganization(t *testing.T) {
