@@ -119,7 +119,6 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 

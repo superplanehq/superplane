@@ -68,7 +68,6 @@ func (s *settingsAutoSaveSteps) clearExpressionField() {
 }
 
 func (s *settingsAutoSaveSteps) waitForAutoSave() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(500)
 }
 

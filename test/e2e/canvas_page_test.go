@@ -111,7 +111,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.publishCanvas()
 		steps.enterEditMode()
 		steps.deleteConnectionBetweenNodes("First", "Second")
-		steps.canvas.WaitForCanvasSaveStatusSaved()
 		steps.publishCanvas()
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})

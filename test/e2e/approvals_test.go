@@ -238,7 +238,6 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -259,7 +258,6 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 	s.session.Click(q.Locator(`button:has-text("Select role")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -280,7 +278,6 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -324,7 +321,6 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 

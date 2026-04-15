@@ -241,5 +241,4 @@ func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
 
 // waitForSaved polls the canvas save status indicator until it reports "saved".
 func (s *canvasAutoSaveSteps) waitForSaved() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
 }

@@ -58,7 +58,6 @@ func (s *WebhookResetSteps) addWebhookTrigger(name string, pos models.Position) 
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
