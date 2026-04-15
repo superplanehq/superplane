@@ -230,7 +230,7 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 	return fmt.Errorf("unknown record type: %s", record.Type)
 }
 
-func (a *Approval) newNodeMetadata(auth core.AuthContext, items []Item) (*NodeMetadata, error) {
+func (a *Approval) newNodeMetadata(auth core.AuthReader, items []Item) (*NodeMetadata, error) {
 	records := []Record{}
 
 	for i, item := range items {
@@ -247,7 +247,7 @@ func (a *Approval) newNodeMetadata(auth core.AuthContext, items []Item) (*NodeMe
 	}, nil
 }
 
-func approvalItemToRecord(auth core.AuthContext, item Item, index int) (*Record, error) {
+func approvalItemToRecord(auth core.AuthReader, item Item, index int) (*Record, error) {
 	switch item.Type {
 	case ItemTypeAnyone:
 		return &Record{
