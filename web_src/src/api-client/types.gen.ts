@@ -138,6 +138,7 @@ export type CanvasChangesetChangeNode = {
   configuration?: {
     [key: string]: unknown;
   };
+  integrationId?: string;
 };
 
 export type CanvasChangesetChangeType =
