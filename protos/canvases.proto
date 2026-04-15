@@ -1008,6 +1008,7 @@ message CanvasChangeset {
       string name = 2;
       string block = 3;
       google.protobuf.Struct configuration = 4;
+      string integration_id = 5;
     }
 
     message Edge {
@@ -1015,6 +1016,7 @@ message CanvasChangeset {
       string target_id = 2;
       string channel = 3;
     }
+
     Type type = 1;
 
     //
