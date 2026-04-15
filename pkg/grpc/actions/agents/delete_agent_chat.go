@@ -35,6 +35,10 @@ func DeleteAgentChat(
 	})
 
 	if err != nil {
+		if s, ok := status.FromError(err); ok && s.Code() == codes.NotFound {
+			return nil, status.Error(codes.NotFound, "agent chat not found")
+		}
+
 		log.WithError(err).Errorf("failed to delete agent chat %s for org %s, user %s", chatID, orgID, userID)
 		return nil, status.Error(codes.Unavailable, "failed to delete agent chat")
 	}
