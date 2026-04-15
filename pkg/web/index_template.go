@@ -11,6 +11,7 @@ type indexTemplateData struct {
 	SentryDSN         string
 	SentryEnvironment string
 	AgentEnabled      bool
+	PostHogKey        string
 }
 
 func agentEnabled() bool {
@@ -22,6 +23,7 @@ func newIndexTemplateDataFromEnv() indexTemplateData {
 		SentryDSN:         os.Getenv("SENTRY_DSN"),
 		SentryEnvironment: os.Getenv("SENTRY_ENVIRONMENT"),
 		AgentEnabled:      agentEnabled(),
+		PostHogKey:        os.Getenv("POSTHOG_KEY"),
 	}
 }
 
