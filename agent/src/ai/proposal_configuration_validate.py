@@ -201,16 +201,25 @@ def _is_required_by_condition(
         if not isinstance(cond_field, str) or not isinstance(cond_values, list):
             continue
         cond_value = configuration.get(cond_field)
-        if cond_value is not None and _go_fmt_value(cond_value) in [str(v) for v in cond_values]:
-            return True
+        if cond_value is None:
+            continue
+        # Go returns on the first condition whose field exists in config,
+        # regardless of whether the value matches.
+        return _go_fmt_value(cond_value) in [str(v) for v in cond_values]
     return False
 
 
 def validate_configuration(
     configuration: dict[str, Any],
     fields: list[dict[str, Any]],
+    *,
+    check_required: bool = True,
 ) -> list[str]:
-    """Validate *configuration* against *fields*. Return a list of error messages."""
+    """Validate *configuration* against *fields*. Return a list of error messages.
+
+    Set *check_required* to ``False`` for partial updates where only a subset
+    of fields is provided (e.g. ``update_node_config`` operations).
+    """
     errors: list[str] = []
     fields_by_name: dict[str, dict[str, Any]] = {}
     for item in fields:
@@ -220,13 +229,14 @@ def validate_configuration(
 
     for name, field in fields_by_name.items():
         value = configuration.get(name)
-        is_required = bool(field.get("required"))
-        if not is_required:
-            is_required = _is_required_by_condition(field, configuration)
 
         if value is None:
-            if is_required:
-                errors.append(f"field '{name}' is required")
+            if check_required:
+                is_required = bool(field.get("required"))
+                if not is_required:
+                    is_required = _is_required_by_condition(field, configuration)
+                if is_required:
+                    errors.append(f"field '{name}' is required")
             continue
 
         error = validate_value_for_field(field, value)
@@ -271,6 +281,7 @@ def validate_proposal_operations(
                     for msg in validate_configuration(
                         dict(op.configuration),
                         fields,
+                        check_required=False,
                     ):
                         errors.append(f"{node_label} ({block_name}): {msg}")
 
