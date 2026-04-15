@@ -12,7 +12,7 @@ import type { CanvasOperation } from "@/lib/ai";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
@@ -70,6 +70,13 @@ export function BuildingBlocksSidebar({
   onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
+  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveTab("components");
+    setCurrentChatId(null);
+  }, [canvasId]);
 
   if (!isOpen) {
     return (
@@ -95,6 +102,10 @@ export function BuildingBlocksSidebar({
       disabled={disabled}
       disabledTooltip={disabledTooltip}
       onBlockClick={onBlockClick}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      currentChatId={currentChatId}
+      setCurrentChatId={setCurrentChatId}
     />
   );
 }
@@ -181,6 +192,10 @@ interface OpenBuildingBlocksSidebarProps {
   disabled: boolean;
   disabledTooltip: string;
   onBlockClick?: (block: BuildingBlock) => void;
+  activeTab: "components" | "ai";
+  setActiveTab: Dispatch<SetStateAction<"components" | "ai">>;
+  currentChatId: string | null;
+  setCurrentChatId: Dispatch<SetStateAction<string | null>>;
 }
 
 function OpenBuildingBlocksSidebar({
@@ -195,6 +210,10 @@ function OpenBuildingBlocksSidebar({
   disabled,
   disabledTooltip,
   onBlockClick,
+  activeTab,
+  setActiveTab,
+  currentChatId,
+  setCurrentChatId,
 }: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "component">("all");
@@ -215,11 +234,9 @@ function OpenBuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
@@ -255,7 +272,7 @@ function OpenBuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [agentContext, aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
+    [agentContext, aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId, setCurrentChatId],
   );
 
   const handleStartNewChatSession = useCallback(() => {
@@ -266,13 +283,16 @@ function OpenBuildingBlocksSidebar({
     requestAnimationFrame(() => {
       aiInputRef.current?.focus();
     });
-  }, []);
+  }, [setCurrentChatId]);
 
-  const handleSelectChatSession = useCallback((chatId: string) => {
-    setCurrentChatId(chatId);
-    setPendingProposal(null);
-    setAiError(null);
-  }, []);
+  const handleSelectChatSession = useCallback(
+    (chatId: string) => {
+      setCurrentChatId(chatId);
+      setPendingProposal(null);
+      setAiError(null);
+    },
+    [setCurrentChatId],
+  );
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
@@ -387,11 +407,9 @@ function OpenBuildingBlocksSidebar({
     if (!agentContext.enabled && activeTab === "ai") {
       setActiveTab("components");
     }
-  }, [agentContext.enabled, activeTab]);
+  }, [agentContext.enabled, activeTab, setActiveTab]);
 
   useEffect(() => {
-    setActiveTab("components");
-    setCurrentChatId(null);
     setAiMessages([]);
     setPendingProposal(null);
     setAiError(null);
@@ -461,7 +479,7 @@ function OpenBuildingBlocksSidebar({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, organizationId]);
+  }, [canvasId, organizationId, setCurrentChatId]);
 
   useEffect(() => {
     let cancelled = false;
