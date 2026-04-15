@@ -357,6 +357,7 @@ pb.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
 openapi.spec.gen:
 	$(MAKE) compose.setup
@@ -376,11 +377,12 @@ openapi.client.gen:
 	rm -rf pkg/openapi_client/.travis.yml
 	rm -rf pkg/openapi_client/README.md
 	rm -rf pkg/openapi_client/git_push.sh
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/openapi_client -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
 openapi.web.client.gen:
 	$(MAKE) compose.setup
 	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm ci && npm run generate:api"
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm ci && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
 
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi
