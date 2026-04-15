@@ -121,6 +121,9 @@ func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb
 	return canvases.ApplyCanvasVersionChangeset(
 		ctx,
 		s.registry,
+		s.encryptor,
+		s.webhookBaseURL,
+		s.authService,
 		uuid.MustParse(organizationID),
 		canvasID,
 		versionID,
@@ -144,6 +147,9 @@ func (s *CanvasService) ValidateCanvasVersionChangeset(ctx context.Context, req 
 	return canvases.ValidateCanvasVersionChangeset(
 		ctx,
 		s.registry,
+		s.encryptor,
+		s.webhookBaseURL,
+		s.authService,
 		uuid.MustParse(organizationID),
 		canvasID,
 		versionID,

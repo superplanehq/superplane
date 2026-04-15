@@ -11,6 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
+/*
+ * Implementation of core.EventContext for nodes that are part of a live canvas.
+ */
 type EventContext struct {
 	tx             *gorm.DB
 	node           *models.CanvasNode
@@ -105,4 +108,17 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 	}
 
 	return &resolvedName, nil
+}
+
+/*
+ * Implementation of core.EventContext for nodes that are not yet part of a live canvas.
+ */
+type NoOpEventContext struct{}
+
+func NewNoOpEventContext() *NoOpEventContext {
+	return &NoOpEventContext{}
+}
+
+func (s *NoOpEventContext) Emit(payloadType string, payload any) error {
+	return nil
 }

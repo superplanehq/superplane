@@ -8,6 +8,9 @@ import (
 	"gorm.io/gorm"
 )
 
+/*
+ * Implementation of core.MetadataContext for nodes that are part of a live canvas.
+ */
 type NodeMetadataContext struct {
 	tx   *gorm.DB
 	node *models.CanvasNode
@@ -38,4 +41,36 @@ func (m *NodeMetadataContext) Set(value any) error {
 		Model(m.node).
 		Update("metadata", v).
 		Error
+}
+
+/*
+ * Implementation of core.MetadataContext for nodes that are not yet part of a live canvas.
+ * Nothing is persisted, so all write operations are no-ops.
+ */
+type ReadOnlyNodeMetadataContext struct {
+	Metadata any
+}
+
+func NewReadOnlyNodeMetadataContext(metadata any) *ReadOnlyNodeMetadataContext {
+	return &ReadOnlyNodeMetadataContext{Metadata: metadata}
+}
+
+func (m *ReadOnlyNodeMetadataContext) Get() any {
+	return m.Metadata
+}
+
+func (m *ReadOnlyNodeMetadataContext) Set(value any) error {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	var v map[string]any
+	err = json.Unmarshal(b, &v)
+	if err != nil {
+		return err
+	}
+
+	m.Metadata = v
+	return nil
 }

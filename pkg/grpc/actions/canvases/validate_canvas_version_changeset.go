@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -20,6 +22,9 @@ import (
 func ValidateCanvasVersionChangeset(
 	ctx context.Context,
 	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	baseURL string,
+	authService authorization.Authorization,
 	organizationID uuid.UUID,
 	canvasID uuid.UUID,
 	versionID uuid.UUID,
@@ -33,6 +38,12 @@ func ValidateCanvasVersionChangeset(
 	user, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
+	}
+
+	authenticatedUser, err := models.FindActiveUserByID(organizationID.String(), userID)
+	if err != nil {
+		log.WithError(err).Errorf("failed to find authenticated user - organization=%s, user=%s", organizationID.String(), userID)
+		return nil, status.Error(codes.Internal, "failed to find authenticated user")
 	}
 
 	if changeset == nil || len(changeset.Changes) == 0 {
@@ -57,8 +68,20 @@ func ValidateCanvasVersionChangeset(
 		return nil, status.Error(codes.FailedPrecondition, "published versions are immutable")
 	}
 
-	patcher := changesets.NewCanvasPatcher(database.Conn(), organizationID, registry, version)
-	err = patcher.ApplyChangeset(changeset, nil)
+	patcher, err := changesets.NewCanvasPatcher(&changesets.CanvasPatcherOptions{
+		OrgID:             organizationID,
+		Registry:          registry,
+		Encryptor:         encryptor,
+		BaseURL:           baseURL,
+		AuthService:       authService,
+		AuthenticatedUser: authenticatedUser,
+	}, version)
+
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to create canvas patcher: %v", err)
+	}
+
+	err = patcher.ApplyChangeset(database.Conn(), changeset, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "changeset is invalid: %v", err)
 	}

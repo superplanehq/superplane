@@ -11,6 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
+/*
+ * Implementation of core.NodeWebhookContext for nodes that are part of a live canvas.
+ */
 type NodeWebhookContext struct {
 	tx        *gorm.DB
 	ctx       context.Context
@@ -131,4 +134,35 @@ func (c *NodeWebhookContext) findOrCreateWebhook() (*models.Webhook, error) {
 
 func (c *NodeWebhookContext) GetBaseURL() string {
 	return c.baseURL
+}
+
+/*
+ * Implementation of core.NodeWebhookContext for nodes that are not yet part of a live canvas.
+ */
+type NoOpNodeWebhookContext struct {
+	baseURL string
+}
+
+func NewNoOpNodeWebhookContext(baseURL string) *NoOpNodeWebhookContext {
+	return &NoOpNodeWebhookContext{baseURL: baseURL}
+}
+
+func (c *NoOpNodeWebhookContext) GetSecret() ([]byte, error) {
+	return nil, nil
+}
+
+func (c *NoOpNodeWebhookContext) SetSecret(secret []byte) error {
+	return nil
+}
+
+func (c *NoOpNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+
+func (c *NoOpNodeWebhookContext) GetBaseURL() string {
+	return c.baseURL
+}
+
+func (c *NoOpNodeWebhookContext) Setup() (string, error) {
+	return "", nil
 }

@@ -28,6 +28,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		_, err := ApplyCanvasVersionChangeset(
 			context.Background(),
 			r.Registry,
+			r.Encryptor,
+			testWebhookBaseURL,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			*canvas.LiveVersionID,
@@ -46,6 +49,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		_, err := ApplyCanvasVersionChangeset(
 			ctx,
 			r.Registry,
+			r.Encryptor,
+			testWebhookBaseURL,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			*canvas.LiveVersionID,
@@ -64,6 +70,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		_, err := ApplyCanvasVersionChangeset(
 			ctx,
 			r.Registry,
+			r.Encryptor,
+			testWebhookBaseURL,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			*canvas.LiveVersionID,
@@ -83,6 +92,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		_, err := ApplyCanvasVersionChangeset(
 			ctx,
 			r.Registry,
+			r.Encryptor,
+			testWebhookBaseURL,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			uuid.New(),
@@ -122,6 +134,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		response, err := ApplyCanvasVersionChangeset(
 			ctx,
 			r.Registry,
+			r.Encryptor,
+			testWebhookBaseURL,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			draftVersion.ID,
@@ -216,6 +231,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		_, err := ApplyCanvasVersionChangeset(
 			ctx,
 			r.Registry,
+			r.Encryptor,
+			testWebhookBaseURL,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			draftVersion.ID,
@@ -263,6 +281,9 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		response, err := ApplyCanvasVersionChangeset(
 			ctx,
 			r.Registry,
+			r.Encryptor,
+			testWebhookBaseURL,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			draftVersion.ID,

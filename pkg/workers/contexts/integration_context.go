@@ -18,6 +18,9 @@ import (
 	"gorm.io/gorm"
 )
 
+/*
+ * Implementation of core.IntegrationContext for nodes that are part of a live canvas.
+ */
 type IntegrationContext struct {
 	tx          *gorm.DB
 	node        *models.CanvasNode
@@ -454,4 +457,99 @@ func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSub
 	}
 
 	return nil, nil
+}
+
+/*
+ * Implementation of core.IntegrationContext for nodes that are not yet part of a live canvas.
+ */
+type ReadOnlyIntegrationContext struct {
+	underlying IntegrationContext
+}
+
+func NewReadOnlyIntegrationContext(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, integration *models.Integration) *ReadOnlyIntegrationContext {
+	//
+	// We reuse the underlying implementation, so we can pass the read methods to it.
+	//
+	underlying := NewIntegrationContext(tx, nil, integration, encryptor, registry, func(events []models.CanvasEvent) {})
+	return &ReadOnlyIntegrationContext{underlying: *underlying}
+}
+
+//
+// Read methods are passthrough to the underlying implementation.
+//
+
+func (c *ReadOnlyIntegrationContext) ID() uuid.UUID {
+	return c.underlying.ID()
+}
+
+func (c *ReadOnlyIntegrationContext) GetConfig(name string) ([]byte, error) {
+	return c.underlying.GetConfig(name)
+}
+
+func (c *ReadOnlyIntegrationContext) GetOptionalConfig(name string) ([]byte, error) {
+	return c.underlying.GetOptionalConfig(name)
+}
+
+func (c *ReadOnlyIntegrationContext) GetMetadata() any {
+	return c.underlying.GetMetadata()
+}
+
+func (c *ReadOnlyIntegrationContext) GetState() string {
+	return c.underlying.GetState()
+}
+
+func (c *ReadOnlyIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
+	return c.underlying.GetSecrets()
+}
+
+func (c *ReadOnlyIntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+	return c.underlying.ListSubscriptions()
+}
+
+func (c *ReadOnlyIntegrationContext) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
+	return c.underlying.FindSubscription(predicate)
+}
+
+//
+// Write methods are no-ops, because the integration is not part of a live canvas.
+//
+
+func (c *ReadOnlyIntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {
+	return nil, nil
+}
+
+func (c *ReadOnlyIntegrationContext) SetMetadata(value any) {
+	// no-op
+}
+
+func (c *ReadOnlyIntegrationContext) RequestWebhook(configuration any) error {
+	return nil
+}
+
+func (c *ReadOnlyIntegrationContext) ScheduleResync(interval time.Duration) error {
+	return nil
+}
+
+func (c *ReadOnlyIntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
+	return nil
+}
+
+func (c *ReadOnlyIntegrationContext) Ready() {
+	// no-op
+}
+
+func (c *ReadOnlyIntegrationContext) Error(message string) {
+	// no-op
+}
+
+func (c *ReadOnlyIntegrationContext) SetSecret(name string, value []byte) error {
+	return nil
+}
+
+func (c *ReadOnlyIntegrationContext) NewBrowserAction(action core.BrowserAction) {
+	// no-op
+}
+
+func (c *ReadOnlyIntegrationContext) RemoveBrowserAction() {
+	// no-op
 }

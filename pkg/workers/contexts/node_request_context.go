@@ -9,6 +9,9 @@ import (
 	"gorm.io/gorm"
 )
 
+/*
+ * Implementation of core.NodeRequestContext for nodes that are part of a live canvas.
+ */
 type NodeRequestContext struct {
 	tx   *gorm.DB
 	node *models.CanvasNode
@@ -48,4 +51,17 @@ func (c *NodeRequestContext) completeCurrentRequestForNode() error {
 	}
 
 	return err
+}
+
+/*
+ * Implementation of core.NodeRequestContext for nodes that are not yet part of a live canvas.
+ */
+type NoOpNodeRequestContext struct{}
+
+func NewNoOpNodeRequestContext() *NoOpNodeRequestContext {
+	return &NoOpNodeRequestContext{}
+}
+
+func (c *NoOpNodeRequestContext) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
+	return nil
 }
