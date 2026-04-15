@@ -29,9 +29,65 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 }
 
 func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
-	// ugly, but it is what it is for now
-	// TODO: remove this completely once edit mode is shipped
 	s.session.Sleep(2500)
+}
+
+// EnterEditMode clicks the Edit button in the header to create a draft version.
+// This must be called before making any canvas changes.
+func (s *CanvasSteps) EnterEditMode() {
+	editButton := q.Locator(`header button:has-text("Edit")`).Run(s.session)
+
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		disabled, err := editButton.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			break
+		}
+		if time.Now().After(deadline) {
+			s.t.Fatalf("edit button did not become enabled")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(500)
+}
+
+// Publish clicks the Publish button in the header to publish the current draft version.
+// This should be called after making and saving canvas changes.
+func (s *CanvasSteps) Publish() {
+	publishButton := q.Locator(`header button:has-text("Publish")`).Run(s.session)
+
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		disabled, err := publishButton.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			break
+		}
+		if time.Now().After(deadline) {
+			s.t.Fatalf("publish button did not become enabled")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.NoError(s.t, publishButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(1000)
+}
+
+// FindCurrentDraft returns the current draft version for this canvas, or nil if none exists.
+func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
+	versions, err := models.ListCanvasVersions(s.WorkflowID)
+	require.NoError(s.t, err)
+
+	for i := range versions {
+		if versions[i].State == models.CanvasVersionStateDraft {
+			return &versions[i]
+		}
+	}
+
+	return nil
 }
 
 func (s *CanvasSteps) Create() {

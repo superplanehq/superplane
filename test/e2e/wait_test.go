@@ -21,6 +21,7 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Seconds")
 		steps.addWaitWithDuration(10, "Seconds")
+		steps.canvas.Publish()
 		steps.assertWaitSavedToDB(10, "seconds")
 	})
 
@@ -29,6 +30,7 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Minutes")
 		steps.addWaitWithDuration(5, "Minutes")
+		steps.canvas.Publish()
 		steps.assertWaitSavedToDB(5, "minutes")
 	})
 
@@ -37,6 +39,7 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Hours")
 		steps.addWaitWithDuration(2, "Hours")
+		steps.canvas.Publish()
 		steps.assertWaitSavedToDB(2, "hours")
 	})
 
@@ -67,6 +70,7 @@ func (s *WaitSteps) start() {
 func (s *WaitSteps) givenACanvasExists(canvasName string) {
 	s.canvas = shared.NewCanvasSteps(canvasName, s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 }
 
 func (s *WaitSteps) addWaitWithDuration(value int, unit string) {
@@ -134,6 +138,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 	s.canvas = shared.NewCanvasSteps("Wait Push Through", s.t, s.session)
 
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
@@ -142,6 +147,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 	s.canvas.Connect("Wait", "Output")
 
 	s.canvas.Save()
+	s.canvas.Publish()
 }
 
 func (s *WaitSteps) runManualTrigger() {

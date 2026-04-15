@@ -21,12 +21,11 @@ var _ MappedNullable = &OrganizationsOrganizationMetadata{}
 
 // OrganizationsOrganizationMetadata struct for OrganizationsOrganizationMetadata
 type OrganizationsOrganizationMetadata struct {
-	Id                *string    `json:"id,omitempty"`
-	Name              *string    `json:"name,omitempty"`
-	Description       *string    `json:"description,omitempty"`
-	CreatedAt         *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
-	VersioningEnabled *bool      `json:"versioningEnabled,omitempty"`
+	Id          *string    `json:"id,omitempty"`
+	Name        *string    `json:"name,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	CreatedAt   *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
 }
 
 // NewOrganizationsOrganizationMetadata instantiates a new OrganizationsOrganizationMetadata object
@@ -206,38 +205,6 @@ func (o *OrganizationsOrganizationMetadata) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
-// GetVersioningEnabled returns the VersioningEnabled field value if set, zero value otherwise.
-func (o *OrganizationsOrganizationMetadata) GetVersioningEnabled() bool {
-	if o == nil || IsNil(o.VersioningEnabled) {
-		var ret bool
-		return ret
-	}
-	return *o.VersioningEnabled
-}
-
-// GetVersioningEnabledOk returns a tuple with the VersioningEnabled field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsOrganizationMetadata) GetVersioningEnabledOk() (*bool, bool) {
-	if o == nil || IsNil(o.VersioningEnabled) {
-		return nil, false
-	}
-	return o.VersioningEnabled, true
-}
-
-// HasVersioningEnabled returns a boolean if a field has been set.
-func (o *OrganizationsOrganizationMetadata) HasVersioningEnabled() bool {
-	if o != nil && !IsNil(o.VersioningEnabled) {
-		return true
-	}
-
-	return false
-}
-
-// SetVersioningEnabled gets a reference to the given bool and assigns it to the VersioningEnabled field.
-func (o *OrganizationsOrganizationMetadata) SetVersioningEnabled(v bool) {
-	o.VersioningEnabled = &v
-}
-
 func (o OrganizationsOrganizationMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -262,9 +229,6 @@ func (o OrganizationsOrganizationMetadata) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
-	}
-	if !IsNil(o.VersioningEnabled) {
-		toSerialize["versioningEnabled"] = o.VersioningEnabled
 	}
 	return toSerialize, nil
 }

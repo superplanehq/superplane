@@ -22,7 +22,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from superplaneapi.models.canvases_canvas_change_request_approval_state import CanvasesCanvasChangeRequestApprovalState
-from superplaneapi.models.canvases_canvas_change_request_approver import CanvasesCanvasChangeRequestApprover
+from superplaneapi.models.change_management_approver import ChangeManagementApprover
 from superplaneapi.models.superplane_canvases_user_ref import SuperplaneCanvasesUserRef
 from typing import Optional, Set
 from typing_extensions import Self
@@ -32,7 +32,7 @@ class CanvasesCanvasChangeRequestApproval(BaseModel):
     CanvasesCanvasChangeRequestApproval
     """ # noqa: E501
     actor: Optional[SuperplaneCanvasesUserRef] = None
-    approver: Optional[CanvasesCanvasChangeRequestApprover] = None
+    approver: Optional[ChangeManagementApprover] = None
     state: Optional[CanvasesCanvasChangeRequestApprovalState] = CanvasesCanvasChangeRequestApprovalState.STATE_UNSPECIFIED
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     invalidated_at: Optional[datetime] = Field(default=None, alias="invalidatedAt")
@@ -96,7 +96,7 @@ class CanvasesCanvasChangeRequestApproval(BaseModel):
 
         _obj = cls.model_validate({
             "actor": SuperplaneCanvasesUserRef.from_dict(obj["actor"]) if obj.get("actor") is not None else None,
-            "approver": CanvasesCanvasChangeRequestApprover.from_dict(obj["approver"]) if obj.get("approver") is not None else None,
+            "approver": ChangeManagementApprover.from_dict(obj["approver"]) if obj.get("approver") is not None else None,
             "state": obj.get("state") if obj.get("state") is not None else CanvasesCanvasChangeRequestApprovalState.STATE_UNSPECIFIED,
             "createdAt": obj.get("createdAt"),
             "invalidatedAt": obj.get("invalidatedAt")
