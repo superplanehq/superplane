@@ -77,10 +77,12 @@ function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry
   }
 
   return (
-    <div className="m-4 min-h-0 w-full min-w-0 flex-1 overflow-auto">
+    <div className="min-h-0 w-full min-w-0 flex-1 overflow-auto">
       {Object.entries(groupedEntries).map(([namespace, values]) => (
-        <div key={namespace} className="m-4 border border-slate-200 rounded-md">
-          <div className="px-3 py-2 font-mono text-sm text-gray-600">Namespace: {namespace}</div>
+        <div key={namespace} className="m-4 border border-slate-300 rounded-md bg-white">
+          <div className="px-3 py-2 font-mono text-sm text-gray-600 border-b border-slate-300">
+            Namespace: {namespace}
+          </div>
 
           {renderNamespaceTable(values, onDeleteEntry, deletingId)}
         </div>
@@ -190,7 +192,7 @@ function renderNamespaceTable(
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto bg-red-500">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-950/15 bg-slate-50">
