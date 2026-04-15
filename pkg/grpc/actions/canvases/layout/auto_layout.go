@@ -27,7 +27,7 @@ func ApplyLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAuto
 
 	switch layout.Algorithm {
 	case pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED:
-		return nil, nil, fmt.Errorf("layout.algorithm is required")
+		return nil, nil, fmt.Errorf("layout algorithm is required")
 	case pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL:
 		layoutedNodes, err := applyHorizontalLayout(nodes, edges, layout)
 		if err != nil {
@@ -520,7 +520,7 @@ func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[s
 	seedNodeIDs := make([]string, 0, len(autoLayout.NodeIds))
 	for _, nodeID := range autoLayout.NodeIds {
 		if _, exists := flowNodeSet[nodeID]; !exists {
-			return nil, fmt.Errorf("auto_layout.node_ids contains unknown node: %s", nodeID)
+			return nil, fmt.Errorf("auto layout node ids contains unknown node: %s", nodeID)
 		}
 		if _, exists := seen[nodeID]; exists {
 			continue

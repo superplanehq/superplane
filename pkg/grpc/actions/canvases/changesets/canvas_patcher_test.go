@@ -156,7 +156,7 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 
 		steps.assertHasError()
-		steps.assertErrorContains("layout.algorithm is required")
+		steps.assertErrorContains("layout algorithm is required")
 		require.Nil(t, steps.finalVersion)
 	})
 

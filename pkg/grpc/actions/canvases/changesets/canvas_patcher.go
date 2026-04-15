@@ -99,7 +99,7 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 	return v, nil
 }
 
-func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, layout *pb.CanvasAutoLayout) error {
+func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, autoLayout *pb.CanvasAutoLayout) error {
 	if changeset == nil || len(changeset.Changes) == 0 {
 		return fmt.Errorf("changeset is required")
 	}
@@ -110,7 +110,7 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, layout *pb
 		}
 	}
 
-	finalVersion, err := p.buildFinalVersion(layout)
+	finalVersion, err := p.buildFinalVersion(autoLayout)
 	if err != nil {
 		return err
 	}
