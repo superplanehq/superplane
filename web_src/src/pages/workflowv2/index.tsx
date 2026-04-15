@@ -14,6 +14,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import type {
   BlueprintsBlueprint,
+  CanvasChangesetChange,
   CanvasesCanvas,
   CanvasesCanvasChangeRequest,
   CanvasesCanvasEvent,
@@ -29,7 +30,7 @@ import type {
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
-import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,6 @@ import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
-import { CanvasBuilder, type CanvasOperation } from "@/lib/ai";
 import { buildChildToGroupMap } from "@/lib/canvas/groups";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
@@ -3018,43 +3018,99 @@ export function WorkflowPageV2() {
   );
 
   const handleApplyAiOperations = useCallback(
-    async (operations: CanvasOperation[]) => {
+    async (operations: CanvasChangesetChange[]) => {
       if (!operations.length || !organizationId || !canvasId) {
         return;
       }
 
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-      if (!latestWorkflow) {
-        throw new Error("Canvas not found.");
+      const versionId = activeCanvasVersionIdRef.current || activeCanvasVersionId;
+      if (!versionId) {
+        throw new Error("Enable edit mode before applying AI changes.");
       }
 
-      const builder = new CanvasBuilder({
-        canvas: latestWorkflow,
-        buildingBlocks,
-        integrations,
-        components,
-        blueprints,
-      });
-      const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
+      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(versionId);
+      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
+      try {
+        const response = await canvasesApplyCanvasVersionChangeset(
+          withOrganizationHeader({
+            path: {
+              canvasId,
+              versionId,
+            },
+            body: {
+              changeset: {
+                changes: operations,
+              },
+            },
+          }),
+        );
 
-      if (!isReadOnly) {
-        await handleSaveWorkflow(finalWorkflow, { showToast: false });
+        const version = response.data?.version;
+        if (!version) {
+          throw new Error("Failed to apply AI changes.");
+        }
+
+        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), version);
+        queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
+          if (!current) {
+            return current;
+          }
+
+          let found = false;
+          const next = current.map((item) => {
+            if (item?.metadata?.id === version.metadata?.id) {
+              found = true;
+              return version;
+            }
+            return item;
+          });
+
+          if (!found) {
+            next.unshift(version);
+          }
+
+          next.sort(
+            (left, right) =>
+              versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
+              versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
+          );
+          return next;
+        });
+
+        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+          if (!current || !version.spec) {
+            return current;
+          }
+
+          return {
+            ...current,
+            spec: {
+              ...current.spec,
+              ...version.spec,
+            },
+          };
+        });
+
+        setActiveCanvasVersion(version);
+        lastSavedWorkflowRef.current = JSON.parse(
+          JSON.stringify(queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? null),
+        );
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+      } catch (error) {
+        releaseCanvasUpdatedEcho();
+        releaseCanvasVersionUpdatedEcho();
+        throw error;
       }
     },
     [
-      buildingBlocks,
-      isReadOnly,
-      canvas,
+      activeCanvasVersionId,
       canvasId,
-      handleSaveWorkflow,
-      components,
-      blueprints,
-      integrations,
       organizationId,
       queryClient,
+      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasVersionUpdatedEcho,
     ],
   );
 
