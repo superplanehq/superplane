@@ -115,6 +115,21 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
 
+	t.Run("autocomplete suggests node data in filter expression", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addManualTrigger("Start")
+		steps.addFilter("Filter")
+		steps.connectNodes("Start", "Filter")
+		steps.saveCanvas()
+		steps.openNodeSettings("Filter")
+		steps.typeExpression("$")
+		steps.assertAutocompleteNodeSuggestionVisible()
+	})
+}
+
+func TestCanvasPageYamlViewer(t *testing.T) {
 	t.Run("YAML preview modal shows canvas definition", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
@@ -134,19 +149,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertYamlContentVisible("SwitchTest")
 		steps.closeYamlPreviewModal()
 		steps.assertNodeIsAdded("SwitchTest")
-	})
-
-	t.Run("autocomplete suggests node data in filter expression", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addManualTrigger("Start")
-		steps.addFilter("Filter")
-		steps.connectNodes("Start", "Filter")
-		steps.saveCanvas()
-		steps.openNodeSettings("Filter")
-		steps.typeExpression("$")
-		steps.assertAutocompleteNodeSuggestionVisible()
 	})
 }
 
@@ -469,8 +471,10 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 }
 
 func (s *CanvasPageSteps) openYamlPreviewModal() {
+	// Adding a node opens the component sidebar over the canvas chrome; dismiss it so
+	// the floating YAML control (same corner as the sidebar) is clickable.
+	s.canvas.ClickOnEmptyCanvasArea()
 	s.session.Click(q.TestID("open-yaml-modal-button"))
-	s.session.Sleep(1000)
 }
 
 func (s *CanvasPageSteps) closeYamlPreviewModal() {
