@@ -43,6 +43,9 @@ from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescr
 from superplaneapi.models.canvases_describe_canvas_version_response import (
     CanvasesDescribeCanvasVersionResponse,
 )
+from superplaneapi.models.canvases_create_canvas_version_response import (
+    CanvasesCreateCanvasVersionResponse,
+)
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.canvases_list_node_executions_response import (
     CanvasesListNodeExecutionsResponse,
@@ -308,6 +311,26 @@ class SuperplaneClient:
         return self._canvas_summary_from_describe_response(
             self._fetch_describe_canvas_response(canvas_id), canvas_id
         )
+
+    def create_canvas_version(self, canvas_id: str) -> str:
+        response = self._api_request(
+            lambda: self._canvas_version_api.canvases_create_canvas_version(
+                canvas_id,
+                {},
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_create_canvas_version",
+            fields={"canvas_id": canvas_id},
+        )
+        if not isinstance(response, CanvasesCreateCanvasVersionResponse):
+            raise ValueError("Expected typed response from Superplane API.")
+
+        version = response.version
+        metadata = version.metadata if version is not None else None
+        version_id = metadata.id if metadata is not None and isinstance(metadata.id, str) else None
+        if not version_id:
+            raise ValueError("Canvas version create response is missing version metadata id.")
+        return version_id
 
     def validate_canvas_version_changeset(
         self,

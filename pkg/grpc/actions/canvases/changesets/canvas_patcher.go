@@ -326,6 +326,7 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
+			currentNode.Configuration = node.GetConfiguration().AsMap()
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
@@ -334,6 +335,7 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
+			currentNode.Configuration = node.GetConfiguration().AsMap()
 			p.nodes[nodeID] = currentNode
 			return nil
 		}

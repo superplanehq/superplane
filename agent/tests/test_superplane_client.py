@@ -2,6 +2,9 @@ from typing import Any
 
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
+from superplaneapi.models.canvases_create_canvas_version_response import (
+    CanvasesCreateCanvasVersionResponse,
+)
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_describe_canvas_version_response import (
     CanvasesDescribeCanvasVersionResponse,
@@ -44,6 +47,7 @@ class FakeCanvasApi:
 class FakeCanvasVersionApi:
     def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
         self._payloads = payloads
+        self.create_calls: list[dict[str, Any]] = []
         self.validate_calls: list[dict[str, Any]] = []
 
     def canvases_describe_canvas_version(
@@ -58,6 +62,27 @@ class FakeCanvasVersionApi:
         if payload is None:
             raise ValueError(f"Missing payload for canvas version: {canvas_id}/{version_id}")
         result = CanvasesDescribeCanvasVersionResponse.from_dict(payload)
+        assert result is not None
+        return result
+
+    def canvases_create_canvas_version(
+        self,
+        canvas_id: str,
+        body: dict[str, Any],
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> CanvasesCreateCanvasVersionResponse:
+        self.create_calls.append(
+            {
+                "canvas_id": canvas_id,
+                "body": body,
+                "request_timeout": _request_timeout,
+            }
+        )
+        key = f"/api/v1/canvases/{canvas_id}/versions"
+        payload = self._payloads.get(key)
+        if payload is None:
+            raise ValueError(f"Missing payload for canvas version create: {canvas_id}")
+        result = CanvasesCreateCanvasVersionResponse.from_dict(payload)
         assert result is not None
         return result
 
@@ -327,6 +352,29 @@ def test_validate_canvas_version_changeset_sends_expected_payload() -> None:
     assert isinstance(body, CanvasesValidateCanvasVersionChangesetBody)
     assert body.changeset is not None
     assert body.changeset.to_dict().get("changes", [])[0]["node"]["id"] == "node-1"
+
+
+def test_create_canvas_version_returns_metadata_id_and_sends_empty_body() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/canvases/canvas-1/versions": {
+                "version": {
+                    "metadata": {"id": "draft-ver", "canvasId": "canvas-1"},
+                    "spec": {"nodes": [], "edges": []},
+                }
+            }
+        }
+    )
+
+    version_id = client.create_canvas_version("canvas-1")
+    assert version_id == "draft-ver"
+
+    canvas_version_api = client._canvas_version_api
+    assert isinstance(canvas_version_api, FakeCanvasVersionApi)
+    assert len(canvas_version_api.create_calls) == 1
+    call = canvas_version_api.create_calls[0]
+    assert call["canvas_id"] == "canvas-1"
+    assert call["body"] == {}
 
 
 def test_get_node_details_includes_recent_events() -> None:
