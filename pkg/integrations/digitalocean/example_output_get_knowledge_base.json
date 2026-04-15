@@ -1,0 +1,53 @@
+{
+  "data": {
+    "uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "name": "product-catalog-v2",
+    "databaseStatus": "ONLINE",
+    "region": "tor1",
+    "embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+    "embeddingModelName": "GTE Large EN v1.5",
+    "projectId": "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+    "projectName": "AI Agents",
+    "tags": ["production", "docs"],
+    "database": {
+      "id": "abf1055a-745d-4c24-a1db-1959ea819264",
+      "name": "product-catalog-os",
+      "status": "online"
+    },
+    "dataSources": [
+      {
+        "uuid": "a1b2c3d4-0000-0000-0000-000000000001",
+        "type": "spaces",
+        "spacesBucket": "tor1/product-data",
+        "chunkingAlgorithm": "CHUNKING_ALGORITHM_SECTION_BASED",
+        "createdAt": "2025-01-01T00:00:00Z",
+        "updatedAt": "2025-06-01T00:00:00Z"
+      },
+      {
+        "uuid": "a1b2c3d4-0000-0000-0000-000000000002",
+        "type": "web",
+        "webURL": "https://docs.example.com",
+        "crawlingOption": "SCOPED",
+        "chunkingAlgorithm": "CHUNKING_ALGORITHM_SEMANTIC",
+        "createdAt": "2025-02-01T00:00:00Z",
+        "updatedAt": "2025-06-01T00:00:00Z"
+      }
+    ],
+    "lastIndexingJob": {
+      "uuid": "b2c3d4e5-0000-0000-0000-000000000001",
+      "status": "INDEX_JOB_STATUS_COMPLETED",
+      "phase": "BATCH_JOB_PHASE_COMPLETE",
+      "totalTokens": "12345",
+      "completedDataSources": 2,
+      "totalDataSources": 2,
+      "startedAt": "2025-06-01T00:00:00Z",
+      "finishedAt": "2025-06-01T00:05:32Z",
+      "createdAt": "2025-06-01T00:00:00Z",
+      "isReportAvailable": true
+    },
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-06-01T00:00:00Z"
+  },
+  "timestamp": "2025-06-01T00:05:32Z",
+  "type": "digitalocean.knowledge_base.fetched"
+}
