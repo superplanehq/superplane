@@ -11,15 +11,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type AuthContext struct {
+type AuthReader struct {
 	tx                *gorm.DB
 	orgID             uuid.UUID
 	authService       authorization.Authorization
 	authenticatedUser *models.User
 }
 
-func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) *AuthContext {
-	return &AuthContext{
+func NewAuthReader(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) *AuthReader {
+	return &AuthReader{
 		tx:                tx,
 		orgID:             orgID,
 		authService:       authService,
@@ -27,7 +27,7 @@ func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Auth
 	}
 }
 
-func (c *AuthContext) AuthenticatedUser() *core.User {
+func (c *AuthReader) AuthenticatedUser() *core.User {
 	if c.authenticatedUser == nil {
 		return nil
 	}
@@ -39,7 +39,7 @@ func (c *AuthContext) AuthenticatedUser() *core.User {
 	}
 }
 
-func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
+func (c *AuthReader) GetUser(id uuid.UUID) (*core.User, error) {
 	user, err := models.FindActiveUserByIDInTransaction(c.tx, c.orgID.String(), id.String())
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
 	}, nil
 }
 
-func (c *AuthContext) GetRole(name string) (*core.RoleRef, error) {
+func (c *AuthReader) GetRole(name string) (*core.RoleRef, error) {
 	roleDefinition, err := c.authService.GetRoleDefinition(name, models.DomainTypeOrganization, c.orgID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error getting role definition: %v", err)
@@ -66,7 +66,7 @@ func (c *AuthContext) GetRole(name string) (*core.RoleRef, error) {
 	return &core.RoleRef{Name: roleDefinition.Name, DisplayName: roleMetadata.DisplayName}, nil
 }
 
-func (c *AuthContext) GetGroup(name string) (*core.GroupRef, error) {
+func (c *AuthReader) GetGroup(name string) (*core.GroupRef, error) {
 	groupMetadata, err := models.FindGroupMetadata(name, models.DomainTypeOrganization, c.orgID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error getting group metadata: %v", err)
@@ -75,7 +75,7 @@ func (c *AuthContext) GetGroup(name string) (*core.GroupRef, error) {
 	return &core.GroupRef{Name: groupMetadata.GroupName, DisplayName: groupMetadata.DisplayName}, nil
 }
 
-func (c *AuthContext) HasRole(role string) (bool, error) {
+func (c *AuthReader) HasRole(role string) (bool, error) {
 	if c.authenticatedUser == nil {
 		return false, fmt.Errorf("user not authenticated")
 	}
@@ -94,7 +94,7 @@ func (c *AuthContext) HasRole(role string) (bool, error) {
 	return false, nil
 }
 
-func (c *AuthContext) InGroup(group string) (bool, error) {
+func (c *AuthReader) InGroup(group string) (bool, error) {
 	if c.authenticatedUser == nil {
 		return false, fmt.Errorf("user not authenticated")
 	}
