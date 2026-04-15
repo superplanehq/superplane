@@ -28,6 +28,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Switch } from "@/ui/switch";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/lib/errors";
+import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -360,51 +361,54 @@ export function General({ organization }: GeneralProps) {
         </Fieldset>
       </PermissionTooltip>
 
-      <PermissionTooltip
-        allowed={canUpdateOrg || permissionsLoading}
-        message="You don't have permission to update this organization."
-        className="w-full"
-      >
-        <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <Label
-                htmlFor="organization-change-management-switch"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+      {isChangeManagementSettingsEnabled() ? (
+        <PermissionTooltip
+          allowed={canUpdateOrg || permissionsLoading}
+          message="You don't have permission to update this organization."
+          className="w-full"
+        >
+          <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <Label
+                  htmlFor="organization-change-management-switch"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  Change Management
+                </Label>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Require change requests with approvals before publishing canvas changes. When enabled at the
+                  organization level, change management is enforced for every canvas and cannot be turned off per
+                  canvas.
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  When disabled here, each canvas can choose its own change management setting. New canvases inherit
+                  this organization setting by default.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {changeManagementEnabled ? "Enabled" : "Disabled"}
+                </span>
+                <Switch
+                  id="organization-change-management-switch"
+                  checked={changeManagementEnabled}
+                  onCheckedChange={handleChangeManagementToggle}
+                  disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
+                  aria-label="Toggle change management"
+                />
+              </div>
+            </div>
+            {changeManagementMessage ? (
+              <p
+                className={`mt-3 text-sm ${changeManagementMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}
               >
-                Change Management
-              </Label>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Require change requests with approvals before publishing canvas changes. When enabled at the
-                organization level, change management is enforced for every canvas and cannot be turned off per canvas.
+                {changeManagementMessage}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                When disabled here, each canvas can choose its own change management setting. New canvases inherit this
-                organization setting by default.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {changeManagementEnabled ? "Enabled" : "Disabled"}
-              </span>
-              <Switch
-                id="organization-change-management-switch"
-                checked={changeManagementEnabled}
-                onCheckedChange={handleChangeManagementToggle}
-                disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
-                aria-label="Toggle change management"
-              />
-            </div>
-          </div>
-          {changeManagementMessage ? (
-            <p
-              className={`mt-3 text-sm ${changeManagementMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}
-            >
-              {changeManagementMessage}
-            </p>
-          ) : null}
-        </Fieldset>
-      </PermissionTooltip>
+            ) : null}
+          </Fieldset>
+        </PermissionTooltip>
+      ) : null}
 
       <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
         {!showDeleteForm ? (

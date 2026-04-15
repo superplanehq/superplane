@@ -6,6 +6,7 @@ import { normalizeApprovers, validateApproverConfig } from "./approverUtils";
 import { IdentityFields } from "./IdentityFields";
 import type { ChangeRequestApproverType, SettingsApprover, SettingsViewProps } from "./types";
 import { ChangeManagementFieldset } from "./ChangeManagementFieldset";
+import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 export function SettingsView({
   initialValues,
@@ -179,24 +180,26 @@ export function SettingsView({
           onDescriptionChange={setDescription}
           canUpdateCanvas={canUpdateCanvas}
         />
-        <ChangeManagementFieldset
-          isChangeManagementEnforcedByOrganization={isChangeManagementEnforcedByOrganization}
-          changeManagementEnabled={changeManagementEnabled}
-          onChangeManagementEnabledChange={setChangeManagementEnabled}
-          isChangeManagementToggleDisabled={isChangeManagementToggleDisabled}
-          effectiveChangeManagementEnabled={effectiveChangeManagementEnabled}
-          approvers={approvers}
-          canUpdateCanvas={canUpdateCanvas}
-          availableUsers={availableUsers}
-          availableRoles={availableRoles}
-          approverValidation={approverValidation}
-          hasEveryoneApprover={hasEveryoneApprover}
-          onApproverTypeChange={updateApproverType}
-          onApproverUserChange={updateApproverUser}
-          onApproverRoleChange={updateApproverRole}
-          onRemoveApprover={removeApprover}
-          onAddApprover={addApprover}
-        />
+        {isChangeManagementSettingsEnabled() ? (
+          <ChangeManagementFieldset
+            isChangeManagementEnforcedByOrganization={isChangeManagementEnforcedByOrganization}
+            changeManagementEnabled={changeManagementEnabled}
+            onChangeManagementEnabledChange={setChangeManagementEnabled}
+            isChangeManagementToggleDisabled={isChangeManagementToggleDisabled}
+            effectiveChangeManagementEnabled={effectiveChangeManagementEnabled}
+            approvers={approvers}
+            canUpdateCanvas={canUpdateCanvas}
+            availableUsers={availableUsers}
+            availableRoles={availableRoles}
+            approverValidation={approverValidation}
+            hasEveryoneApprover={hasEveryoneApprover}
+            onApproverTypeChange={updateApproverType}
+            onApproverUserChange={updateApproverUser}
+            onApproverRoleChange={updateApproverRole}
+            onRemoveApprover={removeApprover}
+            onAddApprover={addApprover}
+          />
+        ) : null}
         <div className="flex items-center gap-4">
           <LoadingButton
             type="button"
