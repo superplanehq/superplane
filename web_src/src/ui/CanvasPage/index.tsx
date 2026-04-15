@@ -81,7 +81,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
-import { Header, type BreadcrumbItem } from "./Header";
+import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -154,12 +154,11 @@ export interface CanvasPageProps {
   edges: CanvasEdge[];
 
   startCollapsed?: boolean;
+  /** Display name for the canvas header (center title). */
   title?: string;
-  breadcrumbs?: BreadcrumbItem[];
   headerBanner?: React.ReactNode;
   organizationId?: string;
   canvasId?: string;
-  unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
@@ -185,16 +184,11 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "cli";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli") => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
   showCanvasSettingsMenu?: boolean;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
-  dataViewContent?: React.ReactNode;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -1159,9 +1153,9 @@ function CanvasPage(props: CanvasPageProps) {
       <div className="relative z-30">
         <CanvasContentHeader
           state={state}
+          canvasName={props.title ?? ""}
           onSave={props.onSave}
           organizationId={props.organizationId}
-          unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
           saveButtonHidden={props.saveButtonHidden}
           saveDisabled={props.saveDisabled}
@@ -1178,11 +1172,7 @@ function CanvasPage(props: CanvasPageProps) {
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
           publishVersionLabel={props.publishVersionLabel}
           unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
-          topViewMode={props.topViewMode}
-          onTopViewModeChange={props.onTopViewModeChange}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          onExportYamlCopy={props.onExportYamlCopy}
-          onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1221,192 +1211,183 @@ function CanvasPage(props: CanvasPageProps) {
         </div>
       ) : null}
 
-      {/* Main content area with sidebar and canvas/CLI/settings views */}
-      {props.topViewMode && props.topViewMode !== "canvas" ? (
-        <div className="flex-1 flex relative overflow-hidden">
-          {props.versionControlSidebar}
-          <div className="flex-1 overflow-auto bg-slate-100">{props.dataViewContent}</div>
-        </div>
-      ) : (
-        <div className="flex-1 flex relative overflow-hidden">
-          {props.versionControlSidebar}
+      {/* Main content area with sidebar and canvas */}
+      <div className="flex-1 flex relative overflow-hidden">
+        {props.versionControlSidebar}
 
-          <RightSideControls
-            mode={readOnly ? "live" : "edit"}
-            onSidebarOpen={() => handleSidebarToggle(true)}
-            onAddNote={handleAddNote}
-            onMemoryOpen={props.onMemoryOpen}
-            onYamlOpen={props.onYamlOpen}
+        <RightSideControls
+          mode={readOnly ? "live" : "edit"}
+          onSidebarOpen={() => handleSidebarToggle(true)}
+          onAddNote={handleAddNote}
+          onMemoryOpen={props.onMemoryOpen}
+          onYamlOpen={props.onYamlOpen}
+        />
+
+        {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
+          <BuildingBlocksSidebar
+            isOpen
+            onToggle={handleSidebarToggle}
+            blocks={props.buildingBlocks || []}
+            agentContext={props.agentContext}
+            canvasId={props.canvasId}
+            organizationId={props.organizationId}
+            canvasNodes={canvasNodesForAiContext}
+            onApplyAiOperations={props.onApplyAiOperations}
+            integrations={props.integrations}
+            canvasZoom={canvasZoom}
+            disabled={readOnly}
+            disabledMessage="You don't have permission to edit this canvas."
+            onBlockClick={handleBuildingBlockClick}
           />
+        )}
 
-          {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
-            <BuildingBlocksSidebar
-              isOpen
-              onToggle={handleSidebarToggle}
-              blocks={props.buildingBlocks || []}
-              agentContext={props.agentContext}
-              canvasId={props.canvasId}
-              organizationId={props.organizationId}
-              canvasNodes={canvasNodesForAiContext}
-              onApplyAiOperations={props.onApplyAiOperations}
-              integrations={props.integrations}
-              canvasZoom={canvasZoom}
-              disabled={readOnly}
-              disabledMessage="You don't have permission to edit this canvas."
-              onBlockClick={handleBuildingBlockClick}
-            />
-          )}
-
-          <div className="flex-1 relative">
-            {showPreviewFloatingBar || showAwaitingFloatingBar ? (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
-                <div
+        <div className="flex-1 relative">
+          {showPreviewFloatingBar || showAwaitingFloatingBar ? (
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
+              <div
+                className={cn(
+                  "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
+                  showAwaitingFloatingBar ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName : "bg-sky-50",
+                )}
+              >
+                <span
                   className={cn(
-                    "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
-                    showAwaitingFloatingBar
-                      ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName
-                      : "bg-sky-50",
+                    "flex min-w-0 max-w-full items-center gap-1 text-sm",
+                    showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "flex min-w-0 max-w-full items-center gap-1 text-sm",
-                      showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
-                    )}
-                  >
-                    {showAwaitingFloatingBar ? (
-                      <>
-                        <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
-                        <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
-                          {props.awaitingApprovalBanner?.reviewUi.label}
-                        </span>
-                      </>
-                    ) : (
-                      "Previewing previous version"
-                    )}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => {
-                      if (showAwaitingFloatingBar) {
-                        props.awaitingApprovalBanner?.onViewNodeDiff?.();
-                      } else {
-                        props.onPreviewPreviousVersionViewDetails?.();
-                      }
-                    }}
-                  >
-                    View details
-                  </Button>
-                </div>
+                  {showAwaitingFloatingBar ? (
+                    <>
+                      <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
+                      <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
+                        {props.awaitingApprovalBanner?.reviewUi.label}
+                      </span>
+                    </>
+                  ) : (
+                    "Previewing previous version"
+                  )}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    if (showAwaitingFloatingBar) {
+                      props.awaitingApprovalBanner?.onViewNodeDiff?.();
+                    } else {
+                      props.onPreviewPreviousVersionViewDetails?.();
+                    }
+                  }}
+                >
+                  View details
+                </Button>
               </div>
-            ) : null}
-            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-              <CanvasContent
-                state={state}
-                onNodeEdit={handleNodeEdit}
-                onNodeDelete={handleNodeDelete}
-                onNodesDelete={props.onNodesDelete}
-                onDuplicateNodes={props.onDuplicateNodes}
-                onAutoLayoutNodes={props.onAutoLayoutNodes}
-                onEdgeCreate={props.onEdgeCreate}
-                onToggleView={handleToggleView}
-                onRun={(nodeId) => handleNodeRun(nodeId)}
-                onDuplicate={props.onDuplicate}
-                onDeactivate={props.onDeactivate}
-                onAnnotationUpdate={props.onAnnotationUpdate}
-                onAnnotationBlur={props.onAnnotationBlur}
-                onGroupUpdate={props.onGroupUpdate}
-                onGroupNodes={props.onGroupNodes}
-                onUngroupNodes={props.onUngroupNodes}
-                onTogglePause={props.onTogglePause}
-                runDisabled={props.runDisabled}
-                runDisabledTooltip={props.runDisabledTooltip}
-                onBuildingBlockDrop={handleBuildingBlockDrop}
-                onBuildingBlocksSidebarToggle={handleSidebarToggle}
-                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-                onZoomChange={setCanvasZoom}
-                hasFitToViewRef={hasFitToViewRef}
-                viewportRefProp={props.viewportRef}
-                highlightedNodeIds={highlightedNodeIds}
-                workflowNodes={props.workflowNodes}
-                setCurrentTab={setCurrentTab}
-                isVersionControlOpen={props.isVersionControlOpen}
-                onOpenVersionControl={props.onOpenVersionControl}
-                versionControlButtonTooltip={props.versionControlButtonTooltip}
-                versionControlNotificationCount={props.versionControlNotificationCount}
-                showBottomStatusControls={props.showBottomStatusControls}
-                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
-                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
-                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
-                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
-                readOnly={props.readOnly}
-                logEntries={props.logEntries}
-                focusRequest={props.focusRequest}
-                initialFocusNodeId={props.initialFocusNodeId}
-                runsEvents={props.runsEvents}
-                runsTotalCount={props.runsTotalCount}
-                runsHasNextPage={props.runsHasNextPage}
-                runsIsFetchingNextPage={props.runsIsFetchingNextPage}
-                onRunsLoadMore={props.onRunsLoadMore}
-                runsNodes={props.runsNodes}
-                runsComponentIconMap={props.runsComponentIconMap}
-                runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
-                onRunNodeSelect={props.onRunNodeSelect}
-                onRunExecutionSelect={props.onRunExecutionSelect}
-                onAcknowledgeErrors={props.onAcknowledgeErrors}
-                missingIntegrations={props.missingIntegrations}
-                onConnectIntegration={props.onConnectIntegration}
-                canCreateIntegrations={props.canCreateIntegrations}
-              />
-            </ReactFlowProvider>
-
-            <Sidebar
+            </div>
+          ) : null}
+          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+            <CanvasContent
               state={state}
-              getSidebarData={props.getSidebarData}
-              loadSidebarData={props.loadSidebarData}
-              getTabData={props.getTabData}
-              getAutocompleteExampleObj={props.getAutocompleteExampleObj}
-              onCancelQueueItem={handleCancelQueueItem}
-              onCancelExecution={handleCancelExecution}
-              getAllHistoryEvents={props.getAllHistoryEvents}
-              onLoadMoreHistory={props.onLoadMoreHistory}
-              getHasMoreHistory={props.getHasMoreHistory}
-              getLoadingMoreHistory={props.getLoadingMoreHistory}
-              onLoadMoreQueue={props.onLoadMoreQueue}
-              getAllQueueEvents={props.getAllQueueEvents}
-              getHasMoreQueue={props.getHasMoreQueue}
-              getLoadingMoreQueue={props.getLoadingMoreQueue}
-              onReEmit={props.onReEmit}
-              loadExecutionChain={props.loadExecutionChain}
-              getExecutionState={props.getExecutionState}
-              onSidebarClose={handleSidebarClose}
-              editingNodeData={editingNodeData}
-              onSaveConfiguration={handleSaveConfiguration}
-              configurationSaveMode={props.configurationSaveMode}
-              currentTab={currentTab}
-              onTabChange={setCurrentTab}
-              organizationId={props.organizationId}
-              getCustomField={props.getCustomField}
-              integrations={props.integrations}
+              onNodeEdit={handleNodeEdit}
+              onNodeDelete={handleNodeDelete}
+              onNodesDelete={props.onNodesDelete}
+              onDuplicateNodes={props.onDuplicateNodes}
+              onAutoLayoutNodes={props.onAutoLayoutNodes}
+              onEdgeCreate={props.onEdgeCreate}
+              onToggleView={handleToggleView}
+              onRun={(nodeId) => handleNodeRun(nodeId)}
+              onDuplicate={props.onDuplicate}
+              onDeactivate={props.onDeactivate}
+              onAnnotationUpdate={props.onAnnotationUpdate}
+              onAnnotationBlur={props.onAnnotationBlur}
+              onGroupUpdate={props.onGroupUpdate}
+              onGroupNodes={props.onGroupNodes}
+              onUngroupNodes={props.onUngroupNodes}
+              onTogglePause={props.onTogglePause}
+              runDisabled={props.runDisabled}
+              runDisabledTooltip={props.runDisabledTooltip}
+              onBuildingBlockDrop={handleBuildingBlockDrop}
+              onBuildingBlocksSidebarToggle={handleSidebarToggle}
+              onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+              onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+              onZoomChange={setCanvasZoom}
+              hasFitToViewRef={hasFitToViewRef}
+              viewportRefProp={props.viewportRef}
+              highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
-              components={props.components}
-              triggers={props.triggers}
-              blueprints={props.blueprints}
-              onHighlightedNodesChange={setHighlightedNodeIds}
+              setCurrentTab={setCurrentTab}
+              isVersionControlOpen={props.isVersionControlOpen}
+              onOpenVersionControl={props.onOpenVersionControl}
+              versionControlButtonTooltip={props.versionControlButtonTooltip}
+              versionControlNotificationCount={props.versionControlNotificationCount}
+              showBottomStatusControls={props.showBottomStatusControls}
+              isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+              onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+              autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+              autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+              readOnly={props.readOnly}
+              logEntries={props.logEntries}
               focusRequest={props.focusRequest}
-              onExecutionChainHandled={props.onExecutionChainHandled}
-              readOnly={readOnly}
-              canReadIntegrations={props.canReadIntegrations}
+              initialFocusNodeId={props.initialFocusNodeId}
+              runsEvents={props.runsEvents}
+              runsTotalCount={props.runsTotalCount}
+              runsHasNextPage={props.runsHasNextPage}
+              runsIsFetchingNextPage={props.runsIsFetchingNextPage}
+              onRunsLoadMore={props.onRunsLoadMore}
+              runsNodes={props.runsNodes}
+              runsComponentIconMap={props.runsComponentIconMap}
+              runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
+              onRunNodeSelect={props.onRunNodeSelect}
+              onRunExecutionSelect={props.onRunExecutionSelect}
+              onAcknowledgeErrors={props.onAcknowledgeErrors}
+              missingIntegrations={props.missingIntegrations}
+              onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
-              canUpdateIntegrations={props.canUpdateIntegrations}
             />
-          </div>
+          </ReactFlowProvider>
+
+          <Sidebar
+            state={state}
+            getSidebarData={props.getSidebarData}
+            loadSidebarData={props.loadSidebarData}
+            getTabData={props.getTabData}
+            getAutocompleteExampleObj={props.getAutocompleteExampleObj}
+            onCancelQueueItem={handleCancelQueueItem}
+            onCancelExecution={handleCancelExecution}
+            getAllHistoryEvents={props.getAllHistoryEvents}
+            onLoadMoreHistory={props.onLoadMoreHistory}
+            getHasMoreHistory={props.getHasMoreHistory}
+            getLoadingMoreHistory={props.getLoadingMoreHistory}
+            onLoadMoreQueue={props.onLoadMoreQueue}
+            getAllQueueEvents={props.getAllQueueEvents}
+            getHasMoreQueue={props.getHasMoreQueue}
+            getLoadingMoreQueue={props.getLoadingMoreQueue}
+            onReEmit={props.onReEmit}
+            loadExecutionChain={props.loadExecutionChain}
+            getExecutionState={props.getExecutionState}
+            onSidebarClose={handleSidebarClose}
+            editingNodeData={editingNodeData}
+            onSaveConfiguration={handleSaveConfiguration}
+            configurationSaveMode={props.configurationSaveMode}
+            currentTab={currentTab}
+            onTabChange={setCurrentTab}
+            organizationId={props.organizationId}
+            getCustomField={props.getCustomField}
+            integrations={props.integrations}
+            workflowNodes={props.workflowNodes}
+            components={props.components}
+            triggers={props.triggers}
+            blueprints={props.blueprints}
+            onHighlightedNodesChange={setHighlightedNodeIds}
+            focusRequest={props.focusRequest}
+            onExecutionChainHandled={props.onExecutionChainHandled}
+            readOnly={readOnly}
+            canReadIntegrations={props.canReadIntegrations}
+            canCreateIntegrations={props.canCreateIntegrations}
+            canUpdateIntegrations={props.canUpdateIntegrations}
+          />
         </div>
-      )}
+      </div>
 
       {/* Edit existing node modal - now handled by settings sidebar */}
 
@@ -1700,9 +1681,9 @@ function Sidebar({
 
 function CanvasContentHeader({
   state,
+  canvasName,
   onSave,
   organizationId,
-  unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
   saveDisabled,
@@ -1719,16 +1700,12 @@ function CanvasContentHeader({
   enterEditModeDisabledTooltip,
   publishVersionLabel,
   unpublishedDraftChangeCount,
-  topViewMode,
-  onTopViewModeChange,
   showCanvasSettingsMenu,
-  onExportYamlCopy,
-  onExportYamlDownload,
 }: {
   state: CanvasPageState;
+  canvasName: string;
   onSave?: (nodes: CanvasNode[]) => void;
   organizationId?: string;
-  unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
@@ -1745,11 +1722,7 @@ function CanvasContentHeader({
   enterEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
   unpublishedDraftChangeCount?: number;
-  topViewMode?: "canvas" | "yaml" | "cli";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli") => void;
   showCanvasSettingsMenu?: boolean;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1760,18 +1733,6 @@ function CanvasContentHeader({
     }
   }, [onSave]);
 
-  const handleExportYamlCopy = useCallback(() => {
-    if (onExportYamlCopy) {
-      onExportYamlCopy(stateRef.current.nodes);
-    }
-  }, [onExportYamlCopy]);
-
-  const handleExportYamlDownload = useCallback(() => {
-    if (onExportYamlDownload) {
-      onExportYamlDownload(stateRef.current.nodes);
-    }
-  }, [onExportYamlDownload]);
-
   const handleLogoClick = useCallback(() => {
     if (organizationId) {
       window.location.href = `/${organizationId}`;
@@ -1780,11 +1741,10 @@ function CanvasContentHeader({
 
   return (
     <Header
-      breadcrumbs={state.breadcrumbs}
+      canvasName={canvasName}
       onSave={onSave ? handleSave : undefined}
       onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
-      unsavedMessage={unsavedMessage}
       saveIsPrimary={saveIsPrimary}
       saveButtonHidden={saveButtonHidden}
       saveDisabled={saveDisabled}
@@ -1801,11 +1761,7 @@ function CanvasContentHeader({
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
       publishVersionLabel={publishVersionLabel}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
-      topViewMode={topViewMode}
-      onTopViewModeChange={onTopViewModeChange}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
-      onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
   );
 }
