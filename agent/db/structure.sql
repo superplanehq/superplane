@@ -149,6 +149,13 @@ CREATE INDEX idx_agent_chat_runs_chat_id ON public.agent_chat_runs USING btree (
 
 
 --
+-- Name: idx_agent_chats_org_updated_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_chats_org_updated_at ON public.agent_chats USING btree (org_id, updated_at);
+
+
+--
 -- Name: idx_agent_chats_owner_canvas_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -211,7 +218,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260412145739	f
+20260413132301	f
 \.
 
 

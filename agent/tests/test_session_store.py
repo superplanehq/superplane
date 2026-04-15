@@ -1,4 +1,6 @@
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
@@ -304,6 +306,56 @@ def test_load_agent_chat_message_history_skips_undeserializable_records(
     assert history[0].parts[0].content == "What is in my canvas?"
 
 
+def test_delete_expired_chats_for_org_uses_batched_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _build_store(monkeypatch)
+
+    mock_result = MagicMock()
+    mock_result.rowcount = 3
+    mock_session = MagicMock()
+    mock_session.execute.return_value = mock_result
+
+    @contextmanager
+    def fake_session() -> Iterator[MagicMock]:
+        yield mock_session
+
+    monkeypatch.setattr(store, "_session", fake_session)
+
+    deleted = store.delete_expired_chats_for_org(org_id="org-1", retention_days=14, batch_size=500)
+
+    assert deleted == 3
+    mock_session.execute.assert_called_once()
+    stmt, params = mock_session.execute.call_args.args
+    sql = str(stmt)
+    assert "DELETE FROM agent_chats" in sql
+    assert "org_id" in sql
+    assert "LIMIT" in sql
+    assert params == {
+        "org_id": "org-1",
+        "retention_days": 14,
+        "batch_size": 500,
+    }
+
+
+def test_delete_expired_chats_for_org_loops_until_batch_underflows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = _build_store(monkeypatch)
+    results = [MagicMock(rowcount=500), MagicMock(rowcount=500), MagicMock(rowcount=200)]
+    mock_session = MagicMock()
+    mock_session.execute.side_effect = results
+
+    @contextmanager
+    def fake_session() -> Iterator[MagicMock]:
+        yield mock_session
+
+    monkeypatch.setattr(store, "_session", fake_session)
+
+    deleted = store.delete_expired_chats_for_org(org_id="org-1", retention_days=30, batch_size=500)
+
+    assert deleted == 1200
+    assert mock_session.execute.call_count == 3
+
+
 def test_set_canvas_memory_markdown_executes_pg_upsert(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -315,9 +367,6 @@ def test_set_canvas_memory_markdown_executes_pg_upsert(
     mock_begin.__enter__ = MagicMock(return_value=None)
     mock_begin.__exit__ = MagicMock(return_value=False)
     mock_session.begin.return_value = mock_begin
-
-    from collections.abc import Iterator
-    from contextlib import contextmanager
 
     @contextmanager
     def fake_session() -> Iterator[MagicMock]:
