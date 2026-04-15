@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup gen gen.code openapi.web.client.deps
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -37,6 +37,7 @@ test.setup.build:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
+	$(MAKE) gen.code
 	$(COMPOSE) run --rm app go mod download
 
 test.setup.db:
@@ -92,6 +93,7 @@ test.agent.evals:
 test.agent.setup:
 	@touch agent/.env
 	$(COMPOSE) build app agent
+	$(MAKE) gen.code
 	$(COMPOSE) up -d db
 	sleep 5
 	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
@@ -127,6 +129,7 @@ dev.setup:
 	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
+	$(MAKE) gen.code
 	$(MAKE) dev.setup.app
 	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
@@ -145,6 +148,7 @@ dev.setup.no.cache:
 	rm -rf tmp
 	$(COMPOSE) down -v --remove-orphans
 	$(COMPOSE) build --no-cache
+	$(MAKE) gen.code
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
@@ -291,12 +295,15 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-gen:
+gen.code:
 	$(MAKE) pb.gen
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
 	$(MAKE) openapi.python.client.gen
+
+gen:
+	$(MAKE) gen.code
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
@@ -310,15 +317,13 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
 pb.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh
 	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
 
 openapi.spec.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
@@ -335,8 +340,12 @@ openapi.client.gen:
 	rm -rf pkg/openapi_client/README.md
 	rm -rf pkg/openapi_client/git_push.sh
 
+openapi.web.client.deps:
+	$(COMPOSE) run --rm --no-deps app bash -lc 'cd /app/web_src && if [ ! -x node_modules/.bin/openapi-ts ]; then npm ci; fi'
+
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
+	$(MAKE) openapi.web.client.deps
 	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
 
 openapi.python.client.gen:

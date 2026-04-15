@@ -12,8 +12,14 @@ fi
 
 INTERNAL_OUT=pkg/protos
 MODULE_NAME=github.com/superplanehq/superplane
-MODULES=(${1//,/ })
 PROTO_DIR="protos"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/proto_modules.sh"
+
+MODULE_LIST="${1:-$PROTO_MODULES}"
+MODULES=(${MODULE_LIST//,/ })
 
 generate_proto_definition() {
   FILE=$2
