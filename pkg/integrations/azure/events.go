@@ -355,6 +355,43 @@ func isSuccessfulStatus(status string) bool {
 	return status == ProvisioningStateSucceeded
 }
 
+// Service Bus event type constants for Azure Event Grid
+const (
+	// EventTypeServiceBusActiveMessages fires when messages are in a queue/topic but no listeners are active
+	EventTypeServiceBusActiveMessages = "Microsoft.ServiceBus.ActiveMessagesAvailableWithNoListeners"
+
+	// EventTypeServiceBusDeadLetterMessages fires when dead-letter messages are in a queue/topic but no listeners are active
+	EventTypeServiceBusDeadLetterMessages = "Microsoft.ServiceBus.DeadletterMessagesAvailableWithNoListeners"
+
+	// EventTypeServiceBusActiveMessagesPeriodic fires periodically (every 30s) when active messages exist with no listeners
+	EventTypeServiceBusActiveMessagesPeriodic = "Microsoft.ServiceBus.ActiveMessagesAvailablePeriodicNotifications"
+
+	// EventTypeServiceBusDeadLetterMessagesPeriodic fires periodically (every 30s) when dead-letter messages exist with no listeners
+	EventTypeServiceBusDeadLetterMessagesPeriodic = "Microsoft.ServiceBus.DeadletterMessagesAvailablePeriodicNotifications"
+)
+
+// ServiceBusMessageAvailableData contains the data payload for Service Bus Event Grid events.
+// It is present in the "data" field of EventGridEvent for Service Bus message available events.
+type ServiceBusMessageAvailableData struct {
+	// NamespaceName is the fully-qualified Service Bus namespace hostname (e.g., "myns.servicebus.windows.net")
+	NamespaceName string `json:"namespaceName" mapstructure:"namespaceName"`
+
+	// RequestURI is the URI to the queue or topic messages endpoint
+	RequestURI string `json:"requestUri" mapstructure:"requestUri"`
+
+	// EntityType is either "queue" or "topic"
+	EntityType string `json:"entityType" mapstructure:"entityType"`
+
+	// QueueName is set when EntityType is "queue"
+	QueueName string `json:"queueName,omitempty" mapstructure:"queueName"`
+
+	// TopicName is set when EntityType is "topic"
+	TopicName string `json:"topicName,omitempty" mapstructure:"topicName"`
+
+	// DeadLetterQueue is true when this event is for the dead-letter sub-queue
+	DeadLetterQueue bool `json:"deadLetterQueue" mapstructure:"deadLetterQueue"`
+}
+
 // Provisioning state constants
 const (
 	// ProvisioningStateSucceeded indicates the resource operation completed successfully
