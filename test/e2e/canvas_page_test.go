@@ -115,24 +115,24 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
 
-	t.Run("YAML preview tab shows canvas definition", func(t *testing.T) {
+	t.Run("YAML preview modal shows canvas definition", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("YamlTestNode")
-		steps.switchToYamlTab()
+		steps.openYamlPreviewModal()
 		steps.assertYamlContentVisible("YamlTestNode")
 		steps.assertYamlContentVisible("metadata:")
 	})
 
-	t.Run("YAML preview tab allows switching back to canvas", func(t *testing.T) {
+	t.Run("YAML preview modal can be closed to return to canvas", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("SwitchTest")
-		steps.switchToYamlTab()
+		steps.openYamlPreviewModal()
 		steps.assertYamlContentVisible("SwitchTest")
-		steps.switchToCanvasTab()
+		steps.closeYamlPreviewModal()
 		steps.assertNodeIsAdded("SwitchTest")
 	})
 
@@ -468,13 +468,13 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 	}
 }
 
-func (s *CanvasPageSteps) switchToYamlTab() {
-	s.session.Click(q.Locator(`button:has-text("YAML")`))
+func (s *CanvasPageSteps) openYamlPreviewModal() {
+	s.session.Click(q.TestID("open-yaml-modal-button"))
 	s.session.Sleep(1000)
 }
 
-func (s *CanvasPageSteps) switchToCanvasTab() {
-	s.session.Click(q.Locator(`button:has-text("Canvas")`))
+func (s *CanvasPageSteps) closeYamlPreviewModal() {
+	s.session.PressKey("Escape")
 	s.session.Sleep(500)
 }
 
