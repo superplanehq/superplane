@@ -20,10 +20,9 @@ var _ MappedNullable = &CanvasesUpdateCanvasBody{}
 
 // CanvasesUpdateCanvasBody struct for CanvasesUpdateCanvasBody
 type CanvasesUpdateCanvasBody struct {
-	Name                        *string                                    `json:"name,omitempty"`
-	Description                 *string                                    `json:"description,omitempty"`
-	VersioningEnabled           *bool                                      `json:"versioningEnabled,omitempty"`
-	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
+	Name             *string                 `json:"name,omitempty"`
+	Description      *string                 `json:"description,omitempty"`
+	ChangeManagement *CanvasChangeManagement `json:"changeManagement,omitempty"`
 }
 
 // NewCanvasesUpdateCanvasBody instantiates a new CanvasesUpdateCanvasBody object
@@ -107,68 +106,36 @@ func (o *CanvasesUpdateCanvasBody) SetDescription(v string) {
 	o.Description = &v
 }
 
-// GetVersioningEnabled returns the VersioningEnabled field value if set, zero value otherwise.
-func (o *CanvasesUpdateCanvasBody) GetVersioningEnabled() bool {
-	if o == nil || IsNil(o.VersioningEnabled) {
-		var ret bool
+// GetChangeManagement returns the ChangeManagement field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasBody) GetChangeManagement() CanvasChangeManagement {
+	if o == nil || IsNil(o.ChangeManagement) {
+		var ret CanvasChangeManagement
 		return ret
 	}
-	return *o.VersioningEnabled
+	return *o.ChangeManagement
 }
 
-// GetVersioningEnabledOk returns a tuple with the VersioningEnabled field value if set, nil otherwise
+// GetChangeManagementOk returns a tuple with the ChangeManagement field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesUpdateCanvasBody) GetVersioningEnabledOk() (*bool, bool) {
-	if o == nil || IsNil(o.VersioningEnabled) {
+func (o *CanvasesUpdateCanvasBody) GetChangeManagementOk() (*CanvasChangeManagement, bool) {
+	if o == nil || IsNil(o.ChangeManagement) {
 		return nil, false
 	}
-	return o.VersioningEnabled, true
+	return o.ChangeManagement, true
 }
 
-// HasVersioningEnabled returns a boolean if a field has been set.
-func (o *CanvasesUpdateCanvasBody) HasVersioningEnabled() bool {
-	if o != nil && !IsNil(o.VersioningEnabled) {
+// HasChangeManagement returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasBody) HasChangeManagement() bool {
+	if o != nil && !IsNil(o.ChangeManagement) {
 		return true
 	}
 
 	return false
 }
 
-// SetVersioningEnabled gets a reference to the given bool and assigns it to the VersioningEnabled field.
-func (o *CanvasesUpdateCanvasBody) SetVersioningEnabled(v bool) {
-	o.VersioningEnabled = &v
-}
-
-// GetChangeRequestApprovalConfig returns the ChangeRequestApprovalConfig field value if set, zero value otherwise.
-func (o *CanvasesUpdateCanvasBody) GetChangeRequestApprovalConfig() CanvasesCanvasChangeRequestApprovalConfig {
-	if o == nil || IsNil(o.ChangeRequestApprovalConfig) {
-		var ret CanvasesCanvasChangeRequestApprovalConfig
-		return ret
-	}
-	return *o.ChangeRequestApprovalConfig
-}
-
-// GetChangeRequestApprovalConfigOk returns a tuple with the ChangeRequestApprovalConfig field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CanvasesUpdateCanvasBody) GetChangeRequestApprovalConfigOk() (*CanvasesCanvasChangeRequestApprovalConfig, bool) {
-	if o == nil || IsNil(o.ChangeRequestApprovalConfig) {
-		return nil, false
-	}
-	return o.ChangeRequestApprovalConfig, true
-}
-
-// HasChangeRequestApprovalConfig returns a boolean if a field has been set.
-func (o *CanvasesUpdateCanvasBody) HasChangeRequestApprovalConfig() bool {
-	if o != nil && !IsNil(o.ChangeRequestApprovalConfig) {
-		return true
-	}
-
-	return false
-}
-
-// SetChangeRequestApprovalConfig gets a reference to the given CanvasesCanvasChangeRequestApprovalConfig and assigns it to the ChangeRequestApprovalConfig field.
-func (o *CanvasesUpdateCanvasBody) SetChangeRequestApprovalConfig(v CanvasesCanvasChangeRequestApprovalConfig) {
-	o.ChangeRequestApprovalConfig = &v
+// SetChangeManagement gets a reference to the given CanvasChangeManagement and assigns it to the ChangeManagement field.
+func (o *CanvasesUpdateCanvasBody) SetChangeManagement(v CanvasChangeManagement) {
+	o.ChangeManagement = &v
 }
 
 func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
@@ -187,11 +154,8 @@ func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
-	if !IsNil(o.VersioningEnabled) {
-		toSerialize["versioningEnabled"] = o.VersioningEnabled
-	}
-	if !IsNil(o.ChangeRequestApprovalConfig) {
-		toSerialize["changeRequestApprovalConfig"] = o.ChangeRequestApprovalConfig
+	if !IsNil(o.ChangeManagement) {
+		toSerialize["changeManagement"] = o.ChangeManagement
 	}
 	return toSerialize, nil
 }

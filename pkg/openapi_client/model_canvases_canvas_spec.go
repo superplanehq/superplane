@@ -20,8 +20,9 @@ var _ MappedNullable = &CanvasesCanvasSpec{}
 
 // CanvasesCanvasSpec struct for CanvasesCanvasSpec
 type CanvasesCanvasSpec struct {
-	Nodes []SuperplaneComponentsNode `json:"nodes,omitempty"`
-	Edges []SuperplaneComponentsEdge `json:"edges,omitempty"`
+	Nodes            []SuperplaneComponentsNode `json:"nodes,omitempty"`
+	Edges            []SuperplaneComponentsEdge `json:"edges,omitempty"`
+	ChangeManagement *CanvasChangeManagement    `json:"changeManagement,omitempty"`
 }
 
 // NewCanvasesCanvasSpec instantiates a new CanvasesCanvasSpec object
@@ -105,6 +106,38 @@ func (o *CanvasesCanvasSpec) SetEdges(v []SuperplaneComponentsEdge) {
 	o.Edges = v
 }
 
+// GetChangeManagement returns the ChangeManagement field value if set, zero value otherwise.
+func (o *CanvasesCanvasSpec) GetChangeManagement() CanvasChangeManagement {
+	if o == nil || IsNil(o.ChangeManagement) {
+		var ret CanvasChangeManagement
+		return ret
+	}
+	return *o.ChangeManagement
+}
+
+// GetChangeManagementOk returns a tuple with the ChangeManagement field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasSpec) GetChangeManagementOk() (*CanvasChangeManagement, bool) {
+	if o == nil || IsNil(o.ChangeManagement) {
+		return nil, false
+	}
+	return o.ChangeManagement, true
+}
+
+// HasChangeManagement returns a boolean if a field has been set.
+func (o *CanvasesCanvasSpec) HasChangeManagement() bool {
+	if o != nil && !IsNil(o.ChangeManagement) {
+		return true
+	}
+
+	return false
+}
+
+// SetChangeManagement gets a reference to the given CanvasChangeManagement and assigns it to the ChangeManagement field.
+func (o *CanvasesCanvasSpec) SetChangeManagement(v CanvasChangeManagement) {
+	o.ChangeManagement = &v
+}
+
 func (o CanvasesCanvasSpec) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o CanvasesCanvasSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Edges) {
 		toSerialize["edges"] = o.Edges
+	}
+	if !IsNil(o.ChangeManagement) {
+		toSerialize["changeManagement"] = o.ChangeManagement
 	}
 	return toSerialize, nil
 }
