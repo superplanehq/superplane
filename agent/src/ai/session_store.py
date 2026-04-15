@@ -1,5 +1,5 @@
 import json
-import threading
+import logging
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -7,9 +7,6 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
-import psycopg
-from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
 from pydantic_ai.messages import (
     ModelMessage,
     ModelMessagesTypeAdapter,
@@ -20,8 +17,21 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from ai.config import config
+from db.db import build_engine, build_session_factory
+from db.models import (
+    AgentCanvasMarkdownMemory,
+    AgentChat,
+    AgentChatMessage,
+    AgentChatRun,
+)
+
+logger = logging.getLogger(__name__)
 
 _SUPERPLANE_TOOL_DISPLAY_LABEL_KEY = "superplane_display_label"
 
@@ -30,10 +40,12 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def _from_db_time(value: datetime | str) -> datetime:
-    if isinstance(value, datetime):
-        return value.astimezone(UTC)
-    return datetime.fromisoformat(value).astimezone(UTC)
+def _from_db_time(value: datetime) -> datetime:
+    """Normalize a timezone-aware datetime to UTC.
+
+    Postgres always returns aware datetimes for ``timestamptz`` columns, so this
+    is a simple timezone conversion."""
+    return value.astimezone(UTC)
 
 
 def _likely_output_tool_name(tool_name: str | None) -> bool:
@@ -239,16 +251,7 @@ class AgentChatNotFoundError(Exception):
 class SessionStore:
     def __init__(self, config: SessionStoreConfig | None = None) -> None:
         self._config = config or SessionStoreConfig.from_env()
-        self._thread_local = threading.local()
-        self._connections: list[psycopg.Connection[Any]] = []
-        self._connections_lock = threading.Lock()
-
-    def _connect(self) -> psycopg.Connection[Any]:
-        existing = getattr(self._thread_local, "connection", None)
-        if existing is not None and not existing.closed and not existing.broken:
-            return existing  # type: ignore[no-any-return]
-
-        connection: psycopg.Connection[Any] = psycopg.connect(
+        self._engine: Engine = build_engine(
             host=self._config.host,
             port=self._config.port,
             dbname=self._config.dbname,
@@ -256,78 +259,72 @@ class SessionStore:
             password=self._config.password,
             sslmode=self._config.sslmode,
             application_name=self._config.application_name,
-            row_factory=dict_row,
-            autocommit=True,
         )
-        self._thread_local.connection = connection
-        with self._connections_lock:
-            self._connections.append(connection)
-        return connection
+        self._session_factory: sessionmaker[Session] = build_session_factory(self._engine)
 
     @contextmanager
-    def _cursor(self, *, transactional: bool = False) -> Iterator[Any]:
-        conn = self._connect()
-        if transactional:
-            with conn.transaction():
-                with conn.cursor() as cur:
-                    yield cur
-            return
+    def _session(self) -> Iterator[Session]:
+        """Provide a short-lived session scope. Callers that mutate data must
+        wrap their work in ``with session.begin():`` so that changes are
+        committed atomically. Read-only callers may use the session directly.
+        Rollback on failure is handled by ``session.begin()``; ``session.close()``
+        releases the connection back to the pool."""
+        session = self._session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
 
-        with conn.cursor() as cur:
-            yield cur
+    @staticmethod
+    def _lock_chat(session: Session, chat_id: uuid.UUID) -> AgentChat | None:
+        """SELECT ... FOR UPDATE on a chat row. Returns None if not found."""
+        return session.execute(
+            select(AgentChat).where(AgentChat.id == chat_id).with_for_update()
+        ).scalar_one_or_none()
 
     def close(self) -> None:
-        with self._connections_lock:
-            connections = list(self._connections)
-            self._connections.clear()
+        self._engine.dispose()
 
-        for connection in connections:
-            if connection.closed:
-                continue
-            connection.close()
-
-        self._thread_local.connection = None
+    # ---- canvas memory ----
 
     def get_canvas_memory_markdown(self, canvas_id: str) -> str:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT markdown_body
-                FROM agent_canvas_markdown_memory
-                WHERE canvas_id = %s::uuid
-                LIMIT 1
-                """,
-                (canvas_id,),
-            )
-            row = cur.fetchone()
-        if row is None:
-            return ""
-        body = row.get("markdown_body")
-        return body if isinstance(body, str) else ""
+        with self._session() as session:
+            row = session.get(AgentCanvasMarkdownMemory, uuid.UUID(canvas_id))
+            if row is None:
+                return ""
+            body = row.markdown_body
+            return body if isinstance(body, str) else ""
 
     def set_canvas_memory_markdown(self, canvas_id: str, body: str) -> None:
         text = body.strip()
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO agent_canvas_markdown_memory (canvas_id, markdown_body, updated_at)
-                VALUES (%s::uuid, %s, NOW())
-                ON CONFLICT (canvas_id) DO UPDATE SET
-                    markdown_body = EXCLUDED.markdown_body,
-                    updated_at = NOW()
-                """,
-                (canvas_id, text),
-            )
+        cid = uuid.UUID(canvas_id)
+        with self._session() as session:
+            with session.begin():
+                stmt = pg_insert(AgentCanvasMarkdownMemory).values(
+                    canvas_id=cid,
+                    markdown_body=text,
+                    updated_at=func.now(),
+                )
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=[AgentCanvasMarkdownMemory.canvas_id],
+                    set_={
+                        "markdown_body": stmt.excluded.markdown_body,
+                        "updated_at": func.now(),
+                    },
+                )
+                session.execute(stmt)
+
+    # ---- agent chats ----
 
     def create_agent_chat(
         self, org_id: str, user_id: str, canvas_id: str, chat_id: str | None = None
     ) -> StoredAgentChat:
         now = _utcnow()
-        chat = StoredAgentChat(
-            id=chat_id or str(uuid.uuid4()),
-            org_id=org_id,
-            user_id=user_id,
-            canvas_id=canvas_id,
+        row = AgentChat(
+            id=uuid.UUID(chat_id) if chat_id else uuid.uuid4(),
+            org_id=uuid.UUID(org_id),
+            user_id=uuid.UUID(user_id),
+            canvas_id=uuid.UUID(canvas_id),
             initial_message=None,
             created_at=now,
             updated_at=now,
@@ -336,40 +333,25 @@ class SessionStore:
             total_tokens=0,
         )
 
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO agent_chats (
-                    id, org_id, user_id, canvas_id, initial_message, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    chat.id,
-                    chat.org_id,
-                    chat.user_id,
-                    chat.canvas_id,
-                    chat.initial_message,
-                    chat.created_at,
-                    chat.updated_at,
-                ),
-            )
-
-        return chat
+        with self._session() as session:
+            with session.begin():
+                session.add(row)
+            return self._to_stored_chat(row)
 
     def list_agent_chats(self, org_id: str, user_id: str, canvas_id: str) -> list[StoredAgentChat]:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT *
-                FROM agent_chats
-                WHERE org_id = %s AND user_id = %s AND canvas_id = %s
-                ORDER BY created_at DESC
-                """,
-                (org_id, user_id, canvas_id),
+        stmt = (
+            select(AgentChat)
+            .where(
+                AgentChat.org_id == uuid.UUID(org_id),
+                AgentChat.user_id == uuid.UUID(user_id),
+                AgentChat.canvas_id == uuid.UUID(canvas_id),
             )
-            rows = cur.fetchall()
+            .order_by(AgentChat.created_at.desc())
+        )
 
-        return [self._row_to_agent_chat(row) for row in rows]
+        with self._session() as session:
+            rows = session.scalars(stmt).all()
+            return [self._to_stored_chat(row) for row in rows]
 
     def describe_agent_chat(
         self, org_id: str, user_id: str, canvas_id: str, chat_id: str
@@ -381,46 +363,37 @@ class SessionStore:
         return chat
 
     def get_agent_chat(self, chat_id: str) -> StoredAgentChat:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT *
-                FROM agent_chats
-                WHERE id = %s
-                LIMIT 1
-                """,
-                (chat_id,),
-            )
-            row = cur.fetchone()
+        with self._session() as session:
+            row = session.get(AgentChat, uuid.UUID(chat_id))
+            if row is None:
+                raise AgentChatNotFoundError(chat_id)
+            return self._to_stored_chat(row)
 
-        if row is None:
-            raise AgentChatNotFoundError(chat_id)
-
-        return self._row_to_agent_chat(row)
+    # ---- chat message counts ----
 
     def count_chat_model_messages(self, chat_id: str) -> int:
-        with self._cursor() as cur:
-            cur.execute(
-                "SELECT COUNT(*) AS message_count FROM agent_chat_messages WHERE chat_id = %s",
-                (chat_id,),
-            )
-            row = cur.fetchone()
-        return int(row["message_count"]) if row is not None else 0
+        stmt = (
+            select(func.count())
+            .select_from(AgentChatMessage)
+            .where(AgentChatMessage.chat_id == uuid.UUID(chat_id))
+        )
+
+        with self._session() as session:
+            result = session.execute(stmt).scalar()
+            return int(result) if result is not None else 0
+
+    # ---- chat message records ----
 
     def list_agent_chat_message_records(self, chat_id: str) -> list[StoredAgentChatMessageRecord]:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT *
-                FROM agent_chat_messages
-                WHERE chat_id = %s
-                ORDER BY message_index ASC
-                """,
-                (chat_id,),
-            )
-            rows = cur.fetchall()
+        stmt = (
+            select(AgentChatMessage)
+            .where(AgentChatMessage.chat_id == uuid.UUID(chat_id))
+            .order_by(AgentChatMessage.message_index.asc())
+        )
 
-        return [self._row_to_message_record(row) for row in rows]
+        with self._session() as session:
+            rows = session.scalars(stmt).all()
+            return [self._to_message_record(row) for row in rows]
 
     def list_agent_chat_messages(
         self, org_id: str, user_id: str, canvas_id: str, chat_id: str
@@ -432,11 +405,12 @@ class SessionStore:
         for record in records:
             try:
                 flattened.extend(self._flatten_message_record(record))
-            except Exception as error:
-                print(
-                    f"[agent] failed to flatten chat message record "
-                    f"chat_id={chat_id} message_id={record.id}: {error}",
-                    flush=True,
+            except Exception:
+                logger.warning(
+                    "failed to flatten chat message record chat_id=%s message_id=%s",
+                    chat_id,
+                    record.id,
+                    exc_info=True,
                 )
         return flattened
 
@@ -446,11 +420,12 @@ class SessionStore:
         for record in records:
             try:
                 history.append(_deserialize_model_message(record.message))
-            except Exception as error:
-                print(
-                    f"[agent] failed to deserialize chat history record "
-                    f"chat_id={chat_id} message_id={record.id}: {error}",
-                    flush=True,
+            except Exception:
+                logger.warning(
+                    "failed to deserialize chat history record chat_id=%s message_id=%s",
+                    chat_id,
+                    record.id,
+                    exc_info=True,
                 )
         return history
 
@@ -460,62 +435,58 @@ class SessionStore:
         now = _utcnow()
         serialized_message = _serialize_model_message(message)
         created_at = _message_timestamp(message)
-        message_id = str(uuid.uuid4())
+        message_id = uuid.uuid4()
+        cid = uuid.UUID(chat_id)
 
-        with self._cursor(transactional=True) as cur:
-            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
-            if cur.fetchone() is None:
-                raise AgentChatNotFoundError(chat_id)
+        with self._session() as session:
+            with session.begin():
+                chat = self._lock_chat(session, cid)
+                if chat is None:
+                    raise AgentChatNotFoundError(chat_id)
 
-            message_index = self._next_chat_message_index(cur, chat_id)
-            cur.execute(
-                """
-                INSERT INTO agent_chat_messages (
-                    id, chat_id, run_id, message_index, message, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    message_id,
-                    chat_id,
-                    run_id,
-                    message_index,
-                    Jsonb(serialized_message),
-                    created_at,
-                    now,
-                ),
-            )
-            record = StoredAgentChatMessageRecord(
-                id=message_id,
-                chat_id=chat_id,
-                message_index=message_index,
-                message=serialized_message,
-                created_at=created_at,
-                updated_at=now,
-            )
-            cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, chat_id))
+                message_index = self._next_message_index(session, cid)
+                row = AgentChatMessage(
+                    id=message_id,
+                    chat_id=cid,
+                    run_id=uuid.UUID(run_id) if run_id else None,
+                    message_index=message_index,
+                    message=serialized_message,
+                    created_at=created_at,
+                    updated_at=now,
+                )
+                session.add(row)
+                chat.updated_at = now
 
-        return record
+        return StoredAgentChatMessageRecord(
+            id=str(message_id),
+            chat_id=chat_id,
+            message_index=message_index,
+            message=serialized_message,
+            created_at=created_at,
+            updated_at=now,
+        )
 
     def update_agent_chat_model_message(self, message_id: str, message: ModelMessage) -> None:
         now = _utcnow()
         serialized_message = _serialize_model_message(message)
         created_at = _message_timestamp(message)
+        mid = uuid.UUID(message_id)
 
-        with self._cursor(transactional=True) as cur:
-            cur.execute(
-                """
-                UPDATE agent_chat_messages
-                SET message = %s, created_at = %s, updated_at = %s
-                WHERE id = %s
-                RETURNING chat_id
-                """,
-                (Jsonb(serialized_message), created_at, now, message_id),
-            )
-            row = cur.fetchone()
-            if row is not None:
-                cur.execute(
-                    "UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, row["chat_id"])
-                )
+        with self._session() as session:
+            with session.begin():
+                row = session.get(AgentChatMessage, mid)
+                if row is None:
+                    logger.warning(
+                        "update_agent_chat_model_message: message %s not found, skipping", mid
+                    )
+                    return
+                row.message = serialized_message
+                row.created_at = created_at
+                row.updated_at = now
+
+                chat = session.get(AgentChat, row.chat_id)
+                if chat is not None:
+                    chat.updated_at = now
 
     def replace_agent_chat_messages_after(
         self,
@@ -525,75 +496,76 @@ class SessionStore:
         run_id: str | None = None,
     ) -> None:
         now = _utcnow()
-        with self._cursor(transactional=True) as cur:
-            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
-            if cur.fetchone() is None:
-                raise AgentChatNotFoundError(chat_id)
+        cid = uuid.UUID(chat_id)
 
-            cur.execute(
-                """
-                DELETE FROM agent_chat_messages
-                WHERE chat_id = %s
-                  AND message_index >= %s
-                """,
-                (chat_id, preserved_message_count),
-            )
+        with self._session() as session:
+            with session.begin():
+                chat = self._lock_chat(session, cid)
+                if chat is None:
+                    raise AgentChatNotFoundError(chat_id)
 
-            for offset, message in enumerate(messages):
-                serialized_message = _serialize_model_message(message)
-                created_at = _message_timestamp(message)
-                cur.execute(
-                    """
-                    INSERT INTO agent_chat_messages (
-                        id, chat_id, run_id, message_index, message, created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        str(uuid.uuid4()),
-                        chat_id,
-                        run_id,
-                        preserved_message_count + offset,
-                        Jsonb(serialized_message),
-                        created_at,
-                        now,
-                    ),
+                session.execute(
+                    delete(AgentChatMessage).where(
+                        AgentChatMessage.chat_id == cid,
+                        AgentChatMessage.message_index >= preserved_message_count,
+                    )
                 )
 
-            cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, chat_id))
+                for offset, msg in enumerate(messages):
+                    serialized_message = _serialize_model_message(msg)
+                    created_at = _message_timestamp(msg)
+                    session.add(
+                        AgentChatMessage(
+                            id=uuid.uuid4(),
+                            chat_id=cid,
+                            run_id=uuid.UUID(run_id) if run_id else None,
+                            message_index=preserved_message_count + offset,
+                            message=serialized_message,
+                            created_at=created_at,
+                            updated_at=now,
+                        )
+                    )
+
+                chat.updated_at = now
 
     def set_initial_chat_message_if_missing(self, chat_id: str, initial_message: str) -> None:
         if not initial_message.strip():
             return
 
         now = _utcnow()
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                UPDATE agent_chats
-                SET initial_message = COALESCE(NULLIF(initial_message, ''), %s), updated_at = %s
-                WHERE id = %s
-                """,
-                (initial_message.strip(), now, chat_id),
-            )
+        cid = uuid.UUID(chat_id)
+        with self._session() as session:
+            with session.begin():
+                chat = self._lock_chat(session, cid)
+                if chat is None:
+                    return
+                if not chat.initial_message:
+                    chat.initial_message = initial_message.strip()
+                    chat.updated_at = now
+
+    # ---- chat runs ----
 
     def create_agent_chat_run(self, chat_id: str, model: str) -> str:
-        run_id = str(uuid.uuid4())
+        run_id = uuid.uuid4()
         now = _utcnow()
+        cid = uuid.UUID(chat_id)
 
-        with self._cursor(transactional=True) as cur:
-            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
-            if cur.fetchone() is None:
-                raise AgentChatNotFoundError(chat_id)
+        with self._session() as session:
+            with session.begin():
+                chat = self._lock_chat(session, cid)
+                if chat is None:
+                    raise AgentChatNotFoundError(chat_id)
 
-            cur.execute(
-                """
-                INSERT INTO agent_chat_runs (id, chat_id, model, created_at)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (run_id, chat_id, model, now),
-            )
+                session.add(
+                    AgentChatRun(
+                        id=run_id,
+                        chat_id=cid,
+                        model=model,
+                        created_at=now,
+                    )
+                )
 
-        return run_id
+        return str(run_id)
 
     def update_run_usage(
         self,
@@ -605,83 +577,58 @@ class SessionStore:
         total_tokens: int,
     ) -> None:
         now = _utcnow()
+        rid = uuid.UUID(run_id)
 
-        with self._cursor(transactional=True) as cur:
-            cur.execute(
-                """
-                UPDATE agent_chat_runs
-                SET input_tokens = %s,
-                    output_tokens = %s,
-                    cache_read_tokens = %s,
-                    cache_write_tokens = %s,
-                    total_tokens = %s
-                WHERE id = %s
-                RETURNING chat_id
-                """,
-                (
-                    input_tokens,
-                    output_tokens,
-                    cache_read_tokens,
-                    cache_write_tokens,
-                    total_tokens,
-                    run_id,
-                ),
-            )
-            row = cur.fetchone()
-            if row is None:
-                return
+        with self._session() as session:
+            with session.begin():
+                run = session.get(AgentChatRun, rid)
+                if run is None:
+                    return
 
-            chat_id = row["chat_id"]
-            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
-            if cur.fetchone() is None:
-                return
+                run.input_tokens = input_tokens
+                run.output_tokens = output_tokens
+                run.cache_read_tokens = cache_read_tokens
+                run.cache_write_tokens = cache_write_tokens
+                run.total_tokens = total_tokens
+                # Flush so the run's updated tokens are visible to the SUM() below.
+                session.flush()
 
-            cur.execute(
-                """
-                UPDATE agent_chats
-                SET total_input_tokens = sub.input_tokens,
-                    total_output_tokens = sub.output_tokens,
-                    total_tokens = sub.total_tokens,
-                    updated_at = %s
-                FROM (
-                    SELECT COALESCE(SUM(r.input_tokens), 0) AS input_tokens,
-                           COALESCE(SUM(r.output_tokens), 0) AS output_tokens,
-                           COALESCE(SUM(r.total_tokens), 0) AS total_tokens
-                    FROM agent_chat_runs r
-                    WHERE r.chat_id = %s
-                ) sub
-                WHERE id = %s
-                """,
-                (now, chat_id, chat_id),
-            )
+                chat = self._lock_chat(session, run.chat_id)
+                if chat is None:
+                    return
+
+                totals = session.execute(
+                    select(
+                        func.coalesce(func.sum(AgentChatRun.input_tokens), 0),
+                        func.coalesce(func.sum(AgentChatRun.output_tokens), 0),
+                        func.coalesce(func.sum(AgentChatRun.total_tokens), 0),
+                    ).where(AgentChatRun.chat_id == run.chat_id)
+                ).one()
+
+                chat.total_input_tokens = int(totals[0])
+                chat.total_output_tokens = int(totals[1])
+                chat.total_tokens = int(totals[2])
+                chat.updated_at = now
+
+    # ---- org usage ----
 
     def get_org_usage(self, org_id: str) -> StoredAgentChatUsage:
-        with self._cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    COALESCE(SUM(total_input_tokens), 0) AS total_input_tokens,
-                    COALESCE(SUM(total_output_tokens), 0) AS total_output_tokens,
-                    COALESCE(SUM(total_tokens), 0) AS total_tokens
-                FROM agent_chats
-                WHERE org_id = %s
-                """,
-                (org_id,),
-            )
-            row = cur.fetchone()
+        stmt = select(
+            func.coalesce(func.sum(AgentChat.total_input_tokens), 0),
+            func.coalesce(func.sum(AgentChat.total_output_tokens), 0),
+            func.coalesce(func.sum(AgentChat.total_tokens), 0),
+        ).where(AgentChat.org_id == uuid.UUID(org_id))
 
-        if row is None:
-            return StoredAgentChatUsage(
-                total_input_tokens=0,
-                total_output_tokens=0,
-                total_tokens=0,
-            )
+        with self._session() as session:
+            row = session.execute(stmt).one()
 
         return StoredAgentChatUsage(
-            total_input_tokens=int(row["total_input_tokens"]),
-            total_output_tokens=int(row["total_output_tokens"]),
-            total_tokens=int(row["total_tokens"]),
+            total_input_tokens=int(row[0]),
+            total_output_tokens=int(row[1]),
+            total_tokens=int(row[2]),
         )
+
+    # ---- internal helpers ----
 
     def _flatten_message_record(
         self, record: StoredAgentChatMessageRecord
@@ -769,46 +716,40 @@ class SessionStore:
 
         return flattened
 
-    def _row_to_agent_chat(self, row: dict[str, Any]) -> StoredAgentChat:
+    @staticmethod
+    def _to_stored_chat(row: AgentChat) -> StoredAgentChat:
         return StoredAgentChat(
-            id=str(row["id"]),
-            org_id=str(row["org_id"]),
-            user_id=str(row["user_id"]),
-            canvas_id=str(row["canvas_id"]),
-            initial_message=str(row["initial_message"])
-            if row["initial_message"] is not None
-            else None,
-            created_at=_from_db_time(row["created_at"]),
-            updated_at=_from_db_time(row["updated_at"]),
-            total_input_tokens=int(row.get("total_input_tokens") or 0),
-            total_output_tokens=int(row.get("total_output_tokens") or 0),
-            total_tokens=int(row.get("total_tokens") or 0),
+            id=str(row.id),
+            org_id=str(row.org_id),
+            user_id=str(row.user_id),
+            canvas_id=str(row.canvas_id),
+            initial_message=str(row.initial_message) if row.initial_message is not None else None,
+            created_at=_from_db_time(row.created_at),
+            updated_at=_from_db_time(row.updated_at),
+            total_input_tokens=int(row.total_input_tokens or 0),
+            total_output_tokens=int(row.total_output_tokens or 0),
+            total_tokens=int(row.total_tokens or 0),
         )
 
-    def _row_to_message_record(self, row: dict[str, Any]) -> StoredAgentChatMessageRecord:
-        payload = row["message"]
+    @staticmethod
+    def _to_message_record(row: AgentChatMessage) -> StoredAgentChatMessageRecord:
+        payload = row.message
         if not isinstance(payload, dict):
             raise ValueError("Stored agent chat message payload must be a JSON object.")
 
         return StoredAgentChatMessageRecord(
-            id=str(row["id"]),
-            chat_id=str(row["chat_id"]),
-            message_index=int(row["message_index"]),
+            id=str(row.id),
+            chat_id=str(row.chat_id),
+            message_index=int(row.message_index),
             message=payload,
-            created_at=_from_db_time(row["created_at"]),
-            updated_at=_from_db_time(row["updated_at"]),
+            created_at=_from_db_time(row.created_at),
+            updated_at=_from_db_time(row.updated_at),
         )
 
-    def _next_chat_message_index(self, cur: Any, chat_id: str) -> int:
-        cur.execute(
-            """
-            SELECT COALESCE(MAX(message_index), -1) + 1 AS next_index
-            FROM agent_chat_messages
-            WHERE chat_id = %s
-            """,
-            (chat_id,),
+    @staticmethod
+    def _next_message_index(session: Session, chat_id: uuid.UUID) -> int:
+        stmt = select(func.coalesce(func.max(AgentChatMessage.message_index), -1) + 1).where(
+            AgentChatMessage.chat_id == chat_id
         )
-        row = cur.fetchone()
-        if row is None:
-            return 0
-        return int(row["next_index"])
+        result = session.execute(stmt).scalar()
+        return int(result) if result is not None else 0
