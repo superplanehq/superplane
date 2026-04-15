@@ -52,12 +52,12 @@ func ResolveCanvasChangeRequest(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
+		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
 	}
-	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
+	if !changeManagementEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "change management is disabled for this canvas")
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)

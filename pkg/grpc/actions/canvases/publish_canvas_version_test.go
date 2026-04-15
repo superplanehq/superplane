@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -110,6 +109,22 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, codes.PermissionDenied, s.Code())
 	})
 
+	t.Run("version not found -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-missing-version")
+
+		_, err := PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvasID, uuid.New().String(),
+			testWebhookBaseURL, r.AuthService,
+		)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Contains(t, s.Message(), "version not found")
+	})
+
 	t.Run("draft version -> publishes and deletes draft", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-draft")
@@ -138,25 +153,4 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
 	})
 
-	t.Run("versioning disabled -> error", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := PublishCanvasVersion(
-			ctx,
-			r.Encryptor, r.Registry,
-			r.Organization.ID.String(), canvas.ID.String(), uuid.New().String(),
-			testWebhookBaseURL, r.AuthService,
-		)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "versioning is disabled")
-	})
 }

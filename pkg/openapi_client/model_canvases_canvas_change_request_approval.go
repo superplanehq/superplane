@@ -22,7 +22,7 @@ var _ MappedNullable = &CanvasesCanvasChangeRequestApproval{}
 // CanvasesCanvasChangeRequestApproval struct for CanvasesCanvasChangeRequestApproval
 type CanvasesCanvasChangeRequestApproval struct {
 	Actor         *SuperplaneCanvasesUserRef                `json:"actor,omitempty"`
-	Approver      *CanvasesCanvasChangeRequestApprover      `json:"approver,omitempty"`
+	Approver      *ChangeManagementApprover                 `json:"approver,omitempty"`
 	State         *CanvasesCanvasChangeRequestApprovalState `json:"state,omitempty"`
 	CreatedAt     *time.Time                                `json:"createdAt,omitempty"`
 	InvalidatedAt *time.Time                                `json:"invalidatedAt,omitempty"`
@@ -82,9 +82,9 @@ func (o *CanvasesCanvasChangeRequestApproval) SetActor(v SuperplaneCanvasesUserR
 }
 
 // GetApprover returns the Approver field value if set, zero value otherwise.
-func (o *CanvasesCanvasChangeRequestApproval) GetApprover() CanvasesCanvasChangeRequestApprover {
+func (o *CanvasesCanvasChangeRequestApproval) GetApprover() ChangeManagementApprover {
 	if o == nil || IsNil(o.Approver) {
-		var ret CanvasesCanvasChangeRequestApprover
+		var ret ChangeManagementApprover
 		return ret
 	}
 	return *o.Approver
@@ -92,7 +92,7 @@ func (o *CanvasesCanvasChangeRequestApproval) GetApprover() CanvasesCanvasChange
 
 // GetApproverOk returns a tuple with the Approver field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasChangeRequestApproval) GetApproverOk() (*CanvasesCanvasChangeRequestApprover, bool) {
+func (o *CanvasesCanvasChangeRequestApproval) GetApproverOk() (*ChangeManagementApprover, bool) {
 	if o == nil || IsNil(o.Approver) {
 		return nil, false
 	}
@@ -108,8 +108,8 @@ func (o *CanvasesCanvasChangeRequestApproval) HasApprover() bool {
 	return false
 }
 
-// SetApprover gets a reference to the given CanvasesCanvasChangeRequestApprover and assigns it to the Approver field.
-func (o *CanvasesCanvasChangeRequestApproval) SetApprover(v CanvasesCanvasChangeRequestApprover) {
+// SetApprover gets a reference to the given ChangeManagementApprover and assigns it to the Approver field.
+func (o *CanvasesCanvasChangeRequestApproval) SetApprover(v ChangeManagementApprover) {
 	o.Approver = &v
 }
 
