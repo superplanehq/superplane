@@ -13,9 +13,15 @@ fi
 
 OPENAPI_OUT=api/swagger
 MODULE_NAME=github.com/superplanehq/superplane
-MODULES=(${1//,/ })
 PROTO_DIR="protos"
 MERGE_FILE_NAME=superplane.swagger
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/proto_modules.sh"
+
+MODULE_LIST="${1:-$REST_API_MODULES}"
+MODULES=(${MODULE_LIST//,/ })
 
 generate_openapi_spec() {
   FILES=$ALL_MODULE_PATHS

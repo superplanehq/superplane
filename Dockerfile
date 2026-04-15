@@ -81,12 +81,9 @@ COPY api/swagger /app/api/swagger
 COPY rbac /app/rbac
 COPY templates /app/templates
 
-RUN bash /app/scripts/protoc.sh \
-    authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
-RUN bash /app/scripts/protoc_gateway.sh \
-    authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
-RUN bash /app/scripts/protoc_openapi_spec.sh \
-    authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
+RUN bash /app/scripts/protoc.sh
+RUN bash /app/scripts/protoc_gateway.sh
+RUN bash /app/scripts/protoc_openapi_spec.sh
 
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
