@@ -138,9 +138,6 @@ func (r *Registry) ListTriggers() []core.Trigger {
 
 func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 	parts := strings.SplitN(name, ".", 2)
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid trigger name: %s", name)
-	}
 
 	if len(parts) == 1 {
 		trigger, ok := r.Triggers[name]
@@ -169,9 +166,6 @@ func (r *Registry) ListComponents() []core.Component {
 
 func (r *Registry) GetComponent(name string) (core.Component, error) {
 	parts := strings.SplitN(name, ".", 2)
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid component name: %s", name)
-	}
 
 	if len(parts) == 1 {
 		component, ok := r.Components[name]
@@ -270,14 +264,5 @@ func (r *Registry) GetIntegrationComponent(appName, componentName string) (core.
 }
 
 func (r *Registry) IsCoreBlock(name string) bool {
-	parts := strings.SplitN(name, ".", 2)
-	if len(parts) > 2 {
-		return false
-	}
-
-	if len(parts) == 1 {
-		return true
-	}
-
-	return false
+	return !strings.Contains(name, ".")
 }
