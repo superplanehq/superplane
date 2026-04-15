@@ -1,39 +1,39 @@
 import {
   Background,
-  type Connection,
   Panel,
   ReactFlow,
   ReactFlowProvider,
-  type Viewport,
   ViewportPortal,
   useOnSelectionChange,
   useReactFlow,
   useViewport,
+  type Connection,
+  type EdgeChange,
+  type NodeChange,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
-  type NodeChange,
-  type EdgeChange,
+  type Viewport,
 } from "@xyflow/react";
 
+import { NodeSearch } from "@/components/node-search";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ZoomSlider } from "@/components/zoom-slider";
+import { cn } from "@/lib/utils";
 import {
   ChevronsDownUp,
   ChevronsUpDown,
   CircleX,
+  Copy,
   GitBranch,
   Group,
   LayoutDashboard,
+  LayoutGrid,
   Loader2,
   Play,
-  Copy,
-  LayoutGrid,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { ZoomSlider } from "@/components/zoom-slider";
-import { NodeSearch } from "@/components/node-search";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import {
   Component,
   memo,
@@ -48,42 +48,42 @@ import {
 } from "react";
 
 import type {
-  ConfigurationField,
+  BlueprintsBlueprint,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  SuperplaneComponentsNode as ComponentsNode,
   ComponentsComponent,
-  TriggersTrigger,
-  BlueprintsBlueprint,
   ComponentsIntegrationRef,
+  SuperplaneComponentsNode as ComponentsNode,
+  ConfigurationField,
   OrganizationsIntegration,
+  TriggersTrigger,
 } from "@/api-client";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import type { CanvasOperation } from "@/lib/ai";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import { Sentry } from "@/sentry";
+import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
+import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
+import type { EventState, EventStateMap } from "../componentBase";
 import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
+import type { SidebarEvent } from "../componentSidebar/types";
 import { EmitEventModal } from "../EmitEventModal";
-import type { EventState, EventStateMap } from "../componentBase";
-import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import { GroupNode } from "../groupNode";
+import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
-import type { SidebarEvent } from "../componentSidebar/types";
-import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
-import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
-import { Sentry } from "@/sentry";
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
-import type { CanvasOperation } from "@/lib/ai";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -183,10 +183,11 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory") => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
+  showCanvasSettingsMenu?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   dataViewContent?: React.ReactNode;
@@ -273,7 +274,7 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  showAiBuilderTab?: boolean;
+  agentContext: AgentContext;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
@@ -1174,6 +1175,7 @@ function CanvasPage(props: CanvasPageProps) {
           unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
+          showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
@@ -1229,7 +1231,7 @@ function CanvasPage(props: CanvasPageProps) {
               isOpen={isBuildingBlocksSidebarOpen}
               onToggle={handleSidebarToggle}
               blocks={props.buildingBlocks || []}
-              showAiBuilderTab={props.showAiBuilderTab}
+              agentContext={props.agentContext}
               canvasId={props.canvasId}
               organizationId={props.organizationId}
               canvasNodes={canvasNodesForAiContext}
@@ -1706,6 +1708,7 @@ function CanvasContentHeader({
   unpublishedDraftChangeCount,
   topViewMode,
   onTopViewModeChange,
+  showCanvasSettingsMenu,
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
@@ -1729,8 +1732,9 @@ function CanvasContentHeader({
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
-  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory") => void;
+  showCanvasSettingsMenu?: boolean;
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
@@ -1786,6 +1790,7 @@ function CanvasContentHeader({
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
+      showCanvasSettingsMenu={showCanvasSettingsMenu}
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
@@ -3014,6 +3019,6 @@ function CanvasContent({
   );
 }
 
-export type { BuildingBlock } from "../BuildingBlocksSidebar";
+export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
 export { CanvasPage };

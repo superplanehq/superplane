@@ -6,6 +6,7 @@ from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.test import TestModel
 
 from ai.agent_deps import (
+    AgentContextState,
     AgentDeps,
     CatalogListKind,
     _catalog_list_cache_key,
@@ -18,6 +19,7 @@ from ai.skills import skill_index_markdown
 from ai.tools import default_tools
 
 __all__ = [
+    "AgentContextState",
     "AgentDeps",
     "CatalogListKind",
     "build_agent",

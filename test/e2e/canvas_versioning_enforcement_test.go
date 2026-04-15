@@ -91,8 +91,10 @@ func (s *canvasVersioningEnforcementSteps) setCanvasVersioningInDB(enabled bool)
 
 func (s *canvasVersioningEnforcementSteps) visitCanvasSettings() {
 	s.canvas.Visit()
-	s.session.AssertVisible(q.Locator(`header button:has-text("Settings")`))
-	s.session.Click(q.Locator(`header button:has-text("Settings")`))
+	s.session.AssertVisible(q.Locator(`header button[aria-label="Canvas menu"]`))
+	s.session.Click(q.Locator(`header button[aria-label="Canvas menu"]`))
+	s.session.AssertVisible(q.Locator(`[role="menuitem"]:has-text("Settings")`))
+	s.session.Click(q.Locator(`[role="menuitem"]:has-text("Settings")`))
 	s.session.AssertText("Canvas Name")
 	s.session.AssertVisible(canvasVersioningSwitchQuery())
 }

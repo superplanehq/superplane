@@ -1,10 +1,5 @@
-import type { Dispatch, SetStateAction } from "react";
-import {
-  agentsCreateAgentChat,
-  agentsListAgentChatMessages,
-  agentsListAgentChats,
-  agentsResumeAgentChat,
-} from "@/api-client";
+import { isAgentEnabled } from "@/lib/env";
+
 import type {
   AgentsAgentChatInfo,
   AgentsAgentChatMessage,
@@ -13,7 +8,15 @@ import type {
   AgentsListAgentChatsResponse,
   AgentsResumeAgentChatResponse,
 } from "@/api-client";
+import {
+  agentsCreateAgentChat,
+  agentsListAgentChatMessages,
+  agentsListAgentChats,
+  agentsResumeAgentChat,
+} from "@/api-client";
+import type { CanvasOperation } from "@/lib/ai";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import type { Dispatch, SetStateAction } from "react";
 import { consumeChatResponseStream } from "./agentChatSupport";
 import {
   addLocalPromptMessages,
@@ -22,7 +25,6 @@ import {
   clearChatPrompt,
   prependChatSession,
 } from "./agentChatUi";
-import type { CanvasOperation } from "@/lib/ai";
 
 export type AiBuilderMessage = {
   id: string;
@@ -43,6 +45,34 @@ export type AiChatSession = {
   title: string;
   initialMessage?: string;
   createdAt?: string;
+};
+
+export type AgentMode = { mode: "inspect" } | { mode: "build"; canvasVersion: string };
+export type AgentContext = { enabled: boolean } & AgentMode;
+
+export function useAgentContext(isEditing: boolean, canvasVersion: string): AgentContext {
+  const enabled = isAgentEnabled();
+
+  if (!enabled) {
+    return { enabled: false, mode: "inspect" };
+  }
+
+  if (!isEditing) {
+    const trimmed = canvasVersion.trim();
+    // Build mode requires a draft version id for the agent API; otherwise fall back to inspect
+    // (live canvas) so we do not send enabled+build with an empty canvas_version (422).
+    if (trimmed) {
+      return { enabled: true, mode: "build", canvasVersion: trimmed };
+    }
+    return { enabled: true, mode: "inspect" };
+  }
+
+  return { enabled: true, mode: "inspect" };
+}
+
+export const DEFAULT_AGENT_CONTEXT: AgentContext = {
+  enabled: false,
+  mode: "inspect",
 };
 
 const AI_MAX_STORED_MESSAGES = 50;
@@ -218,6 +248,7 @@ type SendChatPromptArgs = {
   currentChatId: string | null;
   canvasId?: string;
   organizationId?: string;
+  agentContext: AgentContext;
   isGeneratingResponse: boolean;
   setChatSessions?: Dispatch<SetStateAction<AiChatSession[]>>;
   setCurrentChatId: Dispatch<SetStateAction<string | null>>;
@@ -290,11 +321,29 @@ async function fetchChatStreamResponse({
   nextPrompt,
   token,
   url,
+  agentContext,
 }: {
   nextPrompt: string;
   token: string;
   url: string;
+  agentContext: AgentContext;
 }): Promise<Response> {
+  const canvasVersion = agentContext.mode === "build" ? agentContext.canvasVersion : null;
+  const body: {
+    question: string;
+    agent_context: {
+      enabled: boolean;
+      mode: "inspect" | "build";
+      canvas_version: string | null;
+    };
+  } = {
+    question: nextPrompt,
+    agent_context: {
+      enabled: agentContext.enabled,
+      mode: agentContext.mode,
+      canvas_version: canvasVersion,
+    },
+  };
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -302,9 +351,7 @@ async function fetchChatStreamResponse({
       Accept: "text/event-stream",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      question: nextPrompt,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok || !response.body) {
@@ -340,6 +387,7 @@ export async function sendChatPrompt({
   currentChatId,
   canvasId,
   organizationId,
+  agentContext,
   isGeneratingResponse,
   setChatSessions,
   setCurrentChatId,
@@ -400,6 +448,7 @@ export async function sendChatPrompt({
       nextPrompt,
       token: session.token,
       url: session.url,
+      agentContext,
     });
 
     const { assistantContentSnapshot, streamedAnyAnswer, runModel } = await consumeChatResponseStream({
