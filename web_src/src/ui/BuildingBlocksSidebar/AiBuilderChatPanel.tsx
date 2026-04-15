@@ -29,6 +29,7 @@ type AiBuilderChatPanelProps = {
   aiInput: string;
   onAiInputChange: (value: string) => void;
   onSelectChat: (chatId: string) => void;
+  onDeleteChat?: (chatId: string) => void;
   onStartNewSession: () => void;
   onSendPrompt: () => void;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
@@ -53,6 +54,7 @@ export function AiBuilderChatPanel({
   aiInput,
   onAiInputChange,
   onSelectChat,
+  onDeleteChat,
   onStartNewSession,
   onSendPrompt,
   aiInputRef,
@@ -105,6 +107,7 @@ export function AiBuilderChatPanel({
               isLoadingChatSessions={isLoadingChatSessions}
               isGeneratingResponse={isGeneratingResponse}
               onSelectChat={onSelectChat}
+              onDeleteChat={onDeleteChat}
               onStartNewSession={onStartNewSession}
               title="Previous chats"
               className="flex-1 min-h-0 px-2 py-2 space-y-2"
@@ -120,6 +123,7 @@ export function AiBuilderChatPanel({
                 isLoadingChatSessions={isLoadingChatSessions}
                 isGeneratingResponse={isGeneratingResponse}
                 onSelectChat={onSelectChat}
+                onDeleteChat={onDeleteChat}
                 onStartNewSession={onStartNewSession}
               />
             ) : null}
