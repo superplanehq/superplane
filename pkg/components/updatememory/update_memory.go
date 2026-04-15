@@ -202,11 +202,9 @@ func (c *UpdateMemory) Execute(ctx core.ExecutionContext) error {
 		"matches":      matches,
 		"updatedCount": len(updatedValues),
 	}
+
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
-	}
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
 	}
 
 	channel := ChannelNameNotFound
