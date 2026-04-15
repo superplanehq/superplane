@@ -451,7 +451,7 @@ func (t *OnCaseStatusChange) Cleanup(ctx core.TriggerContext) error {
 	return client.DeleteKibanaRule(meta.RuleID)
 }
 
-func loadCaseStatusChangeMetadata(metadata core.MetadataContext) OnCaseStatusChangeMetadata {
+func loadCaseStatusChangeMetadata(metadata core.MetadataWriter) OnCaseStatusChangeMetadata {
 	var meta OnCaseStatusChangeMetadata
 	if metadata == nil {
 		return meta
