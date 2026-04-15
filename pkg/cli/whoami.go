@@ -23,13 +23,16 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 			OrganizationsDescribeOrganization(ctx.Context, response.User.GetOrganizationId()).
 			Execute()
 
-		if err == nil && orgResponse != nil && orgResponse.Organization != nil && orgResponse.Organization.Metadata != nil {
-			metadata := orgResponse.Organization.Metadata
-			if metadata.Name != nil && *metadata.Name != "" {
-				organizationLabel = *metadata.Name
+		if err == nil && orgResponse != nil && orgResponse.Organization != nil {
+			if orgResponse.Organization.Metadata != nil {
+				metadata := orgResponse.Organization.Metadata
+				if metadata.Name != nil && *metadata.Name != "" {
+					organizationLabel = *metadata.Name
+				}
 			}
 
-			if enabled, ok := metadata.GetChangeManagementEnabledOk(); ok {
+			spec := orgResponse.Organization.GetSpec()
+			if enabled, ok := spec.GetChangeManagementEnabledOk(); ok {
 				changeManagementEnabled = enabled
 			}
 		}

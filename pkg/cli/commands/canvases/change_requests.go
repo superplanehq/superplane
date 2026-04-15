@@ -454,9 +454,9 @@ func renderCanvasChangeRequestText(ctx core.CommandContext, changeRequest openap
 
 			approverScope := "any user"
 			approver := approval.GetApprover()
-			if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_USER {
+			if approver.GetType() == openapi_client.CHANGEMANAGEMENTAPPROVERTYPE_TYPE_USER {
 				approverScope = "user " + approver.GetUserId()
-			} else if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ROLE {
+			} else if approver.GetType() == openapi_client.CHANGEMANAGEMENTAPPROVERTYPE_TYPE_ROLE {
 				approverScope = "role " + approver.GetRoleName()
 			}
 

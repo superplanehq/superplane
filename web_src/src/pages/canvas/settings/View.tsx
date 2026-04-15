@@ -21,9 +21,7 @@ export function SettingsView({
   const [name, setName] = useState(initialValues.name);
   const [description, setDescription] = useState(initialValues.description);
   const [changeManagementEnabled, setChangeManagementEnabled] = useState(initialValues.changeManagementEnabled);
-  const [approvers, setApprovers] = useState<SettingsApprover[]>(
-    normalizeApprovers(initialValues.changeRequestApprovalConfig?.items),
-  );
+  const [approvers, setApprovers] = useState<SettingsApprover[]>(normalizeApprovers(initialValues.approvers));
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const isChangeManagementEnforcedByOrganization = orgChangeManagementEnabled === true;
   const effectiveChangeManagementEnabled = isChangeManagementEnforcedByOrganization ? true : changeManagementEnabled;
@@ -33,12 +31,12 @@ export function SettingsView({
     setName(initialValues.name);
     setDescription(initialValues.description);
     setChangeManagementEnabled(isChangeManagementEnforcedByOrganization ? true : initialValues.changeManagementEnabled);
-    setApprovers(normalizeApprovers(initialValues.changeRequestApprovalConfig?.items));
+    setApprovers(normalizeApprovers(initialValues.approvers));
   }, [initialValues, isChangeManagementEnforcedByOrganization]);
 
   const normalizedInitialApprovers = useMemo(
-    () => normalizeApprovers(initialValues.changeRequestApprovalConfig?.items),
-    [initialValues.changeRequestApprovalConfig?.items],
+    () => normalizeApprovers(initialValues.approvers),
+    [initialValues.approvers],
   );
 
   const hasChanges = useMemo(() => {
@@ -89,12 +87,10 @@ export function SettingsView({
       await onSave({
         name,
         description,
-        changeManagementEnabled: isChangeManagementEnforcedByOrganization ? undefined : changeManagementEnabled,
-        changeRequestApprovalConfig: effectiveChangeManagementEnabled
-          ? {
-              items: normalizeApprovers(approvers),
-            }
-          : undefined,
+        changeManagement: {
+          enabled: isChangeManagementEnforcedByOrganization ? undefined : changeManagementEnabled,
+          approvals: effectiveChangeManagementEnabled ? normalizeApprovers(approvers) : undefined,
+        },
       });
       setSaveMessage("Canvas updated successfully");
       setTimeout(() => setSaveMessage(null), 3000);

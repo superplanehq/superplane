@@ -119,6 +119,11 @@ export type CanvasAutoLayoutAlgorithm = "ALGORITHM_UNSPECIFIED" | "ALGORITHM_HOR
 
 export type CanvasAutoLayoutScope = "SCOPE_UNSPECIFIED" | "SCOPE_FULL_CANVAS" | "SCOPE_CONNECTED_COMPONENT";
 
+export type CanvasChangeManagement = {
+  enabled?: boolean;
+  approvals?: Array<ChangeManagementApprover>;
+};
+
 export type CanvasChangesetChange = {
   type?: CanvasChangesetChangeType;
   node?: CanvasChangesetChangeNode;
@@ -200,14 +205,10 @@ export type CanvasesCanvasChangeRequest = {
 
 export type CanvasesCanvasChangeRequestApproval = {
   actor?: SuperplaneCanvasesUserRef;
-  approver?: CanvasesCanvasChangeRequestApprover;
+  approver?: ChangeManagementApprover;
   state?: CanvasesCanvasChangeRequestApprovalState;
   createdAt?: string;
   invalidatedAt?: string;
-};
-
-export type CanvasesCanvasChangeRequestApprovalConfig = {
-  items?: Array<CanvasesCanvasChangeRequestApprover>;
 };
 
 export type CanvasesCanvasChangeRequestApprovalState =
@@ -215,14 +216,6 @@ export type CanvasesCanvasChangeRequestApprovalState =
   | "STATE_APPROVED"
   | "STATE_REJECTED"
   | "STATE_UNAPPROVED";
-
-export type CanvasesCanvasChangeRequestApprover = {
-  type?: CanvasesCanvasChangeRequestApproverType;
-  userId?: string;
-  roleName?: string;
-};
-
-export type CanvasesCanvasChangeRequestApproverType = "TYPE_UNSPECIFIED" | "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
 
 export type CanvasesCanvasChangeRequestDiff = {
   changedNodeIds?: Array<string>;
@@ -298,8 +291,6 @@ export type CanvasesCanvasMetadata = {
   updatedAt?: string;
   createdBy?: SuperplaneCanvasesUserRef;
   isTemplate?: boolean;
-  changeManagementEnabled?: boolean;
-  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
 /**
@@ -364,6 +355,7 @@ export type CanvasesCanvasNodeQueueItem = {
 export type CanvasesCanvasSpec = {
   nodes?: Array<SuperplaneComponentsNode>;
   edges?: Array<SuperplaneComponentsEdge>;
+  changeManagement?: CanvasChangeManagement;
 };
 
 export type CanvasesCanvasStatus = {
@@ -567,8 +559,7 @@ export type CanvasesResolveExecutionErrorsResponse = {
 export type CanvasesUpdateCanvasBody = {
   name?: string;
   description?: string;
-  changeManagementEnabled?: boolean;
-  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
+  changeManagement?: CanvasChangeManagement;
 };
 
 export type CanvasesUpdateCanvasResponse = {
@@ -600,6 +591,14 @@ export type CanvasesValidateCanvasVersionChangesetBody = {
 export type CanvasesValidateCanvasVersionChangesetResponse = {
   version?: CanvasesCanvasVersion;
 };
+
+export type ChangeManagementApprover = {
+  type?: ChangeManagementApproverType;
+  userId?: string;
+  roleName?: string;
+};
+
+export type ChangeManagementApproverType = "TYPE_UNSPECIFIED" | "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
 
 export type ComponentsComponent = {
   name?: string;
@@ -1035,6 +1034,7 @@ export type OrganizationsListInvitationsResponse = {
 
 export type OrganizationsOrganization = {
   metadata?: OrganizationsOrganizationMetadata;
+  spec?: OrganizationsOrganizationSpec;
 };
 
 export type OrganizationsOrganizationLimits = {
@@ -1053,6 +1053,9 @@ export type OrganizationsOrganizationMetadata = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type OrganizationsOrganizationSpec = {
   changeManagementEnabled?: boolean;
 };
 

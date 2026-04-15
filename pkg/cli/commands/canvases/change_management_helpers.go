@@ -19,12 +19,14 @@ func resolveChangeManagementContext(ctx core.CommandContext, canvasID string) (*
 	if err != nil {
 		return nil, err
 	}
-	if canvasResponse.Canvas == nil || canvasResponse.Canvas.Metadata == nil {
-		return nil, fmt.Errorf("canvas metadata not found")
+	if canvasResponse.Canvas == nil {
+		return nil, fmt.Errorf("canvas not found")
 	}
 
+	spec := canvasResponse.Canvas.GetSpec()
+	cm := spec.GetChangeManagement()
 	return &changeManagementContext{
-		changeManagementEnabled: canvasResponse.Canvas.Metadata.GetChangeManagementEnabled(),
+		changeManagementEnabled: cm.GetEnabled(),
 	}, nil
 }
 

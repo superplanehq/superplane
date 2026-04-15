@@ -388,9 +388,9 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     mutationFn: async (data: {
       name?: string;
       description?: string;
-      changeManagementEnabled?: boolean;
-      changeRequestApprovalConfig?: {
-        items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
+      changeManagement?: {
+        enabled?: boolean;
+        approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
       };
     }) => {
       return await canvasesUpdateCanvas(
@@ -399,8 +399,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           body: {
             name: data.name,
             description: data.description,
-            changeManagementEnabled: data.changeManagementEnabled,
-            changeRequestApprovalConfig: data.changeRequestApprovalConfig,
+            changeManagement: data.changeManagement,
           },
         }),
       );
@@ -419,6 +418,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           }
 
           const updatedMetadata = updatedCanvas.metadata;
+          const updatedSpec = updatedCanvas.spec;
 
           return {
             ...current,
@@ -426,14 +426,11 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               ...current.metadata,
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
-              changeManagementEnabled:
-                updatedMetadata?.changeManagementEnabled ??
-                variables.changeManagementEnabled ??
-                current.metadata?.changeManagementEnabled,
-              changeRequestApprovalConfig:
-                updatedMetadata?.changeRequestApprovalConfig ??
-                variables.changeRequestApprovalConfig ??
-                current.metadata?.changeRequestApprovalConfig,
+            },
+            spec: {
+              ...current.spec,
+              changeManagement:
+                updatedSpec?.changeManagement ?? variables.changeManagement ?? current.spec?.changeManagement,
             },
           };
         });

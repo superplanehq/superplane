@@ -10,9 +10,7 @@ export type SettingsValues = {
   name: string;
   description: string;
   changeManagementEnabled: boolean;
-  changeRequestApprovalConfig?: {
-    items?: SettingsApprover[];
-  };
+  approvers?: SettingsApprover[];
 };
 
 export type ApproverFieldErrors = {
@@ -29,9 +27,9 @@ export type ApproverValidationResult = {
 export type SettingsSavePayload = {
   name: string;
   description: string;
-  changeManagementEnabled?: boolean;
-  changeRequestApprovalConfig?: {
-    items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
+  changeManagement?: {
+    enabled?: boolean;
+    approvals?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
   };
 };
 

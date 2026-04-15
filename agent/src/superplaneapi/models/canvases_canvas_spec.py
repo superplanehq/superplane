@@ -18,8 +18,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.canvas_change_management import CanvasChangeManagement
 from superplaneapi.models.superplane_components_edge import SuperplaneComponentsEdge
 from superplaneapi.models.superplane_components_node import SuperplaneComponentsNode
 from typing import Optional, Set
@@ -31,7 +32,8 @@ class CanvasesCanvasSpec(BaseModel):
     """ # noqa: E501
     nodes: Optional[List[SuperplaneComponentsNode]] = None
     edges: Optional[List[SuperplaneComponentsEdge]] = None
-    __properties: ClassVar[List[str]] = ["nodes", "edges"]
+    change_management: Optional[CanvasChangeManagement] = Field(default=None, alias="changeManagement")
+    __properties: ClassVar[List[str]] = ["nodes", "edges", "changeManagement"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -86,6 +88,9 @@ class CanvasesCanvasSpec(BaseModel):
                 if _item_edges:
                     _items.append(_item_edges.to_dict())
             _dict['edges'] = _items
+        # override the default output from pydantic by calling `to_dict()` of change_management
+        if self.change_management:
+            _dict['changeManagement'] = self.change_management.to_dict()
         return _dict
 
     @classmethod
@@ -99,7 +104,8 @@ class CanvasesCanvasSpec(BaseModel):
 
         _obj = cls.model_validate({
             "nodes": [SuperplaneComponentsNode.from_dict(_item) for _item in obj["nodes"]] if obj.get("nodes") is not None else None,
-            "edges": [SuperplaneComponentsEdge.from_dict(_item) for _item in obj["edges"]] if obj.get("edges") is not None else None
+            "edges": [SuperplaneComponentsEdge.from_dict(_item) for _item in obj["edges"]] if obj.get("edges") is not None else None,
+            "changeManagement": CanvasChangeManagement.from_dict(obj["changeManagement"]) if obj.get("changeManagement") is not None else None
         })
         return _obj
 

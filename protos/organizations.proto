@@ -284,10 +284,14 @@ message Organization {
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
-    optional bool change_management_enabled = 6;
+  }
+
+  message Spec {
+    optional bool change_management_enabled = 1;
   }
 
   Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message DescribeOrganizationRequest {

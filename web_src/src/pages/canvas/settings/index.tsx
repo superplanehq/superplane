@@ -70,7 +70,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const resolvedCanvasId = canvas.metadata!.id!;
   const canvasName = canvas.metadata?.name || "Canvas";
   const baseCanvasPath = `/${orgId}/canvases/${resolvedCanvasId}`;
-  const isOrgChangeManagementEnabled = organization?.metadata?.changeManagementEnabled ?? false;
+  const isOrgChangeManagementEnabled = organization?.spec?.changeManagementEnabled ?? false;
 
   usePageTitle([`${canvasName} · Settings`]);
 
@@ -156,8 +156,7 @@ function useSaveCallback(canvasId: string, organizationId: string): (values: Set
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        changeManagementEnabled: values.changeManagementEnabled,
-        changeRequestApprovalConfig: values.changeRequestApprovalConfig,
+        changeManagement: values.changeManagement,
       });
     },
     [canvasId, updateCanvasMutation],

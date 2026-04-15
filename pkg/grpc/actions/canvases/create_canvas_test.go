@@ -114,7 +114,9 @@ func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.
 	require.NotNil(t, response.Canvas)
 	require.NotNil(t, response.Canvas.Metadata)
 	// New canvases inherit organization change management setting.
-	require.True(t, response.Canvas.Metadata.ChangeManagementEnabled)
+	require.NotNil(t, response.Canvas.Spec)
+	require.NotNil(t, response.Canvas.Spec.ChangeManagement)
+	require.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
 
 	require.NotEmpty(t, response.Canvas.Metadata.Id)
 	createdCanvasUUID, parseErr := uuid.Parse(response.Canvas.Metadata.Id)

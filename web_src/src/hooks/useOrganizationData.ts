@@ -625,8 +625,11 @@ export const useUpdateOrganization = (organizationId: string) => {
               metadata: {
                 name: params.name,
                 description: params.description,
-                changeManagementEnabled: params.changeManagementEnabled,
               },
+              spec:
+                typeof params.changeManagementEnabled === "boolean"
+                  ? { changeManagementEnabled: params.changeManagementEnabled }
+                  : undefined,
             },
           },
         }),

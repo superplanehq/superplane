@@ -125,7 +125,7 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 			path:   "/api/v1/canvases/" + canvasID,
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":false}}}`))
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
 		// 2. List versions (no existing draft)
@@ -172,9 +172,10 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 				rawBody, _ := io.ReadAll(r.Body)
 				var payload map[string]any
 				_ = json.Unmarshal(rawBody, &payload)
-				require.Equal(t, true, payload["changeManagementEnabled"])
+				cm := payload["changeManagement"].(map[string]any)
+				require.Equal(t, true, cm["enabled"])
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":true}}}`))
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
 	)
@@ -210,7 +211,7 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 			path:   "/api/v1/canvases/" + canvasID,
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":true}}}`))
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
 		// 2. Resolve org to check if disable is allowed
@@ -227,7 +228,7 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 			path:   "/api/v1/organizations/org-1",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","changeManagementEnabled":false}}}`))
+				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1"},"spec":{"changeManagementEnabled":false}}}`))
 			},
 		},
 		// 3. Disable change management
@@ -238,9 +239,10 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 				rawBody, _ := io.ReadAll(r.Body)
 				var payload map[string]any
 				_ = json.Unmarshal(rawBody, &payload)
-				require.Equal(t, false, payload["changeManagementEnabled"])
+				cm := payload["changeManagement"].(map[string]any)
+				require.Equal(t, false, cm["enabled"])
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":false}}}`))
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
 		// 4. List versions (no existing draft)
@@ -313,7 +315,7 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 			path:   "/api/v1/canvases/" + canvasID,
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":false}}}`))
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
 			},
 		},
 		requestExpectation{
@@ -323,9 +325,10 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 				rawBody, _ := io.ReadAll(r.Body)
 				var payload map[string]any
 				_ = json.Unmarshal(rawBody, &payload)
-				require.Equal(t, true, payload["changeManagementEnabled"])
+				cm := payload["changeManagement"].(map[string]any)
+				require.Equal(t, true, cm["enabled"])
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":true}}}`))
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
 		requestExpectation{
@@ -378,7 +381,7 @@ func TestUpdateFromFileDisableChangeManagementFailsWhenOrganizationEnforcesIt(t 
 			path:   "/api/v1/canvases/" + canvasID,
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":true}}}`))
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
 		requestExpectation{
@@ -394,7 +397,7 @@ func TestUpdateFromFileDisableChangeManagementFailsWhenOrganizationEnforcesIt(t 
 			path:   "/api/v1/organizations/org-1",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","changeManagementEnabled":true}}}`))
+				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1"},"spec":{"changeManagementEnabled":true}}}`))
 			},
 		},
 	)
@@ -432,10 +435,11 @@ func writeTestCanvasFileWithChangeManagementEnabled(t *testing.T, canvasID strin
 			"metadata:\n" +
 			"  id: " + canvasID + "\n" +
 			"  name: parse-check\n" +
-			"  changeManagementEnabled: " + enabledValue + "\n" +
 			"spec:\n" +
 			"  nodes: []\n" +
-			"  edges: []\n",
+			"  edges: []\n" +
+			"  changeManagement:\n" +
+			"    enabled: " + enabledValue + "\n",
 	)
 	require.NoError(t, os.WriteFile(filePath, content, 0o644))
 	return filePath

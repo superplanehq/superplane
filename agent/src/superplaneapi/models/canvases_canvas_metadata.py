@@ -21,7 +21,6 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_change_request_approval_config import CanvasesCanvasChangeRequestApprovalConfig
 from superplaneapi.models.superplane_canvases_user_ref import SuperplaneCanvasesUserRef
 from typing import Optional, Set
 from typing_extensions import Self
@@ -38,9 +37,7 @@ class CanvasesCanvasMetadata(BaseModel):
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
     created_by: Optional[SuperplaneCanvasesUserRef] = Field(default=None, alias="createdBy")
     is_template: Optional[StrictBool] = Field(default=None, alias="isTemplate")
-    change_management_enabled: Optional[StrictBool] = Field(default=None, alias="changeManagementEnabled")
-    change_request_approval_config: Optional[CanvasesCanvasChangeRequestApprovalConfig] = Field(default=None, alias="changeRequestApprovalConfig")
-    __properties: ClassVar[List[str]] = ["id", "organizationId", "name", "description", "createdAt", "updatedAt", "createdBy", "isTemplate", "changeManagementEnabled", "changeRequestApprovalConfig"]
+    __properties: ClassVar[List[str]] = ["id", "organizationId", "name", "description", "createdAt", "updatedAt", "createdBy", "isTemplate"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -84,9 +81,6 @@ class CanvasesCanvasMetadata(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of created_by
         if self.created_by:
             _dict['createdBy'] = self.created_by.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of change_request_approval_config
-        if self.change_request_approval_config:
-            _dict['changeRequestApprovalConfig'] = self.change_request_approval_config.to_dict()
         return _dict
 
     @classmethod
@@ -106,9 +100,7 @@ class CanvasesCanvasMetadata(BaseModel):
             "createdAt": obj.get("createdAt"),
             "updatedAt": obj.get("updatedAt"),
             "createdBy": SuperplaneCanvasesUserRef.from_dict(obj["createdBy"]) if obj.get("createdBy") is not None else None,
-            "isTemplate": obj.get("isTemplate"),
-            "changeManagementEnabled": obj.get("changeManagementEnabled"),
-            "changeRequestApprovalConfig": CanvasesCanvasChangeRequestApprovalConfig.from_dict(obj["changeRequestApprovalConfig"]) if obj.get("changeRequestApprovalConfig") is not None else None
+            "isTemplate": obj.get("isTemplate")
         })
         return _obj
 

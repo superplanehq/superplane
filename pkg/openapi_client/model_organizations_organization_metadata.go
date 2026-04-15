@@ -21,12 +21,11 @@ var _ MappedNullable = &OrganizationsOrganizationMetadata{}
 
 // OrganizationsOrganizationMetadata struct for OrganizationsOrganizationMetadata
 type OrganizationsOrganizationMetadata struct {
-	Id                      *string    `json:"id,omitempty"`
-	Name                    *string    `json:"name,omitempty"`
-	Description             *string    `json:"description,omitempty"`
-	CreatedAt               *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt               *time.Time `json:"updatedAt,omitempty"`
-	ChangeManagementEnabled *bool      `json:"changeManagementEnabled,omitempty"`
+	Id          *string    `json:"id,omitempty"`
+	Name        *string    `json:"name,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	CreatedAt   *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
 }
 
 // NewOrganizationsOrganizationMetadata instantiates a new OrganizationsOrganizationMetadata object
@@ -206,38 +205,6 @@ func (o *OrganizationsOrganizationMetadata) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
-// GetChangeManagementEnabled returns the ChangeManagementEnabled field value if set, zero value otherwise.
-func (o *OrganizationsOrganizationMetadata) GetChangeManagementEnabled() bool {
-	if o == nil || IsNil(o.ChangeManagementEnabled) {
-		var ret bool
-		return ret
-	}
-	return *o.ChangeManagementEnabled
-}
-
-// GetChangeManagementEnabledOk returns a tuple with the ChangeManagementEnabled field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsOrganizationMetadata) GetChangeManagementEnabledOk() (*bool, bool) {
-	if o == nil || IsNil(o.ChangeManagementEnabled) {
-		return nil, false
-	}
-	return o.ChangeManagementEnabled, true
-}
-
-// HasChangeManagementEnabled returns a boolean if a field has been set.
-func (o *OrganizationsOrganizationMetadata) HasChangeManagementEnabled() bool {
-	if o != nil && !IsNil(o.ChangeManagementEnabled) {
-		return true
-	}
-
-	return false
-}
-
-// SetChangeManagementEnabled gets a reference to the given bool and assigns it to the ChangeManagementEnabled field.
-func (o *OrganizationsOrganizationMetadata) SetChangeManagementEnabled(v bool) {
-	o.ChangeManagementEnabled = &v
-}
-
 func (o OrganizationsOrganizationMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -262,9 +229,6 @@ func (o OrganizationsOrganizationMetadata) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
-	}
-	if !IsNil(o.ChangeManagementEnabled) {
-		toSerialize["changeManagementEnabled"] = o.ChangeManagementEnabled
 	}
 	return toSerialize, nil
 }

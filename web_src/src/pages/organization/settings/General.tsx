@@ -48,7 +48,7 @@ export function General({ organization }: GeneralProps) {
   const [agentApiKeyError, setAgentApiKeyError] = useState<string | null>(null);
   const [showAgentConfigureModal, setShowAgentConfigureModal] = useState(false);
   const [changeManagementEnabled, setChangeManagementEnabled] = useState(
-    organization.metadata?.changeManagementEnabled ?? false,
+    organization.spec?.changeManagementEnabled ?? false,
   );
 
   // Use React Query mutation hook
@@ -62,8 +62,8 @@ export function General({ organization }: GeneralProps) {
   const canDeleteOrg = canAct("org", "delete");
 
   useEffect(() => {
-    setChangeManagementEnabled(organization.metadata?.changeManagementEnabled ?? false);
-  }, [organization.metadata?.changeManagementEnabled]);
+    setChangeManagementEnabled(organization.spec?.changeManagementEnabled ?? false);
+  }, [organization.spec?.changeManagementEnabled]);
 
   const agentModeEnabled = agentSettings?.agentModeEnabled ?? false;
   const openAIKey = agentSettings?.openaiKey;

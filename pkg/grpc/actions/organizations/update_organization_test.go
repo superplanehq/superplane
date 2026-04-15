@@ -37,8 +37,10 @@ func Test__UpdateOrganization(t *testing.T) {
 
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
-				Name:                    "updated-org",
-				Description:             "Updated description",
+				Name:        "updated-org",
+				Description: "Updated description",
+			},
+			Spec: &protos.Organization_Spec{
 				ChangeManagementEnabled: &changeManagementEnabled,
 			},
 		}
@@ -53,8 +55,9 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, "Updated description", response.Organization.Metadata.Description)
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.True(t, response.Organization.Metadata.UpdatedAt.AsTime().After(*r.Organization.UpdatedAt))
-		require.NotNil(t, response.Organization.Metadata.ChangeManagementEnabled)
-		assert.Equal(t, changeManagementEnabled, response.Organization.Metadata.GetChangeManagementEnabled())
+		require.NotNil(t, response.Organization.Spec)
+		require.NotNil(t, response.Organization.Spec.ChangeManagementEnabled)
+		assert.Equal(t, changeManagementEnabled, response.Organization.Spec.GetChangeManagementEnabled())
 
 		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)

@@ -33,12 +33,15 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if ctx.Cmd.Flags().Changed("description") {
 		metadata.SetDescription(*c.description)
 	}
-	if ctx.Cmd.Flags().Changed("change-management-enabled") {
-		metadata.SetChangeManagementEnabled(*c.changeManagementEnabled)
-	}
 
 	org := openapi_client.OrganizationsOrganization{}
 	org.SetMetadata(metadata)
+
+	if ctx.Cmd.Flags().Changed("change-management-enabled") {
+		spec := openapi_client.OrganizationsOrganizationSpec{}
+		spec.SetChangeManagementEnabled(*c.changeManagementEnabled)
+		org.SetSpec(spec)
+	}
 
 	body := openapi_client.OrganizationsUpdateOrganizationBody{}
 	body.SetOrganization(org)

@@ -24,7 +24,9 @@ type changeManagementPlan struct {
 
 func updateCanvasChangeManagementEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
 	body := openapi_client.CanvasesUpdateCanvasBody{}
-	body.SetChangeManagementEnabled(enabled)
+	cm := openapi_client.CanvasChangeManagement{}
+	cm.SetEnabled(enabled)
+	body.SetChangeManagement(cm)
 
 	_, _, err := ctx.API.CanvasAPI.
 		CanvasesUpdateCanvas(ctx.Context, canvasID).
@@ -52,15 +54,24 @@ func resolveOrganizationChangeManagementEnabled(ctx core.CommandContext) (bool, 
 		return false, fmt.Errorf("organization metadata not found")
 	}
 
-	return metadata.GetChangeManagementEnabled(), nil
+	spec, _ := org.GetSpecOk()
+	if spec == nil {
+		return false, nil
+	}
+
+	return spec.GetChangeManagementEnabled(), nil
 }
 
 func requestedCanvasChangeManagementEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
-	if canvas.Metadata == nil {
+	if canvas.Spec == nil {
 		return false, false
 	}
-	value, ok := canvas.Metadata.GetChangeManagementEnabledOk()
-	if !ok || value == nil {
+	cm, ok := canvas.Spec.GetChangeManagementOk()
+	if !ok || cm == nil {
+		return false, false
+	}
+	value, valueOk := cm.GetEnabledOk()
+	if !valueOk || value == nil {
 		return false, false
 	}
 	return *value, true

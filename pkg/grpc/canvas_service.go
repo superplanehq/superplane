@@ -57,8 +57,7 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 		req.Id,
 		req.Name,
 		req.Description,
-		req.ChangeManagementEnabled,
-		req.ChangeRequestApprovalConfig,
+		req.ChangeManagement,
 	)
 }
 

@@ -4439,6 +4439,21 @@
       ],
       "default": "SCOPE_UNSPECIFIED"
     },
+    "CanvasChangeManagement": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ChangeManagementApprover"
+          }
+        }
+      }
+    },
     "CanvasChangesetChange": {
       "type": "object",
       "properties": {
@@ -4614,7 +4629,7 @@
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
         },
         "approver": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
+          "$ref": "#/definitions/ChangeManagementApprover"
         },
         "state": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalState"
@@ -4629,18 +4644,6 @@
         }
       }
     },
-    "CanvasesCanvasChangeRequestApprovalConfig": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
-          }
-        }
-      }
-    },
     "CanvasesCanvasChangeRequestApprovalState": {
       "type": "string",
       "enum": [
@@ -4650,30 +4653,6 @@
         "STATE_UNAPPROVED"
       ],
       "default": "STATE_UNSPECIFIED"
-    },
-    "CanvasesCanvasChangeRequestApprover": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApproverType"
-        },
-        "userId": {
-          "type": "string"
-        },
-        "roleName": {
-          "type": "string"
-        }
-      }
-    },
-    "CanvasesCanvasChangeRequestApproverType": {
-      "type": "string",
-      "enum": [
-        "TYPE_UNSPECIFIED",
-        "TYPE_ANYONE",
-        "TYPE_USER",
-        "TYPE_ROLE"
-      ],
-      "default": "TYPE_UNSPECIFIED"
     },
     "CanvasesCanvasChangeRequestDiff": {
       "type": "object",
@@ -4863,12 +4842,6 @@
         },
         "isTemplate": {
           "type": "boolean"
-        },
-        "changeManagementEnabled": {
-          "type": "boolean"
-        },
-        "changeRequestApprovalConfig": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
         }
       }
     },
@@ -5017,6 +4990,9 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneComponentsEdge"
           }
+        },
+        "changeManagement": {
+          "$ref": "#/definitions/CanvasChangeManagement"
         }
       }
     },
@@ -5468,11 +5444,8 @@
         "description": {
           "type": "string"
         },
-        "changeManagementEnabled": {
-          "type": "boolean"
-        },
-        "changeRequestApprovalConfig": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
+        "changeManagement": {
+          "$ref": "#/definitions/CanvasChangeManagement"
         }
       }
     },
@@ -5537,6 +5510,30 @@
           "$ref": "#/definitions/CanvasesCanvasVersion"
         }
       }
+    },
+    "ChangeManagementApprover": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/ChangeManagementApproverType"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "roleName": {
+          "type": "string"
+        }
+      }
+    },
+    "ChangeManagementApproverType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNSPECIFIED",
+        "TYPE_ANYONE",
+        "TYPE_USER",
+        "TYPE_ROLE"
+      ],
+      "default": "TYPE_UNSPECIFIED"
     },
     "ComponentsComponent": {
       "type": "object",
@@ -6598,6 +6595,9 @@
       "properties": {
         "metadata": {
           "$ref": "#/definitions/OrganizationsOrganizationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/OrganizationsOrganizationSpec"
         }
       }
     },
@@ -6653,7 +6653,12 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
-        },
+        }
+      }
+    },
+    "OrganizationsOrganizationSpec": {
+      "type": "object",
+      "properties": {
         "changeManagementEnabled": {
           "type": "boolean"
         }

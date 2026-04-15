@@ -18,20 +18,17 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_change_request_approver_type import CanvasesCanvasChangeRequestApproverType
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesCanvasChangeRequestApprover(BaseModel):
+class OrganizationsOrganizationSpec(BaseModel):
     """
-    CanvasesCanvasChangeRequestApprover
+    OrganizationsOrganizationSpec
     """ # noqa: E501
-    type: Optional[CanvasesCanvasChangeRequestApproverType] = CanvasesCanvasChangeRequestApproverType.TYPE_UNSPECIFIED
-    user_id: Optional[StrictStr] = Field(default=None, alias="userId")
-    role_name: Optional[StrictStr] = Field(default=None, alias="roleName")
-    __properties: ClassVar[List[str]] = ["type", "userId", "roleName"]
+    change_management_enabled: Optional[StrictBool] = Field(default=None, alias="changeManagementEnabled")
+    __properties: ClassVar[List[str]] = ["changeManagementEnabled"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +48,7 @@ class CanvasesCanvasChangeRequestApprover(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasChangeRequestApprover from a JSON string"""
+        """Create an instance of OrganizationsOrganizationSpec from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -76,7 +73,7 @@ class CanvasesCanvasChangeRequestApprover(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasChangeRequestApprover from a dict"""
+        """Create an instance of OrganizationsOrganizationSpec from a dict"""
         if obj is None:
             return None
 
@@ -84,9 +81,7 @@ class CanvasesCanvasChangeRequestApprover(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "type": obj.get("type") if obj.get("type") is not None else CanvasesCanvasChangeRequestApproverType.TYPE_UNSPECIFIED,
-            "userId": obj.get("userId"),
-            "roleName": obj.get("roleName")
+            "changeManagementEnabled": obj.get("changeManagementEnabled")
         })
         return _obj
 

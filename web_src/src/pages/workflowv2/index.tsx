@@ -461,7 +461,7 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
-  const isChangeManagementDisabled = !(liveCanvas?.metadata?.changeManagementEnabled ?? false);
+  const isChangeManagementDisabled = !(liveCanvas?.spec?.changeManagement?.enabled ?? false);
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const agentContext = useAgentContext(isEditing, activeCanvasVersionId);
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
@@ -4120,7 +4120,7 @@ export function WorkflowPageV2() {
       return undefined;
     }
 
-    const phase = getChangeRequestReviewPhase(changeRequest, liveCanvas?.metadata?.changeRequestApprovalConfig);
+    const phase = getChangeRequestReviewPhase(changeRequest, liveCanvas?.spec?.changeManagement);
     const reviewUi =
       phase.kind === "none"
         ? {
@@ -4156,7 +4156,7 @@ export function WorkflowPageV2() {
     isViewingPendingApprovalVersion,
     selectedCanvasVersionID,
     pendingApprovalVersions,
-    liveCanvas?.metadata?.changeRequestApprovalConfig,
+    liveCanvas?.spec?.changeManagement,
     handleApproveChangeRequest,
     handleRejectChangeRequest,
     handlePublishChangeRequest,
@@ -5193,7 +5193,7 @@ export function WorkflowPageV2() {
                 onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
                 loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
                 loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
-                changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
+                changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
                 rejectedVersions={rejectedVersions}
               />
             ) : undefined
@@ -5221,7 +5221,7 @@ export function WorkflowPageV2() {
           }
         }}
         liveVersionOwnerProfilesById={liveVersionOwnerProfilesById}
-        changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
+        changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
         canActOnChangeRequests={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
         currentUserId={currentUserId}
         changeRequestActionPending={actOnCanvasChangeRequestMutation.isPending}
