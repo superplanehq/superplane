@@ -280,7 +280,7 @@ func createPayload(startedAt, finishedAt, result, reason string, actor *core.Use
 	return output
 }
 
-func getStartTimeFromMetadata(metadataCtx core.MetadataContext) string {
+func getStartTimeFromMetadata(metadataCtx core.MetadataReader) string {
 	metadata := ExecutionMetadata{}
 	if err := mapstructure.Decode(metadataCtx.Get(), &metadata); err == nil && metadata.StartTime != "" {
 		return metadata.StartTime

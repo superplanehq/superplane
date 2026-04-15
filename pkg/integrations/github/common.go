@@ -27,7 +27,7 @@ type NodeMetadata struct {
 	Repository *Repository `json:"repository"`
 }
 
-func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext, configuration any) error {
+func ensureRepoInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, configuration any) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {

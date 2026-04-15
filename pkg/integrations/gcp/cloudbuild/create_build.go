@@ -831,7 +831,7 @@ func normalizeGitRepositoryURL(value string) string {
 	return repo
 }
 
-func storeCreateBuildMetadata(metadataCtx core.MetadataContext, build map[string]any, projectID string) error {
+func storeCreateBuildMetadata(metadataCtx core.MetadataWriter, build map[string]any, projectID string) error {
 	buildCopy := copyBuildMetadata(build)
 
 	if readBuildString(buildCopy, "projectId") == "" && projectID != "" {
