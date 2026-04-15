@@ -48,6 +48,7 @@ docs/BlueprintsUpdateBlueprintResponse.md
 docs/CanvasAPI.md
 docs/CanvasAutoLayoutAlgorithm.md
 docs/CanvasAutoLayoutScope.md
+docs/CanvasChangeManagement.md
 docs/CanvasChangeRequestAPI.md
 docs/CanvasChangesetChange.md
 docs/CanvasChangesetChangeEdge.md
@@ -67,10 +68,7 @@ docs/CanvasesCanvas.md
 docs/CanvasesCanvasAutoLayout.md
 docs/CanvasesCanvasChangeRequest.md
 docs/CanvasesCanvasChangeRequestApproval.md
-docs/CanvasesCanvasChangeRequestApprovalConfig.md
 docs/CanvasesCanvasChangeRequestApprovalState.md
-docs/CanvasesCanvasChangeRequestApprover.md
-docs/CanvasesCanvasChangeRequestApproverType.md
 docs/CanvasesCanvasChangeRequestDiff.md
 docs/CanvasesCanvasChangeRequestMetadata.md
 docs/CanvasesCanvasChangeRequestStatus.md
@@ -111,6 +109,7 @@ docs/CanvasesListEventExecutionsResponse.md
 docs/CanvasesListNodeEventsResponse.md
 docs/CanvasesListNodeExecutionsResponse.md
 docs/CanvasesListNodeQueueItemsResponse.md
+docs/CanvasesPublishCanvasVersionResponse.md
 docs/CanvasesResolveCanvasChangeRequestBody.md
 docs/CanvasesResolveCanvasChangeRequestResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
@@ -120,6 +119,10 @@ docs/CanvasesUpdateCanvasVersionBody.md
 docs/CanvasesUpdateCanvasVersionResponse.md
 docs/CanvasesUpdateNodePauseBody.md
 docs/CanvasesUpdateNodePauseResponse.md
+docs/CanvasesValidateCanvasVersionChangesetBody.md
+docs/CanvasesValidateCanvasVersionChangesetResponse.md
+docs/ChangeManagementApprover.md
+docs/ChangeManagementApproverType.md
 docs/ComponentAPI.md
 docs/ComponentsComponent.md
 docs/ComponentsComponentAction.md
@@ -201,6 +204,7 @@ docs/OrganizationsListInvitationsResponse.md
 docs/OrganizationsOrganization.md
 docs/OrganizationsOrganizationLimits.md
 docs/OrganizationsOrganizationMetadata.md
+docs/OrganizationsOrganizationSpec.md
 docs/OrganizationsOrganizationUsage.md
 docs/OrganizationsResetInviteLinkResponse.md
 docs/OrganizationsSetAgentOpenAIKeyBody.md
@@ -299,6 +303,7 @@ model_blueprints_update_blueprint_body.go
 model_blueprints_update_blueprint_response.go
 model_canvas_auto_layout_algorithm.go
 model_canvas_auto_layout_scope.go
+model_canvas_change_management.go
 model_canvas_changeset_change.go
 model_canvas_changeset_change_edge.go
 model_canvas_changeset_change_node.go
@@ -313,10 +318,7 @@ model_canvases_canvas.go
 model_canvases_canvas_auto_layout.go
 model_canvases_canvas_change_request.go
 model_canvases_canvas_change_request_approval.go
-model_canvases_canvas_change_request_approval_config.go
 model_canvases_canvas_change_request_approval_state.go
-model_canvases_canvas_change_request_approver.go
-model_canvases_canvas_change_request_approver_type.go
 model_canvases_canvas_change_request_diff.go
 model_canvases_canvas_change_request_metadata.go
 model_canvases_canvas_change_request_status.go
@@ -357,6 +359,7 @@ model_canvases_list_event_executions_response.go
 model_canvases_list_node_events_response.go
 model_canvases_list_node_executions_response.go
 model_canvases_list_node_queue_items_response.go
+model_canvases_publish_canvas_version_response.go
 model_canvases_resolve_canvas_change_request_body.go
 model_canvases_resolve_canvas_change_request_response.go
 model_canvases_resolve_execution_errors_body.go
@@ -366,6 +369,10 @@ model_canvases_update_canvas_version_body.go
 model_canvases_update_canvas_version_response.go
 model_canvases_update_node_pause_body.go
 model_canvases_update_node_pause_response.go
+model_canvases_validate_canvas_version_changeset_body.go
+model_canvases_validate_canvas_version_changeset_response.go
+model_change_management_approver.go
+model_change_management_approver_type.go
 model_components_component.go
 model_components_component_action.go
 model_components_describe_component_response.go
@@ -442,6 +449,7 @@ model_organizations_list_invitations_response.go
 model_organizations_organization.go
 model_organizations_organization_limits.go
 model_organizations_organization_metadata.go
+model_organizations_organization_spec.go
 model_organizations_organization_usage.go
 model_organizations_reset_invite_link_response.go
 model_organizations_set_agent_open_ai_key_body.go

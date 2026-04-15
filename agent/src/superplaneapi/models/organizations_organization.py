@@ -21,6 +21,7 @@ import json
 from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
 from superplaneapi.models.organizations_organization_metadata import OrganizationsOrganizationMetadata
+from superplaneapi.models.organizations_organization_spec import OrganizationsOrganizationSpec
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -29,7 +30,8 @@ class OrganizationsOrganization(BaseModel):
     OrganizationsOrganization
     """ # noqa: E501
     metadata: Optional[OrganizationsOrganizationMetadata] = None
-    __properties: ClassVar[List[str]] = ["metadata"]
+    spec: Optional[OrganizationsOrganizationSpec] = None
+    __properties: ClassVar[List[str]] = ["metadata", "spec"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -73,6 +75,9 @@ class OrganizationsOrganization(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of metadata
         if self.metadata:
             _dict['metadata'] = self.metadata.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of spec
+        if self.spec:
+            _dict['spec'] = self.spec.to_dict()
         return _dict
 
     @classmethod
@@ -85,7 +90,8 @@ class OrganizationsOrganization(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "metadata": OrganizationsOrganizationMetadata.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None
+            "metadata": OrganizationsOrganizationMetadata.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "spec": OrganizationsOrganizationSpec.from_dict(obj["spec"]) if obj.get("spec") is not None else None
         })
         return _obj
 

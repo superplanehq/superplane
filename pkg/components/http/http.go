@@ -706,7 +706,7 @@ func (e *HTTP) executeRequest(logger *log.Entry, httpCtx core.HTTPContext, spec 
 	return resp, nil
 }
 
-func (e *HTTP) handleRequestFailure(metadataCtx core.MetadataContext, executionStateCtx core.ExecutionStateContext, resp *http.Response, reqErr error) error {
+func (e *HTTP) handleRequestFailure(metadataCtx core.MetadataWriter, executionStateCtx core.ExecutionStateContext, resp *http.Response, reqErr error) error {
 	var metadata Metadata
 	if decodeErr := mapstructure.Decode(metadataCtx.Get(), &metadata); decodeErr != nil {
 		return fmt.Errorf("failed to decode metadata: %w", decodeErr)
@@ -753,7 +753,7 @@ func (e *HTTP) handleRequestFailure(metadataCtx core.MetadataContext, executionS
 	)
 }
 
-func (e *HTTP) processResponse(metadataCtx core.MetadataContext, executionStateCtx core.ExecutionStateContext, resp *http.Response, spec Spec) error {
+func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCtx core.ExecutionStateContext, resp *http.Response, spec Spec) error {
 	defer resp.Body.Close()
 
 	var metadata Metadata

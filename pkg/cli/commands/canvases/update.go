@@ -17,14 +17,16 @@ type updateCommand struct {
 	autoLayoutNodes *[]string
 }
 
-type versioningPlan struct {
+type changeManagementPlan struct {
 	effectiveEnabled      bool
 	enableAfterSpecUpdate bool
 }
 
-func updateCanvasVersioningEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
+func updateCanvasChangeManagementEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
 	body := openapi_client.CanvasesUpdateCanvasBody{}
-	body.SetVersioningEnabled(enabled)
+	cm := openapi_client.CanvasChangeManagement{}
+	cm.SetEnabled(enabled)
+	body.SetChangeManagement(cm)
 
 	_, _, err := ctx.API.CanvasAPI.
 		CanvasesUpdateCanvas(ctx.Context, canvasID).
@@ -33,7 +35,7 @@ func updateCanvasVersioningEnabled(ctx core.CommandContext, canvasID string, ena
 	return err
 }
 
-func resolveOrganizationVersioningEnabled(ctx core.CommandContext) (bool, error) {
+func resolveOrganizationChangeManagementEnabled(ctx core.CommandContext) (bool, error) {
 	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return false, err
@@ -52,45 +54,54 @@ func resolveOrganizationVersioningEnabled(ctx core.CommandContext) (bool, error)
 		return false, fmt.Errorf("organization metadata not found")
 	}
 
-	return metadata.GetVersioningEnabled(), nil
+	spec, _ := org.GetSpecOk()
+	if spec == nil {
+		return false, nil
+	}
+
+	return spec.GetChangeManagementEnabled(), nil
 }
 
-func requestedCanvasVersioningEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
-	if canvas.Metadata == nil {
+func requestedCanvasChangeManagementEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
+	if canvas.Spec == nil {
 		return false, false
 	}
-	value, ok := canvas.Metadata.GetVersioningEnabledOk()
-	if !ok || value == nil {
+	cm, ok := canvas.Spec.GetChangeManagementOk()
+	if !ok || cm == nil {
+		return false, false
+	}
+	value, valueOk := cm.GetEnabledOk()
+	if !valueOk || value == nil {
 		return false, false
 	}
 	return *value, true
 }
 
-func planCanvasVersioningUpdate(
+func planCanvasChangeManagementUpdate(
 	ctx core.CommandContext,
 	canvasID string,
 	requestedEnabled bool,
 	requestedSet bool,
 	currentEffective bool,
 	draftMode bool,
-) (*versioningPlan, error) {
-	plan := &versioningPlan{effectiveEnabled: currentEffective}
+) (*changeManagementPlan, error) {
+	plan := &changeManagementPlan{effectiveEnabled: currentEffective}
 	if !requestedSet || requestedEnabled == currentEffective {
 		return plan, nil
 	}
 
 	if !requestedEnabled {
-		orgEnabled, err := resolveOrganizationVersioningEnabled(ctx)
+		orgEnabled, err := resolveOrganizationChangeManagementEnabled(ctx)
 		if err != nil {
 			return nil, err
 		}
 		if orgEnabled {
-			return nil, fmt.Errorf("cannot disable canvas versioning while organization versioning is enabled")
+			return nil, fmt.Errorf("cannot disable change management while organization change management is enabled")
 		}
 		if draftMode {
-			return nil, fmt.Errorf("--draft cannot be used when disabling canvas versioning; remove --draft to update the live canvas directly")
+			return nil, fmt.Errorf("--draft cannot be used when disabling change management; remove --draft to update and publish directly")
 		}
-		if err := updateCanvasVersioningEnabled(ctx, canvasID, false); err != nil {
+		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, false); err != nil {
 			return nil, err
 		}
 		plan.effectiveEnabled = false
@@ -98,7 +109,7 @@ func planCanvasVersioningUpdate(
 	}
 
 	if draftMode {
-		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, true); err != nil {
 			return nil, err
 		}
 		plan.effectiveEnabled = true
@@ -148,38 +159,29 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	versioningContext, err := resolveCanvasVersioningContext(ctx, canvasID)
+	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
-	requestedEnabled, requestedSet := requestedCanvasVersioningEnabled(canvas)
-	plan, err := planCanvasVersioningUpdate(ctx, canvasID, requestedEnabled, requestedSet, versioningContext.versioningEnabled, draftMode)
+	requestedEnabled, requestedSet := requestedCanvasChangeManagementEnabled(canvas)
+	plan, err := planCanvasChangeManagementUpdate(ctx, canvasID, requestedEnabled, requestedSet, cmContext.changeManagementEnabled, draftMode)
 	if err != nil {
 		return err
 	}
 
-	targetVersionID := ""
-	if !plan.effectiveEnabled {
-		if draftMode {
-			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to update the live canvas directly")
-		}
-	} else {
-		if !draftMode {
-			return fmt.Errorf("effective canvas versioning is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
-		}
+	if plan.effectiveEnabled && !draftMode {
+		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
+	}
 
-		targetVersionID, err = ensureCurrentUserDraftVersionID(ctx, canvasID)
-		if err != nil {
-			return err
-		}
+	targetVersionID, err := ensureCurrentUserDraftVersionID(ctx, canvasID)
+	if err != nil {
+		return err
 	}
 
 	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
 	body.SetCanvas(canvas)
-	if targetVersionID != "" {
-		body.SetVersionId(targetVersionID)
-	}
+	body.SetVersionId(targetVersionID)
 
 	if autoLayoutFlagsWereSet(ctx) {
 		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
@@ -203,8 +205,19 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	version := response.GetVersion()
 
+	// When not in draft mode, auto-publish the updated draft version.
+	if !draftMode {
+		_, _, publishErr := ctx.API.CanvasVersionAPI.
+			CanvasesPublishCanvasVersion(ctx.Context, canvasID, targetVersionID).
+			Body(map[string]any{}).
+			Execute()
+		if publishErr != nil {
+			return fmt.Errorf("draft was updated but publish failed: %w", publishErr)
+		}
+	}
+
 	if plan.enableAfterSpecUpdate {
-		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, true); err != nil {
 			return err
 		}
 	}
@@ -217,9 +230,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		metadata := version.GetMetadata()
 		spec := version.GetSpec()
 
-		if targetVersionID != "" {
-			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
-		}
+		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
 		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))

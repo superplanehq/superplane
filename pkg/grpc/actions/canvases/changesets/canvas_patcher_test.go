@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -18,7 +19,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("applies mixed operations", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
 		steps.givenCanvasVersion(
 			[]models.Node{
 				{
@@ -75,12 +76,13 @@ func Test__CanvasPatcher(t *testing.T) {
 					Node: &pb.CanvasChangeset_Change_Node{Id: "node-b"},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "false"})
 		steps.assertHasNode("node-c", "Node C", map[string]any{})
 		steps.assertHasNodeBlock("node-c", "noop")
+		steps.assertHasNoNodeIntegrationID("node-c")
 		steps.assertNodeCount(2)
 		steps.assertHasEdge("node-a", "node-c", "default")
 		steps.assertEdgeCount(1)
@@ -112,7 +114,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertNoError()
 		steps.assertNodeOrder([]string{"node-a", "node-b", "node-c"})
@@ -121,6 +123,41 @@ func Test__CanvasPatcher(t *testing.T) {
 			{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
 			{SourceID: "node-c", TargetID: "node-a", Channel: "default"},
 		})
+	})
+
+	t.Run("returns error when auto layout is invalid", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{
+					ID:   "node-a",
+					Name: "Node A",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:   "node-a",
+						Name: "Node A Updated",
+					},
+				},
+			},
+		}, &pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED,
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("layout algorithm is required")
+		require.Nil(t, steps.finalVersion)
 	})
 
 	t.Run("update node -> no configuration provided, previous configuration is preserved", func(t *testing.T) {
@@ -145,7 +182,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Node: &pb.CanvasChangeset_Change_Node{Id: "node-a", Name: "Node A Updated"},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "true"})
@@ -179,7 +216,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'expression' is required")
@@ -203,7 +240,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 		steps.assertHasError()
 		steps.assertErrorContains("self-loop edges are not allowed")
 	})
@@ -223,7 +260,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("block core.hello not found in registry")
@@ -239,7 +276,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Type: pb.CanvasChangeset_Change_UNSPECIFIED,
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 	})
@@ -267,7 +304,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 		steps.assertHasError()
 	})
 
@@ -286,7 +323,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'expression' is required")
@@ -307,7 +344,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'type' is required")
@@ -328,22 +365,143 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 		steps.assertHasError()
 		steps.assertErrorContains("field 'text' is required")
+	})
+
+	t.Run("rejects integration component without integration id", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:    "node-a",
+						Name:  "Node A",
+						Block: "github.getIssue",
+						Configuration: structFromMap(t, map[string]any{
+							"repository":  "superplanehq/superplane",
+							"issueNumber": "1",
+						}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertHasError()
+		steps.assertErrorContains("integration is required for github.getIssue")
+	})
+
+	t.Run("rejects integration component with invalid integration id", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-a",
+						Name:          "Node A",
+						Block:         "github.getIssue",
+						IntegrationId: "not-a-uuid",
+						Configuration: structFromMap(t, map[string]any{
+							"repository":  "superplanehq/superplane",
+							"issueNumber": "1",
+						}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertHasError()
+		steps.assertErrorContains("invalid integration id")
+	})
+
+	t.Run("rejects integration component with integration id that does not exist", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(nil, nil)
+
+		missingIntegrationID := uuid.New().String()
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-a",
+						Name:          "Node A",
+						Block:         "github.getIssue",
+						IntegrationId: missingIntegrationID,
+						Configuration: structFromMap(t, map[string]any{
+							"repository":  "superplanehq/superplane",
+							"issueNumber": "1",
+						}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertHasError()
+		steps.assertErrorContains("integration " + missingIntegrationID + " not found")
+	})
+
+	t.Run("accepts integration component with existing integration id", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(nil, nil)
+
+		integration, err := models.CreateIntegration(
+			uuid.New(),
+			r.Organization.ID,
+			"github",
+			support.RandomName("integration"),
+			nil,
+		)
+		require.NoError(t, err)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-a",
+						Name:          "Node A",
+						Block:         "github.getIssue",
+						IntegrationId: integration.ID.String(),
+						Configuration: structFromMap(t, map[string]any{
+							"repository":  "superplanehq/superplane",
+							"issueNumber": "1",
+						}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
+		steps.assertHasNodeBlock("node-a", "github.getIssue")
+		steps.assertHasNodeIntegrationID("node-a", integration.ID.String())
 	})
 }
 
 type CanvasPatcherSteps struct {
 	t            *testing.T
 	registry     *registry.Registry
+	orgID        uuid.UUID
 	patcher      *CanvasPatcher
 	err          error
 	finalVersion *models.CanvasVersion
 }
 
 func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []models.Edge) {
-	s.patcher = NewCanvasPatcher(s.registry, &models.CanvasVersion{
+	s.patcher = NewCanvasPatcher(database.Conn(), s.orgID, s.registry, &models.CanvasVersion{
 		ID:         uuid.New(),
 		WorkflowID: uuid.New(),
 		Nodes:      datatypes.NewJSONSlice(nodes),
@@ -351,8 +509,8 @@ func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []mod
 	})
 }
 
-func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset) {
-	s.err = s.patcher.ApplyChangeset(operations)
+func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset, autoLayout *pb.CanvasAutoLayout) {
+	s.err = s.patcher.ApplyChangeset(operations, autoLayout)
 	s.finalVersion = s.patcher.GetVersion()
 }
 
@@ -392,6 +550,25 @@ func (s *CanvasPatcherSteps) assertHasNodeBlock(nodeID string, block string) {
 
 	nodeBlock := s.findBlockName(s.finalVersion.Nodes[i])
 	require.Equal(s.t, block, nodeBlock)
+}
+
+func (s *CanvasPatcherSteps) assertHasNodeIntegrationID(nodeID string, integrationID string) {
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.NotNil(s.t, s.finalVersion.Nodes[i].IntegrationID)
+	require.Equal(s.t, integrationID, *s.finalVersion.Nodes[i].IntegrationID)
+}
+
+func (s *CanvasPatcherSteps) assertHasNoNodeIntegrationID(nodeID string) {
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.Nil(s.t, s.finalVersion.Nodes[i].IntegrationID)
 }
 
 func (s *CanvasPatcherSteps) findBlockName(node models.Node) string {

@@ -107,29 +107,12 @@ func TestCanvasPage(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addTwoNodesAndConnect()
+		steps.saveCanvas()
+		steps.publishCanvas()
+		steps.enterEditMode()
 		steps.deleteConnectionBetweenNodes("First", "Second")
+		steps.publishCanvas()
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
-	})
-
-	t.Run("YAML preview tab shows canvas definition", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("YamlTestNode")
-		steps.switchToYamlTab()
-		steps.assertYamlContentVisible("YamlTestNode")
-		steps.assertYamlContentVisible("metadata:")
-	})
-
-	t.Run("YAML preview tab allows switching back to canvas", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("SwitchTest")
-		steps.switchToYamlTab()
-		steps.assertYamlContentVisible("SwitchTest")
-		steps.switchToCanvasTab()
-		steps.assertNodeIsAdded("SwitchTest")
 	})
 
 	t.Run("autocomplete suggests node data in filter expression", func(t *testing.T) {
@@ -143,6 +126,29 @@ func TestCanvasPage(t *testing.T) {
 		steps.openNodeSettings("Filter")
 		steps.typeExpression("$")
 		steps.assertAutocompleteNodeSuggestionVisible()
+	})
+}
+
+func TestCanvasPageYamlViewer(t *testing.T) {
+	t.Run("YAML preview modal shows canvas definition", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("YamlTestNode")
+		steps.openYamlPreviewModal()
+		steps.assertYamlContentVisible("YamlTestNode")
+		steps.assertYamlContentVisible("metadata:")
+	})
+
+	t.Run("YAML preview modal can be closed to return to canvas", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addNoop("SwitchTest")
+		steps.openYamlPreviewModal()
+		steps.assertYamlContentVisible("SwitchTest")
+		steps.closeYamlPreviewModal()
+		steps.assertNodeIsAdded("SwitchTest")
 	})
 }
 
@@ -161,6 +167,7 @@ func (s *CanvasPageSteps) start() {
 func (s *CanvasPageSteps) givenACanvasExists() {
 	s.canvas = shared.NewCanvasSteps("E2E Canvas", s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 }
 
 func (s *CanvasPageSteps) addNoop(name string) {
@@ -193,6 +200,14 @@ func (s *CanvasPageSteps) saveCanvas() {
 	s.canvas.Save()
 }
 
+func (s *CanvasPageSteps) publishCanvas() {
+	s.canvas.Publish()
+}
+
+func (s *CanvasPageSteps) enterEditMode() {
+	s.canvas.EnterEditMode()
+}
+
 func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
 	s.canvas.DeleteConnection(sourceName, targetName)
 }
@@ -220,6 +235,7 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 
 	s.canvas.Create()
 	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 	s.canvas.AddNoop("DeleteMe", models.Position{X: 500, Y: 200})
 }
 
@@ -273,11 +289,13 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas = shared.NewCanvasSteps("E2E Canvas With Queue", s.t, s.session)
 
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
 	s.session.TakeScreenshot()
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()
+	s.canvas.Publish()
 
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-start-header"]) [data-testid="start-template-run"]`)
 	emitEvent := q.Locator("button:has-text('Emit Event')")
@@ -423,7 +441,7 @@ func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
 }
 
 func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 
 	for {
 		workflow := s.canvas.GetWorkflowFromDB()
@@ -452,13 +470,15 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 	}
 }
 
-func (s *CanvasPageSteps) switchToYamlTab() {
-	s.session.Click(q.Locator(`button:has-text("YAML")`))
-	s.session.Sleep(1000)
+func (s *CanvasPageSteps) openYamlPreviewModal() {
+	// Adding a node opens the component sidebar over the canvas chrome; dismiss it so
+	// the floating YAML control (same corner as the sidebar) is clickable.
+	s.canvas.ClickOnEmptyCanvasArea()
+	s.session.Click(q.TestID("open-yaml-modal-button"))
 }
 
-func (s *CanvasPageSteps) switchToCanvasTab() {
-	s.session.Click(q.Locator(`button:has-text("Canvas")`))
+func (s *CanvasPageSteps) closeYamlPreviewModal() {
+	s.session.PressKey("Escape")
 	s.session.Sleep(500)
 }
 

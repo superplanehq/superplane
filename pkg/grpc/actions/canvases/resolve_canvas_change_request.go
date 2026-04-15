@@ -52,22 +52,21 @@ func ResolveCanvasChangeRequest(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
+		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
 	}
-	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
+	if !changeManagementEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "change management is disabled for this canvas")
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
 	if err != nil {
 		return nil, err
 	}
-	engine := layout.NewLayoutEngine(autoLayout)
-	nodes, edges, err = engine.Apply(nodes, edges)
+	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
 	}
 
 	userUUID := uuid.MustParse(userID)

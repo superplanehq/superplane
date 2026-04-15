@@ -217,11 +217,9 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 		"operation":    operation,
 		"updatedCount": len(updatedValues),
 	}
+
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
-	}
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(

@@ -1692,6 +1692,98 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/versions/{versionId}/publish": {
+      "patch": {
+        "summary": "Publish draft canvas version",
+        "description": "Publishes a user-owned draft canvas version directly to live",
+        "operationId": "Canvases_PublishCanvasVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesPublishCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesPublishCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/versions/{versionId}/validate": {
+      "patch": {
+        "summary": "Validate a canvas version changeset",
+        "description": "Validate a canvas version changeset",
+        "operationId": "Canvases_ValidateCanvasVersionChangeset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesValidateCanvasVersionChangesetResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesValidateCanvasVersionChangesetBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
     "/api/v1/canvases/{id}": {
       "get": {
         "summary": "Describe canvas",
@@ -4347,6 +4439,21 @@
       ],
       "default": "SCOPE_UNSPECIFIED"
     },
+    "CanvasChangeManagement": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ChangeManagementApprover"
+          }
+        }
+      }
+    },
     "CanvasChangesetChange": {
       "type": "object",
       "properties": {
@@ -4391,6 +4498,9 @@
         },
         "configuration": {
           "type": "object"
+        },
+        "integrationId": {
+          "type": "string"
         }
       }
     },
@@ -4447,8 +4557,8 @@
         "changeset": {
           "$ref": "#/definitions/CanvasesCanvasChangeset"
         },
-        "dryRun": {
-          "type": "boolean"
+        "autoLayout": {
+          "$ref": "#/definitions/CanvasesCanvasAutoLayout"
         }
       }
     },
@@ -4525,7 +4635,7 @@
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
         },
         "approver": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
+          "$ref": "#/definitions/ChangeManagementApprover"
         },
         "state": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalState"
@@ -4540,18 +4650,6 @@
         }
       }
     },
-    "CanvasesCanvasChangeRequestApprovalConfig": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasChangeRequestApprover"
-          }
-        }
-      }
-    },
     "CanvasesCanvasChangeRequestApprovalState": {
       "type": "string",
       "enum": [
@@ -4561,30 +4659,6 @@
         "STATE_UNAPPROVED"
       ],
       "default": "STATE_UNSPECIFIED"
-    },
-    "CanvasesCanvasChangeRequestApprover": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApproverType"
-        },
-        "userId": {
-          "type": "string"
-        },
-        "roleName": {
-          "type": "string"
-        }
-      }
-    },
-    "CanvasesCanvasChangeRequestApproverType": {
-      "type": "string",
-      "enum": [
-        "TYPE_UNSPECIFIED",
-        "TYPE_ANYONE",
-        "TYPE_USER",
-        "TYPE_ROLE"
-      ],
-      "default": "TYPE_UNSPECIFIED"
     },
     "CanvasesCanvasChangeRequestDiff": {
       "type": "object",
@@ -4774,12 +4848,6 @@
         },
         "isTemplate": {
           "type": "boolean"
-        },
-        "versioningEnabled": {
-          "type": "boolean"
-        },
-        "changeRequestApprovalConfig": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
         }
       }
     },
@@ -4928,6 +4996,9 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneComponentsEdge"
           }
+        },
+        "changeManagement": {
+          "$ref": "#/definitions/CanvasChangeManagement"
         }
       }
     },
@@ -5323,6 +5394,17 @@
         }
       }
     },
+    "CanvasesPublishCanvasVersionBody": {
+      "type": "object"
+    },
+    "CanvasesPublishCanvasVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        }
+      }
+    },
     "CanvasesResolveCanvasChangeRequestBody": {
       "type": "object",
       "properties": {
@@ -5368,11 +5450,8 @@
         "description": {
           "type": "string"
         },
-        "versioningEnabled": {
-          "type": "boolean"
-        },
-        "changeRequestApprovalConfig": {
-          "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
+        "changeManagement": {
+          "$ref": "#/definitions/CanvasChangeManagement"
         }
       }
     },
@@ -5421,6 +5500,46 @@
           "$ref": "#/definitions/SuperplaneComponentsNode"
         }
       }
+    },
+    "CanvasesValidateCanvasVersionChangesetBody": {
+      "type": "object",
+      "properties": {
+        "changeset": {
+          "$ref": "#/definitions/CanvasesCanvasChangeset"
+        }
+      }
+    },
+    "CanvasesValidateCanvasVersionChangesetResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        }
+      }
+    },
+    "ChangeManagementApprover": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/ChangeManagementApproverType"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "roleName": {
+          "type": "string"
+        }
+      }
+    },
+    "ChangeManagementApproverType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNSPECIFIED",
+        "TYPE_ANYONE",
+        "TYPE_USER",
+        "TYPE_ROLE"
+      ],
+      "default": "TYPE_UNSPECIFIED"
     },
     "ComponentsComponent": {
       "type": "object",
@@ -6482,6 +6601,9 @@
       "properties": {
         "metadata": {
           "$ref": "#/definitions/OrganizationsOrganizationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/OrganizationsOrganizationSpec"
         }
       }
     },
@@ -6537,8 +6659,13 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
-        },
-        "versioningEnabled": {
+        }
+      }
+    },
+    "OrganizationsOrganizationSpec": {
+      "type": "object",
+      "properties": {
+        "changeManagementEnabled": {
           "type": "boolean"
         }
       }

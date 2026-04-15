@@ -55,7 +55,7 @@ func TestUpdateMemoryExecute(t *testing.T) {
 				},
 			},
 		}
-		nodeMetadata := &contexts.MetadataContext{}
+		execMetadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -68,8 +68,8 @@ func TestUpdateMemoryExecute(t *testing.T) {
 					{"name": "status", "value": "running"},
 				},
 			},
-			Metadata:       &contexts.MetadataContext{},
-			NodeMetadata:   nodeMetadata,
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
 			CanvasMemory:   memoryCtx,
 			ExecutionState: execState,
 		})
@@ -86,7 +86,7 @@ func TestUpdateMemoryExecute(t *testing.T) {
 				"matches":      map[string]any{"creator": "igor", "pull_request": 123},
 				"updatedCount": 1,
 			},
-			nodeMetadata.Get(),
+			execMetadata.Get(),
 		)
 	})
 

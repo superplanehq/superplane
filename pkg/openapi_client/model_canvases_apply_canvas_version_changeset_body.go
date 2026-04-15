@@ -20,8 +20,8 @@ var _ MappedNullable = &CanvasesApplyCanvasVersionChangesetBody{}
 
 // CanvasesApplyCanvasVersionChangesetBody struct for CanvasesApplyCanvasVersionChangesetBody
 type CanvasesApplyCanvasVersionChangesetBody struct {
-	Changeset *CanvasesCanvasChangeset `json:"changeset,omitempty"`
-	DryRun    *bool                    `json:"dryRun,omitempty"`
+	Changeset  *CanvasesCanvasChangeset  `json:"changeset,omitempty"`
+	AutoLayout *CanvasesCanvasAutoLayout `json:"autoLayout,omitempty"`
 }
 
 // NewCanvasesApplyCanvasVersionChangesetBody instantiates a new CanvasesApplyCanvasVersionChangesetBody object
@@ -73,36 +73,36 @@ func (o *CanvasesApplyCanvasVersionChangesetBody) SetChangeset(v CanvasesCanvasC
 	o.Changeset = &v
 }
 
-// GetDryRun returns the DryRun field value if set, zero value otherwise.
-func (o *CanvasesApplyCanvasVersionChangesetBody) GetDryRun() bool {
-	if o == nil || IsNil(o.DryRun) {
-		var ret bool
+// GetAutoLayout returns the AutoLayout field value if set, zero value otherwise.
+func (o *CanvasesApplyCanvasVersionChangesetBody) GetAutoLayout() CanvasesCanvasAutoLayout {
+	if o == nil || IsNil(o.AutoLayout) {
+		var ret CanvasesCanvasAutoLayout
 		return ret
 	}
-	return *o.DryRun
+	return *o.AutoLayout
 }
 
-// GetDryRunOk returns a tuple with the DryRun field value if set, nil otherwise
+// GetAutoLayoutOk returns a tuple with the AutoLayout field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesApplyCanvasVersionChangesetBody) GetDryRunOk() (*bool, bool) {
-	if o == nil || IsNil(o.DryRun) {
+func (o *CanvasesApplyCanvasVersionChangesetBody) GetAutoLayoutOk() (*CanvasesCanvasAutoLayout, bool) {
+	if o == nil || IsNil(o.AutoLayout) {
 		return nil, false
 	}
-	return o.DryRun, true
+	return o.AutoLayout, true
 }
 
-// HasDryRun returns a boolean if a field has been set.
-func (o *CanvasesApplyCanvasVersionChangesetBody) HasDryRun() bool {
-	if o != nil && !IsNil(o.DryRun) {
+// HasAutoLayout returns a boolean if a field has been set.
+func (o *CanvasesApplyCanvasVersionChangesetBody) HasAutoLayout() bool {
+	if o != nil && !IsNil(o.AutoLayout) {
 		return true
 	}
 
 	return false
 }
 
-// SetDryRun gets a reference to the given bool and assigns it to the DryRun field.
-func (o *CanvasesApplyCanvasVersionChangesetBody) SetDryRun(v bool) {
-	o.DryRun = &v
+// SetAutoLayout gets a reference to the given CanvasesCanvasAutoLayout and assigns it to the AutoLayout field.
+func (o *CanvasesApplyCanvasVersionChangesetBody) SetAutoLayout(v CanvasesCanvasAutoLayout) {
+	o.AutoLayout = &v
 }
 
 func (o CanvasesApplyCanvasVersionChangesetBody) MarshalJSON() ([]byte, error) {
@@ -118,8 +118,8 @@ func (o CanvasesApplyCanvasVersionChangesetBody) ToMap() (map[string]interface{}
 	if !IsNil(o.Changeset) {
 		toSerialize["changeset"] = o.Changeset
 	}
-	if !IsNil(o.DryRun) {
-		toSerialize["dryRun"] = o.DryRun
+	if !IsNil(o.AutoLayout) {
+		toSerialize["autoLayout"] = o.AutoLayout
 	}
 	return toSerialize, nil
 }

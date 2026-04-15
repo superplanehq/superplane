@@ -111,6 +111,9 @@ import type {
   CanvasesListNodeQueueItemsData,
   CanvasesListNodeQueueItemsErrors,
   CanvasesListNodeQueueItemsResponses,
+  CanvasesPublishCanvasVersionData,
+  CanvasesPublishCanvasVersionErrors,
+  CanvasesPublishCanvasVersionResponses,
   CanvasesResolveCanvasChangeRequestData,
   CanvasesResolveCanvasChangeRequestErrors,
   CanvasesResolveCanvasChangeRequestResponses,
@@ -129,6 +132,9 @@ import type {
   CanvasesUpdateNodePauseData,
   CanvasesUpdateNodePauseErrors,
   CanvasesUpdateNodePauseResponses,
+  CanvasesValidateCanvasVersionChangesetData,
+  CanvasesValidateCanvasVersionChangesetErrors,
+  CanvasesValidateCanvasVersionChangesetResponses,
   ComponentsDescribeComponentData,
   ComponentsDescribeComponentErrors,
   ComponentsDescribeComponentResponses,
@@ -958,6 +964,48 @@ export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>
       },
     },
   );
+
+/**
+ * Publish draft canvas version
+ *
+ * Publishes a user-owned draft canvas version directly to live
+ */
+export const canvasesPublishCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesPublishCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesPublishCanvasVersionResponses,
+    CanvasesPublishCanvasVersionErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/{versionId}/publish",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Validate a canvas version changeset
+ *
+ * Validate a canvas version changeset
+ */
+export const canvasesValidateCanvasVersionChangeset = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesValidateCanvasVersionChangesetData, ThrowOnError>,
+) =>
+  (options.client ?? client).patch<
+    CanvasesValidateCanvasVersionChangesetResponses,
+    CanvasesValidateCanvasVersionChangesetErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/{versionId}/validate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * Delete canvas

@@ -136,10 +136,6 @@ func (c *AddMemory) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
-	}
-
 	if err := ctx.CanvasMemory.Add(spec.Namespace, values); err != nil {
 		return fmt.Errorf("failed to add canvas memory: %w", err)
 	}

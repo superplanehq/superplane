@@ -9,17 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
-import type { AiChatSession, AiBuilderMessage, AiBuilderProposal } from "./agentChat";
+import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
 import { loadChatConversation, loadChatSessions, pushAiMessages, sendChatPrompt } from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import { CategorySection } from "./CategorySection";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
+export type { AgentContext, AgentMode } from "./agentChat";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
@@ -28,7 +29,7 @@ export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
-  showAiBuilderTab?: boolean;
+  agentContext: AgentContext;
   canvasId?: string;
   organizationId?: string;
   canvasNodes?: Array<{
@@ -50,14 +51,13 @@ export interface BuildingBlocksSidebarProps {
   disabled?: boolean;
   disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
-  onAddNote?: () => void;
 }
 
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
-  showAiBuilderTab = false,
+  agentContext,
   canvasId,
   organizationId,
   onApplyAiOperations,
@@ -66,26 +66,18 @@ export function BuildingBlocksSidebar({
   disabled = false,
   disabledMessage,
   onBlockClick,
-  onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
 
   if (!isOpen) {
-    return (
-      <ClosedBuildingBlocksSidebar
-        disabled={disabled}
-        disabledTooltip={disabledTooltip}
-        onAddNote={onAddNote}
-        onToggle={onToggle}
-      />
-    );
+    return null;
   }
 
   return (
     <OpenBuildingBlocksSidebar
       onToggle={onToggle}
       blocks={blocks}
-      showAiBuilderTab={showAiBuilderTab}
+      agentContext={agentContext}
       canvasId={canvasId}
       organizationId={organizationId}
       onApplyAiOperations={onApplyAiOperations}
@@ -98,80 +90,10 @@ export function BuildingBlocksSidebar({
   );
 }
 
-interface ClosedBuildingBlocksSidebarProps {
-  disabled: boolean;
-  disabledTooltip: string;
-  onAddNote?: () => void;
-  onToggle: (open: boolean) => void;
-}
-
-function ClosedBuildingBlocksSidebar({
-  disabled,
-  disabledTooltip,
-  onAddNote,
-  onToggle,
-}: ClosedBuildingBlocksSidebarProps) {
-  const addNoteButton = (
-    <Button
-      variant="outline"
-      onClick={() => {
-        if (disabled) return;
-        onAddNote?.();
-      }}
-      aria-label="Add Note"
-      data-testid="add-note-button"
-      disabled={disabled}
-    >
-      <StickyNote size={16} />
-      Add Note
-    </Button>
-  );
-  const openSidebarButton = (
-    <Button
-      variant="outline"
-      onClick={() => {
-        if (disabled) return;
-        onToggle(true);
-      }}
-      aria-label="Open sidebar"
-      data-testid="open-sidebar-button"
-      disabled={disabled}
-    >
-      <Plus size={16} />
-      Components
-    </Button>
-  );
-
-  return (
-    <div className="absolute top-4 right-4 z-10 flex gap-3">
-      {disabled ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
-          <TooltipContent side="left" sideOffset={10}>
-            <p>{disabledTooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        addNoteButton
-      )}
-      {disabled ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
-          <TooltipContent side="left" sideOffset={10}>
-            <p>{disabledTooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        openSidebarButton
-      )}
-    </div>
-  );
-}
-
 interface OpenBuildingBlocksSidebarProps {
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
-  showAiBuilderTab: boolean;
+  agentContext: AgentContext;
   canvasId?: string;
   organizationId?: string;
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
@@ -185,7 +107,7 @@ interface OpenBuildingBlocksSidebarProps {
 function OpenBuildingBlocksSidebar({
   onToggle,
   blocks,
-  showAiBuilderTab,
+  agentContext,
   canvasId,
   organizationId,
   onApplyAiOperations,
@@ -241,6 +163,7 @@ function OpenBuildingBlocksSidebar({
         aiInput,
         canvasId,
         organizationId,
+        agentContext,
         currentChatId,
         isGeneratingResponse,
         setChatSessions,
@@ -253,7 +176,7 @@ function OpenBuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
+    [agentContext, aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
   );
 
   const handleStartNewChatSession = useCallback(() => {
@@ -378,10 +301,10 @@ function OpenBuildingBlocksSidebar({
   }, [sidebarWidth]);
 
   useEffect(() => {
-    if (!showAiBuilderTab && activeTab === "ai") {
+    if (!agentContext.enabled && activeTab === "ai") {
       setActiveTab("components");
     }
-  }, [showAiBuilderTab, activeTab]);
+  }, [agentContext.enabled, activeTab]);
 
   useEffect(() => {
     setActiveTab("components");
@@ -714,7 +637,7 @@ function OpenBuildingBlocksSidebar({
         />
       </div>
 
-      {!showAiBuilderTab && (
+      {!agentContext.enabled && (
         <div className="flex items-center justify-between gap-3 px-5 py-4 relative">
           <div className="flex flex-col items-start gap-3 w-full">
             <div className="flex justify-between gap-3 w-full">
@@ -734,11 +657,11 @@ function OpenBuildingBlocksSidebar({
       )}
 
       <Tabs
-        value={showAiBuilderTab ? activeTab : "components"}
+        value={agentContext.enabled ? activeTab : "components"}
         onValueChange={(value) => setActiveTab(value as "components" | "ai")}
-        className={`flex ${showAiBuilderTab ? "h-full" : "h-[calc(100%-82px)]"} flex-col`}
+        className={`flex ${agentContext.enabled ? "h-full" : "h-[calc(100%-82px)]"} flex-col`}
       >
-        {showAiBuilderTab && (
+        {agentContext.enabled && (
           <div className="px-4 pt-3 pb-3 flex items-center gap-1.5 relative">
             <TabsList className="grid h-8 w-auto grid-cols-2 gap-0.5 bg-transparent p-0">
               <TabsTrigger
@@ -764,9 +687,9 @@ function OpenBuildingBlocksSidebar({
             </div>
           </div>
         )}
-        {(!showAiBuilderTab || activeTab === "components") && componentsTabContent}
+        {(!agentContext.enabled || activeTab === "components") && componentsTabContent}
 
-        {showAiBuilderTab && (
+        {agentContext.enabled && (
           <AiBuilderChatPanel
             chatSessions={chatSessions}
             currentChatId={currentChatId}

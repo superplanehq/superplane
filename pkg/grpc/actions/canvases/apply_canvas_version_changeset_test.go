@@ -32,7 +32,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			canvas.ID,
 			*canvas.LiveVersionID,
 			nil,
-			false,
+			nil,
 		)
 
 		require.Error(t, err)
@@ -50,7 +50,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			canvas.ID,
 			*canvas.LiveVersionID,
 			nil,
-			false,
+			nil,
 		)
 
 		require.Error(t, err)
@@ -68,7 +68,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 			canvas.ID,
 			*canvas.LiveVersionID,
 			&pb.CanvasChangeset{},
-			false,
+			nil,
 		)
 
 		require.Error(t, err)
@@ -96,7 +96,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 					},
 				},
 			},
-			false,
+			nil,
 		)
 
 		require.Error(t, err)
@@ -166,7 +166,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 					},
 				},
 			},
-			false,
+			nil,
 		)
 
 		require.NoError(t, err)
@@ -197,119 +197,6 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		assert.Equal(t, otherUser.ID, *version.OwnerID)
 		require.Len(t, version.Nodes, 2)
 		require.Len(t, version.Edges, 1)
-	})
-
-	t.Run("applies changeset in dry run without persisting patched version", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(
-			t,
-			r.Organization.ID,
-			r.User,
-			[]models.CanvasNode{
-				testCanvasNode("node-a", "Node A", map[string]any{"foo": "before"}),
-				testCanvasNode("node-b", "Node B", map[string]any{"bar": "value"}),
-			},
-			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
-		)
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		draftVersion := createCanvasDraftVersionFromLive(t, canvas.ID, *canvas.LiveVersionID, r.User)
-
-		versionBefore, err := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
-		require.NoError(t, err)
-		require.Len(t, versionBefore.Nodes, 2)
-		require.Len(t, versionBefore.Edges, 1)
-
-		response, err := ApplyCanvasVersionChangeset(
-			ctx,
-			r.Registry,
-			r.Organization.ID,
-			canvas.ID,
-			draftVersion.ID,
-			&pb.CanvasChangeset{
-				Changes: []*pb.CanvasChangeset_Change{
-					{
-						Type: pb.CanvasChangeset_Change_ADD_NODE,
-						Node: &pb.CanvasChangeset_Change_Node{
-							Id:            "node-c",
-							Name:          "Node C",
-							Block:         "noop",
-							Configuration: structFromAnyMap(t, map[string]any{"baz": "value"}),
-						},
-					},
-					{
-						Type: pb.CanvasChangeset_Change_UPDATE_NODE,
-						Node: &pb.CanvasChangeset_Change_Node{
-							Id:            "node-a",
-							Name:          "Node A Updated",
-							Configuration: structFromAnyMap(t, map[string]any{"foo": "after"}),
-						},
-					},
-					{
-						Type: pb.CanvasChangeset_Change_DELETE_NODE,
-						Node: &pb.CanvasChangeset_Change_Node{Id: "node-b"},
-					},
-					{
-						Type: pb.CanvasChangeset_Change_ADD_EDGE,
-						Edge: &pb.CanvasChangeset_Change_Edge{
-							SourceId: "node-a",
-							TargetId: "node-c",
-							Channel:  "default",
-						},
-					},
-				},
-			},
-			true,
-		)
-
-		//
-		// Response returns the the updated canvas version structure
-		//
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
-		require.NotNil(t, response.Version.Spec)
-		require.Len(t, response.Version.Spec.Nodes, 2)
-		require.Len(t, response.Version.Spec.Edges, 1)
-
-		nodeA := findProtoNode(response.Version.Spec.Nodes, "node-a")
-		require.NotNil(t, nodeA)
-		assert.Equal(t, "Node A Updated", nodeA.Name)
-		assert.Equal(t, "after", nodeA.Configuration.AsMap()["foo"])
-
-		nodeC := findProtoNode(response.Version.Spec.Nodes, "node-c")
-		require.NotNil(t, nodeC)
-		assert.Equal(t, "Node C", nodeC.Name)
-		assert.Equal(t, "value", nodeC.Configuration.AsMap()["baz"])
-
-		edge := response.Version.Spec.Edges[0]
-		assert.Equal(t, "node-a", edge.SourceId)
-		assert.Equal(t, "node-c", edge.TargetId)
-		assert.Equal(t, "default", edge.Channel)
-
-		//
-		// But, data in the database remains unchanged
-		//
-		versionAfter, err := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
-		require.NoError(t, err)
-		require.Len(t, versionAfter.Nodes, 2)
-		require.Len(t, versionAfter.Edges, 1)
-
-		nodeAInDB := findCanvasNode(versionAfter.Nodes, "node-a")
-		require.NotNil(t, nodeAInDB)
-		assert.Equal(t, "Node A", nodeAInDB.Name)
-		assert.Equal(t, "before", nodeAInDB.Configuration["foo"])
-
-		nodeBInDB := findCanvasNode(versionAfter.Nodes, "node-b")
-		require.NotNil(t, nodeBInDB)
-		assert.Equal(t, "Node B", nodeBInDB.Name)
-		assert.Equal(t, "value", nodeBInDB.Configuration["bar"])
-
-		edgeInDB := versionAfter.Edges[0]
-		assert.Equal(t, "node-a", edgeInDB.SourceID)
-		assert.Equal(t, "node-b", edgeInDB.TargetID)
-		assert.Equal(t, "default", edgeInDB.Channel)
-
-		assert.Equal(t, versionBefore.UpdatedAt, versionAfter.UpdatedAt)
-		assert.Equal(t, versionBefore.OwnerID, versionAfter.OwnerID)
 	})
 
 	t.Run("returns invalid argument when operations produce invalid graph", func(t *testing.T) {
@@ -344,7 +231,7 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 					},
 				},
 			},
-			false,
+			nil,
 		)
 
 		require.Error(t, err)
@@ -356,6 +243,68 @@ func Test__ApplyCanvasVersionChangeset(t *testing.T) {
 		require.Len(t, version.Edges, 1)
 		assert.Equal(t, "node-a", version.Edges[0].SourceID)
 		assert.Equal(t, "node-b", version.Edges[0].TargetID)
+	})
+
+	t.Run("applies auto layout when requested", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				testCanvasNode("node-a", "Node A", map[string]any{"foo": "value"}),
+				testCanvasNode("node-b", "Node B", map[string]any{"bar": "value"}),
+			},
+			nil,
+		)
+
+		draftVersion := createCanvasDraftVersionFromLive(t, canvas.ID, *canvas.LiveVersionID, r.User)
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+		response, err := ApplyCanvasVersionChangeset(
+			ctx,
+			r.Registry,
+			r.Organization.ID,
+			canvas.ID,
+			draftVersion.ID,
+			&pb.CanvasChangeset{
+				Changes: []*pb.CanvasChangeset_Change{
+					{
+						Type: pb.CanvasChangeset_Change_ADD_EDGE,
+						Edge: &pb.CanvasChangeset_Change_Edge{
+							SourceId: "node-a",
+							TargetId: "node-b",
+							Channel:  "default",
+						},
+					},
+				},
+			},
+			&pb.CanvasAutoLayout{
+				Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+				Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
+			},
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Version)
+		require.NotNil(t, response.Version.Spec)
+
+		nodeA := findProtoNode(response.Version.Spec.Nodes, "node-a")
+		nodeB := findProtoNode(response.Version.Spec.Nodes, "node-b")
+		require.NotNil(t, nodeA)
+		require.NotNil(t, nodeB)
+		require.NotNil(t, nodeA.Position)
+		require.NotNil(t, nodeB.Position)
+		assert.Greater(t, nodeB.Position.X, nodeA.Position.X)
+
+		version, findErr := models.FindCanvasVersion(canvas.ID, draftVersion.ID)
+		require.NoError(t, findErr)
+
+		storedNodeA := findModelNode(version.Nodes, "node-a")
+		storedNodeB := findModelNode(version.Nodes, "node-b")
+		require.NotNil(t, storedNodeA)
+		require.NotNil(t, storedNodeB)
+		assert.Greater(t, storedNodeB.Position.X, storedNodeA.Position.X)
 	})
 }
 
@@ -391,7 +340,7 @@ func findProtoNode(nodes []*componentpb.Node, nodeID string) *componentpb.Node {
 	return nil
 }
 
-func findCanvasNode(nodes datatypes.JSONSlice[models.Node], nodeID string) *models.Node {
+func findModelNode(nodes []models.Node, nodeID string) *models.Node {
 	for i := range nodes {
 		if nodes[i].ID == nodeID {
 			return &nodes[i]

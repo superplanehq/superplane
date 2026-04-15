@@ -26,8 +26,7 @@ func TestApplyCanvasAutoLayoutStacksDisconnectedComponentsVertically(t *testing.
 		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
 	}
 
-	engine := NewLayoutEngine(autoLayout)
-	updatedNodes, updatedEdges, err := engine.Apply(nodes, edges)
+	updatedNodes, updatedEdges, err := ApplyLayout(nodes, edges, autoLayout)
 	require.NoError(t, err)
 	require.Equal(t, edges, updatedEdges)
 
@@ -61,8 +60,7 @@ func TestApplyCanvasAutoLayoutPacksIsolatedNodesBelowConnectedComponent(t *testi
 		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
 	}
 
-	engine := NewLayoutEngine(autoLayout)
-	updatedNodes, _, err := engine.Apply(nodes, edges)
+	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
 	require.NoError(t, err)
 
 	nodesByID := mapLayoutNodesByID(updatedNodes)
@@ -101,8 +99,7 @@ func TestApplyCanvasAutoLayoutDoesNotPushTerminalNodeBackWithParallelEdges(t *te
 		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
 	}
 
-	engine := NewLayoutEngine(autoLayout)
-	updatedNodes, _, err := engine.Apply(nodes, edges)
+	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
 	require.NoError(t, err)
 
 	nodesByID := mapLayoutNodesByID(updatedNodes)

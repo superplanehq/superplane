@@ -15,11 +15,12 @@ from pydantic_ai.messages import (
 from starlette.testclient import TestClient
 
 import ai.web as agent_web
+from ai.agent_stream_context import AgentStreamRequest
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.session_store import AgentChatNotFoundError
 from ai.usage_limit_checker import NoopUsageLimitChecker
 from ai.usage_publisher import NoopUsagePublisher
-from ai.web import AgentStreamRequest, create_app
+from ai.web import create_app
 
 
 @pytest.fixture(autouse=True)

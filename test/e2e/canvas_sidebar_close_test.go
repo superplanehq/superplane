@@ -18,7 +18,7 @@ func TestCanvasSidebarClose(t *testing.T) {
 	t.Run("sidebar close button works after exiting edit mode on versioned canvas", func(t *testing.T) {
 		steps := &sidebarCloseSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithVersioningEnabled("E2E Sidebar Close")
+		steps.givenCanvasWithChangeManagementEnabled("E2E Sidebar Close")
 		steps.enterEditMode()
 		steps.openBuildingBlocksSidebar()
 		steps.assertSidebarVisible()
@@ -41,11 +41,11 @@ func (s *sidebarCloseSteps) start() {
 	s.session.Login()
 }
 
-func (s *sidebarCloseSteps) givenCanvasWithVersioningEnabled(name string) {
+func (s *sidebarCloseSteps) givenCanvasWithChangeManagementEnabled(name string) {
 	err := database.Conn().
 		Model(&models.Organization{}).
 		Where("id = ?", s.session.OrgID).
-		Update("versioning_enabled", true).
+		Update("change_management_enabled", true).
 		Error
 	require.NoError(s.t, err)
 

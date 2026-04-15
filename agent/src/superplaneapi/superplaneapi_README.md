@@ -104,8 +104,10 @@ Class | Method | HTTP request | Description
 *CanvasVersionApi* | [**canvases_delete_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_delete_canvas_version) | **DELETE** /api/v1/canvases/{canvasId}/versions/{versionId} | Discard draft canvas version
 *CanvasVersionApi* | [**canvases_describe_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_describe_canvas_version) | **GET** /api/v1/canvases/{canvasId}/versions/{versionId} | Describe canvas version
 *CanvasVersionApi* | [**canvases_list_canvas_versions**](superplaneapi/docs/CanvasVersionApi.md#canvases_list_canvas_versions) | **GET** /api/v1/canvases/{canvasId}/versions | List canvas versions
+*CanvasVersionApi* | [**canvases_publish_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_publish_canvas_version) | **PATCH** /api/v1/canvases/{canvasId}/versions/{versionId}/publish | Publish draft canvas version
 *CanvasVersionApi* | [**canvases_update_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version) | **PUT** /api/v1/canvases/{canvasId}/versions/{versionId} | Update canvas version
 *CanvasVersionApi* | [**canvases_update_canvas_version2**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version2) | **PUT** /api/v1/canvases/{canvasId}/versions | Update canvas version
+*CanvasVersionApi* | [**canvases_validate_canvas_version_changeset**](superplaneapi/docs/CanvasVersionApi.md#canvases_validate_canvas_version_changeset) | **PATCH** /api/v1/canvases/{canvasId}/versions/{versionId}/validate | Validate a canvas version changeset
 *ComponentApi* | [**components_describe_component**](superplaneapi/docs/ComponentApi.md#components_describe_component) | **GET** /api/v1/components/{name} | Describe component
 *ComponentApi* | [**components_list_component_actions**](superplaneapi/docs/ComponentApi.md#components_list_component_actions) | **GET** /api/v1/components/{name}/actions | List component actions
 *ComponentApi* | [**components_list_components**](superplaneapi/docs/ComponentApi.md#components_list_components) | **GET** /api/v1/components | List components
@@ -192,6 +194,7 @@ Class | Method | HTTP request | Description
  - [BlueprintsUpdateBlueprintResponse](superplaneapi/docs/BlueprintsUpdateBlueprintResponse.md)
  - [CanvasAutoLayoutAlgorithm](superplaneapi/docs/CanvasAutoLayoutAlgorithm.md)
  - [CanvasAutoLayoutScope](superplaneapi/docs/CanvasAutoLayoutScope.md)
+ - [CanvasChangeManagement](superplaneapi/docs/CanvasChangeManagement.md)
  - [CanvasChangesetChange](superplaneapi/docs/CanvasChangesetChange.md)
  - [CanvasChangesetChangeEdge](superplaneapi/docs/CanvasChangesetChangeEdge.md)
  - [CanvasChangesetChangeNode](superplaneapi/docs/CanvasChangesetChangeNode.md)
@@ -206,10 +209,7 @@ Class | Method | HTTP request | Description
  - [CanvasesCanvasAutoLayout](superplaneapi/docs/CanvasesCanvasAutoLayout.md)
  - [CanvasesCanvasChangeRequest](superplaneapi/docs/CanvasesCanvasChangeRequest.md)
  - [CanvasesCanvasChangeRequestApproval](superplaneapi/docs/CanvasesCanvasChangeRequestApproval.md)
- - [CanvasesCanvasChangeRequestApprovalConfig](superplaneapi/docs/CanvasesCanvasChangeRequestApprovalConfig.md)
  - [CanvasesCanvasChangeRequestApprovalState](superplaneapi/docs/CanvasesCanvasChangeRequestApprovalState.md)
- - [CanvasesCanvasChangeRequestApprover](superplaneapi/docs/CanvasesCanvasChangeRequestApprover.md)
- - [CanvasesCanvasChangeRequestApproverType](superplaneapi/docs/CanvasesCanvasChangeRequestApproverType.md)
  - [CanvasesCanvasChangeRequestDiff](superplaneapi/docs/CanvasesCanvasChangeRequestDiff.md)
  - [CanvasesCanvasChangeRequestMetadata](superplaneapi/docs/CanvasesCanvasChangeRequestMetadata.md)
  - [CanvasesCanvasChangeRequestStatus](superplaneapi/docs/CanvasesCanvasChangeRequestStatus.md)
@@ -250,6 +250,7 @@ Class | Method | HTTP request | Description
  - [CanvasesListNodeEventsResponse](superplaneapi/docs/CanvasesListNodeEventsResponse.md)
  - [CanvasesListNodeExecutionsResponse](superplaneapi/docs/CanvasesListNodeExecutionsResponse.md)
  - [CanvasesListNodeQueueItemsResponse](superplaneapi/docs/CanvasesListNodeQueueItemsResponse.md)
+ - [CanvasesPublishCanvasVersionResponse](superplaneapi/docs/CanvasesPublishCanvasVersionResponse.md)
  - [CanvasesResolveCanvasChangeRequestBody](superplaneapi/docs/CanvasesResolveCanvasChangeRequestBody.md)
  - [CanvasesResolveCanvasChangeRequestResponse](superplaneapi/docs/CanvasesResolveCanvasChangeRequestResponse.md)
  - [CanvasesResolveExecutionErrorsBody](superplaneapi/docs/CanvasesResolveExecutionErrorsBody.md)
@@ -259,6 +260,10 @@ Class | Method | HTTP request | Description
  - [CanvasesUpdateCanvasVersionResponse](superplaneapi/docs/CanvasesUpdateCanvasVersionResponse.md)
  - [CanvasesUpdateNodePauseBody](superplaneapi/docs/CanvasesUpdateNodePauseBody.md)
  - [CanvasesUpdateNodePauseResponse](superplaneapi/docs/CanvasesUpdateNodePauseResponse.md)
+ - [CanvasesValidateCanvasVersionChangesetBody](superplaneapi/docs/CanvasesValidateCanvasVersionChangesetBody.md)
+ - [CanvasesValidateCanvasVersionChangesetResponse](superplaneapi/docs/CanvasesValidateCanvasVersionChangesetResponse.md)
+ - [ChangeManagementApprover](superplaneapi/docs/ChangeManagementApprover.md)
+ - [ChangeManagementApproverType](superplaneapi/docs/ChangeManagementApproverType.md)
  - [ComponentsComponent](superplaneapi/docs/ComponentsComponent.md)
  - [ComponentsComponentAction](superplaneapi/docs/ComponentsComponentAction.md)
  - [ComponentsDescribeComponentResponse](superplaneapi/docs/ComponentsDescribeComponentResponse.md)
@@ -335,6 +340,7 @@ Class | Method | HTTP request | Description
  - [OrganizationsOrganization](superplaneapi/docs/OrganizationsOrganization.md)
  - [OrganizationsOrganizationLimits](superplaneapi/docs/OrganizationsOrganizationLimits.md)
  - [OrganizationsOrganizationMetadata](superplaneapi/docs/OrganizationsOrganizationMetadata.md)
+ - [OrganizationsOrganizationSpec](superplaneapi/docs/OrganizationsOrganizationSpec.md)
  - [OrganizationsOrganizationUsage](superplaneapi/docs/OrganizationsOrganizationUsage.md)
  - [OrganizationsResetInviteLinkResponse](superplaneapi/docs/OrganizationsResetInviteLinkResponse.md)
  - [OrganizationsSetAgentOpenAIKeyBody](superplaneapi/docs/OrganizationsSetAgentOpenAIKeyBody.md)

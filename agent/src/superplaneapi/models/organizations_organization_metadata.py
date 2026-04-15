@@ -19,7 +19,7 @@ import re  # noqa: F401
 import json
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
@@ -33,8 +33,7 @@ class OrganizationsOrganizationMetadata(BaseModel):
     description: Optional[StrictStr] = None
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
-    versioning_enabled: Optional[StrictBool] = Field(default=None, alias="versioningEnabled")
-    __properties: ClassVar[List[str]] = ["id", "name", "description", "createdAt", "updatedAt", "versioningEnabled"]
+    __properties: ClassVar[List[str]] = ["id", "name", "description", "createdAt", "updatedAt"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -91,8 +90,7 @@ class OrganizationsOrganizationMetadata(BaseModel):
             "name": obj.get("name"),
             "description": obj.get("description"),
             "createdAt": obj.get("createdAt"),
-            "updatedAt": obj.get("updatedAt"),
-            "versioningEnabled": obj.get("versioningEnabled")
+            "updatedAt": obj.get("updatedAt")
         })
         return _obj
 

@@ -57,10 +57,9 @@ func CreateCanvasWithAutoLayoutAndUsage(
 		return nil, err
 	}
 
-	engine := layout.NewLayoutEngine(autoLayout)
-	nodes, edges, err = engine.Apply(nodes, edges)
+	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
 	}
 
 	expandedNodes, err := expandNodes(organizationID, nodes)
@@ -76,11 +75,11 @@ func CreateCanvasWithAutoLayoutAndUsage(
 	if isTemplate {
 		targetOrganizationID = models.TemplateOrganizationID
 	}
-	canvasVersioningEnabled := false
+	changeManagementEnabled := false
 	if !isTemplate {
-		canvasVersioningEnabled, err = models.IsCanvasVersioningEnabled(targetOrganizationID)
+		changeManagementEnabled, err = models.IsChangeManagementEnabled(targetOrganizationID)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to load organization change management setting: %v", err)
 		}
 	}
 
@@ -102,16 +101,16 @@ func CreateCanvasWithAutoLayoutAndUsage(
 	liveVersionID := uuid.New()
 
 	canvas := models.Canvas{
-		ID:                uuid.New(),
-		OrganizationID:    targetOrganizationID,
-		LiveVersionID:     &liveVersionID,
-		IsTemplate:        isTemplate,
-		VersioningEnabled: canvasVersioningEnabled,
-		Name:              pbCanvas.Metadata.Name,
-		Description:       pbCanvas.Metadata.Description,
-		CreatedBy:         &createdBy,
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
+		ID:                      uuid.New(),
+		OrganizationID:          targetOrganizationID,
+		LiveVersionID:           &liveVersionID,
+		IsTemplate:              isTemplate,
+		ChangeManagementEnabled: changeManagementEnabled,
+		Name:                    pbCanvas.Metadata.Name,
+		Description:             pbCanvas.Metadata.Description,
+		CreatedBy:               &createdBy,
+		CreatedAt:               &now,
+		UpdatedAt:               &now,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {

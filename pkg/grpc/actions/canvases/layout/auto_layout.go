@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -9,8 +10,6 @@ import (
 	"github.com/nulab/autog/graph"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const (
@@ -21,32 +20,26 @@ const (
 	autoLayoutDisconnectedComponentVerticalGap = 280
 )
 
-type LayoutEngine struct {
-	autoLayout *pb.CanvasAutoLayout
-}
-
-func NewLayoutEngine(autoLayout *pb.CanvasAutoLayout) *LayoutEngine {
-	return &LayoutEngine{autoLayout: autoLayout}
-}
-
-func (e *LayoutEngine) Apply(nodes []models.Node, edges []models.Edge) ([]models.Node, []models.Edge, error) {
-	if e.autoLayout == nil {
+func ApplyLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAutoLayout) ([]models.Node, []models.Edge, error) {
+	if layout == nil {
 		return nodes, edges, nil
 	}
 
-	switch e.autoLayout.Algorithm {
+	switch layout.Algorithm {
+	case pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED:
+		return nil, nil, fmt.Errorf("layout algorithm is required")
 	case pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL:
-		layoutedNodes, err := e.applyHorizontalAutoLayout(nodes, edges)
+		layoutedNodes, err := applyHorizontalLayout(nodes, edges, layout)
 		if err != nil {
 			return nil, nil, err
 		}
 		return layoutedNodes, edges, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported layout algorithm: %s", layout.Algorithm.String())
 	}
-
-	return nil, nil, status.Errorf(codes.InvalidArgument, "unsupported auto layout algorithm: %s", e.autoLayout.Algorithm.String())
 }
 
-func (e *LayoutEngine) applyHorizontalAutoLayout(nodes []models.Node, edges []models.Edge) ([]models.Node, error) {
+func applyHorizontalLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAutoLayout) ([]models.Node, error) {
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
@@ -68,12 +61,12 @@ func (e *LayoutEngine) applyHorizontalAutoLayout(nodes []models.Node, edges []mo
 		return nodes, nil
 	}
 
-	seedNodeIDs, err := e.resolveLayoutSeedNodeIDs(flowNodeSet)
+	seedNodeIDs, err := resolveLayoutSeedNodeIDs(layout, flowNodeSet)
 	if err != nil {
 		return nil, err
 	}
 
-	scope := e.resolveAutoLayoutScope(len(seedNodeIDs) > 0)
+	scope := resolveLayoutScope(layout, len(seedNodeIDs) > 0)
 	scopedNodeIDs, err := resolveScopedNodeIDs(scope, seedNodeIDs, flowNodeIDs, flowNodeSet, edges)
 	if err != nil {
 		return nil, err
@@ -518,16 +511,16 @@ func applyPositionOffset(positions *layoutPositions, offset models.Position) {
 	}
 }
 
-func (e *LayoutEngine) resolveLayoutSeedNodeIDs(flowNodeSet map[string]struct{}) ([]string, error) {
-	if len(e.autoLayout.NodeIds) == 0 {
+func resolveLayoutSeedNodeIDs(layout *pb.CanvasAutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {
+	if len(layout.NodeIds) == 0 {
 		return []string{}, nil
 	}
 
-	seen := make(map[string]struct{}, len(e.autoLayout.NodeIds))
-	seedNodeIDs := make([]string, 0, len(e.autoLayout.NodeIds))
-	for _, nodeID := range e.autoLayout.NodeIds {
+	seen := make(map[string]struct{}, len(layout.NodeIds))
+	seedNodeIDs := make([]string, 0, len(layout.NodeIds))
+	for _, nodeID := range layout.NodeIds {
 		if _, exists := flowNodeSet[nodeID]; !exists {
-			return nil, status.Errorf(codes.InvalidArgument, "auto_layout.node_ids contains unknown node: %s", nodeID)
+			return nil, fmt.Errorf("auto layout node ids contains unknown node: %s", nodeID)
 		}
 
 		if _, exists := seen[nodeID]; exists {
@@ -541,15 +534,19 @@ func (e *LayoutEngine) resolveLayoutSeedNodeIDs(flowNodeSet map[string]struct{})
 	return seedNodeIDs, nil
 }
 
-func (e *LayoutEngine) resolveAutoLayoutScope(hasSeedNodeIDs bool) pb.CanvasAutoLayout_Scope {
-	if e.autoLayout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED {
+func resolveLayoutScope(layout *pb.CanvasAutoLayout, hasSeedNodeIDs bool) pb.CanvasAutoLayout_Scope {
+	if layout == nil {
+		return pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
+	}
+
+	if layout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED {
 		if hasSeedNodeIDs {
 			return pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
 		}
 		return pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
 	}
 
-	return e.autoLayout.Scope
+	return layout.Scope
 }
 
 func resolveScopedNodeIDs(
@@ -565,7 +562,7 @@ func resolveScopedNodeIDs(
 	case pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT:
 		return resolveConnectedComponentNodeIDs(seedNodeIDs, flowNodeIDs, flowNodeSet, edges), nil
 	default:
-		return nil, status.Errorf(codes.InvalidArgument, "unsupported auto layout scope: %s", scope.String())
+		return nil, fmt.Errorf("unsupported auto layout scope: %s", scope.String())
 	}
 }
 
