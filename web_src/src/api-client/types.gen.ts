@@ -166,6 +166,7 @@ export type CanvasesActOnCanvasChangeRequestResponse = {
 
 export type CanvasesApplyCanvasVersionChangesetBody = {
   changeset?: CanvasesCanvasChangeset;
+  autoLayout?: CanvasesCanvasAutoLayout;
 };
 
 export type CanvasesApplyCanvasVersionChangesetResponse = {
