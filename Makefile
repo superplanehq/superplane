@@ -11,6 +11,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
+DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
 #
@@ -87,6 +88,7 @@ test.coverage.baseline.update:
 	$(MAKE) check.coverage.go.baseline.update
 
 test.license.check:
+	$(MAKE) gen.setup.backend
 	bash ./scripts/license-check.sh
 
 test.watch:
@@ -357,7 +359,7 @@ openapi.spec.gen:
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
-	docker run --rm \
+	$(DOCKER_RUN_AS_CURRENT_USER) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
@@ -376,7 +378,7 @@ openapi.web.client.gen:
 
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi
-	docker run --rm \
+	$(DOCKER_RUN_AS_CURRENT_USER) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g python \

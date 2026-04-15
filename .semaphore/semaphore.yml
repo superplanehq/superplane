@@ -15,6 +15,9 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
       prologue:
         commands:
           - checkout
