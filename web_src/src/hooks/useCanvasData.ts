@@ -35,6 +35,7 @@ import type {
   ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
+import { analytics } from "../lib/analytics";
 import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
 
 // Query Keys
@@ -374,6 +375,7 @@ export const useCreateCanvas = (organizationId: string) => {
           canvasKeys.detail(organizationId, response.data.canvas.metadata.id),
           response.data.canvas,
         );
+        analytics.canvasCreated(response.data.canvas.metadata.id, organizationId);
       }
     },
   });
@@ -716,6 +718,7 @@ export const useDeleteCanvas = (organizationId: string) => {
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      analytics.canvasDeleted(canvasId, organizationId);
     },
   });
 };

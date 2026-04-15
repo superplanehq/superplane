@@ -6,6 +6,7 @@ import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { getResponseErrorMessage } from "@/lib/errors";
+import { analytics } from "@/lib/analytics";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -31,6 +32,7 @@ const OrganizationCreate: React.FC = () => {
 
       if (response.ok) {
         const org = await response.json();
+        analytics.organizationCreated(org.id);
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {

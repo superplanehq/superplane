@@ -57,6 +57,7 @@ services:
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
