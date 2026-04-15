@@ -588,6 +588,94 @@ func (x *ResumeAgentChatResponse) GetUrl() string {
 	return ""
 }
 
+type DeleteAgentChatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	ChatId        string                 `protobuf:"bytes,2,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAgentChatRequest) Reset() {
+	*x = DeleteAgentChatRequest{}
+	mi := &file_agents_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAgentChatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAgentChatRequest) ProtoMessage() {}
+
+func (x *DeleteAgentChatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAgentChatRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAgentChatRequest) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DeleteAgentChatRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+func (x *DeleteAgentChatRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+type DeleteAgentChatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAgentChatResponse) Reset() {
+	*x = DeleteAgentChatResponse{}
+	mi := &file_agents_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAgentChatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAgentChatResponse) ProtoMessage() {}
+
+func (x *DeleteAgentChatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAgentChatResponse.ProtoReflect.Descriptor instead.
+func (*DeleteAgentChatResponse) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{12}
+}
+
 type AgentChatInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -599,7 +687,7 @@ type AgentChatInfo struct {
 
 func (x *AgentChatInfo) Reset() {
 	*x = AgentChatInfo{}
-	mi := &file_agents_proto_msgTypes[11]
+	mi := &file_agents_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -611,7 +699,7 @@ func (x *AgentChatInfo) String() string {
 func (*AgentChatInfo) ProtoMessage() {}
 
 func (x *AgentChatInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_agents_proto_msgTypes[11]
+	mi := &file_agents_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -624,7 +712,7 @@ func (x *AgentChatInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentChatInfo.ProtoReflect.Descriptor instead.
 func (*AgentChatInfo) Descriptor() ([]byte, []int) {
-	return file_agents_proto_rawDescGZIP(), []int{11}
+	return file_agents_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AgentChatInfo) GetId() string {
@@ -687,13 +775,16 @@ const file_agents_proto_rawDesc = "" +
 	"\achat_id\x18\x02 \x01(\tR\x06chatId\"A\n" +
 	"\x17ResumeAgentChatResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url\"\x83\x01\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"N\n" +
+	"\x16DeleteAgentChatRequest\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\achat_id\x18\x02 \x01(\tR\x06chatId\"\x19\n" +
+	"\x17DeleteAgentChatResponse\"\x83\x01\n" +
 	"\rAgentChatInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xb4\n" +
-	"\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\x9f\f\n" +
 	"\x06Agents\x12\xf5\x01\n" +
 	"\x0eListAgentChats\x12(.Superplane.Agents.ListAgentChatsRequest\x1a).Superplane.Agents.ListAgentChatsResponse\"\x8d\x01\x92An\n" +
 	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/agents/chats\x12\x90\x02\n" +
@@ -704,7 +795,9 @@ const file_agents_proto_rawDesc = "" +
 	"\x15ListAgentChatMessages\x12/.Superplane.Agents.ListAgentChatMessagesRequest\x1a0.Superplane.Agents.ListAgentChatMessagesResponse\"\x81\x01\x92AO\n" +
 	"\x05Agent\x12\"List the messages in an agent chat\x1a\"List the messages in an agent chat\x82\xd3\xe4\x93\x02)\x12'/api/v1/agents/chats/{chat_id}/messages\x12\x91\x02\n" +
 	"\x0fResumeAgentChat\x12).Superplane.Agents.ResumeAgentChatRequest\x1a*.Superplane.Agents.ResumeAgentChatResponse\"\xa6\x01\x92As\n" +
-	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/agents/chats/{chat_id}/resumeB\xca\x01\x92A\x90\x01\x12f\n" +
+	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/agents/chats/{chat_id}/resume\x12\xe8\x01\n" +
+	"\x0fDeleteAgentChat\x12).Superplane.Agents.DeleteAgentChatRequest\x1a*.Superplane.Agents.DeleteAgentChatResponse\"~\x92AU\n" +
+	"\x05Agent\x12\x14Delete an agent chat\x1a6Permanently deletes an agent chat and all its messages\x82\xd3\xe4\x93\x02 *\x1e/api/v1/agents/chats/{chat_id}B\xca\x01\x92A\x90\x01\x12f\n" +
 	"\x15SuperPlane Agents API\x12!API for SuperPlane agent sessions\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/agentsb\x06proto3"
 
@@ -720,7 +813,7 @@ func file_agents_proto_rawDescGZIP() []byte {
 	return file_agents_proto_rawDescData
 }
 
-var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_agents_proto_goTypes = []any{
 	(*ListAgentChatsRequest)(nil),         // 0: Superplane.Agents.ListAgentChatsRequest
 	(*ListAgentChatsResponse)(nil),        // 1: Superplane.Agents.ListAgentChatsResponse
@@ -733,27 +826,31 @@ var file_agents_proto_goTypes = []any{
 	(*CreateAgentChatResponse)(nil),       // 8: Superplane.Agents.CreateAgentChatResponse
 	(*ResumeAgentChatRequest)(nil),        // 9: Superplane.Agents.ResumeAgentChatRequest
 	(*ResumeAgentChatResponse)(nil),       // 10: Superplane.Agents.ResumeAgentChatResponse
-	(*AgentChatInfo)(nil),                 // 11: Superplane.Agents.AgentChatInfo
-	(*timestamp.Timestamp)(nil),           // 12: google.protobuf.Timestamp
+	(*DeleteAgentChatRequest)(nil),        // 11: Superplane.Agents.DeleteAgentChatRequest
+	(*DeleteAgentChatResponse)(nil),       // 12: Superplane.Agents.DeleteAgentChatResponse
+	(*AgentChatInfo)(nil),                 // 13: Superplane.Agents.AgentChatInfo
+	(*timestamp.Timestamp)(nil),           // 14: google.protobuf.Timestamp
 }
 var file_agents_proto_depIdxs = []int32{
-	11, // 0: Superplane.Agents.ListAgentChatsResponse.chats:type_name -> Superplane.Agents.AgentChatInfo
-	11, // 1: Superplane.Agents.DescribeAgentChatResponse.chat:type_name -> Superplane.Agents.AgentChatInfo
+	13, // 0: Superplane.Agents.ListAgentChatsResponse.chats:type_name -> Superplane.Agents.AgentChatInfo
+	13, // 1: Superplane.Agents.DescribeAgentChatResponse.chat:type_name -> Superplane.Agents.AgentChatInfo
 	6,  // 2: Superplane.Agents.ListAgentChatMessagesResponse.messages:type_name -> Superplane.Agents.AgentChatMessage
-	12, // 3: Superplane.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
-	12, // 4: Superplane.Agents.AgentChatInfo.created_at:type_name -> google.protobuf.Timestamp
+	14, // 3: Superplane.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	14, // 4: Superplane.Agents.AgentChatInfo.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: Superplane.Agents.Agents.ListAgentChats:input_type -> Superplane.Agents.ListAgentChatsRequest
 	7,  // 6: Superplane.Agents.Agents.CreateAgentChat:input_type -> Superplane.Agents.CreateAgentChatRequest
 	2,  // 7: Superplane.Agents.Agents.DescribeAgentChat:input_type -> Superplane.Agents.DescribeAgentChatRequest
 	4,  // 8: Superplane.Agents.Agents.ListAgentChatMessages:input_type -> Superplane.Agents.ListAgentChatMessagesRequest
 	9,  // 9: Superplane.Agents.Agents.ResumeAgentChat:input_type -> Superplane.Agents.ResumeAgentChatRequest
-	1,  // 10: Superplane.Agents.Agents.ListAgentChats:output_type -> Superplane.Agents.ListAgentChatsResponse
-	8,  // 11: Superplane.Agents.Agents.CreateAgentChat:output_type -> Superplane.Agents.CreateAgentChatResponse
-	3,  // 12: Superplane.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Agents.DescribeAgentChatResponse
-	5,  // 13: Superplane.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Agents.ListAgentChatMessagesResponse
-	10, // 14: Superplane.Agents.Agents.ResumeAgentChat:output_type -> Superplane.Agents.ResumeAgentChatResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
+	11, // 10: Superplane.Agents.Agents.DeleteAgentChat:input_type -> Superplane.Agents.DeleteAgentChatRequest
+	1,  // 11: Superplane.Agents.Agents.ListAgentChats:output_type -> Superplane.Agents.ListAgentChatsResponse
+	8,  // 12: Superplane.Agents.Agents.CreateAgentChat:output_type -> Superplane.Agents.CreateAgentChatResponse
+	3,  // 13: Superplane.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Agents.DescribeAgentChatResponse
+	5,  // 14: Superplane.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Agents.ListAgentChatMessagesResponse
+	10, // 15: Superplane.Agents.Agents.ResumeAgentChat:output_type -> Superplane.Agents.ResumeAgentChatResponse
+	12, // 16: Superplane.Agents.Agents.DeleteAgentChat:output_type -> Superplane.Agents.DeleteAgentChatResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -770,7 +867,7 @@ func file_agents_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agents_proto_rawDesc), len(file_agents_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

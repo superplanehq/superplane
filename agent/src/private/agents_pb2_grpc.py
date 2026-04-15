@@ -59,6 +59,11 @@ class AgentsStub(object):
                 request_serializer=private_dot_agents__pb2.ListAgentChatMessagesRequest.SerializeToString,
                 response_deserializer=private_dot_agents__pb2.ListAgentChatMessagesResponse.FromString,
                 _registered_method=True)
+        self.DeleteAgentChat = channel.unary_unary(
+                '/Superplane.Internal.Agents.Agents/DeleteAgentChat',
+                request_serializer=private_dot_agents__pb2.DeleteAgentChatRequest.SerializeToString,
+                response_deserializer=private_dot_agents__pb2.DeleteAgentChatResponse.FromString,
+                _registered_method=True)
         self.DescribeOrganizationAgentUsage = channel.unary_unary(
                 '/Superplane.Internal.Agents.Agents/DescribeOrganizationAgentUsage',
                 request_serializer=private_dot_agents__pb2.DescribeOrganizationAgentUsageRequest.SerializeToString,
@@ -98,6 +103,12 @@ class AgentsServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DeleteAgentChat(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DescribeOrganizationAgentUsage(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -126,6 +137,11 @@ def add_AgentsServicer_to_server(servicer, server):
                     servicer.ListAgentChatMessages,
                     request_deserializer=private_dot_agents__pb2.ListAgentChatMessagesRequest.FromString,
                     response_serializer=private_dot_agents__pb2.ListAgentChatMessagesResponse.SerializeToString,
+            ),
+            'DeleteAgentChat': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteAgentChat,
+                    request_deserializer=private_dot_agents__pb2.DeleteAgentChatRequest.FromString,
+                    response_serializer=private_dot_agents__pb2.DeleteAgentChatResponse.SerializeToString,
             ),
             'DescribeOrganizationAgentUsage': grpc.unary_unary_rpc_method_handler(
                     servicer.DescribeOrganizationAgentUsage,
@@ -246,6 +262,33 @@ class Agents(object):
             '/Superplane.Internal.Agents.Agents/ListAgentChatMessages',
             private_dot_agents__pb2.ListAgentChatMessagesRequest.SerializeToString,
             private_dot_agents__pb2.ListAgentChatMessagesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteAgentChat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/Superplane.Internal.Agents.Agents/DeleteAgentChat',
+            private_dot_agents__pb2.DeleteAgentChatRequest.SerializeToString,
+            private_dot_agents__pb2.DeleteAgentChatResponse.FromString,
             options,
             channel_credentials,
             insecure,
