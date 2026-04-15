@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
 )
 
 type CanvasPatcher struct {
+	tx       *gorm.DB
+	orgID    uuid.UUID
 	registry *registry.Registry
 
 	originalVersion *models.CanvasVersion
@@ -23,8 +27,10 @@ type CanvasPatcher struct {
 	edges map[string]models.Edge
 }
 
-func NewCanvasPatcher(registry *registry.Registry, canvas *models.CanvasVersion) *CanvasPatcher {
+func NewCanvasPatcher(tx *gorm.DB, orgID uuid.UUID, registry *registry.Registry, canvas *models.CanvasVersion) *CanvasPatcher {
 	p := &CanvasPatcher{
+		tx:              tx,
+		orgID:           orgID,
 		registry:        registry,
 		originalVersion: canvas,
 		nodes:           make(map[string]models.Node),
@@ -142,17 +148,26 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("node %s already exists", nodeID)
 	}
 
+	newNode := models.Node{
+		ID:   nodeID,
+		Name: node.GetName(),
+	}
+
 	nodeType, nodeRef, err := p.findBlock(node)
 	if err != nil {
 		return err
 	}
 
-	schema, err := p.findConfigurationSchemaForNode(nodeType, *nodeRef)
+	newNode.Type = nodeType
+	newNode.Ref = *nodeRef
+
+	integrationID, err := p.validateIntegration(node)
 	if err != nil {
 		return err
 	}
 
-	err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
+	newNode.IntegrationID = integrationID
+	schema, err := p.findConfigurationSchemaForNode(nodeType, *nodeRef)
 	if err != nil {
 		return err
 	}
@@ -162,15 +177,38 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		nodeConfiguration = node.GetConfiguration().AsMap()
 	}
 
-	p.nodes[nodeID] = models.Node{
-		ID:            nodeID,
-		Name:          node.GetName(),
-		Type:          nodeType,
-		Ref:           *nodeRef,
-		Configuration: nodeConfiguration,
+	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
+	if err != nil {
+		return err
 	}
 
+	newNode.Configuration = nodeConfiguration
+	p.nodes[nodeID] = newNode
+
 	return nil
+}
+
+func (p *CanvasPatcher) validateIntegration(node *pb.CanvasChangeset_Change_Node) (*string, error) {
+	if p.registry.IsCoreBlock(node.GetBlock()) {
+		return nil, nil
+	}
+
+	if node.GetIntegrationId() == "" {
+		return nil, fmt.Errorf("integration is required for %s", node.GetBlock())
+	}
+
+	integration := node.GetIntegrationId()
+	integrationID, err := uuid.Parse(integration)
+	if err != nil {
+		return nil, fmt.Errorf("invalid integration id: %v", err)
+	}
+
+	_, err = models.FindIntegrationInTransaction(p.tx, p.orgID, integrationID)
+	if err != nil {
+		return nil, fmt.Errorf("integration %s not found", node.GetIntegrationId())
+	}
+
+	return &integration, nil
 }
 
 func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
