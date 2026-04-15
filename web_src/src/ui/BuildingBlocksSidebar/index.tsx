@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { CanvasOperation } from "@/lib/ai";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
+import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
@@ -51,7 +51,6 @@ export interface BuildingBlocksSidebarProps {
   disabled?: boolean;
   disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
-  onAddNote?: () => void;
 }
 
 export function BuildingBlocksSidebar({
@@ -67,19 +66,11 @@ export function BuildingBlocksSidebar({
   disabled = false,
   disabledMessage,
   onBlockClick,
-  onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
 
   if (!isOpen) {
-    return (
-      <ClosedBuildingBlocksSidebar
-        disabled={disabled}
-        disabledTooltip={disabledTooltip}
-        onAddNote={onAddNote}
-        onToggle={onToggle}
-      />
-    );
+    return null;
   }
 
   return (
@@ -96,76 +87,6 @@ export function BuildingBlocksSidebar({
       disabledTooltip={disabledTooltip}
       onBlockClick={onBlockClick}
     />
-  );
-}
-
-interface ClosedBuildingBlocksSidebarProps {
-  disabled: boolean;
-  disabledTooltip: string;
-  onAddNote?: () => void;
-  onToggle: (open: boolean) => void;
-}
-
-function ClosedBuildingBlocksSidebar({
-  disabled,
-  disabledTooltip,
-  onAddNote,
-  onToggle,
-}: ClosedBuildingBlocksSidebarProps) {
-  const addNoteButton = (
-    <Button
-      variant="outline"
-      onClick={() => {
-        if (disabled) return;
-        onAddNote?.();
-      }}
-      aria-label="Add Note"
-      data-testid="add-note-button"
-      disabled={disabled}
-    >
-      <StickyNote size={16} />
-      Add Note
-    </Button>
-  );
-  const openSidebarButton = (
-    <Button
-      variant="outline"
-      onClick={() => {
-        if (disabled) return;
-        onToggle(true);
-      }}
-      aria-label="Open sidebar"
-      data-testid="open-sidebar-button"
-      disabled={disabled}
-    >
-      <Plus size={16} />
-      Components
-    </Button>
-  );
-
-  return (
-    <div className="absolute top-4 right-4 z-10 flex gap-3">
-      {disabled ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
-          <TooltipContent side="left" sideOffset={10}>
-            <p>{disabledTooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        addNoteButton
-      )}
-      {disabled ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
-          <TooltipContent side="left" sideOffset={10}>
-            <p>{disabledTooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        openSidebarButton
-      )}
-    </div>
   );
 }
 

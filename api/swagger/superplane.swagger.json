@@ -4498,6 +4498,9 @@
         },
         "configuration": {
           "type": "object"
+        },
+        "integrationId": {
+          "type": "string"
         }
       }
     },

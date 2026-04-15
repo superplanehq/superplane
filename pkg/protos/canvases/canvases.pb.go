@@ -6128,6 +6128,7 @@ type CanvasChangeset_Change_Node struct {
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Block         string                 `protobuf:"bytes,3,opt,name=block,proto3" json:"block,omitempty"`
 	Configuration *_struct.Struct        `protobuf:"bytes,4,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	IntegrationId string                 `protobuf:"bytes,5,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6188,6 +6189,13 @@ func (x *CanvasChangeset_Change_Node) GetConfiguration() *_struct.Struct {
 		return x.Configuration
 	}
 	return nil
+}
+
+func (x *CanvasChangeset_Change_Node) GetIntegrationId() string {
+	if x != nil {
+		return x.IntegrationId
+	}
+	return ""
 }
 
 type CanvasChangeset_Change_Edge struct {
@@ -6691,18 +6699,19 @@ const file_canvases_proto_rawDesc = "" +
 	"\x1dResolveExecutionErrorsRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12#\n" +
 	"\rexecution_ids\x18\x02 \x03(\tR\fexecutionIds\" \n" +
-	"\x1eResolveExecutionErrorsResponse\"\xfa\x04\n" +
+	"\x1eResolveExecutionErrorsResponse\"\xa2\x05\n" +
 	"\x0fCanvasChangeset\x12E\n" +
-	"\achanges\x18\x01 \x03(\v2+.Superplane.Canvases.CanvasChangeset.ChangeR\achanges\x1a\x9f\x04\n" +
+	"\achanges\x18\x01 \x03(\v2+.Superplane.Canvases.CanvasChangeset.ChangeR\achanges\x1a\xc7\x04\n" +
 	"\x06Change\x12D\n" +
 	"\x04type\x18\x01 \x01(\x0e20.Superplane.Canvases.CanvasChangeset.Change.TypeR\x04type\x12D\n" +
 	"\x04node\x18\x02 \x01(\v20.Superplane.Canvases.CanvasChangeset.Change.NodeR\x04node\x12D\n" +
-	"\x04edge\x18\x03 \x01(\v20.Superplane.Canvases.CanvasChangeset.Change.EdgeR\x04edge\x1a\x7f\n" +
+	"\x04edge\x18\x03 \x01(\v20.Superplane.Canvases.CanvasChangeset.Change.EdgeR\x04edge\x1a\xa6\x01\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05block\x18\x03 \x01(\tR\x05block\x12=\n" +
-	"\rconfiguration\x18\x04 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1aZ\n" +
+	"\rconfiguration\x18\x04 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x12%\n" +
+	"\x0eintegration_id\x18\x05 \x01(\tR\rintegrationId\x1aZ\n" +
 	"\x04Edge\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x18\n" +

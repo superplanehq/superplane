@@ -82,6 +82,7 @@ import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
+import { RightSideControls } from "./RightSideControls";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 
@@ -1228,9 +1229,16 @@ function CanvasPage(props: CanvasPageProps) {
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
-          {props.hideAddControls ? null : (
+
+          <RightSideControls
+            readOnly={readOnly}
+            onSidebarOpen={() => handleSidebarToggle(true)}
+            onAddNote={handleAddNote}
+          />
+
+          {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
             <BuildingBlocksSidebar
-              isOpen={isBuildingBlocksSidebarOpen}
+              isOpen
               onToggle={handleSidebarToggle}
               blocks={props.buildingBlocks || []}
               agentContext={props.agentContext}
@@ -1243,7 +1251,6 @@ function CanvasPage(props: CanvasPageProps) {
               disabled={readOnly}
               disabledMessage="You don't have permission to edit this canvas."
               onBlockClick={handleBuildingBlockClick}
-              onAddNote={handleAddNote}
             />
           )}
 
