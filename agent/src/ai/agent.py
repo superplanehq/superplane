@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.test import TestModel
 
@@ -15,6 +15,8 @@ from ai.agent_deps import (
     _put_cached_catalog_list,
 )
 from ai.models import CanvasAnswer, CanvasQuestionRequest
+from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
+from ai.proposal_configuration_validate import validate_proposal_operations
 from ai.skills import skill_index_markdown
 from ai.tools import default_tools
 
@@ -67,9 +69,30 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         ctx: RunContext[AgentDeps],
         answer: CanvasAnswer,
     ) -> CanvasAnswer:
-        # Placeholder for proposal validation.
-        #   raise ModelRetry("... explain why the proposal is invalid and what to do about it.")
+        if answer.proposal is None or not answer.proposal.operations:
+            return answer
 
-        return answer
+        cache_key = f"{ctx.deps.canvas_id}:{ctx.deps.canvas_version_id or 'inspect'}"
+        canvas = ctx.deps.canvas_cache.get(cache_key)
+        schema_cache: dict[str, list[dict[str, Any]] | None] = {}
+        coerced = coerce_canvas_answer_proposal(
+            ctx.deps.client,
+            answer,
+            canvas,
+            schema_cache=schema_cache,
+        )
+
+        errors = validate_proposal_operations(
+            ctx.deps.client,
+            list(coerced.proposal.operations),  # type: ignore[union-attr]
+            canvas,
+            schema_cache=schema_cache,
+        )
+        if errors:
+            raise ModelRetry(
+                "The proposal has invalid node configuration. "
+                "Fix these errors and try again:\n" + "\n".join(f"- {e}" for e in errors)
+            )
+        return coerced
 
     return agent

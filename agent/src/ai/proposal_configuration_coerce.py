@@ -250,11 +250,13 @@ def coerce_canvas_answer_proposal(
     client: SuperplaneClient,
     answer: CanvasAnswer,
     canvas: CanvasSummary | None = None,
+    schema_cache: dict[str, list[dict[str, Any]] | None] | None = None,
 ) -> CanvasAnswer:
     if answer.proposal is None or not answer.proposal.operations:
         return answer
 
-    schema_cache: dict[str, list[dict[str, Any]] | None] = {}
+    if schema_cache is None:
+        schema_cache = {}
     new_operations = _coerce_operations(
         client,
         list(answer.proposal.operations),
