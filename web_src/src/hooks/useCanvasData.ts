@@ -16,6 +16,7 @@ import {
   canvasesDescribeCanvasChangeRequest,
   canvasesDeleteCanvas,
   canvasesDeleteCanvasVersion,
+  canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
   canvasesListCanvasMemories,
@@ -387,9 +388,9 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     mutationFn: async (data: {
       name?: string;
       description?: string;
-      versioningEnabled?: boolean;
-      changeRequestApprovalConfig?: {
-        items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
+      changeManagement?: {
+        enabled?: boolean;
+        approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
       };
     }) => {
       return await canvasesUpdateCanvas(
@@ -398,8 +399,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           body: {
             name: data.name,
             description: data.description,
-            versioningEnabled: data.versioningEnabled,
-            changeRequestApprovalConfig: data.changeRequestApprovalConfig,
+            changeManagement: data.changeManagement,
           },
         }),
       );
@@ -418,6 +418,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           }
 
           const updatedMetadata = updatedCanvas.metadata;
+          const updatedSpec = updatedCanvas.spec;
 
           return {
             ...current,
@@ -425,14 +426,11 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               ...current.metadata,
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
-              versioningEnabled:
-                updatedMetadata?.versioningEnabled ??
-                variables.versioningEnabled ??
-                current.metadata?.versioningEnabled,
-              changeRequestApprovalConfig:
-                updatedMetadata?.changeRequestApprovalConfig ??
-                variables.changeRequestApprovalConfig ??
-                current.metadata?.changeRequestApprovalConfig,
+            },
+            spec: {
+              ...current.spec,
+              changeManagement:
+                updatedSpec?.changeManagement ?? variables.changeManagement ?? current.spec?.changeManagement,
             },
           };
         });
@@ -469,6 +467,26 @@ export const useDeleteCanvasVersion = (organizationId: string, canvasId: string)
       return await canvasesDeleteCanvasVersion(
         withOrganizationHeader({
           path: { canvasId, versionId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    },
+  });
+};
+
+export const usePublishCanvasVersion = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (versionId: string) => {
+      return await canvasesPublishCanvasVersion(
+        withOrganizationHeader({
+          path: { canvasId, versionId },
+          body: {},
         }),
       );
     },

@@ -18,9 +18,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_change_request_approval_config import CanvasesCanvasChangeRequestApprovalConfig
+from superplaneapi.models.canvas_change_management import CanvasChangeManagement
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -30,9 +30,8 @@ class CanvasesUpdateCanvasBody(BaseModel):
     """ # noqa: E501
     name: Optional[StrictStr] = None
     description: Optional[StrictStr] = None
-    versioning_enabled: Optional[StrictBool] = Field(default=None, alias="versioningEnabled")
-    change_request_approval_config: Optional[CanvasesCanvasChangeRequestApprovalConfig] = Field(default=None, alias="changeRequestApprovalConfig")
-    __properties: ClassVar[List[str]] = ["name", "description", "versioningEnabled", "changeRequestApprovalConfig"]
+    change_management: Optional[CanvasChangeManagement] = Field(default=None, alias="changeManagement")
+    __properties: ClassVar[List[str]] = ["name", "description", "changeManagement"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -73,9 +72,9 @@ class CanvasesUpdateCanvasBody(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of change_request_approval_config
-        if self.change_request_approval_config:
-            _dict['changeRequestApprovalConfig'] = self.change_request_approval_config.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of change_management
+        if self.change_management:
+            _dict['changeManagement'] = self.change_management.to_dict()
         return _dict
 
     @classmethod
@@ -90,8 +89,7 @@ class CanvasesUpdateCanvasBody(BaseModel):
         _obj = cls.model_validate({
             "name": obj.get("name"),
             "description": obj.get("description"),
-            "versioningEnabled": obj.get("versioningEnabled"),
-            "changeRequestApprovalConfig": CanvasesCanvasChangeRequestApprovalConfig.from_dict(obj["changeRequestApprovalConfig"]) if obj.get("changeRequestApprovalConfig") is not None else None
+            "changeManagement": CanvasChangeManagement.from_dict(obj["changeManagement"]) if obj.get("changeManagement") is not None else None
         })
         return _obj
 

@@ -170,7 +170,7 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
+  headerMode?: "default" | "version-live" | "version-edit";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -179,6 +179,7 @@ export interface CanvasPageProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
+  publishVersionLabel?: string;
   unpublishedDraftChangeCount?: number;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
@@ -1173,6 +1174,7 @@ function CanvasPage(props: CanvasPageProps) {
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+          publishVersionLabel={props.publishVersionLabel}
           unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
@@ -1712,6 +1714,7 @@ function CanvasContentHeader({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  publishVersionLabel,
   unpublishedDraftChangeCount,
   topViewMode,
   onTopViewModeChange,
@@ -1734,10 +1737,11 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
+  headerMode?: "default" | "version-live" | "version-edit";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
+  publishVersionLabel?: string;
   unpublishedDraftChangeCount?: number;
   topViewMode?: "canvas" | "yaml" | "cli" | "memory";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory") => void;
@@ -1794,6 +1798,7 @@ function CanvasContentHeader({
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+      publishVersionLabel={publishVersionLabel}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}

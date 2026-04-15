@@ -41,8 +41,11 @@ func (s *WebhookResetSteps) start() {
 func (s *WebhookResetSteps) givenACanvasWithWebhook(canvasName, nodeName string) {
 	s.canvas = shared.NewCanvasSteps(canvasName, s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 	s.addWebhookTrigger(nodeName, models.Position{X: 500, Y: 200})
 	s.canvas.Save()
+	s.canvas.Publish()
+	s.session.Sleep(1000)
 }
 
 func (s *WebhookResetSteps) addWebhookTrigger(name string, pos models.Position) {
