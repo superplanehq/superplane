@@ -298,7 +298,7 @@ export type CanvasesCanvasMetadata = {
   updatedAt?: string;
   createdBy?: SuperplaneCanvasesUserRef;
   isTemplate?: boolean;
-  versioningEnabled?: boolean;
+  changeManagementEnabled?: boolean;
   changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
@@ -567,7 +567,7 @@ export type CanvasesResolveExecutionErrorsResponse = {
 export type CanvasesUpdateCanvasBody = {
   name?: string;
   description?: string;
-  versioningEnabled?: boolean;
+  changeManagementEnabled?: boolean;
   changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
@@ -1053,7 +1053,7 @@ export type OrganizationsOrganizationMetadata = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
-  versioningEnabled?: boolean;
+  changeManagementEnabled?: boolean;
 };
 
 export type OrganizationsOrganizationUsage = {

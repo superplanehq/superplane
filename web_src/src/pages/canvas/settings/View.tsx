@@ -5,12 +5,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { normalizeApprovers, validateApproverConfig } from "./approverUtils";
 import { IdentityFields } from "./IdentityFields";
 import type { ChangeRequestApproverType, SettingsApprover, SettingsViewProps } from "./types";
-import { VersioningFieldset } from "./VersioningFieldset";
+import { ChangeManagementFieldset } from "./ChangeManagementFieldset";
+import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 export function SettingsView({
   initialValues,
   canUpdateCanvas,
-  orgVersioningEnabled,
+  orgChangeManagementEnabled,
   isSaving,
   availableUsers,
   availableRoles,
@@ -19,21 +20,21 @@ export function SettingsView({
 }: SettingsViewProps) {
   const [name, setName] = useState(initialValues.name);
   const [description, setDescription] = useState(initialValues.description);
-  const [versioningEnabled, setVersioningEnabled] = useState(initialValues.versioningEnabled);
+  const [changeManagementEnabled, setChangeManagementEnabled] = useState(initialValues.changeManagementEnabled);
   const [approvers, setApprovers] = useState<SettingsApprover[]>(
     normalizeApprovers(initialValues.changeRequestApprovalConfig?.items),
   );
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const isVersioningEnforcedByOrganization = orgVersioningEnabled === true;
-  const effectiveCanvasVersioningEnabled = isVersioningEnforcedByOrganization ? true : versioningEnabled;
-  const isVersioningToggleDisabled = !canUpdateCanvas || isVersioningEnforcedByOrganization;
+  const isChangeManagementEnforcedByOrganization = orgChangeManagementEnabled === true;
+  const effectiveChangeManagementEnabled = isChangeManagementEnforcedByOrganization ? true : changeManagementEnabled;
+  const isChangeManagementToggleDisabled = !canUpdateCanvas || isChangeManagementEnforcedByOrganization;
 
   useEffect(() => {
     setName(initialValues.name);
     setDescription(initialValues.description);
-    setVersioningEnabled(isVersioningEnforcedByOrganization ? true : initialValues.versioningEnabled);
+    setChangeManagementEnabled(isChangeManagementEnforcedByOrganization ? true : initialValues.changeManagementEnabled);
     setApprovers(normalizeApprovers(initialValues.changeRequestApprovalConfig?.items));
-  }, [initialValues, isVersioningEnforcedByOrganization]);
+  }, [initialValues, isChangeManagementEnforcedByOrganization]);
 
   const normalizedInitialApprovers = useMemo(
     () => normalizeApprovers(initialValues.changeRequestApprovalConfig?.items),
@@ -44,27 +45,26 @@ export function SettingsView({
     return (
       name !== initialValues.name ||
       description !== initialValues.description ||
-      effectiveCanvasVersioningEnabled !== initialValues.versioningEnabled ||
+      effectiveChangeManagementEnabled !== initialValues.changeManagementEnabled ||
       JSON.stringify(approvers) !== JSON.stringify(normalizedInitialApprovers)
     );
   }, [
     description,
-    initialValues.versioningEnabled,
+    effectiveChangeManagementEnabled,
+    initialValues.changeManagementEnabled,
     initialValues.description,
     initialValues.name,
-    isVersioningEnforcedByOrganization,
     name,
     approvers,
     normalizedInitialApprovers,
-    versioningEnabled,
   ]);
 
   const approverValidation = useMemo(() => {
-    if (!effectiveCanvasVersioningEnabled) {
+    if (!effectiveChangeManagementEnabled) {
       return { formErrors: [], itemErrors: [] };
     }
     return validateApproverConfig(approvers, availableUsers, availableRoles);
-  }, [approvers, availableRoles, availableUsers, effectiveCanvasVersioningEnabled]);
+  }, [approvers, availableRoles, availableUsers, effectiveChangeManagementEnabled]);
 
   const hasApproverValidationErrors = useMemo(
     () =>
@@ -89,8 +89,8 @@ export function SettingsView({
       await onSave({
         name,
         description,
-        versioningEnabled: isVersioningEnforcedByOrganization ? undefined : versioningEnabled,
-        changeRequestApprovalConfig: effectiveCanvasVersioningEnabled
+        changeManagementEnabled: isChangeManagementEnforcedByOrganization ? undefined : changeManagementEnabled,
+        changeRequestApprovalConfig: effectiveChangeManagementEnabled
           ? {
               items: normalizeApprovers(approvers),
             }
@@ -108,12 +108,12 @@ export function SettingsView({
     approvers,
     canUpdateCanvas,
     description,
-    effectiveCanvasVersioningEnabled,
+    effectiveChangeManagementEnabled,
     hasApproverValidationErrors,
-    isVersioningEnforcedByOrganization,
+    isChangeManagementEnforcedByOrganization,
     name,
     onSave,
-    versioningEnabled,
+    changeManagementEnabled,
   ]);
 
   const addApprover = useCallback(() => {
@@ -180,24 +180,26 @@ export function SettingsView({
           onDescriptionChange={setDescription}
           canUpdateCanvas={canUpdateCanvas}
         />
-        <VersioningFieldset
-          isVersioningEnforcedByOrganization={isVersioningEnforcedByOrganization}
-          versioningEnabled={versioningEnabled}
-          onVersioningEnabledChange={setVersioningEnabled}
-          isVersioningToggleDisabled={isVersioningToggleDisabled}
-          effectiveCanvasVersioningEnabled={effectiveCanvasVersioningEnabled}
-          approvers={approvers}
-          canUpdateCanvas={canUpdateCanvas}
-          availableUsers={availableUsers}
-          availableRoles={availableRoles}
-          approverValidation={approverValidation}
-          hasEveryoneApprover={hasEveryoneApprover}
-          onApproverTypeChange={updateApproverType}
-          onApproverUserChange={updateApproverUser}
-          onApproverRoleChange={updateApproverRole}
-          onRemoveApprover={removeApprover}
-          onAddApprover={addApprover}
-        />
+        {isChangeManagementSettingsEnabled() ? (
+          <ChangeManagementFieldset
+            isChangeManagementEnforcedByOrganization={isChangeManagementEnforcedByOrganization}
+            changeManagementEnabled={changeManagementEnabled}
+            onChangeManagementEnabledChange={setChangeManagementEnabled}
+            isChangeManagementToggleDisabled={isChangeManagementToggleDisabled}
+            effectiveChangeManagementEnabled={effectiveChangeManagementEnabled}
+            approvers={approvers}
+            canUpdateCanvas={canUpdateCanvas}
+            availableUsers={availableUsers}
+            availableRoles={availableRoles}
+            approverValidation={approverValidation}
+            hasEveryoneApprover={hasEveryoneApprover}
+            onApproverTypeChange={updateApproverType}
+            onApproverUserChange={updateApproverUser}
+            onApproverRoleChange={updateApproverRole}
+            onRemoveApprover={removeApprover}
+            onAddApprover={addApprover}
+          />
+        ) : null}
         <div className="flex items-center gap-4">
           <LoadingButton
             type="button"

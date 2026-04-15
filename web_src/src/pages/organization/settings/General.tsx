@@ -28,6 +28,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Switch } from "@/ui/switch";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/lib/errors";
+import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -38,7 +39,7 @@ export function General({ organization }: GeneralProps) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   usePageTitle(["Settings"]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [versioningMessage, setVersioningMessage] = useState<string | null>(null);
+  const [changeManagementMessage, setChangeManagementMessage] = useState<string | null>(null);
   const [name, setName] = useState(organization.metadata?.name || "");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -46,7 +47,9 @@ export function General({ organization }: GeneralProps) {
   const [agentApiKey, setAgentApiKey] = useState("");
   const [agentApiKeyError, setAgentApiKeyError] = useState<string | null>(null);
   const [showAgentConfigureModal, setShowAgentConfigureModal] = useState(false);
-  const [versioningEnabled, setVersioningEnabled] = useState(organization.metadata?.versioningEnabled ?? false);
+  const [changeManagementEnabled, setChangeManagementEnabled] = useState(
+    organization.metadata?.changeManagementEnabled ?? false,
+  );
 
   // Use React Query mutation hook
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
@@ -59,8 +62,8 @@ export function General({ organization }: GeneralProps) {
   const canDeleteOrg = canAct("org", "delete");
 
   useEffect(() => {
-    setVersioningEnabled(organization.metadata?.versioningEnabled ?? false);
-  }, [organization.metadata?.versioningEnabled]);
+    setChangeManagementEnabled(organization.metadata?.changeManagementEnabled ?? false);
+  }, [organization.metadata?.changeManagementEnabled]);
 
   const agentModeEnabled = agentSettings?.agentModeEnabled ?? false;
   const openAIKey = agentSettings?.openaiKey;
@@ -170,25 +173,25 @@ export function General({ organization }: GeneralProps) {
     }
   };
 
-  const handleCanvasVersioningToggle = async (enabled: boolean) => {
+  const handleChangeManagementToggle = async (enabled: boolean) => {
     if (!canUpdateOrg || !organizationId) {
       return;
     }
 
-    const previous = versioningEnabled;
-    setVersioningEnabled(enabled);
-    setVersioningMessage(null);
+    const previous = changeManagementEnabled;
+    setChangeManagementEnabled(enabled);
+    setChangeManagementMessage(null);
 
     try {
       await updateOrganizationMutation.mutateAsync({
-        versioningEnabled: enabled,
+        changeManagementEnabled: enabled,
       });
-      setVersioningMessage(`Canvas versioning ${enabled ? "enabled" : "disabled"}`);
-      setTimeout(() => setVersioningMessage(null), 3000);
+      setChangeManagementMessage(`Change management ${enabled ? "enabled" : "disabled"}`);
+      setTimeout(() => setChangeManagementMessage(null), 3000);
     } catch {
-      setVersioningEnabled(previous);
-      setVersioningMessage("Failed to update canvas versioning");
-      setTimeout(() => setVersioningMessage(null), 3000);
+      setChangeManagementEnabled(previous);
+      setChangeManagementMessage("Failed to update change management");
+      setTimeout(() => setChangeManagementMessage(null), 3000);
     }
   };
 
@@ -358,49 +361,54 @@ export function General({ organization }: GeneralProps) {
         </Fieldset>
       </PermissionTooltip>
 
-      <PermissionTooltip
-        allowed={canUpdateOrg || permissionsLoading}
-        message="You don't have permission to update this organization."
-        className="w-full"
-      >
-        <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <Label
-                htmlFor="organization-canvas-versioning-switch"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+      {isChangeManagementSettingsEnabled() ? (
+        <PermissionTooltip
+          allowed={canUpdateOrg || permissionsLoading}
+          message="You don't have permission to update this organization."
+          className="w-full"
+        >
+          <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <Label
+                  htmlFor="organization-change-management-switch"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  Change Management
+                </Label>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Require change requests with approvals before publishing canvas changes. When enabled at the
+                  organization level, change management is enforced for every canvas and cannot be turned off per
+                  canvas.
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  When disabled here, each canvas can choose its own change management setting. New canvases inherit
+                  this organization setting by default.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {changeManagementEnabled ? "Enabled" : "Disabled"}
+                </span>
+                <Switch
+                  id="organization-change-management-switch"
+                  checked={changeManagementEnabled}
+                  onCheckedChange={handleChangeManagementToggle}
+                  disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
+                  aria-label="Toggle change management"
+                />
+              </div>
+            </div>
+            {changeManagementMessage ? (
+              <p
+                className={`mt-3 text-sm ${changeManagementMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}
               >
-                Canvas Versioning
-              </Label>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Manage canvas edits with drafts and publish flow. When enabled at the organization level, versioning is
-                enforced for every canvas and cannot be turned off per canvas.
+                {changeManagementMessage}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                When disabled here, each canvas can choose its own versioning setting. New canvases inherit this
-                organization setting by default.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {versioningEnabled ? "Enabled" : "Disabled"}
-              </span>
-              <Switch
-                id="organization-canvas-versioning-switch"
-                checked={versioningEnabled}
-                onCheckedChange={handleCanvasVersioningToggle}
-                disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
-                aria-label="Toggle canvas versioning"
-              />
-            </div>
-          </div>
-          {versioningMessage ? (
-            <p className={`mt-3 text-sm ${versioningMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
-              {versioningMessage}
-            </p>
-          ) : null}
-        </Fieldset>
-      </PermissionTooltip>
+            ) : null}
+          </Fieldset>
+        </PermissionTooltip>
+      ) : null}
 
       <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
         {!showDeleteForm ? (

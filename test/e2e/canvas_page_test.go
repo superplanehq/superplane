@@ -107,7 +107,12 @@ func TestCanvasPage(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addTwoNodesAndConnect()
+		steps.saveCanvas()
+		steps.publishCanvas()
+		steps.enterEditMode()
 		steps.deleteConnectionBetweenNodes("First", "Second")
+		steps.canvas.WaitForCanvasSaveStatusSaved()
+		steps.publishCanvas()
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
 
@@ -161,6 +166,7 @@ func (s *CanvasPageSteps) start() {
 func (s *CanvasPageSteps) givenACanvasExists() {
 	s.canvas = shared.NewCanvasSteps("E2E Canvas", s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 }
 
 func (s *CanvasPageSteps) addNoop(name string) {
@@ -193,6 +199,14 @@ func (s *CanvasPageSteps) saveCanvas() {
 	s.canvas.Save()
 }
 
+func (s *CanvasPageSteps) publishCanvas() {
+	s.canvas.Publish()
+}
+
+func (s *CanvasPageSteps) enterEditMode() {
+	s.canvas.EnterEditMode()
+}
+
 func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
 	s.canvas.DeleteConnection(sourceName, targetName)
 }
@@ -220,6 +234,7 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 
 	s.canvas.Create()
 	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 	s.canvas.AddNoop("DeleteMe", models.Position{X: 500, Y: 200})
 }
 
@@ -273,11 +288,13 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas = shared.NewCanvasSteps("E2E Canvas With Queue", s.t, s.session)
 
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
 	s.session.TakeScreenshot()
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()
+	s.canvas.Publish()
 
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-start-header"]) [data-testid="start-template-run"]`)
 	emitEvent := q.Locator("button:has-text('Emit Event')")
@@ -423,7 +440,7 @@ func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
 }
 
 func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 
 	for {
 		workflow := s.canvas.GetWorkflowFromDB()

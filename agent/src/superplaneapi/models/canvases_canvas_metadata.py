@@ -38,9 +38,9 @@ class CanvasesCanvasMetadata(BaseModel):
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
     created_by: Optional[SuperplaneCanvasesUserRef] = Field(default=None, alias="createdBy")
     is_template: Optional[StrictBool] = Field(default=None, alias="isTemplate")
-    versioning_enabled: Optional[StrictBool] = Field(default=None, alias="versioningEnabled")
+    change_management_enabled: Optional[StrictBool] = Field(default=None, alias="changeManagementEnabled")
     change_request_approval_config: Optional[CanvasesCanvasChangeRequestApprovalConfig] = Field(default=None, alias="changeRequestApprovalConfig")
-    __properties: ClassVar[List[str]] = ["id", "organizationId", "name", "description", "createdAt", "updatedAt", "createdBy", "isTemplate", "versioningEnabled", "changeRequestApprovalConfig"]
+    __properties: ClassVar[List[str]] = ["id", "organizationId", "name", "description", "createdAt", "updatedAt", "createdBy", "isTemplate", "changeManagementEnabled", "changeRequestApprovalConfig"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -107,7 +107,7 @@ class CanvasesCanvasMetadata(BaseModel):
             "updatedAt": obj.get("updatedAt"),
             "createdBy": SuperplaneCanvasesUserRef.from_dict(obj["createdBy"]) if obj.get("createdBy") is not None else None,
             "isTemplate": obj.get("isTemplate"),
-            "versioningEnabled": obj.get("versioningEnabled"),
+            "changeManagementEnabled": obj.get("changeManagementEnabled"),
             "changeRequestApprovalConfig": CanvasesCanvasChangeRequestApprovalConfig.from_dict(obj["changeRequestApprovalConfig"]) if obj.get("changeRequestApprovalConfig") is not None else None
         })
         return _obj
