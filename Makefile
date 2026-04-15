@@ -330,6 +330,7 @@ openapi.spec.gen:
 openapi.client.gen:
 	rm -rf pkg/openapi_client
 	docker run --rm \
+		--user $$(id -u):$$(id -g) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
@@ -353,6 +354,7 @@ openapi.web.client.gen:
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi
 	docker run --rm \
+		--user $$(id -u):$$(id -g) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g python \
