@@ -19,7 +19,7 @@ func TestCanvasAutoSave(t *testing.T) {
 	t.Run("versioned canvas auto-saves after moving a node", func(t *testing.T) {
 		steps := &canvasAutoSaveSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithVersioningEnabled("E2E Auto Save Versioning")
+		steps.givenCanvasWithChangeManagementEnabled("E2E Auto Save Versioning")
 		steps.enterEditMode()
 		steps.addNoopNode("Auto Save Node", models.Position{X: 500, Y: 220})
 		steps.waitForSaved()
@@ -31,7 +31,7 @@ func TestCanvasAutoSave(t *testing.T) {
 	t.Run("versioned canvas keeps the latest position after two quick moves", func(t *testing.T) {
 		steps := &canvasAutoSaveSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithVersioningEnabled("E2E Auto Save Queue")
+		steps.givenCanvasWithChangeManagementEnabled("E2E Auto Save Queue")
 		steps.enterEditMode()
 		steps.addNoopNode("Queued Move Node", models.Position{X: 500, Y: 220})
 		steps.waitForSaved()
@@ -56,7 +56,7 @@ func TestCanvasAutoSave(t *testing.T) {
 	t.Run("versioned canvas auto-saves note edits on blur", func(t *testing.T) {
 		steps := &canvasAutoSaveSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithVersioningEnabled("E2E Note Auto Save")
+		steps.givenCanvasWithChangeManagementEnabled("E2E Note Auto Save")
 		steps.enterEditMode()
 		steps.addNote()
 
@@ -88,11 +88,11 @@ func (s *canvasAutoSaveSteps) start() {
 	s.session.Login()
 }
 
-func (s *canvasAutoSaveSteps) givenCanvasWithVersioningEnabled(name string) {
+func (s *canvasAutoSaveSteps) givenCanvasWithChangeManagementEnabled(name string) {
 	err := database.Conn().
 		Model(&models.Organization{}).
 		Where("id = ?", s.session.OrgID).
-		Update("versioning_enabled", true).
+		Update("change_management_enabled", true).
 		Error
 	require.NoError(s.t, err)
 

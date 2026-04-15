@@ -16,10 +16,10 @@ import (
 )
 
 func TestCanvasChangeRequests(t *testing.T) {
-	t.Run("organization versioning enabled allows proposing and opening a change request", func(t *testing.T) {
+	t.Run("organization change management enabled allows proposing and opening a change request", func(t *testing.T) {
 		steps := &canvasChangeRequestSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithOrganizationVersioningEnabled("E2E CR Open")
+		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Open")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop A", models.Position{X: 500, Y: 220})
 		steps.waitForProposeChangeReady()
@@ -32,7 +32,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 	t.Run("approving and publishing an existing change request", func(t *testing.T) {
 		steps := &canvasChangeRequestSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithOrganizationVersioningEnabled("E2E CR Publish")
+		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Publish")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Publish", models.Position{X: 500, Y: 220})
 		steps.waitForProposeChangeReady()
@@ -47,7 +47,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 	t.Run("rejecting and reopening an existing change request", func(t *testing.T) {
 		steps := &canvasChangeRequestSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithOrganizationVersioningEnabled("E2E CR Reject")
+		steps.givenCanvasWithOrganizationChangeManagementEnabled("E2E CR Reject")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Reject", models.Position{X: 500, Y: 220})
 		steps.waitForProposeChangeReady()
@@ -75,8 +75,8 @@ func (s *canvasChangeRequestSteps) start() {
 	s.session.Login()
 }
 
-func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationVersioningEnabled(name string) {
-	s.setOrganizationVersioningInDB(true)
+func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationChangeManagementEnabled(name string) {
+	s.setOrganizationChangeManagementInDB(true)
 
 	s.canvas = shared.NewCanvasSteps(name, s.t, s.session)
 	s.canvas.Create()
@@ -85,11 +85,11 @@ func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationVersioningEnabled(
 	s.session.AssertVisible(q.Locator(`header button:has-text("Edit")`))
 }
 
-func (s *canvasChangeRequestSteps) setOrganizationVersioningInDB(enabled bool) {
+func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled bool) {
 	err := database.Conn().
 		Model(&models.Organization{}).
 		Where("id = ?", s.session.OrgID).
-		Update("versioning_enabled", enabled).
+		Update("change_management_enabled", enabled).
 		Error
 	require.NoError(s.t, err)
 }

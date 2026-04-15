@@ -57,14 +57,6 @@ func PublishCanvasVersion(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", err)
-	}
-	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
-	}
-
 	publishedVersion, err := publishDraftVersionInTransaction(
 		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
