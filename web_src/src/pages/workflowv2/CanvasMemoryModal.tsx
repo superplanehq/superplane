@@ -17,18 +17,20 @@ export function CanvasMemoryModal(props: CanvasMemoryModalProps) {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent size="large" className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0">
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
             <span className="font-mono text-sm text-gray-600">Canvas Memory</span>
           </div>
 
-          <CanvasMemoryModalBody
-            entries={props.entries}
-            isLoading={props.isLoading}
-            errorMessage={props.errorMessage}
-            onDeleteEntry={props.onDeleteEntry}
-            deletingId={props.deletingId}
-          />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
+            <CanvasMemoryModalBody
+              entries={props.entries}
+              isLoading={props.isLoading}
+              errorMessage={props.errorMessage}
+              onDeleteEntry={props.onDeleteEntry}
+              deletingId={props.deletingId}
+            />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -54,13 +56,18 @@ function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry
   }, {});
 
   if (isLoading) {
-    return <div className="px-4 py-6 text-[13px] text-gray-500">Loading memory entries...</div>;
+    return (
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center px-4 py-12 text-[13px] text-gray-500">
+        Loading memory entries…
+      </div>
+    );
   }
 
   if (errorMessage) {
     return (
-      <div className="px-4 py-6 text-[13px] text-red-600">
-        Failed to load memory entries. <div className="mt-1 text-xs text-red-500">{errorMessage}</div>
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+        <p className="text-[13px] font-medium text-red-600">Failed to load memory entries.</p>
+        <p className="max-w-md text-xs text-red-500">{errorMessage}</p>
       </div>
     );
   }
@@ -70,7 +77,7 @@ function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry
   }
 
   return (
-    <div className="m-4">
+    <div className="m-4 min-h-0 w-full min-w-0 flex-1 overflow-auto">
       {Object.entries(groupedEntries).map(([namespace, values]) => (
         <div key={namespace} className="m-4 border border-slate-200 rounded-md">
           <div className="px-3 py-2 font-mono text-sm text-gray-600">Namespace: {namespace}</div>
@@ -83,7 +90,20 @@ function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry
 }
 
 function ZeroState() {
-  return <div className="px-4 py-6 text-[13px] text-gray-500">No memory entries added yet.</div>;
+  return (
+    <div
+      role="status"
+      className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center sm:px-10"
+    >
+      <p className="text-base font-medium text-gray-900">No canvas memory yet</p>
+      <p className="max-w-lg text-pretty text-sm leading-relaxed text-gray-500">
+        Use memory components on your canvas—for example <span className="font-medium text-gray-700">Add Memory</span>,{" "}
+        <span className="font-medium text-gray-700">Read Memory</span>, or{" "}
+        <span className="font-medium text-gray-700">Upsert Memory</span>. After a run writes to canvas memory, entries
+        will show up here.
+      </p>
+    </div>
+  );
 }
 
 function formatValue(value: unknown): string {
