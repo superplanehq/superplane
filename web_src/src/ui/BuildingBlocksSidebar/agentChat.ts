@@ -58,10 +58,10 @@ export function useAgentContext(isEditing: boolean, canvasVersion: string): Agen
     return { enabled: false, mode: "inspect" };
   }
 
-  if (!isEditing) {
+  if (isEditing) {
     const trimmed = canvasVersion.trim();
     // Build mode requires a draft version id for the agent API; otherwise fall back to inspect
-    // (live canvas) so we do not send enabled+build with an empty canvas_version (422).
+    // to avoid sending enabled+build with an empty canvas_version (422).
     if (trimmed) {
       return { enabled: true, mode: "build", canvasVersion: trimmed };
     }

@@ -1,6 +1,7 @@
 from typing import Any
 
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_describe_canvas_version_response import (
     CanvasesDescribeCanvasVersionResponse,
@@ -8,6 +9,12 @@ from superplaneapi.models.canvases_describe_canvas_version_response import (
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.canvases_list_node_executions_response import (
     CanvasesListNodeExecutionsResponse,
+)
+from superplaneapi.models.canvases_validate_canvas_version_changeset_body import (
+    CanvasesValidateCanvasVersionChangesetBody,
+)
+from superplaneapi.models.canvases_validate_canvas_version_changeset_response import (
+    CanvasesValidateCanvasVersionChangesetResponse,
 )
 from superplaneapi.models.components_list_components_response import (
     ComponentsListComponentsResponse,
@@ -37,6 +44,7 @@ class FakeCanvasApi:
 class FakeCanvasVersionApi:
     def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
         self._payloads = payloads
+        self.validate_calls: list[dict[str, Any]] = []
 
     def canvases_describe_canvas_version(
         self,
@@ -50,6 +58,31 @@ class FakeCanvasVersionApi:
         if payload is None:
             raise ValueError(f"Missing payload for canvas version: {canvas_id}/{version_id}")
         result = CanvasesDescribeCanvasVersionResponse.from_dict(payload)
+        assert result is not None
+        return result
+
+    def canvases_validate_canvas_version_changeset(
+        self,
+        canvas_id: str,
+        version_id: str,
+        body: CanvasesValidateCanvasVersionChangesetBody,
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> CanvasesValidateCanvasVersionChangesetResponse:
+        self.validate_calls.append(
+            {
+                "canvas_id": canvas_id,
+                "version_id": version_id,
+                "body": body,
+                "request_timeout": _request_timeout,
+            }
+        )
+        key = f"/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"
+        payload = self._payloads.get(key)
+        if payload is None:
+            raise ValueError(
+                f"Missing payload for canvas version changeset validation: {canvas_id}/{version_id}"
+            )
+        result = CanvasesValidateCanvasVersionChangesetResponse.from_dict(payload)
         assert result is not None
         return result
 
@@ -245,6 +278,55 @@ def test_describe_editing_canvas_prefers_version_nodes_and_live_metadata_name() 
     assert len(summary.nodes) == 1
     assert summary.nodes[0].id == "draft-only"
     assert summary.nodes[0].name == "Draft node"
+
+
+def test_validate_canvas_version_changeset_sends_expected_payload() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/canvases/canvas-1/versions/draft-ver/validate": {
+                "version": {
+                    "metadata": {"id": "draft-ver", "canvasId": "canvas-1"},
+                    "spec": {"nodes": [], "edges": []},
+                }
+            }
+        }
+    )
+    changeset = CanvasesCanvasChangeset.from_dict(
+        {
+            "changes": [
+                {
+                    "type": "ADD_NODE",
+                    "node": {
+                        "id": "node-1",
+                        "name": "Slack",
+                        "block": "slack.sendTextMessage",
+                    },
+                }
+            ]
+        }
+    )
+    assert changeset is not None
+
+    response = client.validate_canvas_version_changeset(
+        canvas_id="canvas-1",
+        canvas_version_id="draft-ver",
+        changeset=changeset,
+    )
+
+    assert response.version is not None
+    assert response.version.metadata is not None
+    assert response.version.metadata.id == "draft-ver"
+
+    canvas_version_api = client._canvas_version_api
+    assert isinstance(canvas_version_api, FakeCanvasVersionApi)
+    assert len(canvas_version_api.validate_calls) == 1
+    call = canvas_version_api.validate_calls[0]
+    assert call["canvas_id"] == "canvas-1"
+    assert call["version_id"] == "draft-ver"
+    body = call["body"]
+    assert isinstance(body, CanvasesValidateCanvasVersionChangesetBody)
+    assert body.changeset is not None
+    assert body.changeset.to_dict().get("changes", [])[0]["node"]["id"] == "node-1"
 
 
 def test_get_node_details_includes_recent_events() -> None:
