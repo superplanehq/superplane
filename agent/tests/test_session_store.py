@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -306,62 +307,55 @@ def test_load_agent_chat_message_history_skips_undeserializable_records(
 
 
 def test_delete_expired_chats_for_org_uses_batched_query(monkeypatch: pytest.MonkeyPatch) -> None:
-    store = _build_store()
-    mock_cursor = MagicMock()
-    mock_cursor.rowcount = 3
-    mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
-    mock_cursor.__exit__ = MagicMock(return_value=False)
+    store = _build_store(monkeypatch)
 
-    mock_conn = MagicMock()
-    mock_conn.closed = False
-    mock_conn.broken = False
-    mock_conn.cursor = MagicMock(return_value=mock_cursor)
+    mock_result = MagicMock()
+    mock_result.rowcount = 3
+    mock_session = MagicMock()
+    mock_session.execute.return_value = mock_result
 
-    monkeypatch.setattr(psycopg, "connect", lambda **kwargs: mock_conn)
+    @contextmanager
+    def fake_session() -> Iterator[MagicMock]:
+        yield mock_session
+
+    monkeypatch.setattr(store, "_session", fake_session)
 
     deleted = store.delete_expired_chats_for_org(org_id="org-1", retention_days=14, batch_size=500)
 
     assert deleted == 3
-    sql, params = mock_cursor.execute.call_args.args
+    mock_session.execute.assert_called_once()
+    stmt, params = mock_session.execute.call_args.args
+    sql = str(stmt)
     assert "DELETE FROM agent_chats" in sql
     assert "org_id" in sql
     assert "LIMIT" in sql
-    assert params == ("org-1", 14, 500, 14)
+    assert params == {
+        "org_id": "org-1",
+        "retention_days": 14,
+        "batch_size": 500,
+    }
 
 
 def test_delete_expired_chats_for_org_loops_until_batch_underflows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = _build_store()
-    batch_rowcounts = iter([500, 500, 200])
-    mock_cursor = MagicMock()
-    mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
-    mock_cursor.__exit__ = MagicMock(return_value=False)
+    store = _build_store(monkeypatch)
+    results = [MagicMock(rowcount=500), MagicMock(rowcount=500), MagicMock(rowcount=200)]
+    mock_session = MagicMock()
+    mock_session.execute.side_effect = results
 
-    original_execute = mock_cursor.execute
+    @contextmanager
+    def fake_session() -> Iterator[MagicMock]:
+        yield mock_session
 
-    def execute_with_rowcount(*args: Any, **kwargs: Any) -> None:
-        original_execute(*args, **kwargs)
-        mock_cursor.rowcount = next(batch_rowcounts)
-
-    mock_cursor.execute = MagicMock(side_effect=execute_with_rowcount)
-
-    mock_conn = MagicMock()
-    mock_conn.closed = False
-    mock_conn.broken = False
-    mock_conn.cursor = MagicMock(return_value=mock_cursor)
-
-    monkeypatch.setattr(psycopg, "connect", lambda **kwargs: mock_conn)
+    monkeypatch.setattr(store, "_session", fake_session)
 
     deleted = store.delete_expired_chats_for_org(org_id="org-1", retention_days=30, batch_size=500)
 
     assert deleted == 1200
-    assert mock_cursor.execute.call_count == 3
+    assert mock_session.execute.call_count == 3
 
 
-def test_connect_reuses_open_connection_until_closed(monkeypatch: pytest.MonkeyPatch) -> None:
-    store = _build_store()
-    created_connections: list[object] = []
 def test_set_canvas_memory_markdown_executes_pg_upsert(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -373,9 +367,6 @@ def test_set_canvas_memory_markdown_executes_pg_upsert(
     mock_begin.__enter__ = MagicMock(return_value=None)
     mock_begin.__exit__ = MagicMock(return_value=False)
     mock_session.begin.return_value = mock_begin
-
-    from collections.abc import Iterator
-    from contextlib import contextmanager
 
     @contextmanager
     def fake_session() -> Iterator[MagicMock]:

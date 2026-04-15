@@ -17,7 +17,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -546,39 +546,44 @@ class SessionStore:
     # ---- chat runs ----
 
     def list_distinct_org_ids(self) -> list[str]:
-        with self._cursor() as cur:
-            cur.execute("SELECT DISTINCT org_id FROM agent_chats")
-            return [str(row["org_id"]) for row in cur.fetchall()]
+        with self._session() as session:
+            rows = session.execute(select(AgentChat.org_id).distinct()).scalars().all()
+            return [str(org_id) for org_id in rows]
 
     def delete_expired_chats_for_org(
         self, org_id: str, retention_days: int, batch_size: int = 500
     ) -> int:
         total = 0
         while True:
-            with self._cursor() as cur:
-                # The outer updated_at re-check guards against a concurrent
-                # update (e.g. a new message) that commits between the subquery
-                # materializing IDs and the DELETE locking rows. Under READ
-                # COMMITTED, PostgreSQL re-evaluates only the outer WHERE after
-                # acquiring the row lock, so without this the chat could be
-                # deleted despite having just been refreshed.
-                cur.execute(
-                    """
-                    DELETE FROM agent_chats
-                    WHERE id IN (
-                        SELECT id FROM agent_chats
-                        WHERE org_id = %s
-                          AND updated_at < NOW() - make_interval(days => %s)
-                        LIMIT %s
+            with self._session() as session:
+                with session.begin():
+                    # The outer updated_at re-check guards against a concurrent
+                    # update (e.g. a new message) that commits between the subquery
+                    # materializing IDs and the DELETE locking rows. Under READ
+                    # COMMITTED, PostgreSQL re-evaluates only the outer WHERE after
+                    # acquiring the row lock, so without this the chat could be
+                    # deleted despite having just been refreshed.
+                    result = session.execute(
+                        text("""
+                            DELETE FROM agent_chats
+                            WHERE id IN (
+                                SELECT id FROM agent_chats
+                                WHERE org_id = :org_id
+                                  AND updated_at < NOW() - make_interval(days => :retention_days)
+                                LIMIT :batch_size
+                            )
+                            AND updated_at < NOW() - make_interval(days => :retention_days)
+                        """),
+                        {
+                            "org_id": org_id,
+                            "retention_days": retention_days,
+                            "batch_size": batch_size,
+                        },
                     )
-                    AND updated_at < NOW() - make_interval(days => %s)
-                    """,
-                    (org_id, retention_days, batch_size, retention_days),
-                )
-                deleted = int(cur.rowcount)
-                total += deleted
-                if deleted < batch_size:
-                    break
+                    deleted: int = result.rowcount  # type: ignore[attr-defined]
+                    total += deleted
+                    if deleted < batch_size:
+                        break
         return total
 
     def create_agent_chat_run(self, chat_id: str, model: str) -> str:
