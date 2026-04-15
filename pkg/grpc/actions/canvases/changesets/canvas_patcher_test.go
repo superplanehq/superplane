@@ -76,7 +76,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Node: &pb.CanvasChangeset_Change_Node{Id: "node-b"},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "false"})
@@ -114,7 +114,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertNoError()
 		steps.assertNodeOrder([]string{"node-a", "node-b", "node-c"})
@@ -123,6 +123,41 @@ func Test__CanvasPatcher(t *testing.T) {
 			{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
 			{SourceID: "node-c", TargetID: "node-a", Channel: "default"},
 		})
+	})
+
+	t.Run("returns error when auto layout is invalid", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{
+					ID:   "node-a",
+					Name: "Node A",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_UPDATE_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:   "node-a",
+						Name: "Node A Updated",
+					},
+				},
+			},
+		}, &pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED,
+		})
+
+		steps.assertHasError()
+		steps.assertErrorContains("layout.algorithm is required")
+		require.Nil(t, steps.finalVersion)
 	})
 
 	t.Run("update node -> no configuration provided, previous configuration is preserved", func(t *testing.T) {
@@ -147,7 +182,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Node: &pb.CanvasChangeset_Change_Node{Id: "node-a", Name: "Node A Updated"},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "true"})
@@ -181,7 +216,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'expression' is required")
@@ -205,7 +240,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 		steps.assertHasError()
 		steps.assertErrorContains("self-loop edges are not allowed")
 	})
@@ -225,7 +260,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("block core.hello not found in registry")
@@ -241,7 +276,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Type: pb.CanvasChangeset_Change_UNSPECIFIED,
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 	})
@@ -269,7 +304,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 		steps.assertHasError()
 	})
 
@@ -288,7 +323,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'expression' is required")
@@ -309,7 +344,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("field 'type' is required")
@@ -330,7 +365,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 		steps.assertHasError()
 		steps.assertErrorContains("field 'text' is required")
 	})
@@ -354,7 +389,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("integration is required for github.getIssue")
@@ -380,7 +415,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("invalid integration id")
@@ -408,7 +443,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertHasError()
 		steps.assertErrorContains("integration " + missingIntegrationID + " not found")
@@ -443,7 +478,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
@@ -474,8 +509,8 @@ func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []mod
 	})
 }
 
-func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset) {
-	s.err = s.patcher.ApplyChangeset(operations)
+func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset, autoLayout *pb.CanvasAutoLayout) {
+	s.err = s.patcher.ApplyChangeset(operations, autoLayout)
 	s.finalVersion = s.patcher.GetVersion()
 }
 
