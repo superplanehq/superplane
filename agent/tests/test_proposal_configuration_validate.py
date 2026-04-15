@@ -440,3 +440,57 @@ def test_validate_configuration_conditional_required_with_boolean() -> None:
     assert len(errors) == 1
     assert "required" in errors[0]
     assert "target" in errors[0]
+
+
+def test_conditional_required_first_match_returns() -> None:
+    """Go returns on the first condition whose field exists, even if value doesn't match."""
+    fields = [
+        _field(
+            name="body",
+            ftype="string",
+            required=False,
+            required_conditions=[
+                {"field": "mode", "values": ["advanced"]},
+                {"field": "fallback", "values": ["yes"]},
+            ],
+        ),
+        _field(name="mode", ftype="select"),
+        _field(name="fallback", ftype="select"),
+    ]
+    # 'mode' exists but doesn't match 'advanced'; Go stops here and returns False.
+    # 'fallback' matches 'yes' but Go never checks it.
+    errors = validate_configuration(
+        {"mode": "simple", "fallback": "yes"},
+        fields,
+    )
+    assert errors == []
+
+
+def test_validate_configuration_check_required_false() -> None:
+    """Partial updates should skip required-field checks."""
+    fields = [
+        _field(name="url", ftype="string", required=True),
+        _field(name="method", ftype="select", required=True),
+    ]
+    # Only updating method — url is missing but that's fine for a partial update.
+    errors = validate_configuration(
+        {"method": "POST"},
+        fields,
+        check_required=False,
+    )
+    assert errors == []
+
+
+def test_validate_configuration_check_required_false_still_validates_types() -> None:
+    """Partial updates still reject wrong types on present fields."""
+    fields = [
+        _field(name="url", ftype="string", required=True),
+        _field(name="method", ftype="select", required=True),
+    ]
+    errors = validate_configuration(
+        {"method": 123},
+        fields,
+        check_required=False,
+    )
+    assert len(errors) == 1
+    assert "method" in errors[0]
