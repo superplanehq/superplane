@@ -6,27 +6,27 @@ import (
 	"gorm.io/gorm"
 )
 
-func isCanvasVersioningEnabledForCanvas(canvas *models.Canvas) (bool, error) {
-	return isCanvasVersioningEnabledForCanvasInTransaction(database.Conn(), canvas)
+func isChangeManagementEnabledForCanvas(canvas *models.Canvas) (bool, error) {
+	return isChangeManagementEnabledForCanvasInTransaction(database.Conn(), canvas)
 }
 
-func isCanvasVersioningEnabledForCanvasInTransaction(tx *gorm.DB, canvas *models.Canvas) (bool, error) {
+func isChangeManagementEnabledForCanvasInTransaction(tx *gorm.DB, canvas *models.Canvas) (bool, error) {
 	if canvas == nil {
 		return false, nil
 	}
 
-	// Template canvases are not user-editable, but keep the value stable if needed.
+	// Template canvases are read-only and never use change management.
 	if canvas.IsTemplate {
-		return canvas.VersioningEnabled, nil
+		return false, nil
 	}
 
-	organizationVersioningEnabled, err := models.IsCanvasVersioningEnabledInTransaction(tx, canvas.OrganizationID)
+	organizationChangeManagementEnabled, err := models.IsChangeManagementEnabledInTransaction(tx, canvas.OrganizationID)
 	if err != nil {
 		return false, err
 	}
-	if organizationVersioningEnabled {
+	if organizationChangeManagementEnabled {
 		return true, nil
 	}
 
-	return canvas.VersioningEnabled, nil
+	return canvas.ChangeManagementEnabled, nil
 }

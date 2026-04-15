@@ -17,14 +17,14 @@ type updateCommand struct {
 	autoLayoutNodes *[]string
 }
 
-type versioningPlan struct {
+type changeManagementPlan struct {
 	effectiveEnabled      bool
 	enableAfterSpecUpdate bool
 }
 
-func updateCanvasVersioningEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
+func updateCanvasChangeManagementEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
 	body := openapi_client.CanvasesUpdateCanvasBody{}
-	body.SetVersioningEnabled(enabled)
+	body.SetChangeManagementEnabled(enabled)
 
 	_, _, err := ctx.API.CanvasAPI.
 		CanvasesUpdateCanvas(ctx.Context, canvasID).
@@ -33,7 +33,7 @@ func updateCanvasVersioningEnabled(ctx core.CommandContext, canvasID string, ena
 	return err
 }
 
-func resolveOrganizationVersioningEnabled(ctx core.CommandContext) (bool, error) {
+func resolveOrganizationChangeManagementEnabled(ctx core.CommandContext) (bool, error) {
 	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return false, err
@@ -52,45 +52,45 @@ func resolveOrganizationVersioningEnabled(ctx core.CommandContext) (bool, error)
 		return false, fmt.Errorf("organization metadata not found")
 	}
 
-	return metadata.GetVersioningEnabled(), nil
+	return metadata.GetChangeManagementEnabled(), nil
 }
 
-func requestedCanvasVersioningEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
+func requestedCanvasChangeManagementEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
 	if canvas.Metadata == nil {
 		return false, false
 	}
-	value, ok := canvas.Metadata.GetVersioningEnabledOk()
+	value, ok := canvas.Metadata.GetChangeManagementEnabledOk()
 	if !ok || value == nil {
 		return false, false
 	}
 	return *value, true
 }
 
-func planCanvasVersioningUpdate(
+func planCanvasChangeManagementUpdate(
 	ctx core.CommandContext,
 	canvasID string,
 	requestedEnabled bool,
 	requestedSet bool,
 	currentEffective bool,
 	draftMode bool,
-) (*versioningPlan, error) {
-	plan := &versioningPlan{effectiveEnabled: currentEffective}
+) (*changeManagementPlan, error) {
+	plan := &changeManagementPlan{effectiveEnabled: currentEffective}
 	if !requestedSet || requestedEnabled == currentEffective {
 		return plan, nil
 	}
 
 	if !requestedEnabled {
-		orgEnabled, err := resolveOrganizationVersioningEnabled(ctx)
+		orgEnabled, err := resolveOrganizationChangeManagementEnabled(ctx)
 		if err != nil {
 			return nil, err
 		}
 		if orgEnabled {
-			return nil, fmt.Errorf("cannot disable canvas versioning while organization versioning is enabled")
+			return nil, fmt.Errorf("cannot disable change management while organization change management is enabled")
 		}
 		if draftMode {
-			return nil, fmt.Errorf("--draft cannot be used when disabling canvas versioning; remove --draft to update the live canvas directly")
+			return nil, fmt.Errorf("--draft cannot be used when disabling change management; remove --draft to update the live canvas directly")
 		}
-		if err := updateCanvasVersioningEnabled(ctx, canvasID, false); err != nil {
+		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, false); err != nil {
 			return nil, err
 		}
 		plan.effectiveEnabled = false
@@ -98,7 +98,7 @@ func planCanvasVersioningUpdate(
 	}
 
 	if draftMode {
-		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, true); err != nil {
 			return nil, err
 		}
 		plan.effectiveEnabled = true
@@ -148,13 +148,13 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
-	versioningContext, err := resolveCanvasVersioningContext(ctx, canvasID)
+	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
-	requestedEnabled, requestedSet := requestedCanvasVersioningEnabled(canvas)
-	plan, err := planCanvasVersioningUpdate(ctx, canvasID, requestedEnabled, requestedSet, versioningContext.versioningEnabled, draftMode)
+	requestedEnabled, requestedSet := requestedCanvasChangeManagementEnabled(canvas)
+	plan, err := planCanvasChangeManagementUpdate(ctx, canvasID, requestedEnabled, requestedSet, cmContext.changeManagementEnabled, draftMode)
 	if err != nil {
 		return err
 	}
@@ -162,11 +162,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	targetVersionID := ""
 	if !plan.effectiveEnabled {
 		if draftMode {
-			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to update the live canvas directly")
+			return fmt.Errorf("--draft cannot be used when change management is disabled; remove --draft to update the live canvas directly")
 		}
 	} else {
 		if !draftMode {
-			return fmt.Errorf("effective canvas versioning is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
+			return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
 		}
 
 		targetVersionID, err = ensureCurrentUserDraftVersionID(ctx, canvasID)
@@ -204,7 +204,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	version := response.GetVersion()
 
 	if plan.enableAfterSpecUpdate {
-		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, true); err != nil {
 			return err
 		}
 	}

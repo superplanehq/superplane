@@ -8,11 +8,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-type canvasVersioningContext struct {
-	versioningEnabled bool
+type changeManagementContext struct {
+	changeManagementEnabled bool
 }
 
-func resolveCanvasVersioningContext(ctx core.CommandContext, canvasID string) (*canvasVersioningContext, error) {
+func resolveChangeManagementContext(ctx core.CommandContext, canvasID string) (*changeManagementContext, error) {
 	canvasResponse, _, err := ctx.API.CanvasAPI.
 		CanvasesDescribeCanvas(ctx.Context, canvasID).
 		Execute()
@@ -23,8 +23,8 @@ func resolveCanvasVersioningContext(ctx core.CommandContext, canvasID string) (*
 		return nil, fmt.Errorf("canvas metadata not found")
 	}
 
-	return &canvasVersioningContext{
-		versioningEnabled: canvasResponse.Canvas.Metadata.GetVersioningEnabled(),
+	return &changeManagementContext{
+		changeManagementEnabled: canvasResponse.Canvas.Metadata.GetChangeManagementEnabled(),
 	}, nil
 }
 

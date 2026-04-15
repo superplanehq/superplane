@@ -32,8 +32,8 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 
 	canvas := *response.Canvas
 	if c.draft != nil && *c.draft {
-		if canvas.Metadata == nil || !canvas.Metadata.GetVersioningEnabled() {
-			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to get the live canvas directly")
+		if canvas.Metadata == nil || !canvas.Metadata.GetChangeManagementEnabled() {
+			return fmt.Errorf("--draft cannot be used when change management is disabled; remove --draft to get the live canvas directly")
 		}
 
 		me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
