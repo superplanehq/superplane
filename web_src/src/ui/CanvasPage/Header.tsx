@@ -1,16 +1,13 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/PermissionsContext";
-import { Copy, Download, ChevronDown, Palette, Plus, RotateCcw, Pencil } from "lucide-react";
+import { Copy, Download, ChevronDown, MoreVertical, RotateCcw, Pencil, Settings } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
-import { Link, useParams } from "react-router-dom";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-
 export interface BreadcrumbItem {
   label: string;
   onClick?: () => void;
@@ -21,6 +18,8 @@ export interface BreadcrumbItem {
 }
 
 type HeaderMode = "default" | "version-live" | "version-edit" | "versioning-disabled";
+
+type CanvasTopViewTab = "canvas" | "yaml" | "cli" | "memory";
 
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
@@ -38,8 +37,8 @@ interface HeaderProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
+  topViewMode?: CanvasTopViewTab;
+  onTopViewModeChange?: (mode: CanvasTopViewTab) => void;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
   memoryItemCount?: number;
@@ -49,6 +48,8 @@ interface HeaderProps {
   enterEditModeDisabledTooltip?: string;
   /** When &gt; 0 (unpublished draft diff items), shown as "Propose Change (n)" in version edit mode. */
   unpublishedDraftChangeCount?: number;
+  /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
+  showCanvasSettingsMenu?: boolean;
 }
 
 export function Header({
@@ -77,61 +78,27 @@ export function Header({
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
   unpublishedDraftChangeCount = 0,
+  showCanvasSettingsMenu = true,
 }: HeaderProps) {
-  const { workflowId } = useParams<{ workflowId?: string }>();
+  const navigate = useNavigate();
+  const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
+  const activeCanvasId = canvasIdParam || workflowId;
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const canCreateCanvas = permissionsLoading || canAct("canvases", "create");
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
   const [exportAction, setExportAction] = useState<string>("");
-  const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // Get the workflow name from the workflows list if workflowId is available
-  // Otherwise, use breadcrumbs[1] which is always the workflow name (index 0 is "Canvases")
-  // Fall back to the last breadcrumb item if neither is available
   const currentWorkflowName = (() => {
-    if (workflowId) {
-      const workflow = workflows.find((w) => w.metadata?.id === workflowId);
+    if (activeCanvasId) {
+      const workflow = workflows.find((w) => w.metadata?.id === activeCanvasId);
       if (workflow?.metadata?.name) {
         return workflow.metadata.name;
       }
     }
-    // breadcrumbs[1] is always the workflow name (index 0 is "Canvases")
     if (breadcrumbs.length > 1 && breadcrumbs[1]?.label) {
       return breadcrumbs[1].label;
     }
-    // Fall back to last breadcrumb if no workflow name found
     return breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : "";
   })();
-
-  useEffect(() => {
-    if (!isMenuOpen) return;
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsMenuOpen(false);
-      }
-    };
-
-    const listenerOptions: AddEventListenerOptions = { capture: true };
-
-    document.addEventListener("mousedown", handlePointerDown, listenerOptions);
-    document.addEventListener("touchstart", handlePointerDown, listenerOptions);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown, listenerOptions);
-      document.removeEventListener("touchstart", handlePointerDown, listenerOptions);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMenuOpen]);
 
   const wrapWithTooltip = (disabled: boolean | undefined, message: string | undefined, child: ReactNode) => {
     if (!disabled || !message) return child;
@@ -152,101 +119,48 @@ export function Header({
   const proposeChangeLabel =
     unpublishedDraftChangeCount > 0 ? `Propose Change (${unpublishedDraftChangeCount})` : "Propose Change";
 
+  const showSecondaryHeaderRow = true;
+
   return (
-    <>
-      <header className="bg-white border-b border-slate-950/15">
-        <div className="relative grid h-12 grid-cols-3 items-center px-4">
-          <div className="flex items-center justify-self-start">
-            <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
-
-            {/* Canvas Dropdown */}
-            {organizationId && (
-              <div className="relative flex items-center" ref={menuRef}>
-                <button
+    <header className="border-b border-slate-950/15 bg-white">
+      {/* Top bar: nav + title + canvas menu */}
+      <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
+        <div className="relative z-10 flex min-w-0 shrink-0 items-center">
+          <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
+          <span className="truncate text-center text-sm font-medium text-slate-900">
+            {currentWorkflowName || (workflowsLoading ? "Loading…" : "Canvas")}
+          </span>
+        </div>
+        <div className="relative z-10 ml-auto flex shrink-0 items-center">
+          {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <UIButton
                   type="button"
-                  onClick={() => setIsMenuOpen((prev) => !prev)}
-                  className="flex h-8 cursor-pointer items-center gap-1 rounded-md px-2.5 hover:bg-slate-100"
-                  aria-label="Open canvas menu"
-                  aria-expanded={isMenuOpen}
-                  disabled={workflowsLoading}
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-600"
+                  aria-label="Canvas menu"
                 >
-                  <span className="text-sm text-gray-800 font-medium">
-                    {currentWorkflowName || (workflowsLoading ? "Loading..." : "Select canvas")}
-                  </span>
-                  <ChevronDown
-                    size={16}
-                    className={`text-gray-400 transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-                {isMenuOpen && !workflowsLoading && (
-                  <div className="absolute left-0 top-0 z-50 w-full min-w-[15rem] rounded-md border border-slate-950/20 bg-white shadow-md">
-                    <div className="px-4 py-2">
-                      {/* New Canvas */}
-                      <div className="mb-2">
-                        <PermissionTooltip
-                          allowed={canCreateCanvas}
-                          message="You don't have permission to create canvases."
-                          className="w-full"
-                        >
-                          <Link
-                            to={organizationId ? `/${organizationId}/canvases/new` : "/"}
-                            className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <Plus size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                            <span>New Canvas</span>
-                          </Link>
-                        </PermissionTooltip>
-                      </div>
-                      {/* Divider */}
-                      <div className="border-b border-gray-300 mb-2"></div>
-                      {/* Canvas List */}
-                      <div className="mt-2 flex flex-col">
-                        {workflows.map((workflow) => {
-                          const isSelected = workflow.metadata?.id === workflowId;
-                          const workflowHref =
-                            workflow.metadata?.id && organizationId
-                              ? `/${organizationId}/canvases/${workflow.metadata.id}`
-                              : undefined;
-                          if (!workflowHref) {
-                            return (
-                              <span
-                                key={workflow.metadata?.id}
-                                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left text-gray-500"
-                              >
-                                <span className="w-4" />
-                                <span>{workflow.metadata?.name || "Unnamed Canvas"}</span>
-                              </span>
-                            );
-                          }
+                  <MoreVertical className="h-4 w-4" />
+                </UIButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`)}>
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+      </div>
 
-                          return (
-                            <Link
-                              key={workflow.metadata?.id}
-                              to={workflowHref}
-                              onClick={() => setIsMenuOpen(false)}
-                              className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${
-                                isSelected
-                                  ? "bg-sky-100 text-gray-800"
-                                  : "text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                              }`}
-                            >
-                              {isSelected ? (
-                                <Palette size={16} className="text-gray-800 transition group-hover:text-gray-800" />
-                              ) : (
-                                <span className="w-4" />
-                              )}
-                              <span>{workflow.metadata?.name || "Unnamed Canvas"}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+      {showSecondaryHeaderRow ? (
+        <div className="relative grid h-12 grid-cols-3 items-center px-4">
+          <div className="min-w-0 justify-self-start" aria-hidden />
 
           <div className="justify-self-center">
             {topViewMode && onTopViewModeChange && (
@@ -291,15 +205,6 @@ export function Header({
                       <span aria-label={`${memoryItemCount} memory items`}>({memoryItemCount})</span>
                     ) : null}
                   </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onTopViewModeChange("settings")}
-                  className={`rounded-sm px-2 py-0.5 ${
-                    topViewMode === "settings" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  Settings
                 </button>
               </div>
             )}
@@ -378,7 +283,7 @@ export function Header({
                   </DropdownMenu>
                 ) : null}
                 {!isVersioningDisabledMode && unsavedMessage ? (
-                  <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
+                  <span className="hidden rounded bg-orange-100 px-2 py-1 text-xs font-medium text-yellow-700 sm:inline">
                     {unsavedMessage}
                   </span>
                 ) : null}
@@ -458,7 +363,7 @@ export function Header({
               : null}
           </div>
         </div>
-      </header>
-    </>
+      ) : null}
+    </header>
   );
 }
