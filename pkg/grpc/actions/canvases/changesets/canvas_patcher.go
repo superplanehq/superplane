@@ -92,16 +92,17 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 	}
 
 	//
-	// TODO: if this is being called by the agent flow, we want this.
-	// But, if it is being called by the UI itself (regular user changing things flow),
-	// we should respect what the user chose.
+	// If auto layout is not provided, we only auto layout the new nodes.
 	//
-	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, &pb.CanvasAutoLayout{
-		Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-		NodeIds:   p.newNodes,
-		Scope:     pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT,
-	})
+	if autoLayout == nil {
+		autoLayout = &pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+			NodeIds:   p.newNodes,
+			Scope:     pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT,
+		}
+	}
 
+	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, autoLayout)
 	if err != nil {
 		return nil, err
 	}
