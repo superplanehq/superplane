@@ -1,4 +1,4 @@
-package canvases
+package layout
 
 import (
 	"math"
@@ -26,7 +26,7 @@ func TestApplyCanvasAutoLayoutStacksDisconnectedComponentsVertically(t *testing.
 		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
 	}
 
-	updatedNodes, updatedEdges, err := applyCanvasAutoLayout(nodes, edges, autoLayout, nil)
+	updatedNodes, updatedEdges, err := ApplyLayout(nodes, edges, autoLayout)
 	require.NoError(t, err)
 	require.Equal(t, edges, updatedEdges)
 
@@ -60,7 +60,7 @@ func TestApplyCanvasAutoLayoutPacksIsolatedNodesBelowConnectedComponent(t *testi
 		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
 	}
 
-	updatedNodes, _, err := applyCanvasAutoLayout(nodes, edges, autoLayout, nil)
+	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
 	require.NoError(t, err)
 
 	nodesByID := mapLayoutNodesByID(updatedNodes)
@@ -99,7 +99,7 @@ func TestApplyCanvasAutoLayoutDoesNotPushTerminalNodeBackWithParallelEdges(t *te
 		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
 	}
 
-	updatedNodes, _, err := applyCanvasAutoLayout(nodes, edges, autoLayout, nil)
+	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
 	require.NoError(t, err)
 
 	nodesByID := mapLayoutNodesByID(updatedNodes)

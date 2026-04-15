@@ -18,8 +18,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.canvases_canvas_auto_layout import CanvasesCanvasAutoLayout
 from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
 from typing import Optional, Set
 from typing_extensions import Self
@@ -29,7 +30,8 @@ class CanvasesApplyCanvasVersionChangesetBody(BaseModel):
     CanvasesApplyCanvasVersionChangesetBody
     """ # noqa: E501
     changeset: Optional[CanvasesCanvasChangeset] = None
-    __properties: ClassVar[List[str]] = ["changeset"]
+    auto_layout: Optional[CanvasesCanvasAutoLayout] = Field(default=None, alias="autoLayout")
+    __properties: ClassVar[List[str]] = ["changeset", "autoLayout"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -73,6 +75,9 @@ class CanvasesApplyCanvasVersionChangesetBody(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of changeset
         if self.changeset:
             _dict['changeset'] = self.changeset.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of auto_layout
+        if self.auto_layout:
+            _dict['autoLayout'] = self.auto_layout.to_dict()
         return _dict
 
     @classmethod
@@ -85,7 +90,8 @@ class CanvasesApplyCanvasVersionChangesetBody(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "changeset": CanvasesCanvasChangeset.from_dict(obj["changeset"]) if obj.get("changeset") is not None else None
+            "changeset": CanvasesCanvasChangeset.from_dict(obj["changeset"]) if obj.get("changeset") is not None else None,
+            "autoLayout": CanvasesCanvasAutoLayout.from_dict(obj["autoLayout"]) if obj.get("autoLayout") is not None else None
         })
         return _obj
 
