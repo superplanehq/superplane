@@ -66,22 +66,30 @@ FROM dev-base AS builder
 ARG BASE_URL=https://app.superplane.com
 
 WORKDIR /app
-COPY pkg /app/pkg
-COPY cmd /app/cmd
 COPY go.mod /app/go.mod
 COPY go.sum /app/go.sum
+COPY protos /app/protos
+COPY scripts /app/scripts
+COPY Makefile /app/Makefile
+COPY pkg /app/pkg
+COPY cmd /app/cmd
 COPY db/migrations /app/db/migrations
 COPY db/data_migrations /app/db/data_migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY web_src /app/web_src
-COPY protos /app/protos
 COPY api/swagger /app/api/swagger
 COPY rbac /app/rbac
 COPY templates /app/templates
+
+RUN bash /app/scripts/protoc.sh
+RUN bash /app/scripts/protoc_gateway.sh
+RUN bash /app/scripts/protoc_openapi_spec.sh
+
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN npm install
+RUN npm run generate:api
 RUN VITE_BASE_URL=$BASE_URL npm run build
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -18,3 +18,19 @@ CLAUDE.local.md
 .idea/
 .agents/
 .worktrees/
+
+# Generated protobuf Go stubs and gRPC gateway files
+pkg/protos/
+
+# Generated Go OpenAPI client
+pkg/openapi_client/
+
+# Generated TypeScript API client
+web_src/src/api-client/
+
+# Generated Python OpenAPI client
+agent/src/superplaneapi/
+
+# Generated Python protobuf stubs
+agent/src/private/
+agent/src/usage_pb2.py

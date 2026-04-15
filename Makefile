@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup gen gen.code openapi.web.client.deps
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -20,7 +20,7 @@ COMPOSE=docker compose -f docker-compose.dev.yml
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
+GOTESTSUM=$(COMPOSE) run --rm --no-deps -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment
@@ -37,7 +37,8 @@ test.setup.build:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
-	$(COMPOSE) run --rm app go mod download
+	$(MAKE) gen.code
+	$(COMPOSE) run --rm --no-deps app go mod download
 
 test.setup.db:
 	$(MAKE) db.create DB_NAME=superplane_test
@@ -69,7 +70,7 @@ test:
 
 test.coverage:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
-	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
+	$(COMPOSE) run --rm --no-deps app go tool cover -func=coverage-go.out | grep '^total:'
 
 test.coverage.check:
 	$(MAKE) test.coverage
@@ -92,6 +93,7 @@ test.agent.evals:
 test.agent.setup:
 	@touch agent/.env
 	$(COMPOSE) build app agent
+	$(MAKE) gen.code
 	$(COMPOSE) up -d db
 	sleep 5
 	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
@@ -127,6 +129,7 @@ dev.setup:
 	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
+	$(MAKE) gen.code
 	$(MAKE) dev.setup.app
 	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
@@ -135,8 +138,8 @@ dev.setup:
 	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.setup.app:
-	$(COMPOSE) run --rm app go mod download
-	$(COMPOSE) run --rm app go build cmd/server/main.go
+	$(COMPOSE) run --rm --no-deps app go mod download
+	$(COMPOSE) run --rm --no-deps app go build cmd/server/main.go
 
 dev.setup.agent:
 	$(COMPOSE) run --rm agent uv sync --frozen || $(COMPOSE) run --rm agent uv sync
@@ -145,6 +148,7 @@ dev.setup.no.cache:
 	rm -rf tmp
 	$(COMPOSE) down -v --remove-orphans
 	$(COMPOSE) build --no-cache
+	$(MAKE) gen.code
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
@@ -234,10 +238,11 @@ ui.start:
 #
 
 db.create:
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	$(COMPOSE) up -d db
+	-$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
+	-$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
+	-$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
 db.migration.create:
 	$(COMPOSE) run --rm app mkdir -p db/migrations
@@ -250,13 +255,14 @@ db.data_migration.create:
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
+	$(COMPOSE) up -d db
 	rm -f db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
 	# echo dump schema to db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
@@ -291,12 +297,15 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-gen:
+gen.code:
 	$(MAKE) pb.gen
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
 	$(MAKE) openapi.python.client.gen
+
+gen:
+	$(MAKE) gen.code
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
@@ -310,15 +319,13 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
 pb.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh
 	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
 
 openapi.spec.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
@@ -335,8 +342,12 @@ openapi.client.gen:
 	rm -rf pkg/openapi_client/README.md
 	rm -rf pkg/openapi_client/git_push.sh
 
+openapi.web.client.deps:
+	$(COMPOSE) run --rm --no-deps app bash -lc 'cd /app/web_src && if [ ! -x node_modules/.bin/openapi-ts ]; then npm ci; fi'
+
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
+	$(MAKE) openapi.web.client.deps
 	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
 
 openapi.python.client.gen:
