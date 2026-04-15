@@ -587,7 +587,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
           // local node positions to avoid overwriting positions that changed
           // while the save was in flight.
           if (variables.autoLayout) {
-            return { ...current, spec: version.spec };
+            return { ...current, spec: { ...current.spec, ...version.spec } };
           }
 
           const currentPositionsByNodeId = new Map(
@@ -610,7 +610,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
 
           return {
             ...current,
-            spec: { ...version.spec, nodes: mergedNodes },
+            spec: { ...current.spec, ...version.spec, nodes: mergedNodes },
           };
         });
       }
