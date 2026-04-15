@@ -375,7 +375,7 @@ func Test__CanvasPatcher(t *testing.T) {
 		}, nil)
 
 		steps.assertNoError()
-		steps.assertHasNode("node-a", "Node A", map[string]any{"expression": "true"})
+		steps.assertHasNode("node-a", "Node A", map[string]any{"expression": nil})
 		steps.assertNodeErrorContains("node-a", "field 'expression' is required")
 	})
 
@@ -536,7 +536,7 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertNodeErrorContains("node-a", "field 'text' is required")
 	})
 
-	t.Run("rejects integration component without integration id", func(t *testing.T) {
+	t.Run("add integration component without integration id -> sets node error without returning error", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
 		steps.givenCanvasVersion(nil, nil)
 
@@ -557,11 +557,14 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		}, nil)
 
-		steps.assertHasError()
-		steps.assertErrorContains("integration is required for github.getIssue")
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNodeBlock("node-a", "github.getIssue")
+		steps.assertNodeErrorContains("node-a", "integration is required for github.getIssue")
 	})
 
-	t.Run("rejects integration component with invalid integration id", func(t *testing.T) {
+	t.Run("add integration component with invalid integration id -> sets node error without returning error", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
 		steps.givenCanvasVersion(nil, nil)
 
@@ -583,11 +586,14 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		}, nil)
 
-		steps.assertHasError()
-		steps.assertErrorContains("invalid integration id")
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNodeBlock("node-a", "github.getIssue")
+		steps.assertNodeErrorContains("node-a", "invalid integration id")
 	})
 
-	t.Run("rejects integration component with integration id that does not exist", func(t *testing.T) {
+	t.Run("add integration component with integration id that does not exist -> sets node error without returning error", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
 		steps.givenCanvasVersion(nil, nil)
 
@@ -611,8 +617,11 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		}, nil)
 
-		steps.assertHasError()
-		steps.assertErrorContains("integration " + missingIntegrationID + " not found")
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNodeBlock("node-a", "github.getIssue")
+		steps.assertNodeErrorContains("node-a", "integration "+missingIntegrationID+" not found")
 	})
 
 	t.Run("accepts integration component with existing integration id", func(t *testing.T) {
