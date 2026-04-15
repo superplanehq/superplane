@@ -5,7 +5,7 @@ export function buildSettingsInitialValues(canvas: CanvasesCanvas | undefined): 
   return {
     name: canvas?.metadata?.name || "",
     description: canvas?.metadata?.description || "",
-    versioningEnabled: canvas?.metadata?.versioningEnabled ?? false,
+    changeManagementEnabled: canvas?.metadata?.changeManagementEnabled ?? false,
     changeRequestApprovalConfig: {
       items: (canvas?.metadata?.changeRequestApprovalConfig?.items || [])
         .map((item) => {
