@@ -12,4 +12,8 @@ export const analytics = {
   canvasDeleted: (canvasId: string, organizationId: string) => {
     posthog.capture("canvas deleted", { canvas_id: canvasId, organization_id: organizationId });
   },
+
+  integrationConnected: (integrationType: string, organizationId: string) => {
+    posthog.capture("integration connected", { integration_type: integrationType, organization_id: organizationId });
+  },
 };
