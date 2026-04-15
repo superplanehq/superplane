@@ -15,6 +15,9 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
       prologue:
         commands:
           - checkout
@@ -37,9 +40,7 @@ blocks:
           - mkdir -p tmp/go tmp/go-build
           - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
           - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
-          - make test.setup.build
-          - make test.setup.db
-          - make test.start
+          - make test.setup
       jobs:
         - name: Lint
           commands:
@@ -64,6 +65,9 @@ blocks:
         - name: "Check: Example Payloads"
           commands:
             - make check.example.payloads
+        - name: "Check: Generated Artifacts"
+          commands:
+            - make check.generated.artifacts
       epilogue:
         always:
           commands:
@@ -112,6 +116,7 @@ blocks:
           - checkout
           - sem-version node 20
           - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
+          - make gen.setup.ui
           - cd web_src
           - npm ci
       epilogue:
