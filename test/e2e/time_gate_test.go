@@ -27,6 +27,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("00:00", "23:59")
 		steps.setTimezone("0")
 		steps.saveTimeGate()
+		steps.canvas.Publish()
 		steps.assertTimeGateSavedToDB("00:00-23:59", "0", weekendDays)
 	})
 
@@ -38,6 +39,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
 		steps.saveTimeGate()
+		steps.canvas.Publish()
 		steps.assertTimeGateSavedToDB("09:00 - 17:00", "-5", workweekDays)
 	})
 
@@ -68,6 +70,7 @@ func (s *TimeGateSteps) start() {
 func (s *TimeGateSteps) givenACanvasExists(canvasName string) {
 	s.canvas = shared.NewCanvasSteps(canvasName, s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 }
 
 func (s *TimeGateSteps) addTimeGate() {
@@ -146,6 +149,7 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []st
 	s.canvas = shared.NewCanvasSteps("Time Gate Push Through", s.t, s.session)
 
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddTimeGate("timeGate", models.Position{X: 1000, Y: 250})
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
@@ -163,6 +167,7 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []st
 	s.canvas.Connect("timeGate", "Output")
 
 	s.saveCanvas()
+	s.canvas.Publish()
 }
 
 func (s *TimeGateSteps) runManualTrigger() {
