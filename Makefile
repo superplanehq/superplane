@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup.ui
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -40,7 +40,7 @@ test.setup.build:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
-	$(MAKE) test.setup.ui
+	$(MAKE) test.e2e.ui.setup
 	$(MAKE) gen.setup.backend
 
 test.setup:
@@ -62,9 +62,8 @@ test.down:
 
 test.e2e.setup:
 	$(MAKE) test.setup
-	$(MAKE) test.setup.ui
 
-test.setup.ui:
+test.e2e.ui.setup:
 	$(COMPOSE) exec app bash -lc "cd /app/web_src && npm ci"
 
 test.e2e:
