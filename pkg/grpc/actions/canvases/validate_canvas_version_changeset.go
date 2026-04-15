@@ -58,7 +58,7 @@ func ValidateCanvasVersionChangeset(
 	}
 
 	patcher := changesets.NewCanvasPatcher(database.Conn(), organizationID, registry, version)
-	err = patcher.ApplyChangeset(changeset)
+	err = patcher.ApplyChangeset(changeset, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "changeset is invalid: %v", err)
 	}
