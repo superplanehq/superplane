@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-export type CanvasWorkflowTopViewTab = "canvas" | "yaml" | "cli" | "memory";
+export type CanvasWorkflowTopViewTab = "canvas" | "yaml" | "cli";
 
 export function useCanvasWorkflowTopView() {
   const [topViewMode, setTopViewMode] = useState<CanvasWorkflowTopViewTab>("canvas");

@@ -19,7 +19,7 @@ export interface BreadcrumbItem {
 
 type HeaderMode = "default" | "version-live" | "version-edit";
 
-type CanvasTopViewTab = "canvas" | "yaml" | "cli" | "memory";
+type CanvasTopViewTab = "canvas" | "yaml" | "cli";
 
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
@@ -41,7 +41,6 @@ interface HeaderProps {
   onTopViewModeChange?: (mode: CanvasTopViewTab) => void;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
-  memoryItemCount?: number;
   mode?: HeaderMode;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
@@ -74,7 +73,6 @@ export function Header({
   onTopViewModeChange,
   onExportYamlCopy,
   onExportYamlDownload,
-  memoryItemCount,
   mode = "default",
   onEnterEditMode,
   enterEditModeDisabled,
@@ -185,20 +183,6 @@ export function Header({
                   }`}
                 >
                   CLI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onTopViewModeChange("memory")}
-                  className={`rounded-sm px-2 py-0.5 ${
-                    topViewMode === "memory" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <span>Memory</span>
-                    {memoryItemCount && memoryItemCount > 0 ? (
-                      <span aria-label={`${memoryItemCount} memory items`}>({memoryItemCount})</span>
-                    ) : null}
-                  </span>
                 </button>
               </div>
             )}
