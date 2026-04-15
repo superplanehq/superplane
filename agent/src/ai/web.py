@@ -46,7 +46,13 @@ from ai.session_store import (
 )
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from ai.telemetry import init_sentry, init_telemetry, shutdown_sentry, shutdown_telemetry
+from ai.telemetry import (
+    init_sentry,
+    init_telemetry,
+    record_first_token_duration,
+    shutdown_sentry,
+    shutdown_telemetry,
+)
 from ai.text import normalize_optional
 from ai.tools import format_tool_display_label
 from ai.usage_limit_checker import (
@@ -410,6 +416,8 @@ async def _stream_agent_run(
             return None
         delta = answer[already_streamed:]
         streamed_answer_length_by_call_id[call_id] = len(answer)
+        if not streamed_any_answer_delta:
+            record_first_token_duration(time.perf_counter() - started_at)
         streamed_any_answer_delta = True
         recorder.append_assistant_content(delta)
         return {
