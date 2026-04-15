@@ -21,6 +21,7 @@ var _ MappedNullable = &OrganizationsOrganization{}
 // OrganizationsOrganization struct for OrganizationsOrganization
 type OrganizationsOrganization struct {
 	Metadata *OrganizationsOrganizationMetadata `json:"metadata,omitempty"`
+	Spec     *OrganizationsOrganizationSpec     `json:"spec,omitempty"`
 }
 
 // NewOrganizationsOrganization instantiates a new OrganizationsOrganization object
@@ -72,6 +73,38 @@ func (o *OrganizationsOrganization) SetMetadata(v OrganizationsOrganizationMetad
 	o.Metadata = &v
 }
 
+// GetSpec returns the Spec field value if set, zero value otherwise.
+func (o *OrganizationsOrganization) GetSpec() OrganizationsOrganizationSpec {
+	if o == nil || IsNil(o.Spec) {
+		var ret OrganizationsOrganizationSpec
+		return ret
+	}
+	return *o.Spec
+}
+
+// GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganization) GetSpecOk() (*OrganizationsOrganizationSpec, bool) {
+	if o == nil || IsNil(o.Spec) {
+		return nil, false
+	}
+	return o.Spec, true
+}
+
+// HasSpec returns a boolean if a field has been set.
+func (o *OrganizationsOrganization) HasSpec() bool {
+	if o != nil && !IsNil(o.Spec) {
+		return true
+	}
+
+	return false
+}
+
+// SetSpec gets a reference to the given OrganizationsOrganizationSpec and assigns it to the Spec field.
+func (o *OrganizationsOrganization) SetSpec(v OrganizationsOrganizationSpec) {
+	o.Spec = &v
+}
+
 func (o OrganizationsOrganization) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o OrganizationsOrganization) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
+	}
+	if !IsNil(o.Spec) {
+		toSerialize["spec"] = o.Spec
 	}
 	return toSerialize, nil
 }
