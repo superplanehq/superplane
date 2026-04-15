@@ -114,6 +114,7 @@ blocks:
           - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
           - cd web_src
           - npm ci
+          - npm run generate:api
       epilogue:
         always:
           commands:
