@@ -1665,7 +1665,11 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip,
   headerMode,
   onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
   onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
   publishVersionLabel,
   unpublishedDraftChangeCount,
   showCanvasSettingsMenu,
@@ -1686,7 +1690,11 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit";
   onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
   unpublishedDraftChangeCount?: number;
   showCanvasSettingsMenu?: boolean;
@@ -1724,7 +1732,11 @@ function CanvasContentHeader({
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
       onEnterEditMode={onEnterEditMode}
+      enterEditModeDisabled={enterEditModeDisabled}
+      enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
       onExitEditMode={onExitEditMode}
+      exitEditModeDisabled={exitEditModeDisabled}
+      exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       publishVersionLabel={publishVersionLabel}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       showCanvasSettingsMenu={showCanvasSettingsMenu}

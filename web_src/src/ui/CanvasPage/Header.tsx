@@ -2,7 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { MoreVertical, RotateCcw, Settings } from "lucide-react";
+import { MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
@@ -305,28 +305,25 @@ function DiscardDraftButton({
   disabled: boolean;
   disabledTooltip?: string;
 }) {
-  const tooltipText =
-    disabled && disabledTooltip ? disabledTooltip : "Discard draft changes and reset to the current live version.";
+  if (disabled && disabledTooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">
+            <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
+              Discard
+            </UIButton>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="inline-flex">
-          <UIButton
-            type="button"
-            variant="outline"
-            size="icon-xs"
-            className="shrink-0"
-            onClick={onDiscard}
-            disabled={disabled}
-            aria-label="Discard draft"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </UIButton>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">{tooltipText}</TooltipContent>
-    </Tooltip>
+    <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
+      Discard
+    </UIButton>
   );
 }
 
