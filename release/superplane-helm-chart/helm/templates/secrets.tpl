@@ -79,10 +79,3 @@
 {{- end }}
 {{- end }}
 
-{{- define "secrets.posthog.name" }}
-{{- if eq .Values.posthog.secretName "" }}
-{{- printf "%s-posthog" .Release.Name }}
-{{- else }}
-{{- .Values.posthog.secretName }}
-{{- end }}
-{{- end }}
