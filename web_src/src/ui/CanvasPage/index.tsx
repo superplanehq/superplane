@@ -188,8 +188,6 @@ export interface CanvasPageProps {
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
   showCanvasSettingsMenu?: boolean;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
   versionControlSidebar?: React.ReactNode;
@@ -1177,8 +1175,6 @@ function CanvasPage(props: CanvasPageProps) {
           publishVersionLabel={props.publishVersionLabel}
           unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          onExportYamlCopy={props.onExportYamlCopy}
-          onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1708,8 +1704,6 @@ function CanvasContentHeader({
   publishVersionLabel,
   unpublishedDraftChangeCount,
   showCanvasSettingsMenu,
-  onExportYamlCopy,
-  onExportYamlDownload,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1733,8 +1727,6 @@ function CanvasContentHeader({
   publishVersionLabel?: string;
   unpublishedDraftChangeCount?: number;
   showCanvasSettingsMenu?: boolean;
-  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
-  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1744,18 +1736,6 @@ function CanvasContentHeader({
       onSave(stateRef.current.nodes);
     }
   }, [onSave]);
-
-  const handleExportYamlCopy = useCallback(() => {
-    if (onExportYamlCopy) {
-      onExportYamlCopy(stateRef.current.nodes);
-    }
-  }, [onExportYamlCopy]);
-
-  const handleExportYamlDownload = useCallback(() => {
-    if (onExportYamlDownload) {
-      onExportYamlDownload(stateRef.current.nodes);
-    }
-  }, [onExportYamlDownload]);
 
   const handleLogoClick = useCallback(() => {
     if (organizationId) {
@@ -1787,8 +1767,6 @@ function CanvasContentHeader({
       publishVersionLabel={publishVersionLabel}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
-      onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
   );
 }
