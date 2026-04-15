@@ -18,18 +18,20 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_change_request_approver import CanvasesCanvasChangeRequestApprover
+from superplaneapi.models.change_management_approver_type import ChangeManagementApproverType
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesCanvasChangeRequestApprovalConfig(BaseModel):
+class ChangeManagementApprover(BaseModel):
     """
-    CanvasesCanvasChangeRequestApprovalConfig
+    ChangeManagementApprover
     """ # noqa: E501
-    items: Optional[List[CanvasesCanvasChangeRequestApprover]] = None
-    __properties: ClassVar[List[str]] = ["items"]
+    type: Optional[ChangeManagementApproverType] = ChangeManagementApproverType.TYPE_UNSPECIFIED
+    user_id: Optional[StrictStr] = Field(default=None, alias="userId")
+    role_name: Optional[StrictStr] = Field(default=None, alias="roleName")
+    __properties: ClassVar[List[str]] = ["type", "userId", "roleName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +51,7 @@ class CanvasesCanvasChangeRequestApprovalConfig(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasChangeRequestApprovalConfig from a JSON string"""
+        """Create an instance of ChangeManagementApprover from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,18 +72,11 @@ class CanvasesCanvasChangeRequestApprovalConfig(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in items (list)
-        _items = []
-        if self.items:
-            for _item_items in self.items:
-                if _item_items:
-                    _items.append(_item_items.to_dict())
-            _dict['items'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasChangeRequestApprovalConfig from a dict"""
+        """Create an instance of ChangeManagementApprover from a dict"""
         if obj is None:
             return None
 
@@ -89,7 +84,9 @@ class CanvasesCanvasChangeRequestApprovalConfig(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "items": [CanvasesCanvasChangeRequestApprover.from_dict(_item) for _item in obj["items"]] if obj.get("items") is not None else None
+            "type": obj.get("type") if obj.get("type") is not None else ChangeManagementApproverType.TYPE_UNSPECIFIED,
+            "userId": obj.get("userId"),
+            "roleName": obj.get("roleName")
         })
         return _obj
 

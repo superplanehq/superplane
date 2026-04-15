@@ -55,12 +55,12 @@ func PublishCanvasChangeRequest(
 		return nil, nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
+		return nil, nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
 	}
-	if !versioningEnabled {
-		return nil, nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
+	if !changeManagementEnabled {
+		return nil, nil, status.Error(codes.FailedPrecondition, "change management is disabled for this canvas")
 	}
 
 	var version *models.CanvasVersion

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -55,6 +54,7 @@ func (s *settingsAutoSaveSteps) start() {
 func (s *settingsAutoSaveSteps) givenACanvasExists(canvasName string) {
 	s.canvas = shared.NewCanvasSteps(canvasName, s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 }
 
 func (s *settingsAutoSaveSteps) addFilterNode(name string) {
@@ -144,27 +144,17 @@ func (s *settingsAutoSaveSteps) assertExpressionInputEquals(expected string) {
 func (s *settingsAutoSaveSteps) waitForSingleNodeID() string {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
-		require.NoError(s.t, err)
-
-		nodes, err := models.FindCanvasNodes(canvas.ID)
-		require.NoError(s.t, err)
-
-		if len(nodes) == 1 {
-			return nodes[0].NodeID
+		draft := s.canvas.FindCurrentDraft()
+		if draft != nil && len(draft.Nodes) == 1 {
+			return draft.Nodes[0].ID
 		}
-
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
-
-	nodes, err := models.FindCanvasNodes(canvas.ID)
-	require.NoError(s.t, err)
-
-	require.Len(s.t, nodes, 1, "expected exactly one node in canvas after adding filter")
-	return nodes[0].NodeID
+	draft := s.canvas.FindCurrentDraft()
+	require.NotNil(s.t, draft, "no draft version found")
+	require.Len(s.t, draft.Nodes, 1, "expected exactly one node in draft version after adding filter")
+	return draft.Nodes[0].ID
 }
 
 func (s *settingsAutoSaveSteps) getExpressionField() (any, bool, bool) {
@@ -172,11 +162,17 @@ func (s *settingsAutoSaveSteps) getExpressionField() (any, bool, bool) {
 		return nil, false, false
 	}
 
-	node, err := models.FindCanvasNode(database.Conn(), s.canvas.WorkflowID, s.nodeID)
-	if err != nil {
+	draft := s.canvas.FindCurrentDraft()
+	if draft == nil {
 		return nil, false, false
 	}
 
-	val, exists := node.Configuration.Data()["expression"]
-	return val, exists, true
+	for _, node := range draft.Nodes {
+		if node.ID == s.nodeID {
+			val, exists := node.Configuration["expression"]
+			return val, exists, true
+		}
+	}
+
+	return nil, false, false
 }
