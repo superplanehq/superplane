@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup.ui
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -40,6 +40,7 @@ test.setup.build:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
+	$(MAKE) test.setup.ui
 	$(MAKE) gen.setup.backend
 
 test.setup:
@@ -61,7 +62,10 @@ test.down:
 
 test.e2e.setup:
 	$(MAKE) test.setup
-	$(COMPOSE) exec app bash -c "cd web_src && npm ci"
+	$(MAKE) test.setup.ui
+
+test.setup.ui:
+	$(COMPOSE) exec app bash -lc "cd /app/web_src && npm ci"
 
 test.e2e:
 	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
