@@ -183,7 +183,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if !cmContext.changeManagementEnabled {
-			return fmt.Errorf("change management is disabled for this canvas; use `superplane canvases update` without --draft to update the live canvas directly")
+			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
 		}
 
 		versionID, err = findCurrentUserDraftVersionID(ctx, canvasID)

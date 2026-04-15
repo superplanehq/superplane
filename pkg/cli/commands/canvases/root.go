@@ -28,7 +28,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 	}
 	var getDraft bool
-	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version (only available when change management is enabled)")
+	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version instead of the live version")
 	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
 
 	activeCmd := &cobra.Command{
@@ -70,7 +70,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
-	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "update your draft version (required when change management is enabled)")
+	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")

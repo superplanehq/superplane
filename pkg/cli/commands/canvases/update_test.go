@@ -119,6 +119,7 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 
 	server := newAPITestServer(
 		t,
+		// 1. Describe canvas
 		requestExpectation{
 			method: http.MethodGet,
 			path:   "/api/v1/canvases/" + canvasID,
@@ -127,6 +128,25 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":false}}}`))
 			},
 		},
+		// 2. List versions (no existing draft)
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[]}`))
+			},
+		},
+		// 3. Create draft version
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
+			},
+		},
+		// 4. Update draft version
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
@@ -135,6 +155,16 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
 			},
 		},
+		// 5. Auto-publish (not in draft mode)
+		requestExpectation{
+			method: http.MethodPatch,
+			path:   "/api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
+			},
+		},
+		// 6. Enable change management after spec update
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID,
@@ -159,7 +189,10 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
 	})
 }
@@ -171,6 +204,7 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 
 	server := newAPITestServer(
 		t,
+		// 1. Describe canvas
 		requestExpectation{
 			method: http.MethodGet,
 			path:   "/api/v1/canvases/" + canvasID,
@@ -179,6 +213,7 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":true}}}`))
 			},
 		},
+		// 2. Resolve org to check if disable is allowed
 		requestExpectation{
 			method: http.MethodGet,
 			path:   "/api/v1/me",
@@ -195,6 +230,7 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","changeManagementEnabled":false}}}`))
 			},
 		},
+		// 3. Disable change management
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID,
@@ -207,12 +243,40 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","changeManagementEnabled":false}}}`))
 			},
 		},
+		// 4. List versions (no existing draft)
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[]}`))
+			},
+		},
+		// 5. Create draft version
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
+			},
+		},
+		// 6. Update draft version
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
+			},
+		},
+		// 7. Auto-publish
+		requestExpectation{
+			method: http.MethodPatch,
+			path:   "/api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
 			},
 		},
 	)
@@ -230,7 +294,10 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 		http.MethodGet + " /api/v1/me",
 		http.MethodGet + " /api/v1/organizations/org-1",
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
 	})
 }
 
