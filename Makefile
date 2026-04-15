@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -349,12 +349,17 @@ check.components.docs:
 
 MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
+compose.setup:
+	@touch agent/.env
+
 pb.gen:
+	$(MAKE) compose.setup
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
 
 openapi.spec.gen:
+	$(MAKE) compose.setup
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
 openapi.client.gen:
@@ -373,6 +378,7 @@ openapi.client.gen:
 	rm -rf pkg/openapi_client/git_push.sh
 
 openapi.web.client.gen:
+	$(MAKE) compose.setup
 	rm -rf web_src/src/api-client
 	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm ci && npm run generate:api"
 
