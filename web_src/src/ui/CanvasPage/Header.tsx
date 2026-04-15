@@ -1,11 +1,11 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { MoreVertical, RotateCcw, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
+import { CanvasModeToggle } from "./components/CanvasModeToggle";
 
 type HeaderMode = "default" | "version-live" | "version-edit";
 
@@ -180,11 +180,7 @@ function SecondaryHeader({
   onPublishVersion,
   publishButtonLabel,
   onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
   onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
 }: {
   isDefaultMode: boolean;
   onSave?: () => void;
@@ -217,15 +213,7 @@ function SecondaryHeader({
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
           {showCanvasViewModeToggle && onEnterEditMode && onExitEditMode ? (
-            <CanvasViewModeToggle
-              mode={canvasViewMode}
-              onSelectEditor={onEnterEditMode}
-              onSelectLive={onExitEditMode}
-              enterEditorDisabled={!!enterEditModeDisabled}
-              enterEditorDisabledTooltip={enterEditModeDisabledTooltip}
-              exitEditorDisabled={!!exitEditModeDisabled}
-              exitEditorDisabledTooltip={exitEditModeDisabledTooltip}
-            />
+            <CanvasModeToggle mode={canvasViewMode} onSelectEditor={onEnterEditMode} onSelectLive={onExitEditMode} />
           ) : null}
         </div>
       </div>
@@ -374,81 +362,5 @@ function PublishVersionButton({
     <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
       {label}
     </UIButton>
-  );
-}
-
-type CanvasViewMode = "version-live" | "version-edit";
-
-function CanvasViewModeToggle({
-  mode,
-  onSelectEditor,
-  onSelectLive,
-  enterEditorDisabled,
-  enterEditorDisabledTooltip,
-  exitEditorDisabled,
-  exitEditorDisabledTooltip,
-}: {
-  mode: CanvasViewMode;
-  onSelectEditor: () => void;
-  onSelectLive: () => void;
-  enterEditorDisabled: boolean;
-  enterEditorDisabledTooltip?: string;
-  exitEditorDisabled: boolean;
-  exitEditorDisabledTooltip?: string;
-}) {
-  const handleValueChange = (next: string) => {
-    if (next === "version-edit" && mode === "version-live") {
-      void onSelectEditor();
-    } else if (next === "version-live" && mode === "version-edit") {
-      void onSelectLive();
-    }
-  };
-
-  const editorDisabled = mode === "version-live" && enterEditorDisabled;
-  const liveDisabled = mode === "version-edit" && exitEditorDisabled;
-
-  const editorTrigger = (
-    <TabsTrigger
-      value="version-edit"
-      disabled={editorDisabled}
-      data-testid="canvas-view-mode-editor"
-      aria-label="Editor"
-    >
-      Editor
-    </TabsTrigger>
-  );
-
-  const liveTrigger = (
-    <TabsTrigger
-      value="version-live"
-      disabled={liveDisabled}
-      data-testid="canvas-view-mode-live"
-      aria-label="Live Canvas"
-    >
-      Live Canvas
-    </TabsTrigger>
-  );
-
-  return (
-    <Tabs value={mode} onValueChange={handleValueChange} className="inline-flex w-auto" aria-label="Canvas view">
-      <TabsList className="h-8 w-fit gap-0">
-        {editorDisabled && enterEditorDisabledTooltip ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{editorTrigger}</TooltipTrigger>
-            <TooltipContent side="top">{enterEditorDisabledTooltip}</TooltipContent>
-          </Tooltip>
-        ) : (
-          editorTrigger
-        )}
-        {liveDisabled && exitEditorDisabledTooltip ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{liveTrigger}</TooltipTrigger>
-            <TooltipContent side="top">{exitEditorDisabledTooltip}</TooltipContent>
-          </Tooltip>
-        ) : (
-          liveTrigger
-        )}
-      </TabsList>
-    </Tabs>
   );
 }

@@ -1732,11 +1732,7 @@ function CanvasContentHeader({
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
       onEnterEditMode={onEnterEditMode}
-      enterEditModeDisabled={enterEditModeDisabled}
-      enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
       onExitEditMode={onExitEditMode}
-      exitEditModeDisabled={exitEditModeDisabled}
-      exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       publishVersionLabel={publishVersionLabel}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
