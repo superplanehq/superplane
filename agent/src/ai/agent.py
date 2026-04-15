@@ -72,12 +72,12 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         if answer.proposal is None or not answer.proposal.operations:
             return answer
 
-        cache_key = (
-            f"{ctx.deps.canvas_id}:{ctx.deps.canvas_version_id or 'inspect'}"
-        )
+        cache_key = f"{ctx.deps.canvas_id}:{ctx.deps.canvas_version_id or 'inspect'}"
         canvas = ctx.deps.canvas_cache.get(cache_key)
         coerced = coerce_canvas_answer_proposal(
-            ctx.deps.client, answer, canvas,
+            ctx.deps.client,
+            answer,
+            canvas,
         )
 
         errors = validate_proposal_operations(
@@ -88,8 +88,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         if errors:
             raise ModelRetry(
                 "The proposal has invalid node configuration. "
-                "Fix these errors and try again:\n"
-                + "\n".join(f"- {e}" for e in errors)
+                "Fix these errors and try again:\n" + "\n".join(f"- {e}" for e in errors)
             )
         return coerced
 

@@ -27,24 +27,26 @@ from ai.superplane_client import SuperplaneClient
 
 _LOG = logging.getLogger(__name__)
 
-_STRING_LIKE_TYPES = frozenset({
-    "string",
-    "text",
-    "expression",
-    "xml",
-    "time",
-    "time-range",
-    "date",
-    "datetime",
-    "day-in-year",
-    "cron",
-    "timezone",
-    "user",
-    "role",
-    "group",
-    "git-ref",
-    "secret-key",
-})
+_STRING_LIKE_TYPES = frozenset(
+    {
+        "string",
+        "text",
+        "expression",
+        "xml",
+        "time",
+        "time-range",
+        "date",
+        "datetime",
+        "day-in-year",
+        "cron",
+        "timezone",
+        "user",
+        "role",
+        "group",
+        "git-ref",
+        "secret-key",
+    }
+)
 
 
 def _select_options(field: dict[str, Any]) -> list[str] | None:
@@ -245,14 +247,17 @@ def validate_proposal_operations(
 
         elif isinstance(op, UpdateNodeConfigOperation):
             block_name = _resolve_block_name_for_update(
-                op, block_by_node_key, canvas,
+                op,
+                block_by_node_key,
+                canvas,
             )
             if block_name:
                 fields = _cached_block_fields(client, block_name, schema_cache)
                 if fields:
                     node_label = op.node_name or block_name
                     for msg in validate_configuration(
-                        dict(op.configuration), fields,
+                        dict(op.configuration),
+                        fields,
                     ):
                         errors.append(f"{node_label} ({block_name}): {msg}")
 

@@ -149,9 +149,13 @@ def test_multi_select_rejects_invalid_option() -> None:
 
 
 def test_multi_select_without_options_accepts_string_list() -> None:
-    assert validate_value_for_field(
-        _field(ftype="multi-select"), ["x", "y"],
-    ) is None
+    assert (
+        validate_value_for_field(
+            _field(ftype="multi-select"),
+            ["x", "y"],
+        )
+        is None
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -172,9 +176,13 @@ _OBJECT_WITH_SCHEMA = _field(
 
 
 def test_object_with_schema_accepts_dict() -> None:
-    assert validate_value_for_field(
-        _OBJECT_WITH_SCHEMA, {"enabled": True},
-    ) is None
+    assert (
+        validate_value_for_field(
+            _OBJECT_WITH_SCHEMA,
+            {"enabled": True},
+        )
+        is None
+    )
 
 
 def test_object_with_schema_rejects_list() -> None:
@@ -187,7 +195,8 @@ def test_object_with_schema_rejects_string() -> None:
 
 def test_object_with_schema_validates_nested() -> None:
     err = validate_value_for_field(
-        _OBJECT_WITH_SCHEMA, {"enabled": "yes"},
+        _OBJECT_WITH_SCHEMA,
+        {"enabled": "yes"},
     )
     assert err is not None
     assert "boolean" in err
@@ -229,20 +238,29 @@ _LIST_WITH_ITEM_SCHEMA = _field(
 
 
 def test_list_accepts_list() -> None:
-    assert validate_value_for_field(
-        _LIST_WITH_ITEM_SCHEMA, [{"key": "a"}],
-    ) is None
+    assert (
+        validate_value_for_field(
+            _LIST_WITH_ITEM_SCHEMA,
+            [{"key": "a"}],
+        )
+        is None
+    )
 
 
 def test_list_rejects_non_list() -> None:
-    assert validate_value_for_field(
-        _LIST_WITH_ITEM_SCHEMA, "not a list",
-    ) is not None
+    assert (
+        validate_value_for_field(
+            _LIST_WITH_ITEM_SCHEMA,
+            "not a list",
+        )
+        is not None
+    )
 
 
 def test_list_validates_item_schema() -> None:
     err = validate_value_for_field(
-        _LIST_WITH_ITEM_SCHEMA, [{"key": 123}],
+        _LIST_WITH_ITEM_SCHEMA,
+        [{"key": 123}],
     )
     assert err is not None
     assert "item 0" in err
@@ -254,21 +272,33 @@ def test_list_validates_item_schema() -> None:
 
 
 def test_days_of_week_accepts_string_list() -> None:
-    assert validate_value_for_field(
-        _field(ftype="days-of-week"), ["monday", "friday"],
-    ) is None
+    assert (
+        validate_value_for_field(
+            _field(ftype="days-of-week"),
+            ["monday", "friday"],
+        )
+        is None
+    )
 
 
 def test_days_of_week_rejects_non_list() -> None:
-    assert validate_value_for_field(
-        _field(ftype="days-of-week"), "monday",
-    ) is not None
+    assert (
+        validate_value_for_field(
+            _field(ftype="days-of-week"),
+            "monday",
+        )
+        is not None
+    )
 
 
 def test_days_of_week_rejects_non_string_item() -> None:
-    assert validate_value_for_field(
-        _field(ftype="days-of-week"), [1, 2],
-    ) is not None
+    assert (
+        validate_value_for_field(
+            _field(ftype="days-of-week"),
+            [1, 2],
+        )
+        is not None
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -277,15 +307,23 @@ def test_days_of_week_rejects_non_string_item() -> None:
 
 
 def test_integration_resource_single_accepts_string() -> None:
-    assert validate_value_for_field(
-        _field(ftype="integration-resource"), "res-1",
-    ) is None
+    assert (
+        validate_value_for_field(
+            _field(ftype="integration-resource"),
+            "res-1",
+        )
+        is None
+    )
 
 
 def test_integration_resource_single_rejects_list() -> None:
-    assert validate_value_for_field(
-        _field(ftype="integration-resource"), ["a"],
-    ) is not None
+    assert (
+        validate_value_for_field(
+            _field(ftype="integration-resource"),
+            ["a"],
+        )
+        is not None
+    )
 
 
 def test_integration_resource_multi_accepts_list() -> None:
