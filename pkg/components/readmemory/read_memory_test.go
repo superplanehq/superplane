@@ -90,7 +90,7 @@ func TestReadMemoryExecute(t *testing.T) {
 				"emitMode":   EmitModeAllAtOnce,
 				"count":      1,
 			},
-			nodeMetadata.Get(),
+			execMetadata.Get(),
 		)
 	})
 

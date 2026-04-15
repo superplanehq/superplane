@@ -146,8 +146,8 @@ type ExecutionContext struct {
 	Configuration  any
 	Logger         *log.Entry
 	HTTP           HTTPContext
-	Metadata       MetadataContext
-	NodeMetadata   MetadataContext
+	Metadata       MetadataWriter
+	NodeMetadata   MetadataReader
 	ExecutionState ExecutionStateContext
 	Requests       RequestContext
 	Auth           AuthReader
@@ -182,20 +182,11 @@ type SetupContext struct {
 	Logger        *log.Entry
 	Configuration any
 	HTTP          HTTPContext
-	Metadata      MetadataContext
+	Metadata      MetadataWriter
 	Requests      RequestContext
 	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
-}
-
-/*
- * MetadataContext allows components to store/retrieve
- * component-specific information about each execution.
- */
-type MetadataContext interface {
-	Get() any
-	Set(any) error
 }
 
 type CanvasMemoryContext interface {
@@ -260,7 +251,7 @@ type ActionContext struct {
 	Parameters     map[string]any
 	Logger         *log.Entry
 	HTTP           HTTPContext
-	Metadata       MetadataContext
+	Metadata       MetadataWriter
 	ExecutionState ExecutionStateContext
 	Auth           AuthReader
 	Requests       RequestContext

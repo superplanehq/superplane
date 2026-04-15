@@ -344,7 +344,7 @@ func (t *OnDocumentIndexed) Cleanup(ctx core.TriggerContext) error {
 	return client.DeleteKibanaRule(meta.RuleID)
 }
 
-func loadDocumentIndexedMetadata(metadata core.MetadataContext) OnDocumentIndexedMetadata {
+func loadDocumentIndexedMetadata(metadata core.MetadataWriter) OnDocumentIndexedMetadata {
 	var meta OnDocumentIndexedMetadata
 	if metadata == nil {
 		return meta
