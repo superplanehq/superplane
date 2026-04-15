@@ -71,9 +71,20 @@ function YamlEditor(props: CanvasYamlModalProps) {
 }
 
 function ImportButton(props: CanvasYamlModalProps) {
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  if (!props.onImport) {
+    return null;
+  }
 
-  if (!props.onImport) return null;
+  return <ImportButtonWithDialog onImport={props.onImport} isImporting={props.isImporting} />;
+}
+
+type ImportButtonWithDialogProps = {
+  onImport: NonNullable<CanvasYamlModalProps["onImport"]>;
+  isImporting?: boolean;
+};
+
+function ImportButtonWithDialog({ onImport, isImporting }: ImportButtonWithDialogProps) {
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   return (
     <>
@@ -84,8 +95,8 @@ function ImportButton(props: CanvasYamlModalProps) {
       <ImportYamlIntoCanvasDialog
         open={isImportDialogOpen}
         onOpenChange={setIsImportDialogOpen}
-        onImport={props.onImport}
-        isImporting={props.isImporting}
+        onImport={onImport}
+        isImporting={isImporting}
       />
     </>
   );
