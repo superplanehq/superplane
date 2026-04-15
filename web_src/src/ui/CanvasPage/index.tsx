@@ -17,6 +17,7 @@ import {
 
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
@@ -191,6 +192,8 @@ export interface CanvasPageProps {
   showCanvasSettingsMenu?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  /** When set, the right rail shows a YAML action that opens this body in a modal (e.g. workflow canvas). */
+  yamlEditorModalBody?: React.ReactNode;
   dataViewContent?: React.ReactNode;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
@@ -711,6 +714,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
+  const [isYamlEditorModalOpen, setIsYamlEditorModalOpen] = useState(false);
   const [emitModalData, setEmitModalData] = useState<{
     nodeId: string;
     nodeName: string;
@@ -1232,6 +1236,7 @@ function CanvasPage(props: CanvasPageProps) {
             readOnly={readOnly}
             onSidebarOpen={() => handleSidebarToggle(true)}
             onAddNote={handleAddNote}
+            onOpenYamlModal={() => setIsYamlEditorModalOpen(true)}
           />
 
           {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
@@ -1419,6 +1424,18 @@ function CanvasPage(props: CanvasPageProps) {
           initialData={emitModalData.initialData}
         />
       )}
+
+      {props.yamlEditorModalBody ? (
+        <Dialog open={isYamlEditorModalOpen} onOpenChange={setIsYamlEditorModalOpen}>
+          <DialogContent
+            size="large"
+            className="flex max-h-[90vh] w-[min(95vw,56rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          >
+            <DialogTitle className="sr-only">Canvas YAML</DialogTitle>
+            <div className="flex h-[min(75vh,720px)] w-full min-h-[320px] flex-col">{props.yamlEditorModalBody}</div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

@@ -176,15 +176,6 @@ export function Header({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onTopViewModeChange("yaml")}
-                  className={`rounded-sm px-2 py-0.5 ${
-                    topViewMode === "yaml" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  YAML
-                </button>
-                <button
-                  type="button"
                   onClick={() => onTopViewModeChange("cli")}
                   className={`rounded-sm px-2 py-0.5 ${
                     topViewMode === "cli" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"

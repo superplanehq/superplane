@@ -5106,6 +5106,18 @@ export function WorkflowPageV2() {
           hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           dataViewContent={dataViewContent}
+          yamlEditorModalBody={
+            yamlPayload ? (
+              <CanvasYamlView
+                yamlText={yamlPayload.yamlText}
+                filename={yamlPayload.filename}
+                onCopy={handleYamlViewCopy}
+                onDownload={handleYamlViewDownload}
+                onImport={!isReadOnly ? handleImportYaml : undefined}
+                isImporting={hasLocalSaveActivity}
+              />
+            ) : undefined
+          }
           nodes={nodes}
           edges={edges}
           organizationId={organizationId}
