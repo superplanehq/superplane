@@ -150,7 +150,7 @@ type ExecutionContext struct {
 	NodeMetadata   MetadataContext
 	ExecutionState ExecutionStateContext
 	Requests       RequestContext
-	Auth           AuthContext
+	Auth           AuthReader
 	Integration    IntegrationContext
 	Notifications  NotificationContext
 	Secrets        SecretsContext
@@ -184,7 +184,7 @@ type SetupContext struct {
 	HTTP          HTTPContext
 	Metadata      MetadataContext
 	Requests      RequestContext
-	Auth          AuthContext
+	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
 }
@@ -262,7 +262,7 @@ type ActionContext struct {
 	HTTP           HTTPContext
 	Metadata       MetadataContext
 	ExecutionState ExecutionStateContext
-	Auth           AuthContext
+	Auth           AuthReader
 	Requests       RequestContext
 	Integration    IntegrationContext
 	Notifications  NotificationContext
@@ -317,15 +317,6 @@ type ProcessQueueContext struct {
 	// same source)
 	//
 	DistinctIncomingSources func() ([]Node, error)
-}
-
-type AuthContext interface {
-	AuthenticatedUser() *User
-	GetUser(id uuid.UUID) (*User, error)
-	GetRole(name string) (*RoleRef, error)
-	GetGroup(name string) (*GroupRef, error)
-	HasRole(role string) (bool, error)
-	InGroup(group string) (bool, error)
 }
 
 type NotificationReceivers struct {
