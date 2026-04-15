@@ -16,7 +16,6 @@ interface HeaderProps {
   onDiscardVersion?: () => void;
   onLogoClick?: () => void;
   organizationId?: string;
-  unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
@@ -44,7 +43,6 @@ export function Header({
   onDiscardVersion,
   onLogoClick,
   organizationId,
-  unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
   saveDisabled,
@@ -82,7 +80,6 @@ export function Header({
 
       <SecondaryHeader
         isDefaultMode={isDefaultMode}
-        unsavedMessage={unsavedMessage}
         onSave={onSave}
         saveButtonHidden={saveButtonHidden}
         saveDisabled={saveDisabled}
@@ -158,7 +155,6 @@ function PageHeader({
 
 function SecondaryHeader({
   isDefaultMode,
-  unsavedMessage,
   onSave,
   saveButtonHidden,
   saveDisabled,
@@ -179,7 +175,6 @@ function SecondaryHeader({
   onEnterEditMode,
 }: {
   isDefaultMode: boolean;
-  unsavedMessage?: string;
   onSave?: () => void;
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
@@ -201,44 +196,35 @@ function SecondaryHeader({
 }) {
   return (
     <div className="relative flex h-12 items-center justify-end gap-2 px-4">
-      {isDefaultMode ? (
-        <>
-          {unsavedMessage ? (
-            <span className="hidden rounded bg-orange-100 px-2 py-1 text-xs font-medium text-yellow-700 sm:inline">
-              {unsavedMessage}
-            </span>
-          ) : null}
-          {onSave && !saveButtonHidden ? (
-            saveDisabled && saveDisabledTooltip ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex">
-                    <Button
-                      onClick={onSave}
-                      size="sm"
-                      variant={saveIsPrimary ? "default" : "outline"}
-                      data-testid="save-canvas-button"
-                      disabled={saveDisabled}
-                    >
-                      Save
-                    </Button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                onClick={onSave}
-                size="sm"
-                variant={saveIsPrimary ? "default" : "outline"}
-                data-testid="save-canvas-button"
-                disabled={saveDisabled}
-              >
-                Save
-              </Button>
-            )
-          ) : null}
-        </>
+      {isDefaultMode && onSave && !saveButtonHidden ? (
+        saveDisabled && saveDisabledTooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="inline-flex">
+                <Button
+                  onClick={onSave}
+                  size="sm"
+                  variant={saveIsPrimary ? "default" : "outline"}
+                  data-testid="save-canvas-button"
+                  disabled={saveDisabled}
+                >
+                  Save
+                </Button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            onClick={onSave}
+            size="sm"
+            variant={saveIsPrimary ? "default" : "outline"}
+            data-testid="save-canvas-button"
+            disabled={saveDisabled}
+          >
+            Save
+          </Button>
+        )
       ) : null}
 
       {showVersionEditActions ? (

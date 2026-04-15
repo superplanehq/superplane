@@ -159,7 +159,6 @@ export interface CanvasPageProps {
   headerBanner?: React.ReactNode;
   organizationId?: string;
   canvasId?: string;
-  unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
@@ -1157,7 +1156,6 @@ function CanvasPage(props: CanvasPageProps) {
           canvasName={props.title ?? ""}
           onSave={props.onSave}
           organizationId={props.organizationId}
-          unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
           saveButtonHidden={props.saveButtonHidden}
           saveDisabled={props.saveDisabled}
@@ -1686,7 +1684,6 @@ function CanvasContentHeader({
   canvasName,
   onSave,
   organizationId,
-  unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
   saveDisabled,
@@ -1709,7 +1706,6 @@ function CanvasContentHeader({
   canvasName: string;
   onSave?: (nodes: CanvasNode[]) => void;
   organizationId?: string;
-  unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
@@ -1749,7 +1745,6 @@ function CanvasContentHeader({
       onSave={onSave ? handleSave : undefined}
       onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
-      unsavedMessage={unsavedMessage}
       saveIsPrimary={saveIsPrimary}
       saveButtonHidden={saveButtonHidden}
       saveDisabled={saveDisabled}
