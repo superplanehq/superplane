@@ -26,6 +26,7 @@ func ApplyCanvasVersionChangeset(
 	canvasID uuid.UUID,
 	versionID uuid.UUID,
 	changeset *pb.CanvasChangeset,
+	autoLayout *pb.CanvasAutoLayout,
 ) (*pb.ApplyCanvasVersionChangesetResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
@@ -66,7 +67,7 @@ func ApplyCanvasVersionChangeset(
 		// Apply operations to version.
 		//
 		patcher := changesets.NewCanvasPatcher(tx, organizationID, registry, version)
-		err = patcher.ApplyChangeset(changeset)
+		err = patcher.ApplyChangeset(changeset, autoLayout)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "failed to update canvas version: %v", err)
 		}

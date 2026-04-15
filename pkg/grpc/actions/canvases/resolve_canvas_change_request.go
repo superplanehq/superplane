@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -63,7 +64,7 @@ func ResolveCanvasChangeRequest(
 	if err != nil {
 		return nil, err
 	}
-	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
+	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, err
 	}
