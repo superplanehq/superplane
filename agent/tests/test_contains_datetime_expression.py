@@ -1,7 +1,7 @@
 from pydantic_evals.evaluators import EvaluatorContext
 from pydantic_evals.otel._errors import SpanTreeRecordingError
 
-from ai.models import CanvasAnswer, CanvasProposal
+from ai.models import CanvasAnswer, CanvasChangeset, CanvasProposal
 from evals.evaluators.contains_datetime_expression import ContainsDatetimeExpression
 
 
@@ -25,19 +25,21 @@ def _answer_with_expression(expression: str) -> CanvasAnswer:
         confidence=0.9,
         proposal=CanvasProposal(
             summary="Add filter with datetime expression.",
-            changeset={
-                "changes": [
-                    {
-                        "type": "ADD_NODE",
-                        "node": {
-                            "id": "filter_1",
-                            "name": "Filter",
-                            "block": "filter",
-                            "configuration": {"expression": expression},
+            changeset=CanvasChangeset.model_validate(
+                {
+                    "changes": [
+                        {
+                            "type": "ADD_NODE",
+                            "node": {
+                                "id": "filter_1",
+                                "name": "Filter",
+                                "block": "filter",
+                                "configuration": {"expression": expression},
+                            },
                         },
-                    },
-                ]
-            },
+                    ]
+                }
+            ),
         ),
     )
 

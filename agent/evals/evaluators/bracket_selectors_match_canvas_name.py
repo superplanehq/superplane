@@ -1,11 +1,11 @@
 import re
-from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
 from ai.models import CanvasAnswer, CanvasChange, CanvasChangeType
+from evals.evaluators.workflow_utils import iter_config_strings_from_changes
 
 _BRACKET_SINGLE_QUOTED = re.compile(r"\$\[\s*'([^']*)'\s*\]")
 _BRACKET_DOUBLE_QUOTED = re.compile(r'\$\[\s*"([^"]*)"\s*\]')
@@ -102,38 +102,10 @@ def _collect_config_texts_for_bracket_scan(
         candidates = list(add_changes)
 
     texts: list[str] = []
-    for change in candidates:
-        if change.node is None:
-            continue
-        if not isinstance(change.node.configuration, dict):
-            continue
-        texts.extend(_iter_strings_in_value(change.node.configuration))
+    texts.extend(iter_config_strings_from_changes(candidates))
     return texts
 
 
 def _extract_bracket_keys(text: str) -> list[str]:
     keys = _BRACKET_SINGLE_QUOTED.findall(text) + _BRACKET_DOUBLE_QUOTED.findall(text)
     return [k for k in keys if k]
-
-
-def iter_config_strings_from_operations(
-    changes: list[CanvasChange],
-) -> Iterator[str]:
-    for change in changes:
-        if change.node is None:
-            continue
-        if change.type not in (CanvasChangeType.ADD_NODE, CanvasChangeType.UPDATE_NODE):
-            continue
-        if isinstance(change.node.configuration, dict):
-            yield from _iter_strings_in_value(change.node.configuration)
-
-
-def _iter_strings_in_value(value: Any) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for nested in value.values():
-            yield from _iter_strings_in_value(nested)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _iter_strings_in_value(item)

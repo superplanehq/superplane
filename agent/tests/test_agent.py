@@ -15,7 +15,7 @@ from ai.agent import (
     build_agent,
 )
 from ai.jsonutil import to_jsonable
-from ai.models import CanvasAnswer, CanvasProposal
+from ai.models import CanvasAnswer, CanvasChangeset, CanvasProposal
 
 
 def test_build_agent_returns_agent_instance() -> None:
@@ -29,34 +29,36 @@ def test_canvas_answer_serializes_proposal_with_aliases() -> None:
         confidence=0.8,
         proposal=CanvasProposal(
             summary="Add a webhook trigger and connect to Slack.",
-            changeset={
-                "changes": [
-                    {
-                        "type": "ADD_NODE",
-                        "node": {
-                            "id": "trigger_1",
-                            "name": "Inbound Webhook",
-                            "block": "webhook.inbound",
+            changeset=CanvasChangeset.model_validate(
+                {
+                    "changes": [
+                        {
+                            "type": "ADD_NODE",
+                            "node": {
+                                "id": "trigger_1",
+                                "name": "Inbound Webhook",
+                                "block": "webhook.inbound",
+                            },
                         },
-                    },
-                    {
-                        "type": "ADD_NODE",
-                        "node": {
-                            "id": "slack_1",
-                            "name": "Send Slack Message",
-                            "block": "slack.send_message",
+                        {
+                            "type": "ADD_NODE",
+                            "node": {
+                                "id": "slack_1",
+                                "name": "Send Slack Message",
+                                "block": "slack.send_message",
+                            },
                         },
-                    },
-                    {
-                        "type": "ADD_EDGE",
-                        "edge": {
-                            "sourceId": "trigger_1",
-                            "targetId": "slack_1",
-                            "channel": "default",
+                        {
+                            "type": "ADD_EDGE",
+                            "edge": {
+                                "sourceId": "trigger_1",
+                                "targetId": "slack_1",
+                                "channel": "default",
+                            },
                         },
-                    },
-                ]
-            },
+                    ]
+                }
+            ),
         ),
     )
 
@@ -151,7 +153,7 @@ def test_validate_answer_proposal_calls_server_validation(monkeypatch: pytest.Mo
     answer = CanvasAnswer(
         answer="Plan ready",
         confidence=0.9,
-        proposal=CanvasProposal(summary="s", changeset={"changes": []}),
+        proposal=CanvasProposal(summary="s", changeset=CanvasChangeset(changes=[])),
     )
 
     result = validator(SimpleNamespace(deps=deps), answer)
@@ -182,7 +184,7 @@ def test_validate_answer_proposal_raises_retry_on_validation_failure(
     answer = CanvasAnswer(
         answer="Plan ready",
         confidence=0.9,
-        proposal=CanvasProposal(summary="s", changeset={"changes": []}),
+        proposal=CanvasProposal(summary="s", changeset=CanvasChangeset(changes=[])),
     )
 
     with pytest.raises(ModelRetry):
@@ -205,7 +207,7 @@ def test_validate_answer_proposal_raises_retry_without_canvas_version(
     answer = CanvasAnswer(
         answer="Plan ready",
         confidence=0.9,
-        proposal=CanvasProposal(summary="s", changeset={"changes": []}),
+        proposal=CanvasProposal(summary="s", changeset=CanvasChangeset(changes=[])),
     )
 
     with pytest.raises(ModelRetry):
