@@ -27,7 +27,7 @@ func UpdateCanvas(
 	id string,
 	name *string,
 	description *string,
-	versioningEnabled *bool,
+	changeManagementEnabled *bool,
 	changeRequestApprovalConfig *pb.CanvasChangeRequestApprovalConfig,
 ) (*pb.UpdateCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
@@ -90,8 +90,8 @@ func UpdateCanvas(
 		}
 	}
 
-	if versioningEnabled != nil && canvas.VersioningEnabled != *versioningEnabled {
-		canvas.VersioningEnabled = *versioningEnabled
+	if changeManagementEnabled != nil && canvas.ChangeManagementEnabled != *changeManagementEnabled {
+		canvas.ChangeManagementEnabled = *changeManagementEnabled
 		changed = true
 	}
 
