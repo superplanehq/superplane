@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.test import TestModel
 
@@ -19,6 +19,7 @@ from ai.skills import skill_index_markdown
 from ai.tools import default_tools
 
 __all__ = [
+    "Agent",
     "AgentContextState",
     "AgentDeps",
     "CatalogListKind",
@@ -67,8 +68,27 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         ctx: RunContext[AgentDeps],
         answer: CanvasAnswer,
     ) -> CanvasAnswer:
-        # Placeholder for proposal validation.
-        #   raise ModelRetry("... explain why the proposal is invalid and what to do about it.")
+        if answer.proposal is None:
+            return answer
+
+        canvas_version_id = ctx.deps.canvas_version_id
+        if not canvas_version_id:
+            raise ModelRetry(
+                "Proposal validation requires a canvas version id. "
+                "Return an answer without proposal when no build context is available."
+            )
+
+        try:
+            ctx.deps.client.validate_canvas_version_changeset(
+                canvas_id=ctx.deps.canvas_id,
+                canvas_version_id=canvas_version_id,
+                changeset=answer.proposal.changeset,
+            )
+        except (RuntimeError, ValueError) as error:
+            raise ModelRetry(
+                "The proposal changeset failed server-side validation. "
+                f"Update the changeset and retry. Error: {error}"
+            ) from error
 
         return answer
 

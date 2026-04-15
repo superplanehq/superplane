@@ -4,6 +4,7 @@ import { normalizeAiProposal } from "./agentChatProposal";
 
 type JsonObject = Record<string, unknown>;
 type ToolEvent = Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>;
+type FinalAnswerOutput = string | { answer?: string; proposal?: AiBuilderProposal };
 
 export type ChatStreamEvent =
   | { type: "run_started"; model?: string }
@@ -15,7 +16,7 @@ export type ChatStreamEvent =
       tool_call_id?: string;
       tool_label?: string;
     }
-  | { type: "final_answer"; output?: unknown }
+  | { type: "final_answer"; output?: FinalAnswerOutput }
   | { type: "run_failed"; error?: string }
   | { type: "run_completed" }
   | { type: "done" }
@@ -84,9 +85,26 @@ function normalizeToolFinishedEvent(value: JsonObject): ChatStreamEvent {
 }
 
 function normalizeFinalAnswerEvent(value: JsonObject): ChatStreamEvent {
+  const output = value.output;
+  if (typeof output === "string") {
+    return {
+      type: "final_answer",
+      output,
+    };
+  }
+
+  if (isRecord(output)) {
+    return {
+      type: "final_answer",
+      output: {
+        answer: typeof output.answer === "string" ? output.answer : undefined,
+        proposal: normalizeAiProposal(output.proposal) ?? undefined,
+      },
+    };
+  }
+
   return {
     type: "final_answer",
-    output: value.output,
   };
 }
 
@@ -336,15 +354,15 @@ function appendFinalAnswerContent({
   testModeHint,
   testModelSentinel,
 }: {
-  output: unknown;
+  output?: FinalAnswerOutput;
   state: StreamState;
   appendAssistantContent: (chunk: string) => void;
   setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
   testModeHint: string;
   testModelSentinel: string;
 }): void {
-  if (isRecord(output)) {
-    setPendingProposal(normalizeAiProposal(output.proposal));
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    setPendingProposal(output.proposal ?? null);
   }
 
   if (state.streamedAnyAnswer) {
@@ -367,7 +385,7 @@ function appendFinalAnswerContent({
     return;
   }
 
-  if (isRecord(output) && typeof output.answer === "string") {
+  if (output && typeof output === "object" && !Array.isArray(output) && typeof output.answer === "string") {
     state.streamedAnyAnswer = true;
     appendAssistantContent(output.answer);
   }
