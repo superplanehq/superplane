@@ -65,7 +65,7 @@ func ApplyCanvasVersionChangeset(
 		//
 		// Apply operations to version.
 		//
-		patcher := changesets.NewCanvasPatcher(registry, version)
+		patcher := changesets.NewCanvasPatcher(tx, organizationID, registry, version)
 		err = patcher.ApplyChangeset(changeset)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "failed to update canvas version: %v", err)
