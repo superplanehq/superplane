@@ -209,12 +209,15 @@ function OpenBuildingBlocksSidebar({
       }
 
       setChatSessions((previous) => previous.filter((s) => s.id !== chatId));
-      setCurrentChatId((previous) => (previous === chatId ? null : previous));
-      if (currentChatId === chatId) {
-        setAiMessages([]);
-        setPendingProposal(null);
-        setAiError(null);
-      }
+      setCurrentChatId((previous) => {
+        if (previous === chatId) {
+          setAiMessages([]);
+          setPendingProposal(null);
+          setAiError(null);
+          return null;
+        }
+        return previous;
+      });
 
       void deleteAgentChatSession({ chatId, canvasId, organizationId }).then(
         () => showSuccessToast("Conversation deleted"),
@@ -227,7 +230,7 @@ function OpenBuildingBlocksSidebar({
         },
       );
     },
-    [canvasId, organizationId, currentChatId],
+    [canvasId, organizationId],
   );
 
   const handleDiscardProposal = useCallback(() => {
