@@ -1,8 +1,19 @@
+import { useState } from "react";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
 import type { AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
 import { cn } from "@/lib/utils";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alertDialog";
 
 export type ConversationListProps = {
   chatSessions: AiChatSession[];
@@ -10,6 +21,7 @@ export type ConversationListProps = {
   isLoadingChatSessions: boolean;
   isGeneratingResponse: boolean;
   onSelectChat: (chatId: string) => void;
+  onDeleteChat?: (chatId: string) => void;
   onStartNewSession: () => void;
   title?: string;
   className?: string;
@@ -36,11 +48,14 @@ export function ConversationList({
   isLoadingChatSessions,
   isGeneratingResponse,
   onSelectChat,
+  onDeleteChat,
   onStartNewSession,
   title,
   className,
   fillAvailable = false,
 }: ConversationListProps) {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
   const currentSession = currentChatId ? chatSessions.find((s) => s.id === currentChatId) : undefined;
   const showCurrentSessionHeader = Boolean(currentChatId);
 
@@ -112,25 +127,71 @@ export function ConversationList({
 
           {chatSessions.map((session) => {
             return (
-              <button
-                key={session.id}
-                type="button"
-                onClick={() => onSelectChat(session.id)}
-                disabled={isGeneratingResponse}
-                title={session.createdAt ? formatSessionDate(session.createdAt) : undefined}
-                className="w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                <div className="flex min-w-0 items-center justify-between gap-2">
-                  <div className="min-w-0 truncate text-sm font-medium">{session.title}</div>
-                  {session.createdAt ? (
-                    <TimeAgo date={session.createdAt} className="shrink-0 text-[11px] tabular-nums text-slate-500" />
-                  ) : null}
-                </div>
-              </button>
+              <div key={session.id} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => onSelectChat(session.id)}
+                  disabled={isGeneratingResponse}
+                  title={session.createdAt ? formatSessionDate(session.createdAt) : undefined}
+                  className="w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-sm font-medium">{session.title}</div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {session.createdAt ? (
+                        <TimeAgo
+                          date={session.createdAt}
+                          className="shrink-0 text-[11px] tabular-nums text-slate-500 group-hover:hidden"
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                </button>
+                {onDeleteChat ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPendingDeleteId(session.id);
+                    }}
+                    disabled={isGeneratingResponse}
+                    className="absolute top-1/2 right-2 hidden -translate-y-1/2 rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-red-500 group-hover:block"
+                    aria-label="Delete conversation"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </div>
             );
           })}
         </div>
       ) : null}
+
+      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteId && onDeleteChat) {
+                  onDeleteChat(pendingDeleteId);
+                }
+                setPendingDeleteId(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

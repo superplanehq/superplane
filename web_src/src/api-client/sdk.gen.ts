@@ -6,6 +6,9 @@ import type {
   AgentsCreateAgentChatData,
   AgentsCreateAgentChatErrors,
   AgentsCreateAgentChatResponses,
+  AgentsDeleteAgentChatData,
+  AgentsDeleteAgentChatErrors,
+  AgentsDeleteAgentChatResponses,
   AgentsDescribeAgentChatData,
   AgentsDescribeAgentChatErrors,
   AgentsDescribeAgentChatResponses,
@@ -365,6 +368,19 @@ export const agentsCreateAgentChat = <ThrowOnError extends boolean = true>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Delete an agent chat
+ *
+ * Permanently deletes an agent chat and all its messages
+ */
+export const agentsDeleteAgentChat = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsDeleteAgentChatData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<AgentsDeleteAgentChatResponses, AgentsDeleteAgentChatErrors, ThrowOnError>({
+    url: "/api/v1/agents/chats/{chatId}",
+    ...options,
   });
 
 /**

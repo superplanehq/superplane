@@ -36,6 +36,10 @@ export type AgentsCreateAgentChatResponse = {
   url?: string;
 };
 
+export type AgentsDeleteAgentChatResponse = {
+  [key: string]: unknown;
+};
+
 export type AgentsDescribeAgentChatResponse = {
   chat?: AgentsAgentChatInfo;
 };
@@ -1547,6 +1551,35 @@ export type AgentsCreateAgentChatResponses = {
 };
 
 export type AgentsCreateAgentChatResponse2 = AgentsCreateAgentChatResponses[keyof AgentsCreateAgentChatResponses];
+
+export type AgentsDeleteAgentChatData = {
+  body?: never;
+  path: {
+    chatId: string;
+  };
+  query?: {
+    canvasId?: string;
+  };
+  url: "/api/v1/agents/chats/{chatId}";
+};
+
+export type AgentsDeleteAgentChatErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsDeleteAgentChatError = AgentsDeleteAgentChatErrors[keyof AgentsDeleteAgentChatErrors];
+
+export type AgentsDeleteAgentChatResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsDeleteAgentChatResponse;
+};
+
+export type AgentsDeleteAgentChatResponse2 = AgentsDeleteAgentChatResponses[keyof AgentsDeleteAgentChatResponses];
 
 export type AgentsDescribeAgentChatData = {
   body?: never;

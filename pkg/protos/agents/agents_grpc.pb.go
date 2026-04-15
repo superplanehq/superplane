@@ -24,6 +24,7 @@ const (
 	Agents_DescribeAgentChat_FullMethodName     = "/Superplane.Agents.Agents/DescribeAgentChat"
 	Agents_ListAgentChatMessages_FullMethodName = "/Superplane.Agents.Agents/ListAgentChatMessages"
 	Agents_ResumeAgentChat_FullMethodName       = "/Superplane.Agents.Agents/ResumeAgentChat"
+	Agents_DeleteAgentChat_FullMethodName       = "/Superplane.Agents.Agents/DeleteAgentChat"
 )
 
 // AgentsClient is the client API for Agents service.
@@ -35,6 +36,7 @@ type AgentsClient interface {
 	DescribeAgentChat(ctx context.Context, in *DescribeAgentChatRequest, opts ...grpc.CallOption) (*DescribeAgentChatResponse, error)
 	ListAgentChatMessages(ctx context.Context, in *ListAgentChatMessagesRequest, opts ...grpc.CallOption) (*ListAgentChatMessagesResponse, error)
 	ResumeAgentChat(ctx context.Context, in *ResumeAgentChatRequest, opts ...grpc.CallOption) (*ResumeAgentChatResponse, error)
+	DeleteAgentChat(ctx context.Context, in *DeleteAgentChatRequest, opts ...grpc.CallOption) (*DeleteAgentChatResponse, error)
 }
 
 type agentsClient struct {
@@ -95,6 +97,16 @@ func (c *agentsClient) ResumeAgentChat(ctx context.Context, in *ResumeAgentChatR
 	return out, nil
 }
 
+func (c *agentsClient) DeleteAgentChat(ctx context.Context, in *DeleteAgentChatRequest, opts ...grpc.CallOption) (*DeleteAgentChatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAgentChatResponse)
+	err := c.cc.Invoke(ctx, Agents_DeleteAgentChat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentsServer is the server API for Agents service.
 // All implementations should embed UnimplementedAgentsServer
 // for forward compatibility.
@@ -104,6 +116,7 @@ type AgentsServer interface {
 	DescribeAgentChat(context.Context, *DescribeAgentChatRequest) (*DescribeAgentChatResponse, error)
 	ListAgentChatMessages(context.Context, *ListAgentChatMessagesRequest) (*ListAgentChatMessagesResponse, error)
 	ResumeAgentChat(context.Context, *ResumeAgentChatRequest) (*ResumeAgentChatResponse, error)
+	DeleteAgentChat(context.Context, *DeleteAgentChatRequest) (*DeleteAgentChatResponse, error)
 }
 
 // UnimplementedAgentsServer should be embedded to have
@@ -127,6 +140,9 @@ func (UnimplementedAgentsServer) ListAgentChatMessages(context.Context, *ListAge
 }
 func (UnimplementedAgentsServer) ResumeAgentChat(context.Context, *ResumeAgentChatRequest) (*ResumeAgentChatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeAgentChat not implemented")
+}
+func (UnimplementedAgentsServer) DeleteAgentChat(context.Context, *DeleteAgentChatRequest) (*DeleteAgentChatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAgentChat not implemented")
 }
 func (UnimplementedAgentsServer) testEmbeddedByValue() {}
 
@@ -238,6 +254,24 @@ func _Agents_ResumeAgentChat_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agents_DeleteAgentChat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAgentChatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentsServer).DeleteAgentChat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agents_DeleteAgentChat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentsServer).DeleteAgentChat(ctx, req.(*DeleteAgentChatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agents_ServiceDesc is the grpc.ServiceDesc for Agents service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -264,6 +298,10 @@ var Agents_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResumeAgentChat",
 			Handler:    _Agents_ResumeAgentChat_Handler,
+		},
+		{
+			MethodName: "DeleteAgentChat",
+			Handler:    _Agents_DeleteAgentChat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
