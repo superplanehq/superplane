@@ -1,5 +1,5 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { ChevronDown, MoreVertical, RotateCcw, Pencil, Settings } from "lucide-react";
+import { ChevronDown, Loader2, MoreVertical, RotateCcw, Pencil, Settings } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
@@ -117,8 +117,11 @@ export function Header({
   const isDefaultMode = mode === "default";
   const showEditButton = mode === "version-live";
   const showVersionEditActions = mode === "version-edit";
-  const publishButtonLabel =
-    unpublishedDraftChangeCount > 0 ? `${publishVersionLabel} (${unpublishedDraftChangeCount})` : publishVersionLabel;
+  const hasChanges = unpublishedDraftChangeCount > 0;
+  const isSyncing = publishVersionDisabled && hasChanges;
+  const publishButtonLabel = hasChanges
+    ? `${publishVersionLabel} (${unpublishedDraftChangeCount})`
+    : publishVersionLabel;
 
   const showSecondaryHeaderRow = true;
 
@@ -275,39 +278,48 @@ export function Header({
 
             {showVersionEditActions ? (
               <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex">
-                      <UIButton
-                        type="button"
-                        variant="outline"
-                        size="icon-xs"
-                        className="shrink-0"
-                        onClick={() => onDiscardVersion?.()}
-                        disabled={discardVersionDisabled || !onDiscardVersion}
-                        aria-label="Discard draft"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </UIButton>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {discardVersionDisabled && discardVersionDisabledTooltip
-                      ? discardVersionDisabledTooltip
-                      : "Discard draft changes and reset to the current live version."}
-                  </TooltipContent>
-                </Tooltip>
+                {hasChanges ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <UIButton
+                          type="button"
+                          variant="outline"
+                          size="icon-xs"
+                          className="shrink-0"
+                          onClick={() => onDiscardVersion?.()}
+                          disabled={discardVersionDisabled || !onDiscardVersion}
+                          aria-label="Discard draft"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </UIButton>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {discardVersionDisabled && discardVersionDisabledTooltip
+                        ? discardVersionDisabledTooltip
+                        : "Discard draft changes and reset to the current live version."}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
                 {wrapWithTooltip(
-                  publishVersionDisabled,
+                  publishVersionDisabled && !isSyncing,
                   publishVersionDisabledTooltip,
                   <UIButton
                     type="button"
                     variant="default"
                     size="sm"
                     onClick={() => onPublishVersion?.()}
-                    disabled={publishVersionDisabled || !onPublishVersion}
+                    disabled={publishVersionDisabled || !onPublishVersion || !hasChanges}
                   >
-                    {publishButtonLabel}
+                    {isSyncing ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Syncing…
+                      </>
+                    ) : (
+                      publishButtonLabel
+                    )}
                   </UIButton>,
                 )}
               </div>
