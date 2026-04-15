@@ -461,7 +461,14 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
-  const isChangeManagementDisabled = !(liveCanvas?.spec?.changeManagement?.enabled ?? false);
+  // changeManagement lives on Canvas.Spec but is NOT part of CanvasVersion.Spec.
+  // Optimistic cache updates that spread version.spec into canvas.spec can
+  // temporarily wipe the field, so we latch to the last truthy API value.
+  const changeManagementEnabledRef = useRef(false);
+  if (liveCanvas?.spec?.changeManagement != null) {
+    changeManagementEnabledRef.current = liveCanvas.spec.changeManagement.enabled ?? false;
+  }
+  const isChangeManagementDisabled = !changeManagementEnabledRef.current;
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const agentContext = useAgentContext(isEditing, activeCanvasVersionId);
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
@@ -814,7 +821,7 @@ export function WorkflowPageV2() {
 
       return {
         ...current,
-        spec: requestedVersion.spec,
+        spec: { ...current.spec, ...requestedVersion.spec },
       };
     });
     hasSyncedVersionFromURLRef.current = true;
@@ -892,7 +899,7 @@ export function WorkflowPageV2() {
 
       return {
         ...current,
-        spec: loadedCanvasVersion.spec,
+        spec: { ...current.spec, ...loadedCanvasVersion.spec },
       };
     });
 
@@ -1105,7 +1112,7 @@ export function WorkflowPageV2() {
             name: workflow.metadata?.name ?? current.metadata?.name,
             description: workflow.metadata?.description ?? current.metadata?.description,
           },
-          spec: { ...version.spec, nodes: mergedNodes },
+          spec: { ...current.spec, ...version.spec, nodes: mergedNodes },
         };
       });
     },
@@ -1312,7 +1319,7 @@ export function WorkflowPageV2() {
 
         return {
           ...current,
-          spec: version.spec,
+          spec: { ...current.spec, ...version.spec },
         };
       });
 
@@ -4281,7 +4288,7 @@ export function WorkflowPageV2() {
         }
         return {
           ...current,
-          spec: version.spec,
+          spec: { ...current.spec, ...version.spec },
         };
       });
 
@@ -4489,7 +4496,7 @@ export function WorkflowPageV2() {
 
           return {
             ...current,
-            spec: liveCanvasVersion.spec,
+            spec: { ...current.spec, ...liveCanvasVersion.spec },
           };
         });
       }
