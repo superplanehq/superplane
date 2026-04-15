@@ -18,7 +18,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
@@ -31,7 +31,8 @@ class CanvasChangesetChangeNode(BaseModel):
     name: Optional[StrictStr] = None
     block: Optional[StrictStr] = None
     configuration: Optional[Dict[str, Any]] = None
-    __properties: ClassVar[List[str]] = ["id", "name", "block", "configuration"]
+    integration_id: Optional[StrictStr] = Field(default=None, alias="integrationId")
+    __properties: ClassVar[List[str]] = ["id", "name", "block", "configuration", "integrationId"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -87,7 +88,8 @@ class CanvasChangesetChangeNode(BaseModel):
             "id": obj.get("id"),
             "name": obj.get("name"),
             "block": obj.get("block"),
-            "configuration": obj.get("configuration")
+            "configuration": obj.get("configuration"),
+            "integrationId": obj.get("integrationId")
         })
         return _obj
 

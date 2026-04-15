@@ -268,3 +268,16 @@ func (r *Registry) GetIntegrationComponent(appName, componentName string) (core.
 
 	return nil, fmt.Errorf("component %s not found for integration %s", componentName, appName)
 }
+
+func (r *Registry) IsCoreBlock(name string) bool {
+	parts := strings.SplitN(name, ".", 2)
+	if len(parts) > 2 {
+		return false
+	}
+
+	if len(parts) == 1 {
+		return true
+	}
+
+	return false
+}
