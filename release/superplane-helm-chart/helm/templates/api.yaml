@@ -67,6 +67,8 @@ spec:
                 name: {{ include "secrets.session.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.posthog.name" . }}
           env:
             - name: START_PUBLIC_API
               value: "yes"

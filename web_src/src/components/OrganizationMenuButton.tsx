@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { posthog } from "@/posthog";
 
 interface OrganizationMenuButtonProps {
   organizationId?: string;
@@ -163,6 +164,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
 
   const handleSignOut = () => {
     setIsMenuOpen(false);
+    posthog.reset();
     window.location.href = "/logout";
   };
 

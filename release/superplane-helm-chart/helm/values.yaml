@@ -74,6 +74,11 @@ sentry:
   dsn: ""
   environment: ""
 
+posthog:
+  secretName: ""
+  enabled: false
+  key: ""
+
 #
 # Secret used to sign JWT session tokens
 #
