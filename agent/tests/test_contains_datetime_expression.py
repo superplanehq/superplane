@@ -25,13 +25,19 @@ def _answer_with_expression(expression: str) -> CanvasAnswer:
         confidence=0.9,
         proposal=CanvasProposal(
             summary="Add filter with datetime expression.",
-            operations=[
-                {  # type: ignore[list-item]
-                    "type": "add_node",
-                    "blockName": "filter",
-                    "configuration": {"expression": expression},
-                },
-            ],
+            changeset={
+                "changes": [
+                    {
+                        "type": "ADD_NODE",
+                        "node": {
+                            "id": "filter_1",
+                            "name": "Filter",
+                            "block": "filter",
+                            "configuration": {"expression": expression},
+                        },
+                    },
+                ]
+            },
         ),
     )
 

@@ -511,20 +511,22 @@ func applyPositionOffset(positions *layoutPositions, offset models.Position) {
 	}
 }
 
-func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {
-	if autoLayout == nil || len(autoLayout.NodeIds) == 0 {
+func resolveLayoutSeedNodeIDs(layout *pb.CanvasAutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {
+	if len(layout.NodeIds) == 0 {
 		return []string{}, nil
 	}
 
-	seen := make(map[string]struct{}, len(autoLayout.NodeIds))
-	seedNodeIDs := make([]string, 0, len(autoLayout.NodeIds))
-	for _, nodeID := range autoLayout.NodeIds {
+	seen := make(map[string]struct{}, len(layout.NodeIds))
+	seedNodeIDs := make([]string, 0, len(layout.NodeIds))
+	for _, nodeID := range layout.NodeIds {
 		if _, exists := flowNodeSet[nodeID]; !exists {
 			return nil, fmt.Errorf("auto layout node ids contains unknown node: %s", nodeID)
 		}
+
 		if _, exists := seen[nodeID]; exists {
 			continue
 		}
+
 		seen[nodeID] = struct{}{}
 		seedNodeIDs = append(seedNodeIDs, nodeID)
 	}

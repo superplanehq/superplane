@@ -17,7 +17,7 @@ class NoDollarDataAsRoot(Evaluator):
         if ctx.output.proposal is None:
             return EvaluationReason(value=True, reason="No proposal to check")
 
-        for text in iter_config_strings_from_operations(ctx.output.proposal.operations):
+        for text in iter_config_strings_from_operations(ctx.output.proposal.changeset.changes or []):
             if _FORBIDDEN_DOLLAR_DATA in text:
                 snippet = text if len(text) <= 120 else text[:117] + "..."
                 msg = "Forbidden $.data. in configuration; use root().data... for run-start fields"
