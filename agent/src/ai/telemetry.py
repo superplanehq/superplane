@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from opentelemetry import metrics
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.metrics import set_meter_provider
@@ -17,10 +18,11 @@ log = logging.getLogger(__name__)
 
 _tracer_provider: TracerProvider | None = None
 _meter_provider: MeterProvider | None = None
+_ttft_histogram: metrics.Histogram | None = None
 
 
 def init_telemetry() -> None:
-    global _tracer_provider, _meter_provider  # noqa: PLW0603
+    global _tracer_provider, _meter_provider, _ttft_histogram  # noqa: PLW0603
 
     if not config.otel_enabled:
         return
@@ -40,14 +42,27 @@ def init_telemetry() -> None:
         )
         set_meter_provider(_meter_provider)
 
+        meter = _meter_provider.get_meter("superplane-agent")
+        _ttft_histogram = meter.create_histogram(
+            name="agent.run.first_token.duration",
+            description="Time from run start to first streamed token",
+            unit="s",
+        )
+
         Agent.instrument_all()
     except Exception:
         log.warning("Failed to initialize telemetry", exc_info=True)
         _tracer_provider = None
         _meter_provider = None
+        _ttft_histogram = None
         return
 
     log.info("OpenTelemetry initialized (gRPC OTLP exporter, pydantic-ai instrumented)")
+
+
+def record_first_token_duration(seconds: float) -> None:
+    if _ttft_histogram is not None:
+        _ttft_histogram.record(seconds)
 
 
 def shutdown_telemetry() -> None:
