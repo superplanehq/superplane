@@ -82,6 +82,17 @@ service Agents {
     };
   }
 
+  rpc DeleteAgentChat(DeleteAgentChatRequest) returns (DeleteAgentChatResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/agents/chats/{chat_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete an agent chat";
+      description: "Permanently deletes an agent chat and all its messages";
+      tags: "Agent";
+    };
+  }
+
 }
 
 message ListAgentChatsRequest {
@@ -137,6 +148,13 @@ message ResumeAgentChatResponse {
   string token = 1;
   string url = 2;
 }
+
+message DeleteAgentChatRequest {
+  string canvas_id = 1;
+  string chat_id = 2;
+}
+
+message DeleteAgentChatResponse {}
 
 message AgentChatInfo {
   string id = 1;

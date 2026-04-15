@@ -164,6 +164,42 @@
         "tags": [
           "Agent"
         ]
+      },
+      "delete": {
+        "summary": "Delete an agent chat",
+        "description": "Permanently deletes an agent chat and all its messages",
+        "operationId": "Agents_DeleteAgentChat",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsDeleteAgentChatResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
       }
     },
     "/api/v1/agents/chats/{chatId}/messages": {
@@ -4229,6 +4265,9 @@
           "type": "string"
         }
       }
+    },
+    "AgentsDeleteAgentChatResponse": {
+      "type": "object"
     },
     "AgentsDescribeAgentChatResponse": {
       "type": "object",
