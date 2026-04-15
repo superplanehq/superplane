@@ -21,12 +21,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
   <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
   <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
-  <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
   <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete a Grafana HTTP synthetic check" />
+  <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
   <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
   <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
-  <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
   <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Retrieve a Grafana HTTP synthetic check configuration and best-effort operational metrics" />
+  <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
   <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
   <LinkCard title="List Annotations" href="#list-annotations" description="List Grafana annotations filtered by tag, dashboard, or time range" />
   <LinkCard title="List Silences" href="#list-silences" description="List active and pending silences from the Grafana Alertmanager" />
@@ -292,15 +292,13 @@ The Create HTTP Synthetic Check component creates an HTTP synthetic check in Gra
 
 ### Configuration
 
-- **Job**: Display name for the check
-- **Target**: HTTP or HTTPS URL to monitor
-- **Enabled**: Whether the check should begin running immediately
-- **Frequency / Timeout**: Probe cadence in seconds and request timeout in milliseconds
-- **Probes**: Probe IDs selected from the connected Grafana synthetics tenant
-- **Method / Headers / Body**: Core HTTP request configuration
-- **Redirect / SSL / TLS / Status / Body / Header Matchers**: Request validation behavior
+Fields are grouped like other synthetic check components:
+
+- **Job** and **Labels**: Check display name and optional key/value labels
+- **Request**: URL, HTTP method, headers, body, redirects, basic auth, bearer token, and TLS client settings
+- **Schedule**: Whether the check is enabled, frequency (seconds), timeout (ms), and probe locations
+- **Response validation**: SSL expectations, accepted status codes, and body/header regex rules (optional)
 - **Per-Check Alerts**: Optional Grafana synthetic monitoring alerts configured after check creation
-- **Labels / Basic Auth / Bearer Token**: Optional metadata and authentication
 
 ### Output
 
@@ -485,6 +483,35 @@ Returns the annotation ID and a confirmation that the annotation was deleted.
 }
 ```
 
+<a id="delete-http-synthetic-check"></a>
+
+## Delete HTTP Synthetic Check
+
+The Delete HTTP Synthetic Check component deletes an existing Grafana synthetic check.
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to delete
+
+### Output
+
+Returns a compact confirmation payload for the deleted check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "job": "API health check",
+    "syntheticCheck": "101",
+    "target": "https://api.example.com/health"
+  },
+  "timestamp": "2026-04-15T10:35:30Z",
+  "type": "grafana.syntheticCheck.deleted"
+}
+```
+
 <a id="delete-silence"></a>
 
 ## Delete Silence
@@ -514,35 +541,6 @@ Returns the silence ID and a confirmation that the silence was deleted.
   },
   "timestamp": "2026-03-31T10:24:30Z",
   "type": "grafana.silence.deleted"
-}
-```
-
-<a id="delete-http-synthetic-check"></a>
-
-## Delete HTTP Synthetic Check
-
-The Delete HTTP Synthetic Check component deletes an existing Grafana synthetic check.
-
-### Configuration
-
-- **Synthetic Check**: The synthetic check to delete
-
-### Output
-
-Returns a compact confirmation payload for the deleted check.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "deleted": true,
-    "job": "API health check",
-    "syntheticCheck": "101",
-    "target": "https://api.example.com/health"
-  },
-  "timestamp": "2026-04-15T10:35:30Z",
-  "type": "grafana.syntheticCheck.deleted"
 }
 ```
 
@@ -671,6 +669,7 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
 }
 ```
 
+<<<<<<< HEAD
 <a id="get-dashboard"></a>
 
 ## Get Dashboard
@@ -776,6 +775,8 @@ Returns the silence object including ID, state, comment, matchers, start/end tim
 }
 ```
 
+=======
+>>>>>>> b94c59829 (update component docs)
 <a id="get-http-synthetic-check"></a>
 
 ## Get HTTP Synthetic Check
@@ -794,9 +795,9 @@ The Get HTTP Synthetic Check component fetches a Grafana synthetic check and enr
 
 ### Output Channels
 
-- **Healthy**: The most recent run outcome is "Healthy"
-- **Degraded**: The most recent run outcome is "Degraded"
-- **Critical**: The most recent run outcome is "Critical"
+- **Up**: All probe locations are passing
+- **Partial**: Some probe locations are passing and some are failing
+- **Down**: All probe locations are failing
 
 ### Output
 
@@ -874,6 +875,53 @@ Returns a combined payload containing:
   },
   "timestamp": "2026-04-15T10:25:30Z",
   "type": "grafana.syntheticCheck"
+}
+```
+
+<a id="get-silence"></a>
+
+## Get Silence
+
+The Get Silence component fetches the details of a single silence from Grafana Alertmanager using its ID.
+
+### Use Cases
+
+- **Inspect a silence**: Retrieve full details of a silence including state, comment, matchers, and times
+- **Verify a silence**: Confirm a silence is still active before taking action in a workflow
+
+### Configuration
+
+- **Silence**: The silence to retrieve (required)
+
+### Output
+
+Returns the silence object including ID, state, comment, matchers, start/end times, and the author.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Deploy window for v2.1.0",
+    "createdBy": "devops-bot",
+    "endsAt": "2026-03-31T11:00:00.000Z",
+    "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "env",
+        "value": "production"
+      }
+    ],
+    "startsAt": "2026-03-31T10:00:00.000Z",
+    "status": {
+      "state": "active"
+    },
+    "updatedAt": "2026-03-31T10:00:00.000Z"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence"
 }
 ```
 
@@ -1291,8 +1339,8 @@ The Update HTTP Synthetic Check component updates an existing Grafana Synthetic 
 
 ### Configuration
 
-- **Synthetic Check**: The synthetic check to update
-- **Job**, **Labels**, **Request**, **Schedule**, **Response validation**, and **Per-Check Alerts** are togglable: enable a section only when you want to change it; disabled sections keep the values stored in Grafana
+- **Synthetic Check**: The synthetic check to update (required)
+- **Job**, **Labels**, **Request**, **Schedule**, **Response validation**, and **Per-Check Alerts** are **togglable**. Enable a section only when you want to change it; disabled sections keep the values currently stored in Grafana.
 
 ### Output
 
@@ -1365,4 +1413,3 @@ Returns the updated Grafana synthetic check.
   "type": "grafana.syntheticCheck.updated"
 }
 ```
-
