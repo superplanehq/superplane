@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -56,7 +57,7 @@ func ValidateCanvasVersionChangeset(
 		return nil, status.Error(codes.FailedPrecondition, "published versions are immutable")
 	}
 
-	patcher := changesets.NewCanvasPatcher(registry, version)
+	patcher := changesets.NewCanvasPatcher(database.Conn(), organizationID, registry, version)
 	err = patcher.ApplyChangeset(changeset)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "changeset is invalid: %v", err)
