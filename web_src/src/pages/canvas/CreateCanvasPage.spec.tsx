@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
+import type * as SdkGen from "@/api-client/sdk.gen";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { init, identify, capture, reset } = vi.hoisted(() => ({
@@ -26,7 +27,7 @@ vi.mock("react-router-dom", () => ({
 }));
 
 vi.mock("@/api-client/sdk.gen", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/api-client/sdk.gen")>();
+  const actual = await importOriginal<typeof SdkGen>();
   return { ...actual, canvasesCreateCanvas };
 });
 
