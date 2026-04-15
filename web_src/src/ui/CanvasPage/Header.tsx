@@ -4,7 +4,7 @@ import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { useNavigate, useParams } from "react-router-dom";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
@@ -99,18 +99,6 @@ export function Header({
     }
     return breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : "";
   })();
-
-  const wrapWithTooltip = (disabled: boolean | undefined, message: string | undefined, child: ReactNode) => {
-    if (!disabled || !message) return child;
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">{child}</div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{message}</TooltipContent>
-      </Tooltip>
-    );
-  };
 
   const isDefaultMode = mode === "default";
   const showEditButton = mode === "version-live";
@@ -232,21 +220,36 @@ export function Header({
                     {unsavedMessage}
                   </span>
                 ) : null}
-                {onSave && !saveButtonHidden
-                  ? wrapWithTooltip(
-                      saveDisabled,
-                      saveDisabledTooltip,
-                      <Button
-                        onClick={onSave}
-                        size="sm"
-                        variant={saveIsPrimary ? "default" : "outline"}
-                        data-testid="save-canvas-button"
-                        disabled={saveDisabled}
-                      >
-                        Save
-                      </Button>,
-                    )
-                  : null}
+                {onSave && !saveButtonHidden ? (
+                  saveDisabled && saveDisabledTooltip ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="inline-flex">
+                          <Button
+                            onClick={onSave}
+                            size="sm"
+                            variant={saveIsPrimary ? "default" : "outline"}
+                            data-testid="save-canvas-button"
+                            disabled={saveDisabled}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Button
+                      onClick={onSave}
+                      size="sm"
+                      variant={saveIsPrimary ? "default" : "outline"}
+                      data-testid="save-canvas-button"
+                      disabled={saveDisabled}
+                    >
+                      Save
+                    </Button>
+                  )
+                ) : null}
               </>
             ) : null}
 
@@ -276,9 +279,24 @@ export function Header({
                     </TooltipContent>
                   </Tooltip>
                 ) : null}
-                {wrapWithTooltip(
-                  publishVersionDisabled,
-                  publishVersionDisabledTooltip,
+                {publishVersionDisabled && publishVersionDisabledTooltip ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-flex">
+                        <UIButton
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={() => onPublishVersion?.()}
+                          disabled={publishVersionDisabled || !onPublishVersion}
+                        >
+                          {publishButtonLabel}
+                        </UIButton>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
+                  </Tooltip>
+                ) : (
                   <UIButton
                     type="button"
                     variant="default"
@@ -287,27 +305,43 @@ export function Header({
                     disabled={publishVersionDisabled || !onPublishVersion}
                   >
                     {publishButtonLabel}
-                  </UIButton>,
+                  </UIButton>
                 )}
               </div>
             ) : null}
 
-            {showEditButton
-              ? wrapWithTooltip(
-                  enterEditModeDisabled,
-                  enterEditModeDisabledTooltip,
-                  <UIButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onEnterEditMode}
-                    disabled={enterEditModeDisabled}
-                  >
-                    <Pencil className="size-3.5" />
-                    Edit
-                  </UIButton>,
-                )
-              : null}
+            {showEditButton ? (
+              enterEditModeDisabled && enterEditModeDisabledTooltip ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex">
+                      <UIButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onEnterEditMode}
+                        disabled={enterEditModeDisabled}
+                      >
+                        <Pencil className="size-3.5" />
+                        Edit
+                      </UIButton>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{enterEditModeDisabledTooltip}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <UIButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onEnterEditMode}
+                  disabled={enterEditModeDisabled}
+                >
+                  <Pencil className="size-3.5" />
+                  Edit
+                </UIButton>
+              )
+            ) : null}
           </div>
         </div>
       ) : null}
