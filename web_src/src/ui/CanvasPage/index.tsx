@@ -192,6 +192,7 @@ export interface CanvasPageProps {
   showCanvasSettingsMenu?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  onYamlOpen: () => void;
   dataViewContent?: React.ReactNode;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
@@ -1234,6 +1235,7 @@ function CanvasPage(props: CanvasPageProps) {
             readOnly={readOnly}
             onSidebarOpen={() => handleSidebarToggle(true)}
             onAddNote={handleAddNote}
+            onYamlOpen={props.onYamlOpen}
           />
 
           {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
