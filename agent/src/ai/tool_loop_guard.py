@@ -2,7 +2,6 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-
 _DISCOVERY_TOOL_NAMES = {
     "describe_component",
     "describe_trigger",
