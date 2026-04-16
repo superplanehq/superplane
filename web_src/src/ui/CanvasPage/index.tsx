@@ -1138,7 +1138,13 @@ function CanvasPage(props: CanvasPageProps) {
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
-    <div ref={canvasWrapperRef} className="h-full w-full overflow-hidden sp-canvas relative flex flex-col">
+    <div
+      ref={canvasWrapperRef}
+      className={cn(
+        "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
+        props.headerMode === "version-live" && "sp-canvas-live",
+      )}
+    >
       {/* Header at the top spanning full width */}
       <div className="relative z-30">
         <CanvasContentHeader
@@ -1983,6 +1989,15 @@ function CanvasContent({
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const isLiveMode = headerMode === "version-live";
   const isEditMode = !isLiveMode;
+
+  useEffect(() => {
+    if (isEditMode) {
+      return;
+    }
+
+    setHoveredEdgeId(null);
+  }, [isEditMode]);
+
   useEffect(() => {
     if (showBottomStatusControls) {
       localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
@@ -2455,12 +2470,15 @@ function CanvasContent({
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
-          onDelete: isReadOnly ? undefined : stableEdgeDelete,
+          canDelete: isEditMode && !isReadOnly,
+          onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId, stableEdgeDelete, isReadOnly],
+    [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly],
   );
+
+  const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -2566,13 +2584,13 @@ function CanvasContent({
             snapGrid={[48, 48]}
             panOnScrollSpeed={0.8}
             nodesDraggable={!isReadOnly}
-            nodesConnectable={!isReadOnly && !!onEdgeCreate}
+            nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
-            onConnect={isReadOnly ? undefined : handleConnect}
-            onConnectStart={isReadOnly ? undefined : handleConnectStart}
-            onConnectEnd={isReadOnly ? undefined : handleConnectEnd}
+            onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
+            onConnectStart={isConnectionEditingEnabled ? handleConnectStart : undefined}
+            onConnectEnd={isConnectionEditingEnabled ? handleConnectEnd : undefined}
             onDragOver={isReadOnly ? undefined : handleDragOver}
             onDrop={isReadOnly ? undefined : handleDrop}
             onMove={handleMove}
@@ -2588,8 +2606,8 @@ function CanvasContent({
               setIsSelecting(false);
               previouslySelectedRef.current = new Set();
             }}
-            onEdgeMouseEnter={handleEdgeMouseEnter}
-            onEdgeMouseLeave={handleEdgeMouseLeave}
+            onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
+            onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
