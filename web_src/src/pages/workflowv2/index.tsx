@@ -73,7 +73,7 @@ import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import { useAgentContext } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { useAgentContext } from "@/components/AgentSidebar/agentChat";
 import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";

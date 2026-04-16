@@ -1,6 +1,6 @@
-import { AiMessage } from "@/components/AiBuilderChatMessage";
-import { FinishedToolCallsCollapsible } from "@/components/FinishedToolCallsCollapsible";
-import type { AiBuilderMessage } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { AiMessage } from "./AiBuilderChatMessage";
+import { FinishedToolCallsCollapsible } from "./FinishedToolCallsCollapsible";
+import type { AiBuilderMessage } from "./agentChat";
 import { useMemo, type ReactNode } from "react";
 
 export type AiBuilderConversationMessageListProps = {

@@ -2,20 +2,15 @@ import type { CanvasChangesetChange } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AiBuilderChatPanel } from "../BuildingBlocksSidebar/AiBuilderChatPanel";
-import type {
-  AgentContext,
-  AiBuilderMessage,
-  AiBuilderProposal,
-  AiChatSession,
-} from "../BuildingBlocksSidebar/agentChat";
+import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
+import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
 import {
   deleteAgentChatSession,
   loadChatConversation,
   loadChatSessions,
   pushAiMessages,
   sendChatPrompt,
-} from "../BuildingBlocksSidebar/agentChat";
+} from "./agentChat";
 
 export const AGENT_SIDEBAR_WIDTH_STORAGE_KEY = "agentSidebarWidth";
 
@@ -487,3 +482,6 @@ function OpenAgentSidebar({
     </div>
   );
 }
+
+export type { UseAgentStateOptions } from "./useAgentState";
+export { CANVAS_AGENT_SIDEBAR_STORAGE_KEY, useAgentState } from "./useAgentState";

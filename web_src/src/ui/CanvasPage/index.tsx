@@ -53,7 +53,7 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
-import { AgentSidebar } from "../AgentSidebar";
+import { AgentSidebar, useAgentState } from "@/components/AgentSidebar";
 import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
@@ -347,7 +347,6 @@ export interface CanvasPageProps {
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
-export const CANVAS_AGENT_SIDEBAR_STORAGE_KEY = "canvasAgentSidebarOpen";
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
 export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
 export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
@@ -698,22 +697,10 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const stored = window.localStorage.getItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY);
-    if (stored === null) {
-      return false;
-    }
-
-    try {
-      return JSON.parse(stored) === true;
-    } catch (error) {
-      console.warn("Failed to parse agent sidebar state from local storage:", error);
-      return false;
-    }
+  const { isAgentSidebarOpen, handleAgentSidebarOpenChange, handleAgentSidebarToggle } = useAgentState({
+    agentContextEnabled: props.agentContext.enabled,
+    hideAddControls: props.hideAddControls,
+    readOnly,
   });
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
@@ -1076,49 +1063,6 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
-
-  const persistAgentSidebarOpen = useCallback((open: boolean) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY, JSON.stringify(open));
-    }
-  }, []);
-
-  const handleAgentSidebarOpenChange = useCallback(
-    (open: boolean) => {
-      setIsAgentSidebarOpen(open);
-      persistAgentSidebarOpen(open);
-    },
-    [persistAgentSidebarOpen],
-  );
-
-  const handleAgentSidebarToggle = useCallback(() => {
-    setIsAgentSidebarOpen((previous) => {
-      const next = !previous;
-      persistAgentSidebarOpen(next);
-      return next;
-    });
-  }, [persistAgentSidebarOpen]);
-
-  useEffect(() => {
-    if (!props.agentContext.enabled) {
-      setIsAgentSidebarOpen(false);
-      persistAgentSidebarOpen(false);
-    }
-  }, [props.agentContext.enabled, persistAgentSidebarOpen]);
-
-  useEffect(() => {
-    if (props.hideAddControls) {
-      setIsAgentSidebarOpen(false);
-      persistAgentSidebarOpen(false);
-    }
-  }, [props.hideAddControls, persistAgentSidebarOpen]);
-
-  useEffect(() => {
-    if (readOnly) {
-      setIsAgentSidebarOpen(false);
-      persistAgentSidebarOpen(false);
-    }
-  }, [readOnly, persistAgentSidebarOpen]);
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
@@ -3018,4 +2962,5 @@ function CanvasContent({
 
 export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
+export { CANVAS_AGENT_SIDEBAR_STORAGE_KEY } from "@/components/AgentSidebar";
 export { CanvasPage };

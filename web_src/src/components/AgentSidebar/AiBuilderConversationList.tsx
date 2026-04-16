@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
-import type { AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
+import type { AiChatSession } from "./agentChat";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import {

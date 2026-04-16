@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import type { AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
+import type { AiBuilderProposal } from "./agentChat";
 
 export type ProposalsListProps = {
   pendingProposal: AiBuilderProposal;

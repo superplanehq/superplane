@@ -1,12 +1,8 @@
-import { AiBuilderConversationMessageList } from "@/components/AiBuilderConversationMessageList";
-import { ConversationList } from "@/components/AiBuilderConversationList";
-import { InputForm } from "@/components/AiBuilderInputForm";
-import { ProposalsList } from "@/components/AiBuilderProposalsList";
-import {
-  type AiBuilderMessage,
-  type AiBuilderProposal,
-  type AiChatSession,
-} from "@/ui/BuildingBlocksSidebar/agentChat";
+import { AiBuilderConversationMessageList } from "./AiBuilderConversationMessageList";
+import { ConversationList } from "./AiBuilderConversationList";
+import { InputForm } from "./AiBuilderInputForm";
+import { ProposalsList } from "./AiBuilderProposalsList";
+import { type AiBuilderMessage, type AiBuilderProposal, type AiChatSession } from "./agentChat";
 import { useEffect, useRef, type RefObject } from "react";
 
 type AiBuilderChatPanelProps = {
