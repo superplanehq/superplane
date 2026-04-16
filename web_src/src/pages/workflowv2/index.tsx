@@ -3072,8 +3072,8 @@ export function WorkflowPageV2() {
 
           next.sort(
             (left, right) =>
-              versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
-              versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
+              versionSortValue(right.metadata?.publishedAt || right.metadata?.updatedAt || right.metadata?.createdAt) -
+              versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
           );
           return next;
         });

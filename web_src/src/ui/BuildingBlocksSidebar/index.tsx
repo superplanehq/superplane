@@ -199,45 +199,31 @@ function OpenBuildingBlocksSidebar({
     setPendingProposal(null);
   }, []);
 
-  const formatOperation = useCallback((change: CanvasChangesetChange, proposal?: AiBuilderProposal) => {
-    const operationNodeLabels = new Map<string, string>();
-    if (proposal) {
-      for (const item of proposal.changeset.changes || []) {
-        if (item.type === "ADD_NODE" && item.node?.id) {
-          operationNodeLabels.set(item.node.id, item.node.name || item.node.block || item.node.id);
-        }
-      }
-    }
-
-    const resolveNodeLabel = (nodeId?: string) => {
-      if (!nodeId) {
-        return "node";
-      }
-
-      return operationNodeLabels.get(nodeId) || nodeId;
-    };
+  const formatOperation = useCallback((change: CanvasChangesetChange) => {
+    const getNodeId = (nodeId?: string) => nodeId || "node";
 
     switch (change.type) {
       case "ADD_NODE":
-        return `Add node ${change.node?.name || change.node?.id || "node"} (${change.node?.block || "unknown"})`;
+        return `Add node ${getNodeId(change.node?.id)} (${change.node?.block || "unknown"})`;
       case "UPDATE_NODE":
-        return `Update node ${change.node?.name || change.node?.id || "node"}`;
+        return `Update node ${getNodeId(change.node?.id)}`;
       case "DELETE_NODE":
-        return `Delete node ${change.node?.name || change.node?.id || "node"}`;
+        return `Delete node ${getNodeId(change.node?.id)}`;
       case "ADD_EDGE":
-        return `Connect ${resolveNodeLabel(change.edge?.sourceId)} -> ${resolveNodeLabel(change.edge?.targetId)}`;
+        return `Connect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
       case "DELETE_EDGE":
-        return `Disconnect ${resolveNodeLabel(change.edge?.sourceId)} -> ${resolveNodeLabel(change.edge?.targetId)}`;
+        return `Disconnect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
       default:
         return "Update canvas";
     }
   }, []);
+
   const pendingProposalSummaries = useMemo(() => {
     if (!pendingProposal) {
       return [];
     }
 
-    return (pendingProposal.changeset.changes || []).map((change) => formatOperation(change, pendingProposal));
+    return (pendingProposal.changeset.changes || []).map((change) => formatOperation(change));
   }, [formatOperation, pendingProposal]);
 
   const handleApplyProposal = useCallback(async () => {
