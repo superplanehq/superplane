@@ -470,6 +470,47 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Equal(t, 0, oldIDCount)
 		require.Equal(t, 1, newIDCount)
 	})
+
+	t.Run("filters edges that reference nodes removed from final graph", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				componentCanvasNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+				componentCanvasNode("node-b", "Node B", "noop", map[string]any{"value": "remove"}),
+			},
+			[]models.Edge{
+				{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
+			},
+		)
+
+		// Intentionally keep an invalid edge in draft to assert publisher-side sanitization.
+		draft, err := models.SaveCanvasDraftInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			[]models.Node{
+				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			},
+			[]models.Edge{
+				{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
+			},
+		)
+		require.NoError(t, err)
+
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+		require.Empty(t, publishedVersion.Edges)
+	})
 }
 
 func componentCanvasNode(nodeID string, name string, component string, configuration map[string]any) models.CanvasNode {

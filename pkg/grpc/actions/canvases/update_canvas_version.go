@@ -111,7 +111,7 @@ func UpdateCanvasVersionWithUsage(
 	)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to ensure organization within limits: %v", err)
+		return nil, err
 	}
 
 	requestedVersionID := strings.TrimSpace(versionID)

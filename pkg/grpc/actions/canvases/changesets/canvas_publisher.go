@@ -141,12 +141,30 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 		finalNodes = append(finalNodes, node)
 	}
 
-	err := models.PromoteToLiveInTransaction(p.tx, p.draft, finalNodes, p.draft.Edges)
+	finalEdges := p.filterEdgesForExistingNodes(p.draft.Edges)
+	err := models.PromoteToLiveInTransaction(p.tx, p.draft, finalNodes, finalEdges)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (p *CanvasPublisher) filterEdgesForExistingNodes(edges []models.Edge) []models.Edge {
+	filteredEdges := make([]models.Edge, 0, len(edges))
+	for _, edge := range edges {
+		if _, sourceExists := p.finalNodes[edge.SourceID]; !sourceExists {
+			continue
+		}
+
+		if _, targetExists := p.finalNodes[edge.TargetID]; !targetExists {
+			continue
+		}
+
+		filteredEdges = append(filteredEdges, edge)
+	}
+
+	return filteredEdges
 }
 
 func (p *CanvasPublisher) processChange(ctx context.Context, change *pb.CanvasChangeset_Change) error {
