@@ -197,6 +197,7 @@ export function SettingsView({
         <div className="flex items-center gap-4">
           <LoadingButton
             type="button"
+            data-testid="canvas-settings-save-changes"
             onClick={handleSave}
             disabled={!canUpdateCanvas || !hasChanges || hasApproverValidationErrors}
             loading={isSaving}
