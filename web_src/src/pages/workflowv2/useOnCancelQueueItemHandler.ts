@@ -4,13 +4,12 @@ import { useCallback } from "react";
 import type { CanvasesCanvas } from "@/api-client";
 import { canvasesDeleteNodeQueueItem } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
-import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { showErrorToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 
 type Params = {
   canvasId: string;
-  organizationId?: string;
   canvas?: CanvasesCanvas | null;
   loadSidebarData: (nodeId: string) => void;
 };
@@ -18,7 +17,7 @@ type Params = {
 /**
  * Returns a handler that cancels a queued item for a node and refreshes related data.
  */
-export function useOnCancelQueueItemHandler({ canvasId, organizationId, canvas, loadSidebarData }: Params) {
+export function useOnCancelQueueItemHandler({ canvasId, canvas, loadSidebarData }: Params) {
   const queryClient = useQueryClient();
   const refetchNodeDataMethod = useNodeExecutionStore((state) => state.refetchNodeData);
 
@@ -51,6 +50,6 @@ export function useOnCancelQueueItemHandler({ canvasId, organizationId, canvas, 
         showErrorToast("Failed to cancel queue item");
       }
     },
-    [canvasId, organizationId, queryClient, canvas, refetchNodeDataMethod, loadSidebarData],
+    [canvasId, queryClient, canvas, refetchNodeDataMethod, loadSidebarData],
   );
 }

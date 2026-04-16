@@ -54,7 +54,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
         onCancelExecution(executionId);
       }
     },
-    [onCancelExecution, executionId, eventId],
+    [onCancelExecution, executionId],
   );
 
   const handleCancelQueueItem = React.useCallback(
