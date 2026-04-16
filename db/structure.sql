@@ -87,6 +87,23 @@ CREATE TABLE public.account_providers (
 
 
 --
+-- Name: account_survey_responses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_survey_responses (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    account_id uuid NOT NULL,
+    survey_type character varying(64) DEFAULT 'signup'::character varying NOT NULL,
+    skipped boolean DEFAULT false NOT NULL,
+    source_channel character varying(64),
+    source_other text,
+    role character varying(64),
+    use_case text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: accounts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -695,6 +712,22 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
+-- Name: account_survey_responses account_survey_responses_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_survey_responses
+    ADD CONSTRAINT account_survey_responses_account_id_key UNIQUE (account_id);
+
+
+--
+-- Name: account_survey_responses account_survey_responses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_survey_responses
+    ADD CONSTRAINT account_survey_responses_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: accounts accounts_email_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1079,6 +1112,13 @@ CREATE INDEX idx_account_providers_account_id ON public.account_providers USING 
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
+
+
+--
+-- Name: idx_account_survey_responses_source_channel; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_survey_responses_source_channel ON public.account_survey_responses USING btree (source_channel) WHERE (skipped = false);
 
 
 --
@@ -1494,6 +1534,14 @@ ALTER TABLE ONLY public.account_password_auth
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: account_survey_responses account_survey_responses_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_survey_responses
+    ADD CONSTRAINT account_survey_responses_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id) ON DELETE CASCADE;
 
 
 --
