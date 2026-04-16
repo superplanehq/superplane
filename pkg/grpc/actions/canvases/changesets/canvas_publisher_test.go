@@ -397,6 +397,79 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		})
 		require.True(t, versionHasNewID)
 	})
+
+	t.Run("add node with conflicting id and setup error does not duplicate final nodes", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				componentCanvasNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			},
+			nil,
+		)
+
+		conflictingID := "node-conflict-error"
+		legacyNode := componentCanvasNode(conflictingID, "Legacy Node", "noop", map[string]any{"value": "legacy"})
+		legacyNode.WorkflowID = canvas.ID
+		legacyNode.State = models.CanvasNodeStateReady
+		require.NoError(t, database.Conn().Create(&legacyNode).Error)
+		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
+
+		draft, err := models.SaveCanvasDraftInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			[]models.Node{
+				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+				componentNode(conflictingID, "Node Conflict Broken", "missingcomponent", map[string]any{}),
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		index := slices.IndexFunc(activeNodes, func(node models.CanvasNode) bool {
+			return node.Name == "Node Conflict Broken"
+		})
+		require.True(t, index != -1, "expected added node with conflicting ID and setup error")
+
+		addedNode := activeNodes[index]
+		require.NotEqual(t, conflictingID, addedNode.NodeID)
+		require.Equal(t, models.CanvasNodeStateError, addedNode.State)
+		require.NotNil(t, addedNode.StateReason)
+		require.Contains(t, *addedNode.StateReason, "component missingcomponent not registered")
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+
+		oldIDCount := 0
+		newIDCount := 0
+		for _, node := range publishedVersion.Nodes {
+			if node.ID == conflictingID {
+				oldIDCount++
+			}
+
+			if node.ID == addedNode.NodeID {
+				newIDCount++
+				require.Equal(t, "Node Conflict Broken", node.Name)
+				require.NotNil(t, node.ErrorMessage)
+				require.Contains(t, *node.ErrorMessage, "component missingcomponent not registered")
+			}
+		}
+
+		require.Equal(t, 0, oldIDCount)
+		require.Equal(t, 1, newIDCount)
+	})
 }
 
 func componentCanvasNode(nodeID string, name string, component string, configuration map[string]any) models.CanvasNode {

@@ -24,10 +24,6 @@ type ChangesetBuilder struct {
 }
 
 func NewChangesetBuilder(currentNodes []models.Node, currentEdges []models.Edge, proposedNodes []models.Node, proposedEdges []models.Edge) *ChangesetBuilder {
-	edgeKeyFn := func(edge models.Edge) string {
-		return edge.SourceID + "|" + edge.TargetID + "|" + edge.Channel
-	}
-
 	return &ChangesetBuilder{
 		currentNodes:  buildNodeMap(currentNodes),
 		currentEdges:  buildEdgeMap(currentEdges, edgeKeyFn),
@@ -303,4 +299,8 @@ func buildEdgeMap(edges []models.Edge, keyFn func(models.Edge) string) map[strin
 	}
 
 	return m
+}
+
+func edgeKeyFn(edge models.Edge) string {
+	return edge.SourceID + "|" + edge.TargetID + "|" + edge.Channel
 }

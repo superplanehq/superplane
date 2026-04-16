@@ -164,6 +164,8 @@ func (p *CanvasPublisher) processChange(ctx context.Context, change *pb.CanvasCh
 
 func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangeset_Change) error {
 	node := p.finalNodes[change.GetNode().GetId()]
+	nodeID := p.ensureNewNodeID(node)
+	node.ID = nodeID
 
 	//
 	// Widget nodes are not saved as workflow_nodes records in the database.
@@ -179,7 +181,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	now := time.Now()
 	newNode := models.CanvasNode{
 		WorkflowID:        p.live.WorkflowID,
-		NodeID:            p.ensureNewNodeID(node),
+		NodeID:            nodeID,
 		Name:              node.Name,
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
