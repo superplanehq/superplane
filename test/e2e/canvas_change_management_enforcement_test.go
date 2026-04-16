@@ -48,6 +48,8 @@ func TestCanvasChangeManagementEnforcement(t *testing.T) {
 		steps.saveCanvasSettings()
 		steps.assertCanvasChangeManagementInDB(true)
 
+		steps.visitCanvasSettings()
+		steps.assertCanvasChangeManagementToggleEnabled()
 		steps.setCanvasChangeManagementToggle(false)
 		steps.saveCanvasSettings()
 		steps.assertCanvasChangeManagementInDB(false)
@@ -100,8 +102,9 @@ func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
 }
 
 func (s *canvasChangeManagementEnforcementSteps) saveCanvasSettings() {
-	s.session.Click(q.Locator(`button:has-text("Save Changes")`))
-	s.session.AssertText("Canvas updated successfully")
+	s.session.Click(q.TestID("canvas-settings-save-changes"))
+	canvasPath := "/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String()
+	s.session.WaitForBrowserPath(canvasPath)
 }
 
 func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementToggleDisabled() {

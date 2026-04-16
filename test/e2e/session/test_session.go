@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -377,6 +378,34 @@ func (s *TestSession) AssertURLContains(part string) {
 	if !strings.Contains(current, part) {
 		s.t.Fatalf("expected URL to contain %q, got %q", part, current)
 	}
+}
+
+// WaitForBrowserPath polls until the URL path (ignoring query and fragment) equals expectedPath
+// after normalizing trailing slashes. expectedPath is typically an app pathname such as
+// "/<orgID>/canvases/<canvasID>" (not including the origin or query string).
+func (s *TestSession) WaitForBrowserPath(expectedPath string) {
+	want := normalizeE2EBrowserPath(expectedPath)
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+
+	for time.Now().Before(deadline) {
+		u, err := url.Parse(s.page.URL())
+		if err == nil {
+			if normalizeE2EBrowserPath(u.Path) == want {
+				return
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	s.t.Fatalf("timed out waiting for browser path %q, last URL was %q", want, s.page.URL())
+}
+
+func normalizeE2EBrowserPath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" || p == "/" {
+		return "/"
+	}
+	return strings.TrimSuffix(p, "/")
 }
 
 func (s *TestSession) ScrollToTheBottomOfPage() {

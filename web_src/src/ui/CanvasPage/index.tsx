@@ -395,6 +395,7 @@ type CanvasNodeRendererCallbacks = {
   runDisabledTooltip?: string;
   showHeader: boolean;
   hasMultiSelection: boolean;
+  canvasMode: "live" | "edit";
 };
 
 type CanvasBlockNodeData = CanvasBlockData & {
@@ -498,6 +499,7 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
+    canvasMode: callbacks.canvasMode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -657,7 +659,9 @@ const nodeTypes = {
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
+    props.canvasStateMode === "editing" ? "settings" : "latest",
+  );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -1105,7 +1109,7 @@ function CanvasPage(props: CanvasPageProps) {
 
     state.componentSidebar.close();
     // Reset to latest tab when sidebar closes
-    setCurrentTab("latest");
+    setCurrentTab(props.canvasStateMode === "editing" ? "settings" : "latest");
 
     // Only remove the node if it's a pending connection node (not yet configured)
     if (isPendingConnection && state.componentSidebar.selectedNodeId) {
@@ -1126,7 +1130,7 @@ function CanvasPage(props: CanvasPageProps) {
         selected: false,
       })),
     );
-  }, [state, templateNodeId]);
+  }, [props.canvasStateMode, state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar =
@@ -1134,7 +1138,13 @@ function CanvasPage(props: CanvasPageProps) {
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
-    <div ref={canvasWrapperRef} className="h-full w-full overflow-hidden sp-canvas relative flex flex-col">
+    <div
+      ref={canvasWrapperRef}
+      className={cn(
+        "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
+        props.headerMode === "version-live" && "sp-canvas-live",
+      )}
+    >
       {/* Header at the top spanning full width */}
       <div className="relative z-30">
         <CanvasContentHeader
@@ -1327,6 +1337,7 @@ function CanvasPage(props: CanvasPageProps) {
             configurationSaveMode={props.configurationSaveMode}
             currentTab={currentTab}
             onTabChange={setCurrentTab}
+            canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
             integrations={props.integrations}
@@ -1390,6 +1401,7 @@ function Sidebar({
   configurationSaveMode = "manual",
   currentTab,
   onTabChange,
+  canvasMode,
   organizationId,
   getCustomField,
   integrations,
@@ -1436,6 +1448,7 @@ function Sidebar({
   configurationSaveMode?: "manual" | "auto";
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  canvasMode: "live" | "edit";
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
@@ -1472,6 +1485,7 @@ function Sidebar({
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
+  const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode;
 
   // Trigger data loading when sidebar opens for a node
   useEffect(() => {
@@ -1535,7 +1549,7 @@ function Sidebar({
   }
 
   // Show loading state when data is being fetched (skip for annotation nodes)
-  if (sidebarData.isLoading && currentTab === "latest" && !isAnnotationNode) {
+  if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     const sidebarWidth = saved ? parseInt(saved, 10) : 450;
 
@@ -1558,6 +1572,7 @@ function Sidebar({
     <ComponentSidebar
       key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
+      canvasMode={canvasMode}
       onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}
@@ -1979,6 +1994,15 @@ function CanvasContent({
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const isLiveMode = headerMode === "version-live";
   const isEditMode = !isLiveMode;
+
+  useEffect(() => {
+    if (isEditMode) {
+      return;
+    }
+
+    setHoveredEdgeId(null);
+  }, [isEditMode]);
+
   useEffect(() => {
     if (showBottomStatusControls) {
       localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
@@ -2092,7 +2116,7 @@ function CanvasContent({
         );
 
         if (setCurrentTab) {
-          setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
+          setCurrentTab(hasConfigurationWarning || isEditMode ? "settings" : "latest");
         }
 
         if (onBuildingBlocksSidebarToggle) {
@@ -2107,7 +2131,7 @@ function CanvasContent({
         })),
       );
     },
-    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab],
+    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab, isEditMode],
   );
 
   const onRunRef = useRef(onRun);
@@ -2320,6 +2344,7 @@ function CanvasContent({
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? ("edit" as const) : ("live" as const),
   });
   callbacksRef.current = {
     handleNodeClick,
@@ -2338,6 +2363,7 @@ function CanvasContent({
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? "edit" : "live",
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -2449,12 +2475,15 @@ function CanvasContent({
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
-          onDelete: isReadOnly ? undefined : stableEdgeDelete,
+          canDelete: isEditMode && !isReadOnly,
+          onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId, stableEdgeDelete, isReadOnly],
+    [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly],
   );
+
+  const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -2560,13 +2589,13 @@ function CanvasContent({
             snapGrid={[48, 48]}
             panOnScrollSpeed={0.8}
             nodesDraggable={!isReadOnly}
-            nodesConnectable={!isReadOnly && !!onEdgeCreate}
+            nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
-            onConnect={isReadOnly ? undefined : handleConnect}
-            onConnectStart={isReadOnly ? undefined : handleConnectStart}
-            onConnectEnd={isReadOnly ? undefined : handleConnectEnd}
+            onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
+            onConnectStart={isConnectionEditingEnabled ? handleConnectStart : undefined}
+            onConnectEnd={isConnectionEditingEnabled ? handleConnectEnd : undefined}
             onDragOver={isReadOnly ? undefined : handleDragOver}
             onDrop={isReadOnly ? undefined : handleDrop}
             onMove={handleMove}
@@ -2582,8 +2611,8 @@ function CanvasContent({
               setIsSelecting(false);
               previouslySelectedRef.current = new Set();
             }}
-            onEdgeMouseEnter={handleEdgeMouseEnter}
-            onEdgeMouseLeave={handleEdgeMouseLeave}
+            onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
+            onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
