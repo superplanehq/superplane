@@ -177,6 +177,30 @@ func (g *GetDropletMetrics) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDropletMetricsOnce, exampleOutputGetDropletMetricsBytes, &exampleOutputGetDropletMetrics)
 }
 
+//go:embed example_output_get_database.json
+var exampleOutputGetDatabaseBytes []byte
+
+var exampleOutputGetDatabaseOnce sync.Once
+var exampleOutputGetDatabase map[string]any
+
+func (g *GetDatabase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDatabaseOnce, exampleOutputGetDatabaseBytes, &exampleOutputGetDatabase)
+}
+
+//go:embed example_output_get_cluster_configuration.json
+var exampleOutputGetClusterConfigurationBytes []byte
+
+var exampleOutputGetClusterConfigurationOnce sync.Once
+var exampleOutputGetClusterConfiguration map[string]any
+
+func (g *GetClusterConfiguration) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetClusterConfigurationOnce,
+		exampleOutputGetClusterConfigurationBytes,
+		&exampleOutputGetClusterConfiguration,
+	)
+}
+
 //go:embed example_output_get_object.json
 var exampleOutputGetObjectBytes []byte
 
