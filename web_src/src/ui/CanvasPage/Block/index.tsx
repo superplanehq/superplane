@@ -11,12 +11,13 @@ export const Block = React.memo(function Block(props: BlockProps) {
   const isHighlighted = data._isHighlighted || false;
   const hasHighlightedNodes = data._hasHighlightedNodes || false;
   const shouldDim = hasHighlightedNodes && !isHighlighted;
+  const isConnectionInteractive = props.canvasMode !== "live";
 
   return (
     <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={(e) => props.onClick?.(e)}>
-      <LeftHandle data={data} nodeId={props.nodeId} />
+      <LeftHandle data={data} nodeId={props.nodeId} isConnectionInteractive={isConnectionInteractive} />
       <BlockContent {...props} />
-      <RightHandle data={data} nodeId={props.nodeId} />
+      <RightHandle data={data} nodeId={props.nodeId} isConnectionInteractive={isConnectionInteractive} />
     </div>
   );
 });
