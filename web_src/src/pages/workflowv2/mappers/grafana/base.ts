@@ -45,13 +45,18 @@ export function buildGrafanaEventSections(
   ];
 }
 
+/** Single source for Grafana event display time so subtitle and receivedAt stay aligned. */
+function resolveGrafanaEventDisplayTimestamp(execution: ExecutionInfo): string | undefined {
+  return execution.createdAt || execution.updatedAt;
+}
+
 function resolveGrafanaEventSubtitle(execution: ExecutionInfo): string | React.ReactNode {
-  const timestamp = execution.updatedAt || execution.createdAt;
+  const timestamp = resolveGrafanaEventDisplayTimestamp(execution);
   return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
 }
 
 function resolveGrafanaEventReceivedAt(execution: ExecutionInfo): Date | undefined {
-  const raw = execution.createdAt || execution.updatedAt;
+  const raw = resolveGrafanaEventDisplayTimestamp(execution);
   return raw ? new Date(raw) : undefined;
 }
 
