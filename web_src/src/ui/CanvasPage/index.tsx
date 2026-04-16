@@ -178,7 +178,7 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
-  unpublishedDraftChangeCount?: number;
+  hasUnpublishedDraftChanges?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1173,7 +1173,7 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           publishVersionLabel={props.publishVersionLabel}
-          unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
+          hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
@@ -1670,7 +1670,7 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   publishVersionLabel,
-  unpublishedDraftChangeCount,
+  hasUnpublishedDraftChanges,
   showCanvasSettingsMenu,
 }: {
   state: CanvasPageState;
@@ -1695,7 +1695,7 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
-  unpublishedDraftChangeCount?: number;
+  hasUnpublishedDraftChanges?: boolean;
   showCanvasSettingsMenu?: boolean;
 }) {
   const stateRef = useRef(state);
@@ -1737,7 +1737,7 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       publishVersionLabel={publishVersionLabel}
-      unpublishedDraftChangeCount={unpublishedDraftChangeCount}
+      hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
     />
   );
