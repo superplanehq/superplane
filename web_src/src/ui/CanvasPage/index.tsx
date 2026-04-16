@@ -62,10 +62,10 @@ import type {
 } from "@/api-client";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
-import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
+import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
@@ -1028,7 +1028,7 @@ function CanvasPage(props: CanvasPageProps) {
       configuration: {},
       position,
     });
-  }, [props, state.nodes, props.viewportRef, readOnly]);
+  }, [props, state.nodes, readOnly]);
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {

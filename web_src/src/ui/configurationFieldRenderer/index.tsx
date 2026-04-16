@@ -1,35 +1,35 @@
-import React from "react";
+import type { AuthorizationDomainType } from "@/api-client";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
-import type { FieldRendererProps, ValidationError } from "./types";
-import { StringFieldRenderer } from "./StringFieldRenderer";
-import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
-import { TextFieldRenderer } from "./TextFieldRenderer";
-import { XMLFieldRenderer } from "./XMLFieldRenderer";
-import { NumberFieldRenderer } from "./NumberFieldRenderer";
+import React from "react";
+import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
+import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
-import { SelectFieldRenderer } from "./SelectFieldRenderer";
-import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
+import { CronFieldRenderer } from "./CronFieldRenderer";
 import { DateFieldRenderer } from "./DateFieldRenderer";
 import { DateTimeFieldRenderer } from "./DateTimeFieldRenderer";
-import { UrlFieldRenderer } from "./UrlFieldRenderer";
-import { ListFieldRenderer } from "./ListFieldRenderer";
-import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
-import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
-import { TimeFieldRenderer } from "./TimeFieldRenderer";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
-import { CronFieldRenderer } from "./CronFieldRenderer";
-import { UserFieldRenderer } from "./UserFieldRenderer";
-import { RoleFieldRenderer } from "./RoleFieldRenderer";
-import { GroupFieldRenderer } from "./GroupFieldRenderer";
-import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
-import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
-import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
-import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
+import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
+import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
+import { GroupFieldRenderer } from "./GroupFieldRenderer";
+import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
+import { ListFieldRenderer } from "./ListFieldRenderer";
+import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
+import { NumberFieldRenderer } from "./NumberFieldRenderer";
+import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
+import { RoleFieldRenderer } from "./RoleFieldRenderer";
+import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
+import { SelectFieldRenderer } from "./SelectFieldRenderer";
+import { StringFieldRenderer } from "./StringFieldRenderer";
+import { TextFieldRenderer } from "./TextFieldRenderer";
+import { TimeFieldRenderer } from "./TimeFieldRenderer";
 import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
-import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
-import type { AuthorizationDomainType } from "@/api-client";
+import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
+import type { FieldRendererProps, ValidationError } from "./types";
+import { UrlFieldRenderer } from "./UrlFieldRenderer";
+import { UserFieldRenderer } from "./UserFieldRenderer";
+import { XMLFieldRenderer } from "./XMLFieldRenderer";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
@@ -178,7 +178,7 @@ export const ConfigurationFieldRenderer = ({
       message: error,
       type: "validation_rule" as const,
     }));
-  }, [field, value, allValues, validationErrors, enableRealtimeValidation]);
+  }, [field, value, validationErrors, enableRealtimeValidation]);
 
   // Get field-specific validation errors
   const fieldErrors = React.useMemo(() => {
