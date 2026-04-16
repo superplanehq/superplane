@@ -105,7 +105,6 @@ import {
   prepareTriggerNode,
 } from "./lib/canvas-node-preparation";
 import {
-  formatVersionLabelWithTimestamp,
   isDraftVersion,
   isPublishedVersion,
   sortDraftVersionsDesc,
@@ -1314,8 +1313,6 @@ export function WorkflowPageV2() {
           spec: { ...current.spec, ...version.spec },
         };
       });
-
-      showSuccessToast(`Editing ${formatVersionLabelWithTimestamp(version)}`);
     } catch (error) {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
