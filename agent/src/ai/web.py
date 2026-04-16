@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from pydantic_ai import Agent
+from pydantic_ai import Agent, CallToolsNode, ModelRequestNode
 from pydantic_ai.messages import (
     FinalResultEvent,
     FunctionToolCallEvent,
@@ -23,7 +23,6 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
-from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
 from ai.agent_stream_context import AgentStreamRequest, build_agent_context_state
@@ -54,6 +53,7 @@ from ai.telemetry import (
     shutdown_telemetry,
 )
 from ai.text import normalize_optional
+from ai.tool_loop_guard import ToolLoopGuard
 from ai.tools import format_tool_display_label
 from ai.usage_limit_checker import (
     AgentUsageLimitChecker,
@@ -140,23 +140,103 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
+def _usage_value(usage: Any | None, field: str) -> int:
+    if usage is None:
+        return 0
+    if isinstance(usage, dict):
+        value = usage.get(field, 0)
+    else:
+        value = getattr(usage, field, 0)
+    return int(value or 0)
+
+
+def _usage_snapshot(usage: Any | None) -> dict[str, Any]:
+    details: Any | None = None
+    requests: Any | None = None
+    tool_calls: Any | None = None
+    if isinstance(usage, dict):
+        details = usage.get("details")
+        requests = usage.get("requests")
+        tool_calls = usage.get("tool_calls")
+    elif usage is not None:
+        details = getattr(usage, "details", None)
+        requests = getattr(usage, "requests", None)
+        tool_calls = getattr(usage, "tool_calls", None)
+
+    snapshot: dict[str, Any] = {
+        "input_tokens": _usage_value(usage, "input_tokens"),
+        "output_tokens": _usage_value(usage, "output_tokens"),
+        "cache_read_tokens": _usage_value(usage, "cache_read_tokens"),
+        "cache_write_tokens": _usage_value(usage, "cache_write_tokens"),
+        "total_tokens": _usage_value(usage, "total_tokens"),
+        "requests": int(requests or 0),
+        "tool_calls": int(tool_calls or 0),
+    }
+    if details is not None:
+        snapshot["details"] = _to_jsonable(details)
+    return snapshot
+
+
+def _usage_snapshot_from_run(agent_run: Any) -> dict[str, Any]:
+    usage_candidate = getattr(agent_run, "usage", None)
+    if callable(usage_candidate):
+        usage_candidate = usage_candidate()
+    return _usage_snapshot(usage_candidate)
+
+
+def _emit_answer_delta_from_output_args(
+    call_id: str,
+    output_args: Any,
+    *,
+    streamed_answer_length_by_call_id: dict[str, int],
+    recorder: PersistedRunRecorder,
+    started_at: float,
+    streamed_any_answer_delta: bool,
+) -> tuple[dict[str, Any] | None, bool]:
+    if not isinstance(output_args, dict):
+        return None, streamed_any_answer_delta
+    answer = output_args.get("answer")
+    if not isinstance(answer, str):
+        return None, streamed_any_answer_delta
+    already_streamed = streamed_answer_length_by_call_id.get(call_id, 0)
+    if len(answer) <= already_streamed:
+        return None, streamed_any_answer_delta
+    delta = answer[already_streamed:]
+    streamed_answer_length_by_call_id[call_id] = len(answer)
+    if not streamed_any_answer_delta:
+        record_first_token_duration(time.perf_counter() - started_at)
+    recorder.append_assistant_content(delta)
+    return {
+        "type": "model_delta",
+        "content": delta,
+    }, True
+
+
+def _likely_output_tool_name(tool_name: str | None, output_tool_name_hints: set[str]) -> bool:
+    if not isinstance(tool_name, str):
+        return False
+    normalized = tool_name.strip().lower()
+    return normalized in output_tool_name_hints
+
+
 def _record_usage(
     store: SessionStore,
     publisher: AgentUsagePublisher,
     run_id: str,
-    usage: RunUsage,
+    usage: Any | None,
     org_id: str,
     chat_id: str,
     model: str,
 ) -> None:
+    usage_snapshot = _usage_snapshot(usage)
     try:
         store.update_run_usage(
             run_id=run_id,
-            input_tokens=usage.input_tokens or 0,
-            output_tokens=usage.output_tokens or 0,
-            cache_read_tokens=usage.cache_read_tokens or 0,
-            cache_write_tokens=usage.cache_write_tokens or 0,
-            total_tokens=usage.total_tokens or 0,
+            input_tokens=usage_snapshot["input_tokens"],
+            output_tokens=usage_snapshot["output_tokens"],
+            cache_read_tokens=usage_snapshot["cache_read_tokens"],
+            cache_write_tokens=usage_snapshot["cache_write_tokens"],
+            total_tokens=usage_snapshot["total_tokens"],
         )
     except Exception as error:
         print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
@@ -168,12 +248,40 @@ def _record_usage(
             organization_id=org_id,
             chat_id=chat_id,
             model=model,
-            input_tokens=usage.input_tokens or 0,
-            output_tokens=usage.output_tokens or 0,
-            total_tokens=usage.total_tokens or 0,
+            input_tokens=usage_snapshot["input_tokens"],
+            output_tokens=usage_snapshot["output_tokens"],
+            total_tokens=usage_snapshot["total_tokens"],
         )
     except Exception as error:
         print(f"[web] failed to publish usage for run {run_id}: {error}", flush=True)
+
+
+def _finalize_final_answer(
+    recorder: PersistedRunRecorder,
+    store: SessionStore,
+    publisher: AgentUsagePublisher,
+    run_id: str,
+    org_id: str,
+    chat_id: str,
+    model: str,
+    output: Any,
+    usage: Any | None,
+    *,
+    authoritative_messages: Any | None = None,
+    fallback_assistant_content: str | None = None,
+) -> dict[str, Any]:
+    if authoritative_messages is not None:
+        recorder.save_authoritative_messages(authoritative_messages)
+    elif fallback_assistant_content is not None:
+        recorder.set_assistant_content(fallback_assistant_content)
+
+    usage_snapshot = _usage_snapshot(usage)
+    _record_usage(store, publisher, run_id, usage_snapshot, org_id, chat_id, model)
+    return {
+        "type": "final_answer",
+        "output": _to_jsonable(output),
+        "usage": usage_snapshot,
+    }
 
 
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
@@ -269,6 +377,12 @@ def _friendly_error_message(error: Exception) -> str:
     return "An unexpected error occurred. Please try again."
 
 
+class _AgentToolLoopDetected(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+
 async def _run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[Any]:
     yielded_any = False
     for attempt in range(_MAX_ATTEMPTS):
@@ -344,7 +458,7 @@ async def _stream_agent_run(
     if message_history is not None:
         run_kwargs["message_history"] = message_history
 
-    persisted_tool_display_labels: dict[str, str] = {}
+    test_path_tool_display_labels: dict[str, str] = {}
 
     if payload.model == "test":
         _debug_log("using test model run path", canvas_id=resolved_canvas_id, chat_id=chat.id)
@@ -364,19 +478,22 @@ async def _stream_agent_run(
                 result = event.result
                 messages = apply_tool_display_labels_to_messages(
                     list(result.new_messages()),
-                    persisted_tool_display_labels,
+                    test_path_tool_display_labels,
                 )
-                recorder.save_authoritative_messages(messages)
                 output = _to_jsonable(result.output)
-                if isinstance(output, str) and output:
-                    recorder.set_assistant_content(output)
                 usage = result.usage()
-                _record_usage(store, publisher, run_id, usage, chat.org_id, chat.id, payload.model)
-                yield {
-                    "type": "final_answer",
-                    "output": output,
-                    "usage": _to_jsonable(usage),
-                }
+                yield _finalize_final_answer(
+                    recorder,
+                    store,
+                    publisher,
+                    run_id,
+                    chat.org_id,
+                    chat.id,
+                    payload.model,
+                    output,
+                    usage,
+                    authoritative_messages=messages,
+                )
 
         yield {
             "type": "run_completed",
@@ -398,171 +515,291 @@ async def _stream_agent_run(
     )
 
     last_assistant_snippet = ""
-    output_tool_call_id: str | None = None
-    output_tool_name_hints = {"final_result", "return_canvasanswer", "canvasanswer"}
-    output_args_buffer_by_call_id: dict[str, str] = {}
-    streamed_answer_length_by_call_id: dict[str, int] = {}
-    streamed_any_answer_delta = False
+    for attempt in range(_MAX_ATTEMPTS):
+        persisted_tool_display_labels: dict[str, str] = {}
+        output_tool_call_id: str | None = None
+        output_tool_name_hints = {"final_result", "return_canvasanswer", "canvasanswer"}
+        output_args_buffer_by_call_id: dict[str, str] = {}
+        streamed_answer_length_by_call_id: dict[str, int] = {}
+        streamed_any_answer_delta = False
+        tool_started_at_by_call_id: dict[str, float] = {}
+        tool_display_label_by_call_id: dict[str, str] = {}
+        loop_guard = ToolLoopGuard()
+        yielded_stream_event = False
 
-    def emit_answer_delta_from_output_args(call_id: str, output_args: Any) -> dict[str, Any] | None:
-        nonlocal streamed_any_answer_delta
-        if not isinstance(output_args, dict):
-            return None
-        answer = output_args.get("answer")
-        if not isinstance(answer, str):
-            return None
-        already_streamed = streamed_answer_length_by_call_id.get(call_id, 0)
-        if len(answer) <= already_streamed:
-            return None
-        delta = answer[already_streamed:]
-        streamed_answer_length_by_call_id[call_id] = len(answer)
-        if not streamed_any_answer_delta:
-            record_first_token_duration(time.perf_counter() - started_at)
-        streamed_any_answer_delta = True
-        recorder.append_assistant_content(delta)
-        return {
-            "type": "model_delta",
-            "content": delta,
-        }
+        try:
+            run_completed = False
+            async with agent.iter(**run_kwargs) as agent_run:
+                node = agent_run.next_node
+                while agent_run.result is None and not run_completed:
+                    if isinstance(node, ModelRequestNode):
+                        async with node.stream(agent_run.ctx) as model_events:
+                            async for event in model_events:
+                                yielded_stream_event = True
 
-    def likely_output_tool_name(tool_name: str | None) -> bool:
-        if not isinstance(tool_name, str):
-            return False
-        normalized = tool_name.strip().lower()
-        return normalized in output_tool_name_hints
+                                if isinstance(event, PartStartEvent) and isinstance(
+                                    event.part, ToolCallPart
+                                ):
+                                    tool_call_id = event.part.tool_call_id
+                                    if tool_call_id and _likely_output_tool_name(
+                                        event.part.tool_name,
+                                        output_tool_name_hints,
+                                    ):
+                                        output_tool_call_id = tool_call_id
+                                    recorder.tool_started(event.part)
+                                    continue
 
-    tool_started_at_by_call_id: dict[str, float] = {}
-    tool_display_label_by_call_id: dict[str, str] = {}
-    async for event in _run_stream_events(agent, **run_kwargs):
-        if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
-            tool_call_id = event.part.tool_call_id
-            if tool_call_id and likely_output_tool_name(event.part.tool_name):
-                output_tool_call_id = tool_call_id
-            recorder.tool_started(event.part)
-            continue
+                                if isinstance(event, FinalResultEvent):
+                                    if event.tool_call_id:
+                                        output_tool_call_id = event.tool_call_id
+                                    continue
 
-        if isinstance(event, FinalResultEvent):
-            if event.tool_call_id:
-                output_tool_call_id = event.tool_call_id
-            continue
+                                if isinstance(event, PartDeltaEvent) and isinstance(
+                                    event.delta, ToolCallPartDelta
+                                ):
+                                    raw_tool_call_id = event.delta.tool_call_id
+                                    if raw_tool_call_id is None:
+                                        continue
+                                    tool_call_id = raw_tool_call_id
 
-        if isinstance(event, PartDeltaEvent) and isinstance(event.delta, ToolCallPartDelta):
-            _raw_tool_call_id = event.delta.tool_call_id
-            if _raw_tool_call_id is None:
-                continue
-            tool_call_id = _raw_tool_call_id
+                                    if output_tool_call_id is None and _likely_output_tool_name(
+                                        event.delta.tool_name_delta,
+                                        output_tool_name_hints,
+                                    ):
+                                        output_tool_call_id = tool_call_id
+                                    if output_tool_call_id != tool_call_id:
+                                        continue
 
-            if output_tool_call_id is None and likely_output_tool_name(event.delta.tool_name_delta):
-                output_tool_call_id = tool_call_id
-            if output_tool_call_id != tool_call_id:
-                continue
+                                    args_delta = event.delta.args_delta
+                                    if isinstance(args_delta, dict):
+                                        recorder.tool_call_delta(
+                                            tool_call_id,
+                                            args_delta,
+                                            event.delta.tool_name_delta,
+                                        )
+                                        (
+                                            maybe_delta,
+                                            streamed_any_answer_delta,
+                                        ) = _emit_answer_delta_from_output_args(
+                                            tool_call_id,
+                                            args_delta,
+                                            streamed_answer_length_by_call_id=streamed_answer_length_by_call_id,
+                                            recorder=recorder,
+                                            started_at=started_at,
+                                            streamed_any_answer_delta=streamed_any_answer_delta,
+                                        )
+                                        if maybe_delta is not None:
+                                            yield maybe_delta
+                                        continue
 
-            args_delta = event.delta.args_delta
-            if isinstance(args_delta, dict):
-                recorder.tool_call_delta(tool_call_id, args_delta, event.delta.tool_name_delta)
-                maybe_delta = emit_answer_delta_from_output_args(tool_call_id, args_delta)
-                if maybe_delta is not None:
-                    yield maybe_delta
-                continue
+                                    if isinstance(args_delta, str):
+                                        recorder.tool_call_delta(
+                                            tool_call_id,
+                                            args_delta,
+                                            event.delta.tool_name_delta,
+                                        )
+                                        buffer = output_args_buffer_by_call_id.get(tool_call_id, "")
+                                        buffer += args_delta
+                                        output_args_buffer_by_call_id[tool_call_id] = buffer
+                                        try:
+                                            parsed_args = json.loads(buffer)
+                                        except json.JSONDecodeError:
+                                            continue
+                                        (
+                                            maybe_delta,
+                                            streamed_any_answer_delta,
+                                        ) = _emit_answer_delta_from_output_args(
+                                            tool_call_id,
+                                            parsed_args,
+                                            streamed_answer_length_by_call_id=streamed_answer_length_by_call_id,
+                                            recorder=recorder,
+                                            started_at=started_at,
+                                            streamed_any_answer_delta=streamed_any_answer_delta,
+                                        )
+                                        if maybe_delta is not None:
+                                            yield maybe_delta
+                                    continue
 
-            if isinstance(args_delta, str):
-                recorder.tool_call_delta(tool_call_id, args_delta, event.delta.tool_name_delta)
-                buffer = output_args_buffer_by_call_id.get(tool_call_id, "")
-                buffer += args_delta
-                output_args_buffer_by_call_id[tool_call_id] = buffer
-                try:
-                    parsed_args = json.loads(buffer)
-                except json.JSONDecodeError:
-                    continue
-                maybe_delta = emit_answer_delta_from_output_args(tool_call_id, parsed_args)
-                if maybe_delta is not None:
-                    yield maybe_delta
-            continue
+                                if isinstance(event, PartDeltaEvent) and isinstance(
+                                    event.delta, TextPartDelta
+                                ):
+                                    chunk = event.delta.content_delta
+                                    if chunk:
+                                        recorder.append_assistant_content(chunk)
+                                        yield {
+                                            "type": "model_delta",
+                                            "content": chunk,
+                                        }
+                                    continue
+                    elif isinstance(node, CallToolsNode):
+                        try:
+                            async with node.stream(agent_run.ctx) as tool_events:
+                                async for event in tool_events:
+                                    yielded_stream_event = True
 
-        if isinstance(event, FunctionToolCallEvent):
-            tool_call_id = _stable_tool_call_id(event.part.tool_call_id, event.part.tool_name)
-            tool_started_at_by_call_id[tool_call_id] = time.perf_counter()
-            tool_label = format_tool_display_label(
-                event.part.tool_name or "",
-                event.part.args,
-                deps,
+                                    if isinstance(event, FunctionToolCallEvent):
+                                        tool_call_id = _stable_tool_call_id(
+                                            event.part.tool_call_id, event.part.tool_name
+                                        )
+                                        tool_started_at_by_call_id[tool_call_id] = (
+                                            time.perf_counter()
+                                        )
+                                        loop_guard.register_call(
+                                            tool_call_id,
+                                            event.part.tool_name,
+                                            event.part.args,
+                                        )
+                                        tool_label = format_tool_display_label(
+                                            event.part.tool_name or "",
+                                            event.part.args,
+                                            deps,
+                                        )
+                                        tool_display_label_by_call_id[tool_call_id] = tool_label
+                                        yield {
+                                            "type": "tool_started",
+                                            "tool_name": event.part.tool_name,
+                                            "tool_call_id": tool_call_id,
+                                            "tool_label": tool_label,
+                                            "args": _to_jsonable(event.part.args),
+                                        }
+                                        continue
+
+                                    if isinstance(event, FunctionToolResultEvent):
+                                        tool_call_id = _stable_tool_call_id(
+                                            event.result.tool_call_id, event.result.tool_name
+                                        )
+                                        tool_started_at = tool_started_at_by_call_id.pop(
+                                            tool_call_id, started_at
+                                        )
+                                        elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
+                                        tool_label = tool_display_label_by_call_id.pop(
+                                            tool_call_id,
+                                            (event.result.tool_name or "").strip() or "tool",
+                                        )
+                                        persisted_tool_display_labels[tool_call_id] = tool_label
+                                        recorder.tool_finished(event)
+                                        yield {
+                                            "type": "tool_finished",
+                                            "tool_name": event.result.tool_name,
+                                            "tool_call_id": tool_call_id,
+                                            "tool_label": tool_label,
+                                            "elapsed_ms": elapsed_ms,
+                                        }
+
+                                        decision = loop_guard.observe_result(
+                                            tool_call_id,
+                                            event.result.tool_name,
+                                            getattr(event.result, "content", None),
+                                        )
+                                        if decision is not None:
+                                            _debug_log(
+                                                "circuit breaking repetitive tool loop",
+                                                tool_name=decision.tool_name,
+                                                repeated_count=decision.repeated_count,
+                                                signature=decision.signature,
+                                            )
+                                            raise _AgentToolLoopDetected(decision.message)
+                        except _AgentToolLoopDetected as error:
+                            fallback_output = CanvasAnswer(
+                                answer=error.message,
+                                confidence=0.1,
+                                follow_up_questions=[
+                                    "Which integration should I inspect?",
+                                    "What exact resource type do you want from that integration?",
+                                ],
+                            )
+                            if not streamed_any_answer_delta:
+                                for chunk in _iter_text_chunks(fallback_output.answer):
+                                    yield {
+                                        "type": "model_delta",
+                                        "content": chunk,
+                                    }
+                                    await asyncio.sleep(0.01)
+                            yield _finalize_final_answer(
+                                recorder,
+                                store,
+                                publisher,
+                                run_id,
+                                chat.org_id,
+                                chat.id,
+                                payload.model,
+                                fallback_output,
+                                _usage_snapshot_from_run(agent_run),
+                                fallback_assistant_content=fallback_output.answer,
+                            )
+                            last_assistant_snippet = fallback_output.answer
+                            run_completed = True
+                            break
+                    else:
+                        raise ValueError(f"Unexpected agent run node: {type(node).__name__}")
+
+                    if run_completed or agent_run.result is not None:
+                        break
+
+                    next_node = await agent_run.next(node)
+                    if agent_run.result is None:
+                        node = next_node
+
+                if not run_completed:
+                    result = agent_run.result
+                    if result is None:
+                        raise ValueError("Agent run finished without a final result.")
+
+                    messages = apply_tool_display_labels_to_messages(
+                        list(result.new_messages()),
+                        persisted_tool_display_labels,
+                    )
+                    resolved_output = result.output
+                    if isinstance(resolved_output, CanvasAnswer):
+                        cache_key = f"{deps.canvas_id}:{deps.canvas_version_id or 'inspect'}"
+                        canvas_summary = deps.canvas_cache.get(cache_key)
+                        resolved_output = coerce_canvas_answer_proposal(
+                            deps.client,
+                            resolved_output,
+                            canvas_summary,
+                        )
+                    output = _to_jsonable(resolved_output)
+                    if isinstance(output, dict) and not streamed_any_answer_delta:
+                        answer = output.get("answer")
+                        if isinstance(answer, str) and answer:
+                            for chunk in _iter_text_chunks(answer):
+                                yield {
+                                    "type": "model_delta",
+                                    "content": chunk,
+                                }
+                                await asyncio.sleep(0.01)
+                    yield _finalize_final_answer(
+                        recorder,
+                        store,
+                        publisher,
+                        run_id,
+                        chat.org_id,
+                        chat.id,
+                        payload.model,
+                        output,
+                        _usage_snapshot_from_run(agent_run),
+                        authoritative_messages=messages,
+                    )
+                    last_assistant_snippet = snippet_from_run_output(resolved_output)
+                    run_completed = True
+
+            if run_completed:
+                break
+        except Exception as error:
+            if (
+                yielded_stream_event
+                or not _is_transient_error(error)
+                or attempt == _MAX_ATTEMPTS - 1
+            ):
+                raise
+            delay = _BASE_DELAY_SECONDS * (2**attempt) + random.uniform(0, _JITTER_SECONDS)
+            _debug_log(
+                "transient LLM error, retrying",
+                attempt=attempt + 1,
+                delay=delay,
+                error=str(error),
             )
-            tool_display_label_by_call_id[tool_call_id] = tool_label
-            yield {
-                "type": "tool_started",
-                "tool_name": event.part.tool_name,
-                "tool_call_id": tool_call_id,
-                "tool_label": tool_label,
-                "args": _to_jsonable(event.part.args),
-            }
-            continue
-
-        if isinstance(event, FunctionToolResultEvent):
-            tool_call_id = _stable_tool_call_id(event.result.tool_call_id, event.result.tool_name)
-            tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
-            elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
-            tool_label = tool_display_label_by_call_id.pop(
-                tool_call_id,
-                (event.result.tool_name or "").strip() or "tool",
-            )
-            persisted_tool_display_labels[tool_call_id] = tool_label
-            recorder.tool_finished(event)
-            yield {
-                "type": "tool_finished",
-                "tool_name": event.result.tool_name,
-                "tool_call_id": tool_call_id,
-                "tool_label": tool_label,
-                "elapsed_ms": elapsed_ms,
-            }
-            continue
-
-        if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-            chunk = event.delta.content_delta
-            if chunk:
-                recorder.append_assistant_content(chunk)
-                yield {
-                    "type": "model_delta",
-                    "content": chunk,
-                }
-            continue
-
-        if isinstance(event, AgentRunResultEvent):
-            result = event.result
-            messages = apply_tool_display_labels_to_messages(
-                list(result.new_messages()),
-                persisted_tool_display_labels,
-            )
-            recorder.save_authoritative_messages(messages)
-            resolved_output = result.output
-            if isinstance(resolved_output, CanvasAnswer):
-                cache_key = f"{deps.canvas_id}:{deps.canvas_version_id or 'inspect'}"
-                canvas_summary = deps.canvas_cache.get(cache_key)
-                resolved_output = coerce_canvas_answer_proposal(
-                    deps.client,
-                    resolved_output,
-                    canvas_summary,
-                )
-            output = _to_jsonable(resolved_output)
-            if isinstance(output, dict) and not streamed_any_answer_delta:
-                answer = output.get("answer")
-                if isinstance(answer, str) and answer:
-                    recorder.set_assistant_content(answer)
-                    for chunk in _iter_text_chunks(answer):
-                        yield {
-                            "type": "model_delta",
-                            "content": chunk,
-                        }
-                        await asyncio.sleep(0.01)
-            elif isinstance(output, str) and output:
-                recorder.set_assistant_content(output)
-            usage = result.usage()
-            _record_usage(store, publisher, run_id, usage, chat.org_id, chat.id, payload.model)
-            yield {
-                "type": "final_answer",
-                "output": output,
-                "usage": _to_jsonable(usage),
-            }
-            last_assistant_snippet = snippet_from_run_output(resolved_output)
+            await asyncio.sleep(delay)
 
     if last_assistant_snippet.strip():
         register_background_task(

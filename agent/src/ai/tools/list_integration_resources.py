@@ -3,14 +3,14 @@ from typing import Any
 from pydantic_ai import RunContext
 
 from ai.agent_deps import AgentDeps
-from ai.tools.support import tool_debug, tool_error_entry
+from ai.tools.support import tool_debug, tool_empty_entry, tool_error_entry, tool_failure
 
 
 class ListIntegrationResources:
     name = "list_integration_resources"
     description = (
         "List selectable resources for an org integration resource type.\n\n"
-        "Returns [] without calling the API when integration_id or type "
+        "Returns a structured error without calling the API when integration_id or type "
         "is missing or blank. For results, both must be set: use "
         "describe_component / describe_trigger to read "
         "integration-resource field metadata for the correct type string."
@@ -37,18 +37,41 @@ class ListIntegrationResources:
     ) -> list[dict[str, Any]]:
         if not isinstance(integration_id, str) or not integration_id.strip():
             tool_debug("list_integration_resources skipped: empty integration_id")
-            return []
+            return [
+                tool_failure(
+                    "list_integration_resources",
+                    "integration_id is required",
+                    code="missing_integration_id",
+                )
+            ]
         if not isinstance(type, str) or not type.strip():
             tool_debug(
                 "list_integration_resources skipped: empty type (resource type is required by API)"
             )
-            return []
+            return [
+                tool_failure(
+                    "list_integration_resources",
+                    "type is required",
+                    code="missing_resource_type",
+                )
+            ]
         try:
-            return ctx.deps.client.list_integration_resources(
+            resources = ctx.deps.client.list_integration_resources(
                 integration_id=integration_id,
                 type=type,
                 parameters=parameters,
             )
+            if resources:
+                return resources
+            tool_debug("list_integration_resources returned no resources")
+            return [
+                tool_empty_entry(
+                    "list_integration_resources",
+                    "No resources found",
+                    integration_id=integration_id,
+                    resource_type=type,
+                )
+            ]
         except Exception as error:
             tool_debug(f"list_integration_resources failed: {error}")
             return [tool_error_entry("list_integration_resources", error)]
