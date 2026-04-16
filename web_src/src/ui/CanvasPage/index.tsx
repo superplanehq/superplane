@@ -20,20 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import {
-  ChevronsDownUp,
-  ChevronsUpDown,
-  CircleX,
-  Copy,
-  GitBranch,
-  Group,
-  LayoutDashboard,
-  LayoutGrid,
-  Loader2,
-  Play,
-  Trash2,
-  TriangleAlert,
-} from "lucide-react";
+import { CircleX, Copy, Group, LayoutDashboard, LayoutGrid, Loader2, Play, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -178,7 +165,7 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
-  unpublishedDraftChangeCount?: number;
+  hasUnpublishedDraftChanges?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -408,6 +395,7 @@ type CanvasNodeRendererCallbacks = {
   runDisabledTooltip?: string;
   showHeader: boolean;
   hasMultiSelection: boolean;
+  canvasMode: "live" | "edit";
 };
 
 type CanvasBlockNodeData = CanvasBlockData & {
@@ -511,6 +499,7 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
+    canvasMode: callbacks.canvasMode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -670,7 +659,9 @@ const nodeTypes = {
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
+    props.canvasStateMode === "editing" ? "settings" : "latest",
+  );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -1118,7 +1109,7 @@ function CanvasPage(props: CanvasPageProps) {
 
     state.componentSidebar.close();
     // Reset to latest tab when sidebar closes
-    setCurrentTab("latest");
+    setCurrentTab(props.canvasStateMode === "editing" ? "settings" : "latest");
 
     // Only remove the node if it's a pending connection node (not yet configured)
     if (isPendingConnection && state.componentSidebar.selectedNodeId) {
@@ -1139,7 +1130,7 @@ function CanvasPage(props: CanvasPageProps) {
         selected: false,
       })),
     );
-  }, [state, templateNodeId]);
+  }, [props.canvasStateMode, state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar =
@@ -1173,8 +1164,12 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           publishVersionLabel={props.publishVersionLabel}
-          unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
+          hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+          isVersionControlOpen={props.isVersionControlOpen}
+          onOpenVersionControl={props.onOpenVersionControl}
+          versionControlButtonTooltip={props.versionControlButtonTooltip}
+          versionControlNotificationCount={props.versionControlNotificationCount}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1284,11 +1279,8 @@ function CanvasPage(props: CanvasPageProps) {
               highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
               setCurrentTab={setCurrentTab}
-              isVersionControlOpen={props.isVersionControlOpen}
-              onOpenVersionControl={props.onOpenVersionControl}
-              versionControlButtonTooltip={props.versionControlButtonTooltip}
-              versionControlNotificationCount={props.versionControlNotificationCount}
               showBottomStatusControls={props.showBottomStatusControls}
+              headerMode={props.headerMode}
               isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
               onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
               autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1670,8 +1662,12 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   publishVersionLabel,
-  unpublishedDraftChangeCount,
+  hasUnpublishedDraftChanges,
   showCanvasSettingsMenu,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  versionControlNotificationCount,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1695,8 +1691,12 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
-  unpublishedDraftChangeCount?: number;
+  hasUnpublishedDraftChanges?: boolean;
   showCanvasSettingsMenu?: boolean;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1737,8 +1737,12 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       publishVersionLabel={publishVersionLabel}
-      unpublishedDraftChangeCount={unpublishedDraftChangeCount}
+      hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
+      isVersionControlOpen={isVersionControlOpen}
+      onOpenVersionControl={onOpenVersionControl}
+      versionControlButtonTooltip={versionControlButtonTooltip}
+      versionControlNotificationCount={versionControlNotificationCount}
     />
   );
 }
@@ -1807,11 +1811,8 @@ function CanvasContent({
   highlightedNodeIds,
   workflowNodes,
   setCurrentTab,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount = 0,
   showBottomStatusControls = true,
+  headerMode,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -1873,11 +1874,8 @@ function CanvasContent({
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
+  headerMode?: CanvasPageProps["headerMode"];
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1983,6 +1981,8 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
+  const isLiveMode = headerMode === "version-live";
+  const isEditMode = !isLiveMode;
   useEffect(() => {
     if (showBottomStatusControls) {
       localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
@@ -2012,6 +2012,14 @@ function CanvasContent({
       setIsLogSidebarOpen(false);
     }
   }, [showBottomStatusControls]);
+
+  useEffect(() => {
+    if (isLiveMode || consoleTab !== "runs") {
+      return;
+    }
+
+    setConsoleTab("errors");
+  }, [consoleTab, isLiveMode]);
 
   const [multiSelectedNodes, setMultiSelectedNodes] = useState<ReactFlowNode[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -2088,7 +2096,7 @@ function CanvasContent({
         );
 
         if (setCurrentTab) {
-          setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
+          setCurrentTab(hasConfigurationWarning || isEditMode ? "settings" : "latest");
         }
 
         if (onBuildingBlocksSidebarToggle) {
@@ -2103,7 +2111,7 @@ function CanvasContent({
         })),
       );
     },
-    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab],
+    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab, isEditMode],
   );
 
   const onRunRef = useRef(onRun);
@@ -2200,10 +2208,6 @@ function CanvasContent({
     [reportZoom, viewportRef],
   );
 
-  const handleToggleCollapse = useCallback(() => {
-    state.toggleCollapse();
-  }, [state.toggleCollapse]);
-
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
       return;
@@ -2236,20 +2240,6 @@ function CanvasContent({
     );
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
   }, [focusRequest, fitView]);
-
-  // Add keyboard shortcut for toggling collapse/expand
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Toggle collapse: Ctrl/Cmd + E
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "e") {
-        e.preventDefault();
-        handleToggleCollapse();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleToggleCollapse]);
 
   const handlePaneClick = useCallback(() => {
     previouslySelectedRef.current = new Set();
@@ -2334,6 +2324,7 @@ function CanvasContent({
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? ("edit" as const) : ("live" as const),
   });
   callbacksRef.current = {
     handleNodeClick,
@@ -2352,6 +2343,7 @@ function CanvasContent({
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? "edit" : "live",
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -2551,8 +2543,6 @@ function CanvasContent({
     setIsLogSidebarOpen(true);
   }, []);
 
-  const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
-
   return (
     <div className="h-full w-full relative">
       <div className="h-full">
@@ -2621,74 +2611,35 @@ function CanvasContent({
                 </div>
               )}
               <div className="flex items-center gap-3">
-                {showVersionControlTrigger ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center rounded-md p-0.5 h-8">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="relative inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 items-center text-xs font-medium gap-1.5"
-                            onClick={onOpenVersionControl}
-                            aria-label="Open version control"
-                          >
-                            <GitBranch className="h-3 w-3" />
-                          </Button>
-                          {versionControlNotificationCount > 0 ? (
-                            <span className="absolute left-6 -top-2 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
-                              {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
-                            </span>
-                          ) : null}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                ) : null}
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
-                  isSnapToGridEnabled={isSnapToGridEnabled}
-                  onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+                  isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
+                  onSnapToGridToggle={isEditMode ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined}
                 >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                        {state.isCollapsed ? (
-                          <ChevronsUpDown className="h-3 w-3" />
-                        ) : (
-                          <ChevronsDownUp className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {state.isCollapsed
-                        ? "Switch components to Detailed view (Ctrl/Cmd + E)"
-                        : "Switch components to Compact view (Ctrl/Cmd + E)"}
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
-                          onClick={handleToggleAutoLayoutOnUpdate}
-                          disabled={isAutoLayoutToggleDisabled}
-                          aria-pressed={isAutoLayoutOnUpdateEnabled}
-                        >
-                          {isAutoLayoutOnUpdateEnabled ? (
-                            <LayoutGrid className="h-3 w-3" />
-                          ) : (
-                            <LayoutDashboard className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-                  </Tooltip>
+                  {isEditMode ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
+                            onClick={handleToggleAutoLayoutOnUpdate}
+                            disabled={isAutoLayoutToggleDisabled}
+                            aria-pressed={isAutoLayoutOnUpdateEnabled}
+                          >
+                            {isAutoLayoutOnUpdateEnabled ? (
+                              <LayoutGrid className="h-3 w-3" />
+                            ) : (
+                              <LayoutDashboard className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+                    </Tooltip>
+                  ) : null}
                   <NodeSearch
                     onSearch={(searchString) => {
                       const query = searchString.toLowerCase();
@@ -2712,36 +2663,41 @@ function CanvasContent({
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={cn(
-                            "h-8 items-center text-xs font-medium",
-                            runsCountInfo.running > 0 && "text-blue-600",
-                          )}
-                          onClick={() => handleLogButtonClick("runs")}
-                        >
-                          {runsCountInfo.running > 0 ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Play className="h-3 w-3" />
-                          )}
-                          <span className={cn(runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800")}>
-                            Runs ·{" "}
-                            <span className="tabular-nums">
-                              {(runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total).toLocaleString(
-                                "en-US",
-                              )}
+                    {isLiveMode ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 items-center text-xs font-medium",
+                              runsCountInfo.running > 0 && "text-blue-600",
+                            )}
+                            onClick={() => handleLogButtonClick("runs")}
+                          >
+                            {runsCountInfo.running > 0 ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Play className="h-3 w-3" />
+                            )}
+                            <span className={cn(runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800")}>
+                              Runs ·{" "}
+                              <span className="tabular-nums">
+                                {(runsCountInfo.running > 0
+                                  ? runsCountInfo.running
+                                  : runsCountInfo.total
+                                ).toLocaleString("en-US")}
+                              </span>
                             </span>
-                          </span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {runsCountInfo.running > 0 ? `${runsCountInfo.running} running` : `${runsCountInfo.total} runs`}
-                      </TooltipContent>
-                    </Tooltip>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {runsCountInfo.running > 0
+                            ? `${runsCountInfo.running} running`
+                            : `${runsCountInfo.total} runs`}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -2939,6 +2895,7 @@ function CanvasContent({
         <CanvasLogSidebar
           isOpen={isLogSidebarOpen}
           onClose={() => setIsLogSidebarOpen(false)}
+          showRunsTab={isLiveMode}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
           searchValue={logSearch}

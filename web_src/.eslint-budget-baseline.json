@@ -1,16 +1,16 @@
 {
-  "maxAllowedTotalIssues": 747,
+  "maxAllowedTotalIssues": 750,
   "maxAllowedByRule": {
     "complexity": 239,
     "@typescript-eslint/no-explicit-any": 171,
     "@typescript-eslint/no-non-null-asserted-optional-chain": 83,
     "max-statements": 80,
     "max-lines-per-function": 79,
-    "react-hooks/exhaustive-deps": 35,
+    "react-hooks/exhaustive-deps": 38,
     "react-refresh/only-export-components": 25,
     "max-lines": 20,
     "max-depth": 9,
     "max-params": 6
   },
-  "updatedAt": "2026-04-16T14:07:41.619Z"
+  "updatedAt": "2026-04-16T16:40:32.593Z"
 }

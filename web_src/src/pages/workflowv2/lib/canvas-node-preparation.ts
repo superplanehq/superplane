@@ -245,6 +245,7 @@ function buildPlaceholderComponentNode(node: ComponentsNode): CanvasNode {
         emptyStateProps: {
           icon: Puzzle,
           title: "Select a component from the sidebar",
+          purpose: "setup",
         },
         error: "Select a component from the sidebar",
         parameters: [],
@@ -268,6 +269,7 @@ function resolveComponentEmptyStateProps(
     ...componentBaseProps.emptyStateProps,
     icon: componentBaseProps.emptyStateProps?.icon || Puzzle,
     title: "Finish configuring this component",
+    purpose: "setup",
   };
 }
 

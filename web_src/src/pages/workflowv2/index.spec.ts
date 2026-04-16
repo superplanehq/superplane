@@ -17,6 +17,7 @@ type FallbackComponentData = {
     error?: string;
     emptyStateProps?: {
       title?: string;
+      purpose?: string;
     };
   };
 };
@@ -92,6 +93,7 @@ describe("canvas node preparation resilience", () => {
     });
     expect(fallbackData.component.error).toBeUndefined();
     expect(fallbackData.component.emptyStateProps?.title).toBe("Can't display");
+    expect(fallbackData.component.emptyStateProps?.purpose).toBe("fallback");
   });
 
   it("returns null when a custom field renderer throws so sidebar rendering stays alive", () => {

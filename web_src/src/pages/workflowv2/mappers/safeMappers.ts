@@ -111,6 +111,12 @@ function normalizeEmptyStateProps(
         : undefined,
     title: sanitizeString(emptyStateProps.title),
     description: sanitizeString(emptyStateProps.description),
+    purpose:
+      emptyStateProps.purpose === "runtime" ||
+      emptyStateProps.purpose === "setup" ||
+      emptyStateProps.purpose === "fallback"
+        ? emptyStateProps.purpose
+        : undefined,
   };
 }
 
@@ -159,6 +165,7 @@ function applyComponentBaseFallbacks(
     icon: undefined,
     title: CANVAS_NODE_FALLBACK_MESSAGE,
     description: undefined,
+    purpose: "fallback",
   };
   const isFallback = !isRecord(props) || typeof record.title !== "string";
 
@@ -284,6 +291,7 @@ function applyTriggerFallbacks(
       icon: undefined,
       title: CANVAS_NODE_FALLBACK_MESSAGE,
       description: undefined,
+      purpose: "fallback",
     },
   };
 }
@@ -323,6 +331,7 @@ export function createSafeComponentMapper(mapper: ComponentBaseMapper, mapperNam
           emptyStateProps: {
             title: CANVAS_NODE_FALLBACK_MESSAGE,
             description: undefined,
+            purpose: "fallback",
           },
         };
         return fallbackProps;
@@ -372,6 +381,7 @@ export function createSafeTriggerRenderer(renderer: TriggerRenderer, rendererNam
           emptyStateProps: {
             title: CANVAS_NODE_FALLBACK_MESSAGE,
             description: undefined,
+            purpose: "fallback",
           },
         };
         return fallbackProps;

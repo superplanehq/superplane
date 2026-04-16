@@ -64,6 +64,50 @@ describe("Block fallback rendering", () => {
     expect(screen.getByText("Can't display")).toBeInTheDocument();
   });
 
+  it("replaces runtime empty states with edit-mode copy", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Draft Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "Draft Component",
+            iconSlug: "box",
+            collapsed: false,
+            includeEmptyState: true,
+            emptyStateProps: {
+              title: "Waiting for the first run",
+              purpose: "runtime",
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Runtime data appears in live mode")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for the first run")).not.toBeInTheDocument();
+  });
+
+  it("preserves fallback empty states in edit mode", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Broken Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Can't display")).toBeInTheDocument();
+    expect(screen.queryByText("Runtime data appears in live mode")).not.toBeInTheDocument();
+  });
+
   it("does not highlight a right handle when the target node is already connected", () => {
     render(
       <Block

@@ -49,6 +49,7 @@ export interface CompositeProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   showHeader?: boolean;
+  canvasMode?: "live" | "edit";
   metadata?: MetadataItem[];
   parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
@@ -73,6 +74,7 @@ export const Composite: React.FC<CompositeProps> = ({
   iconColor,
   title,
   showHeader,
+  canvasMode,
   metadata,
   parameters = [],
   lastRunItem,
@@ -196,6 +198,7 @@ export const Composite: React.FC<CompositeProps> = ({
       iconColor={iconColor}
       title={title}
       showHeader={showHeader}
+      canvasMode={canvasMode}
       metadata={metadata}
       specs={specs}
       eventSections={eventSections}
@@ -213,7 +216,7 @@ export const Composite: React.FC<CompositeProps> = ({
       onDelete={onDelete}
       isCompactView={isCompactView}
       includeEmptyState={eventsToDisplay.length === 0}
-      emptyStateProps={{ title: "No executions received yet" }}
+      emptyStateProps={{ title: "No executions received yet", purpose: "runtime" }}
       customField={customField}
       error={error}
       warning={warning}

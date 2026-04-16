@@ -4,7 +4,8 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { getStateMap } from "..";
 import type { ComponentBaseContext, ComponentBaseMapper, SubtitleContext } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { buildAlertRuleExecutionDetails, buildAlertRuleMetadata, buildGrafanaEventSections } from "./alert_rule_shared";
+import { buildGrafanaEventSections } from "./base";
+import { buildAlertRuleExecutionDetails, buildAlertRuleMetadata } from "./alert_rule_shared";
 
 export const createAlertRuleMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -16,7 +17,9 @@ export const createAlertRuleMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution
+        ? buildGrafanaEventSections(context.nodes, lastExecution, componentName, { strict: true })
+        : undefined,
       metadata: buildAlertRuleMetadata(context.node, { includeGroup: true, includePausedState: true }),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
