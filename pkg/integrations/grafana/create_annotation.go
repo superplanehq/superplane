@@ -144,7 +144,6 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Start time",
-			Default:     `{{ now() }}`,
 			Placeholder: `{{ now() }}`,
 		},
 		{
