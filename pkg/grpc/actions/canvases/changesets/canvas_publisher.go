@@ -204,6 +204,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
 		Configuration:     datatypes.NewJSONType(node.Configuration),
+		Metadata:          datatypes.NewJSONType(node.Metadata),
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
 		AppInstallationID: p.getNodeIntegrationID(node),
@@ -227,6 +228,8 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	// If node is already in error state, no need to run Setup() for it.
 	//
 	if newNode.State == models.CanvasNodeStateError {
+		node.Metadata = newNode.Metadata.Data()
+		p.finalNodes[node.ID] = node
 		return p.tx.Create(&newNode).Error
 	}
 
@@ -242,9 +245,10 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		newNode.State = models.CanvasNodeStateError
 		newNode.StateReason = &errorMsg
 		node.ErrorMessage = &errorMsg
-		p.finalNodes[node.ID] = node
 	}
 
+	node.Metadata = newNode.Metadata.Data()
+	p.finalNodes[node.ID] = node
 	return p.tx.Create(&newNode).Error
 }
 
@@ -296,6 +300,8 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	// If node is already in error state, no need to run Setup() for it.
 	//
 	if existingNode.State == models.CanvasNodeStateError {
+		updatedNode.Metadata = existingNode.Metadata.Data()
+		p.finalNodes[existingNode.NodeID] = updatedNode
 		return p.tx.Save(&existingNode).Error
 	}
 
@@ -310,9 +316,10 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 		existingNode.State = models.CanvasNodeStateError
 		existingNode.StateReason = &errorMsg
 		updatedNode.ErrorMessage = &errorMsg
-		p.finalNodes[existingNode.NodeID] = updatedNode
 	}
 
+	updatedNode.Metadata = existingNode.Metadata.Data()
+	p.finalNodes[existingNode.NodeID] = updatedNode
 	return p.tx.Save(&existingNode).Error
 }
 

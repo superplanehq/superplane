@@ -223,6 +223,106 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Contains(t, *brokenVersionNode.ErrorMessage, "component missingcomponent not registered")
 	})
 
+	t.Run("add node preserves metadata from draft version", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				componentCanvasNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			},
+			nil,
+		)
+
+		expectedMetadata := map[string]any{
+			"webhook_url":    "https://example.com/webhooks/123",
+			"authentication": "signature",
+		}
+
+		draft, err := models.SaveCanvasDraftInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			[]models.Node{
+				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+				{
+					ID:            "node-b",
+					Name:          "Node B",
+					Type:          models.NodeTypeComponent,
+					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+					Configuration: map[string]any{"value": "new"},
+					Metadata:      expectedMetadata,
+					Position:      models.Position{X: 10, Y: 20},
+				},
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		activeNodeB := findCanvasNode(t, activeNodes, "node-b")
+		require.Equal(t, expectedMetadata, activeNodeB.Metadata.Data())
+	})
+
+	t.Run("add node persists setup metadata into published version", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{},
+			nil,
+		)
+
+		draft, err := models.SaveCanvasDraftInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			[]models.Node{
+				{
+					ID:            "approval-node",
+					Name:          "Approval Node",
+					Type:          models.NodeTypeComponent,
+					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "approval"}},
+					Configuration: map[string]any{},
+					Metadata:      map[string]any{},
+					Position:      models.Position{X: 10, Y: 20},
+				},
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+
+		activeNode := findCanvasNode(t, activeNodes, "approval-node")
+		activeMetadata := activeNode.Metadata.Data()
+		require.Contains(t, activeMetadata, "records")
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+
+		publishedNode := findVersionNode(t, publishedVersion.Nodes, "approval-node")
+		require.Equal(t, activeMetadata, publishedNode.Metadata)
+	})
+
 	t.Run("add node skips setup when node already has error", func(t *testing.T) {
 		r := support.Setup(t)
 
