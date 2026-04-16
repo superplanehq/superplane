@@ -2553,24 +2553,6 @@ func (c *Client) GetKnowledgeBase(kbUUID string) (*KnowledgeBase, error) {
 	return &response.KnowledgeBase, nil
 }
 
-func (c *Client) ListClusterDatabases(clusterID string) ([]ClusterDatabase, error) {
-	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Databases []ClusterDatabase `json:"dbs"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Databases, nil
-}
-
 // KBSpacesDataSource defines a Spaces bucket data source for a knowledge base
 type KBSpacesDataSource struct {
 	BucketName string `json:"bucket_name"`
@@ -2944,6 +2926,7 @@ func (c *Client) GetDatabaseClusterConfig(clusterID string) (map[string]any, err
 	return response.Config, nil
 }
 
+// ListDatabases lists logical databases within a managed database cluster.
 func (c *Client) ListDatabases(clusterID string) ([]Database, error) {
 	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)

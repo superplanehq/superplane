@@ -242,7 +242,6 @@ export interface GetDatabaseClusterConfiguration {
   databaseCluster: string;
 }
 
-
 export interface CreateAppConfiguration {
   name: string;
   region: string;
