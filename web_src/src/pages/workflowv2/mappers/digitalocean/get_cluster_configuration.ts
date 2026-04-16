@@ -14,7 +14,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { DatabaseNodeMetadata, GetClusterConfiguration } from "./types";
+import type { DatabaseNodeMetadata, GetDatabaseClusterConfiguration as GetClusterConfiguration } from "./types";
 
 const CONFIG_LABELS: Record<string, string> = {
   autovacuum_analyze_scale_factor: "Analyze Scale",
