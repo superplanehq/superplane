@@ -10,13 +10,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getBackgroundColorClass } from "@/lib/colors";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
-import { loadChatConversation, loadChatSessions, pushAiMessages, sendChatPrompt } from "./agentChat";
+import {
+  deleteAgentChatSession,
+  loadChatConversation,
+  loadChatSessions,
+  pushAiMessages,
+  sendChatPrompt,
+} from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import { CategorySection } from "./CategorySection";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
@@ -141,6 +148,8 @@ function OpenBuildingBlocksSidebar({
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const currentChatIdRef = useRef(currentChatId);
+  currentChatIdRef.current = currentChatId;
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
@@ -194,6 +203,34 @@ function OpenBuildingBlocksSidebar({
     setPendingProposal(null);
     setAiError(null);
   }, []);
+
+  const handleDeleteChatSession = useCallback(
+    (chatId: string) => {
+      if (!canvasId || !organizationId) {
+        return;
+      }
+
+      setChatSessions((previous) => previous.filter((s) => s.id !== chatId));
+      if (currentChatIdRef.current === chatId) {
+        setCurrentChatId(null);
+        setAiMessages([]);
+        setPendingProposal(null);
+        setAiError(null);
+      }
+
+      void deleteAgentChatSession({ chatId, canvasId, organizationId }).then(
+        () => showSuccessToast("Conversation deleted"),
+        () => {
+          showErrorToast("Failed to delete conversation");
+          void loadChatSessions({ canvasId, organizationId }).then(
+            (sessions) => setChatSessions(sessions),
+            () => {},
+          );
+        },
+      );
+    },
+    [canvasId, organizationId],
+  );
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
@@ -695,6 +732,7 @@ function OpenBuildingBlocksSidebar({
             aiInput={aiInput}
             onAiInputChange={setAiInput}
             onSelectChat={handleSelectChatSession}
+            onDeleteChat={handleDeleteChatSession}
             onStartNewSession={handleStartNewChatSession}
             onSendPrompt={() => void handleSendPrompt()}
             aiInputRef={aiInputRef}
