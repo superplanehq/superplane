@@ -395,6 +395,7 @@ type CanvasNodeRendererCallbacks = {
   runDisabledTooltip?: string;
   showHeader: boolean;
   hasMultiSelection: boolean;
+  canvasMode: "live" | "edit";
 };
 
 type CanvasBlockNodeData = CanvasBlockData & {
@@ -498,6 +499,7 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
+    canvasMode: callbacks.canvasMode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -657,7 +659,9 @@ const nodeTypes = {
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
+    props.canvasStateMode === "editing" ? "settings" : "latest",
+  );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -1105,7 +1109,7 @@ function CanvasPage(props: CanvasPageProps) {
 
     state.componentSidebar.close();
     // Reset to latest tab when sidebar closes
-    setCurrentTab("latest");
+    setCurrentTab(props.canvasStateMode === "editing" ? "settings" : "latest");
 
     // Only remove the node if it's a pending connection node (not yet configured)
     if (isPendingConnection && state.componentSidebar.selectedNodeId) {
@@ -1126,7 +1130,7 @@ function CanvasPage(props: CanvasPageProps) {
         selected: false,
       })),
     );
-  }, [state, templateNodeId]);
+  }, [props.canvasStateMode, state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar =
@@ -2092,7 +2096,7 @@ function CanvasContent({
         );
 
         if (setCurrentTab) {
-          setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
+          setCurrentTab(hasConfigurationWarning || isEditMode ? "settings" : "latest");
         }
 
         if (onBuildingBlocksSidebarToggle) {
@@ -2107,7 +2111,7 @@ function CanvasContent({
         })),
       );
     },
-    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab],
+    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab, isEditMode],
   );
 
   const onRunRef = useRef(onRun);
@@ -2320,6 +2324,7 @@ function CanvasContent({
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? ("edit" as const) : ("live" as const),
   });
   callbacksRef.current = {
     handleNodeClick,
@@ -2338,6 +2343,7 @@ function CanvasContent({
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? "edit" : "live",
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes

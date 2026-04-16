@@ -69,6 +69,7 @@ export interface BlockProps extends ComponentActionsProps {
   nodeId?: string;
   selected?: boolean;
   showHeader?: boolean;
+  canvasMode?: "live" | "edit";
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
