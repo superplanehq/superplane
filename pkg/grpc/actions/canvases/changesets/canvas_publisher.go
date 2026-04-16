@@ -31,13 +31,20 @@ import (
  * run Setup(), and update things accordingly.
  */
 type CanvasPublisher struct {
-	tx            *gorm.DB
-	options       CanvasPublisherOptions
-	live          *models.CanvasVersion
-	draft         *models.CanvasVersion
-	changeset     *pb.CanvasChangeset
-	finalNodes    map[string]models.Node
-	existingNodes map[string]models.CanvasNode
+	tx         *gorm.DB
+	options    CanvasPublisherOptions
+	live       *models.CanvasVersion
+	draft      *models.CanvasVersion
+	changeset  *pb.CanvasChangeset
+	finalNodes map[string]models.Node
+
+	//
+	// All nodes in the workflow, including deleted ones.
+	// Deleted ones are needed, so we can use proper node IDs
+	// when adding new nodes, ensuring they are unique and do
+	// not conflict with deleted nodes.
+	//
+	allNodes map[string]models.CanvasNode
 }
 
 type CanvasPublisherOptions struct {
@@ -91,14 +98,14 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, options Canvas
 		return nil, fmt.Errorf("no changes between live and draft version being applied")
 	}
 
-	existingNodes, err := models.FindCanvasNodesInTransaction(tx, liveVersion.WorkflowID)
+	allNodes, err := models.FindCanvasNodesUnscopedInTransaction(tx, liveVersion.WorkflowID)
 	if err != nil {
 		return nil, err
 	}
 
-	existingNodesMap := make(map[string]models.CanvasNode)
-	for _, node := range existingNodes {
-		existingNodesMap[node.NodeID] = node
+	allNodesMap := make(map[string]models.CanvasNode)
+	for _, node := range allNodes {
+		allNodesMap[node.NodeID] = node
 	}
 
 	//
@@ -112,13 +119,13 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, options Canvas
 	}
 
 	return &CanvasPublisher{
-		tx:            tx,
-		options:       options,
-		live:          liveVersion,
-		finalNodes:    finalNodes,
-		draft:         draft,
-		changeset:     changeset,
-		existingNodes: existingNodesMap,
+		tx:         tx,
+		options:    options,
+		live:       liveVersion,
+		finalNodes: finalNodes,
+		draft:      draft,
+		changeset:  changeset,
+		allNodes:   allNodesMap,
 	}, nil
 }
 
@@ -166,15 +173,13 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	}
 
 	//
-	// TODO: expand node if node is a blueprint.
-	// TODO: set parent node ID
-	// TODO: remapping of IDs (????)
+	// TODO: handle blueprint nodes once blueprints are enabled again
 	//
 
 	now := time.Now()
 	newNode := models.CanvasNode{
 		WorkflowID:        p.live.WorkflowID,
-		NodeID:            node.ID,
+		NodeID:            p.getNewNodeID(node),
 		Name:              node.Name,
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
@@ -227,15 +232,13 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 		return nil
 	}
 
-	existingNode, exists := p.existingNodes[updatedNode.ID]
+	existingNode, exists := p.allNodes[updatedNode.ID]
 	if !exists {
 		return fmt.Errorf("node %s not found", updatedNode.ID)
 	}
 
 	//
-	// TODO: expand node if node is a blueprint.
-	// TODO: set parent node ID
-	// TODO: remapping of IDs (????)
+	// TODO: handle blueprint nodes once blueprints are enabled again
 	//
 
 	//
@@ -280,12 +283,12 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 }
 
 func (p *CanvasPublisher) deleteNode(change *pb.CanvasChangeset_Change) error {
-	existingNode, exists := p.existingNodes[change.GetNode().GetId()]
+	existingNode, exists := p.allNodes[change.GetNode().GetId()]
 	if !exists {
 		return nil
 	}
 
-	delete(p.existingNodes, existingNode.NodeID)
+	delete(p.allNodes, existingNode.NodeID)
 	return models.DeleteCanvasNode(p.tx, existingNode)
 }
 
@@ -389,4 +392,24 @@ func (p *CanvasPublisher) setupComponent(ctx context.Context, node *models.Canva
 
 	setupCtx.Logger = logger
 	return component.Setup(setupCtx)
+}
+
+func (p *CanvasPublisher) getNewNodeID(node models.Node) string {
+
+	//
+	// If node ID has not been used yet, just use it.
+	//
+	if _, exists := p.allNodes[node.ID]; !exists {
+		return node.ID
+	}
+
+	reservedIDs := make(map[string]bool)
+	for _, node := range p.allNodes {
+		reservedIDs[node.NodeID] = true
+	}
+
+	//
+	// If node ID has been used, generate a new one.
+	//
+	return models.GenerateUniqueNodeID(node, reservedIDs)
 }
