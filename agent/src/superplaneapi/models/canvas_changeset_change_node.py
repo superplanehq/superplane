@@ -18,8 +18,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.components_position import ComponentsPosition
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -32,7 +33,9 @@ class CanvasChangesetChangeNode(BaseModel):
     block: Optional[StrictStr] = None
     configuration: Optional[Dict[str, Any]] = None
     integration_id: Optional[StrictStr] = Field(default=None, alias="integrationId")
-    __properties: ClassVar[List[str]] = ["id", "name", "block", "configuration", "integrationId"]
+    position: Optional[ComponentsPosition] = None
+    is_collapsed: Optional[StrictBool] = Field(default=None, alias="isCollapsed")
+    __properties: ClassVar[List[str]] = ["id", "name", "block", "configuration", "integrationId", "position", "isCollapsed"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -73,6 +76,9 @@ class CanvasChangesetChangeNode(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of position
+        if self.position:
+            _dict['position'] = self.position.to_dict()
         return _dict
 
     @classmethod
@@ -89,7 +95,9 @@ class CanvasChangesetChangeNode(BaseModel):
             "name": obj.get("name"),
             "block": obj.get("block"),
             "configuration": obj.get("configuration"),
-            "integrationId": obj.get("integrationId")
+            "integrationId": obj.get("integrationId"),
+            "position": ComponentsPosition.from_dict(obj["position"]) if obj.get("position") is not None else None,
+            "isCollapsed": obj.get("isCollapsed")
         })
         return _obj
 

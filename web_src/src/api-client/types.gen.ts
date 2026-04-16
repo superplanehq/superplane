@@ -144,6 +144,8 @@ export type CanvasChangesetChangeNode = {
     [key: string]: unknown;
   };
   integrationId?: string;
+  position?: ComponentsPosition;
+  isCollapsed?: boolean;
 };
 
 export type CanvasChangesetChangeType =

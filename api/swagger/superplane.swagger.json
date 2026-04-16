@@ -4501,6 +4501,12 @@
         },
         "integrationId": {
           "type": "string"
+        },
+        "position": {
+          "$ref": "#/definitions/ComponentsPosition"
+        },
+        "isCollapsed": {
+          "type": "boolean"
         }
       }
     },

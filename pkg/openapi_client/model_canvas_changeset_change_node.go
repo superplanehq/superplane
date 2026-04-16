@@ -25,6 +25,8 @@ type CanvasChangesetChangeNode struct {
 	Block         *string                `json:"block,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 	IntegrationId *string                `json:"integrationId,omitempty"`
+	Position      *ComponentsPosition    `json:"position,omitempty"`
+	IsCollapsed   *bool                  `json:"isCollapsed,omitempty"`
 }
 
 // NewCanvasChangesetChangeNode instantiates a new CanvasChangesetChangeNode object
@@ -204,6 +206,70 @@ func (o *CanvasChangesetChangeNode) SetIntegrationId(v string) {
 	o.IntegrationId = &v
 }
 
+// GetPosition returns the Position field value if set, zero value otherwise.
+func (o *CanvasChangesetChangeNode) GetPosition() ComponentsPosition {
+	if o == nil || IsNil(o.Position) {
+		var ret ComponentsPosition
+		return ret
+	}
+	return *o.Position
+}
+
+// GetPositionOk returns a tuple with the Position field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasChangesetChangeNode) GetPositionOk() (*ComponentsPosition, bool) {
+	if o == nil || IsNil(o.Position) {
+		return nil, false
+	}
+	return o.Position, true
+}
+
+// HasPosition returns a boolean if a field has been set.
+func (o *CanvasChangesetChangeNode) HasPosition() bool {
+	if o != nil && !IsNil(o.Position) {
+		return true
+	}
+
+	return false
+}
+
+// SetPosition gets a reference to the given ComponentsPosition and assigns it to the Position field.
+func (o *CanvasChangesetChangeNode) SetPosition(v ComponentsPosition) {
+	o.Position = &v
+}
+
+// GetIsCollapsed returns the IsCollapsed field value if set, zero value otherwise.
+func (o *CanvasChangesetChangeNode) GetIsCollapsed() bool {
+	if o == nil || IsNil(o.IsCollapsed) {
+		var ret bool
+		return ret
+	}
+	return *o.IsCollapsed
+}
+
+// GetIsCollapsedOk returns a tuple with the IsCollapsed field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasChangesetChangeNode) GetIsCollapsedOk() (*bool, bool) {
+	if o == nil || IsNil(o.IsCollapsed) {
+		return nil, false
+	}
+	return o.IsCollapsed, true
+}
+
+// HasIsCollapsed returns a boolean if a field has been set.
+func (o *CanvasChangesetChangeNode) HasIsCollapsed() bool {
+	if o != nil && !IsNil(o.IsCollapsed) {
+		return true
+	}
+
+	return false
+}
+
+// SetIsCollapsed gets a reference to the given bool and assigns it to the IsCollapsed field.
+func (o *CanvasChangesetChangeNode) SetIsCollapsed(v bool) {
+	o.IsCollapsed = &v
+}
+
 func (o CanvasChangesetChangeNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -228,6 +294,12 @@ func (o CanvasChangesetChangeNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.IntegrationId) {
 		toSerialize["integrationId"] = o.IntegrationId
+	}
+	if !IsNil(o.Position) {
+		toSerialize["position"] = o.Position
+	}
+	if !IsNil(o.IsCollapsed) {
+		toSerialize["isCollapsed"] = o.IsCollapsed
 	}
 	return toSerialize, nil
 }
