@@ -203,9 +203,20 @@ export interface AppNodeMetadata {
   appName?: string;
 }
 
+export interface DatabaseNodeMetadata {
+  databaseClusterId?: string;
+  databaseClusterName?: string;
+  databaseName?: string;
+}
+
 export interface DatabaseClusterNodeMetadata {
   databaseClusterId?: string;
   databaseClusterName?: string;
+}
+
+export interface GetDatabaseConfiguration {
+  databaseCluster: string;
+  database: string;
 }
 
 export interface CreateDatabaseClusterConfiguration {
