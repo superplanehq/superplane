@@ -5045,8 +5045,8 @@ export function WorkflowPageV2() {
           awaitingApprovalBanner={awaitingApprovalBanner}
           showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
-          onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen(true) : undefined}
-          versionControlButtonTooltip="Open versions"
+          onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen((prev) => !prev) : undefined}
+          versionControlButtonTooltip={isVersionControlOpen ? "Close versions" : "Open versions"}
           versionControlNotificationCount={pendingApprovalVersions.length}
           showBottomStatusControls={!isTemplate}
           hideAddControls={isTemplate}

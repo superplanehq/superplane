@@ -2,7 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { MoreVertical, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
@@ -38,6 +38,10 @@ interface HeaderProps {
   unpublishedDraftChangeCount?: number;
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
 }
 
 export function Header({
@@ -65,6 +69,10 @@ export function Header({
   publishVersionLabel = "Publish",
   unpublishedDraftChangeCount = 0,
   showCanvasSettingsMenu = true,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  versionControlNotificationCount = 0,
 }: HeaderProps) {
   const headerTitle = canvasName.trim() || "Canvas";
 
@@ -107,6 +115,10 @@ export function Header({
         onExitEditMode={onExitEditMode}
         exitEditModeDisabled={exitEditModeDisabled}
         exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+        isVersionControlOpen={isVersionControlOpen}
+        onOpenVersionControl={onOpenVersionControl}
+        versionControlButtonTooltip={versionControlButtonTooltip}
+        versionControlNotificationCount={versionControlNotificationCount}
       />
     </header>
   );
@@ -181,6 +193,10 @@ function SecondaryHeader({
   publishButtonLabel,
   onEnterEditMode,
   onExitEditMode,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  versionControlNotificationCount = 0,
 }: {
   isDefaultMode: boolean;
   onSave?: () => void;
@@ -204,6 +220,10 @@ function SecondaryHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
 }) {
   const showCanvasViewModeToggle = headerMode === "version-live" || headerMode === "version-edit";
   const canvasViewMode = headerMode === "version-edit" ? "version-edit" : "version-live";
@@ -218,36 +238,154 @@ function SecondaryHeader({
         </div>
       </div>
 
-      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {isDefaultMode && onSave && !saveButtonHidden ? (
-          <SaveButton
-            onSave={onSave}
-            saveDisabled={saveDisabled}
-            saveDisabledTooltip={saveDisabledTooltip}
-            saveIsPrimary={saveIsPrimary}
-          />
-        ) : null}
-
-        {showVersionEditActions ? (
-          <div className="flex items-center gap-2">
-            {hasChanges ? (
-              <DiscardDraftButton
-                onDiscard={() => onDiscardVersion?.()}
-                disabled={discardVersionDisabled || !onDiscardVersion}
-                disabledTooltip={discardVersionDisabledTooltip}
-              />
-            ) : null}
-            <PublishVersionButton
-              onPublish={() => onPublishVersion?.()}
-              label={publishButtonLabel}
-              disabled={publishVersionDisabled || !onPublishVersion}
-              publishVersionDisabled={!!publishVersionDisabled}
-              publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-            />
-          </div>
-        ) : null}
-      </div>
+      <SecondaryHeaderActions
+        headerMode={headerMode}
+        isVersionControlOpen={isVersionControlOpen}
+        onOpenVersionControl={onOpenVersionControl}
+        versionControlButtonTooltip={versionControlButtonTooltip}
+        versionControlNotificationCount={versionControlNotificationCount}
+        isDefaultMode={isDefaultMode}
+        onSave={onSave}
+        saveButtonHidden={saveButtonHidden}
+        saveDisabled={saveDisabled}
+        saveDisabledTooltip={saveDisabledTooltip}
+        saveIsPrimary={saveIsPrimary}
+        showVersionEditActions={showVersionEditActions}
+        hasChanges={hasChanges}
+        onDiscardVersion={onDiscardVersion}
+        discardVersionDisabled={discardVersionDisabled}
+        discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+        onPublishVersion={onPublishVersion}
+        publishButtonLabel={publishButtonLabel}
+        publishVersionDisabled={publishVersionDisabled}
+        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+      />
     </div>
+  );
+}
+
+function SecondaryHeaderActions({
+  headerMode,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  versionControlNotificationCount = 0,
+  isDefaultMode,
+  onSave,
+  saveButtonHidden,
+  saveDisabled,
+  saveDisabledTooltip,
+  saveIsPrimary,
+  showVersionEditActions,
+  hasChanges,
+  onDiscardVersion,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
+  onPublishVersion,
+  publishButtonLabel,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+}: {
+  headerMode: HeaderMode;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
+  isDefaultMode: boolean;
+  onSave?: () => void;
+  saveButtonHidden?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledTooltip?: string;
+  saveIsPrimary?: boolean;
+  showVersionEditActions: boolean;
+  hasChanges: boolean;
+  onDiscardVersion?: () => void;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
+  onPublishVersion?: () => void;
+  publishButtonLabel: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+}) {
+  const showVersionControlTrigger = headerMode === "version-live" && !!onOpenVersionControl;
+
+  return (
+    <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
+      {showVersionControlTrigger ? (
+        <VersionControlButton
+          onToggle={onOpenVersionControl}
+          isOpen={!!isVersionControlOpen}
+          tooltip={versionControlButtonTooltip}
+          notificationCount={versionControlNotificationCount}
+        />
+      ) : null}
+
+      {isDefaultMode && onSave && !saveButtonHidden ? (
+        <SaveButton
+          onSave={onSave}
+          saveDisabled={saveDisabled}
+          saveDisabledTooltip={saveDisabledTooltip}
+          saveIsPrimary={saveIsPrimary}
+        />
+      ) : null}
+
+      {showVersionEditActions ? (
+        <div className="flex items-center gap-2">
+          {hasChanges ? (
+            <DiscardDraftButton
+              onDiscard={() => onDiscardVersion?.()}
+              disabled={discardVersionDisabled || !onDiscardVersion}
+              disabledTooltip={discardVersionDisabledTooltip}
+            />
+          ) : null}
+          <PublishVersionButton
+            onPublish={() => onPublishVersion?.()}
+            label={publishButtonLabel}
+            disabled={publishVersionDisabled || !onPublishVersion}
+            publishVersionDisabled={!!publishVersionDisabled}
+            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function VersionControlButton({
+  onToggle,
+  isOpen,
+  tooltip,
+  notificationCount,
+}: {
+  onToggle: () => void;
+  isOpen: boolean;
+  tooltip?: string;
+  notificationCount: number;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="relative inline-flex">
+          <UIButton
+            type="button"
+            variant="outline"
+            size="icon"
+            className={isOpen ? "h-8 w-8 bg-slate-200 border-slate-300" : "h-8 w-8"}
+            onClick={onToggle}
+            aria-label={isOpen ? "Close version control" : "Open version control"}
+            aria-pressed={isOpen}
+          >
+            <GitBranch className="h-4 w-4" />
+          </UIButton>
+          {notificationCount > 0 ? (
+            <span className="absolute left-5 -top-1.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
+              {notificationCount > 99 ? "99+" : notificationCount}
+            </span>
+          ) : null}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tooltip || "Open version control"}</TooltipContent>
+    </Tooltip>
   );
 }
 
