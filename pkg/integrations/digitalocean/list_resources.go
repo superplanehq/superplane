@@ -2,6 +2,7 @@ package digitalocean
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -36,6 +37,14 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listSpacesBuckets(ctx)
 	case "app":
 		return listApps(ctx)
+	case "database_cluster":
+		return listDatabaseClusters(ctx)
+	case "database":
+		return listDatabases(ctx)
+	case "database_cluster_version":
+		return listDatabaseClusterVersions(ctx)
+	case "database_cluster_size":
+		return listDatabaseClusterSizes(ctx)
 	case "embedding_model":
 		return listEmbeddingModels(ctx)
 	case "project":
@@ -255,6 +264,38 @@ func listLoadBalancers(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	return resources, nil
 }
 
+func listDatabases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	clusterID := ctx.Parameters["databaseCluster"]
+	if clusterID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if strings.Contains(clusterID, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	databases, err := client.ListDatabases(clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing databases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(databases))
+	for _, database := range databases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "database",
+			Name: database.Name,
+			ID:   database.Name,
+		})
+	}
+
+	return resources, nil
+}
+
 func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -273,6 +314,109 @@ func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource,
 			Name: ip.IP,
 			ID:   ip.IP,
 		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusters(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	clusters, err := client.ListDatabaseClusters()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database clusters: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(clusters))
+	for _, cluster := range clusters {
+		name := cluster.Name
+		if name == "" {
+			name = cluster.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "database_cluster",
+			Name: name,
+			ID:   cluster.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusterVersions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	engine := ctx.Parameters["engine"]
+	if engine == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	options, err := client.GetDatabaseOptions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database cluster versions: %w", err)
+	}
+
+	engineOptions, ok := options[engine]
+	if !ok {
+		return []core.IntegrationResource{}, nil
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(engineOptions.Versions))
+	for _, version := range engineOptions.Versions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "database_cluster_version",
+			Name: version,
+			ID:   version,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusterSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	engine := ctx.Parameters["engine"]
+	numNodes := ctx.Parameters["numNodes"]
+	if engine == "" || numNodes == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	options, err := client.GetDatabaseOptions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database cluster sizes: %w", err)
+	}
+
+	engineOptions, ok := options[engine]
+	if !ok {
+		return []core.IntegrationResource{}, nil
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, layout := range engineOptions.Layouts {
+		if fmt.Sprintf("%d", layout.NumNodes) != numNodes {
+			continue
+		}
+
+		resources = make([]core.IntegrationResource, 0, len(layout.Sizes))
+		for _, size := range layout.Sizes {
+			resources = append(resources, core.IntegrationResource{
+				Type: "database_cluster_size",
+				Name: size,
+				ID:   size,
+			})
+		}
+		break
 	}
 
 	return resources, nil

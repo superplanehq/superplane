@@ -114,7 +114,7 @@ func Test__CreateAnnotation__Configuration__timeFieldsAreStrings(t *testing.T) {
 
 	require.Equal(t, "string", fieldTypes["time"])
 	require.Equal(t, "string", fieldTypes["timeEnd"])
-	require.Equal(t, `{{ now() }}`, fieldDefaults["time"])
+	require.Nil(t, fieldDefaults["time"])
 	require.Equal(t, `{{ now() }}`, fieldPlaceholders["time"])
 	require.Nil(t, fieldDefaults["timeEnd"])
 	require.Equal(t, `{{ now() + duration("24h") }}`, fieldPlaceholders["timeEnd"])
