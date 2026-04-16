@@ -2,8 +2,6 @@ import type { MetadataItem } from "@/ui/metadataList";
 import type { DashboardNodeMetadata } from "./types";
 import type { NodeInfo } from "../types";
 
-const TEXT_PREVIEW_MAX_LENGTH = 40;
-
 export function buildDashboardMetadata(node: NodeInfo, dashboard?: string): MetadataItem[] {
   const nodeMetadata =
     typeof node.metadata === "object" && node.metadata !== null ? (node.metadata as DashboardNodeMetadata) : undefined;
@@ -54,23 +52,4 @@ export function buildTimeRangeMetadata(from: string | undefined, to: string | un
   }
 
   return undefined;
-}
-
-export function previewMetadataItem(
-  icon: string,
-  prefix: string,
-  value: string | number | undefined,
-): MetadataItem | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-
-  const text = String(value).trim();
-  if (!text) {
-    return undefined;
-  }
-
-  const preview =
-    text.length > TEXT_PREVIEW_MAX_LENGTH ? `${text.slice(0, TEXT_PREVIEW_MAX_LENGTH).trimEnd()}...` : text;
-  return { icon, label: `${prefix}${preview}` };
 }

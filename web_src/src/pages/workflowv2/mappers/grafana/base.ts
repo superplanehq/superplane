@@ -6,9 +6,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../types";
 
-/** When set, matches the historical Query Data Source node event strip (subtitle + id fallbacks). */
 export type BuildGrafanaEventSectionsOptions = {
-  legacyQueryDataSource?: boolean;
   /** When true, return [] if root trigger event or timestamp is missing (alert rule mappers). */
   strict?: boolean;
 };
@@ -19,7 +17,6 @@ export function buildGrafanaEventSections(
   componentName: string,
   options?: BuildGrafanaEventSectionsOptions,
 ): EventSection[] {
-  const legacy = options?.legacyQueryDataSource === true;
   const strict = options?.strict === true;
 
   if (strict) {
@@ -39,28 +36,26 @@ export function buildGrafanaEventSections(
 
   return [
     {
-      receivedAt: resolveGrafanaEventReceivedAt(execution, legacy),
+      receivedAt: resolveGrafanaEventReceivedAt(execution),
       eventTitle: title || "Trigger event",
-      eventSubtitle: resolveGrafanaEventSubtitle(execution, legacy),
+      eventSubtitle: resolveGrafanaEventSubtitle(execution),
       eventState: getState(componentName)(execution),
-      eventId: resolveGrafanaEventId(execution, legacy),
+      eventId: resolveGrafanaEventId(execution),
     },
   ];
 }
 
-function resolveGrafanaEventSubtitle(execution: ExecutionInfo, legacy: boolean): string | React.ReactNode {
-  const timestamp = legacy ? execution.createdAt : execution.updatedAt || execution.createdAt;
-  const empty = legacy ? "-" : "";
-  return timestamp ? renderTimeAgo(new Date(timestamp)) : empty;
+function resolveGrafanaEventSubtitle(execution: ExecutionInfo): string | React.ReactNode {
+  const timestamp = execution.updatedAt || execution.createdAt;
+  return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
 }
 
-function resolveGrafanaEventReceivedAt(execution: ExecutionInfo, legacy: boolean): Date | undefined {
-  const raw = legacy ? execution.createdAt : execution.createdAt || execution.updatedAt;
+function resolveGrafanaEventReceivedAt(execution: ExecutionInfo): Date | undefined {
+  const raw = execution.createdAt || execution.updatedAt;
   return raw ? new Date(raw) : undefined;
 }
 
-function resolveGrafanaEventId(execution: ExecutionInfo, legacy: boolean): string {
-  if (legacy) return execution.rootEvent?.id ?? "";
+function resolveGrafanaEventId(execution: ExecutionInfo): string {
   return execution.rootEvent?.id ?? execution.id;
 }
 
