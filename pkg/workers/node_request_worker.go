@@ -326,7 +326,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
-		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, w.authService, nil),
+		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 	}
 
@@ -412,7 +412,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
-		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
+		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, nil, nil),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 	}
 

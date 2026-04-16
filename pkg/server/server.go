@@ -65,6 +65,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/launchdarkly"
+	_ "github.com/superplanehq/superplane/pkg/integrations/logfire"
 	_ "github.com/superplanehq/superplane/pkg/integrations/newrelic"
 	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"

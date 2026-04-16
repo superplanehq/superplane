@@ -1,14 +1,18 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useCanvasData";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import type { ComponentsNode, CanvasesListNodeEventsResponse, CanvasesListNodeExecutionsResponse } from "@/api-client";
+import type {
+  SuperplaneComponentsNode,
+  CanvasesListNodeEventsResponse,
+  CanvasesListNodeExecutionsResponse,
+} from "@/api-client";
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
 
 interface UseNodeHistoryProps {
   canvasId: string;
   nodeId: string;
   nodeType: string;
-  allNodes: ComponentsNode[];
+  allNodes: SuperplaneComponentsNode[];
   enabled: boolean;
 }
 

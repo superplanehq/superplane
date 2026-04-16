@@ -178,12 +178,12 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if versionID == "" {
-		versioningContext, err := resolveCanvasVersioningContext(ctx, canvasID)
+		cmContext, err := resolveChangeManagementContext(ctx, canvasID)
 		if err != nil {
 			return err
 		}
-		if !versioningContext.versioningEnabled {
-			return fmt.Errorf("effective canvas versioning is disabled for this canvas; use `superplane canvases update` without --draft to update the live canvas directly")
+		if !cmContext.changeManagementEnabled {
+			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
 		}
 
 		versionID, err = findCurrentUserDraftVersionID(ctx, canvasID)
@@ -454,9 +454,9 @@ func renderCanvasChangeRequestText(ctx core.CommandContext, changeRequest openap
 
 			approverScope := "any user"
 			approver := approval.GetApprover()
-			if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_USER {
+			if approver.GetType() == openapi_client.CHANGEMANAGEMENTAPPROVERTYPE_TYPE_USER {
 				approverScope = "user " + approver.GetUserId()
-			} else if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ROLE {
+			} else if approver.GetType() == openapi_client.CHANGEMANAGEMENTAPPROVERTYPE_TYPE_ROLE {
 				approverScope = "role " + approver.GetRoleName()
 			}
 

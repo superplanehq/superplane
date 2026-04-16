@@ -54,6 +54,22 @@ func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) 
 	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
 }
 
+func FindCanvasVersionForUpdateInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
+	var version CanvasVersion
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("workflow_id = ?", workflowID).
+		Where("id = ?", versionID).
+		First(&version).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &version, nil
+}
+
 func ListCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasVersion, error) {
 	var versions []CanvasVersion
 	err := tx.
@@ -160,6 +176,27 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 	}
 
 	return &canvas, nil
+}
+
+func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Node, edges []Edge) error {
+	canvas, err := lockCanvasForVersioningInTransaction(tx, version.WorkflowID)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	version.State = CanvasVersionStatePublished
+	version.PublishedAt = &now
+	version.UpdatedAt = &now
+	version.Nodes = datatypes.NewJSONSlice(nodes)
+	version.Edges = datatypes.NewJSONSlice(edges)
+	if err := tx.Save(version).Error; err != nil {
+		return err
+	}
+
+	canvas.LiveVersionID = &version.ID
+	canvas.UpdatedAt = &now
+	return tx.Save(canvas).Error
 }
 
 func CreatePublishedCanvasVersionInTransaction(

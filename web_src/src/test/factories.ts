@@ -1,4 +1,9 @@
-import type { CanvasesCanvas, ComponentsEdge, ComponentsNode, OrganizationsIntegration } from "@/api-client";
+import type {
+  CanvasesCanvas,
+  SuperplaneComponentsEdge as ComponentsEdge,
+  SuperplaneComponentsNode as ComponentsNode,
+  OrganizationsIntegration,
+} from "@/api-client";
 import type { BuildingBlock } from "@/ui/BuildingBlocksSidebar";
 
 export function makeCanvas(overrides: Partial<CanvasesCanvas> = {}): CanvasesCanvas {

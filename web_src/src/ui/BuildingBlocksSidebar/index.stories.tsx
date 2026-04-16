@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 
+import { DEFAULT_AGENT_CONTEXT } from "./agentChat";
 import type { BuildingBlock, BuildingBlockCategory } from "./index";
 import { BuildingBlocksSidebar } from "./index";
 import React from "react";
@@ -84,6 +85,9 @@ const sampleBlocks: BuildingBlockCategory[] = [
 const meta = {
   title: "ui/BuildingBlocksSidebar",
   component: BuildingBlocksSidebar,
+  args: {
+    agentContext: DEFAULT_AGENT_CONTEXT,
+  },
   parameters: {
     layout: "fullscreen",
   },
