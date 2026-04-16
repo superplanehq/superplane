@@ -1,11 +1,11 @@
 import re
-from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
-from ai.models import AddNodeOperation, CanvasAnswer, CanvasOperation
+from ai.models import CanvasAnswer, CanvasChange, CanvasChangeType
+from evals.evaluators.workflow_utils import iter_config_strings_from_changes
 
 _BRACKET_SINGLE_QUOTED = re.compile(r"\$\[\s*'([^']*)'\s*\]")
 _BRACKET_DOUBLE_QUOTED = re.compile(r'\$\[\s*"([^"]*)"\s*\]')
@@ -23,14 +23,18 @@ class BracketSelectorsMatchCanvasNames(Evaluator):
         if ctx.output.proposal is None:
             return EvaluationReason(value=False, reason="No proposal to check")
 
-        ops = ctx.output.proposal.operations
-        add_ops = [op for op in ops if op.type == "add_node"]
-        if not add_ops:
+        changes = ctx.output.proposal.changeset.changes or []
+        add_changes = [
+            change
+            for change in changes
+            if change.type == CanvasChangeType.ADD_NODE and change.node is not None
+        ]
+        if not add_changes:
             return EvaluationReason(value=False, reason="No add_node operations")
 
-        allowed_names = _effective_canvas_labels(add_ops)
+        allowed_names = _effective_canvas_labels(add_changes)
         texts = _collect_config_texts_for_bracket_scan(
-            add_ops,
+            add_changes,
             scan_scope=self.scan_scope,
             target_block_name=self.target_block_name,
         )
@@ -61,57 +65,47 @@ class BracketSelectorsMatchCanvasNames(Evaluator):
         )
 
 
-def _effective_canvas_labels(add_ops: list[AddNodeOperation]) -> set[str]:
+def _effective_canvas_labels(add_changes: list[CanvasChange]) -> set[str]:
     labels: set[str] = set()
-    for op in add_ops:
-        name = (op.node_name or "").strip()
-        labels.add(name if name else op.block_name)
+    for change in add_changes:
+        if change.node is None:
+            continue
+
+        name = (change.node.name or "").strip()
+        block = (change.node.block or "").strip()
+        if name:
+            labels.add(name)
+            continue
+        if block:
+            labels.add(block)
     return labels
 
 
 def _collect_config_texts_for_bracket_scan(
-    add_ops: list[AddNodeOperation],
+    add_changes: list[CanvasChange],
     *,
     scan_scope: Literal["all", "last_add_node"],
     target_block_name: str | None,
 ) -> list[str]:
-    candidates: list[AddNodeOperation]
+    candidates: list[CanvasChange]
     if target_block_name is not None:
-        candidates = [op for op in add_ops if op.block_name == target_block_name]
+        candidates = [
+            change
+            for change in add_changes
+            if change.node is not None and change.node.block == target_block_name
+        ]
         if not candidates:
             return []
     elif scan_scope == "last_add_node":
-        candidates = [add_ops[-1]]
+        candidates = [add_changes[-1]]
     else:
-        candidates = list(add_ops)
+        candidates = list(add_changes)
 
     texts: list[str] = []
-    for op in candidates:
-        texts.extend(_iter_strings_in_value(op.configuration))
+    texts.extend(iter_config_strings_from_changes(candidates))
     return texts
 
 
 def _extract_bracket_keys(text: str) -> list[str]:
     keys = _BRACKET_SINGLE_QUOTED.findall(text) + _BRACKET_DOUBLE_QUOTED.findall(text)
     return [k for k in keys if k]
-
-
-def iter_config_strings_from_operations(
-    operations: list[CanvasOperation],
-) -> Iterator[str]:
-    for op in operations:
-        if op.type == "add_node":
-            yield from _iter_strings_in_value(op.configuration)
-        elif op.type == "update_node_config":
-            yield from _iter_strings_in_value(op.configuration)
-
-
-def _iter_strings_in_value(value: Any) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for nested in value.values():
-            yield from _iter_strings_in_value(nested)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _iter_strings_in_value(item)

@@ -2289,6 +2289,137 @@ func (c *Client) ListApps() ([]App, error) {
 	return response.Apps, nil
 }
 
+type DatabaseClusterConnection struct {
+	Host     string `json:"host,omitempty"`
+	Port     int    `json:"port,omitempty"`
+	User     string `json:"user,omitempty"`
+	Database string `json:"database,omitempty"`
+	URI      string `json:"uri,omitempty"`
+	SSL      bool   `json:"ssl,omitempty"`
+}
+
+type DatabaseOptionLayout struct {
+	NumNodes int      `json:"num_nodes"`
+	Sizes    []string `json:"sizes"`
+}
+
+type DatabaseEngineOptions struct {
+	Regions        []string               `json:"regions"`
+	Versions       []string               `json:"versions"`
+	Layouts        []DatabaseOptionLayout `json:"layouts"`
+	DefaultVersion string                 `json:"default_version,omitempty"`
+}
+
+type DatabaseCluster struct {
+	ID                 string                     `json:"id"`
+	Name               string                     `json:"name"`
+	Engine             string                     `json:"engine,omitempty"`
+	Version            string                     `json:"version,omitempty"`
+	Region             string                     `json:"region,omitempty"`
+	Size               string                     `json:"size,omitempty"`
+	NumNodes           int                        `json:"num_nodes,omitempty"`
+	Status             string                     `json:"status,omitempty"`
+	CreatedAt          string                     `json:"created_at,omitempty"`
+	PrivateNetworkUUID string                     `json:"private_network_uuid,omitempty"`
+	Connection         *DatabaseClusterConnection `json:"connection,omitempty"`
+	PrivateConnection  *DatabaseClusterConnection `json:"private_connection,omitempty"`
+}
+
+type CreateDatabaseClusterRequest struct {
+	Name     string `json:"name"`
+	Engine   string `json:"engine"`
+	Version  string `json:"version"`
+	Region   string `json:"region"`
+	Size     string `json:"size"`
+	NumNodes int    `json:"num_nodes"`
+}
+
+func (c *Client) GetDatabaseOptions() (map[string]DatabaseEngineOptions, error) {
+	url := fmt.Sprintf("%s/databases/options", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Options map[string]DatabaseEngineOptions `json:"options"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if response.Options == nil {
+		return map[string]DatabaseEngineOptions{}, nil
+	}
+
+	return response.Options, nil
+}
+
+func (c *Client) ListDatabaseClusters() ([]DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []DatabaseCluster `json:"databases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if response.Databases == nil {
+		return []DatabaseCluster{}, nil
+	}
+
+	return response.Databases, nil
+}
+
+func (c *Client) CreateDatabaseCluster(req CreateDatabaseClusterRequest) (*DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database DatabaseCluster `json:"database"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Database, nil
+}
+
+func (c *Client) GetDatabaseCluster(clusterID string) (*DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases/%s", c.BaseURL, clusterID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database DatabaseCluster `json:"database"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Database, nil
+}
+
 // EmbeddingModel represents a DigitalOcean Gradient AI embedding model
 type EmbeddingModel struct {
 	UUID               string `json:"uuid"`
@@ -2733,6 +2864,68 @@ func (c *Client) DeleteDatabase(databaseID string) error {
 	url := fmt.Sprintf("%s/databases/%s", c.BaseURL, databaseID)
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
+}
+
+func (c *Client) GetDatabaseClusterConfig(clusterID string) (map[string]any, error) {
+	url := fmt.Sprintf("%s/databases/%s/config", c.BaseURL, clusterID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Config map[string]any `json:"config"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if response.Config == nil {
+		return map[string]any{}, nil
+	}
+
+	return response.Config, nil
+}
+
+func (c *Client) ListDatabases(clusterID string) ([]Database, error) {
+	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []Database `json:"dbs"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Databases, nil
+}
+
+func (c *Client) GetDatabase(clusterID, databaseName string) (map[string]any, error) {
+	url := fmt.Sprintf("%s/databases/%s/dbs/%s", c.BaseURL, clusterID, url.PathEscape(databaseName))
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database map[string]any `json:"db"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if response.Database == nil {
+		return map[string]any{}, nil
+	}
+
+	return response.Database, nil
 }
 
 // EvaluationTestCase represents a Gradient AI evaluation test case

@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast } from "@/lib/toast";
+import { analytics } from "@/lib/analytics";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 
 type AcceptStatus = "idle" | "loading" | "error";
@@ -64,6 +65,7 @@ export default function InviteLinkAccept() {
           throw new Error("Invite link response was missing organization details.");
         }
 
+        analytics.organizationJoined(data.organization_id);
         navigate(`/${data.organization_id}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unable to accept invite link.";
