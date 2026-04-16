@@ -1,9 +1,9 @@
+import { useEffect, useRef, type RefObject } from "react";
 import { AiBuilderConversationMessageList } from "./AiBuilderConversationMessageList";
 import { ConversationList } from "./AiBuilderConversationList";
 import { InputForm } from "./AiBuilderInputForm";
 import { ProposalsList } from "./AiBuilderProposalsList";
 import { type AiBuilderMessage, type AiBuilderProposal, type AiChatSession } from "./agentChat";
-import { useEffect, useRef, type RefObject } from "react";
 
 type AiBuilderChatPanelProps = {
   chatSessions: AiChatSession[];
@@ -13,7 +13,6 @@ type AiBuilderChatPanelProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  pendingProposalSummaries: string[];
   applyShortcutHint: string;
   onApplyProposal: () => void;
   onDiscardProposal: () => void;
@@ -38,7 +37,6 @@ export function AiBuilderChatPanel({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  pendingProposalSummaries,
   applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
@@ -129,7 +127,6 @@ export function AiBuilderChatPanel({
               aiMessages={aiMessages}
               isGeneratingResponse={isGeneratingResponse}
               pendingProposal={pendingProposal}
-              pendingProposalSummaries={pendingProposalSummaries}
               applyShortcutHint={applyShortcutHint}
               onApplyProposal={onApplyProposal}
               onDiscardProposal={onDiscardProposal}
@@ -161,7 +158,6 @@ type ConversationContentProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  pendingProposalSummaries: string[];
   applyShortcutHint: string;
   onApplyProposal: () => void;
   onDiscardProposal: () => void;
@@ -176,7 +172,6 @@ function ConversationContent({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  pendingProposalSummaries,
   applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
@@ -198,7 +193,6 @@ function ConversationContent({
           disabled={disabled}
           pendingProposal={pendingProposal}
           applyShortcutHint={applyShortcutHint}
-          pendingProposalSummaries={pendingProposalSummaries}
           onApplyProposal={onApplyProposal}
           onDiscardProposal={onDiscardProposal}
           isApplyingProposal={isApplyingProposal}

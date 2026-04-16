@@ -1,21 +1,17 @@
 import type { CanvasChangesetChange } from "@/api-client";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
-import {
-  deleteAgentChatSession,
-  loadChatConversation,
-  loadChatSessions,
-  pushAiMessages,
-  sendChatPrompt,
-} from "./agentChat";
+import { sendChatPrompt } from "./agentChat";
 import type { AgentState } from "./useAgentState";
+import { useApplyAiProposal } from "./useApplyAiProposal";
 import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
 import { useApplyShortcutHint } from "./useApplyShortcutHint";
-import { useFormatOperation } from "./useFormatOperation";
+import { useDeleteChatSession } from "./useDeleteChatSession";
+import { useLoadChatConversation } from "./useLoadChatConversation";
+import { useLoadChatSessions } from "./useLoadChatSessions";
 import { useSidebarWidth } from "./useSidebarWidth";
 
 export interface AgentSidebarProps {
@@ -78,7 +74,6 @@ function OpenAgentSidebar({
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const currentChatIdRef = useRef(currentChatId);
-  currentChatIdRef.current = currentChatId;
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
@@ -127,77 +122,33 @@ function OpenAgentSidebar({
     setAiError(null);
   }, []);
 
-  const handleDeleteChatSession = useCallback(
-    (chatId: string) => {
-      if (!canvasId || !organizationId) {
-        return;
-      }
-
-      setChatSessions((previous) => previous.filter((s) => s.id !== chatId));
-      if (currentChatIdRef.current === chatId) {
-        setCurrentChatId(null);
-        setAiMessages([]);
-        setPendingProposal(null);
-        setAiError(null);
-      }
-
-      void deleteAgentChatSession({ chatId, canvasId, organizationId }).then(
-        () => showSuccessToast("Conversation deleted"),
-        () => {
-          showErrorToast("Failed to delete conversation");
-          void loadChatSessions({ canvasId, organizationId }).then(
-            (sessions) => setChatSessions(sessions),
-            () => {},
-          );
-        },
-      );
-    },
-    [canvasId, organizationId],
-  );
+  const handleDeleteChatSession = useDeleteChatSession({
+    canvasId,
+    organizationId,
+    currentChatIdRef,
+    setChatSessions,
+    setCurrentChatId,
+    setAiMessages,
+    setPendingProposal,
+    setAiError,
+  });
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
   }, []);
 
-  const formatOperation = useFormatOperation();
-
-  const pendingProposalSummaries = useMemo(() => {
-    if (!pendingProposal) {
-      return [];
-    }
-
-    return (pendingProposal.changeset.changes || []).map((change) => formatOperation(change));
-  }, [formatOperation, pendingProposal]);
-
-  const handleApplyProposal = useCallback(async () => {
-    if (!pendingProposal) return;
-
-    if (!onApplyAiOperations) {
-      setAiError("Canvas apply handlers are not available.");
-      return;
-    }
-
-    setAiError(null);
-    setIsApplyingProposal(true);
-    try {
-      await onApplyAiOperations(pendingProposal.changeset.changes || []);
-      setAiMessages((prev) =>
-        pushAiMessages(prev, {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: "Applied the proposed changes to the canvas.",
-        }),
-      );
-      setPendingProposal(null);
-    } catch (error) {
-      setAiError(error instanceof Error ? error.message : "Failed to apply AI proposal.");
-    } finally {
-      setIsApplyingProposal(false);
-    }
-  }, [onApplyAiOperations, pendingProposal]);
+  const handleApplyProposal = useApplyAiProposal({
+    onApplyAiOperations,
+    pendingProposal,
+    setAiError,
+    setIsApplyingProposal,
+    setAiMessages,
+    setPendingProposal,
+  });
 
   const canApplyProposalWithShortcut = !!pendingProposal && (pendingProposal.changeset.changes || []).length > 0;
 
+  // apply proposal with shortcut (Cmd+Enter)
   useApplyOnCmdEnter({
     enabled: canApplyProposalWithShortcut,
     disabled,
@@ -205,6 +156,7 @@ function OpenAgentSidebar({
     onApply: handleApplyProposal,
   });
 
+  // reset state when canvasId changes
   useEffect(() => {
     setCurrentChatId(null);
     setAiMessages([]);
@@ -213,97 +165,26 @@ function OpenAgentSidebar({
     setAiInput("");
   }, [canvasId]);
 
-  useEffect(() => {
-    let cancelled = false;
+  // load previous chat sessions
+  useLoadChatSessions({
+    canvasId,
+    organizationId,
+    setChatSessions,
+    setCurrentChatId,
+    setAiMessages,
+    setIsLoadingChatSessions,
+  });
 
-    if (!canvasId || !organizationId) {
-      setChatSessions([]);
-      setCurrentChatId(null);
-      setAiMessages([]);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void (async () => {
-      setIsLoadingChatSessions(true);
-      try {
-        const sessions = await loadChatSessions({
-          canvasId,
-          organizationId,
-        });
-        if (cancelled) {
-          return;
-        }
-
-        setChatSessions(sessions);
-        setCurrentChatId((previousChatId) => {
-          if (previousChatId && sessions.some((session) => session.id === previousChatId)) {
-            return previousChatId;
-          }
-
-          return null;
-        });
-      } catch (error) {
-        if (!cancelled) {
-          console.warn("Failed to load chat sessions:", error);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingChatSessions(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canvasId, organizationId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!canvasId || !organizationId || !currentChatId) {
-      if (!currentChatId) {
-        setAiMessages([]);
-        setPendingProposal(null);
-      }
-      setIsLoadingChatMessages(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void (async () => {
-      setIsLoadingChatMessages(true);
-      try {
-        const messages = await loadChatConversation({
-          chatId: currentChatId,
-          canvasId,
-          organizationId,
-        });
-        if (cancelled) {
-          return;
-        }
-
-        setAiMessages(messages);
-        setAiError(null);
-      } catch (error) {
-        if (!cancelled) {
-          console.warn("Failed to load chat conversation:", error);
-          setAiError(error instanceof Error ? error.message : "Failed to load chat conversation.");
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingChatMessages(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canvasId, currentChatId, organizationId]);
+  // load chat conversation when currentChatId changes
+  useLoadChatConversation({
+    canvasId,
+    organizationId,
+    currentChatId,
+    setAiMessages,
+    setPendingProposal,
+    setIsLoadingChatMessages,
+    setAiError,
+  });
 
   return (
     <div
@@ -326,7 +207,6 @@ function OpenAgentSidebar({
           aiMessages={aiMessages}
           isGeneratingResponse={isGeneratingResponse}
           pendingProposal={pendingProposal}
-          pendingProposalSummaries={pendingProposalSummaries}
           applyShortcutHint={applyShortcutHint}
           onApplyProposal={() => void handleApplyProposal()}
           onDiscardProposal={handleDiscardProposal}

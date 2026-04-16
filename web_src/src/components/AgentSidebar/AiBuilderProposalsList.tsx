@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 import type { AiBuilderProposal } from "./agentChat";
+import { useFormatOperation } from "./useFormatOperation";
 
 export type ProposalsListProps = {
   pendingProposal: AiBuilderProposal;
   applyShortcutHint: string;
-  pendingProposalSummaries: string[];
   onApplyProposal: () => void;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
@@ -15,13 +16,18 @@ export type ProposalsListProps = {
 export function ProposalsList({
   pendingProposal,
   applyShortcutHint,
-  pendingProposalSummaries,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
   aiError,
   disabled,
 }: ProposalsListProps) {
+  const formatOperation = useFormatOperation();
+  const pendingProposalSummaries = useMemo(
+    () => (pendingProposal.changeset.changes || []).map((change) => formatOperation(change)),
+    [formatOperation, pendingProposal],
+  );
+
   const isDisabled = disabled || isApplyingProposal || (pendingProposal.changeset.changes || []).length === 0;
 
   return (
