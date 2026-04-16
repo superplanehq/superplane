@@ -1169,46 +1169,15 @@ function CanvasPage(props: CanvasPageProps) {
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+          onExitEditMode={props.onExitEditMode}
+          exitEditModeDisabled={props.exitEditModeDisabled}
+          exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           publishVersionLabel={props.publishVersionLabel}
           unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
-
-      {canvasStateMode === "editing" ? (
-        <div
-          className="shrink-0 flex min-h-8 items-center justify-center gap-2 bg-amber-200 px-4 py-1.5 text-[13px] font-medium text-amber-700"
-          role="status"
-        >
-          <p className="m-0 text-amber-700">You’re editing the canvas</p>
-          <span className="select-none text-amber-700" aria-hidden>
-            ·
-          </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="min-h-0 shrink-0 gap-1 rounded-sm border border-amber-700 px-1.5 h-5 text-[13px] font-medium !text-amber-700 underline-offset-2 hover:!text-amber-700 hover:bg-white/10 hover:no-underline"
-                  onClick={() => props.onExitEditMode?.()}
-                  disabled={props.exitEditModeDisabled}
-                  aria-label="Exit edit mode"
-                >
-                  Exit
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {props.exitEditModeDisabled && props.exitEditModeDisabledTooltip
-                ? props.exitEditModeDisabledTooltip
-                : "Return to the live version. Draft will be preserved."}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      ) : null}
 
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
@@ -1697,6 +1666,9 @@ function CanvasContentHeader({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
   publishVersionLabel,
   unpublishedDraftChangeCount,
   showCanvasSettingsMenu,
@@ -1719,6 +1691,9 @@ function CanvasContentHeader({
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
   unpublishedDraftChangeCount?: number;
   showCanvasSettingsMenu?: boolean;
@@ -1758,6 +1733,9 @@ function CanvasContentHeader({
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+      onExitEditMode={onExitEditMode}
+      exitEditModeDisabled={exitEditModeDisabled}
+      exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       publishVersionLabel={publishVersionLabel}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
