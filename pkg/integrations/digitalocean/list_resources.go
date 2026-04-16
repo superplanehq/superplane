@@ -2,6 +2,7 @@ package digitalocean
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -38,6 +39,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listApps(ctx)
 	case "database_cluster":
 		return listDatabaseClusters(ctx)
+	case "database":
+		return listDatabases(ctx)
 	case "database_cluster_version":
 		return listDatabaseClusterVersions(ctx)
 	case "database_cluster_size":
@@ -255,6 +258,38 @@ func listLoadBalancers(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 			Type: "load_balancer",
 			Name: lb.Name,
 			ID:   lb.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	clusterID := ctx.Parameters["databaseCluster"]
+	if clusterID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if strings.Contains(clusterID, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	databases, err := client.ListDatabases(clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing databases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(databases))
+	for _, database := range databases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "database",
+			Name: database.Name,
+			ID:   database.Name,
 		})
 	}
 

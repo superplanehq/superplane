@@ -105,7 +105,6 @@ import {
   prepareTriggerNode,
 } from "./lib/canvas-node-preparation";
 import {
-  formatVersionLabelWithTimestamp,
   isDraftVersion,
   isPublishedVersion,
   sortDraftVersionsDesc,
@@ -132,6 +131,7 @@ import {
   generateUniqueNodeName,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
+  mergeWorkflowLogEntries,
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
@@ -527,8 +527,8 @@ export function WorkflowPageV2() {
       return true;
     }
   });
-  /** After creating a change request, hide "Unpublished Changes" until the user enters edit mode again. */
-  const [suppressUnpublishedChangesBadge, setSuppressUnpublishedChangesBadge] = useState(false);
+  /** After creating a change request, hide draft Discard until the user enters edit mode again. */
+  const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
   const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
   const versionNodeDiffLiveChangeRequest = useMemo(() => {
     const fallback = versionNodeDiffContext?.changeRequest;
@@ -1314,8 +1314,6 @@ export function WorkflowPageV2() {
           spec: { ...current.spec, ...version.spec },
         };
       });
-
-      showSuccessToast(`Editing ${formatVersionLabelWithTimestamp(version)}`);
     } catch (error) {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -1942,58 +1940,27 @@ export function WorkflowPageV2() {
   );
 
   const logEntries = useMemo(() => {
-    if (!isViewingLiveVersion) {
-      return [];
-    }
-
     const nodes = canvas?.spec?.nodes || [];
-    const rootEvents = canvasEventsResponse?.events || [];
-
-    const runEntries = mapWorkflowEventsToRunLogEntries({
-      events: rootEvents,
-      nodes,
-      onNodeSelect: handleLogRunNodeSelect,
-      onExecutionSelect: handleLogRunExecutionSelect,
-    });
-
-    const mergedRunEntries = new Map<string, LogEntry>();
-    runEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-    liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-    const allRunEntries = Array.from(mergedRunEntries.values());
-
     const canvasEntries = mapCanvasNodesToLogEntries({
       nodes,
       workflowUpdatedAt: canvas?.metadata?.updatedAt || "",
       onNodeSelect: handleLogNodeSelect,
     });
 
-    const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
-
-    const resolvedEntries = [...allRunEntries, ...allCanvasEntries].map((entry) => {
-      if (!entry.runItems?.length || resolvedExecutionIds.size === 0) {
-        return entry;
-      }
-
-      const runItems = entry.runItems.map((item) => {
-        if (!resolvedExecutionIds.has(item.id)) {
-          return item;
-        }
-        return {
-          ...item,
-          type: "resolved-error" as const,
-        };
-      });
-
-      return {
-        ...entry,
-        runItems,
-      };
+    const rootEvents = canvasEventsResponse?.events || [];
+    const runEntries = mapWorkflowEventsToRunLogEntries({
+      events: rootEvents,
+      nodes,
+      onNodeSelect: handleLogRunNodeSelect,
+      onExecutionSelect: handleLogRunExecutionSelect,
     });
-
-    return resolvedEntries.sort((a, b) => {
-      const aTime = Date.parse(a.timestamp || "") || 0;
-      const bTime = Date.parse(b.timestamp || "") || 0;
-      return aTime - bTime;
+    return mergeWorkflowLogEntries({
+      isViewingLiveVersion,
+      runEntries,
+      liveRunEntries,
+      canvasEntries,
+      liveCanvasEntries,
+      resolvedExecutionIds,
     });
   }, [
     isViewingLiveVersion,
@@ -4415,7 +4382,7 @@ export function WorkflowPageV2() {
           setSelectedChangeRequestId(changeRequestID);
         }
         setIsVersionControlOpen(true);
-        setSuppressUnpublishedChangesBadge(true);
+        setSuppressUnpublishedDraftDiscard(true);
         showSuccessToast("Change request created");
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to create change request")));
@@ -4459,7 +4426,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    setSuppressUnpublishedChangesBadge(false);
+    setSuppressUnpublishedDraftDiscard(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;
     if (existingDraftVersionID) {
@@ -4988,8 +4955,8 @@ export function WorkflowPageV2() {
             ? "Save your version before creating a change request."
             : undefined;
   const headerMode = hasEditableVersion ? "version-edit" : "version-live";
-  const unpublishedDraftChangeCount =
-    !suppressUnpublishedChangesBadge && !!latestDraftVersion ? pendingDraftDiffSummary.items.length : 0;
+  const hasUnpublishedDraftChanges =
+    !suppressUnpublishedDraftDiscard && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
   const canvasStateMode = hasEditableVersion
     ? "editing"
     : isViewingPendingApprovalVersion
@@ -5045,8 +5012,8 @@ export function WorkflowPageV2() {
           awaitingApprovalBanner={awaitingApprovalBanner}
           showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
-          onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen(true) : undefined}
-          versionControlButtonTooltip="Open versions"
+          onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen((prev) => !prev) : undefined}
+          versionControlButtonTooltip={isVersionControlOpen ? "Close versions" : "Open versions"}
           versionControlNotificationCount={pendingApprovalVersions.length}
           showBottomStatusControls={!isTemplate}
           hideAddControls={isTemplate}
@@ -5140,7 +5107,7 @@ export function WorkflowPageV2() {
           onExitEditMode={handleToggleEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          unpublishedDraftChangeCount={unpublishedDraftChangeCount}
+          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}
