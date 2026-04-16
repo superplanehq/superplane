@@ -1,6 +1,7 @@
 import type { CanvasChangesetChange } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { X } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
@@ -13,11 +14,9 @@ import {
 } from "./agentChat";
 import type { AgentState } from "./useAgentState";
 import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
-import { useFormatOperation } from "./useFormatOperation";
 import { useApplyShortcutHint } from "./useApplyShortcutHint";
+import { useFormatOperation } from "./useFormatOperation";
 import { useSidebarWidth } from "./useSidebarWidth";
-
-const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -72,10 +71,8 @@ function OpenAgentSidebar({
   onApplyAiOperations,
   disabled,
 }: OpenAgentSidebarProps) {
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
-  const [sidebarWidth, setSidebarWidth] = useSidebarWidth();
-  const [isResizing, setIsResizing] = useState(false);
+  const { sidebarRef, sidebarWidth, isResizing, onResizeMouseDown } = useSidebarWidth();
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
@@ -217,24 +214,6 @@ function OpenAgentSidebar({
   }, [canvasId]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const keysToRemove: string[] = [];
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (key?.startsWith(AI_BUILDER_STORAGE_KEY_PREFIX)) {
-        keysToRemove.push(key);
-      }
-    }
-
-    for (const key of keysToRemove) {
-      window.localStorage.removeItem(key);
-    }
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
 
     if (!canvasId || !organizationId) {
@@ -326,43 +305,6 @@ function OpenAgentSidebar({
     };
   }, [canvasId, currentChatId, organizationId]);
 
-  const handleMouseDownResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const handleMouseMoveResize = useCallback(
-    (e: MouseEvent) => {
-      if (!isResizing || !sidebarRef.current) return;
-
-      const rect = sidebarRef.current.getBoundingClientRect();
-      const newWidth = e.clientX - rect.left;
-      const clampedWidth = Math.max(280, Math.min(560, newWidth));
-      setSidebarWidth(clampedWidth);
-    },
-    [isResizing],
-  );
-
-  const handleMouseUpResize = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMoveResize);
-      document.addEventListener("mouseup", handleMouseUpResize);
-      document.body.style.cursor = "ew-resize";
-      document.body.style.userSelect = "none";
-
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMoveResize);
-        document.removeEventListener("mouseup", handleMouseUpResize);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
-    }
-  }, [isResizing, handleMouseMoveResize, handleMouseUpResize]);
-
   return (
     <div
       ref={sidebarRef}
@@ -372,15 +314,7 @@ function OpenAgentSidebar({
     >
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border shrink-0">
         <h2 className="text-base font-medium">SuperPlane Agent</h2>
-        <button
-          type="button"
-          onClick={() => onToggle(false)}
-          data-testid="close-agent-sidebar-button"
-          className="z-40 w-8 h-8 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
-          aria-label="Close SuperPlane Agent"
-        >
-          <X size={16} />
-        </button>
+        <CloseButton onToggle={onToggle} />
       </div>
 
       <div className="flex flex-1 flex-col min-h-0">
@@ -410,20 +344,42 @@ function OpenAgentSidebar({
         />
       </div>
 
-      <div
-        onMouseDown={handleMouseDownResize}
-        className={`absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
-          isResizing ? "bg-blue-50" : ""
-        }`}
-        style={{ marginRight: "-8px" }}
-        aria-hidden
-      >
-        <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
-            isResizing ? "bg-blue-500" : ""
-          }`}
-        />
-      </div>
+      <AgentSidebarResizeHandle isResizing={isResizing} onMouseDown={onResizeMouseDown} />
     </div>
+  );
+}
+
+type OnMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => void;
+
+function AgentSidebarResizeHandle({ isResizing, onMouseDown }: { isResizing: boolean; onMouseDown: OnMouseDown }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className={`absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
+        isResizing ? "bg-blue-50" : ""
+      }`}
+      style={{ marginRight: "-8px" }}
+      aria-hidden
+    >
+      <div
+        className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
+          isResizing ? "bg-blue-500" : ""
+        }`}
+      />
+    </div>
+  );
+}
+
+function CloseButton({ onToggle }: { onToggle: (open: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(false)}
+      data-testid="close-agent-sidebar-button"
+      className="z-40 w-8 h-8 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
+      aria-label="Close SuperPlane Agent"
+    >
+      <X size={16} />
+    </button>
   );
 }
