@@ -458,7 +458,7 @@ async def _stream_agent_run(
     if message_history is not None:
         run_kwargs["message_history"] = message_history
 
-    persisted_tool_display_labels: dict[str, str] = {}
+    test_path_tool_display_labels: dict[str, str] = {}
 
     if payload.model == "test":
         _debug_log("using test model run path", canvas_id=resolved_canvas_id, chat_id=chat.id)
@@ -478,7 +478,7 @@ async def _stream_agent_run(
                 result = event.result
                 messages = apply_tool_display_labels_to_messages(
                     list(result.new_messages()),
-                    persisted_tool_display_labels,
+                    test_path_tool_display_labels,
                 )
                 output = _to_jsonable(result.output)
                 usage = result.usage()

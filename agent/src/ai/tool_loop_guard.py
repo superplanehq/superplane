@@ -65,8 +65,7 @@ def is_no_progress_tool_result(content: Any) -> bool:
         if not content:
             return True
         if all(
-            isinstance(item, dict)
-            and (item.get("__tool_error__") or item.get("__tool_empty__"))
+            isinstance(item, dict) and (item.get("__tool_error__") or item.get("__tool_empty__"))
             for item in content
         ):
             return True

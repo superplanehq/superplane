@@ -1,10 +1,19 @@
 from types import SimpleNamespace
+from typing import Any, cast
 
+from pydantic_ai import RunContext
+
+from ai.agent_deps import AgentDeps
 from ai.tools.list_integration_resources import ListIntegrationResources
 
 
+def _run_context(client: Any) -> RunContext[AgentDeps]:
+    deps = AgentDeps(client=cast(Any, client), canvas_id="canvas-1", session_store=None)
+    return cast(RunContext[AgentDeps], SimpleNamespace(deps=deps))
+
+
 def test_list_integration_resources_requires_integration_id() -> None:
-    ctx = SimpleNamespace(deps=SimpleNamespace(client=SimpleNamespace()))
+    ctx = _run_context(SimpleNamespace())
 
     result = ListIntegrationResources.run(ctx, "", "repository")
 
@@ -18,7 +27,7 @@ def test_list_integration_resources_requires_integration_id() -> None:
 
 
 def test_list_integration_resources_requires_resource_type() -> None:
-    ctx = SimpleNamespace(deps=SimpleNamespace(client=SimpleNamespace()))
+    ctx = _run_context(SimpleNamespace())
 
     result = ListIntegrationResources.run(ctx, "integration-123", "")
 
@@ -33,7 +42,7 @@ def test_list_integration_resources_requires_resource_type() -> None:
 
 def test_list_integration_resources_marks_empty_results() -> None:
     client = SimpleNamespace(list_integration_resources=lambda **kwargs: [])
-    ctx = SimpleNamespace(deps=SimpleNamespace(client=client))
+    ctx = _run_context(client)
 
     result = ListIntegrationResources.run(ctx, "integration-123", "repository")
 
