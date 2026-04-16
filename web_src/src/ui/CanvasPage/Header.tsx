@@ -115,70 +115,31 @@ function PageHeader({
   );
 }
 
-function SecondaryHeader({
-  mode,
-  onSave,
-  saveButtonHidden,
-  saveDisabled,
-  saveDisabledTooltip,
-  saveIsPrimary,
-  hasUnpublishedDraftChanges,
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  onEnterEditMode,
-  onExitEditMode,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount = 0,
-  showAgentSidebarToggle,
-  isAgentSidebarOpen,
-  onToggleAgentSidebar,
-}: HeaderProps) {
-  const showCanvasViewModeToggle = mode === "version-live" || mode === "version-edit";
-  const canvasViewMode = mode === "version-edit" ? "version-edit" : "version-live";
+function SecondaryHeader(props: HeaderProps) {
+  const showCanvasViewModeToggle = props.mode === "version-live" || props.mode === "version-edit";
+  const canvasViewMode = props.mode === "version-edit" ? "version-edit" : "version-live";
 
   return (
     <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
       <AgentSidebarTrigger
-        showAgentSidebarToggle={showAgentSidebarToggle}
-        isAgentSidebarOpen={isAgentSidebarOpen}
-        onToggleAgentSidebar={onToggleAgentSidebar}
+        showAgentSidebarToggle={props.showAgentSidebarToggle}
+        isAgentSidebarOpen={props.isAgentSidebarOpen}
+        onToggleAgentSidebar={props.onToggleAgentSidebar}
       />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
-          {showCanvasViewModeToggle && onEnterEditMode && onExitEditMode ? (
-            <CanvasModeToggle mode={canvasViewMode} onSelectEditor={onEnterEditMode} onSelectLive={onExitEditMode} />
+          {showCanvasViewModeToggle && props.onEnterEditMode && props.onExitEditMode ? (
+            <CanvasModeToggle
+              mode={canvasViewMode}
+              onSelectEditor={props.onEnterEditMode}
+              onSelectLive={props.onExitEditMode}
+            />
           ) : null}
         </div>
       </div>
 
-      <SecondaryHeaderActions
-        mode={mode}
-        isVersionControlOpen={isVersionControlOpen}
-        onOpenVersionControl={onOpenVersionControl}
-        versionControlButtonTooltip={versionControlButtonTooltip}
-        versionControlNotificationCount={versionControlNotificationCount}
-        onSave={onSave}
-        saveButtonHidden={saveButtonHidden}
-        saveDisabled={saveDisabled}
-        saveDisabledTooltip={saveDisabledTooltip}
-        saveIsPrimary={saveIsPrimary}
-        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-        onDiscardVersion={onDiscardVersion}
-        discardVersionDisabled={discardVersionDisabled}
-        discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-        onPublishVersion={onPublishVersion}
-        publishVersionLabel={publishVersionLabel}
-        publishVersionDisabled={publishVersionDisabled}
-        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-      />
+      <SecondaryHeaderActions {...props} />
     </div>
   );
 }
