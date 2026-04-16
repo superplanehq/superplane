@@ -18,6 +18,7 @@ import {
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useContextMenu } from "@/hooks/useContextMenu";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
 import {
@@ -78,6 +79,7 @@ import { GroupNode } from "../groupNode";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
+import { CanvasContextMenu, type CanvasContextMenuData } from "./components/CanvasContextMenu";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header } from "./Header";
@@ -1256,6 +1258,7 @@ function CanvasPage(props: CanvasPageProps) {
           <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
             <CanvasContent
               state={state}
+              buildingBlocks={props.buildingBlocks}
               onNodeEdit={handleNodeEdit}
               onNodeDelete={handleNodeDelete}
               onNodesDelete={props.onNodesDelete}
@@ -1779,6 +1782,7 @@ function resolveAbsoluteNodeRect(
 
 function CanvasContent({
   state,
+  buildingBlocks,
   onNodeEdit,
   onNodeDelete,
   onNodesDelete,
@@ -1836,6 +1840,7 @@ function CanvasContent({
   canCreateIntegrations,
 }: {
   state: CanvasPageState;
+  buildingBlocks: BuildingBlockCategory[];
   onNodeEdit: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
@@ -2016,6 +2021,18 @@ function CanvasContent({
   const [multiSelectedNodes, setMultiSelectedNodes] = useState<ReactFlowNode[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
   const previouslySelectedRef = useRef<Set<string>>(new Set());
+  const {
+    contextMenuData,
+    contextMenuPosition,
+    isContextMenuOpen,
+    menuRef: contextMenuRef,
+    selectedGroupKey: selectedContextMenuGroupKey,
+    setSelectedGroupKey: setSelectedContextMenuGroupKey,
+    backdropProps: contextMenuBackdropProps,
+    menuProps: contextMenuProps,
+    openContextMenu,
+    closeContextMenu,
+  } = useContextMenu<CanvasContextMenuData>();
 
   const stopCanvasPointerEvent = useCallback((event: SyntheticEvent) => {
     event.preventDefault();
@@ -2252,6 +2269,7 @@ function CanvasContent({
   }, [handleToggleCollapse]);
 
   const handlePaneClick = useCallback(() => {
+    closeContextMenu();
     previouslySelectedRef.current = new Set();
 
     // Clear ReactFlow's selection state and close both sidebars
@@ -2269,7 +2287,50 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [onBuildingBlocksSidebarToggle]);
+  }, [closeContextMenu, onBuildingBlocksSidebarToggle]);
+
+  const handlePaneContextMenu = useCallback(
+    (event: MouseEvent | React.MouseEvent<Element, MouseEvent>) => {
+      if (isReadOnly || !buildingBlocks.length) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      closeContextMenu();
+      const flowPosition = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      openContextMenu(
+        { x: event.clientX, y: event.clientY },
+        {
+          kind: "canvas",
+          flowPosition,
+        },
+      );
+    },
+    [buildingBlocks.length, closeContextMenu, isReadOnly, openContextMenu, screenToFlowPosition],
+  );
+
+  const handleNodeContextMenu = useCallback(
+    (event: MouseEvent | React.MouseEvent<Element, MouseEvent>, node: ReactFlowNode) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      closeContextMenu();
+      openContextMenu(
+        { x: event.clientX, y: event.clientY },
+        {
+          kind: "node",
+          nodeId: node.id,
+        },
+      );
+    },
+    [closeContextMenu, openContextMenu],
+  );
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
@@ -2551,6 +2612,51 @@ function CanvasContent({
     setIsLogSidebarOpen(true);
   }, []);
 
+  const handleContextMenuBlockSelect = useCallback(
+    async (block: BuildingBlock) => {
+      if (contextMenuData?.kind !== "canvas") {
+        return;
+      }
+
+      closeContextMenu();
+      await onBuildingBlockDrop?.(block, contextMenuData.flowPosition);
+    },
+    [closeContextMenu, contextMenuData, onBuildingBlockDrop],
+  );
+
+  const handleContextMenuCopy = useCallback(() => {
+    if (contextMenuData?.kind !== "node") {
+      return;
+    }
+
+    closeContextMenu();
+
+    if (onDuplicate) {
+      onDuplicate(contextMenuData.nodeId);
+      return;
+    }
+
+    onDuplicateNodes?.([contextMenuData.nodeId]);
+  }, [closeContextMenu, contextMenuData, onDuplicate, onDuplicateNodes]);
+
+  const handleContextMenuEdit = useCallback(() => {
+    if (contextMenuData?.kind !== "node") {
+      return;
+    }
+
+    closeContextMenu();
+    onNodeEdit(contextMenuData.nodeId);
+  }, [closeContextMenu, contextMenuData, onNodeEdit]);
+
+  const handleContextMenuDelete = useCallback(() => {
+    if (contextMenuData?.kind !== "node") {
+      return;
+    }
+
+    closeContextMenu();
+    onNodeDelete?.(contextMenuData.nodeId);
+  }, [closeContextMenu, contextMenuData, onNodeDelete]);
+
   const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
 
   return (
@@ -2564,11 +2670,11 @@ function CanvasContent({
             edgeTypes={edgeTypes}
             minZoom={MIN_CANVAS_ZOOM}
             maxZoom={1.5}
-            zoomOnScroll={true}
-            zoomOnPinch={true}
+            zoomOnScroll={!isContextMenuOpen}
+            zoomOnPinch={!isContextMenuOpen}
             zoomOnDoubleClick={false}
-            panOnScroll={true}
-            panOnDrag={true}
+            panOnScroll={!isContextMenuOpen}
+            panOnDrag={!isContextMenuOpen}
             selectionOnDrag={true}
             selectionKeyCode={selectionKey}
             multiSelectionKeyCode={selectionKey}
@@ -2589,6 +2695,8 @@ function CanvasContent({
             onInit={handleInit}
             deleteKeyCode={null}
             onPaneClick={handlePaneClick}
+            onPaneContextMenu={handlePaneContextMenu}
+            onNodeContextMenu={handleNodeContextMenu}
             onSelectionStart={() => {
               setIsSelecting(true);
               const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
@@ -2933,6 +3041,23 @@ function CanvasContent({
                 </ViewportPortal>
               )}
           </ReactFlow>
+          <CanvasContextMenu
+            isOpen={isContextMenuOpen}
+            position={contextMenuPosition}
+            menuRef={contextMenuRef}
+            contextMenuData={contextMenuData}
+            buildingBlocks={buildingBlocks}
+            selectedGroupKey={selectedContextMenuGroupKey}
+            onSelectGroupKey={setSelectedContextMenuGroupKey}
+            onSelectBlock={handleContextMenuBlockSelect}
+            onCopy={handleContextMenuCopy}
+            onEdit={handleContextMenuEdit}
+            onDelete={handleContextMenuDelete}
+            canCopy={Boolean(onDuplicate || onDuplicateNodes)}
+            canDelete={Boolean(onNodeDelete)}
+            backdropProps={contextMenuBackdropProps}
+            menuProps={contextMenuProps}
+          />
         </div>
       </div>
       {showBottomStatusControls ? (
