@@ -2,7 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Settings, Sparkles } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
@@ -42,6 +42,10 @@ interface HeaderProps {
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
+  showAgentSidebarToggle?: boolean;
+  isAgentSidebarOpen?: boolean;
+  onToggleAgentSidebar?: () => void;
+  agentSidebarHasPendingProposal?: boolean;
 }
 
 export function Header({
@@ -73,6 +77,10 @@ export function Header({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount = 0,
+  showAgentSidebarToggle,
+  isAgentSidebarOpen,
+  onToggleAgentSidebar,
+  agentSidebarHasPendingProposal,
 }: HeaderProps) {
   const headerTitle = canvasName.trim() || "Canvas";
 
@@ -115,6 +123,10 @@ export function Header({
         onOpenVersionControl={onOpenVersionControl}
         versionControlButtonTooltip={versionControlButtonTooltip}
         versionControlNotificationCount={versionControlNotificationCount}
+        showAgentSidebarToggle={showAgentSidebarToggle}
+        isAgentSidebarOpen={isAgentSidebarOpen}
+        onToggleAgentSidebar={onToggleAgentSidebar}
+        agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
       />
     </header>
   );
@@ -193,6 +205,10 @@ function SecondaryHeader({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount = 0,
+  showAgentSidebarToggle,
+  isAgentSidebarOpen,
+  onToggleAgentSidebar,
+  agentSidebarHasPendingProposal,
 }: {
   isDefaultMode: boolean;
   onSave?: () => void;
@@ -220,12 +236,23 @@ function SecondaryHeader({
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
+  showAgentSidebarToggle?: boolean;
+  isAgentSidebarOpen?: boolean;
+  onToggleAgentSidebar?: () => void;
+  agentSidebarHasPendingProposal?: boolean;
 }) {
   const showCanvasViewModeToggle = headerMode === "version-live" || headerMode === "version-edit";
   const canvasViewMode = headerMode === "version-edit" ? "version-edit" : "version-live";
 
   return (
-    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4">
+    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
+      <AgentSidebarToolbarTrigger
+        showAgentSidebarToggle={showAgentSidebarToggle}
+        isAgentSidebarOpen={isAgentSidebarOpen}
+        onToggleAgentSidebar={onToggleAgentSidebar}
+        agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
+      />
+
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
           {showCanvasViewModeToggle && onEnterEditMode && onExitEditMode ? (
@@ -493,5 +520,43 @@ function PublishVersionButton({
     <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
       {label}
     </UIButton>
+  );
+}
+
+function AgentSidebarToolbarTrigger({
+  showAgentSidebarToggle,
+  isAgentSidebarOpen,
+  onToggleAgentSidebar,
+  agentSidebarHasPendingProposal,
+}: {
+  showAgentSidebarToggle?: boolean;
+  isAgentSidebarOpen?: boolean;
+  onToggleAgentSidebar?: () => void;
+  agentSidebarHasPendingProposal?: boolean;
+}) {
+  return (
+    <div className="relative z-10 flex shrink-0 items-center">
+      {showAgentSidebarToggle && onToggleAgentSidebar && !isAgentSidebarOpen ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="relative inline-flex">
+              <UIButton
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 bg-white border-slate-300"
+                aria-label="Open SuperPlane Agent"
+                onClick={onToggleAgentSidebar}
+              >
+                <Sparkles className="h-3 w-3 text-slate-700" />
+              </UIButton>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            Open SuperPlane Agent
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
+    </div>
   );
 }

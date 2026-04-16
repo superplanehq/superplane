@@ -53,6 +53,7 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
+import { AgentSidebar } from "../AgentSidebar";
 import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
@@ -346,6 +347,7 @@ export interface CanvasPageProps {
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
+export const CANVAS_AGENT_SIDEBAR_STORAGE_KEY = "canvasAgentSidebarOpen";
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
 export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
 export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
@@ -696,6 +698,25 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
+  const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    const stored = window.localStorage.getItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY);
+    if (stored === null) {
+      return false;
+    }
+
+    try {
+      return JSON.parse(stored) === true;
+    } catch (error) {
+      console.warn("Failed to parse agent sidebar state from local storage:", error);
+      return false;
+    }
+  });
+  const [agentSidebarHasPendingProposal, setAgentSidebarHasPendingProposal] = useState(false);
+
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
@@ -704,17 +725,6 @@ function CanvasPage(props: CanvasPageProps) {
     channels: string[];
     initialData?: string;
   } | null>(null);
-  const canvasNodesForAiContext = useMemo(
-    () =>
-      (props.workflowNodes || []).map((node) => ({
-        id: node.id || "",
-        name: node.name || "",
-        label: node.name || "",
-        type: node.type || "",
-      })),
-    [props.workflowNodes],
-  );
-
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
       return;
@@ -1068,6 +1078,50 @@ function CanvasPage(props: CanvasPageProps) {
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
 
+  const persistAgentSidebarOpen = useCallback((open: boolean) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY, JSON.stringify(open));
+    }
+  }, []);
+
+  const handleAgentSidebarOpenChange = useCallback(
+    (open: boolean) => {
+      setIsAgentSidebarOpen(open);
+      persistAgentSidebarOpen(open);
+    },
+    [persistAgentSidebarOpen],
+  );
+
+  const handleAgentSidebarToggle = useCallback(() => {
+    setIsAgentSidebarOpen((previous) => {
+      const next = !previous;
+      persistAgentSidebarOpen(next);
+      return next;
+    });
+  }, [persistAgentSidebarOpen]);
+
+  useEffect(() => {
+    if (!props.agentContext.enabled) {
+      setIsAgentSidebarOpen(false);
+      persistAgentSidebarOpen(false);
+    }
+  }, [props.agentContext.enabled, persistAgentSidebarOpen]);
+
+  useEffect(() => {
+    if (props.hideAddControls) {
+      setIsAgentSidebarOpen(false);
+      persistAgentSidebarOpen(false);
+    }
+  }, [props.hideAddControls, persistAgentSidebarOpen]);
+
+  useEffect(() => {
+    if (readOnly) {
+      setIsAgentSidebarOpen(false);
+      persistAgentSidebarOpen(false);
+      setAgentSidebarHasPendingProposal(false);
+    }
+  }, [readOnly, persistAgentSidebarOpen]);
+
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
       if (!editingNodeData || !props.onNodeConfigurationSave) {
@@ -1176,6 +1230,10 @@ function CanvasPage(props: CanvasPageProps) {
           onOpenVersionControl={props.onOpenVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
+          showAgentSidebarToggle={props.agentContext.enabled && !props.hideAddControls && !readOnly}
+          isAgentSidebarOpen={isAgentSidebarOpen}
+          onToggleAgentSidebar={handleAgentSidebarToggle}
+          agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1183,6 +1241,20 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
         {props.versionControlSidebar}
+
+        {!props.hideAddControls && props.agentContext.enabled && !readOnly ? (
+          <AgentSidebar
+            isOpen={isAgentSidebarOpen}
+            onToggle={handleAgentSidebarOpenChange}
+            agentContext={props.agentContext}
+            canvasId={props.canvasId}
+            organizationId={props.organizationId}
+            onApplyAiOperations={props.onApplyAiOperations}
+            disabled={readOnly}
+            disabledMessage="You don't have permission to edit this canvas."
+            onPendingProposalChange={setAgentSidebarHasPendingProposal}
+          />
+        ) : null}
 
         <RightSideControls
           mode={readOnly ? "live" : "edit"}
@@ -1197,11 +1269,6 @@ function CanvasPage(props: CanvasPageProps) {
             isOpen
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
-            agentContext={props.agentContext}
-            canvasId={props.canvasId}
-            organizationId={props.organizationId}
-            canvasNodes={canvasNodesForAiContext}
-            onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
             disabled={readOnly}
@@ -1679,6 +1746,10 @@ function CanvasContentHeader({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
+  showAgentSidebarToggle,
+  isAgentSidebarOpen,
+  onToggleAgentSidebar,
+  agentSidebarHasPendingProposal,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1708,6 +1779,10 @@ function CanvasContentHeader({
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
+  showAgentSidebarToggle?: boolean;
+  isAgentSidebarOpen?: boolean;
+  onToggleAgentSidebar?: () => void;
+  agentSidebarHasPendingProposal?: boolean;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1754,6 +1829,10 @@ function CanvasContentHeader({
       onOpenVersionControl={onOpenVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
+      showAgentSidebarToggle={showAgentSidebarToggle}
+      isAgentSidebarOpen={isAgentSidebarOpen}
+      onToggleAgentSidebar={onToggleAgentSidebar}
+      agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
     />
   );
 }

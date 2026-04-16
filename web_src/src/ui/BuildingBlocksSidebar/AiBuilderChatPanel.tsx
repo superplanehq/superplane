@@ -2,7 +2,6 @@ import { AiBuilderConversationMessageList } from "@/components/AiBuilderConversa
 import { ConversationList } from "@/components/AiBuilderConversationList";
 import { InputForm } from "@/components/AiBuilderInputForm";
 import { ProposalsList } from "@/components/AiBuilderProposalsList";
-import { TabsContent } from "@/components/ui/tabs";
 import {
   type AiBuilderMessage,
   type AiBuilderProposal,
@@ -85,8 +84,8 @@ export function AiBuilderChatPanel({
   }, [aiInput, aiInputRef, maxAiInputHeight]);
 
   return (
-    <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
-      <div className="h-full rounded-md bg-slate-50/30 flex flex-col">
+    <div className="mt-0 flex flex-1 min-h-0 flex-col overflow-hidden px-5 pb-5">
+      <div className="h-full min-h-0 rounded-md bg-slate-50/30 flex flex-col">
         {isNewChatView ? (
           <>
             <InputForm
@@ -156,7 +155,7 @@ export function AiBuilderChatPanel({
           </>
         )}
       </div>
-    </TabsContent>
+    </div>
   );
 }
 
