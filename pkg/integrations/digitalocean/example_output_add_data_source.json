@@ -1,0 +1,18 @@
+{
+  "data": {
+    "dataSourceName": "https://example.com/",
+    "dataSourceUUID": "e374bb5e-33e6-11f1-b074-4e01edede4",
+    "indexingJob": {
+      "completedDataSources": 1,
+      "finishedAt": "2026-04-09T07:37:51Z",
+      "startedAt": "2026-04-09T07:36:58Z",
+      "status": "INDEX_JOB_STATUS_COMPLETED",
+      "totalDataSources": 1,
+      "totalTokens": "21"
+    },
+    "knowledgeBaseName": "ecommerce-knowledge-base",
+    "knowledgeBaseUUID": "3b88fe18-31bb-11f1-b074-4e013hhjte4"
+  },
+  "timestamp": "2026-04-09T07:38:01.304486131Z",
+  "type": "digitalocean.data_source.added"
+}

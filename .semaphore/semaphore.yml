@@ -15,6 +15,9 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
       prologue:
         commands:
           - checkout
@@ -64,6 +67,9 @@ blocks:
         - name: "Check: Example Payloads"
           commands:
             - make check.example.payloads
+        - name: "Check: Generated Artifacts"
+          commands:
+            - make check.generated.artifacts
       epilogue:
         always:
           commands:
@@ -107,11 +113,15 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
       prologue:
         commands:
           - checkout
           - sem-version node 20
           - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
+          - make gen.setup.ui
           - cd web_src
           - npm ci
       epilogue:

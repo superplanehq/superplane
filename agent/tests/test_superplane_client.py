@@ -1,6 +1,10 @@
 from typing import Any
 
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
+from superplaneapi.models.canvases_create_canvas_version_response import (
+    CanvasesCreateCanvasVersionResponse,
+)
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_describe_canvas_version_response import (
     CanvasesDescribeCanvasVersionResponse,
@@ -9,8 +13,17 @@ from superplaneapi.models.canvases_list_node_events_response import CanvasesList
 from superplaneapi.models.canvases_list_node_executions_response import (
     CanvasesListNodeExecutionsResponse,
 )
+from superplaneapi.models.canvases_validate_canvas_version_changeset_body import (
+    CanvasesValidateCanvasVersionChangesetBody,
+)
+from superplaneapi.models.canvases_validate_canvas_version_changeset_response import (
+    CanvasesValidateCanvasVersionChangesetResponse,
+)
 from superplaneapi.models.components_list_components_response import (
     ComponentsListComponentsResponse,
+)
+from superplaneapi.models.organizations_list_integration_resources_response import (
+    OrganizationsListIntegrationResourcesResponse,
 )
 from superplaneapi.models.superplane_integrations_list_integrations_response import (
     SuperplaneIntegrationsListIntegrationsResponse,
@@ -37,6 +50,8 @@ class FakeCanvasApi:
 class FakeCanvasVersionApi:
     def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
         self._payloads = payloads
+        self.create_calls: list[dict[str, Any]] = []
+        self.validate_calls: list[dict[str, Any]] = []
 
     def canvases_describe_canvas_version(
         self,
@@ -50,6 +65,52 @@ class FakeCanvasVersionApi:
         if payload is None:
             raise ValueError(f"Missing payload for canvas version: {canvas_id}/{version_id}")
         result = CanvasesDescribeCanvasVersionResponse.from_dict(payload)
+        assert result is not None
+        return result
+
+    def canvases_create_canvas_version(
+        self,
+        canvas_id: str,
+        body: dict[str, Any],
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> CanvasesCreateCanvasVersionResponse:
+        self.create_calls.append(
+            {
+                "canvas_id": canvas_id,
+                "body": body,
+                "request_timeout": _request_timeout,
+            }
+        )
+        key = f"/api/v1/canvases/{canvas_id}/versions"
+        payload = self._payloads.get(key)
+        if payload is None:
+            raise ValueError(f"Missing payload for canvas version create: {canvas_id}")
+        result = CanvasesCreateCanvasVersionResponse.from_dict(payload)
+        assert result is not None
+        return result
+
+    def canvases_validate_canvas_version_changeset(
+        self,
+        canvas_id: str,
+        version_id: str,
+        body: CanvasesValidateCanvasVersionChangesetBody,
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> CanvasesValidateCanvasVersionChangesetResponse:
+        self.validate_calls.append(
+            {
+                "canvas_id": canvas_id,
+                "version_id": version_id,
+                "body": body,
+                "request_timeout": _request_timeout,
+            }
+        )
+        key = f"/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"
+        payload = self._payloads.get(key)
+        if payload is None:
+            raise ValueError(
+                f"Missing payload for canvas version changeset validation: {canvas_id}/{version_id}"
+            )
+        result = CanvasesValidateCanvasVersionChangesetResponse.from_dict(payload)
         assert result is not None
         return result
 
@@ -139,6 +200,84 @@ class FakeIntegrationApi:
         result = SuperplaneIntegrationsListIntegrationsResponse.from_dict(payload)
         assert result is not None
         return result
+
+
+class FakeListResourcesResponseData:
+    def __init__(self) -> None:
+        self.status = 200
+        self.data: bytes | None = None
+
+    def read(self) -> bytes:
+        self.data = b'{"resources":[{"id":"proj-1","name":"Project 1","type":"project"}]}'
+        return self.data
+
+    def getheader(self, name: str) -> str | None:
+        if name.lower() == "content-type":
+            return "application/json"
+        return None
+
+    def getheaders(self) -> list[tuple[str, str]]:
+        return [("content-type", "application/json")]
+
+
+class FakeListResourcesApiClient:
+    def __init__(self) -> None:
+        self.query_params: list[tuple[str, str]] = []
+        self.request_timeout: int | tuple[int, int] | None = None
+
+    def param_serialize(
+        self,
+        method: str,
+        resource_path: str,
+        path_params: dict[str, str] | None = None,
+        query_params: list[tuple[str, str]] | None = None,
+        header_params: dict[str, str] | None = None,
+        body: Any = None,
+        post_params: list[Any] | None = None,
+        files: dict[str, Any] | None = None,
+        auth_settings: list[str] | None = None,
+        collection_formats: dict[str, str] | None = None,
+        _host: str | None = None,
+        _request_auth: Any = None,
+    ) -> tuple[str, str, dict[str, str], Any, list[Any]]:
+        _ = (
+            path_params,
+            header_params,
+            body,
+            post_params,
+            files,
+            auth_settings,
+            collection_formats,
+            _host,
+            _request_auth,
+        )
+        self.query_params = query_params or []
+        return method, f"https://example.test{resource_path}", {}, None, []
+
+    def call_api(
+        self,
+        method: str,
+        url: str,
+        header_params: dict[str, str] | None = None,
+        body: Any = None,
+        post_params: list[Any] | None = None,
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> FakeListResourcesResponseData:
+        _ = (method, url, header_params, body, post_params)
+        self.request_timeout = _request_timeout
+        return FakeListResourcesResponseData()
+
+    def response_deserialize(
+        self,
+        response_data: FakeListResourcesResponseData,
+        response_types_map: dict[str, str] | None = None,
+    ) -> Any:
+        _ = (response_data, response_types_map)
+        payload = OrganizationsListIntegrationResourcesResponse.from_dict(
+            {"resources": [{"id": "proj-1", "name": "Project 1", "type": "project"}]}
+        )
+        assert payload is not None
+        return type("ResponseWrapper", (), {"data": payload})()
 
 
 class FakeSuperplaneClient(SuperplaneClient):
@@ -247,6 +386,78 @@ def test_describe_editing_canvas_prefers_version_nodes_and_live_metadata_name() 
     assert summary.nodes[0].name == "Draft node"
 
 
+def test_validate_canvas_version_changeset_sends_expected_payload() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/canvases/canvas-1/versions/draft-ver/validate": {
+                "version": {
+                    "metadata": {"id": "draft-ver", "canvasId": "canvas-1"},
+                    "spec": {"nodes": [], "edges": []},
+                }
+            }
+        }
+    )
+    changeset = CanvasesCanvasChangeset.from_dict(
+        {
+            "changes": [
+                {
+                    "type": "ADD_NODE",
+                    "node": {
+                        "id": "node-1",
+                        "name": "Slack",
+                        "block": "slack.sendTextMessage",
+                    },
+                }
+            ]
+        }
+    )
+    assert changeset is not None
+
+    response = client.validate_canvas_version_changeset(
+        canvas_id="canvas-1",
+        canvas_version_id="draft-ver",
+        changeset=changeset,
+    )
+
+    assert response.version is not None
+    assert response.version.metadata is not None
+    assert response.version.metadata.id == "draft-ver"
+
+    canvas_version_api = client._canvas_version_api
+    assert isinstance(canvas_version_api, FakeCanvasVersionApi)
+    assert len(canvas_version_api.validate_calls) == 1
+    call = canvas_version_api.validate_calls[0]
+    assert call["canvas_id"] == "canvas-1"
+    assert call["version_id"] == "draft-ver"
+    body = call["body"]
+    assert isinstance(body, CanvasesValidateCanvasVersionChangesetBody)
+    assert body.changeset is not None
+    assert body.changeset.to_dict().get("changes", [])[0]["node"]["id"] == "node-1"
+
+
+def test_create_canvas_version_returns_metadata_id_and_sends_empty_body() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/canvases/canvas-1/versions": {
+                "version": {
+                    "metadata": {"id": "draft-ver", "canvasId": "canvas-1"},
+                    "spec": {"nodes": [], "edges": []},
+                }
+            }
+        }
+    )
+
+    version_id = client.create_canvas_version("canvas-1")
+    assert version_id == "draft-ver"
+
+    canvas_version_api = client._canvas_version_api
+    assert isinstance(canvas_version_api, FakeCanvasVersionApi)
+    assert len(canvas_version_api.create_calls) == 1
+    call = canvas_version_api.create_calls[0]
+    assert call["canvas_id"] == "canvas-1"
+    assert call["body"] == {}
+
+
 def test_get_node_details_includes_recent_events() -> None:
     client = FakeSuperplaneClient(
         payloads={
@@ -331,6 +542,26 @@ def test_list_node_executions_maps_rows() -> None:
     assert rows[0].result_message == "timeout"
     assert rows[0].created_at is not None
     assert rows[0].updated_at is not None
+
+
+def test_list_integration_resources_sends_top_level_query_params() -> None:
+    client = FakeSuperplaneClient(payloads={})
+    fake_api_client = FakeListResourcesApiClient()
+    client._api_client = fake_api_client  # type: ignore[assignment]
+
+    resources = client.list_integration_resources(
+        integration_id="int-1",
+        type="project",
+        parameters={"region": "us-east-1", "ignored-empty": "", "": "ignored-key"},
+    )
+
+    assert resources == [{"id": "proj-1", "name": "Project 1", "type": "project"}]
+    query = dict(fake_api_client.query_params)
+    assert query["type"] == "project"
+    assert query["region"] == "us-east-1"
+    assert "parameters" not in query
+    assert "ignored-empty" not in query
+    assert fake_api_client.request_timeout == client._config.timeout_seconds
 
 
 def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details() -> None:

@@ -9,16 +9,16 @@ import (
 )
 
 type updateCommand struct {
-	name              *string
-	description       *string
-	versioningEnabled *bool
+	name                    *string
+	description             *string
+	changeManagementEnabled *bool
 }
 
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if !ctx.Cmd.Flags().Changed("name") &&
 		!ctx.Cmd.Flags().Changed("description") &&
-		!ctx.Cmd.Flags().Changed("versioning-enabled") {
-		return fmt.Errorf("at least one flag must be provided: --name, --description, or --versioning-enabled")
+		!ctx.Cmd.Flags().Changed("change-management-enabled") {
+		return fmt.Errorf("at least one flag must be provided: --name, --description, or --change-management-enabled")
 	}
 
 	organizationID, err := core.ResolveOrganizationID(ctx)
@@ -33,12 +33,15 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if ctx.Cmd.Flags().Changed("description") {
 		metadata.SetDescription(*c.description)
 	}
-	if ctx.Cmd.Flags().Changed("versioning-enabled") {
-		metadata.SetVersioningEnabled(*c.versioningEnabled)
-	}
 
 	org := openapi_client.OrganizationsOrganization{}
 	org.SetMetadata(metadata)
+
+	if ctx.Cmd.Flags().Changed("change-management-enabled") {
+		spec := openapi_client.OrganizationsOrganizationSpec{}
+		spec.SetChangeManagementEnabled(*c.changeManagementEnabled)
+		org.SetSpec(spec)
+	}
 
 	body := openapi_client.OrganizationsUpdateOrganizationBody{}
 	body.SetOrganization(org)

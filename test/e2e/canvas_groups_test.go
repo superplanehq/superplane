@@ -48,6 +48,7 @@ func (s *CanvasGroupSteps) start() {
 func (s *CanvasGroupSteps) givenACanvasWithTwoNoopNodes(first, second string) {
 	s.canvas = shared.NewCanvasSteps("E2E Canvas Groups", s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 	s.canvas.AddNoop(first, models.Position{X: 200, Y: 220})
 	s.canvas.AddNoop(second, models.Position{X: 200, Y: 420})
 	s.canvas.ClickOnEmptyCanvasArea()

@@ -3,6 +3,7 @@ import { isAgentEnabled } from "@/lib/env";
 import type {
   AgentsAgentChatInfo,
   AgentsAgentChatMessage,
+  CanvasesCanvasChangeset,
   AgentsCreateAgentChatResponse,
   AgentsListAgentChatMessagesResponse,
   AgentsListAgentChatsResponse,
@@ -14,7 +15,7 @@ import {
   agentsListAgentChats,
   agentsResumeAgentChat,
 } from "@/api-client";
-import type { CanvasOperation } from "@/lib/ai";
+
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { Dispatch, SetStateAction } from "react";
 import { consumeChatResponseStream } from "./agentChatSupport";
@@ -37,7 +38,7 @@ export type AiBuilderMessage = {
 export type AiBuilderProposal = {
   id: string;
   summary: string;
-  operations: CanvasOperation[];
+  changeset: CanvasesCanvasChangeset;
 };
 
 export type AiChatSession = {
@@ -57,10 +58,10 @@ export function useAgentContext(isEditing: boolean, canvasVersion: string): Agen
     return { enabled: false, mode: "inspect" };
   }
 
-  if (!isEditing) {
+  if (isEditing) {
     const trimmed = canvasVersion.trim();
     // Build mode requires a draft version id for the agent API; otherwise fall back to inspect
-    // (live canvas) so we do not send enabled+build with an empty canvas_version (422).
+    // to avoid sending enabled+build with an empty canvas_version (422).
     if (trimmed) {
       return { enabled: true, mode: "build", canvasVersion: trimmed };
     }

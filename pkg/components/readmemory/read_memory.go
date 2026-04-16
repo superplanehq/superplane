@@ -221,10 +221,6 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
-	}
-
 	channel := ChannelNameNotFound
 	if len(values) > 0 {
 		channel = ChannelNameFound
