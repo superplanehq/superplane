@@ -7,6 +7,7 @@ import { deleteAlertRuleMapper } from "./delete_alert_rule";
 import { deleteAnnotationMapper } from "./delete_annotation";
 import { deleteSilenceMapper } from "./delete_silence";
 import { getAlertRuleMapper } from "./get_alert_rule";
+import { getDashboardMapper } from "./get_dashboard";
 import { getSilenceMapper } from "./get_silence";
 import { getSilenceEventStateRegistry } from "./get_silence_state";
 import { listAlertRulesMapper } from "./list_alert_rules";
@@ -14,14 +15,17 @@ import { listAnnotationsMapper } from "./list_annotations";
 import { listSilencesMapper } from "./list_silences";
 import { onAlertFiringTriggerRenderer } from "./on_alert_firing";
 import { queryDataSourceMapper } from "./query_data_source";
+import { renderPanelMapper } from "./render_panel";
 import { updateAlertRuleMapper } from "./update_alert_rule";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createAlertRule: createAlertRuleMapper,
   deleteAlertRule: deleteAlertRuleMapper,
   getAlertRule: getAlertRuleMapper,
+  getDashboard: getDashboardMapper,
   listAlertRules: listAlertRulesMapper,
   queryDataSource: queryDataSourceMapper,
+  renderPanel: renderPanelMapper,
   updateAlertRule: updateAlertRuleMapper,
   createAnnotation: createAnnotationMapper,
   listAnnotations: listAnnotationsMapper,
@@ -42,8 +46,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createAlertRule: buildActionStateRegistry("created"),
   deleteAlertRule: buildActionStateRegistry("deleted"),
   getAlertRule: buildActionStateRegistry("fetched"),
+  getDashboard: buildActionStateRegistry("fetched"),
   listAlertRules: buildActionStateRegistry("listed"),
   queryDataSource: buildActionStateRegistry("queried"),
+  renderPanel: buildActionStateRegistry("rendered"),
   updateAlertRule: buildActionStateRegistry("updated"),
   createAnnotation: buildActionStateRegistry("created"),
   listAnnotations: buildActionStateRegistry("listed"),

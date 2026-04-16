@@ -2505,6 +2505,14 @@ func (c *Client) ListDatabasesByEngine(engine string) ([]Database, error) {
 	return response.Databases, nil
 }
 
+type ClusterDatabase struct {
+	Name string `json:"name"`
+}
+
+type CreateClusterDatabaseRequest struct {
+	Name string `json:"name"`
+}
+
 // KnowledgeBase represents a DigitalOcean Gradient AI knowledge base
 type KnowledgeBase struct {
 	UUID               string    `json:"uuid"`
@@ -2609,6 +2617,30 @@ func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*Knowledge
 	}
 
 	return &response.KnowledgeBase, nil
+}
+
+func (c *Client) CreateClusterDatabase(clusterID string, req CreateClusterDatabaseRequest) (*ClusterDatabase, error) {
+	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database ClusterDatabase `json:"db"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Database, nil
 }
 
 // IndexJob represents a DigitalOcean Gradient AI knowledge base indexing job
@@ -2866,6 +2898,12 @@ func (c *Client) DeleteDatabase(databaseID string) error {
 	return err
 }
 
+func (c *Client) DeleteClusterDatabase(clusterID, name string) error {
+	url := fmt.Sprintf("%s/databases/%s/dbs/%s", c.BaseURL, clusterID, url.PathEscape(name))
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
 func (c *Client) GetDatabaseClusterConfig(clusterID string) (map[string]any, error) {
 	url := fmt.Sprintf("%s/databases/%s/config", c.BaseURL, clusterID)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
@@ -2888,6 +2926,7 @@ func (c *Client) GetDatabaseClusterConfig(clusterID string) (map[string]any, err
 	return response.Config, nil
 }
 
+// ListDatabases lists logical databases within a managed database cluster.
 func (c *Client) ListDatabases(clusterID string) ([]Database, error) {
 	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
