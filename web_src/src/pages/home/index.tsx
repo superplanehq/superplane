@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { OnboardingWelcome } from "./OnboardingWelcome";
-import type { CanvasesCanvas, ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 
 type CanvasViewMode = "grid" | "list";
 
@@ -31,8 +31,8 @@ interface CanvasCardData {
   createdAt: string;
   type: "canvases";
   createdBy?: { id?: string; name?: string };
-  nodes?: ComponentsNode[];
-  edges?: ComponentsEdge[];
+  nodes?: SuperplaneComponentsNode[];
+  edges?: SuperplaneComponentsEdge[];
 }
 
 const HomePage = () => {
@@ -504,14 +504,14 @@ function CanvasCard({
 }
 
 interface CanvasMiniMapProps {
-  nodes?: ComponentsNode[];
-  edges?: ComponentsEdge[];
+  nodes?: SuperplaneComponentsNode[];
+  edges?: SuperplaneComponentsEdge[];
 }
 
 function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   const positionedNodes = nodes.filter(
     (node) => typeof node.position?.x === "number" && typeof node.position?.y === "number",
-  ) as Array<ComponentsNode & { position: { x: number; y: number } }>;
+  ) as Array<SuperplaneComponentsNode & { position: { x: number; y: number } }>;
 
   if (!positionedNodes.length) {
     return (

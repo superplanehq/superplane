@@ -167,11 +167,9 @@ func (c *DeleteMemory) Execute(ctx core.ExecutionContext) error {
 		"matches":   matches,
 		"count":     len(deletedValues),
 	}
+
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
-	}
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
 	}
 
 	channel := ChannelNameNotFound

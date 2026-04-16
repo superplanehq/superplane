@@ -1,129 +1,95 @@
-import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import { Badge } from "@/components/ui/badge";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { isAgentEnabled } from "@/lib/env";
+import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
+import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
-import { extractIntegrations, getTemplateTags, countNodesByType } from "@/pages/canvas/templateMetadata";
 
 import type {
   BlueprintsBlueprint,
-  ComponentsIntegrationRef,
-  ComponentsComponent,
-  ComponentsEdge,
-  ComponentsNode,
-  TriggersTrigger,
-  CanvasesListEventExecutionsResponse,
+  CanvasChangesetChange,
   CanvasesCanvas,
-  CanvasesCanvasVersion,
   CanvasesCanvasChangeRequest,
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasVersion,
+  CanvasesListEventExecutionsResponse,
+  ComponentsComponent,
+  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsIntegrationRef,
+  SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
   SuperplaneMeUser,
+  TriggersTrigger,
 } from "@/api-client";
-import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
-import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
+import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import {
+  canvasKeys,
+  eventExecutionsQueryOptions,
+  useActOnCanvasChangeRequest,
+  useCanvas,
+  useCanvasChangeRequests,
+  useCanvasMemoryEntries,
+  useCanvasVersion,
+  useCanvasVersions,
+  useCreateCanvas,
+  useCreateCanvasChangeRequest,
+  useCreateCanvasVersion,
+  useDeleteCanvasMemoryEntry,
+  useDeleteCanvasVersion,
+  usePublishCanvasVersion,
+  useInfiniteCanvasEvents,
+  useInfiniteCanvasLiveVersions,
+  useResolveCanvasChangeRequest,
+  useTriggers,
+  useUpdateCanvasVersion,
+  useWidgets,
+} from "@/hooks/useCanvasData";
+import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
-import { useMe } from "@/hooks/useMe";
-import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
-import {
-  eventExecutionsQueryOptions,
-  useCreateCanvas,
-  useUpdateCanvas,
-  useCreateCanvasVersion,
-  useCreateCanvasChangeRequest,
-  useActOnCanvasChangeRequest,
-  useResolveCanvasChangeRequest,
-  useUpdateCanvasVersion,
-  useCanvasChangeRequests,
-  useTriggers,
-  useCanvas,
-  useInfiniteCanvasEvents,
-  useCanvasMemoryEntries,
-  useDeleteCanvasMemoryEntry,
-  useCanvasVersion,
-  useCanvasVersions,
-  useInfiniteCanvasLiveVersions,
-  useWidgets,
-  canvasKeys,
-} from "@/hooks/useCanvasData";
-import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
-import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { buildChildToGroupMap } from "@/lib/canvas/groups";
+import { getColorClass } from "@/lib/colors";
+import { filterVisibleConfiguration } from "@/lib/components";
+import { getApiErrorMessage } from "@/lib/errors";
+import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
+import { DefaultLayoutEngine } from "@/lib/layout";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
+import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { useAgentContext } from "@/ui/BuildingBlocksSidebar/agentChat";
+import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
-import { getColorClass } from "@/lib/colors";
-import { getApiErrorMessage } from "@/lib/errors";
-import { filterVisibleConfiguration } from "@/lib/components";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
-import { Button } from "@/components/ui/button";
-import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
-import { resolveExecutionErrors } from "./mappers/dash0";
-import { CanvasMemoryView } from "./CanvasMemoryView";
-import { CanvasYamlView } from "./CanvasYamlView";
-import { CanvasCliView } from "./CanvasCliView";
-import { useCanvasYaml } from "./useCanvasYaml";
-import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
-import { DefaultLayoutEngine } from "@/lib/layout";
-import { usePermissions } from "@/contexts/PermissionsContext";
-import {
-  buildRunEntryFromEvent,
-  buildRunItemFromExecution,
-  buildCanvasStatusLogEntry,
-  buildTabData,
-  generateNodeId,
-  generateUniqueNodeName,
-  mapCanvasNodesToLogEntries,
-  mapExecutionsToSidebarEvents,
-  mapQueueItemsToSidebarEvents,
-  mapTriggerEventsToSidebarEvents,
-  mapWorkflowEventsToRunLogEntries,
-  summarizeWorkflowChanges,
-  buildExecutionInfo,
-  buildUserInfo,
-} from "./utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
+import { CanvasMemoryModal } from "./CanvasMemoryModal";
+import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
+import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
-import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
-import { CanvasSettingsView } from "./CanvasSettingsView";
-import { CanvasPageModals } from "./CanvasPageModals";
-import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
-import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-node-preparation";
-import {
-  formatVersionLabelWithTimestamp,
-  isDraftVersion,
-  isPublishedVersion,
-  sortDraftVersionsDesc,
-  sortPublishedVersionsDesc,
-  versionSortValue,
-} from "./lib/canvas-versions";
-import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
-import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
-import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import {
   deleteNodesFromCanvas,
   groupCanvasNodes,
@@ -131,13 +97,49 @@ import {
   ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
+import {
+  CANVAS_BUNDLE_COLOR,
+  CANVAS_BUNDLE_ICON_SLUG,
+  prepareComponentNode,
+  prepareCompositeNode,
+  prepareTriggerNode,
+} from "./lib/canvas-node-preparation";
+import {
+  isDraftVersion,
+  isPublishedVersion,
+  sortDraftVersionsDesc,
+  sortPublishedVersionsDesc,
+  versionSortValue,
+} from "./lib/canvas-versions";
+import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
+import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
+import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
+import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
+import { resolveExecutionErrors } from "./mappers/dash0";
 import type { User } from "./mappers/types";
-import { buildChildToGroupMap } from "@/lib/canvas/groups";
+import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useCanvasYaml } from "./useCanvasYaml";
+import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import {
+  buildCanvasStatusLogEntry,
+  buildExecutionInfo,
+  buildRunEntryFromEvent,
+  buildRunItemFromExecution,
+  buildTabData,
+  buildUserInfo,
+  generateNodeId,
+  generateUniqueNodeName,
+  mapCanvasNodesToLogEntries,
+  mapExecutionsToSidebarEvents,
+  mergeWorkflowLogEntries,
+  mapQueueItemsToSidebarEvents,
+  mapTriggerEventsToSidebarEvents,
+  mapWorkflowEventsToRunLogEntries,
+  summarizeWorkflowChanges,
+} from "./utils";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
-
-type UnsavedChangeKind = "position" | "structural";
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
 
@@ -197,6 +199,8 @@ export function WorkflowPageV2() {
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
+  const deleteCanvasVersionMutation = useDeleteCanvasVersion(organizationId!, canvasId!);
+  const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
@@ -455,11 +459,17 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
-  const canReadOrg = canAct("org", "read");
-  const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
-  const showVersioningUI = !isVersioningDisabled;
-  const hasEditableVersion =
-    (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
+  // changeManagement lives on Canvas.Spec but is NOT part of CanvasVersion.Spec.
+  // Optimistic cache updates that spread version.spec into canvas.spec can
+  // temporarily wipe the field, so we latch to the last truthy API value.
+  const changeManagementEnabledRef = useRef(false);
+  if (liveCanvas?.spec?.changeManagement != null) {
+    changeManagementEnabledRef.current = liveCanvas.spec.changeManagement.enabled ?? false;
+  }
+  const isChangeManagementDisabled = !changeManagementEnabledRef.current;
+  const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
+  const agentContext = useAgentContext(isEditing, activeCanvasVersionId);
+  const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {
     const pages = infiniteEventsQuery.data?.pages || [];
@@ -491,20 +501,16 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
-  const { data: organization } = useOrganization(organizationId || "", !!organizationId && canReadOrg);
-  const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
-  const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
-  const showAiBuilderTab = isAgentEnabled();
-
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "cli" | "memory" | "settings">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
+  const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
+  const [isMemoryViewModalOpen, setIsMemoryViewModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
       return true;
@@ -521,8 +527,8 @@ export function WorkflowPageV2() {
       return true;
     }
   });
-  /** After creating a change request, hide "Unpublished Changes" until the user enters edit mode again. */
-  const [suppressUnpublishedChangesBadge, setSuppressUnpublishedChangesBadge] = useState(false);
+  /** After creating a change request, hide draft Discard until the user enters edit mode again. */
+  const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
   const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
   const versionNodeDiffLiveChangeRequest = useMemo(() => {
     const fallback = versionNodeDiffContext?.changeRequest;
@@ -544,7 +550,7 @@ export function WorkflowPageV2() {
   // user IDs as emails and role names as display names.
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
-  const { data: organizationRoles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
+  useOrganizationRoles(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -601,7 +607,6 @@ export function WorkflowPageV2() {
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
-  const canAutoSave = !isTemplate && hasEditableVersion;
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
   const hasPendingLocalCanvasState = hasUnsavedChanges || hasLocalSaveActivity;
@@ -634,44 +639,6 @@ export function WorkflowPageV2() {
     setCreateChangeRequestTitle(`v${nextVersionNumber}`);
     setCreateChangeRequestDescription("");
   }, [isCreateChangeRequestMode, canvasChangeRequests.length]);
-
-  useEffect(() => {
-    if (!isVersioningDisabled) {
-      return;
-    }
-
-    if (isVersionControlOpen) {
-      setIsVersionControlOpen(false);
-    }
-    if (selectedChangeRequestId) {
-      setSelectedChangeRequestId("");
-    }
-    if (resolvingConflictChangeRequestId) {
-      setResolvingConflictChangeRequestId("");
-    }
-    if (isCreateChangeRequestMode) {
-      setIsCreateChangeRequestMode(false);
-    }
-    if (activeCanvasVersionId) {
-      setActiveCanvasVersion(null);
-    }
-    if (searchParams.get("version")) {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("version");
-        return next;
-      });
-    }
-  }, [
-    isVersioningDisabled,
-    isVersionControlOpen,
-    selectedChangeRequestId,
-    resolvingConflictChangeRequestId,
-    isCreateChangeRequestMode,
-    activeCanvasVersionId,
-    searchParams,
-    setSearchParams,
-  ]);
 
   useEffect(() => {
     if (!hasEditableVersion || !isVersionControlOpen) {
@@ -798,12 +765,7 @@ export function WorkflowPageV2() {
   }, [isTemplate, canvasId]);
 
   useEffect(() => {
-    if (
-      isVersioningDisabled ||
-      hasSyncedVersionFromURLRef.current ||
-      selectableVersionsById.size === 0 ||
-      activeCanvasVersionId
-    ) {
+    if (hasSyncedVersionFromURLRef.current || selectableVersionsById.size === 0 || activeCanvasVersionId) {
       return;
     }
 
@@ -851,7 +813,7 @@ export function WorkflowPageV2() {
 
       return {
         ...current,
-        spec: requestedVersion.spec,
+        spec: { ...current.spec, ...requestedVersion.spec },
       };
     });
     hasSyncedVersionFromURLRef.current = true;
@@ -863,7 +825,6 @@ export function WorkflowPageV2() {
     currentUserId,
     pendingApprovalVersionIds,
     liveCanvasVersionId,
-    isVersioningDisabled,
     setSearchParams,
     queryClient,
     organizationId,
@@ -930,7 +891,7 @@ export function WorkflowPageV2() {
 
       return {
         ...current,
-        spec: loadedCanvasVersion.spec,
+        spec: { ...current.spec, ...loadedCanvasVersion.spec },
       };
     });
 
@@ -1143,7 +1104,7 @@ export function WorkflowPageV2() {
             name: workflow.metadata?.name ?? current.metadata?.name,
             description: workflow.metadata?.description ?? current.metadata?.description,
           },
-          spec: { ...version.spec, nodes: mergedNodes },
+          spec: { ...current.spec, ...version.spec, nodes: mergedNodes },
         };
       });
     },
@@ -1299,13 +1260,6 @@ export function WorkflowPageV2() {
     });
   }, []);
 
-  const markUnsavedChange = useCallback((kind: UnsavedChangeKind) => {
-    setHasUnsavedChanges(true);
-    if (kind === "structural") {
-      setHasNonPositionalUnsavedChanges(true);
-    }
-  }, []);
-
   const handleCreateVersion = useCallback(async () => {
     if (!organizationId || !canvasId) {
       return;
@@ -1318,11 +1272,6 @@ export function WorkflowPageV2() {
 
     if (isTemplate) {
       showErrorToast("Template canvases are read-only");
-      return;
-    }
-
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -1362,11 +1311,9 @@ export function WorkflowPageV2() {
 
         return {
           ...current,
-          spec: version.spec,
+          spec: { ...current.spec, ...version.spec },
         };
       });
-
-      showSuccessToast(`Editing ${formatVersionLabelWithTimestamp(version)}`);
     } catch (error) {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -1384,7 +1331,6 @@ export function WorkflowPageV2() {
     createCanvasVersionMutation,
     queryClient,
     setSearchParams,
-    isVersioningDisabled,
   ]);
 
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
@@ -1431,8 +1377,8 @@ export function WorkflowPageV2() {
 
   /**
    * Debounced auto-save function for node position changes.
-   * Waits 100ms after the last position change when auto-save is enabled,
-   * or 5s when auto-save is disabled to avoid disrupting editing.
+   * Uses a short delay while the canvas is editable; a longer delay when read-only
+   * so stray timers from a mode switch do not fire too aggressively.
    * Only saves position changes, not structural modifications (deletions, additions, etc).
    * If there are unsaved structural changes, position auto-save is skipped.
    */
@@ -1448,17 +1394,13 @@ export function WorkflowPageV2() {
           const focusedNoteId = getActiveNoteId();
 
           try {
-            if (!canAutoSave) {
+            if (isReadOnly) {
               return;
             }
 
             // Check if there are unsaved structural changes
             // If so, skip auto-save to avoid saving those changes accidentally
             if (hasNonPositionalUnsavedChanges) {
-              return;
-            }
-
-            if (isTemplate) {
               return;
             }
 
@@ -1501,7 +1443,7 @@ export function WorkflowPageV2() {
               : "Canvas changes saved";
 
             // Save the workflow with updated positions
-            if (!activeCanvasVersionId && !isVersioningDisabled) {
+            if (!activeCanvasVersionId) {
               return;
             }
             const savingVersionID = activeCanvasVersionId || undefined;
@@ -1585,7 +1527,7 @@ export function WorkflowPageV2() {
             }
           }
         },
-        canAutoSave ? 100 : 2000,
+        isReadOnly ? 2000 : 100,
       ),
     [
       organizationId,
@@ -1593,9 +1535,7 @@ export function WorkflowPageV2() {
       activeCanvasVersionId,
       queryClient,
       hasNonPositionalUnsavedChanges,
-      canAutoSave,
-      isTemplate,
-      isVersioningDisabled,
+      isReadOnly,
       enqueueCanvasSave,
     ],
   );
@@ -2000,58 +1940,27 @@ export function WorkflowPageV2() {
   );
 
   const logEntries = useMemo(() => {
-    if (!isViewingLiveVersion) {
-      return [];
-    }
-
     const nodes = canvas?.spec?.nodes || [];
-    const rootEvents = canvasEventsResponse?.events || [];
-
-    const runEntries = mapWorkflowEventsToRunLogEntries({
-      events: rootEvents,
-      nodes,
-      onNodeSelect: handleLogRunNodeSelect,
-      onExecutionSelect: handleLogRunExecutionSelect,
-    });
-
-    const mergedRunEntries = new Map<string, LogEntry>();
-    runEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-    liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-    const allRunEntries = Array.from(mergedRunEntries.values());
-
     const canvasEntries = mapCanvasNodesToLogEntries({
       nodes,
       workflowUpdatedAt: canvas?.metadata?.updatedAt || "",
       onNodeSelect: handleLogNodeSelect,
     });
 
-    const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
-
-    const resolvedEntries = [...allRunEntries, ...allCanvasEntries].map((entry) => {
-      if (!entry.runItems?.length || resolvedExecutionIds.size === 0) {
-        return entry;
-      }
-
-      const runItems = entry.runItems.map((item) => {
-        if (!resolvedExecutionIds.has(item.id)) {
-          return item;
-        }
-        return {
-          ...item,
-          type: "resolved-error" as const,
-        };
-      });
-
-      return {
-        ...entry,
-        runItems,
-      };
+    const rootEvents = canvasEventsResponse?.events || [];
+    const runEntries = mapWorkflowEventsToRunLogEntries({
+      events: rootEvents,
+      nodes,
+      onNodeSelect: handleLogRunNodeSelect,
+      onExecutionSelect: handleLogRunExecutionSelect,
     });
-
-    return resolvedEntries.sort((a, b) => {
-      const aTime = Date.parse(a.timestamp || "") || 0;
-      const bTime = Date.parse(b.timestamp || "") || 0;
-      return aTime - bTime;
+    return mergeWorkflowLogEntries({
+      isViewingLiveVersion,
+      runEntries,
+      liveRunEntries,
+      canvasEntries,
+      liveCanvasEntries,
+      resolvedExecutionIds,
     });
   }, [
     isViewingLiveVersion,
@@ -2444,7 +2353,7 @@ export function WorkflowPageV2() {
         }
         return;
       }
-      if (!activeCanvasVersionId && !isVersioningDisabled) {
+      if (!activeCanvasVersionId) {
         if (options?.showToast !== false) {
           showErrorToast("Enable edit mode before saving changes");
         }
@@ -2526,7 +2435,6 @@ export function WorkflowPageV2() {
       activeCanvasVersionId,
       isTemplate,
       canUpdateCanvas,
-      isVersioningDisabled,
       enqueueCanvasSave,
       handleLogNodeSelect,
     ],
@@ -2714,10 +2622,8 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
     [
@@ -2728,8 +2634,7 @@ export function WorkflowPageV2() {
       availableIntegrations,
       queryClient,
       handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
+      isReadOnly,
     ],
   );
 
@@ -2777,13 +2682,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const debouncedAnnotationAutoSave = useMemo(
@@ -2796,15 +2699,11 @@ export function WorkflowPageV2() {
           const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
           if (annotationUpdates.size === 0) return;
 
-          if (!canAutoSave) {
+          if (isReadOnly) {
             return;
           }
 
           if (hasNonPositionalUnsavedChanges) {
-            return;
-          }
-
-          if (isTemplate) {
             return;
           }
 
@@ -2849,26 +2748,18 @@ export function WorkflowPageV2() {
             }
           });
         },
-        canAutoSave ? 100 : 2000,
+        isReadOnly ? 2000 : 100,
       ),
-    [
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      hasNonPositionalUnsavedChanges,
-      canAutoSave,
-      isTemplate,
-    ],
+    [organizationId, canvasId, queryClient, handleSaveWorkflow, hasNonPositionalUnsavedChanges, isReadOnly],
   );
 
   const handleAnnotationBlur = useCallback(() => {
-    if (!canAutoSave) {
+    if (isReadOnly) {
       return;
     }
 
     debouncedAnnotationAutoSave.flush();
-  }, [canAutoSave, debouncedAnnotationAutoSave]);
+  }, [isReadOnly, debouncedAnnotationAutoSave]);
 
   const clearPendingAutoSaveWork = useCallback(() => {
     debouncedAutoSave.cancel();
@@ -2930,41 +2821,24 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (hasConfigurationUpdate) {
-        if (canAutoSave) {
-          const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
-          pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...configurationUpdates });
-          setIsAnnotationAutoSaveQueued(true);
-          debouncedAnnotationAutoSave();
-        } else {
-          markUnsavedChange("structural");
-        }
+      if (hasConfigurationUpdate && !isReadOnly) {
+        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
+        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...configurationUpdates });
+        setIsAnnotationAutoSaveQueued(true);
+        debouncedAnnotationAutoSave();
       }
 
-      if (canAutoSave) {
+      if (!isReadOnly && hasPositionUpdate) {
         // Queue position updates for auto-save
-        if (hasPositionUpdate) {
-          pendingPositionUpdatesRef.current.set(nodeId, {
-            x: x !== undefined ? x : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.x || 0,
-            y: y !== undefined ? y : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.y || 0,
-          });
-          setIsPositionAutoSaveQueued(true);
-          debouncedAutoSave();
-        }
-      } else if (hasPositionUpdate) {
-        markUnsavedChange("position");
+        pendingPositionUpdatesRef.current.set(nodeId, {
+          x: x !== undefined ? x : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.x || 0,
+          y: y !== undefined ? y : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.y || 0,
+        });
+        setIsPositionAutoSaveQueued(true);
+        debouncedAutoSave();
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      debouncedAnnotationAutoSave,
-      debouncedAutoSave,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, debouncedAutoSave, isReadOnly],
   );
 
   const handleGroupUpdate = useCallback(
@@ -2999,16 +2873,14 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
         pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
         setIsAnnotationAutoSaveQueued(true);
         debouncedAnnotationAutoSave();
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, isReadOnly],
   );
 
   const handleNodeAdd = useCallback(
@@ -3102,74 +2974,110 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
 
       // Return the new node ID
       return newNodeId;
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      applyAutoLayoutOnAddedNode,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, applyAutoLayoutOnAddedNode, isReadOnly],
   );
 
   const handleApplyAiOperations = useCallback(
-    async (operations: CanvasOperation[]) => {
+    async (operations: CanvasChangesetChange[]) => {
       if (!operations.length || !organizationId || !canvasId) {
         return;
       }
 
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-      if (!latestWorkflow) {
-        throw new Error("Canvas not found.");
+      const versionId = activeCanvasVersionIdRef.current || activeCanvasVersionId;
+      if (!versionId) {
+        throw new Error("Enable edit mode before applying AI changes.");
       }
 
-      const builder = new CanvasBuilder({
-        canvas: latestWorkflow,
-        buildingBlocks,
-        integrations,
-        components,
-        blueprints,
-      });
-      const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
+      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(versionId);
+      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
 
-      const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
-      const aiAddedNodeIds = (finalWorkflow.spec?.nodes || [])
-        .map((node) => node.id)
-        .filter((nodeId): nodeId is string => typeof nodeId === "string" && !previousNodeIds.has(nodeId));
+      try {
+        const response = await canvasesApplyCanvasVersionChangeset(
+          withOrganizationHeader({
+            path: {
+              canvasId,
+              versionId,
+            },
+            body: {
+              changeset: {
+                changes: operations,
+              },
+            },
+          }),
+        );
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
+        const version = response.data?.version;
+        if (!version) {
+          throw new Error("Failed to apply AI changes.");
+        }
 
-      if (canAutoSave) {
-        await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        const changeKind = aiAddedNodeIds.length > 0 ? "position" : "structural";
-        markUnsavedChange(changeKind);
+        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), version);
+        queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
+          if (!current) {
+            return current;
+          }
+
+          let found = false;
+          const next = current.map((item) => {
+            if (item?.metadata?.id === version.metadata?.id) {
+              found = true;
+              return version;
+            }
+            return item;
+          });
+
+          if (!found) {
+            next.unshift(version);
+          }
+
+          next.sort(
+            (left, right) =>
+              versionSortValue(right.metadata?.publishedAt || right.metadata?.updatedAt || right.metadata?.createdAt) -
+              versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
+          );
+          return next;
+        });
+
+        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+          if (!current || !version.spec) {
+            return current;
+          }
+
+          return {
+            ...current,
+            spec: {
+              ...current.spec,
+              ...version.spec,
+            },
+          };
+        });
+
+        setActiveCanvasVersion(version);
+        lastSavedWorkflowRef.current = JSON.parse(
+          JSON.stringify(queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? null),
+        );
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+      } catch (error) {
+        releaseCanvasUpdatedEcho();
+        releaseCanvasVersionUpdatedEcho();
+        throw error;
       }
     },
     [
-      buildingBlocks,
-      canAutoSave,
-      canvas,
+      activeCanvasVersionId,
       canvasId,
-      handleSaveWorkflow,
-      components,
-      blueprints,
-      markUnsavedChange,
-      integrations,
       organizationId,
       queryClient,
+      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasVersionUpdatedEcho,
     ],
   );
 
@@ -3221,24 +3129,13 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
 
       return newNodeId;
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      applyAutoLayoutOnAddedNode,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, applyAutoLayoutOnAddedNode, isReadOnly],
   );
 
   const handlePlaceholderConfigure = useCallback(
@@ -3334,13 +3231,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleEdgeCreate = useCallback(
@@ -3370,13 +3265,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleNodeDelete = useCallback(
@@ -3407,13 +3300,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleNodesDelete = useCallback(
@@ -3440,13 +3331,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleAutoLayoutNodes = useCallback(
@@ -3462,23 +3351,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [
-      canvas,
-      components,
-      blueprints,
-      organizationId,
-      canvasId,
-      queryClient,
-      handleSaveWorkflow,
-      canAutoSave,
-      markUnsavedChange,
-    ],
+    [canvas, components, blueprints, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleGroupNodes = useCallback(
@@ -3494,13 +3371,11 @@ export function WorkflowPageV2() {
       const updatedWorkflow = groupCanvasNodes(latestWorkflow, bounds, nodePositions);
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleUngroupNodes = useCallback(
@@ -3515,13 +3390,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleNodesDuplicate = useCallback(
@@ -3609,13 +3482,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, blueprints, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, blueprints, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleEdgeDelete = useCallback(
@@ -3657,13 +3528,11 @@ export function WorkflowPageV2() {
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   /**
@@ -3701,15 +3570,13 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
         setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
-      } else {
-        markUnsavedChange("position");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, isReadOnly],
   );
 
   const handleNodesPositionChange = useCallback(
@@ -3747,18 +3614,16 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         // Add all position updates to pending updates
         positionMap.forEach((position, nodeId) => {
           pendingPositionUpdatesRef.current.set(nodeId, position);
         });
         setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
-      } else {
-        markUnsavedChange("position");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, isReadOnly],
   );
 
   const handleNodeCollapseChange = useCallback(
@@ -3793,13 +3658,11 @@ export function WorkflowPageV2() {
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, canAutoSave, markUnsavedChange],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
   const handleRun = useCallback(
@@ -3952,10 +3815,8 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
-      if (canAutoSave) {
+      if (!isReadOnly) {
         await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      } else {
-        markUnsavedChange("structural");
       }
     },
     [
@@ -3966,8 +3827,7 @@ export function WorkflowPageV2() {
       queryClient,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
-      canAutoSave,
-      markUnsavedChange,
+      isReadOnly,
     ],
   );
 
@@ -3978,7 +3838,7 @@ export function WorkflowPageV2() {
         showErrorToast("Template canvases are read-only");
         return;
       }
-      if (!activeCanvasVersionId && !isVersioningDisabled) {
+      if (!activeCanvasVersionId) {
         showErrorToast("Enable edit mode before saving changes");
         return;
       }
@@ -4053,16 +3913,11 @@ export function WorkflowPageV2() {
         showErrorToast(errorMessage);
       }
     },
-    [canvas, organizationId, canvasId, activeCanvasVersionId, isTemplate, isVersioningDisabled, enqueueCanvasSave],
+    [canvas, organizationId, canvasId, activeCanvasVersionId, isTemplate, enqueueCanvasSave],
   );
 
   const handleCreateChangeRequest = useCallback(async () => {
     if (!organizationId || !canvasId) {
-      return;
-    }
-
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
       return;
     }
 
@@ -4089,13 +3944,36 @@ export function WorkflowPageV2() {
 
     setSelectedChangeRequestId("");
     setIsCreateChangeRequestMode(true);
+  }, [organizationId, canvasId, activeCanvasVersionId, createChangeRequestVersion, hasUnsavedChanges, setSearchParams]);
+
+  const handlePublishVersion = useCallback(async () => {
+    if (!organizationId || !canvasId || !activeCanvasVersionId) {
+      return;
+    }
+
+    if (hasUnsavedChanges) {
+      showErrorToast("Save your version before publishing");
+      return;
+    }
+
+    try {
+      await publishCanvasVersionMutation.mutateAsync(activeCanvasVersionId);
+      setActiveCanvasVersion(null);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("version");
+        return next;
+      });
+      showSuccessToast("Version published");
+    } catch (error) {
+      showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to publish version")));
+    }
   }, [
     organizationId,
     canvasId,
     activeCanvasVersionId,
-    createChangeRequestVersion,
     hasUnsavedChanges,
-    isVersioningDisabled,
+    publishCanvasVersionMutation,
     setSearchParams,
   ]);
 
@@ -4172,7 +4050,6 @@ export function WorkflowPageV2() {
             next.delete("version");
             return next;
           });
-          setTopViewMode("canvas");
         },
       });
     },
@@ -4208,7 +4085,6 @@ export function WorkflowPageV2() {
     setSelectedChangeRequestId(changeRequestId);
     setResolvingConflictChangeRequestId(changeRequestId);
     setIsVersionControlOpen(true);
-    setTopViewMode("canvas");
   }, []);
 
   const handlePreviewPreviousVersionViewDetails = useCallback(() => {
@@ -4259,7 +4135,7 @@ export function WorkflowPageV2() {
       return undefined;
     }
 
-    const phase = getChangeRequestReviewPhase(changeRequest, liveCanvas?.metadata?.changeRequestApprovalConfig);
+    const phase = getChangeRequestReviewPhase(changeRequest, liveCanvas?.spec?.changeManagement);
     const reviewUi =
       phase.kind === "none"
         ? {
@@ -4284,7 +4160,6 @@ export function WorkflowPageV2() {
       onOpenVersioningTab: () => {
         setSelectedChangeRequestId(changeRequestId);
         setIsVersionControlOpen(true);
-        setTopViewMode("canvas");
       },
       onViewNodeDiff: handleOpenAwaitingApprovalNodeDiff,
       canAct: canUpdateCanvas && !isTemplate && !canvasDeletedRemotely,
@@ -4295,7 +4170,7 @@ export function WorkflowPageV2() {
     isViewingPendingApprovalVersion,
     selectedCanvasVersionID,
     pendingApprovalVersions,
-    liveCanvas?.metadata?.changeRequestApprovalConfig,
+    liveCanvas?.spec?.changeManagement,
     handleApproveChangeRequest,
     handleRejectChangeRequest,
     handlePublishChangeRequest,
@@ -4419,7 +4294,7 @@ export function WorkflowPageV2() {
         }
         return {
           ...current,
-          spec: version.spec,
+          spec: { ...current.spec, ...version.spec },
         };
       });
 
@@ -4473,8 +4348,8 @@ export function WorkflowPageV2() {
         return;
       }
 
-      if (isVersioningDisabled) {
-        showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+      if (isChangeManagementDisabled) {
+        showErrorToast("Change management is disabled for this canvas.");
         return;
       }
 
@@ -4500,7 +4375,6 @@ export function WorkflowPageV2() {
 
         await queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
         setIsCreateChangeRequestMode(false);
-        setTopViewMode("canvas");
         if (liveCanvasVersionId) {
           handleUseVersion(liveCanvasVersionId);
         }
@@ -4508,7 +4382,7 @@ export function WorkflowPageV2() {
           setSelectedChangeRequestId(changeRequestID);
         }
         setIsVersionControlOpen(true);
-        setSuppressUnpublishedChangesBadge(true);
+        setSuppressUnpublishedDraftDiscard(true);
         showSuccessToast("Change request created");
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to create change request")));
@@ -4517,7 +4391,7 @@ export function WorkflowPageV2() {
     [
       organizationId,
       canvasId,
-      isVersioningDisabled,
+      isChangeManagementDisabled,
       activeCanvasVersionId,
       createChangeRequestVersion,
       hasUnsavedChanges,
@@ -4543,11 +4417,6 @@ export function WorkflowPageV2() {
       return;
     }
 
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
-      return;
-    }
-
     if (hasEditableVersion) {
       if (!liveCanvasVersionId) {
         showErrorToast("No live version available");
@@ -4557,8 +4426,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    setTopViewMode("canvas");
-    setSuppressUnpublishedChangesBadge(false);
+    setSuppressUnpublishedDraftDiscard(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;
     if (existingDraftVersionID) {
@@ -4572,7 +4440,6 @@ export function WorkflowPageV2() {
     canvasId,
     canUpdateCanvas,
     isTemplate,
-    isVersioningDisabled,
     hasEditableVersion,
     liveCanvasVersionId,
     draftVersions,
@@ -4595,22 +4462,13 @@ export function WorkflowPageV2() {
       return;
     }
 
-    if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+    if (!hasEditableVersion || !activeCanvasVersionId) {
+      showErrorToast("Enable edit mode before discarding draft");
       return;
     }
 
-    if (!hasEditableVersion) {
-      showErrorToast("Enable edit mode before resetting draft changes");
-      return;
-    }
-
-    const shouldReset = window.confirm(
-      hasUnsavedChanges
-        ? "Discard local unsaved changes and reset your draft to current live?"
-        : "Reset your draft to current live and discard draft changes?",
-    );
-    if (!shouldReset) {
+    const shouldDiscard = window.confirm("Discard this draft? You will be redirected to the live canvas.");
+    if (!shouldDiscard) {
       return;
     }
 
@@ -4618,45 +4476,40 @@ export function WorkflowPageV2() {
 
     try {
       setIsResetDraftPending(true);
-      const response = await createCanvasVersionMutation.mutateAsync();
-      const version = response?.data?.version;
-      if (!version) {
-        showErrorToast("Failed to reset draft");
-        return;
-      }
+      await deleteCanvasVersionMutation.mutateAsync(activeCanvasVersionId);
 
       setIsCreateChangeRequestMode(false);
       setSelectedChangeRequestId("");
-      setActiveCanvasVersion(version);
+      setActiveCanvasVersion(null);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       lastSavedWorkflowRef.current = null;
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
-        if (version.metadata?.id) {
-          next.set("version", version.metadata.id);
-        }
+        next.delete("version");
         return next;
       });
 
-      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-        if (!current || !version.spec) {
-          return current;
-        }
+      if (liveCanvasVersion?.spec) {
+        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+          if (!current) {
+            return current;
+          }
 
-        return {
-          ...current,
-          spec: version.spec,
-        };
-      });
+          return {
+            ...current,
+            spec: { ...current.spec, ...liveCanvasVersion.spec },
+          };
+        });
+      }
 
-      showSuccessToast("Draft reset to current live");
+      showSuccessToast("Draft discarded");
     } catch (error) {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (error as { message?: string })?.message ||
-        "Failed to reset draft";
-      showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+        "Failed to discard draft";
+      showErrorToast(errorMessage);
     } finally {
       setIsResetDraftPending(false);
     }
@@ -4665,10 +4518,10 @@ export function WorkflowPageV2() {
     canvasId,
     canUpdateCanvas,
     isTemplate,
-    isVersioningDisabled,
     hasEditableVersion,
-    hasUnsavedChanges,
-    createCanvasVersionMutation,
+    activeCanvasVersionId,
+    deleteCanvasVersionMutation,
+    liveCanvasVersion,
     queryClient,
     setSearchParams,
     clearPendingAutoSaveWork,
@@ -4846,99 +4699,6 @@ export function WorkflowPageV2() {
     [canvas],
   );
 
-  const canvasSettingsInitialValues = useMemo(
-    () => ({
-      name: liveCanvas?.metadata?.name || "",
-      description: liveCanvas?.metadata?.description || "",
-      versioningEnabled: liveCanvas?.metadata?.versioningEnabled ?? false,
-      changeRequestApprovalConfig: {
-        items: (liveCanvas?.metadata?.changeRequestApprovalConfig?.items || [])
-          .map((item) => {
-            if (!item.type || (item.type !== "TYPE_ANYONE" && item.type !== "TYPE_USER" && item.type !== "TYPE_ROLE")) {
-              return null;
-            }
-
-            return {
-              type: item.type,
-              userId: item.userId,
-              roleName: item.roleName,
-            };
-          })
-          .filter(
-            (
-              item,
-            ): item is {
-              type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
-              userId: string | undefined;
-              roleName: string | undefined;
-            } => !!item,
-          ),
-      },
-    }),
-    [
-      liveCanvas?.metadata?.versioningEnabled,
-      liveCanvas?.metadata?.changeRequestApprovalConfig?.items,
-      liveCanvas?.metadata?.description,
-      liveCanvas?.metadata?.name,
-    ],
-  );
-  const canvasSettingsApproverUsers = useMemo(
-    () =>
-      organizationUsers
-        .map((user) => {
-          const id = user.metadata?.id || "";
-          if (!id) {
-            return null;
-          }
-
-          return {
-            id,
-            name: user.spec?.displayName || user.metadata?.email || id,
-          };
-        })
-        .filter((item): item is { id: string; name: string } => !!item),
-    [organizationUsers],
-  );
-  const canvasSettingsApproverRoles = useMemo(
-    () =>
-      organizationRoles
-        .map((role) => {
-          const name = role.metadata?.name || "";
-          if (!name) {
-            return null;
-          }
-
-          return {
-            name,
-            label: role.spec?.displayName || name,
-          };
-        })
-        .filter((item): item is { name: string; label: string } => !!item),
-    [organizationRoles],
-  );
-  const handleSaveCanvasSettings = useCallback(
-    async (values: {
-      name: string;
-      description: string;
-      versioningEnabled?: boolean;
-      changeRequestApprovalConfig?: {
-        items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
-      };
-    }) => {
-      if (!canvasId) {
-        return;
-      }
-
-      await updateCanvasMutation.mutateAsync({
-        name: values.name,
-        description: values.description,
-        versioningEnabled: values.versioningEnabled,
-        changeRequestApprovalConfig: values.changeRequestApprovalConfig,
-      });
-    },
-    [canvasId, updateCanvasMutation],
-  );
-
   const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
     nodes,
     getYamlExportPayload,
@@ -4951,7 +4711,7 @@ export function WorkflowPageV2() {
         ? "You don't have permission to update this canvas"
         : isTemplate
           ? "Template canvases are read-only"
-          : !activeCanvasVersionId && !isVersioningDisabled
+          : !activeCanvasVersionId
             ? "Enable edit mode before saving changes"
             : null;
 
@@ -4993,13 +4753,7 @@ export function WorkflowPageV2() {
 
   const isInitialCanvasBootstrapLoading =
     !canvas &&
-    (canvasLoading ||
-      triggersLoading ||
-      blueprintsLoading ||
-      componentsLoading ||
-      widgetsLoading ||
-      usersLoading ||
-      rolesLoading);
+    (canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || widgetsLoading || usersLoading);
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
@@ -5152,62 +4906,47 @@ export function WorkflowPageV2() {
       ? "Enable edit mode to save changes."
       : undefined;
   const saveButtonHidden =
-    isVersioningDisabled ||
-    isTemplate ||
-    !canUpdateCanvas ||
-    !hasEditableVersion ||
-    !hasUnsavedChanges ||
-    (canAutoSave && isAutoSaveQueued);
-  const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas && !(canAutoSave && isAutoSaveQueued);
-  const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
+    isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges || (!isReadOnly && isAutoSaveQueued);
+  const saveIsPrimary = hasUnsavedChanges && !isReadOnly && !isAutoSaveQueued;
   const toggleEditModeDisabled =
-    isVersioningDisabled ||
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     createCanvasVersionMutation.isPending ||
     (hasEditableVersion && !liveCanvasVersionId);
   const toggleEditModeDisabledTooltip = !canUpdateCanvas
     ? "You don't have permission to edit this canvas."
-    : isVersioningDisabled
-      ? versioningDisabledTooltip
-      : canvasDeletedRemotely
-        ? "This canvas was deleted in another session."
-        : hasEditableVersion && !liveCanvasVersionId
-          ? "No live version available."
-          : undefined;
+    : canvasDeletedRemotely
+      ? "This canvas was deleted in another session."
+      : hasEditableVersion && !liveCanvasVersionId
+        ? "No live version available."
+        : undefined;
   const resetDraftDisabled =
-    isVersioningDisabled ||
     !hasEditableVersion ||
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
-    createCanvasVersionMutation.isPending ||
+    deleteCanvasVersionMutation.isPending ||
     hasLocalSaveActivity ||
     isResetDraftPending ||
-    !activeCanvasVersionId ||
-    !liveCanvasVersion?.spec;
-  const resetDraftDisabledTooltip = isVersioningDisabled
-    ? versioningDisabledTooltip
-    : !canUpdateCanvas
-      ? "You don't have permission to edit this canvas."
-      : canvasDeletedRemotely
-        ? "This canvas was deleted in another session."
-        : !activeCanvasVersionId
-          ? "Draft version not found."
-          : !liveCanvasVersion?.spec
-            ? "No live version available."
-            : !hasEditableVersion
-              ? "Enable edit mode before resetting draft changes."
-              : undefined;
+    !activeCanvasVersionId;
+  const resetDraftDisabledTooltip = !canUpdateCanvas
+    ? "You don't have permission to edit this canvas."
+    : canvasDeletedRemotely
+      ? "This canvas was deleted in another session."
+      : !activeCanvasVersionId
+        ? "Draft version not found."
+        : !hasEditableVersion
+          ? "Enable edit mode before discarding draft."
+          : undefined;
   const createChangeRequestDisabled =
-    isVersioningDisabled ||
+    isChangeManagementDisabled ||
     !hasEditableVersion ||
     hasPendingLocalCanvasState ||
     createCanvasChangeRequestMutation.isPending ||
     canvasDeletedRemotely;
   const createChangeRequestDisabledTooltip = canvasDeletedRemotely
     ? "This canvas was deleted in another session."
-    : isVersioningDisabled
-      ? versioningDisabledTooltip
+    : isChangeManagementDisabled
+      ? "Change management is disabled for this canvas."
       : !hasEditableVersion
         ? "Enable edit mode before creating a change request."
         : hasLocalSaveActivity
@@ -5215,24 +4954,16 @@ export function WorkflowPageV2() {
           : hasUnsavedChanges
             ? "Save your version before creating a change request."
             : undefined;
-  const headerMode = isVersioningDisabled
-    ? "versioning-disabled"
-    : hasEditableVersion
-      ? "version-edit"
-      : "version-live";
-  const unpublishedDraftChangeCount =
-    !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
-      ? pendingDraftDiffSummary.items.length
-      : 0;
-  const canvasStateMode = !showVersioningUI
-    ? "default"
-    : hasEditableVersion
-      ? "editing"
-      : isViewingPendingApprovalVersion
-        ? "awaiting-approval"
-        : !isViewingCurrentLiveVersion
-          ? "previewing-previous-version"
-          : "default";
+  const headerMode = hasEditableVersion ? "version-edit" : "version-live";
+  const hasUnpublishedDraftChanges =
+    !suppressUnpublishedDraftDiscard && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
+  const canvasStateMode = hasEditableVersion
+    ? "editing"
+    : isViewingPendingApprovalVersion
+      ? "awaiting-approval"
+      : !isViewingCurrentLiveVersion
+        ? "previewing-previous-version"
+        : "default";
   const exitEditModeDisabled =
     !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
   const exitEditModeDisabledTooltip = !canUpdateCanvas
@@ -5263,42 +4994,6 @@ export function WorkflowPageV2() {
               ? "Save canvas changes before running"
               : undefined;
 
-  const dataViewContent =
-    topViewMode === "yaml" && yamlPayload ? (
-      <CanvasYamlView
-        yamlText={yamlPayload.yamlText}
-        filename={yamlPayload.filename}
-        onCopy={handleYamlViewCopy}
-        onDownload={handleYamlViewDownload}
-        onImport={!isReadOnly ? handleImportYaml : undefined}
-        isImporting={hasLocalSaveActivity}
-      />
-    ) : topViewMode === "cli" ? (
-      <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
-    ) : topViewMode === "memory" ? (
-      <CanvasMemoryView
-        entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
-        isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
-        errorMessage={
-          isViewingDraftVersion ? undefined : canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined
-        }
-        onDeleteEntry={
-          canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
-        }
-        deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
-      />
-    ) : topViewMode === "settings" ? (
-      <CanvasSettingsView
-        initialValues={canvasSettingsInitialValues}
-        canUpdateCanvas={canUpdateCanvas && !isTemplate}
-        orgVersioningEnabled={isOrgVersioningEnabled}
-        isSaving={updateCanvasMutation.isPending}
-        availableUsers={canvasSettingsApproverUsers}
-        availableRoles={canvasSettingsApproverRoles}
-        onSave={handleSaveCanvasSettings}
-      />
-    ) : null;
-
   return (
     <>
       <div className="relative h-full w-full">
@@ -5310,28 +5005,21 @@ export function WorkflowPageV2() {
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
-          title={canvas?.metadata?.name || "Canvas"}
+          title={canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas")}
           headerBanner={headerBanner}
-          topViewMode={topViewMode}
           canvasStateMode={canvasStateMode}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          onTopViewModeChange={(mode) => {
-            setIsCreateChangeRequestMode(false);
-            setTopViewMode(mode);
-          }}
-          isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
-          onOpenVersionControl={
-            showVersioningUI && !hasEditableVersion && topViewMode === "canvas"
-              ? () => setIsVersionControlOpen(true)
-              : undefined
-          }
-          versionControlButtonTooltip="Open versions"
+          showCanvasSettingsMenu={canUpdateCanvas}
+          isVersionControlOpen={isVersionControlOpen}
+          onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen((prev) => !prev) : undefined}
+          versionControlButtonTooltip={isVersionControlOpen ? "Close versions" : "Open versions"}
           versionControlNotificationCount={pendingApprovalVersions.length}
           showBottomStatusControls={!isTemplate}
           hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
-          dataViewContent={dataViewContent}
+          onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
+          onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
           edges={edges}
           organizationId={organizationId}
@@ -5361,12 +5049,11 @@ export function WorkflowPageV2() {
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
-          onToggleCollapse={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
-          showAiBuilderTab={showAiBuilderTab}
+          agentContext={agentContext}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
           onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
@@ -5383,27 +5070,44 @@ export function WorkflowPageV2() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          unsavedMessage={
-            hasUnsavedChanges && !(canAutoSave && isAutoSaveQueued) ? "You have unsaved changes" : undefined
-          }
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
           saveDisabledTooltip={saveDisabledTooltip}
-          onPublishVersion={showVersioningUI ? handleCreateChangeRequest : undefined}
-          publishVersionDisabled={createChangeRequestDisabled}
-          publishVersionDisabledTooltip={createChangeRequestDisabledTooltip}
-          onDiscardVersion={showVersioningUI ? handleResetDraftChanges : undefined}
+          onPublishVersion={isChangeManagementDisabled ? handlePublishVersion : handleCreateChangeRequest}
+          publishVersionLabel={isChangeManagementDisabled ? "Publish" : "Propose Change"}
+          publishVersionDisabled={
+            isChangeManagementDisabled
+              ? !hasEditableVersion ||
+                hasPendingLocalCanvasState ||
+                publishCanvasVersionMutation.isPending ||
+                canvasDeletedRemotely
+              : createChangeRequestDisabled
+          }
+          publishVersionDisabledTooltip={
+            isChangeManagementDisabled
+              ? canvasDeletedRemotely
+                ? "This canvas was deleted in another session."
+                : !hasEditableVersion
+                  ? "Enable edit mode before publishing."
+                  : hasLocalSaveActivity
+                    ? "Wait for the current save to finish."
+                    : hasUnsavedChanges
+                      ? "Save your version before publishing."
+                      : undefined
+              : createChangeRequestDisabledTooltip
+          }
+          onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           headerMode={headerMode}
-          onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+          onEnterEditMode={handleToggleEditMode}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
-          onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
+          onExitEditMode={handleToggleEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          unpublishedDraftChangeCount={unpublishedDraftChangeCount}
+          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}
@@ -5439,17 +5143,8 @@ export function WorkflowPageV2() {
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
-          breadcrumbs={[
-            {
-              label: isTemplate ? "Templates" : "Canvases",
-              href: isTemplate ? `/${organizationId}/templates` : `/${organizationId}`,
-            },
-            {
-              label: canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
-            },
-          ]}
           versionControlSidebar={
-            showVersioningUI && !hasEditableVersion && topViewMode === "canvas" ? (
+            !hasEditableVersion ? (
               <CanvasVersionControlSidebar
                 isOpen={isVersionControlOpen}
                 onToggle={setIsVersionControlOpen}
@@ -5466,13 +5161,38 @@ export function WorkflowPageV2() {
                 onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
                 loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
                 loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
-                changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
+                changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
                 rejectedVersions={rejectedVersions}
               />
             ) : undefined
           }
         />
       </div>
+      {yamlPayload ? (
+        <CanvasYamlModal
+          open={isYamlViewModalOpen}
+          onOpenChange={setIsYamlViewModalOpen}
+          yamlText={yamlPayload.yamlText}
+          filename={yamlPayload.filename}
+          onCopy={handleYamlViewCopy}
+          onDownload={handleYamlViewDownload}
+          onImport={!isReadOnly ? handleImportYaml : undefined}
+          isImporting={hasLocalSaveActivity}
+        />
+      ) : null}
+      <CanvasMemoryModal
+        open={isMemoryViewModalOpen}
+        onOpenChange={setIsMemoryViewModalOpen}
+        entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
+        isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
+        errorMessage={
+          isViewingDraftVersion ? undefined : canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined
+        }
+        onDeleteEntry={
+          canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
+        }
+        deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+      />
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver
@@ -5494,7 +5214,7 @@ export function WorkflowPageV2() {
           }
         }}
         liveVersionOwnerProfilesById={liveVersionOwnerProfilesById}
-        changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
+        changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
         canActOnChangeRequests={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
         currentUserId={currentUserId}
         changeRequestActionPending={actOnCanvasChangeRequestMutation.isPending}

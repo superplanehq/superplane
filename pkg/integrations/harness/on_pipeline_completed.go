@@ -577,10 +577,7 @@ func (t *OnPipelineCompleted) processPolledExecution(
 	return t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, execution)
 }
 
-func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(
-	metadataCtx core.MetadataContext,
-	execution ExecutionSummary,
-) error {
+func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(metadataCtx core.MetadataWriter, execution ExecutionSummary) error {
 	if metadataCtx == nil {
 		return nil
 	}
@@ -602,7 +599,7 @@ func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(
 }
 
 func (t *OnPipelineCompleted) updatePollingMetadata(
-	metadataCtx core.MetadataContext,
+	metadataCtx core.MetadataWriter,
 	config OnPipelineCompletedConfiguration,
 	mutate func(*OnPipelineCompletedMetadata),
 ) (OnPipelineCompletedMetadata, error) {

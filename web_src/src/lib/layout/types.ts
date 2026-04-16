@@ -1,4 +1,4 @@
-import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, ComponentsNode } from "@/api-client";
+import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, SuperplaneComponentsNode } from "@/api-client";
 
 export type LayoutScope = "full-canvas" | "connected-component";
 
@@ -10,6 +10,6 @@ export type LayoutEngineApplyOptions = {
 };
 
 export interface LayoutEngine {
-  estimateNodeSize(node: ComponentsNode): { width: number; height: number };
+  estimateNodeSize(node: SuperplaneComponentsNode): { width: number; height: number };
   apply(workflow: CanvasesCanvas, options?: LayoutEngineApplyOptions): Promise<CanvasesCanvas>;
 }

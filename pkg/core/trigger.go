@@ -84,7 +84,7 @@ type TriggerContext struct {
 	Logger        *log.Entry
 	Configuration any
 	HTTP          HTTPContext
-	Metadata      MetadataContext
+	Metadata      MetadataWriter
 	Requests      RequestContext
 	Events        EventContext
 	Webhook       NodeWebhookContext
@@ -101,7 +101,7 @@ type TriggerActionContext struct {
 	Configuration any
 	Logger        *log.Entry
 	HTTP          HTTPContext
-	Metadata      MetadataContext
+	Metadata      MetadataWriter
 	Requests      RequestContext
 	Events        EventContext
 	Webhook       NodeWebhookContext
@@ -114,7 +114,7 @@ type WebhookRequestContext struct {
 	WorkflowID    string
 	NodeID        string
 	Configuration any
-	Metadata      MetadataContext
+	Metadata      MetadataWriter
 	Logger        *log.Entry
 	Webhook       NodeWebhookContext
 	Events        EventContext

@@ -466,9 +466,9 @@ export function SettingsTab({
         }
       }}
     >
-      <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
+      <div className="space-y-6">
         {/* Node identification section — always visible */}
-        <div className="flex flex-col gap-2">
+        <div className={`flex flex-col gap-2 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}>
           <Label className="min-w-[100px] text-left">
             Name
             <span className="text-gray-800 ml-1">*</span>
@@ -488,7 +488,9 @@ export function SettingsTab({
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+          <div
+            className={`border-t border-gray-200 dark:border-gray-700 pt-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
+          >
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
                 You don't have permission to view integrations.
@@ -658,7 +660,9 @@ export function SettingsTab({
 
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+          <div
+            className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
+          >
             {configurationFields.map((field) => {
               if (!field.name) return null;
               const fieldName = field.name;

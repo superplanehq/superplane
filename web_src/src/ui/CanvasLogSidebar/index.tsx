@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, CircleX, Play, Search, TriangleAlert, X } from "lucide-react";
 
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeQueueItem,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
@@ -45,6 +49,7 @@ export interface LogCounts {
 export interface CanvasLogSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  showRunsTab?: boolean;
   height?: number;
   defaultHeight?: number;
   minHeight?: number;
@@ -96,6 +101,7 @@ function formatLogTimestamp(value: string) {
 export function CanvasLogSidebar({
   isOpen,
   onClose,
+  showRunsTab = true,
   height,
   defaultHeight = 320,
   minHeight = 240,
@@ -119,9 +125,26 @@ export function CanvasLogSidebar({
   onRunExecutionSelect,
   onAcknowledgeErrors,
 }: CanvasLogSidebarProps) {
-  const [internalTab, setInternalTab] = useState<ConsoleTab>("runs");
-  const activeTab = controlledTab ?? internalTab;
-  const setActiveTab = onTabChange ?? setInternalTab;
+  const fallbackTab: Exclude<ConsoleTab, "runs"> = "errors";
+  const [internalTab, setInternalTab] = useState<ConsoleTab>(showRunsTab ? "runs" : fallbackTab);
+  const activeTab = useMemo(() => {
+    const nextTab = controlledTab ?? internalTab;
+    if (showRunsTab || nextTab !== "runs") {
+      return nextTab;
+    }
+    return fallbackTab;
+  }, [controlledTab, fallbackTab, internalTab, showRunsTab]);
+  const setActiveTab = useCallback(
+    (tab: ConsoleTab) => {
+      const nextTab = !showRunsTab && tab === "runs" ? fallbackTab : tab;
+      if (onTabChange) {
+        onTabChange(nextTab);
+        return;
+      }
+      setInternalTab(nextTab);
+    },
+    [fallbackTab, onTabChange, showRunsTab],
+  );
 
   const [internalHeight, setInternalHeight] = useState(defaultHeight);
   const [isResizing, setIsResizing] = useState(false);
@@ -179,6 +202,14 @@ export function CanvasLogSidebar({
 
     container.scrollTop = container.scrollHeight;
   }, [isOpen]);
+
+  useEffect(() => {
+    if (showRunsTab || activeTab !== "runs") {
+      return;
+    }
+
+    setActiveTab(fallbackTab);
+  }, [activeTab, fallbackTab, setActiveTab, showRunsTab]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -274,19 +305,21 @@ export function CanvasLogSidebar({
         </div>
         <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 h-8">
           <div className="flex items-center gap-4 -mb-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab("runs")}
-              className={cn(
-                "flex items-center gap-2 pb-2 !text-[13px] font-medium leading-none border-b transition-colors",
-                activeTab === "runs"
-                  ? "border-gray-800 text-gray-800"
-                  : "border-transparent text-gray-500 hover:text-gray-800",
-              )}
-            >
-              <Play className="h-4 w-4" />
-              Runs
-            </button>
+            {showRunsTab ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab("runs")}
+                className={cn(
+                  "flex items-center gap-2 pb-2 !text-[13px] font-medium leading-none border-b transition-colors",
+                  activeTab === "runs"
+                    ? "border-gray-800 text-gray-800"
+                    : "border-transparent text-gray-500 hover:text-gray-800",
+                )}
+              >
+                <Play className="h-4 w-4" />
+                Runs
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setActiveTab("errors")}

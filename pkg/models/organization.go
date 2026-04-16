@@ -17,7 +17,7 @@ type Organization struct {
 	Name                     string    `gorm:"uniqueIndex"`
 	Description              string
 	AllowedProviders         datatypes.JSONSlice[string]
-	VersioningEnabled        bool
+	ChangeManagementEnabled  bool
 	UsageSyncedAt            *time.Time
 	UsageRetentionWindowDays *int32
 	UsageLimitsSyncedAt      *time.Time
@@ -166,12 +166,12 @@ func CreateOrganization(name, description string) (*Organization, error) {
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:              name,
-		Description:       description,
-		AllowedProviders:  datatypes.JSONSlice[string]{ProviderGitHub},
-		VersioningEnabled: false,
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
+		Name:                    name,
+		Description:             description,
+		AllowedProviders:        datatypes.JSONSlice[string]{ProviderGitHub},
+		ChangeManagementEnabled: false,
+		CreatedAt:               &now,
+		UpdatedAt:               &now,
 	}
 
 	err := tx.
@@ -472,14 +472,14 @@ func ListOrganizationsPendingUsageLimitsRefreshInTransaction(
 	return organizations, nil
 }
 
-func IsCanvasVersioningEnabled(organizationID uuid.UUID) (bool, error) {
-	return IsCanvasVersioningEnabledInTransaction(database.Conn(), organizationID)
+func IsChangeManagementEnabled(organizationID uuid.UUID) (bool, error) {
+	return IsChangeManagementEnabledInTransaction(database.Conn(), organizationID)
 }
 
-func IsCanvasVersioningEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
+func IsChangeManagementEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
 	var organization Organization
 	err := tx.
-		Select("versioning_enabled").
+		Select("change_management_enabled").
 		Where("id = ?", organizationID).
 		First(&organization).
 		Error
@@ -487,5 +487,5 @@ func IsCanvasVersioningEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUI
 		return false, err
 	}
 
-	return organization.VersioningEnabled, nil
+	return organization.ChangeManagementEnabled, nil
 }
