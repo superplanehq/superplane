@@ -50,9 +50,9 @@ import {
   useCreateCanvasVersion,
   useDeleteCanvasMemoryEntry,
   useDeleteCanvasVersion,
-  usePublishCanvasVersion,
   useInfiniteCanvasEvents,
   useInfiniteCanvasLiveVersions,
+  usePublishCanvasVersion,
   useResolveCanvasChangeRequest,
   useTriggers,
   useUpdateCanvasVersion,
@@ -685,7 +685,6 @@ export function WorkflowPageV2() {
 
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
   // Subscribe to version to ensure React detects all updates
-  const storeVersion = useNodeExecutionStore((state) => state.version);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
@@ -971,7 +970,8 @@ export function WorkflowPageV2() {
     });
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
-  }, [storeVersion]);
+  }, []);
+
   const visibleNodeExecutionsMap = isViewingLiveVersion ? nodeExecutionsMap : {};
   const visibleNodeQueueItemsMap = isViewingLiveVersion ? nodeQueueItemsMap : {};
   const visibleNodeEventsMap = isViewingLiveVersion ? nodeEventsMap : {};
@@ -1651,7 +1651,6 @@ export function WorkflowPageV2() {
     blueprintsLoading,
     componentsLoading,
     integrationsLoading,
-    organizationId,
     me,
   ]);
 
@@ -1723,8 +1722,8 @@ export function WorkflowPageV2() {
   );
 
   const onCancelQueueItem = useOnCancelQueueItemHandler({
+    organizationId: organizationId!,
     canvasId: canvasId!,
-    organizationId,
     canvas,
     loadSidebarData,
   });
@@ -4031,6 +4030,7 @@ export function WorkflowPageV2() {
       activeCanvasVersionId,
       isTemplate,
       enqueueCanvasSave,
+      handleLogNodeSelect,
       setLastSavedWorkflowSnapshot,
     ],
   );

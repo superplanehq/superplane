@@ -1,7 +1,7 @@
 import React from "react";
 import { ComponentBase, type EventSection, type EventState } from "../componentBase";
-import type { ComponentActionsProps } from "../types/componentActions";
 import { type MetadataItem } from "../metadataList";
+import type { ComponentActionsProps } from "../types/componentActions";
 
 export type LastRunState = "success" | "failed" | "running";
 export type ChildEventsState = "processed" | "discarded" | "waiting" | "running" | string;
@@ -54,8 +54,9 @@ export interface CompositeProps extends ComponentActionsProps {
   parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
   lastRunItems?: LastRunItem[];
-  maxVisibleEvents?: number;
+  /** Set on flow canvas nodes to show queued work; optional on the React view. */
   nextInQueue?: QueueItem;
+  maxVisibleEvents?: number;
   collapsedBackground?: string;
   collapsed?: boolean;
   selected?: boolean;
@@ -79,7 +80,6 @@ export const Composite: React.FC<CompositeProps> = ({
   lastRunItem,
   lastRunItems,
   maxVisibleEvents = 5,
-  nextInQueue,
   collapsed = false,
   collapsedBackground,
   onViewMoreEvents,
@@ -151,7 +151,7 @@ export const Composite: React.FC<CompositeProps> = ({
     }
 
     return sections;
-  }, [visibleEvents, hiddenEventsCount, nextInQueue, onViewMoreEvents]);
+  }, [visibleEvents, hiddenEventsCount, onViewMoreEvents]);
 
   // Convert parameters to specs format
   const specs = React.useMemo(() => {
