@@ -1337,6 +1337,7 @@ function CanvasPage(props: CanvasPageProps) {
             configurationSaveMode={props.configurationSaveMode}
             currentTab={currentTab}
             onTabChange={setCurrentTab}
+            canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
             integrations={props.integrations}
@@ -1400,6 +1401,7 @@ function Sidebar({
   configurationSaveMode = "manual",
   currentTab,
   onTabChange,
+  canvasMode,
   organizationId,
   getCustomField,
   integrations,
@@ -1446,6 +1448,7 @@ function Sidebar({
   configurationSaveMode?: "manual" | "auto";
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  canvasMode: "live" | "edit";
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
@@ -1482,6 +1485,7 @@ function Sidebar({
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
+  const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode;
 
   // Trigger data loading when sidebar opens for a node
   useEffect(() => {
@@ -1545,7 +1549,7 @@ function Sidebar({
   }
 
   // Show loading state when data is being fetched (skip for annotation nodes)
-  if (sidebarData.isLoading && currentTab === "latest" && !isAnnotationNode) {
+  if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     const sidebarWidth = saved ? parseInt(saved, 10) : 450;
 
@@ -1568,6 +1572,7 @@ function Sidebar({
     <ComponentSidebar
       key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
+      canvasMode={canvasMode}
       onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}
