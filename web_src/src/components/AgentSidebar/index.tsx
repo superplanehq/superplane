@@ -11,45 +11,44 @@ import {
   pushAiMessages,
   sendChatPrompt,
 } from "./agentChat";
+import type { AgentState } from "./useAgentState";
 
 export const AGENT_SIDEBAR_WIDTH_STORAGE_KEY = "agentSidebarWidth";
 
 const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
 export interface AgentSidebarProps {
-  isOpen: boolean;
-  onToggle: (open: boolean) => void;
-  agentContext: AgentContext;
-  canvasId?: string;
-  organizationId?: string;
-  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
-  disabled?: boolean;
-  disabledMessage?: string;
+  agentState: AgentState;
 }
 
-export function AgentSidebar({
-  isOpen,
-  onToggle,
-  agentContext,
-  canvasId,
-  organizationId,
-  onApplyAiOperations,
-  disabled = false,
-  disabledMessage,
-}: AgentSidebarProps) {
-  if (!isOpen || !agentContext.enabled) {
+export function AgentSidebar({ agentState }: AgentSidebarProps) {
+  const {
+    agentContext,
+    isAgentSidebarOpen,
+    handleAgentSidebarOpenChange,
+    canvasId,
+    organizationId,
+    readOnly,
+    onApplyAiOperations,
+    showAgentSidebarToggle,
+  } = agentState;
+
+  if (!showAgentSidebarToggle) {
+    return null;
+  }
+
+  if (!isAgentSidebarOpen || !agentContext.enabled) {
     return null;
   }
 
   return (
     <OpenAgentSidebar
-      onToggle={onToggle}
+      onToggle={handleAgentSidebarOpenChange}
       agentContext={agentContext}
       canvasId={canvasId}
       organizationId={organizationId}
       onApplyAiOperations={onApplyAiOperations}
-      disabled={disabled}
-      disabledMessage={disabledMessage}
+      disabled={readOnly}
     />
   );
 }
@@ -61,7 +60,6 @@ interface OpenAgentSidebarProps {
   organizationId?: string;
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   disabled: boolean;
-  disabledMessage?: string;
 }
 
 function OpenAgentSidebar({
@@ -71,7 +69,6 @@ function OpenAgentSidebar({
   organizationId,
   onApplyAiOperations,
   disabled,
-  disabledMessage: _disabledMessage,
 }: OpenAgentSidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
@@ -483,5 +480,5 @@ function OpenAgentSidebar({
   );
 }
 
-export type { UseAgentStateOptions } from "./useAgentState";
+export type { AgentState, UseAgentStateOptions } from "./useAgentState";
 export { CANVAS_AGENT_SIDEBAR_STORAGE_KEY, useAgentState } from "./useAgentState";

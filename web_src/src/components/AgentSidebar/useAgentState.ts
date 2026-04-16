@@ -1,4 +1,7 @@
+import type { CanvasChangesetChange } from "@/api-client";
 import { useCallback, useEffect, useState } from "react";
+
+import { useAgentContext } from "./agentChat";
 
 export const CANVAS_AGENT_SIDEBAR_STORAGE_KEY = "canvasAgentSidebarOpen";
 
@@ -21,12 +24,25 @@ function readInitialAgentSidebarOpen(): boolean {
 }
 
 export type UseAgentStateOptions = {
-  agentContextEnabled: boolean;
+  isEditing: boolean;
+  canvasVersion: string;
   hideAddControls?: boolean;
   readOnly: boolean;
+  canvasId?: string;
+  organizationId?: string;
+  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
 };
 
-export function useAgentState({ agentContextEnabled, hideAddControls = false, readOnly }: UseAgentStateOptions) {
+export function useAgentState({
+  isEditing,
+  canvasVersion,
+  hideAddControls = false,
+  readOnly,
+  canvasId,
+  organizationId,
+  onApplyAiOperations,
+}: UseAgentStateOptions) {
+  const agentContext = useAgentContext(isEditing, canvasVersion);
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(readInitialAgentSidebarOpen);
 
   const persistAgentSidebarOpen = useCallback((open: boolean) => {
@@ -57,10 +73,10 @@ export function useAgentState({ agentContextEnabled, hideAddControls = false, re
   }, [persistAgentSidebarOpen]);
 
   useEffect(() => {
-    if (!agentContextEnabled) {
+    if (!agentContext.enabled) {
       closeAgentSidebar();
     }
-  }, [agentContextEnabled, closeAgentSidebar]);
+  }, [agentContext.enabled, closeAgentSidebar]);
 
   useEffect(() => {
     if (hideAddControls) {
@@ -74,9 +90,19 @@ export function useAgentState({ agentContextEnabled, hideAddControls = false, re
     }
   }, [readOnly, closeAgentSidebar]);
 
+  const showAgentSidebarToggle = agentContext.enabled && !hideAddControls && !readOnly;
+
   return {
+    agentContext,
     isAgentSidebarOpen,
     handleAgentSidebarOpenChange,
     handleAgentSidebarToggle,
+    canvasId,
+    organizationId,
+    showAgentSidebarToggle,
+    readOnly,
+    onApplyAiOperations,
   };
 }
+
+export type AgentState = ReturnType<typeof useAgentState>;

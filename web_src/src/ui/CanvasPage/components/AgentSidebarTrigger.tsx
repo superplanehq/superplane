@@ -1,21 +1,18 @@
+import type { AgentState } from "@/components/AgentSidebar";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkles } from "lucide-react";
 
 export type AgentSidebarTriggerProps = {
-  showAgentSidebarToggle?: boolean;
-  isAgentSidebarOpen?: boolean;
-  onToggleAgentSidebar?: () => void;
+  agentState: AgentState;
 };
 
-export function AgentSidebarTrigger({
-  showAgentSidebarToggle,
-  isAgentSidebarOpen,
-  onToggleAgentSidebar,
-}: AgentSidebarTriggerProps) {
+export function AgentSidebarTrigger({ agentState }: AgentSidebarTriggerProps) {
+  const { showAgentSidebarToggle, isAgentSidebarOpen, handleAgentSidebarToggle } = agentState;
+
   return (
     <div className="relative z-10 flex shrink-0 items-center">
-      {showAgentSidebarToggle && onToggleAgentSidebar && !isAgentSidebarOpen ? (
+      {showAgentSidebarToggle && !isAgentSidebarOpen ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="relative inline-flex">
@@ -25,7 +22,7 @@ export function AgentSidebarTrigger({
                 size="icon"
                 className="h-8 w-8 bg-white border-slate-300"
                 aria-label="Open SuperPlane Agent"
-                onClick={onToggleAgentSidebar}
+                onClick={handleAgentSidebarToggle}
               >
                 <Sparkles className="h-3 w-3 text-slate-700" />
               </UIButton>

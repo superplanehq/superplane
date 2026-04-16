@@ -53,8 +53,8 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
-import { AgentSidebar, useAgentState } from "@/components/AgentSidebar";
-import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import { AgentSidebar, useAgentState, type AgentState } from "@/components/AgentSidebar";
+import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import type { EventState, EventStateMap } from "../componentBase";
@@ -259,7 +259,10 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  agentContext: AgentContext;
+  /** When true with a non-empty `activeCanvasVersionId`, the agent may run in build mode. */
+  isEditing: boolean;
+  /** Active canvas version id (draft when editing); drives agent build mode. */
+  activeCanvasVersionId: string;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
@@ -697,10 +700,14 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const { isAgentSidebarOpen, handleAgentSidebarOpenChange, handleAgentSidebarToggle } = useAgentState({
-    agentContextEnabled: props.agentContext.enabled,
+  const agentState = useAgentState({
+    isEditing: props.isEditing,
+    canvasVersion: props.activeCanvasVersionId,
     hideAddControls: props.hideAddControls,
     readOnly,
+    canvasId: props.canvasId,
+    organizationId: props.organizationId,
+    onApplyAiOperations: props.onApplyAiOperations,
   });
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
@@ -1172,9 +1179,7 @@ function CanvasPage(props: CanvasPageProps) {
           onOpenVersionControl={props.onOpenVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
-          showAgentSidebarToggle={props.agentContext.enabled && !props.hideAddControls && !readOnly}
-          isAgentSidebarOpen={isAgentSidebarOpen}
-          onToggleAgentSidebar={handleAgentSidebarToggle}
+          agentState={agentState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1183,18 +1188,7 @@ function CanvasPage(props: CanvasPageProps) {
       <div className="flex-1 flex relative overflow-hidden">
         {props.versionControlSidebar}
 
-        {!props.hideAddControls && props.agentContext.enabled && !readOnly ? (
-          <AgentSidebar
-            isOpen={isAgentSidebarOpen}
-            onToggle={handleAgentSidebarOpenChange}
-            agentContext={props.agentContext}
-            canvasId={props.canvasId}
-            organizationId={props.organizationId}
-            onApplyAiOperations={props.onApplyAiOperations}
-            disabled={readOnly}
-            disabledMessage="You don't have permission to edit this canvas."
-          />
-        ) : null}
+        <AgentSidebar agentState={agentState} />
 
         <RightSideControls
           mode={readOnly ? "live" : "edit"}
@@ -1686,9 +1680,7 @@ function CanvasContentHeader({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
-  showAgentSidebarToggle,
-  isAgentSidebarOpen,
-  onToggleAgentSidebar,
+  agentState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1718,9 +1710,7 @@ function CanvasContentHeader({
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
-  showAgentSidebarToggle?: boolean;
-  isAgentSidebarOpen?: boolean;
-  onToggleAgentSidebar?: () => void;
+  agentState: AgentState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1767,9 +1757,7 @@ function CanvasContentHeader({
       onOpenVersionControl={onOpenVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
-      showAgentSidebarToggle={showAgentSidebarToggle}
-      isAgentSidebarOpen={isAgentSidebarOpen}
-      onToggleAgentSidebar={onToggleAgentSidebar}
+      agentState={agentState}
     />
   );
 }

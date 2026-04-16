@@ -73,7 +73,6 @@ import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import { useAgentContext } from "@/components/AgentSidebar/agentChat";
 import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
@@ -471,7 +470,6 @@ export function WorkflowPageV2() {
   }
   const isChangeManagementDisabled = !changeManagementEnabledRef.current;
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
-  const agentContext = useAgentContext(isEditing, activeCanvasVersionId);
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {
@@ -5199,7 +5197,8 @@ export function WorkflowPageV2() {
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
-          agentContext={agentContext}
+          isEditing={isEditing}
+          activeCanvasVersionId={activeCanvasVersionId}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
           onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}

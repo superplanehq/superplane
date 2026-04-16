@@ -1,3 +1,4 @@
+import type { AgentState } from "@/components/AgentSidebar";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -43,9 +44,7 @@ interface HeaderProps {
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
-  showAgentSidebarToggle?: boolean;
-  isAgentSidebarOpen?: boolean;
-  onToggleAgentSidebar?: () => void;
+  agentState: AgentState;
 }
 
 export function Header(props: HeaderProps) {
@@ -121,11 +120,7 @@ function SecondaryHeader(props: HeaderProps) {
 
   return (
     <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
-      <AgentSidebarTrigger
-        showAgentSidebarToggle={props.showAgentSidebarToggle}
-        isAgentSidebarOpen={props.isAgentSidebarOpen}
-        onToggleAgentSidebar={props.onToggleAgentSidebar}
-      />
+      <AgentSidebarTrigger agentState={props.agentState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
