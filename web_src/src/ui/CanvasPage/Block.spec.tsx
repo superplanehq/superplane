@@ -2,10 +2,21 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@xyflow/react", () => ({
-  Handle: ({ type, id, className }: { type: string; id?: string; className?: string }) => (
+  Handle: ({
+    type,
+    id,
+    className,
+    style,
+  }: {
+    type: string;
+    id?: string;
+    className?: string;
+    style?: { pointerEvents?: string };
+  }) => (
     <div
       data-testid={`handle-${type}-${id || "default"}`}
       data-highlighted={className === "highlighted" ? "true" : "false"}
+      data-pointer-events={style?.pointerEvents || "auto"}
     />
   ),
   Position: {
@@ -64,6 +75,50 @@ describe("Block fallback rendering", () => {
     expect(screen.getByText("Can't display")).toBeInTheDocument();
   });
 
+  it("replaces runtime empty states with edit-mode copy", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Draft Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "Draft Component",
+            iconSlug: "box",
+            collapsed: false,
+            includeEmptyState: true,
+            emptyStateProps: {
+              title: "Waiting for the first run",
+              purpose: "runtime",
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Runtime data appears in live mode")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for the first run")).not.toBeInTheDocument();
+  });
+
+  it("preserves fallback empty states in edit mode", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Broken Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Can't display")).toBeInTheDocument();
+    expect(screen.queryByText("Runtime data appears in live mode")).not.toBeInTheDocument();
+  });
+
   it("does not highlight a right handle when the target node is already connected", () => {
     render(
       <Block
@@ -94,5 +149,28 @@ describe("Block fallback rendering", () => {
     );
 
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-highlighted", "false");
+  });
+
+  it("disables handle interactivity in live mode", () => {
+    render(
+      <Block
+        canvasMode="live"
+        nodeId="component-node"
+        data={{
+          label: "Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "Component",
+            iconSlug: "box",
+            collapsed: false,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
   });
 });
