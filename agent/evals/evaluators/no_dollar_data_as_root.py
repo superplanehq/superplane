@@ -4,7 +4,7 @@ from typing import Any
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
 from ai.models import CanvasAnswer
-from evals.evaluators.workflow_utils import iter_config_strings_from_operations
+from evals.evaluators.workflow_utils import iter_config_strings_from_changes
 
 _FORBIDDEN_DOLLAR_DATA = "$.data."
 
@@ -17,7 +17,7 @@ class NoDollarDataAsRoot(Evaluator):
         if ctx.output.proposal is None:
             return EvaluationReason(value=True, reason="No proposal to check")
 
-        for text in iter_config_strings_from_operations(ctx.output.proposal.operations):
+        for text in iter_config_strings_from_changes(ctx.output.proposal.changeset.changes or []):
             if _FORBIDDEN_DOLLAR_DATA in text:
                 snippet = text if len(text) <= 120 else text[:117] + "..."
                 msg = "Forbidden $.data. in configuration; use root().data... for run-start fields"

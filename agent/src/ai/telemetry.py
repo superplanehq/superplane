@@ -1,74 +1,103 @@
 from __future__ import annotations
 
 import logging
-import os
-import threading
-from typing import TYPE_CHECKING
 
 from opentelemetry import metrics
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.metrics import set_meter_provider
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import set_tracer_provider
 
-if TYPE_CHECKING:
-    from pydantic_ai.usage import RunUsage
+from ai.config import config
 
 log = logging.getLogger(__name__)
 
-_lock = threading.Lock()
+_tracer_provider: TracerProvider | None = None
 _meter_provider: MeterProvider | None = None
-_agent_run_tokens: metrics.Histogram | None = None
+_ttft_histogram: metrics.Histogram | None = None
 
 
-def init_metrics() -> None:
-    global _meter_provider, _agent_run_tokens  # noqa: PLW0603
+def init_telemetry() -> None:
+    global _tracer_provider, _meter_provider, _ttft_histogram  # noqa: PLW0603
 
-    if os.getenv("OTEL_ENABLED") != "yes":
+    if not config.otel_enabled:
         return
 
-    with _lock:
-        if _meter_provider is not None:
-            return
-
-        try:
-            exporter = OTLPMetricExporter()
-            reader = PeriodicExportingMetricReader(exporter)
-            _meter_provider = MeterProvider(metric_readers=[reader])
-            metrics.set_meter_provider(_meter_provider)
-
-            meter = _meter_provider.get_meter("superplane-agent")
-            _agent_run_tokens = meter.create_histogram(
-                name="agent.run.tokens",
-                description="Token count per agent run",
-                unit="1",
-            )
-        except Exception:
-            log.warning("Failed to initialize OpenTelemetry metrics", exc_info=True)
-            _meter_provider = None
-            _agent_run_tokens = None
-            return
-
-    log.info("OpenTelemetry metrics initialized")
-
-
-def shutdown_metrics() -> None:
-    global _meter_provider  # noqa: PLW0603
-    with _lock:
-        if _meter_provider is not None:
-            _meter_provider.shutdown()
-            _meter_provider = None
-
-
-def record_agent_run_tokens(usage: RunUsage) -> None:
-    histogram = _agent_run_tokens
-    if histogram is None:
+    if _tracer_provider is not None:
         return
 
-    if usage.input_tokens > 0:
-        histogram.record(usage.input_tokens, {"token_type": "input"})
-    if usage.output_tokens > 0:
-        histogram.record(usage.output_tokens, {"token_type": "output"})
-    if usage.cache_read_tokens > 0:
-        histogram.record(usage.cache_read_tokens, {"token_type": "cache_read"})
-    if usage.cache_write_tokens > 0:
-        histogram.record(usage.cache_write_tokens, {"token_type": "cache_write"})
+    try:
+        from pydantic_ai import Agent
+
+        _tracer_provider = TracerProvider()
+        _tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        set_tracer_provider(_tracer_provider)
+
+        _meter_provider = MeterProvider(
+            metric_readers=[PeriodicExportingMetricReader(OTLPMetricExporter())]
+        )
+        set_meter_provider(_meter_provider)
+
+        meter = _meter_provider.get_meter("superplane-agent")
+        _ttft_histogram = meter.create_histogram(
+            name="agent.run.first_token.duration",
+            description="Time from run start to first streamed token",
+            unit="s",
+        )
+
+        Agent.instrument_all()
+    except Exception:
+        log.warning("Failed to initialize telemetry", exc_info=True)
+        _tracer_provider = None
+        _meter_provider = None
+        _ttft_histogram = None
+        return
+
+    log.info("OpenTelemetry initialized (gRPC OTLP exporter, pydantic-ai instrumented)")
+
+
+def record_first_token_duration(seconds: float) -> None:
+    if _ttft_histogram is not None:
+        _ttft_histogram.record(seconds)
+
+
+def shutdown_telemetry() -> None:
+    if _meter_provider is not None:
+        _meter_provider.shutdown()
+    if _tracer_provider is not None:
+        _tracer_provider.shutdown()
+
+
+def init_sentry() -> None:
+    if not config.sentry_dsn:
+        return
+
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=config.sentry_dsn,
+            environment=config.sentry_environment or None,
+            enable_tracing=False,
+        )
+    except Exception:
+        log.warning("Failed to initialize Sentry", exc_info=True)
+        return
+
+    log.info("Sentry telemetry initialized")
+
+
+def shutdown_sentry() -> None:
+    if not config.sentry_dsn:
+        return
+
+    try:
+        import sentry_sdk
+
+        sentry_sdk.flush(timeout=2)
+    except Exception:
+        log.warning("Failed to flush Sentry", exc_info=True)

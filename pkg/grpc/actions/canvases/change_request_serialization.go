@@ -95,7 +95,7 @@ func serializeCanvasChangeRequestApprovals(
 	serialized := make([]*pb.CanvasChangeRequestApproval, 0, len(approvals))
 	for _, approval := range approvals {
 		item := &pb.CanvasChangeRequestApproval{
-			Approver: &pb.CanvasChangeRequestApprover{
+			Approver: &pb.Canvas_ChangeManagement_Approver{
 				Type: canvasChangeRequestApproverTypeToProto(approval.ApproverType),
 			},
 			State: canvasChangeRequestApprovalStateToProto(approval.State),

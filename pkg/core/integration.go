@@ -141,7 +141,7 @@ type IntegrationTrigger interface {
 type IntegrationMessageContext struct {
 	Message           any
 	Configuration     any
-	NodeMetadata      MetadataContext
+	NodeMetadata      MetadataReader
 	Logger            *logrus.Entry
 	HTTP              HTTPContext
 	Integration       IntegrationContext

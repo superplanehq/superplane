@@ -16,6 +16,7 @@ import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
+import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import HomePage from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
@@ -69,42 +70,50 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
-      <ImpersonationBanner />
-      <SetupGuard>
-        <Routes>
-          {/* public routes */}
-          <Route path="login" element={<Login />} />
-          <Route path="create" element={<OrganizationCreate />} />
-          <Route path="setup" element={<OwnerSetup />} />
+      <div className="flex h-dvh flex-col overflow-hidden">
+        <ImpersonationBanner />
+        <div className="flex-1 overflow-auto">
+          <SetupGuard>
+            <Routes>
+              {/* public routes */}
+              <Route path="login" element={<Login />} />
+              <Route path="create" element={<OrganizationCreate />} />
+              <Route path="setup" element={<OwnerSetup />} />
 
-          {/* Admin dashboard routes */}
-          <Route path="admin" element={<AdminLayout />}>
-            <Route index element={<OrganizationsListAdmin />} />
-            <Route path="accounts" element={<AccountsListAdmin />} />
-            <Route path="settings" element={<InstallationSettingsAdmin />} />
-            <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
-          </Route>
+              {/* Admin dashboard routes */}
+              <Route path="admin" element={<AdminLayout />}>
+                <Route index element={<OrganizationsListAdmin />} />
+                <Route path="accounts" element={<AccountsListAdmin />} />
+                <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
+              </Route>
 
-          {/* Organization selection and creation */}
-          <Route path="" element={withAuthOnly(OrganizationSelect)} />
+              {/* Organization selection and creation */}
+              <Route path="" element={withAuthOnly(OrganizationSelect)} />
 
-          {/* Invite link acceptance */}
-          <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
+              {/* Invite link acceptance */}
+              <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
 
-          {/* Organization-scoped protected routes */}
-          <Route path=":organizationId" element={<OrganizationScope />}>
-            <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
-            <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
-            <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
-            <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
-            <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
-            <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
-          </Route>
+              {/* Organization-scoped protected routes */}
+              <Route path=":organizationId" element={<OrganizationScope />}>
+                <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
+                <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
+                <Route
+                  path="canvases/:canvasId/settings"
+                  element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
+                />
+                <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
+                <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
+              </Route>
 
-          {/* Catch-all route */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </SetupGuard>
+              {/* Catch-all route */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </SetupGuard>
+        </div>
+      </div>
     </BrowserRouter>
   );
 }

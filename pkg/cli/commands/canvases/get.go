@@ -32,10 +32,6 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 
 	canvas := *response.Canvas
 	if c.draft != nil && *c.draft {
-		if canvas.Metadata == nil || !canvas.Metadata.GetVersioningEnabled() {
-			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to get the live canvas directly")
-		}
-
 		me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
 		if err != nil {
 			return err
@@ -98,7 +94,7 @@ func findOwnedDraftVersionID(ctx core.CommandContext, canvasID string, userID st
 
 		for _, version := range response.GetVersions() {
 			metadata := version.GetMetadata()
-			if metadata.GetIsPublished() {
+			if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
 				continue
 			}
 

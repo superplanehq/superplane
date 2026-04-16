@@ -188,8 +188,12 @@ func FindMaybeDeletedIntegrationInTransaction(tx *gorm.DB, integrationID uuid.UU
 }
 
 func FindIntegration(orgID, integrationID uuid.UUID) (*Integration, error) {
+	return FindIntegrationInTransaction(database.Conn(), orgID, integrationID)
+}
+
+func FindIntegrationInTransaction(tx *gorm.DB, orgID, integrationID uuid.UUID) (*Integration, error) {
 	var integration Integration
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", integrationID).
 		Where("organization_id = ?", orgID).
 		First(&integration).

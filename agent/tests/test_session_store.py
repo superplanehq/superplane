@@ -1,14 +1,24 @@
+import uuid
 from datetime import UTC, datetime
-from typing import Any
+from unittest.mock import MagicMock
 
-import psycopg
 import pytest
-from pydantic_ai.messages import UserPromptPart
+from pydantic_ai.messages import ModelRequest, ToolReturnPart, UserPromptPart
+from sqlalchemy.dialects.postgresql import Insert as PgInsert
 
-from ai.session_store import SessionStore, SessionStoreConfig, StoredAgentChatMessageRecord
+from ai.session_store import (
+    SessionStore,
+    SessionStoreConfig,
+    StoredAgentChat,
+    StoredAgentChatMessageRecord,
+    apply_tool_display_labels_to_messages,
+)
 
 
-def _build_store() -> SessionStore:
+def _build_store(monkeypatch: pytest.MonkeyPatch) -> SessionStore:
+    """Build a SessionStore that doesn't connect to a real database."""
+    monkeypatch.setattr("ai.session_store.build_engine", lambda **kwargs: MagicMock())
+    monkeypatch.setattr("ai.session_store.build_session_factory", lambda engine: MagicMock())
     return SessionStore(
         SessionStoreConfig(
             host="localhost",
@@ -22,9 +32,11 @@ def _build_store() -> SessionStore:
     )
 
 
-def test_flatten_message_record_exposes_output_tool_answer_as_assistant() -> None:
+def test_flatten_message_record_exposes_output_tool_answer_as_assistant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     now = datetime.now(UTC)
-    store = _build_store()
+    store = _build_store(monkeypatch)
     record = StoredAgentChatMessageRecord(
         id="119c8cab-e93f-42d1-a96d-d2d77f2d4d6f",
         chat_id="chat-123",
@@ -83,9 +95,11 @@ def test_flatten_message_record_exposes_output_tool_answer_as_assistant() -> Non
     assert messages[0].tool_status is None
 
 
-def test_flatten_message_record_ignores_output_tool_returns() -> None:
+def test_flatten_message_record_ignores_output_tool_returns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     now = datetime.now(UTC)
-    store = _build_store()
+    store = _build_store(monkeypatch)
     record = StoredAgentChatMessageRecord(
         id="b7774432-1cdb-473d-b12e-28ccb055f780",
         chat_id="chat-123",
@@ -125,16 +139,72 @@ def test_flatten_message_record_ignores_output_tool_returns() -> None:
 
     assert len(messages) == 1
     assert messages[0].role == "tool"
-    assert messages[0].content == "Reading canvas"
+    assert messages[0].content == "get_canvas"
     assert messages[0].tool_call_id == "toolu_012wJyWVffYDcQqR3Ne9W6FN"
     assert messages[0].tool_status == "completed"
+
+
+def test_flatten_message_record_prefers_superplane_display_label_in_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime.now(UTC)
+    store = _build_store(monkeypatch)
+    record = StoredAgentChatMessageRecord(
+        id="c8884432-1cdb-473d-b12e-28ccb055f781",
+        chat_id="chat-123",
+        message_index=0,
+        message={
+            "kind": "request",
+            "parts": [
+                {
+                    "content": {"name": "test"},
+                    "outcome": "success",
+                    "metadata": {"superplane_display_label": "Loading canvas details"},
+                    "part_kind": "tool-return",
+                    "timestamp": "2026-03-27T00:01:12.551360Z",
+                    "tool_name": "get_canvas",
+                    "tool_call_id": "toolu_012wJyWVffYDcQqR3Ne9W6FN",
+                },
+            ],
+            "run_id": "43beced1-acec-43b2-abc0-261dc36608ab",
+            "metadata": None,
+            "timestamp": "2026-03-27T00:01:19.265172Z",
+            "instructions": None,
+        },
+        created_at=now,
+        updated_at=now,
+    )
+
+    messages = store._flatten_message_record(record)
+
+    assert len(messages) == 1
+    assert messages[0].role == "tool"
+    assert messages[0].content == "Loading canvas details"
+
+
+def test_apply_tool_display_labels_to_messages_sets_metadata() -> None:
+    original = ModelRequest(
+        parts=[
+            ToolReturnPart(
+                tool_name="get_canvas",
+                content={"ok": True},
+                tool_call_id="call-1",
+            )
+        ]
+    )
+    out = apply_tool_display_labels_to_messages([original], {"call-1": "Loading canvas details"})
+    assert len(out) == 1
+    part = out[0].parts[0]
+    assert isinstance(part, ToolReturnPart)
+    assert isinstance(part.metadata, dict)
+    assert part.metadata.get("superplane_display_label") == "Loading canvas details"
 
 
 def test_list_agent_chat_messages_skips_unflattenable_records(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now = datetime.now(UTC)
-    store = _build_store()
+    store = _build_store(monkeypatch)
     records = [
         StoredAgentChatMessageRecord(
             id="0f57a7f6-e181-4482-8637-4accf779b324",
@@ -167,9 +237,18 @@ def test_list_agent_chat_messages_skips_unflattenable_records(
         ),
     ]
 
-    monkeypatch.setattr(
-        store, "describe_agent_chat", lambda org_id, user_id, canvas_id, chat_id: None
-    )
+    def fake_describe(org_id: str, user_id: str, canvas_id: str, chat_id: str) -> StoredAgentChat:
+        return StoredAgentChat(
+            id=chat_id,
+            org_id=org_id,
+            user_id=user_id,
+            canvas_id=canvas_id,
+            initial_message=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+    monkeypatch.setattr(store, "describe_agent_chat", fake_describe)
     monkeypatch.setattr(store, "list_agent_chat_message_records", lambda chat_id: records)
 
     messages = store.list_agent_chat_messages("org-123", "user-123", "canvas-123", "chat-123")
@@ -183,7 +262,7 @@ def test_load_agent_chat_message_history_skips_undeserializable_records(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now = datetime.now(UTC)
-    store = _build_store()
+    store = _build_store(monkeypatch)
     records = [
         StoredAgentChatMessageRecord(
             id="0f57a7f6-e181-4482-8637-4accf779b324",
@@ -225,31 +304,39 @@ def test_load_agent_chat_message_history_skips_undeserializable_records(
     assert history[0].parts[0].content == "What is in my canvas?"
 
 
-def test_connect_reuses_open_connection_until_closed(monkeypatch: pytest.MonkeyPatch) -> None:
-    store = _build_store()
-    created_connections: list[object] = []
+def test_set_canvas_memory_markdown_executes_pg_upsert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify set_canvas_memory_markdown builds a correct PG upsert with stripped body."""
+    store = _build_store(monkeypatch)
 
-    class FakeConnection:
-        def __init__(self) -> None:
-            self.closed = False
-            self.broken = False
+    mock_session = MagicMock()
+    mock_begin = MagicMock()
+    mock_begin.__enter__ = MagicMock(return_value=None)
+    mock_begin.__exit__ = MagicMock(return_value=False)
+    mock_session.begin.return_value = mock_begin
 
-        def close(self) -> None:
-            self.closed = True
+    from collections.abc import Iterator
+    from contextlib import contextmanager
 
-    def fake_connect(**kwargs: Any) -> FakeConnection:
-        connection = FakeConnection()
-        created_connections.append(connection)
-        return connection
+    @contextmanager
+    def fake_session() -> Iterator[MagicMock]:
+        yield mock_session
 
-    monkeypatch.setattr(psycopg, "connect", fake_connect)
+    monkeypatch.setattr(store, "_session", fake_session)
 
-    first = store._connect()
-    second = store._connect()
-    store.close()
-    third = store._connect()
+    canvas_id = str(uuid.uuid4())
+    store.set_canvas_memory_markdown(canvas_id, "  hello world  ")
 
-    assert first is second
-    assert len(created_connections) == 2
-    assert first is created_connections[0]
-    assert third is created_connections[1]
+    mock_session.execute.assert_called_once()
+    stmt = mock_session.execute.call_args[0][0]
+    assert isinstance(stmt, PgInsert)
+
+    compiled = stmt.compile(compile_kwargs={"literal_binds": False})
+    params = compiled.params
+    assert str(params["canvas_id"]) == canvas_id
+    assert params["markdown_body"] == "hello world"
+
+    sql_text = str(compiled)
+    assert "ON CONFLICT" in sql_text
+    assert "agent_canvas_markdown_memory" in sql_text

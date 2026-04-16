@@ -284,10 +284,14 @@ message Organization {
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
-    optional bool versioning_enabled = 6;
+  }
+
+  message Spec {
+    optional bool change_management_enabled = 1;
   }
 
   Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message DescribeOrganizationRequest {
@@ -438,6 +442,7 @@ message OrganizationLimits {
   int32 retention_window_days = 4;
   int64 max_events_per_month = 5;
   int32 max_integrations = 6;
+  int64 max_agent_tokens_per_month = 7;
 }
 
 message OrganizationUsage {
@@ -446,6 +451,10 @@ message OrganizationUsage {
   double event_bucket_capacity = 3;
   google.protobuf.Timestamp event_bucket_last_updated_at = 4;
   google.protobuf.Timestamp next_event_bucket_decrease_at = 5;
+  double agent_token_bucket_level = 6;
+  double agent_token_bucket_capacity = 7;
+  google.protobuf.Timestamp agent_token_bucket_last_updated_at = 8;
+  google.protobuf.Timestamp next_agent_token_bucket_decrease_at = 9;
 }
 
 message DescribeUsageRequest {

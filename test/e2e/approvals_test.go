@@ -19,6 +19,8 @@ func TestApprovals(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("TestApproval")
+		steps.saveCanvas()
+		steps.canvas.Publish()
 		steps.verifyApprovalSavedToDB("TestApproval")
 	})
 
@@ -28,6 +30,8 @@ func TestApprovals(t *testing.T) {
 		steps.givenACanvasExists()
 		groupName := steps.createApprovalGroup()
 		steps.addApprovalWithUserRoleGroup("ReleaseApproval", models.Position{X: 600, Y: 200}, models.DisplayNameOwner, groupName)
+		steps.saveCanvas()
+		steps.canvas.Publish()
 		steps.verifyApprovalConfigurationPersisted(models.RoleOrgOwner, groupName)
 	})
 
@@ -87,6 +91,7 @@ func (s *ApprovalSteps) givenACanvasExists() {
 	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
 	s.canvas.Create()
 	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 }
 
 func (s *ApprovalSteps) addApprovalToCanvas(nodeName string) {
@@ -141,6 +146,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
 	s.canvas.Create()
 	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddApproval("Approval", models.Position{X: 1000, Y: 200})
@@ -150,12 +156,14 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
+	s.canvas.Publish()
 }
 
 func (s *ApprovalSteps) givenCanvasWithManualTriggerRoleApprovalAndNoop(roleLabel string) {
 	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
 	s.canvas.Create()
 	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.addApprovalWithRole("Approval", models.Position{X: 1000, Y: 200}, roleLabel)
@@ -165,12 +173,14 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerRoleApprovalAndNoop(roleLabe
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
+	s.canvas.Publish()
 }
 
 func (s *ApprovalSteps) givenCanvasWithManualTriggerGroupApprovalAndNoop(groupLabel string) {
 	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
 	s.canvas.Create()
 	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.addApprovalWithGroup("Approval", models.Position{X: 1000, Y: 200}, groupLabel)
@@ -180,12 +190,14 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerGroupApprovalAndNoop(groupLa
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
+	s.canvas.Publish()
 }
 
 func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop() {
 	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
 	s.canvas.Create()
 	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.addApprovalWithAnyAndSpecificUser("Approval", models.Position{X: 1000, Y: 200})
@@ -195,6 +207,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
+	s.canvas.Publish()
 }
 
 func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos models.Position) {
@@ -225,7 +238,6 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -246,7 +258,6 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 	s.session.Click(q.Locator(`button:has-text("Select role")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -267,7 +278,6 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -311,7 +321,6 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 

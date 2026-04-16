@@ -1,6 +1,6 @@
 import { Puzzle } from "lucide-react";
 import type { ComponentType } from "react";
-import type { ComponentsNode, ComponentsComponent, TriggersTrigger } from "@/api-client";
+import type { SuperplaneComponentsNode as ComponentsNode, ComponentsComponent, TriggersTrigger } from "@/api-client";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "../mappers/safeMappers";

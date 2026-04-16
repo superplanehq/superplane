@@ -6,8 +6,8 @@ import type {
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
   ComponentsComponent,
-  ComponentsEdge,
-  ComponentsNode,
+  SuperplaneComponentsEdge as ComponentsEdge,
+  SuperplaneComponentsNode as ComponentsNode,
   SuperplaneMeUser,
 } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -19,22 +19,6 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
-
-export function collectGroupChildIds(node: ComponentsNode): string[] {
-  if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return [];
-  return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);
-}
-
-export function buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const node of nodes) {
-    if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group" || !node.id) continue;
-    for (const childId of collectGroupChildIds(node)) {
-      map.set(childId, node.id);
-    }
-  }
-  return map;
-}
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);

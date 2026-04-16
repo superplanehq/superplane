@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Dataset
 
-from ai.agent import AgentDeps, build_agent
+from ai.agent import AgentContextState, AgentDeps, build_agent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from evals.case_filter import case_filter, select_cases
 from evals.case_logger import CaseLogger
@@ -47,6 +47,15 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
             )
         ),
         canvas_id=env["canvas_id"],
+        # No agent Postgres: evals must not read or write canvas markdown memory (or chats).
+        # Memory curation only runs from the web REPL after a completed stream, not here.
+        session_store=None,
+    )
+    draft_canvas_version_id = deps.client.create_canvas_version(env["canvas_id"])
+    deps.agent_context = AgentContextState(
+        enabled=True,
+        mode="build",
+        canvas_version=draft_canvas_version_id,
     )
     agent = build_agent(env["model"])
     # Keyed by case ``inputs`` string so usage matches when cases run concurrently.

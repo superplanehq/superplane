@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComponentsComponent, ComponentsNode } from "@/api-client";
+import type { ComponentsComponent, SuperplaneComponentsNode } from "@/api-client";
+import { makeComponentsNode } from "@/test/factories";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
 import { createSafeCustomFieldRenderer } from "./mappers/safeMappers";
@@ -20,8 +21,8 @@ type FallbackComponentData = {
   };
 };
 
-function makeNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
-  return {
+function makeNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {
+  return makeComponentsNode({
     id: "node-1",
     name: "Broken Component",
     type: "TYPE_COMPONENT",
@@ -31,7 +32,7 @@ function makeNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
     },
     configuration: {},
     ...overrides,
-  } as ComponentsNode;
+  });
 }
 
 function makeComponent(overrides: Partial<ComponentsComponent> = {}): ComponentsComponent {
@@ -45,8 +46,8 @@ function makeComponent(overrides: Partial<ComponentsComponent> = {}): Components
   } as ComponentsComponent;
 }
 
-function makeTriggerNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
-  return {
+function makeTriggerNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {
+  return makeComponentsNode({
     id: "trigger-1",
     name: "Incoming Event",
     type: "TYPE_TRIGGER",
@@ -56,7 +57,7 @@ function makeTriggerNode(overrides: Partial<ComponentsNode> = {}): ComponentsNod
     },
     configuration: {},
     ...overrides,
-  } as ComponentsNode;
+  });
 }
 
 describe("canvas node preparation resilience", () => {

@@ -212,7 +212,7 @@ func Test__GrafanaWebhookHandler__Setup__LegacySharedSecretOverridesStoredWebhoo
 	assert.Equal(t, "legacy-bearer", settings["authorization_credentials"])
 }
 
-func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *testing.T) {
+func Test__GrafanaWebhookHandler__Setup__FailsWhenClientUnavailable(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 	webhookCtx := &testWebhookContext{
 		id:            "wh_123",
@@ -229,12 +229,11 @@ func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *
 		},
 	})
 
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "failed to create Grafana client")
 	assert.Nil(t, metadata)
-	assert.NotEmpty(t, webhookCtx.secret)
 }
 
-func Test__GrafanaWebhookHandler__Setup__ManualFallbackOnNonRetriableProvisioningError(t *testing.T) {
+func Test__GrafanaWebhookHandler__Setup__FailsOnNonRetryableProvisioningError(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -261,7 +260,7 @@ func Test__GrafanaWebhookHandler__Setup__ManualFallbackOnNonRetriableProvisionin
 		},
 	})
 
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "contact point provisioning failed")
 	assert.Nil(t, metadata)
 	require.Len(t, httpCtx.Requests, 1)
 	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)

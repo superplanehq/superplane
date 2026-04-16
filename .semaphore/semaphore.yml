@@ -12,7 +12,12 @@ auto_cancel:
 blocks:
   - name: "License Check"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
       prologue:
         commands:
           - checkout
@@ -23,6 +28,8 @@ blocks:
 
   - name: "Backend Tests"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -53,14 +60,16 @@ blocks:
             - make check.db.migrations
         - name: "Check: Components Docs"
           commands:
-            - make gen.components.docs
-            - git diff --exit-code docs/components
+            - make check.components.docs
         - name: "Check: Go Format"
           commands:
-            - make format.go.check
+            - make check.format.go
         - name: "Check: Example Payloads"
           commands:
-            - go run ./scripts/check_example_payloads.go
+            - make check.example.payloads
+        - name: "Check: Generated Artifacts"
+          commands:
+            - make check.generated.artifacts
       epilogue:
         always:
           commands:
@@ -71,6 +80,8 @@ blocks:
 
   - name: "Agent Tests"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'}) OR change_in('/agent/**/*.md', {default_branch: 'main'}) OR change_in('/agent/**/*.mdx', {default_branch: 'main'})"
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -99,12 +110,18 @@ blocks:
 
   - name: "Frondend Tests"
     dependencies: []
+    run:
+      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
       prologue:
         commands:
           - checkout
           - sem-version node 20
           - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
+          - make gen.setup.ui
           - cd web_src
           - npm ci
       epilogue:

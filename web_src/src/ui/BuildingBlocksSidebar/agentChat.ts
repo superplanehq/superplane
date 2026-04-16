@@ -1,19 +1,23 @@
-import type { Dispatch, SetStateAction } from "react";
+import { isAgentEnabled } from "@/lib/env";
+
+import type {
+  AgentsAgentChatInfo,
+  AgentsAgentChatMessage,
+  CanvasesCanvasChangeset,
+  AgentsCreateAgentChatResponse,
+  AgentsListAgentChatMessagesResponse,
+  AgentsListAgentChatsResponse,
+  AgentsResumeAgentChatResponse,
+} from "@/api-client";
 import {
   agentsCreateAgentChat,
   agentsListAgentChatMessages,
   agentsListAgentChats,
   agentsResumeAgentChat,
 } from "@/api-client";
-import type {
-  AgentsAgentChatInfo,
-  AgentsAgentChatMessage,
-  AgentsCreateAgentChatResponse,
-  AgentsListAgentChatMessagesResponse,
-  AgentsListAgentChatsResponse,
-  AgentsResumeAgentChatResponse,
-} from "@/api-client";
+
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import type { Dispatch, SetStateAction } from "react";
 import { consumeChatResponseStream } from "./agentChatSupport";
 import {
   addLocalPromptMessages,
@@ -22,7 +26,6 @@ import {
   clearChatPrompt,
   prependChatSession,
 } from "./agentChatUi";
-import type { AiCanvasOperation } from "./index";
 
 export type AiBuilderMessage = {
   id: string;
@@ -35,7 +38,7 @@ export type AiBuilderMessage = {
 export type AiBuilderProposal = {
   id: string;
   summary: string;
-  operations: AiCanvasOperation[];
+  changeset: CanvasesCanvasChangeset;
 };
 
 export type AiChatSession = {
@@ -43,6 +46,34 @@ export type AiChatSession = {
   title: string;
   initialMessage?: string;
   createdAt?: string;
+};
+
+export type AgentMode = { mode: "inspect" } | { mode: "build"; canvasVersion: string };
+export type AgentContext = { enabled: boolean } & AgentMode;
+
+export function useAgentContext(isEditing: boolean, canvasVersion: string): AgentContext {
+  const enabled = isAgentEnabled();
+
+  if (!enabled) {
+    return { enabled: false, mode: "inspect" };
+  }
+
+  if (isEditing) {
+    const trimmed = canvasVersion.trim();
+    // Build mode requires a draft version id for the agent API; otherwise fall back to inspect
+    // to avoid sending enabled+build with an empty canvas_version (422).
+    if (trimmed) {
+      return { enabled: true, mode: "build", canvasVersion: trimmed };
+    }
+    return { enabled: true, mode: "inspect" };
+  }
+
+  return { enabled: true, mode: "inspect" };
+}
+
+export const DEFAULT_AGENT_CONTEXT: AgentContext = {
+  enabled: false,
+  mode: "inspect",
 };
 
 const AI_MAX_STORED_MESSAGES = 50;
@@ -84,30 +115,6 @@ function insertAiMessageBefore(
 
   const updated = [...previous.slice(0, beforeIndex), next, ...previous.slice(beforeIndex)];
   return trimAiMessages(updated);
-}
-
-function formatToolLabel(toolName: string): string {
-  const normalized = toolName.trim().toLowerCase();
-  const labelByTool: Record<string, string> = {
-    get_canvas: "Reading canvas",
-    get_canvas_shape: "Reading canvas structure",
-    get_canvas_details: "Reading canvas details",
-    get_node_details: "Reading node details",
-    list_node_events: "Listing node events",
-    list_node_executions: "Listing node executions",
-    list_available_blocks: "Listing available components",
-    validate_proposal: "Validating proposal",
-  };
-  if (labelByTool[normalized]) {
-    return labelByTool[normalized];
-  }
-
-  const words = normalized.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-  if (!words) {
-    return "Running tool";
-  }
-
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function parseChatIdFromUrl(url: string): string | null {
@@ -242,6 +249,7 @@ type SendChatPromptArgs = {
   currentChatId: string | null;
   canvasId?: string;
   organizationId?: string;
+  agentContext: AgentContext;
   isGeneratingResponse: boolean;
   setChatSessions?: Dispatch<SetStateAction<AiChatSession[]>>;
   setCurrentChatId: Dispatch<SetStateAction<string | null>>;
@@ -314,11 +322,29 @@ async function fetchChatStreamResponse({
   nextPrompt,
   token,
   url,
+  agentContext,
 }: {
   nextPrompt: string;
   token: string;
   url: string;
+  agentContext: AgentContext;
 }): Promise<Response> {
+  const canvasVersion = agentContext.mode === "build" ? agentContext.canvasVersion : null;
+  const body: {
+    question: string;
+    agent_context: {
+      enabled: boolean;
+      mode: "inspect" | "build";
+      canvas_version: string | null;
+    };
+  } = {
+    question: nextPrompt,
+    agent_context: {
+      enabled: agentContext.enabled,
+      mode: agentContext.mode,
+      canvas_version: canvasVersion,
+    },
+  };
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -326,9 +352,7 @@ async function fetchChatStreamResponse({
       Accept: "text/event-stream",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      question: nextPrompt,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok || !response.body) {
@@ -364,6 +388,7 @@ export async function sendChatPrompt({
   currentChatId,
   canvasId,
   organizationId,
+  agentContext,
   isGeneratingResponse,
   setChatSessions,
   setCurrentChatId,
@@ -424,6 +449,7 @@ export async function sendChatPrompt({
       nextPrompt,
       token: session.token,
       url: session.url,
+      agentContext,
     });
 
     const { assistantContentSnapshot, streamedAnyAnswer, runModel } = await consumeChatResponseStream({
@@ -433,7 +459,6 @@ export async function sendChatPrompt({
       setPendingProposal,
       insertAiMessageBefore,
       trimAiMessages,
-      formatToolLabel,
       testModelSentinel: TEST_MODEL_SENTINEL,
       testModeHint: TEST_MODE_HINT,
     });

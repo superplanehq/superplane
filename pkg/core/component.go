@@ -146,11 +146,11 @@ type ExecutionContext struct {
 	Configuration  any
 	Logger         *log.Entry
 	HTTP           HTTPContext
-	Metadata       MetadataContext
-	NodeMetadata   MetadataContext
+	Metadata       MetadataWriter
+	NodeMetadata   MetadataReader
 	ExecutionState ExecutionStateContext
 	Requests       RequestContext
-	Auth           AuthContext
+	Auth           AuthReader
 	Integration    IntegrationContext
 	Notifications  NotificationContext
 	Secrets        SecretsContext
@@ -182,20 +182,11 @@ type SetupContext struct {
 	Logger        *log.Entry
 	Configuration any
 	HTTP          HTTPContext
-	Metadata      MetadataContext
+	Metadata      MetadataWriter
 	Requests      RequestContext
-	Auth          AuthContext
+	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
-}
-
-/*
- * MetadataContext allows components to store/retrieve
- * component-specific information about each execution.
- */
-type MetadataContext interface {
-	Get() any
-	Set(any) error
 }
 
 type CanvasMemoryContext interface {
@@ -260,9 +251,9 @@ type ActionContext struct {
 	Parameters     map[string]any
 	Logger         *log.Entry
 	HTTP           HTTPContext
-	Metadata       MetadataContext
+	Metadata       MetadataWriter
 	ExecutionState ExecutionStateContext
-	Auth           AuthContext
+	Auth           AuthReader
 	Requests       RequestContext
 	Integration    IntegrationContext
 	Notifications  NotificationContext
@@ -317,15 +308,6 @@ type ProcessQueueContext struct {
 	// same source)
 	//
 	DistinctIncomingSources func() ([]Node, error)
-}
-
-type AuthContext interface {
-	AuthenticatedUser() *User
-	GetUser(id uuid.UUID) (*User, error)
-	GetRole(name string) (*RoleRef, error)
-	GetGroup(name string) (*GroupRef, error)
-	HasRole(role string) (bool, error)
-	InGroup(group string) (bool, error)
 }
 
 type NotificationReceivers struct {
