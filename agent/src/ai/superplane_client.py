@@ -14,19 +14,6 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
-from ai.config import config as app_config
-from ai.models import (
-    CanvasChangeset,
-    CanvasEdge,
-    CanvasNode,
-    CanvasShape,
-    CanvasShapeEdge,
-    CanvasShapeNode,
-    CanvasSummary,
-    NodeDetails,
-    NodeEvent,
-    NodeExecution,
-)
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_node_api import CanvasNodeApi
 from superplaneapi.api.canvas_version_api import CanvasVersionApi
@@ -80,6 +67,20 @@ from superplaneapi.models.superplane_organizations_list_integrations_response im
 from superplaneapi.models.triggers_describe_trigger_response import TriggersDescribeTriggerResponse
 from superplaneapi.models.triggers_list_triggers_response import TriggersListTriggersResponse
 from superplaneapi.models.triggers_trigger import TriggersTrigger
+
+from ai.config import config as app_config
+from ai.models import (
+    CanvasChangeset,
+    CanvasEdge,
+    CanvasNode,
+    CanvasShape,
+    CanvasShapeEdge,
+    CanvasShapeNode,
+    CanvasSummary,
+    NodeDetails,
+    NodeEvent,
+    NodeExecution,
+)
 
 
 def _debug_enabled() -> bool:
