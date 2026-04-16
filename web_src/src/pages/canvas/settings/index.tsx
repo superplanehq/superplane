@@ -163,6 +163,6 @@ function useSaveCallback(canvasId: string, organizationId: string): (values: Set
 
       navigate(baseCanvasPath, { replace: true });
     },
-    [canvasId, updateCanvasMutation],
+    [canvasId, updateCanvasMutation, navigate, baseCanvasPath],
   );
 }
