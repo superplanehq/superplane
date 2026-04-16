@@ -24,6 +24,7 @@ make gen.setup.backend
 make gen.setup.ui
 
 docker buildx build \
+  --platform "linux/${ARCH}" \
   --progress=plain \
   --provenance=false \
   --push \
