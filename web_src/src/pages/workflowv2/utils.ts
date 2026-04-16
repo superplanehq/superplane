@@ -525,7 +525,7 @@ export function mergeWorkflowLogEntries(options: {
     return allCanvasEntries.sort((a, b) => {
       const aTime = Date.parse(a.timestamp || "") || 0;
       const bTime = Date.parse(b.timestamp || "") || 0;
-      return bTime - aTime;
+      return aTime - bTime;
     });
   }
 

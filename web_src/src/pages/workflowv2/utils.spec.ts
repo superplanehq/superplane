@@ -48,9 +48,14 @@ describe("mergeWorkflowLogEntries", () => {
     const canvasEntries = mapCanvasNodesToLogEntries({
       nodes: [
         makeComponentsNode({
-          id: "draft-node",
-          name: "Draft Node",
-          warningMessage: "Draft contains a warning",
+          id: "draft-node-newer",
+          name: "Draft Node Newer",
+          warningMessage: "Newer warning",
+        }),
+        makeComponentsNode({
+          id: "draft-node-older",
+          name: "Draft Node Older",
+          warningMessage: "Older warning",
         }),
       ],
       workflowUpdatedAt: "2026-04-03T12:00:00Z",
@@ -69,15 +74,21 @@ describe("mergeWorkflowLogEntries", () => {
         } satisfies LogEntry,
       ],
       liveRunEntries: [],
-      canvasEntries,
-      liveCanvasEntries: [],
+      canvasEntries: [canvasEntries[0]!],
+      liveCanvasEntries: [
+        {
+          ...canvasEntries[1]!,
+          timestamp: "2026-04-02T12:00:00Z",
+        },
+      ],
       resolvedExecutionIds: new Set(["execution-1"]),
     });
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
+    expect(result.map((entry) => entry.id)).toEqual(["warning-2", "warning-1"]);
     expect(result[0]?.type).toBe("warning");
     expect(result[0]?.source).toBe("canvas");
-    expect(result[0]?.searchText).toContain("Draft contains a warning");
+    expect(result[0]?.searchText).toContain("Older warning");
   });
 
   it("preserves resolved run item state in live mode", () => {
