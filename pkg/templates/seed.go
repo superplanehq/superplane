@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/uuid"
@@ -15,7 +14,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/encoding/protojson"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	log "github.com/sirupsen/logrus"
@@ -138,72 +136,14 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 }
 
 func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb.Canvas) error {
-	organizationID := models.TemplateOrganizationID.String()
-	nodes, edges, err := canvases.ParseCanvas(registry, organizationID, template)
-	if err != nil {
-		return err
-	}
-
-	expandedNodes, err := canvases.ExpandNodes(organizationID, nodes)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	liveVersionID := uuid.New()
-	canvas := models.Canvas{
-		ID:             uuid.New(),
-		OrganizationID: models.TemplateOrganizationID,
-		LiveVersionID:  &liveVersionID,
-		IsTemplate:     true,
-		Name:           template.Metadata.Name,
-		Description:    template.Metadata.Description,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-
-	if err := tx.Create(&canvas).Error; err != nil {
-		return err
-	}
-
-	for _, node := range expandedNodes {
-		var parentNodeID *string
-		if idx := strings.Index(node.ID, ":"); idx != -1 {
-			parent := node.ID[:idx]
-			parentNodeID = &parent
-		}
-
-		canvasNode := models.CanvasNode{
-			WorkflowID:    canvas.ID,
-			NodeID:        node.ID,
-			ParentNodeID:  parentNodeID,
-			Name:          node.Name,
-			State:         models.CanvasNodeStateReady,
-			Type:          node.Type,
-			Ref:           datatypes.NewJSONType(node.Ref),
-			Configuration: datatypes.NewJSONType(node.Configuration),
-			Metadata:      datatypes.NewJSONType(node.Metadata),
-			CreatedAt:     &now,
-			UpdatedAt:     &now,
-		}
-
-		if err := tx.Create(&canvasNode).Error; err != nil {
-			return err
-		}
-	}
-
-	version := models.CanvasVersion{
-		ID:          liveVersionID,
-		WorkflowID:  canvas.ID,
-		State:       models.CanvasVersionStatePublished,
-		PublishedAt: &now,
-		Nodes:       datatypes.NewJSONSlice(expandedNodes),
-		Edges:       datatypes.NewJSONSlice(edges),
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
-	}
-
-	return tx.Create(&version).Error
+	_, err := canvases.CreatePublishedTemplateCanvasWithoutSetupInTransaction(
+		tx,
+		registry,
+		template,
+		nil,
+		nil,
+	)
+	return err
 }
 
 func lockTemplateSeed(tx *gorm.DB) (bool, error) {
