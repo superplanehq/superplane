@@ -116,7 +116,7 @@ func (s *canvasChangeRequestSteps) enterEditMode() {
 	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
 }
 
-// headerProposeChangeButton matches "Propose Change" or "Propose Change (n)" in the canvas header.
+// headerProposeChangeButton matches the Propose Change button in the canvas header.
 func (s *canvasChangeRequestSteps) headerProposeChangeButton() pw.Locator {
 	return s.session.Page().Locator("header").GetByRole("button", pw.LocatorGetByRoleOptions{
 		Name: regexp.MustCompile(`Propose Change`),
