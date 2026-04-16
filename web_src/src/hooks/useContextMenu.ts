@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { HTMLAttributes, SyntheticEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ContextMenuPosition = {
   x: number;
@@ -13,17 +14,76 @@ type ContextMenuState<TData> = {
 export function useContextMenu<TData>() {
   const [menuState, setMenuState] = useState<ContextMenuState<TData> | null>(null);
   const [menuPosition, setMenuPosition] = useState<ContextMenuPosition | null>(null);
+  const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const closeContextMenu = useCallback(() => {
     setMenuState(null);
     setMenuPosition(null);
+    setSelectedGroupKey(null);
   }, []);
 
   const openContextMenu = useCallback((position: ContextMenuPosition, data: TData) => {
     setMenuState({ position, data });
     setMenuPosition(position);
+    setSelectedGroupKey(null);
   }, []);
+
+  const stopInteraction = useCallback((event: SyntheticEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
+  const backdropProps = useMemo<HTMLAttributes<HTMLDivElement>>(
+    () => ({
+      onMouseDown: (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeContextMenu();
+      },
+      onPointerDown: (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeContextMenu();
+      },
+      onTouchStart: (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeContextMenu();
+      },
+      onWheelCapture: (event) => {
+        stopInteraction(event);
+      },
+      onTouchMoveCapture: (event) => {
+        stopInteraction(event);
+      },
+      onContextMenu: (event) => {
+        stopInteraction(event);
+      },
+    }),
+    [closeContextMenu, stopInteraction],
+  );
+
+  const menuProps = useMemo<HTMLAttributes<HTMLDivElement>>(
+    () => ({
+      onMouseDown: (event) => {
+        event.stopPropagation();
+      },
+      onPointerDown: (event) => {
+        event.stopPropagation();
+      },
+      onWheelCapture: (event) => {
+        stopInteraction(event);
+      },
+      onTouchMoveCapture: (event) => {
+        stopInteraction(event);
+      },
+      onContextMenu: (event) => {
+        stopInteraction(event);
+      },
+    }),
+    [stopInteraction],
+  );
 
   useEffect(() => {
     if (!menuState) {
@@ -78,6 +138,10 @@ export function useContextMenu<TData>() {
     contextMenuPosition: menuPosition,
     isContextMenuOpen: Boolean(menuState && menuPosition),
     menuRef,
+    selectedGroupKey,
+    setSelectedGroupKey,
+    backdropProps,
+    menuProps,
     openContextMenu,
     closeContextMenu,
   };
