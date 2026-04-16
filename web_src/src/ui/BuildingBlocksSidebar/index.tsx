@@ -148,6 +148,8 @@ function OpenBuildingBlocksSidebar({
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const currentChatIdRef = useRef(currentChatId);
+  currentChatIdRef.current = currentChatId;
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
@@ -209,15 +211,12 @@ function OpenBuildingBlocksSidebar({
       }
 
       setChatSessions((previous) => previous.filter((s) => s.id !== chatId));
-      setCurrentChatId((previous) => {
-        if (previous === chatId) {
-          setAiMessages([]);
-          setPendingProposal(null);
-          setAiError(null);
-          return null;
-        }
-        return previous;
-      });
+      if (currentChatIdRef.current === chatId) {
+        setCurrentChatId(null);
+        setAiMessages([]);
+        setPendingProposal(null);
+        setAiError(null);
+      }
 
       void deleteAgentChatSession({ chatId, canvasId, organizationId }).then(
         () => showSuccessToast("Conversation deleted"),
