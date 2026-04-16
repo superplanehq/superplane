@@ -43,7 +43,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-function SettingsTabPlayground() {
+function SettingsTabPlayground({ integrations = STORY_INTEGRATIONS }: { integrations?: typeof STORY_INTEGRATIONS }) {
   const [configuration, setConfiguration] = useState<Record<string, unknown>>(settingsTabConfiguration);
   const [nodeName, setNodeName] = useState("Renderer Coverage Demo");
   const [integrationRef, setIntegrationRef] = useState(STORY_INTEGRATION_REF);
@@ -69,7 +69,7 @@ function SettingsTabPlayground() {
       domainType={STORY_DOMAIN_TYPE}
       integrationName="github"
       integrationRef={integrationRef}
-      integrations={STORY_INTEGRATIONS}
+      integrations={integrations}
       integrationDefinition={{
         name: "github",
         label: "GitHub",
@@ -95,4 +95,29 @@ export const RendererCoverage: Story = {
     },
   },
   render: () => <SettingsTabPlayground />,
+};
+
+const errorStateIntegrations = STORY_INTEGRATIONS.map((integration, index) =>
+  index === 0
+    ? {
+        ...integration,
+        status: {
+          state: "error",
+          stateDescription:
+            "The GitHub App installation needs to be re-authorized before repository metadata can be loaded. Open Configure to finish the browser step and restore access.",
+        },
+      }
+    : integration,
+);
+
+export const IntegrationErrorVisible: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Shows the settings sidebar with an integration in an error state so the inline error treatment can be reviewed without relying on hover behavior.",
+      },
+    },
+  },
+  render: () => <SettingsTabPlayground integrations={errorStateIntegrations} />,
 };
