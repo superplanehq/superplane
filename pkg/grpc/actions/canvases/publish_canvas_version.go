@@ -130,7 +130,7 @@ func publishDraftVersionInTransaction(
 			return err
 		}
 
-		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, version.ID)
+		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
 		if refreshErr != nil {
 			log.Errorf("failed to refresh open canvas change requests: %v", refreshErr)
 			return refreshErr
