@@ -22,6 +22,9 @@ from superplaneapi.models.canvases_validate_canvas_version_changeset_response im
 from superplaneapi.models.components_list_components_response import (
     ComponentsListComponentsResponse,
 )
+from superplaneapi.models.organizations_list_integration_resources_response import (
+    OrganizationsListIntegrationResourcesResponse,
+)
 from superplaneapi.models.superplane_integrations_list_integrations_response import (
     SuperplaneIntegrationsListIntegrationsResponse,
 )
@@ -197,6 +200,84 @@ class FakeIntegrationApi:
         result = SuperplaneIntegrationsListIntegrationsResponse.from_dict(payload)
         assert result is not None
         return result
+
+
+class FakeListResourcesResponseData:
+    def __init__(self) -> None:
+        self.status = 200
+        self.data: bytes | None = None
+
+    def read(self) -> bytes:
+        self.data = b'{"resources":[{"id":"proj-1","name":"Project 1","type":"project"}]}'
+        return self.data
+
+    def getheader(self, name: str) -> str | None:
+        if name.lower() == "content-type":
+            return "application/json"
+        return None
+
+    def getheaders(self) -> list[tuple[str, str]]:
+        return [("content-type", "application/json")]
+
+
+class FakeListResourcesApiClient:
+    def __init__(self) -> None:
+        self.query_params: list[tuple[str, str]] = []
+        self.request_timeout: int | tuple[int, int] | None = None
+
+    def param_serialize(
+        self,
+        method: str,
+        resource_path: str,
+        path_params: dict[str, str] | None = None,
+        query_params: list[tuple[str, str]] | None = None,
+        header_params: dict[str, str] | None = None,
+        body: Any = None,
+        post_params: list[Any] | None = None,
+        files: dict[str, Any] | None = None,
+        auth_settings: list[str] | None = None,
+        collection_formats: dict[str, str] | None = None,
+        _host: str | None = None,
+        _request_auth: Any = None,
+    ) -> tuple[str, str, dict[str, str], Any, list[Any]]:
+        _ = (
+            path_params,
+            header_params,
+            body,
+            post_params,
+            files,
+            auth_settings,
+            collection_formats,
+            _host,
+            _request_auth,
+        )
+        self.query_params = query_params or []
+        return method, f"https://example.test{resource_path}", {}, None, []
+
+    def call_api(
+        self,
+        method: str,
+        url: str,
+        header_params: dict[str, str] | None = None,
+        body: Any = None,
+        post_params: list[Any] | None = None,
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> FakeListResourcesResponseData:
+        _ = (method, url, header_params, body, post_params)
+        self.request_timeout = _request_timeout
+        return FakeListResourcesResponseData()
+
+    def response_deserialize(
+        self,
+        response_data: FakeListResourcesResponseData,
+        response_types_map: dict[str, str] | None = None,
+    ) -> Any:
+        _ = (response_data, response_types_map)
+        payload = OrganizationsListIntegrationResourcesResponse.from_dict(
+            {"resources": [{"id": "proj-1", "name": "Project 1", "type": "project"}]}
+        )
+        assert payload is not None
+        return type("ResponseWrapper", (), {"data": payload})()
 
 
 class FakeSuperplaneClient(SuperplaneClient):
@@ -461,6 +542,26 @@ def test_list_node_executions_maps_rows() -> None:
     assert rows[0].result_message == "timeout"
     assert rows[0].created_at is not None
     assert rows[0].updated_at is not None
+
+
+def test_list_integration_resources_sends_top_level_query_params() -> None:
+    client = FakeSuperplaneClient(payloads={})
+    fake_api_client = FakeListResourcesApiClient()
+    client._api_client = fake_api_client  # type: ignore[assignment]
+
+    resources = client.list_integration_resources(
+        integration_id="int-1",
+        type="project",
+        parameters={"region": "us-east-1", "ignored-empty": "", "": "ignored-key"},
+    )
+
+    assert resources == [{"id": "proj-1", "name": "Project 1", "type": "project"}]
+    query = dict(fake_api_client.query_params)
+    assert query["type"] == "project"
+    assert query["region"] == "us-east-1"
+    assert "parameters" not in query
+    assert "ignored-empty" not in query
+    assert fake_api_client.request_timeout == client._config.timeout_seconds
 
 
 def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details() -> None:
