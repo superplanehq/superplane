@@ -223,12 +223,11 @@ def _record_usage(
     store: SessionStore,
     publisher: AgentUsagePublisher,
     run_id: str,
-    usage: Any | None,
+    usage_snapshot: dict[str, Any],
     org_id: str,
     chat_id: str,
     model: str,
 ) -> None:
-    usage_snapshot = _usage_snapshot(usage)
     try:
         store.update_run_usage(
             run_id=run_id,
