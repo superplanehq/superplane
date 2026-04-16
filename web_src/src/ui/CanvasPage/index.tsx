@@ -49,6 +49,7 @@ import {
 
 import type {
   BlueprintsBlueprint,
+  CanvasChangesetChange,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
@@ -62,8 +63,6 @@ import type {
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
-
-import type { CanvasOperation } from "@/lib/ai";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
@@ -274,7 +273,7 @@ export interface CanvasPageProps {
   buildingBlocks: BuildingBlockCategory[];
   agentContext: AgentContext;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
-  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId: string;
