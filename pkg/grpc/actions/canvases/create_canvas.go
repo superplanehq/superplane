@@ -94,21 +94,22 @@ func CreateCanvasWithAutoLayoutAndUsageAndSetup(
 	if isTemplate {
 		var canvas *models.Canvas
 		err = database.Conn().Transaction(func(tx *gorm.DB) error {
-			canvas, err = CreatePublishedTemplateCanvasWithoutSetupInTransaction(
+			var txErr error
+			canvas, txErr = CreatePublishedTemplateCanvasWithoutSetupInTransaction(
 				tx,
 				registry,
 				pbCanvas,
 				autoLayout,
 				&createdBy,
 			)
-			if err != nil {
-				if strings.Contains(err.Error(), ErrDuplicateCanvasName) {
+			if txErr != nil {
+				if strings.Contains(txErr.Error(), ErrDuplicateCanvasName) {
 					return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
 				}
-				if errors.Is(err, errTemplateCanvasAutoLayout) {
-					return status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
+				if errors.Is(txErr, errTemplateCanvasAutoLayout) {
+					return status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", txErr)
 				}
-				return err
+				return txErr
 			}
 			return nil
 		})
