@@ -23,8 +23,9 @@ type CanvasPatcher struct {
 	//
 	// Using maps to keep lookup operations fast
 	//
-	nodes map[string]models.Node
-	edges map[string]models.Edge
+	nodes    map[string]models.Node
+	edges    map[string]models.Edge
+	newNodes []string
 }
 
 func NewCanvasPatcher(tx *gorm.DB, orgID uuid.UUID, registry *registry.Registry, canvas *models.CanvasVersion) *CanvasPatcher {
@@ -35,6 +36,7 @@ func NewCanvasPatcher(tx *gorm.DB, orgID uuid.UUID, registry *registry.Registry,
 		originalVersion: canvas,
 		nodes:           make(map[string]models.Node),
 		edges:           make(map[string]models.Edge),
+		newNodes:        []string{},
 	}
 
 	for _, node := range p.originalVersion.Nodes {
@@ -89,6 +91,17 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 		v.Edges = append(v.Edges, p.edges[edgeKey])
 	}
 
+	//
+	// If auto layout is not provided, we only auto layout the new nodes.
+	//
+	if autoLayout == nil {
+		autoLayout = &pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+			NodeIds:   p.newNodes,
+			Scope:     pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT,
+		}
+	}
+
 	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, autoLayout)
 	if err != nil {
 		return nil, err
@@ -141,6 +154,11 @@ func (p *CanvasPatcher) handleChange(change *pb.CanvasChangeset_Change) error {
 }
 
 func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
+
+	//
+	// These initial checks are hard checks.
+	// If they fail, we should return an error immediately.
+	//
 	node := change.GetNode()
 	if node == nil {
 		return fmt.Errorf("node is required for %s", change.Type)
@@ -172,15 +190,29 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	newNode.Type = nodeType
 	newNode.Ref = *nodeRef
 
+	//
+	// From here on out, we don't return errors,
+	// we just save the error message in the node.ErrorMessage field.
+	// This still allows the changeset to be applied, but
+	// node will be in an error state.
+	//
 	integrationID, err := p.validateIntegration(node)
 	if err != nil {
-		return err
+		errorMessage := err.Error()
+		newNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = newNode
+		p.newNodes = append(p.newNodes, nodeID)
+		return nil
 	}
 
 	newNode.IntegrationID = integrationID
 	schema, err := p.findConfigurationSchemaForNode(nodeType, *nodeRef)
 	if err != nil {
-		return err
+		errorMessage := err.Error()
+		newNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = newNode
+		p.newNodes = append(p.newNodes, nodeID)
+		return nil
 	}
 
 	var nodeConfiguration map[string]any
@@ -190,12 +222,17 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 
 	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
 	if err != nil {
-		return err
+		errorMessage := err.Error()
+		newNode.ErrorMessage = &errorMessage
+		newNode.Configuration = nodeConfiguration
+		p.nodes[nodeID] = newNode
+		p.newNodes = append(p.newNodes, nodeID)
+		return nil
 	}
 
 	newNode.Configuration = nodeConfiguration
 	p.nodes[nodeID] = newNode
-
+	p.newNodes = append(p.newNodes, nodeID)
 	return nil
 }
 
@@ -250,6 +287,11 @@ func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
 }
 
 func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
+
+	//
+	// These initial checks are hard checks.
+	// If they fail, we should return an error immediately.
+	//
 	node := change.GetNode()
 	if node == nil {
 		return fmt.Errorf("node is required for %s", change.Type)
@@ -260,16 +302,21 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("node id is required for %s", change.Type)
 	}
 
-	if node.GetName() == "" {
-		return fmt.Errorf("node name is required for %s", change.Type)
-	}
-
 	currentNode, exists := p.nodes[nodeID]
 	if !exists {
 		return fmt.Errorf("node %s not found", nodeID)
 	}
 
-	currentNode.Name = node.GetName()
+	if node.GetName() != "" {
+		currentNode.Name = node.GetName()
+	}
+
+	//
+	// From here on out, we don't return errors,
+	// we save the error message alongside the new invalid configuration.
+	// This still allows the changeset to be applied, but
+	// node will be in an error state.
+	//
 
 	//
 	// We only update the configuration if it is provided
@@ -277,15 +324,24 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 	if node.GetConfiguration() != nil {
 		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
 		if err != nil {
-			return err
+			errorMessage := err.Error()
+			currentNode.ErrorMessage = &errorMessage
+			currentNode.Configuration = node.GetConfiguration().AsMap()
+			p.nodes[nodeID] = currentNode
+			return nil
 		}
 
 		err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
 		if err != nil {
-			return err
+			errorMessage := err.Error()
+			currentNode.ErrorMessage = &errorMessage
+			currentNode.Configuration = node.GetConfiguration().AsMap()
+			p.nodes[nodeID] = currentNode
+			return nil
 		}
 
 		currentNode.Configuration = node.GetConfiguration().AsMap()
+		currentNode.ErrorMessage = nil
 	}
 
 	p.nodes[nodeID] = currentNode
