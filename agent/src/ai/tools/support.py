@@ -32,6 +32,18 @@ def tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:
     return tool_failure(tool_name, str(error))
 
 
+def tool_empty_entry(tool_name: str, message: str, **context: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "__tool_empty__": True,
+        "__tool_name__": tool_name,
+        "message": message,
+    }
+    for key, value in context.items():
+        if value is not None:
+            payload[key] = value
+    return payload
+
+
 def tool_debug(message: str) -> None:
     if config.debug:
         print(f"[web][agent] {message}", flush=True)
