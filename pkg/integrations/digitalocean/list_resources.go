@@ -41,6 +41,10 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listDatabaseClusters(ctx)
 	case "database":
 		return listDatabases(ctx)
+	case "database_cluster_version":
+		return listDatabaseClusterVersions(ctx)
+	case "database_cluster_size":
+		return listDatabaseClusterSizes(ctx)
 	case "embedding_model":
 		return listEmbeddingModels(ctx)
 	case "project":
@@ -51,6 +55,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listAgents(ctx)
 	case "knowledge_base":
 		return listKnowledgeBases(ctx)
+	case "knowledge_base_data_source":
+		return listKBDataSources(ctx)
 	case "agent_available_knowledge_base":
 		return listAgentAvailableKnowledgeBases(ctx)
 	case "agent_knowledge_base":
@@ -258,34 +264,6 @@ func listLoadBalancers(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	return resources, nil
 }
 
-func listDatabaseClusters(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
-	}
-
-	clusters, err := client.ListDatabaseClusters()
-	if err != nil {
-		return nil, fmt.Errorf("error listing database clusters: %w", err)
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(clusters))
-	for _, cluster := range clusters {
-		name := cluster.Name
-		if name == "" {
-			name = cluster.ID
-		}
-
-		resources = append(resources, core.IntegrationResource{
-			Type: "database_cluster",
-			Name: name,
-			ID:   cluster.ID,
-		})
-	}
-
-	return resources, nil
-}
-
 func listDatabases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	clusterID := ctx.Parameters["databaseCluster"]
 	if clusterID == "" {
@@ -336,6 +314,109 @@ func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource,
 			Name: ip.IP,
 			ID:   ip.IP,
 		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusters(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	clusters, err := client.ListDatabaseClusters()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database clusters: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(clusters))
+	for _, cluster := range clusters {
+		name := cluster.Name
+		if name == "" {
+			name = cluster.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "database_cluster",
+			Name: name,
+			ID:   cluster.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusterVersions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	engine := ctx.Parameters["engine"]
+	if engine == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	options, err := client.GetDatabaseOptions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database cluster versions: %w", err)
+	}
+
+	engineOptions, ok := options[engine]
+	if !ok {
+		return []core.IntegrationResource{}, nil
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(engineOptions.Versions))
+	for _, version := range engineOptions.Versions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "database_cluster_version",
+			Name: version,
+			ID:   version,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusterSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	engine := ctx.Parameters["engine"]
+	numNodes := ctx.Parameters["numNodes"]
+	if engine == "" || numNodes == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	options, err := client.GetDatabaseOptions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database cluster sizes: %w", err)
+	}
+
+	engineOptions, ok := options[engine]
+	if !ok {
+		return []core.IntegrationResource{}, nil
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, layout := range engineOptions.Layouts {
+		if fmt.Sprintf("%d", layout.NumNodes) != numNodes {
+			continue
+		}
+
+		resources = make([]core.IntegrationResource, 0, len(layout.Sizes))
+		for _, size := range layout.Sizes {
+			resources = append(resources, core.IntegrationResource{
+				Type: "database_cluster_size",
+				Name: size,
+				ID:   size,
+			})
+		}
+		break
 	}
 
 	return resources, nil
@@ -649,6 +730,41 @@ func listKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResour
 			Type: "knowledge_base",
 			Name: kb.Name,
 			ID:   kb.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listKBDataSources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	kbUUID := ctx.Parameters["knowledgeBase"]
+	if kbUUID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	dataSources, err := client.ListKBDataSources(kbUUID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing data sources: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(dataSources))
+	for _, ds := range dataSources {
+		name := ds.UUID
+		if ds.BucketName != "" {
+			name = fmt.Sprintf("%s (%s)", ds.BucketName, ds.Region)
+		} else if ds.WebCrawlerDataSource != nil && ds.WebCrawlerDataSource.BaseURL != "" {
+			name = ds.WebCrawlerDataSource.BaseURL
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "knowledge_base_data_source",
+			Name: name,
+			ID:   ds.UUID,
 		})
 	}
 

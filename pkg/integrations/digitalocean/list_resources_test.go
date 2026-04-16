@@ -282,15 +282,15 @@ func Test__ListResources__Sizes(t *testing.T) {
 func Test__ListResources__DatabaseClusters(t *testing.T) {
 	integration := &DigitalOcean{}
 
-	t.Run("successful database cluster listing returns resources", func(t *testing.T) {
+	t.Run("successful cluster listing returns resources", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`{
 						"databases": [
-							{"id":"cluster-1","name":"primary-db"},
-							{"id":"cluster-2","name":"analytics-db"}
+							{"id": "cluster-1", "name": "superplane-db", "engine": "pg"},
+							{"id": "cluster-2", "name": "analytics-db", "engine": "mysql"}
 						]
 					}`)),
 				},
@@ -303,10 +303,31 @@ func Test__ListResources__DatabaseClusters(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Len(t, resources, 2)
+		require.Len(t, resources, 2)
 		assert.Equal(t, "database_cluster", resources[0].Type)
-		assert.Equal(t, "primary-db", resources[0].Name)
+		assert.Equal(t, "superplane-db", resources[0].Name)
 		assert.Equal(t, "cluster-1", resources[0].ID)
+	})
+
+	t.Run("null database list returns empty resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"databases": null
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database_cluster", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
 	})
 }
 
@@ -351,6 +372,100 @@ func Test__ListResources__Databases(t *testing.T) {
 		assert.Equal(t, "database", resources[0].Type)
 		assert.Equal(t, "app_db", resources[0].Name)
 		assert.Equal(t, "app_db", resources[0].ID)
+	})
+}
+
+func Test__ListResources__DatabaseClusterVersions(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("missing engine returns empty resources", func(t *testing.T) {
+		resources, err := integration.ListResources("database_cluster_version", core.ListResourcesContext{
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
+
+	t.Run("successful version listing returns versions for engine", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"options": {
+							"pg": {
+								"versions": ["14", "15", "16", "18"],
+								"layouts": []
+							},
+							"mysql": {
+								"versions": ["8"],
+								"layouts": []
+							}
+						}
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database_cluster_version", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{"engine": "pg"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 4)
+		assert.Equal(t, "14", resources[0].ID)
+		assert.Equal(t, "18", resources[3].Name)
+	})
+}
+
+func Test__ListResources__DatabaseClusterSizes(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("missing parameters returns empty resources", func(t *testing.T) {
+		resources, err := integration.ListResources("database_cluster_size", core.ListResourcesContext{
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{"engine": "pg"},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
+
+	t.Run("successful size listing returns sizes for engine and node count", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"options": {
+							"pg": {
+								"versions": ["18"],
+								"layouts": [
+									{"num_nodes": 1, "sizes": ["db-s-1vcpu-1gb", "db-s-1vcpu-2gb"]},
+									{"num_nodes": 2, "sizes": ["db-s-1vcpu-2gb", "db-s-2vcpu-4gb"]}
+								]
+							}
+						}
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database_cluster_size", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{"engine": "pg", "numNodes": "2"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "db-s-1vcpu-2gb", resources[0].ID)
+		assert.Equal(t, "db-s-2vcpu-4gb", resources[1].Name)
 	})
 }
 

@@ -66,12 +66,12 @@ func CreateCanvasChangeRequestWithMetadata(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
+		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
 	}
-	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
+	if !changeManagementEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "change management is disabled for this canvas")
 	}
 
 	userUUID := uuid.MustParse(userID)
@@ -87,7 +87,7 @@ func CreateCanvasChangeRequestWithMetadata(
 			return status.Error(codes.FailedPrecondition, "canvas live version not found")
 		}
 
-		draft, findDraftErr := models.FindCanvasDraftInTransaction(tx, canvasUUID, userUUID)
+		draftVersion, findDraftErr := models.FindCanvasDraftInTransaction(tx, canvasUUID, userUUID)
 		if findDraftErr != nil {
 			if errors.Is(findDraftErr, gorm.ErrRecordNotFound) {
 				return status.Error(codes.FailedPrecondition, "no edit version found for this user")
@@ -95,21 +95,14 @@ func CreateCanvasChangeRequestWithMetadata(
 			return findDraftErr
 		}
 
-		if requestedVersionUUID != nil && draft.VersionID != *requestedVersionUUID {
+		if requestedVersionUUID != nil && draftVersion.ID != *requestedVersionUUID {
 			return status.Error(codes.FailedPrecondition, "version is not your current edit version")
 		}
 
-		draftVersion, findVersionErr := models.FindCanvasVersionInTransaction(tx, canvasUUID, draft.VersionID)
-		if findVersionErr != nil {
-			if errors.Is(findVersionErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "edit version not found")
-			}
-			return findVersionErr
-		}
 		if draftVersion.OwnerID == nil || *draftVersion.OwnerID != userUUID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
-		if draftVersion.IsPublished {
+		if draftVersion.State == models.CanvasVersionStatePublished {
 			return status.Error(codes.FailedPrecondition, "published versions cannot create change requests")
 		}
 

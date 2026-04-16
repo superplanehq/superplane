@@ -38,7 +38,6 @@ function getActionProps(data: BlockProps["data"], compactView: boolean, props: P
     onEdit: props.onEdit,
     onDuplicate: props.onDuplicate,
     onDeactivate: props.onDeactivate,
-    onToggleCollapse: props.onToggleCollapse,
     onToggleView: props.onToggleView,
     onDelete: props.onDelete,
     isCompactView: compactView,
@@ -172,7 +171,6 @@ export function BlockContent({
   onEdit,
   onDuplicate,
   onDeactivate,
-  onToggleCollapse,
   onToggleView,
   onDelete,
   showHeader,
@@ -189,7 +187,6 @@ export function BlockContent({
     onEdit,
     onDuplicate,
     onDeactivate,
-    onToggleCollapse,
     onToggleView,
     onDelete,
   });

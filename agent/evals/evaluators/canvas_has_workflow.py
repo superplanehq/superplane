@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
-from ai.models import CanvasAnswer
+from ai.models import CanvasAnswer, CanvasChange, CanvasChangeType
 
 
 class CanvasHasWorkflow(Evaluator):
@@ -23,7 +23,7 @@ class CanvasHasWorkflow(Evaluator):
         if ctx.output.proposal is None:
             return EvaluationReason(value=False, reason="No proposal to check")
 
-        node_names, graph = _build_graph(ctx.output.proposal.operations)
+        node_names, graph = _build_graph(ctx.output.proposal.changeset.changes or [])
         if not node_names:
             return EvaluationReason(value=False, reason="No add_node operations")
 
@@ -53,37 +53,41 @@ class CanvasHasWorkflow(Evaluator):
         )
 
 
-def _build_graph(operations: list[Any]) -> tuple[dict[str, str], dict[str, set[str]]]:
+def _build_graph(changes: list[CanvasChange]) -> tuple[dict[str, str], dict[str, set[str]]]:
     node_names: dict[str, str] = {}
     graph: dict[str, set[str]] = {}
-    add_node_ops: list[Any] = []
 
-    for op in operations:
-        if op.type != "add_node":
-            continue
-        node_names[op.node_key] = op.block_name
-        graph.setdefault(op.node_key, set())
-        add_node_ops.append(op)
-
-    # Most proposals encode connectivity via add_node.source rather than connect_nodes.
-    for op in add_node_ops:
-        if op.source is None:
-            continue
-        source_key = op.source.node_key
-        target_key = op.node_key
-        if source_key in node_names and target_key in node_names:
-            graph.setdefault(source_key, set()).add(target_key)
-
-    for op in operations:
-        if op.type != "connect_nodes":
+    for change in changes:
+        if change.type != CanvasChangeType.ADD_NODE or change.node is None:
             continue
 
-        source_key = op.source.node_key
-        target_key = op.target.node_key
-        if source_key not in node_names or target_key not in node_names:
+        node_id = change.node.id
+        block = change.node.block
+        if not isinstance(node_id, str) or not node_id:
+            continue
+        if not isinstance(block, str) or not block:
             continue
 
-        graph.setdefault(source_key, set()).add(target_key)
+        node_names[node_id] = block
+        graph.setdefault(node_id, set())
+
+    for change in changes:
+        if change.type != CanvasChangeType.ADD_EDGE or change.edge is None:
+            continue
+
+        source_id = change.edge.source_id
+        target_id = change.edge.target_id
+        if (
+            not isinstance(source_id, str)
+            or not source_id
+            or not isinstance(target_id, str)
+            or not target_id
+        ):
+            continue
+        if source_id not in node_names or target_id not in node_names:
+            continue
+
+        graph.setdefault(source_id, set()).add(target_id)
 
     return node_names, graph
 

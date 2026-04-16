@@ -209,12 +209,26 @@ export interface DatabaseNodeMetadata {
   databaseName?: string;
 }
 
+export interface DatabaseClusterNodeMetadata {
+  databaseClusterId?: string;
+  databaseClusterName?: string;
+}
+
 export interface GetDatabaseConfiguration {
   databaseCluster: string;
   database: string;
 }
 
-export interface GetClusterConfiguration {
+export interface CreateDatabaseClusterConfiguration {
+  name?: string;
+  engine?: string;
+  version?: string;
+  region?: string;
+  size?: string;
+  numNodes?: string;
+}
+
+export interface GetDatabaseClusterConfiguration {
   databaseCluster: string;
 }
 
@@ -243,6 +257,47 @@ export interface UpdateAppConfiguration {
   app: string;
   envVars?: string[];
   gitHubBranch?: string;
+}
+
+export interface GetKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface GetKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
+export interface IndexKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface IndexKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
+export interface AddDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface AddDataSourceConfiguration {
+  knowledgeBase: string;
+  type?: string;
+  indexAfterAdding?: boolean;
+}
+
+export interface DeleteDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+  dataSourceId?: string;
+  dataSourceName?: string;
+}
+
+export interface DeleteDataSourceConfiguration {
+  knowledgeBase: string;
+  dataSource: string;
 }
 
 export interface KBNodeMetadata {

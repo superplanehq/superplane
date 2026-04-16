@@ -1,8 +1,4 @@
-import type {
-  CanvasesCanvasChangeRequest,
-  CanvasesCanvasChangeRequestApprovalConfig,
-  CanvasesCanvasVersion,
-} from "@/api-client";
+import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -44,7 +40,7 @@ interface CanvasVersionControlSidebarProps {
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
-  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
+  changeRequestApprovalConfig?: CanvasChangeManagement;
 }
 
 export function CanvasVersionControlSidebar({
@@ -356,7 +352,7 @@ function VersionRow({
 }: {
   version: CanvasesCanvasVersion;
   changeRequest?: CanvasesCanvasChangeRequest;
-  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
+  changeRequestApprovalConfig?: CanvasChangeManagement;
   previousVersion?: CanvasesCanvasVersion;
   variant?: "default" | "rejected";
   isActive?: boolean;

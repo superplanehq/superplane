@@ -93,7 +93,7 @@ func InvokeNodeExecutionAction(
 		HTTP:           registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
-		Auth:           contexts.NewAuthContext(tx, orgID, authService, user),
+		Auth:           contexts.NewAuthReader(tx, orgID, authService, user),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, orgID, canvas.ID),
 	}

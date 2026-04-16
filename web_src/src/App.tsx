@@ -16,6 +16,7 @@ import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
+import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import HomePage from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
@@ -97,6 +98,10 @@ function AppRouter() {
               <Route path=":organizationId" element={<OrganizationScope />}>
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
                 <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
+                <Route
+                  path="canvases/:canvasId/settings"
+                  element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
+                />
                 <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
                 <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />

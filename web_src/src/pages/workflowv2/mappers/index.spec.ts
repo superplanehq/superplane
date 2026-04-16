@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
 import { getExecutionDetails } from "./index";
 

@@ -251,6 +251,20 @@ func (c *CreateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAppOnce, exampleOutputCreateAppBytes, &exampleOutputCreateApp)
 }
 
+//go:embed example_output_create_database_cluster.json
+var exampleOutputCreateDatabaseClusterBytes []byte
+
+var exampleOutputCreateDatabaseClusterOnce sync.Once
+var exampleOutputCreateDatabaseCluster map[string]any
+
+func (c *CreateDatabaseCluster) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateDatabaseClusterOnce,
+		exampleOutputCreateDatabaseClusterBytes,
+		&exampleOutputCreateDatabaseCluster,
+	)
+}
+
 //go:embed example_output_get_app.json
 var exampleOutputGetAppBytes []byte
 
@@ -259,6 +273,20 @@ var exampleOutputGetApp map[string]any
 
 func (g *GetApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAppOnce, exampleOutputGetAppBytes, &exampleOutputGetApp)
+}
+
+//go:embed example_output_get_database_cluster.json
+var exampleOutputGetDatabaseClusterBytes []byte
+
+var exampleOutputGetDatabaseClusterOnce sync.Once
+var exampleOutputGetDatabaseCluster map[string]any
+
+func (g *GetDatabaseCluster) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetDatabaseClusterOnce,
+		exampleOutputGetDatabaseClusterBytes,
+		&exampleOutputGetDatabaseCluster,
+	)
 }
 
 //go:embed example_output_delete_app.json
@@ -279,6 +307,46 @@ var exampleOutputUpdateApp map[string]any
 
 func (u *UpdateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAppOnce, exampleOutputUpdateAppBytes, &exampleOutputUpdateApp)
+}
+
+//go:embed example_output_get_knowledge_base.json
+var exampleOutputGetKnowledgeBaseBytes []byte
+
+var exampleOutputGetKnowledgeBaseOnce sync.Once
+var exampleOutputGetKnowledgeBase map[string]any
+
+func (g *GetKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetKnowledgeBaseOnce, exampleOutputGetKnowledgeBaseBytes, &exampleOutputGetKnowledgeBase)
+}
+
+//go:embed example_output_add_data_source.json
+var exampleOutputAddDataSourceBytes []byte
+
+var exampleOutputAddDataSourceOnce sync.Once
+var exampleOutputAddDataSource map[string]any
+
+func (a *AddDataSource) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddDataSourceOnce, exampleOutputAddDataSourceBytes, &exampleOutputAddDataSource)
+}
+
+//go:embed example_output_delete_data_source.json
+var exampleOutputDeleteDataSourceBytes []byte
+
+var exampleOutputDeleteDataSourceOnce sync.Once
+var exampleOutputDeleteDataSource map[string]any
+
+func (d *DeleteDataSource) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteDataSourceOnce, exampleOutputDeleteDataSourceBytes, &exampleOutputDeleteDataSource)
+}
+
+//go:embed example_output_index_knowledge_base.json
+var exampleOutputIndexKnowledgeBaseBytes []byte
+
+var exampleOutputIndexKnowledgeBaseOnce sync.Once
+var exampleOutputIndexKnowledgeBase map[string]any
+
+func (i *IndexKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputIndexKnowledgeBaseOnce, exampleOutputIndexKnowledgeBaseBytes, &exampleOutputIndexKnowledgeBase)
 }
 
 //go:embed example_output_create_knowledge_base.json

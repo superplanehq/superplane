@@ -3,6 +3,8 @@ import type { AiBuilderMessage, AiBuilderProposal } from "./agentChat";
 import { normalizeAiProposal } from "./agentChatProposal";
 
 type JsonObject = Record<string, unknown>;
+type ToolEvent = Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>;
+type FinalAnswerOutput = string | { answer?: string; proposal?: AiBuilderProposal };
 
 export type ChatStreamEvent =
   | { type: "run_started"; model?: string }
@@ -14,7 +16,7 @@ export type ChatStreamEvent =
       tool_call_id?: string;
       tool_label?: string;
     }
-  | { type: "final_answer"; output?: unknown }
+  | { type: "final_answer"; output?: FinalAnswerOutput }
   | { type: "run_failed"; error?: string }
   | { type: "run_completed" }
   | { type: "done" }
@@ -83,9 +85,26 @@ function normalizeToolFinishedEvent(value: JsonObject): ChatStreamEvent {
 }
 
 function normalizeFinalAnswerEvent(value: JsonObject): ChatStreamEvent {
+  const output = value.output;
+  if (typeof output === "string") {
+    return {
+      type: "final_answer",
+      output,
+    };
+  }
+
+  if (isRecord(output)) {
+    return {
+      type: "final_answer",
+      output: {
+        answer: typeof output.answer === "string" ? output.answer : undefined,
+        proposal: normalizeAiProposal(output.proposal) ?? undefined,
+      },
+    };
+  }
+
   return {
     type: "final_answer",
-    output: value.output,
   };
 }
 
@@ -167,6 +186,36 @@ function createToolCallId(toolName: string, toolCallId?: string): string {
   return typeof toolCallId === "string" && toolCallId.trim().length > 0 ? toolCallId : `${toolName}-${Date.now()}`;
 }
 
+function collapseWithFinishedEvent(
+  event: ToolEvent,
+  pendingEvents: ToolEvent[],
+): { effectiveEvent: ToolEvent; wasCollapsed: boolean } {
+  if (event.type !== "tool_started") {
+    return { effectiveEvent: event, wasCollapsed: false };
+  }
+
+  const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
+  const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
+
+  const finishedIdx = pendingEvents.findIndex((e) => {
+    if (e.type !== "tool_finished") {
+      return false;
+    }
+    const eName = typeof e.tool_name === "string" ? e.tool_name : "unknown";
+    const eHasId = typeof e.tool_call_id === "string" && e.tool_call_id.trim().length > 0;
+    if (hasExplicitCallId || eHasId) {
+      return hasExplicitCallId && eHasId && e.tool_call_id === event.tool_call_id;
+    }
+    return eName === toolName;
+  });
+
+  if (finishedIdx >= 0) {
+    return { effectiveEvent: pendingEvents.splice(finishedIdx, 1)[0], wasCollapsed: true };
+  }
+
+  return { effectiveEvent: event, wasCollapsed: false };
+}
+
 function createAssistantStreamController({
   assistantMessageId,
   insertAiMessageBefore,
@@ -181,6 +230,9 @@ function createAssistantStreamController({
   let assistantContentSnapshot = "";
   let pendingRenderBuffer = "";
   let isRenderLoopRunning = false;
+  const pendingToolEvents: ToolEvent[] = [];
+  let isToolLoopRunning = false;
+  const flushedToolCallIds = new Set<string>();
 
   const flushPendingRenderBuffer = async () => {
     if (isRenderLoopRunning) {
@@ -214,36 +266,74 @@ function createAssistantStreamController({
     void flushPendingRenderBuffer();
   };
 
-  const upsertToolMessage = (event: Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>) => {
+  const applyToolEvent = (event: ToolEvent): boolean => {
     const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
+    const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
     const toolCallId = createToolCallId(toolName, event.tool_call_id);
     const toolLabel = typeof event.tool_label === "string" ? event.tool_label.trim() : "";
     const content = event.type === "tool_started" ? `${toolLabel}...` : toolLabel;
     const toolStatus = event.type === "tool_started" ? "running" : "completed";
 
+    const isAlreadyTracked = flushedToolCallIds.has(toolCallId);
+    const isNameBasedUpdate = !isAlreadyTracked && event.type === "tool_finished" && !hasExplicitCallId;
+    const isNewInsertion = !isAlreadyTracked && !isNameBasedUpdate;
+
+    flushedToolCallIds.add(toolCallId);
+
     setAiMessages((previous) => {
-      const existingIndex = previous.findIndex(
-        (message) => message.role === "tool" && message.toolCallId === toolCallId,
-      );
-      const nextMessage: AiBuilderMessage = {
-        id: existingIndex >= 0 ? previous[existingIndex].id : `tool-${toolCallId}`,
-        role: "tool",
-        content,
-        toolCallId,
-        toolStatus,
-      };
+      let existingIndex = previous.findIndex((message) => message.role === "tool" && message.toolCallId === toolCallId);
+
+      if (existingIndex < 0 && event.type === "tool_finished" && !hasExplicitCallId && toolLabel.length > 0) {
+        existingIndex = previous.findIndex(
+          (message) =>
+            message.role === "tool" && message.toolStatus === "running" && message.content.startsWith(toolLabel),
+        );
+      }
+
       if (existingIndex >= 0) {
         const updated = [...previous];
-        updated[existingIndex] = nextMessage;
+        updated[existingIndex] = { ...previous[existingIndex], content, toolStatus };
         return trimAiMessages(updated);
       }
 
-      return insertAiMessageBefore(previous, nextMessage, assistantMessageId);
+      return insertAiMessageBefore(
+        previous,
+        { id: `tool-${toolCallId}`, role: "tool", content, toolCallId, toolStatus },
+        assistantMessageId,
+      );
     });
+
+    return isNewInsertion;
+  };
+
+  const flushPendingToolEvents = async () => {
+    if (isToolLoopRunning) {
+      return;
+    }
+
+    isToolLoopRunning = true;
+    try {
+      while (pendingToolEvents.length > 0) {
+        const event = pendingToolEvents.shift()!;
+        const { effectiveEvent, wasCollapsed } = collapseWithFinishedEvent(event, pendingToolEvents);
+        const isNewInsertion = applyToolEvent(effectiveEvent);
+
+        if (isNewInsertion || wasCollapsed) {
+          await sleep(150);
+        }
+      }
+    } finally {
+      isToolLoopRunning = false;
+    }
+  };
+
+  const upsertToolMessage = (event: ToolEvent) => {
+    pendingToolEvents.push(event);
+    void flushPendingToolEvents();
   };
 
   const waitForRenderLoopIdle = async () => {
-    while (isRenderLoopRunning || pendingRenderBuffer.length > 0) {
+    while (isRenderLoopRunning || pendingRenderBuffer.length > 0 || isToolLoopRunning || pendingToolEvents.length > 0) {
       await sleep(10);
     }
   };
@@ -264,15 +354,15 @@ function appendFinalAnswerContent({
   testModeHint,
   testModelSentinel,
 }: {
-  output: unknown;
+  output?: FinalAnswerOutput;
   state: StreamState;
   appendAssistantContent: (chunk: string) => void;
   setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
   testModeHint: string;
   testModelSentinel: string;
 }): void {
-  if (isRecord(output)) {
-    setPendingProposal(normalizeAiProposal(output.proposal));
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    setPendingProposal(output.proposal ?? null);
   }
 
   if (state.streamedAnyAnswer) {
@@ -295,7 +385,7 @@ function appendFinalAnswerContent({
     return;
   }
 
-  if (isRecord(output) && typeof output.answer === "string") {
+  if (output && typeof output === "object" && !Array.isArray(output) && typeof output.answer === "string") {
     state.streamedAnyAnswer = true;
     appendAssistantContent(output.answer);
   }

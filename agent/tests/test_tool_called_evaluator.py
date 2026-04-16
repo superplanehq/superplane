@@ -1,7 +1,7 @@
 from pydantic_evals.evaluators import EvaluatorContext
 from pydantic_evals.otel._errors import SpanTreeRecordingError
 
-from ai.models import CanvasAnswer, CanvasProposal
+from ai.models import CanvasAnswer, CanvasChangeset, CanvasProposal
 from evals.evaluators.tool_called import ToolCalled
 from evals.run_tool_registry import clear_tool_call_registry, record_tool_call
 
@@ -29,7 +29,7 @@ def test_tool_called_passes_when_tool_invoked() -> None:
         answer = CanvasAnswer(
             answer="ok",
             confidence=0.5,
-            proposal=CanvasProposal(summary="s", operations=[]),
+            proposal=CanvasProposal(summary="s", changeset=CanvasChangeset(changes=[])),
         )
         result = ToolCalled("describe_component").evaluate(_ctx(q, answer))
         assert result.value is True

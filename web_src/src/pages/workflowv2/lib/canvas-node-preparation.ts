@@ -7,8 +7,8 @@ import {
   type CanvasesCanvasNodeExecution,
   type CanvasesCanvasNodeQueueItem,
   type ComponentsComponent,
-  type ComponentsEdge,
-  type ComponentsNode,
+  type SuperplaneComponentsEdge as ComponentsEdge,
+  type SuperplaneComponentsNode as ComponentsNode,
   type TriggersTrigger,
 } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";

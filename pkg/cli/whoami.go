@@ -17,32 +17,35 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	organizationLabel := response.User.GetOrganizationId()
-	var versioningEnabled *bool
+	var changeManagementEnabled *bool
 	if response.User.HasOrganizationId() && response.User.GetOrganizationId() != "" {
 		orgResponse, _, err := ctx.API.OrganizationAPI.
 			OrganizationsDescribeOrganization(ctx.Context, response.User.GetOrganizationId()).
 			Execute()
 
-		if err == nil && orgResponse != nil && orgResponse.Organization != nil && orgResponse.Organization.Metadata != nil {
-			metadata := orgResponse.Organization.Metadata
-			if metadata.Name != nil && *metadata.Name != "" {
-				organizationLabel = *metadata.Name
+		if err == nil && orgResponse != nil && orgResponse.Organization != nil {
+			if orgResponse.Organization.Metadata != nil {
+				metadata := orgResponse.Organization.Metadata
+				if metadata.Name != nil && *metadata.Name != "" {
+					organizationLabel = *metadata.Name
+				}
 			}
 
-			if enabled, ok := metadata.GetVersioningEnabledOk(); ok {
-				versioningEnabled = enabled
+			spec := orgResponse.Organization.GetSpec()
+			if enabled, ok := spec.GetChangeManagementEnabledOk(); ok {
+				changeManagementEnabled = enabled
 			}
 		}
 	}
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			versioningLabel := "unknown"
-			if versioningEnabled != nil {
-				if *versioningEnabled {
-					versioningLabel = "enabled"
+			changeManagementLabel := "unknown"
+			if changeManagementEnabled != nil {
+				if *changeManagementEnabled {
+					changeManagementLabel = "enabled"
 				} else {
-					versioningLabel = "disabled"
+					changeManagementLabel = "disabled"
 				}
 			}
 
@@ -50,17 +53,17 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 			_, _ = fmt.Fprintf(stdout, "Email: %s\n", response.User.GetEmail())
 			_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", response.User.GetOrganizationId())
 			_, _ = fmt.Fprintf(stdout, "Organization: %s\n", organizationLabel)
-			_, _ = fmt.Fprintf(stdout, "Canvas Versioning: %s\n", versioningLabel)
+			_, _ = fmt.Fprintf(stdout, "Change Management: %s\n", changeManagementLabel)
 			return nil
 		})
 	}
 
 	return ctx.Renderer.Render(map[string]any{
-		"id":                response.User.GetId(),
-		"email":             response.User.GetEmail(),
-		"organizationId":    response.User.GetOrganizationId(),
-		"organizationName":  organizationLabel,
-		"versioningEnabled": versioningEnabled,
+		"id":                      response.User.GetId(),
+		"email":                   response.User.GetEmail(),
+		"organizationId":          response.User.GetOrganizationId(),
+		"organizationName":        organizationLabel,
+		"changeManagementEnabled": changeManagementEnabled,
 	})
 }
 
