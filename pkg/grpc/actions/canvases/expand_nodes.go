@@ -51,10 +51,6 @@ func expandNodes(organizationID string, nodes []models.Node) ([]models.Node, err
 	return expanded, nil
 }
 
-func ExpandNodes(organizationID string, nodes []models.Node) ([]models.Node, error) {
-	return expandNodes(organizationID, nodes)
-}
-
 func cloneMetadata(md map[string]any) map[string]any {
 	out := map[string]any{}
 	for k, v := range md {
