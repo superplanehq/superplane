@@ -1011,7 +1011,7 @@ message CanvasChangeset {
       google.protobuf.Struct configuration = 4;
       string integration_id = 5;
       Components.Position position = 6;
-      bool is_collapsed = 7;
+      optional bool is_collapsed = 7;
     }
 
     message Edge {

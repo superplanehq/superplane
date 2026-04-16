@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentspb "github.com/superplanehq/superplane/pkg/protos/components"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -208,9 +209,10 @@ func blockNameFromNode(node models.Node) string {
 
 func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_Node, error) {
 	n := &pb.CanvasChangeset_Change_Node{
-		Id:          proposedNode.ID,
-		Name:        proposedNode.Name,
-		IsCollapsed: proposedNode.IsCollapsed,
+		Id:   proposedNode.ID,
+		Name: proposedNode.Name,
+		// Keep explicit presence for add-node changes.
+		IsCollapsed: proto.Bool(proposedNode.IsCollapsed),
 		Position: &componentspb.Position{
 			X: int32(proposedNode.Position.X),
 			Y: int32(proposedNode.Position.Y),
@@ -275,7 +277,7 @@ func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (
 	// If the collapsed state is different, we set it in the change.
 	//
 	if proposedNode.IsCollapsed != currentNode.IsCollapsed {
-		n.IsCollapsed = proposedNode.IsCollapsed
+		n.IsCollapsed = proto.Bool(proposedNode.IsCollapsed)
 	}
 
 	return n, nil

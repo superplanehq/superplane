@@ -179,7 +179,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	now := time.Now()
 	newNode := models.CanvasNode{
 		WorkflowID:        p.live.WorkflowID,
-		NodeID:            p.getNewNodeID(node),
+		NodeID:            p.ensureNewNodeID(node),
 		Name:              node.Name,
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
@@ -204,11 +204,20 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	}
 
 	//
-	// If an error happens when setting up the node,
-	// we propagate that into the finalNodes that are
-	// going to be saved into workflow_versions.nodes.
+	// If node is already in error state, no need to run Setup() for it.
 	//
-	if err := p.setupNode(ctx, &newNode); err != nil {
+	if newNode.State == models.CanvasNodeStateError {
+		return p.tx.Create(&newNode).Error
+	}
+
+	//
+	// Otherwise, run Setup() for the node.
+	//
+	// If an error happens when setting up the node, we propagate that into
+	// the finalNodes that are going to be saved into workflow_versions.nodes.
+	//
+	err := p.setupNode(ctx, &newNode)
+	if err != nil {
 		errorMsg := err.Error()
 		newNode.State = models.CanvasNodeStateError
 		newNode.StateReason = &errorMsg
@@ -216,9 +225,6 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		p.finalNodes[node.ID] = node
 	}
 
-	//
-	// Create the new node.
-	//
 	return p.tx.Create(&newNode).Error
 }
 
@@ -267,11 +273,19 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	existingNode.UpdatedAt = &now
 
 	//
+	// If node is already in error state, no need to run Setup() for it.
+	//
+	if existingNode.State == models.CanvasNodeStateError {
+		return p.tx.Save(&existingNode).Error
+	}
+
+	//
 	// If an error happens when setting up the node,
 	// we propagate that into the finalNodes that are
 	// going to be saved into workflow_versions.nodes.
 	//
-	if err := p.setupNode(ctx, &existingNode); err != nil {
+	err := p.setupNode(ctx, &existingNode)
+	if err != nil {
 		errorMsg := err.Error()
 		existingNode.State = models.CanvasNodeStateError
 		existingNode.StateReason = &errorMsg
@@ -394,7 +408,7 @@ func (p *CanvasPublisher) setupComponent(ctx context.Context, node *models.Canva
 	return component.Setup(setupCtx)
 }
 
-func (p *CanvasPublisher) getNewNodeID(node models.Node) string {
+func (p *CanvasPublisher) ensureNewNodeID(node models.Node) string {
 
 	//
 	// If node ID has not been used yet, just use it.
@@ -410,6 +424,12 @@ func (p *CanvasPublisher) getNewNodeID(node models.Node) string {
 
 	//
 	// If node ID has been used, generate a new one.
+	// Here, we update p.finalNodes to ensure that the new ID
+	// is propagated to the nodes saved in the workflow_versions.nodes record.
 	//
-	return models.GenerateUniqueNodeID(node, reservedIDs)
+	newNodeID := models.GenerateUniqueNodeID(node, reservedIDs)
+	delete(p.finalNodes, node.ID)
+	node.ID = newNodeID
+	p.finalNodes[newNodeID] = node
+	return newNodeID
 }

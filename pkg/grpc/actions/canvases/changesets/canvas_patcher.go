@@ -322,7 +322,7 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		currentNode.Position.Y = int(node.GetPosition().GetY())
 	}
 
-	if node.GetIsCollapsed() != currentNode.IsCollapsed {
+	if node.IsCollapsed != nil {
 		currentNode.IsCollapsed = node.GetIsCollapsed()
 	}
 
