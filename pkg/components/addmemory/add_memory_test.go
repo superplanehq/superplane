@@ -36,7 +36,6 @@ func TestAddMemoryExecute(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{}
 		memoryCtx := &canvasMemoryContext{}
 		execMetadata := &contexts.MetadataContext{}
-		nodeMetadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -48,7 +47,7 @@ func TestAddMemoryExecute(t *testing.T) {
 				},
 			},
 			Metadata:       execMetadata,
-			NodeMetadata:   nodeMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
 			CanvasMemory:   memoryCtx,
 			ExecutionState: execState,
 		})
@@ -67,7 +66,7 @@ func TestAddMemoryExecute(t *testing.T) {
 				"namespace": "machines",
 				"fields":    []string{"id", "pull_request", "creator"},
 			},
-			nodeMetadata.Get(),
+			execMetadata.Get(),
 		)
 		assert.True(t, execState.Passed)
 		assert.Equal(t, "default", execState.Channel)

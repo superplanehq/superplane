@@ -344,7 +344,7 @@ func (t *OnIncidentTimelineEvent) Cleanup(ctx core.TriggerContext) error {
 }
 
 // loadOnIncidentTimelineEventMetadata pulls persisted state for deduping repeated webhook deliveries.
-func loadOnIncidentTimelineEventMetadata(ctx core.MetadataContext) OnIncidentTimelineEventMetadata {
+func loadOnIncidentTimelineEventMetadata(ctx core.MetadataWriter) OnIncidentTimelineEventMetadata {
 	if ctx == nil {
 		return OnIncidentTimelineEventMetadata{EventStates: map[string]string{}}
 	}

@@ -328,7 +328,7 @@ func setupComponent(
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
-		Auth:          contexts.NewAuthContext(tx, orgID, authService, nil),
+		Auth:          contexts.NewAuthReader(tx, orgID, authService, nil),
 	}
 
 	if node.AppInstallationID != nil {

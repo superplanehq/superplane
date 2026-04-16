@@ -2289,6 +2289,136 @@ func (c *Client) ListApps() ([]App, error) {
 	return response.Apps, nil
 }
 
+type DatabaseClusterConnection struct {
+	Host string `json:"host,omitempty"`
+	Port int    `json:"port,omitempty"`
+	User string `json:"user,omitempty"`
+	URI  string `json:"uri,omitempty"`
+	SSL  bool   `json:"ssl,omitempty"`
+}
+
+type DatabaseOptionLayout struct {
+	NumNodes int      `json:"num_nodes"`
+	Sizes    []string `json:"sizes"`
+}
+
+type DatabaseEngineOptions struct {
+	Regions        []string               `json:"regions"`
+	Versions       []string               `json:"versions"`
+	Layouts        []DatabaseOptionLayout `json:"layouts"`
+	DefaultVersion string                 `json:"default_version,omitempty"`
+}
+
+type DatabaseCluster struct {
+	ID                 string                     `json:"id"`
+	Name               string                     `json:"name"`
+	Engine             string                     `json:"engine,omitempty"`
+	Version            string                     `json:"version,omitempty"`
+	Region             string                     `json:"region,omitempty"`
+	Size               string                     `json:"size,omitempty"`
+	NumNodes           int                        `json:"num_nodes,omitempty"`
+	Status             string                     `json:"status,omitempty"`
+	CreatedAt          string                     `json:"created_at,omitempty"`
+	PrivateNetworkUUID string                     `json:"private_network_uuid,omitempty"`
+	Connection         *DatabaseClusterConnection `json:"connection,omitempty"`
+	PrivateConnection  *DatabaseClusterConnection `json:"private_connection,omitempty"`
+}
+
+type CreateDatabaseClusterRequest struct {
+	Name     string `json:"name"`
+	Engine   string `json:"engine"`
+	Version  string `json:"version"`
+	Region   string `json:"region"`
+	Size     string `json:"size"`
+	NumNodes int    `json:"num_nodes"`
+}
+
+func (c *Client) GetDatabaseOptions() (map[string]DatabaseEngineOptions, error) {
+	url := fmt.Sprintf("%s/databases/options", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Options map[string]DatabaseEngineOptions `json:"options"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if response.Options == nil {
+		return map[string]DatabaseEngineOptions{}, nil
+	}
+
+	return response.Options, nil
+}
+
+func (c *Client) ListDatabaseClusters() ([]DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []DatabaseCluster `json:"databases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if response.Databases == nil {
+		return []DatabaseCluster{}, nil
+	}
+
+	return response.Databases, nil
+}
+
+func (c *Client) CreateDatabaseCluster(req CreateDatabaseClusterRequest) (*DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database DatabaseCluster `json:"database"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Database, nil
+}
+
+func (c *Client) GetDatabaseCluster(clusterID string) (*DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases/%s", c.BaseURL, clusterID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database DatabaseCluster `json:"database"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Database, nil
+}
+
 // EmbeddingModel represents a DigitalOcean Gradient AI embedding model
 type EmbeddingModel struct {
 	UUID               string `json:"uuid"`
@@ -2387,6 +2517,10 @@ type KnowledgeBase struct {
 	LastIndexingJob    *IndexJob `json:"last_indexing_job"`
 	CreatedAt          string    `json:"created_at"`
 	UpdatedAt          string    `json:"updated_at"`
+
+	// DatabaseStatus is a sibling field in the API response (not inside knowledge_base).
+	// It is populated by GetKnowledgeBase after parsing the response.
+	DatabaseStatus string `json:"-"`
 }
 
 // GetKnowledgeBase retrieves a knowledge base by its UUID
@@ -2398,13 +2532,15 @@ func (c *Client) GetKnowledgeBase(kbUUID string) (*KnowledgeBase, error) {
 	}
 
 	var response struct {
-		KnowledgeBase KnowledgeBase `json:"knowledge_base"`
+		KnowledgeBase  KnowledgeBase `json:"knowledge_base"`
+		DatabaseStatus string        `json:"database_status"`
 	}
 
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
+	response.KnowledgeBase.DatabaseStatus = response.DatabaseStatus
 	return &response.KnowledgeBase, nil
 }
 
@@ -2476,15 +2612,56 @@ func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*Knowledge
 
 // IndexJob represents a DigitalOcean Gradient AI knowledge base indexing job
 type IndexJob struct {
-	UUID   string `json:"uuid"`
-	Status string `json:"status"`
+	UUID                 string `json:"uuid"`
+	Status               string `json:"status"`
+	Phase                string `json:"phase"`
+	Tokens               int    `json:"tokens"`
+	TotalTokens          string `json:"total_tokens"`
+	CompletedDataSources int    `json:"completed_datasources"`
+	TotalDataSources     int    `json:"total_datasources"`
+	StartedAt            string `json:"started_at"`
+	FinishedAt           string `json:"finished_at"`
+	CreatedAt            string `json:"created_at"`
+	UpdatedAt            string `json:"updated_at"`
+	IsReportAvailable    bool   `json:"is_report_available"`
+	KnowledgeBaseUUID    string `json:"knowledge_base_uuid"`
 }
 
-// StartIndexingJob triggers a new indexing job for a knowledge base
-func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
-	url := fmt.Sprintf("%s/gen-ai/index_jobs", c.BaseURL)
+// GetIndexingJob retrieves an indexing job by its UUID.
+func (c *Client) GetIndexingJob(jobUUID string) (*IndexJob, error) {
+	url := fmt.Sprintf("%s/gen-ai/indexing_jobs/%s", c.BaseURL, jobUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
 
-	body, err := json.Marshal(map[string]string{"knowledge_base_uuid": kbUUID})
+	var response struct {
+		Job IndexJob `json:"job"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if strings.TrimSpace(response.Job.UUID) == "" {
+		return nil, fmt.Errorf("error parsing response: missing job uuid")
+	}
+
+	return &response.Job, nil
+}
+
+// StartIndexingJob triggers a new indexing job for a knowledge base.
+// If dataSourceUUIDs are provided, only those data sources will be indexed.
+// If none are provided, all data sources in the knowledge base will be indexed.
+func (c *Client) StartIndexingJob(kbUUID string, dataSourceUUIDs ...string) (*IndexJob, error) {
+	url := fmt.Sprintf("%s/gen-ai/indexing_jobs", c.BaseURL)
+
+	payload := map[string]any{"knowledge_base_uuid": kbUUID}
+	if len(dataSourceUUIDs) > 0 {
+		payload["data_source_uuids"] = dataSourceUUIDs
+	}
+
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %v", err)
 	}
@@ -2495,14 +2672,83 @@ func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
 	}
 
 	var response struct {
-		IndexJob IndexJob `json:"index_job"`
+		Job IndexJob `json:"job"`
 	}
 
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	return &response.IndexJob, nil
+	if strings.TrimSpace(response.Job.UUID) == "" {
+		return nil, fmt.Errorf("error parsing response: missing job uuid")
+	}
+
+	return &response.Job, nil
+}
+
+// DeleteKBDataSource removes a data source from a knowledge base
+func (c *Client) DeleteKBDataSource(kbUUID, dsUUID string) error {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s/data_sources/%s", c.BaseURL, kbUUID, dsUUID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// AddKBDataSource adds a data source to an existing knowledge base
+func (c *Client) AddKBDataSource(kbUUID string, ds KBDataSource) (*KBDataSourceInfo, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s/data_sources", c.BaseURL, kbUUID)
+
+	body, err := json.Marshal(ds)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		DataSource KBDataSourceInfo `json:"knowledge_base_data_source"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.DataSource, nil
+}
+
+// KBDataSourceInfo represents a data source returned by the list data sources endpoint.
+// Spaces sources use flat fields (bucket_name, region, item_path).
+// Web sources use a nested web_crawler_data_source object.
+type KBDataSourceInfo struct {
+	UUID                 string                  `json:"uuid"`
+	BucketName           string                  `json:"bucket_name,omitempty"`
+	Region               string                  `json:"region,omitempty"`
+	ItemPath             string                  `json:"item_path,omitempty"`
+	WebCrawlerDataSource *KBWebCrawlerDataSource `json:"web_crawler_data_source,omitempty"`
+	ChunkingAlgorithm    string                  `json:"chunking_algorithm,omitempty"`
+	CreatedAt            string                  `json:"created_at,omitempty"`
+	UpdatedAt            string                  `json:"updated_at,omitempty"`
+}
+
+// ListKBDataSources retrieves all data sources for a knowledge base
+func (c *Client) ListKBDataSources(kbUUID string) ([]KBDataSourceInfo, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s/data_sources?per_page=200", c.BaseURL, kbUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		DataSources []KBDataSourceInfo `json:"knowledge_base_data_sources"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.DataSources, nil
 }
 
 // AgentKnowledgeBase represents a knowledge base attached to a GradientAI agent

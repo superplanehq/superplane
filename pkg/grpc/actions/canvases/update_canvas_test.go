@@ -21,7 +21,7 @@ func Test__UpdateCanvas(t *testing.T) {
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		name := "name"
 		description := "description"
-		_, err := UpdateCanvas(context.Background(), r.AuthService, r.Organization.ID.String(), "invalid-id", &name, &description, nil, nil)
+		_, err := UpdateCanvas(context.Background(), r.AuthService, r.Organization.ID.String(), "invalid-id", &name, &description, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -35,7 +35,6 @@ func Test__UpdateCanvas(t *testing.T) {
 			uuid.New().String(),
 			stringPointer("updated-name"),
 			stringPointer("updated-description"),
-			nil,
 			nil,
 		)
 		s, ok := status.FromError(err)
@@ -53,7 +52,6 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			stringPointer("   "),
 			stringPointer("description"),
-			nil,
 			nil,
 		)
 		s, ok := status.FromError(err)
@@ -73,7 +71,6 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			&newName,
 			&newDescription,
-			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -102,20 +99,18 @@ func Test__UpdateCanvas(t *testing.T) {
 			&existingCanvas.Name,
 			&targetCanvas.Description,
 			nil,
-			nil,
 		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.AlreadyExists, s.Code())
 	})
 
-	t.Run("updates canvas versioning setting", func(t *testing.T) {
+	t.Run("updates canvas change management setting", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("change_management_enabled", true).Error,
 		)
-		enabled := true
 
 		response, err := UpdateCanvas(
 			context.Background(),
@@ -124,28 +119,27 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			nil,
 			nil,
-			&enabled,
-			nil,
+			&pb.Canvas_ChangeManagement{Enabled: true},
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
-		require.NotNil(t, response.Canvas.Metadata)
-		assert.True(t, response.Canvas.Metadata.VersioningEnabled)
+		require.NotNil(t, response.Canvas.Spec)
+		require.NotNil(t, response.Canvas.Spec.ChangeManagement)
+		assert.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
-		assert.True(t, updatedCanvas.VersioningEnabled)
+		assert.True(t, updatedCanvas.ChangeManagementEnabled)
 	})
 
-	t.Run("organization versioning enabled keeps effective canvas versioning enabled", func(t *testing.T) {
+	t.Run("organization change management enabled keeps effective canvas change management enabled", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("change_management_enabled", true).Error,
 		)
 
-		enabled := true
 		_, err := UpdateCanvas(
 			context.Background(),
 			r.AuthService,
@@ -153,12 +147,10 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			nil,
 			nil,
-			&enabled,
-			nil,
+			&pb.Canvas_ChangeManagement{Enabled: true},
 		)
 		require.NoError(t, err)
 
-		disabled := false
 		response, err := UpdateCanvas(
 			context.Background(),
 			r.AuthService,
@@ -166,28 +158,27 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			nil,
 			nil,
-			&disabled,
-			nil,
+			&pb.Canvas_ChangeManagement{Enabled: false},
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
-		require.NotNil(t, response.Canvas.Metadata)
-		assert.True(t, response.Canvas.Metadata.VersioningEnabled)
+		require.NotNil(t, response.Canvas.Spec)
+		require.NotNil(t, response.Canvas.Spec.ChangeManagement)
+		assert.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
-		assert.False(t, updatedCanvas.VersioningEnabled)
+		assert.False(t, updatedCanvas.ChangeManagementEnabled)
 	})
 
-	t.Run("organization versioning disabled allows effective canvas versioning to be enabled", func(t *testing.T) {
+	t.Run("organization change management disabled allows effective canvas change management to be enabled", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
 			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("change_management_enabled", false).Error,
 		)
 
-		enabled := true
 		response, err := UpdateCanvas(
 			context.Background(),
 			r.AuthService,
@@ -195,18 +186,18 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			nil,
 			nil,
-			&enabled,
-			nil,
+			&pb.Canvas_ChangeManagement{Enabled: true},
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
-		require.NotNil(t, response.Canvas.Metadata)
-		assert.True(t, response.Canvas.Metadata.VersioningEnabled)
+		require.NotNil(t, response.Canvas.Spec)
+		require.NotNil(t, response.Canvas.Spec.ChangeManagement)
+		assert.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
 
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
-		assert.True(t, updatedCanvas.VersioningEnabled)
+		assert.True(t, updatedCanvas.ChangeManagementEnabled)
 	})
 
 	t.Run("updates change request approval config", func(t *testing.T) {
@@ -220,11 +211,10 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			nil,
 			nil,
-			nil,
-			&pb.CanvasChangeRequestApprovalConfig{
-				Items: []*pb.CanvasChangeRequestApprover{
+			&pb.Canvas_ChangeManagement{
+				Approvals: []*pb.Canvas_ChangeManagement_Approver{
 					{
-						Type:   pb.CanvasChangeRequestApprover_TYPE_USER,
+						Type:   pb.Canvas_ChangeManagement_Approver_TYPE_USER,
 						UserId: user.ID.String(),
 					},
 				},
@@ -233,11 +223,11 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
-		require.NotNil(t, response.Canvas.Metadata)
-		require.NotNil(t, response.Canvas.Metadata.ChangeRequestApprovalConfig)
-		require.Len(t, response.Canvas.Metadata.ChangeRequestApprovalConfig.Items, 1)
-		assert.Equal(t, pb.CanvasChangeRequestApprover_TYPE_USER, response.Canvas.Metadata.ChangeRequestApprovalConfig.Items[0].Type)
-		assert.Equal(t, user.ID.String(), response.Canvas.Metadata.ChangeRequestApprovalConfig.Items[0].UserId)
+		require.NotNil(t, response.Canvas.Spec)
+		require.NotNil(t, response.Canvas.Spec.ChangeManagement)
+		require.Len(t, response.Canvas.Spec.ChangeManagement.Approvals, 1)
+		assert.Equal(t, pb.Canvas_ChangeManagement_Approver_TYPE_USER, response.Canvas.Spec.ChangeManagement.Approvals[0].Type)
+		assert.Equal(t, user.ID.String(), response.Canvas.Spec.ChangeManagement.Approvals[0].UserId)
 	})
 
 	t.Run("invalid change request approval config user returns invalid argument", func(t *testing.T) {
@@ -250,11 +240,10 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			nil,
 			nil,
-			nil,
-			&pb.CanvasChangeRequestApprovalConfig{
-				Items: []*pb.CanvasChangeRequestApprover{
+			&pb.Canvas_ChangeManagement{
+				Approvals: []*pb.Canvas_ChangeManagement_Approver{
 					{
-						Type:   pb.CanvasChangeRequestApprover_TYPE_USER,
+						Type:   pb.Canvas_ChangeManagement_Approver_TYPE_USER,
 						UserId: uuid.New().String(),
 					},
 				},
@@ -275,11 +264,10 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			nil,
 			nil,
-			nil,
-			&pb.CanvasChangeRequestApprovalConfig{
-				Items: []*pb.CanvasChangeRequestApprover{
-					{Type: pb.CanvasChangeRequestApprover_TYPE_ANYONE},
-					{Type: pb.CanvasChangeRequestApprover_TYPE_ANYONE},
+			&pb.Canvas_ChangeManagement{
+				Approvals: []*pb.Canvas_ChangeManagement_Approver{
+					{Type: pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE},
+					{Type: pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE},
 				},
 			},
 		)

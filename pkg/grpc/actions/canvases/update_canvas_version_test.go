@@ -20,16 +20,8 @@ import (
 func Test__UpdateCanvasVersion(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("versioning enabled at canvas level and no version id -> error", func(t *testing.T) {
+	t.Run("no version id -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", true).Error,
-		)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		_, err := UpdateCanvasVersion(
@@ -48,138 +40,12 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "canvas versioning is enabled")
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), "version id is required")
 	})
 
-	t.Run("versioning enabled at org level and no version id -> error", func(t *testing.T) {
+	t.Run("valid draft version id -> updates draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			"",
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-			r.AuthService,
-		)
-
-		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "canvas versioning is enabled")
-	})
-
-	t.Run("versioning disabled and version id provided -> error", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			canvas.LiveVersionID.String(),
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-			r.AuthService,
-		)
-
-		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "canvas versioning is disabled")
-	})
-
-	t.Run("deleted canvas returns not found instead of internal error", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-		// Simulate the race: outer FindCanvas succeeded (we have the canvas object),
-		// but the canvas is deleted before updateLiveCanvasWithoutVersioning's
-		// inner FindCanvasInTransaction runs.
-		require.NoError(t, database.Conn().Delete(&models.Canvas{}, "id = ?", canvas.ID).Error)
-
-		_, err := updateLiveCanvasWithoutVersioning(
-			context.Background(),
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID,
-			canvas,
-			nil,
-			nil,
-			"",
-			r.AuthService,
-		)
-
-		require.Error(t, err)
-		assert.Equal(t, codes.NotFound, status.Code(err))
-	})
-
-	t.Run("versioning disabled and no version id -> updates live canvas", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		response, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			"",
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-			r.AuthService,
-		)
-
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
-	})
-
-	t.Run("versioning enabled and valid draft version id -> updates draft", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", true).Error,
-		)
 
 		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
 		require.NoError(t, err)
@@ -205,10 +71,6 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 
 	t.Run("usage limit violation blocks oversized draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
-		)
 
 		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
 		require.NoError(t, err)
