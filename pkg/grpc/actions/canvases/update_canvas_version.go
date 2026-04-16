@@ -95,15 +95,18 @@ func UpdateCanvasVersionWithUsage(
 		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
 	}
 
-	expandedNodes, err := expandNodes(organizationID, nodes)
-	if err != nil {
-		return nil, err
-	}
+	err = usage.EnsureOrganizationWithinLimits(
+		ctx,
+		usageService,
+		organizationID,
+		&usagepb.OrganizationState{},
+		&usagepb.CanvasState{
+			Nodes: int32(len(nodes)),
+		},
+	)
 
-	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, organizationID, &usagepb.OrganizationState{}, &usagepb.CanvasState{
-		Nodes: int32(len(expandedNodes)),
-	}); err != nil {
-		return nil, err
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to ensure organization within limits: %v", err)
 	}
 
 	requestedVersionID := strings.TrimSpace(versionID)
