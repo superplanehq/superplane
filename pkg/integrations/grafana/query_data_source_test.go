@@ -385,6 +385,16 @@ func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
 	}
 }
 
+func Test__parseGrafanaQueryTimezone__rejectsNaNAndInf(t *testing.T) {
+	for _, bad := range []string{"NaN", "+Inf", "-Inf", "inf", "-inf"} {
+		t.Run(bad, func(t *testing.T) {
+			v := bad
+			_, err := parseGrafanaQueryTimezone(&v)
+			require.Error(t, err)
+		})
+	}
+}
+
 func Test__parseGrafanaQueryTimezone__zoneNameMatchesOffset(t *testing.T) {
 	tests := map[string]string{
 		"5.75":  "GMT+05:45",

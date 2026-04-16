@@ -346,6 +346,9 @@ func parseGrafanaQueryTimezone(timezone *string) (*time.Location, error) {
 	if err != nil {
 		return nil, fmt.Errorf("expected numeric offset like -5, 0, 5.5, or +8")
 	}
+	if math.IsNaN(offsetHours) || math.IsInf(offsetHours, 0) {
+		return nil, fmt.Errorf("expected numeric offset like -5, 0, 5.5, or +8")
+	}
 
 	if offsetHours < -12 || offsetHours > 14 {
 		return nil, fmt.Errorf("offset must be between -12 and +14 hours")
