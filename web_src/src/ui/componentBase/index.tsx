@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { AlertTriangle, PencilLine } from "lucide-react";
+import { AlertTriangle, Rabbit } from "lucide-react";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
@@ -297,8 +297,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
     return {
       ...emptyStateProps,
-      icon: emptyStateProps?.icon || PencilLine,
-      title: "Runtime data appears in live mode",
+      icon: Rabbit,
+      title: "Ready for runs...",
       description: undefined,
       purpose: "runtime" as const,
       tone: "neutral" as const,

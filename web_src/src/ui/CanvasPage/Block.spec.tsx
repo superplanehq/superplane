@@ -98,7 +98,7 @@ describe("Block fallback rendering", () => {
       />,
     );
 
-    expect(screen.getByText("Runtime data appears in live mode")).toBeInTheDocument();
+    expect(screen.getByText("Ready for runs...")).toBeInTheDocument();
     expect(screen.queryByText("Waiting for the first run")).not.toBeInTheDocument();
   });
 
@@ -116,7 +116,7 @@ describe("Block fallback rendering", () => {
     );
 
     expect(screen.getByText("Can't display")).toBeInTheDocument();
-    expect(screen.queryByText("Runtime data appears in live mode")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ready for runs...")).not.toBeInTheDocument();
   });
 
   it("does not highlight a right handle when the target node is already connected", () => {
