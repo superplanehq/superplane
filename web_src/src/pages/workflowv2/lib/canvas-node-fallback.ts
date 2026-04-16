@@ -17,6 +17,7 @@ function buildMinimalEmptyStateProps(icon?: ComponentType<{ size?: number }>) {
     icon,
     title: CANVAS_NODE_FALLBACK_MESSAGE,
     description: undefined,
+    purpose: "fallback" as const,
   };
 }
 
