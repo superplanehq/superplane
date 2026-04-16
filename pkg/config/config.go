@@ -25,3 +25,7 @@ func AgentHTTPURL() string {
 func AgentGRPCURL() string {
 	return os.Getenv("AGENT_GRPC_URL")
 }
+
+func IsSignupSurveyEnabled() bool {
+	return os.Getenv("SIGNUP_SURVEY_ENABLED") == "yes"
+}

@@ -22,6 +22,7 @@ import (
 	"github.com/markbates/goth/providers/google"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -131,7 +132,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err == nil {
-		a.handleSuccessfulAuth(w, r, gothUser)
+		a.handleSuccessfulAuth(w, r, gothUser, false)
 		return
 	}
 
@@ -168,7 +169,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	account, err := a.findOrCreateAccountForProvider(mockUser, allowSignupFromRequest(r))
+	account, created, err := a.findOrCreateAccountForProvider(mockUser, allowSignupFromRequest(r))
 
 	if err != nil {
 		if err.Error() == SignupDisabledError {
@@ -193,7 +194,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.handleSuccessfulAuth(w, r, mockUser)
+	a.handleSuccessfulAuth(w, r, mockUser, created)
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +204,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := a.findOrCreateAccountForProvider(gothUser, allowSignupFromRequest(r))
+	account, created, err := a.findOrCreateAccountForProvider(gothUser, allowSignupFromRequest(r))
 	if err != nil {
 		if err.Error() == SignupDisabledError {
 			http.Error(w, SignupDisabledError, http.StatusForbidden)
@@ -228,7 +229,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.handleSuccessfulAuth(w, r, gothUser)
+	a.handleSuccessfulAuth(w, r, gothUser, created)
 }
 
 func (a *Handler) acceptPendingInvitations(account *models.Account) error {
@@ -272,7 +273,7 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 	})
 }
 
-func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, created bool) {
 	account, err := models.FindAccountByEmail(gothUser.Email)
 	if err != nil {
 		http.Error(w, "Account not found", http.StatusNotFound)
@@ -295,7 +296,7 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	redirectURL := getRedirectURL(r)
+	redirectURL := postAuthRedirectURL(r, created)
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
@@ -506,7 +507,7 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	redirectURL := getRedirectURL(r)
+	redirectURL := postAuthRedirectURL(r, true)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
@@ -626,13 +627,13 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// 4. Find or create the account (policy already verified above).
-	account, err := a.findOrCreateAccountForMagicCode(email, r)
+	account, created, err := a.findOrCreateAccountForMagicCode(email, r)
 	if err != nil {
 		http.Error(w, err.Error(), errorStatusForAccountError(err))
 		return
 	}
 
-	a.issueSessionAndRedirect(w, r, account)
+	a.issueSessionAndRedirect(w, r, account, created)
 }
 
 func (a *Handler) parseMagicCodeInput(r *http.Request) (string, string, error) {
@@ -745,14 +746,14 @@ func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 
 // findOrCreateAccountForMagicCode returns the existing account or creates a
 // new one. Signup policy must already be verified by checkSignupPolicy.
-func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request) (*models.Account, error) {
+func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request) (*models.Account, bool, error) {
 	account, err := models.FindAccountByEmail(email)
 	if err == nil {
-		return account, nil
+		return account, false, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorf("Error finding account for %s: %v", email, err)
-		return nil, errAccountError
+		return nil, false, errAccountError
 	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
@@ -765,11 +766,12 @@ func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request)
 		account, err = models.FindAccountByEmail(email)
 		if err != nil {
 			log.Errorf("Failed to create or find account for %s: %v", email, err)
-			return nil, errAccountError
+			return nil, false, errAccountError
 		}
+		return account, false, nil
 	}
 
-	return account, nil
+	return account, true, nil
 }
 
 func errorStatusForAccountError(err error) int {
@@ -781,7 +783,7 @@ func errorStatusForAccountError(err error) int {
 	}
 }
 
-func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account) {
+func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account, created bool) {
 	if err := a.acceptPendingInvitations(account); err != nil {
 		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -805,8 +807,20 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	redirectURL := getRedirectURL(r)
+	redirectURL := postAuthRedirectURL(r, created)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
+// postAuthRedirectURL returns where to send the user after a successful auth.
+// Brand-new accounts are routed through the signup survey (with the original
+// destination preserved via ?next=) when the feature is enabled; everyone
+// else goes straight to their intended destination.
+func postAuthRedirectURL(r *http.Request, created bool) string {
+	dest := getRedirectURL(r)
+	if created && config.IsSignupSurveyEnabled() {
+		return "/signup-survey?next=" + url.QueryEscape(dest)
+	}
+	return dest
 }
 
 func generateMagicCode() (string, error) {
@@ -881,10 +895,11 @@ func (a *Handler) parseMagicLinkToken(tokenString string) (email string, code st
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
-	return a.findOrCreateAccountForProvider(gothUser, false)
+	account, _, err := a.findOrCreateAccountForProvider(gothUser, false)
+	return account, err
 }
 
-func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup bool) (*models.Account, error) {
+func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup bool) (*models.Account, bool, error) {
 	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
 
 	if err == nil {
@@ -894,32 +909,32 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 
 			if err != nil {
 				log.Errorf("Failed to update account email: %v", err)
-				return nil, fmt.Errorf("failed to update account email: %w", err)
+				return nil, false, fmt.Errorf("failed to update account email: %w", err)
 			}
 		}
-		return account, nil
+		return account, false, nil
 	}
 
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	account, err = models.FindAccountByEmail(gothUser.Email)
 	if err == nil {
-		return account, nil
+		return account, false, nil
 	}
 
 	if a.blockSignup && !allowSignup {
 		log.Warnf("Signup blocked for email: %s", gothUser.Email)
-		return nil, fmt.Errorf(SignupDisabledError)
+		return nil, false, fmt.Errorf(SignupDisabledError)
 	}
 
 	account, err = models.CreateAccount(gothUser.Name, gothUser.Email)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return account, nil
+	return account, true, nil
 }
 
 func allowSignupFromRequest(r *http.Request) bool {
