@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, PencilLine } from "lucide-react";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
@@ -123,6 +123,8 @@ export interface ComponentBaseSpec {
   contentType?: "json" | "xml" | "text";
 }
 
+export type EmptyStatePurpose = "runtime" | "setup" | "fallback";
+
 export type EventState = "success" | "failed" | "neutral" | "queued" | "running" | string;
 
 export interface EventStateStyle {
@@ -221,9 +223,12 @@ export interface ComponentBaseProps extends ComponentActionsProps {
     icon?: React.ComponentType<{ size?: number }>;
     title?: string;
     description?: string;
+    purpose?: EmptyStatePurpose;
+    tone?: "accent" | "neutral";
   };
   error?: string;
   warning?: string;
+  canvasMode?: "live" | "edit";
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -258,6 +263,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   error,
   warning,
   paused,
+  canvasMode = "live",
 }) => {
   const safeMetadata = Array.isArray(metadata) ? metadata : undefined;
   const safeSpecs = Array.isArray(specs) ? specs : undefined;
@@ -282,6 +288,22 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const hasError = safeError.trim() !== "";
   const hasWarning = safeWarning.trim() !== "";
   const hasBadge = hasError || hasWarning;
+  const emptyStatePurpose =
+    emptyStateProps?.purpose || (includeEmptyState ? (hasError ? "setup" : "runtime") : undefined);
+  const resolvedEmptyStateProps = React.useMemo(() => {
+    if (canvasMode !== "edit" || emptyStatePurpose !== "runtime") {
+      return emptyStateProps;
+    }
+
+    return {
+      ...emptyStateProps,
+      icon: emptyStateProps?.icon || PencilLine,
+      title: "Runtime data appears in live mode",
+      description: undefined,
+      purpose: "runtime" as const,
+      tone: "neutral" as const,
+    };
+  }, [canvasMode, emptyStateProps, emptyStatePurpose]);
   const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
   const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
@@ -474,7 +496,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               />
             ))}
 
-            {includeEmptyState && <EmptyState compact {...emptyStateProps} />}
+            {includeEmptyState && <EmptyState compact {...resolvedEmptyStateProps} />}
 
             {safeCustomFieldPosition === "after" &&
               (typeof safeCustomField === "function"
