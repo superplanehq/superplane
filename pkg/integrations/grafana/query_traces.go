@@ -157,7 +157,7 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		timeFrom, resolveErr := resolveQueryTimeValue(*spec.TimeFrom)
+		timeFrom, resolveErr := resolveQueryTimeValue(*spec.TimeFrom, nil)
 		request["from"] = timeFrom
 		err = resolveErr
 		if err != nil {
@@ -166,7 +166,7 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		timeTo, resolveErr := resolveQueryTimeValue(*spec.TimeTo)
+		timeTo, resolveErr := resolveQueryTimeValue(*spec.TimeTo, nil)
 		request["to"] = timeTo
 		err = resolveErr
 		if err != nil {
@@ -259,10 +259,10 @@ func validateQueryTracesSpec(spec QueryTracesSpec) error {
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")
 	}
-	if err := validateQueryTimeValue(spec.TimeFrom); err != nil {
+	if err := validateQueryTimeValue(spec.TimeFrom, nil); err != nil {
 		return fmt.Errorf("timeFrom: %w", err)
 	}
-	if err := validateQueryTimeValue(spec.TimeTo); err != nil {
+	if err := validateQueryTimeValue(spec.TimeTo, nil); err != nil {
 		return fmt.Errorf("timeTo: %w", err)
 	}
 	return nil

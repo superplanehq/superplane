@@ -144,7 +144,6 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Start time",
-			Default:     `{{ now() }}`,
 			Placeholder: `{{ now() }}`,
 		},
 		{
@@ -392,7 +391,7 @@ func parseAnnotationTime(s string) (time.Time, error) {
 		}
 	}
 
-	if t, ok, err := parseGrafanaQueryTime(trimmed); err != nil {
+	if t, ok, err := parseGrafanaQueryTime(trimmed, nil); err != nil {
 		return time.Time{}, err
 	} else if ok {
 		return t, nil

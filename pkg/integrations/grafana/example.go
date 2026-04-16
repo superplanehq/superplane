@@ -34,6 +34,12 @@ var exampleOutputQueryLogsBytes []byte
 //go:embed example_output_query_traces.json
 var exampleOutputQueryTracesBytes []byte
 
+//go:embed example_output_get_dashboard.json
+var exampleOutputGetDashboardBytes []byte
+
+//go:embed example_output_render_panel.json
+var exampleOutputRenderPanelBytes []byte
+
 //go:embed example_output_list_silences.json
 var exampleOutputListSilencesBytes []byte
 
@@ -81,6 +87,12 @@ var exampleOutputQueryLogs map[string]any
 
 var exampleOutputQueryTracesOnce sync.Once
 var exampleOutputQueryTraces map[string]any
+
+var exampleOutputGetDashboardOnce sync.Once
+var exampleOutputGetDashboard map[string]any
+
+var exampleOutputRenderPanelOnce sync.Once
+var exampleOutputRenderPanel map[string]any
 
 var exampleOutputListSilencesOnce sync.Once
 var exampleOutputListSilences map[string]any
@@ -157,6 +169,22 @@ func (q *QueryLogs) ExampleOutput() map[string]any {
 
 func (q *QueryTraces) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryTracesOnce, exampleOutputQueryTracesBytes, &exampleOutputQueryTraces)
+}
+
+func (c *GetDashboard) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetDashboardOnce,
+		exampleOutputGetDashboardBytes,
+		&exampleOutputGetDashboard,
+	)
+}
+
+func (c *RenderPanel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputRenderPanelOnce,
+		exampleOutputRenderPanelBytes,
+		&exampleOutputRenderPanel,
+	)
 }
 
 func (l *ListSilences) ExampleOutput() map[string]any {

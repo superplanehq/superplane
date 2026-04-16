@@ -31,6 +31,7 @@ export interface QueryDataSourceConfiguration {
   query: string;
   timeFrom?: string;
   timeTo?: string;
+  timezone?: string;
   format?: string;
 }
 
@@ -47,6 +48,48 @@ export interface QueryTracesConfiguration {
   query: string;
   timeFrom?: string;
   timeTo?: string;
+}
+
+export interface PanelSummary {
+  id?: number;
+  title?: string;
+  type?: string;
+}
+
+export interface DashboardDetails {
+  uid?: string;
+  title?: string;
+  slug?: string;
+  url?: string;
+  folderTitle?: string;
+  folder?: string;
+  tags?: string[];
+  panels?: PanelSummary[];
+}
+
+export interface DashboardNodeMetadata {
+  dashboardTitle?: string;
+  panelTitle?: string;
+  panelLabel?: string;
+}
+
+export interface GetDashboardConfiguration {
+  dashboard?: string;
+}
+
+export interface RenderPanelConfiguration {
+  dashboard?: string;
+  panel?: string | number;
+  width?: number;
+  height?: number;
+  from?: string;
+  to?: string;
+}
+
+export interface RenderPanelOutput {
+  url?: string;
+  dashboard?: string;
+  panel?: number;
 }
 
 export interface SilenceMatcher {

@@ -167,14 +167,14 @@ func (q *QueryLogs) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom)
+		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, nil)
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo)
+		request.To, err = resolveQueryTimeValue(*spec.TimeTo, nil)
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}
@@ -263,10 +263,10 @@ func validateQueryLogsSpec(spec QueryLogsSpec) error {
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")
 	}
-	if err := validateQueryTimeValue(spec.TimeFrom); err != nil {
+	if err := validateQueryTimeValue(spec.TimeFrom, nil); err != nil {
 		return fmt.Errorf("timeFrom: %w", err)
 	}
-	if err := validateQueryTimeValue(spec.TimeTo); err != nil {
+	if err := validateQueryTimeValue(spec.TimeTo, nil); err != nil {
 		return fmt.Errorf("timeTo: %w", err)
 	}
 	return nil
