@@ -298,7 +298,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     return {
       ...emptyStateProps,
       icon: Rabbit,
-      title: "Ready for runs...",
+      title: "Ready to run...",
       description: undefined,
       purpose: "runtime" as const,
       tone: "neutral" as const,
