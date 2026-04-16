@@ -187,6 +187,7 @@ func CreateCanvasWithAutoLayoutAndUsageAndSetup(
 		if err := createCanvasNodesInTransaction(
 			ctx,
 			tx,
+			false,
 			encryptor,
 			registry,
 			organizationUUID,
@@ -257,6 +258,7 @@ func createCanvasResponse(canvas *models.Canvas, creatorOrganizationID string) (
 func createCanvasNodesInTransaction(
 	ctx context.Context,
 	tx *gorm.DB,
+	allowSetup bool,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
 	organizationUUID uuid.UUID,
@@ -271,7 +273,7 @@ func createCanvasNodesInTransaction(
 		nodesByID[nodes[i].ID] = &nodes[i]
 	}
 
-	canSetupNodes := encryptor != nil && authService != nil
+	canSetupNodes := allowSetup && encryptor != nil && authService != nil
 
 	for _, node := range nodes {
 		canvasNode, nodeLevelErrorMessage, err := upsertNode(tx, existingNodes, node, canvasID)

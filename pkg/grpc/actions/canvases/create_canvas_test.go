@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"testing"
 	"time"
 
@@ -24,6 +25,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
+
+	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 )
 
 type fakeCanvasUsageService struct {
@@ -325,6 +328,65 @@ func TestCreateCanvasTemplateSkipsSetupValidationForOrgSpecificIntegrationNodes(
 	require.Nil(t, node.AppInstallationID)
 }
 
+func TestCreateCanvasSkipsRuntimeSetupForNonTemplateNodes(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvas := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name: "Canvas without runtime setup",
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-a",
+					Name: "Webhook trigger",
+					Type: componentpb.Node_TYPE_TRIGGER,
+					Trigger: &componentpb.Node_TriggerRef{
+						Name: "webhook",
+					},
+					Configuration: mustStruct(t, map[string]any{
+						"authentication": "none",
+					}),
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	response, err := CreateCanvasWithAutoLayoutAndUsageAndSetup(
+		ctx,
+		nil,
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvas,
+		nil,
+		"",
+		r.AuthService,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotNil(t, response.Canvas)
+	require.NotNil(t, response.Canvas.Metadata)
+	require.Equal(t, r.Organization.ID.String(), response.Canvas.Metadata.OrganizationId)
+	require.False(t, response.Canvas.Metadata.IsTemplate)
+
+	canvasID, err := uuid.Parse(response.Canvas.Metadata.Id)
+	require.NoError(t, err)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvasID, "node-a")
+	require.NoError(t, err)
+	require.Equal(t, models.CanvasNodeStateReady, node.State)
+	require.Nil(t, node.StateReason)
+	require.Nil(t, node.WebhookID)
+	require.Empty(t, node.Metadata.Data())
+
+	webhooks, err := models.ListPendingWebhooks()
+	require.NoError(t, err)
+	require.Empty(t, webhooks)
+}
+
 func TestCreateCanvasTemplateAutoLayoutReturnsInvalidArgument(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -356,6 +418,14 @@ func TestCreateCanvasTemplateAutoLayoutReturnsInvalidArgument(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	require.Contains(t, status.Convert(err).Message(), "failed to apply layout")
+}
+
+func TestTemplateCanvasAutoLayoutErrorUnwrapMatchesSentinelAndCause(t *testing.T) {
+	cause := errors.New("layout failed")
+	err := &templateCanvasAutoLayoutError{cause: cause}
+
+	require.True(t, errors.Is(err, errTemplateCanvasAutoLayout))
+	require.True(t, errors.Is(err, cause))
 }
 
 func mustStruct(t *testing.T, value map[string]any) *structpb.Struct {

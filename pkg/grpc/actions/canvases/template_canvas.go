@@ -24,8 +24,8 @@ func (e *templateCanvasAutoLayoutError) Error() string {
 	return e.cause.Error()
 }
 
-func (e *templateCanvasAutoLayoutError) Unwrap() error {
-	return errors.Join(errTemplateCanvasAutoLayout, e.cause)
+func (e *templateCanvasAutoLayoutError) Unwrap() []error {
+	return []error{errTemplateCanvasAutoLayout, e.cause}
 }
 
 // CreatePublishedTemplateCanvasWithoutSetupInTransaction persists a shared template
