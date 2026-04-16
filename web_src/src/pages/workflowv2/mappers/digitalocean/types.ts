@@ -209,6 +209,16 @@ export interface DatabaseNodeMetadata {
   databaseName?: string;
 }
 
+export interface CreateDatabaseConfiguration {
+  databaseCluster: string;
+  name: string;
+}
+
+export interface DeleteDatabaseConfiguration {
+  databaseCluster: string;
+  database: string;
+}
+
 export interface DatabaseClusterNodeMetadata {
   databaseClusterId?: string;
   databaseClusterName?: string;
@@ -231,6 +241,7 @@ export interface CreateDatabaseClusterConfiguration {
 export interface GetDatabaseClusterConfiguration {
   databaseCluster: string;
 }
+
 
 export interface CreateAppConfiguration {
   name: string;
