@@ -227,6 +227,20 @@ func (c *CreateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAppOnce, exampleOutputCreateAppBytes, &exampleOutputCreateApp)
 }
 
+//go:embed example_output_create_database_cluster.json
+var exampleOutputCreateDatabaseClusterBytes []byte
+
+var exampleOutputCreateDatabaseClusterOnce sync.Once
+var exampleOutputCreateDatabaseCluster map[string]any
+
+func (c *CreateDatabaseCluster) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateDatabaseClusterOnce,
+		exampleOutputCreateDatabaseClusterBytes,
+		&exampleOutputCreateDatabaseCluster,
+	)
+}
+
 //go:embed example_output_get_app.json
 var exampleOutputGetAppBytes []byte
 
@@ -235,6 +249,20 @@ var exampleOutputGetApp map[string]any
 
 func (g *GetApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAppOnce, exampleOutputGetAppBytes, &exampleOutputGetApp)
+}
+
+//go:embed example_output_get_database_cluster.json
+var exampleOutputGetDatabaseClusterBytes []byte
+
+var exampleOutputGetDatabaseClusterOnce sync.Once
+var exampleOutputGetDatabaseCluster map[string]any
+
+func (g *GetDatabaseCluster) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetDatabaseClusterOnce,
+		exampleOutputGetDatabaseClusterBytes,
+		&exampleOutputGetDatabaseCluster,
+	)
 }
 
 //go:embed example_output_delete_app.json
