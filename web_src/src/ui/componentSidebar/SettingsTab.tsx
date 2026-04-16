@@ -6,6 +6,7 @@ import type {
 } from "@/api-client";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,6 @@ import {
   validateFieldForSubmission,
 } from "@/lib/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
-import { SimpleTooltip } from "./SimpleTooltip";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -585,7 +585,7 @@ export function SettingsTab({
 
                       const integrationStatusCard = (
                         <div
-                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 ${
                             selectedIntegrationFull.status?.state === "ready"
                               ? "bg-green-100 dark:bg-green-950/30"
                               : selectedIntegrationFull.status?.state === "error"
@@ -593,61 +593,64 @@ export function SettingsTab({
                                 : "bg-orange-100 dark:bg-orange-950/30"
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <IntegrationIcon
-                              integrationName={selectedIntegrationFull.spec?.integrationName}
-                              iconSlug={integrationDefinition?.icon}
-                              className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
-                            />
-                            <div className="min-w-0">
-                              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                                {getIntegrationTypeDisplayName(
-                                  undefined,
-                                  selectedIntegrationFull.spec?.integrationName,
-                                ) || "Integration"}
-                              </h3>
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <IntegrationIcon
+                                  integrationName={selectedIntegrationFull.spec?.integrationName}
+                                  iconSlug={integrationDefinition?.icon}
+                                  className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                                />
+                                <div className="min-w-0">
+                                  <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                                    {getIntegrationTypeDisplayName(
+                                      undefined,
+                                      selectedIntegrationFull.spec?.integrationName,
+                                    ) || "Integration"}
+                                  </h3>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                    selectedIntegrationFull.status?.state === "ready"
+                                      ? "border border-green-950/15 bg-green-100 text-green-800 dark:border-green-950/15 dark:bg-green-900/30 dark:text-green-400"
+                                      : selectedIntegrationFull.status?.state === "error"
+                                        ? "border border-red-950/15 bg-red-100 text-red-800 dark:border-red-950/15 dark:bg-red-900/30 dark:text-red-400"
+                                        : "border border-orange-950/15 bg-orange-100 text-yellow-800 dark:border-orange-950/15 dark:bg-orange-950/30 dark:text-yellow-400"
+                                  }`}
+                                >
+                                  {selectedIntegrationFull.status?.state
+                                    ? selectedIntegrationFull.status.state.charAt(0).toUpperCase() +
+                                      selectedIntegrationFull.status.state.slice(1)
+                                    : "Unknown"}
+                                </span>
+                                {selectedIntegrationFull.metadata?.id && onOpenConfigureIntegrationDialog && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-sm py-1.5"
+                                    onClick={() =>
+                                      onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)
+                                    }
+                                    disabled={isReadOnly || !allowUpdateIntegrations}
+                                  >
+                                    Configure...
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                selectedIntegrationFull.status?.state === "ready"
-                                  ? "border border-green-950/15 bg-green-100 text-green-800 dark:border-green-950/15 dark:bg-green-900/30 dark:text-green-400"
-                                  : selectedIntegrationFull.status?.state === "error"
-                                    ? "border border-red-950/15 bg-red-100 text-red-800 dark:border-red-950/15 dark:bg-red-900/30 dark:text-red-400"
-                                    : "border border-orange-950/15 bg-orange-100 text-yellow-800 dark:border-orange-950/15 dark:bg-orange-950/30 dark:text-yellow-400"
-                              }`}
-                            >
-                              {selectedIntegrationFull.status?.state
-                                ? selectedIntegrationFull.status.state.charAt(0).toUpperCase() +
-                                  selectedIntegrationFull.status.state.slice(1)
-                                : "Unknown"}
-                            </span>
-                            {selectedIntegrationFull.metadata?.id && onOpenConfigureIntegrationDialog && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-sm py-1.5"
-                                onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
-                                disabled={isReadOnly || !allowUpdateIntegrations}
-                              >
-                                Configure...
-                              </Button>
+                            {hasIntegrationError && (
+                              <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
+                                <TriangleAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                <p className="min-w-0 whitespace-pre-wrap break-words">
+                                  {selectedIntegrationFull.status?.stateDescription}
+                                </p>
+                              </div>
                             )}
                           </div>
                         </div>
                       );
-
-                      if (hasIntegrationError) {
-                        return (
-                          <SimpleTooltip
-                            content={selectedIntegrationFull.status?.stateDescription || ""}
-                            interactive={true}
-                          >
-                            {integrationStatusCard}
-                          </SimpleTooltip>
-                        );
-                      }
 
                       return integrationStatusCard;
                     })()}
