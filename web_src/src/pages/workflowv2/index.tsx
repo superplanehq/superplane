@@ -528,8 +528,8 @@ export function WorkflowPageV2() {
       return true;
     }
   });
-  /** After creating a change request, hide "Unpublished Changes" until the user enters edit mode again. */
-  const [suppressUnpublishedChangesBadge, setSuppressUnpublishedChangesBadge] = useState(false);
+  /** After creating a change request, hide draft Discard until the user enters edit mode again. */
+  const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
   const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
   const versionNodeDiffLiveChangeRequest = useMemo(() => {
     const fallback = versionNodeDiffContext?.changeRequest;
@@ -4385,7 +4385,7 @@ export function WorkflowPageV2() {
           setSelectedChangeRequestId(changeRequestID);
         }
         setIsVersionControlOpen(true);
-        setSuppressUnpublishedChangesBadge(true);
+        setSuppressUnpublishedDraftDiscard(true);
         showSuccessToast("Change request created");
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to create change request")));
@@ -4429,7 +4429,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    setSuppressUnpublishedChangesBadge(false);
+    setSuppressUnpublishedDraftDiscard(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;
     if (existingDraftVersionID) {
@@ -4958,8 +4958,8 @@ export function WorkflowPageV2() {
             ? "Save your version before creating a change request."
             : undefined;
   const headerMode = hasEditableVersion ? "version-edit" : "version-live";
-  const unpublishedDraftChangeCount =
-    !suppressUnpublishedChangesBadge && !!latestDraftVersion ? pendingDraftDiffSummary.items.length : 0;
+  const hasUnpublishedDraftChanges =
+    !suppressUnpublishedDraftDiscard && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
   const canvasStateMode = hasEditableVersion
     ? "editing"
     : isViewingPendingApprovalVersion
@@ -5110,7 +5110,7 @@ export function WorkflowPageV2() {
           onExitEditMode={handleToggleEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          unpublishedDraftChangeCount={unpublishedDraftChangeCount}
+          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}

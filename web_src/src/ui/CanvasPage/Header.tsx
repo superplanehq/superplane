@@ -34,8 +34,8 @@ interface HeaderProps {
   exitEditModeDisabledTooltip?: string;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
-  /** When &gt; 0 (unpublished draft diff items), shown as badge count on the publish button in version edit mode. */
-  unpublishedDraftChangeCount?: number;
+  /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
+  hasUnpublishedDraftChanges?: boolean;
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
@@ -67,7 +67,7 @@ export function Header({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   publishVersionLabel = "Publish",
-  unpublishedDraftChangeCount = 0,
+  hasUnpublishedDraftChanges = false,
   showCanvasSettingsMenu = true,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -78,10 +78,6 @@ export function Header({
 
   const isDefaultMode = mode === "default";
   const showVersionEditActions = mode === "version-edit";
-  const hasChanges = unpublishedDraftChangeCount > 0;
-  const publishButtonLabel = hasChanges
-    ? `${publishVersionLabel} (${unpublishedDraftChangeCount})`
-    : publishVersionLabel;
 
   return (
     <header>
@@ -101,14 +97,14 @@ export function Header({
         saveIsPrimary={saveIsPrimary}
         headerMode={mode}
         showVersionEditActions={showVersionEditActions}
-        hasChanges={hasChanges}
+        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
         onDiscardVersion={onDiscardVersion}
         discardVersionDisabled={discardVersionDisabled}
         discardVersionDisabledTooltip={discardVersionDisabledTooltip}
         publishVersionDisabled={publishVersionDisabled}
         publishVersionDisabledTooltip={publishVersionDisabledTooltip}
         onPublishVersion={onPublishVersion}
-        publishButtonLabel={publishButtonLabel}
+        publishVersionLabel={publishVersionLabel}
         onEnterEditMode={onEnterEditMode}
         enterEditModeDisabled={enterEditModeDisabled}
         enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -183,14 +179,14 @@ function SecondaryHeader({
   saveIsPrimary,
   headerMode,
   showVersionEditActions,
-  hasChanges,
+  hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   onPublishVersion,
-  publishButtonLabel,
+  publishVersionLabel,
   onEnterEditMode,
   onExitEditMode,
   isVersionControlOpen,
@@ -206,14 +202,14 @@ function SecondaryHeader({
   saveIsPrimary?: boolean;
   headerMode: HeaderMode;
   showVersionEditActions: boolean;
-  hasChanges: boolean;
+  hasUnpublishedDraftChanges: boolean;
   onDiscardVersion?: () => void;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   onPublishVersion?: () => void;
-  publishButtonLabel: string;
+  publishVersionLabel: string;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -251,12 +247,12 @@ function SecondaryHeader({
         saveDisabledTooltip={saveDisabledTooltip}
         saveIsPrimary={saveIsPrimary}
         showVersionEditActions={showVersionEditActions}
-        hasChanges={hasChanges}
+        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
         onDiscardVersion={onDiscardVersion}
         discardVersionDisabled={discardVersionDisabled}
         discardVersionDisabledTooltip={discardVersionDisabledTooltip}
         onPublishVersion={onPublishVersion}
-        publishButtonLabel={publishButtonLabel}
+        publishVersionLabel={publishVersionLabel}
         publishVersionDisabled={publishVersionDisabled}
         publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       />
@@ -277,12 +273,12 @@ function SecondaryHeaderActions({
   saveDisabledTooltip,
   saveIsPrimary,
   showVersionEditActions,
-  hasChanges,
+  hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   onPublishVersion,
-  publishButtonLabel,
+  publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
 }: {
@@ -298,12 +294,12 @@ function SecondaryHeaderActions({
   saveDisabledTooltip?: string;
   saveIsPrimary?: boolean;
   showVersionEditActions: boolean;
-  hasChanges: boolean;
+  hasUnpublishedDraftChanges: boolean;
   onDiscardVersion?: () => void;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   onPublishVersion?: () => void;
-  publishButtonLabel: string;
+  publishVersionLabel: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
 }) {
@@ -331,7 +327,7 @@ function SecondaryHeaderActions({
 
       {showVersionEditActions ? (
         <div className="flex items-center gap-2">
-          {hasChanges ? (
+          {hasUnpublishedDraftChanges ? (
             <DiscardDraftButton
               onDiscard={() => onDiscardVersion?.()}
               disabled={discardVersionDisabled || !onDiscardVersion}
@@ -340,7 +336,7 @@ function SecondaryHeaderActions({
           ) : null}
           <PublishVersionButton
             onPublish={() => onPublishVersion?.()}
-            label={publishButtonLabel}
+            label={publishVersionLabel}
             disabled={publishVersionDisabled || !onPublishVersion}
             publishVersionDisabled={!!publishVersionDisabled}
             publishVersionDisabledTooltip={publishVersionDisabledTooltip}
