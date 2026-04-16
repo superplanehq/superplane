@@ -1,8 +1,5 @@
-import type { EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
-import { renderTimeAgo } from "@/components/TimeAgo";
-import { getState, getTriggerRenderer } from "..";
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
+import type { ExecutionDetailsContext, NodeInfo, OutputPayload } from "../types";
 import { formatTimestamp } from "../utils";
 import type {
   AlertRuleNodeMetadata,
@@ -10,6 +7,8 @@ import type {
   GrafanaAlertRule,
   UpdateAlertRuleConfiguration,
 } from "./types";
+
+export { buildGrafanaEventSections } from "./base";
 
 export function buildAlertRuleMetadata(
   node: NodeInfo,
@@ -70,34 +69,6 @@ export function buildAlertRuleExecutionDetails(
   addOptionalDetail(details, "Paused", formatPausedState(alertRule.isPaused));
 
   return details;
-}
-
-export function buildGrafanaEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
-  if (!execution.rootEvent?.id || !execution.createdAt) {
-    return [];
-  }
-
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  if (!rootTriggerNode?.componentName) {
-    return [];
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt),
-      eventTitle: title || "Trigger event",
-      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent.id,
-    },
-  ];
 }
 
 export function asAlertRule(value: unknown): GrafanaAlertRule | undefined {

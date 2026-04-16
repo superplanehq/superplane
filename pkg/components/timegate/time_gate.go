@@ -382,7 +382,18 @@ func (tg *TimeGate) parseTimezone(timezoneStr string) *time.Location {
 	}
 	offsetSeconds := int(offsetHours * 3600)
 
-	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+	return time.FixedZone(fixedZoneNameFromOffsetSeconds(offsetSeconds), offsetSeconds)
+}
+
+func fixedZoneNameFromOffsetSeconds(offsetSeconds int) string {
+	sign := "+"
+	if offsetSeconds < 0 {
+		sign = "-"
+		offsetSeconds = -offsetSeconds
+	}
+	hours := offsetSeconds / 3600
+	minutes := (offsetSeconds % 3600) / 60
+	return fmt.Sprintf("GMT%s%02d:%02d", sign, hours, minutes)
 }
 
 func parseTimeString(timeStr string) (int, error) {
