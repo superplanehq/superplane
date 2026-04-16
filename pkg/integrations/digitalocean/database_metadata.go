@@ -56,10 +56,17 @@ func resolveDatabaseClusterMetadata(ctx core.SetupContext, clusterID string) err
 		return fmt.Errorf("database cluster %q was not found", clusterID)
 	}
 
+	// Do not carry DatabaseName across cluster changes: resolveDatabaseMetadata
+	// would treat (newClusterID, oldName) as cached and skip listing DBs on the new cluster.
+	preservedDBName := existing.DatabaseName
+	if existing.DatabaseClusterID != "" && existing.DatabaseClusterID != clusterID {
+		preservedDBName = ""
+	}
+
 	return ctx.Metadata.Set(DatabaseNodeMetadata{
 		DatabaseClusterID:   clusterID,
 		DatabaseClusterName: clusterName,
-		DatabaseName:        existing.DatabaseName,
+		DatabaseName:        preservedDBName,
 	})
 }
 
@@ -68,18 +75,18 @@ func resolveDatabaseMetadata(ctx core.SetupContext, clusterID, databaseName stri
 		return err
 	}
 
-	if strings.Contains(databaseName, "{{") {
-		var existing DatabaseNodeMetadata
-		_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	var existing DatabaseNodeMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+
+	isClusterExpr := strings.Contains(clusterID, "{{")
+	isDatabaseExpr := strings.Contains(databaseName, "{{")
+	if isClusterExpr || isDatabaseExpr {
 		existing.DatabaseName = databaseName
 		return ctx.Metadata.Set(existing)
 	}
 
-	var existing DatabaseNodeMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil {
-		if existing.DatabaseClusterID == clusterID && existing.DatabaseName == databaseName {
-			return nil
-		}
+	if existing.DatabaseClusterID == clusterID && existing.DatabaseName == databaseName {
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -87,7 +94,7 @@ func resolveDatabaseMetadata(ctx core.SetupContext, clusterID, databaseName stri
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	databases, err := client.ListClusterDatabases(clusterID)
+	databases, err := client.ListDatabases(clusterID)
 	if err != nil {
 		return fmt.Errorf("failed to list databases for cluster %q: %w", clusterID, err)
 	}
