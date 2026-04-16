@@ -2,10 +2,21 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@xyflow/react", () => ({
-  Handle: ({ type, id, className }: { type: string; id?: string; className?: string }) => (
+  Handle: ({
+    type,
+    id,
+    className,
+    style,
+  }: {
+    type: string;
+    id?: string;
+    className?: string;
+    style?: { pointerEvents?: string };
+  }) => (
     <div
       data-testid={`handle-${type}-${id || "default"}`}
       data-highlighted={className === "highlighted" ? "true" : "false"}
+      data-pointer-events={style?.pointerEvents || "auto"}
     />
   ),
   Position: {
@@ -138,5 +149,28 @@ describe("Block fallback rendering", () => {
     );
 
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-highlighted", "false");
+  });
+
+  it("disables handle interactivity in live mode", () => {
+    render(
+      <Block
+        canvasMode="live"
+        nodeId="component-node"
+        data={{
+          label: "Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "Component",
+            iconSlug: "box",
+            collapsed: false,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
   });
 });
