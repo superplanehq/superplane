@@ -11,6 +11,7 @@ import {
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import { analytics } from "@/lib/analytics";
 
 export const integrationKeys = {
   all: ["integrations"] as const,
@@ -140,10 +141,11 @@ export const useCreateIntegration = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
+      analytics.integrationConnected(variables.integrationName, organizationId);
     },
   });
 };

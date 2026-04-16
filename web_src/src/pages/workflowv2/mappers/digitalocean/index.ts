@@ -16,12 +16,16 @@ import { getAlertPolicyMapper } from "./get_alert_policy";
 import { deleteAlertPolicyMapper } from "./delete_alert_policy";
 import { updateAlertPolicyMapper } from "./update_alert_policy";
 import { getDropletMetricsMapper } from "./get_droplet_metrics";
+import { getDatabaseMapper } from "./get_database";
+import { getClusterConfigurationMapper } from "./get_cluster_configuration";
 import { getObjectMapper, GET_OBJECT_STATE_REGISTRY } from "./get_object";
 import { putObjectMapper, PUT_OBJECT_STATE_REGISTRY } from "./put_object";
 import { deleteObjectMapper, DELETE_OBJECT_STATE_REGISTRY } from "./delete_object";
 import { copyObjectMapper, COPY_OBJECT_STATE_REGISTRY } from "./copy_object";
 import { createAppMapper } from "./create_app";
+import { createDatabaseClusterMapper } from "./create_database_cluster";
 import { getAppMapper } from "./get_app";
+import { getDatabaseClusterMapper } from "./get_database_cluster";
 import { deleteAppMapper } from "./delete_app";
 import { updateAppMapper } from "./update_app";
 import { createKnowledgeBaseMapper } from "./create_knowledge_base";
@@ -53,12 +57,16 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteAlertPolicy: deleteAlertPolicyMapper,
   updateAlertPolicy: updateAlertPolicyMapper,
   getDropletMetrics: getDropletMetricsMapper,
+  getDatabase: getDatabaseMapper,
+  getClusterConfiguration: getClusterConfigurationMapper,
   getObject: getObjectMapper,
   putObject: putObjectMapper,
   deleteObject: deleteObjectMapper,
   copyObject: copyObjectMapper,
   createApp: createAppMapper,
+  createDatabaseCluster: createDatabaseClusterMapper,
   getApp: getAppMapper,
+  getDatabaseCluster: getDatabaseClusterMapper,
   deleteApp: deleteAppMapper,
   updateApp: updateAppMapper,
   createKnowledgeBase: createKnowledgeBaseMapper,
@@ -92,12 +100,16 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteAlertPolicy: buildActionStateRegistry("deleted"),
   updateAlertPolicy: buildActionStateRegistry("updated"),
   getDropletMetrics: buildActionStateRegistry("fetched"),
+  getDatabase: buildActionStateRegistry("fetched"),
+  getClusterConfiguration: buildActionStateRegistry("fetched"),
   getObject: GET_OBJECT_STATE_REGISTRY,
   putObject: PUT_OBJECT_STATE_REGISTRY,
   deleteObject: DELETE_OBJECT_STATE_REGISTRY,
   copyObject: COPY_OBJECT_STATE_REGISTRY,
   createApp: buildActionStateRegistry("created"),
+  createDatabaseCluster: buildActionStateRegistry("created"),
   getApp: buildActionStateRegistry("fetched"),
+  getDatabaseCluster: buildActionStateRegistry("fetched"),
   deleteApp: buildActionStateRegistry("deleted"),
   updateApp: buildActionStateRegistry("updated"),
   createKnowledgeBase: buildActionStateRegistry("created"),
