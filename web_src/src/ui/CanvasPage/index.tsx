@@ -715,7 +715,6 @@ function CanvasPage(props: CanvasPageProps) {
       return false;
     }
   });
-  const [agentSidebarHasPendingProposal, setAgentSidebarHasPendingProposal] = useState(false);
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
@@ -1118,7 +1117,6 @@ function CanvasPage(props: CanvasPageProps) {
     if (readOnly) {
       setIsAgentSidebarOpen(false);
       persistAgentSidebarOpen(false);
-      setAgentSidebarHasPendingProposal(false);
     }
   }, [readOnly, persistAgentSidebarOpen]);
 
@@ -1233,7 +1231,6 @@ function CanvasPage(props: CanvasPageProps) {
           showAgentSidebarToggle={props.agentContext.enabled && !props.hideAddControls && !readOnly}
           isAgentSidebarOpen={isAgentSidebarOpen}
           onToggleAgentSidebar={handleAgentSidebarToggle}
-          agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1252,7 +1249,6 @@ function CanvasPage(props: CanvasPageProps) {
             onApplyAiOperations={props.onApplyAiOperations}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
-            onPendingProposalChange={setAgentSidebarHasPendingProposal}
           />
         ) : null}
 
@@ -1749,7 +1745,6 @@ function CanvasContentHeader({
   showAgentSidebarToggle,
   isAgentSidebarOpen,
   onToggleAgentSidebar,
-  agentSidebarHasPendingProposal,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1782,7 +1777,6 @@ function CanvasContentHeader({
   showAgentSidebarToggle?: boolean;
   isAgentSidebarOpen?: boolean;
   onToggleAgentSidebar?: () => void;
-  agentSidebarHasPendingProposal?: boolean;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1832,7 +1826,6 @@ function CanvasContentHeader({
       showAgentSidebarToggle={showAgentSidebarToggle}
       isAgentSidebarOpen={isAgentSidebarOpen}
       onToggleAgentSidebar={onToggleAgentSidebar}
-      agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
     />
   );
 }

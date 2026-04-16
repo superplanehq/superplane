@@ -2,9 +2,10 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Settings, Sparkles } from "lucide-react";
+import { GitBranch, MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
+import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 
 type HeaderMode = "default" | "version-live" | "version-edit";
@@ -45,89 +46,21 @@ interface HeaderProps {
   showAgentSidebarToggle?: boolean;
   isAgentSidebarOpen?: boolean;
   onToggleAgentSidebar?: () => void;
-  agentSidebarHasPendingProposal?: boolean;
 }
 
-export function Header({
-  canvasName,
-  onSave,
-  onPublishVersion,
-  onDiscardVersion,
-  onLogoClick,
-  organizationId,
-  saveIsPrimary,
-  saveButtonHidden,
-  saveDisabled,
-  saveDisabledTooltip,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  mode = "default",
-  onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
-  publishVersionLabel = "Publish",
-  hasUnpublishedDraftChanges = false,
-  showCanvasSettingsMenu = true,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount = 0,
-  showAgentSidebarToggle,
-  isAgentSidebarOpen,
-  onToggleAgentSidebar,
-  agentSidebarHasPendingProposal,
-}: HeaderProps) {
-  const headerTitle = canvasName.trim() || "Canvas";
-
-  const isDefaultMode = mode === "default";
-  const showVersionEditActions = mode === "version-edit";
+export function Header(props: HeaderProps) {
+  const headerTitle = props.canvasName.trim() || "Canvas";
 
   return (
     <header>
       <PageHeader
-        organizationId={organizationId}
-        onLogoClick={onLogoClick}
+        organizationId={props.organizationId}
+        onLogoClick={props.onLogoClick}
         headerTitle={headerTitle}
-        showCanvasSettingsMenu={showCanvasSettingsMenu}
+        showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
-      <SecondaryHeader
-        isDefaultMode={isDefaultMode}
-        onSave={onSave}
-        saveButtonHidden={saveButtonHidden}
-        saveDisabled={saveDisabled}
-        saveDisabledTooltip={saveDisabledTooltip}
-        saveIsPrimary={saveIsPrimary}
-        headerMode={mode}
-        showVersionEditActions={showVersionEditActions}
-        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-        onDiscardVersion={onDiscardVersion}
-        discardVersionDisabled={discardVersionDisabled}
-        discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-        publishVersionDisabled={publishVersionDisabled}
-        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-        onPublishVersion={onPublishVersion}
-        publishVersionLabel={publishVersionLabel}
-        onEnterEditMode={onEnterEditMode}
-        enterEditModeDisabled={enterEditModeDisabled}
-        enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-        onExitEditMode={onExitEditMode}
-        exitEditModeDisabled={exitEditModeDisabled}
-        exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-        isVersionControlOpen={isVersionControlOpen}
-        onOpenVersionControl={onOpenVersionControl}
-        versionControlButtonTooltip={versionControlButtonTooltip}
-        versionControlNotificationCount={versionControlNotificationCount}
-        showAgentSidebarToggle={showAgentSidebarToggle}
-        isAgentSidebarOpen={isAgentSidebarOpen}
-        onToggleAgentSidebar={onToggleAgentSidebar}
-        agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
-      />
+      <SecondaryHeader {...props} />
     </header>
   );
 }
@@ -183,14 +116,12 @@ function PageHeader({
 }
 
 function SecondaryHeader({
-  isDefaultMode,
+  mode,
   onSave,
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
   saveIsPrimary,
-  headerMode,
-  showVersionEditActions,
   hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
@@ -208,49 +139,16 @@ function SecondaryHeader({
   showAgentSidebarToggle,
   isAgentSidebarOpen,
   onToggleAgentSidebar,
-  agentSidebarHasPendingProposal,
-}: {
-  isDefaultMode: boolean;
-  onSave?: () => void;
-  saveButtonHidden?: boolean;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
-  saveIsPrimary?: boolean;
-  headerMode: HeaderMode;
-  showVersionEditActions: boolean;
-  hasUnpublishedDraftChanges: boolean;
-  onDiscardVersion?: () => void;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
-  publishVersionDisabled?: boolean;
-  publishVersionDisabledTooltip?: string;
-  onPublishVersion?: () => void;
-  publishVersionLabel: string;
-  onEnterEditMode?: () => void;
-  enterEditModeDisabled?: boolean;
-  enterEditModeDisabledTooltip?: string;
-  onExitEditMode?: () => void;
-  exitEditModeDisabled?: boolean;
-  exitEditModeDisabledTooltip?: string;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
-  showAgentSidebarToggle?: boolean;
-  isAgentSidebarOpen?: boolean;
-  onToggleAgentSidebar?: () => void;
-  agentSidebarHasPendingProposal?: boolean;
-}) {
-  const showCanvasViewModeToggle = headerMode === "version-live" || headerMode === "version-edit";
-  const canvasViewMode = headerMode === "version-edit" ? "version-edit" : "version-live";
+}: HeaderProps) {
+  const showCanvasViewModeToggle = mode === "version-live" || mode === "version-edit";
+  const canvasViewMode = mode === "version-edit" ? "version-edit" : "version-live";
 
   return (
     <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
-      <AgentSidebarToolbarTrigger
+      <AgentSidebarTrigger
         showAgentSidebarToggle={showAgentSidebarToggle}
         isAgentSidebarOpen={isAgentSidebarOpen}
         onToggleAgentSidebar={onToggleAgentSidebar}
-        agentSidebarHasPendingProposal={agentSidebarHasPendingProposal}
       />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
@@ -262,18 +160,16 @@ function SecondaryHeader({
       </div>
 
       <SecondaryHeaderActions
-        headerMode={headerMode}
+        mode={mode}
         isVersionControlOpen={isVersionControlOpen}
         onOpenVersionControl={onOpenVersionControl}
         versionControlButtonTooltip={versionControlButtonTooltip}
         versionControlNotificationCount={versionControlNotificationCount}
-        isDefaultMode={isDefaultMode}
         onSave={onSave}
         saveButtonHidden={saveButtonHidden}
         saveDisabled={saveDisabled}
         saveDisabledTooltip={saveDisabledTooltip}
         saveIsPrimary={saveIsPrimary}
-        showVersionEditActions={showVersionEditActions}
         hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
         onDiscardVersion={onDiscardVersion}
         discardVersionDisabled={discardVersionDisabled}
@@ -288,18 +184,16 @@ function SecondaryHeader({
 }
 
 function SecondaryHeaderActions({
-  headerMode,
+  mode,
   isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount = 0,
-  isDefaultMode,
   onSave,
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
   saveIsPrimary,
-  showVersionEditActions,
   hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
@@ -308,29 +202,8 @@ function SecondaryHeaderActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
-}: {
-  headerMode: HeaderMode;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
-  isDefaultMode: boolean;
-  onSave?: () => void;
-  saveButtonHidden?: boolean;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
-  saveIsPrimary?: boolean;
-  showVersionEditActions: boolean;
-  hasUnpublishedDraftChanges: boolean;
-  onDiscardVersion?: () => void;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
-  onPublishVersion?: () => void;
-  publishVersionLabel: string;
-  publishVersionDisabled?: boolean;
-  publishVersionDisabledTooltip?: string;
-}) {
-  const showVersionControlTrigger = headerMode === "version-live" && !!onOpenVersionControl;
+}: HeaderProps) {
+  const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
@@ -343,7 +216,7 @@ function SecondaryHeaderActions({
         />
       ) : null}
 
-      {isDefaultMode && onSave && !saveButtonHidden ? (
+      {mode === "default" && onSave && !saveButtonHidden ? (
         <SaveButton
           onSave={onSave}
           saveDisabled={saveDisabled}
@@ -352,7 +225,7 @@ function SecondaryHeaderActions({
         />
       ) : null}
 
-      {showVersionEditActions ? (
+      {mode === "version-edit" ? (
         <div className="flex items-center gap-2">
           {hasUnpublishedDraftChanges ? (
             <DiscardDraftButton
@@ -363,7 +236,7 @@ function SecondaryHeaderActions({
           ) : null}
           <PublishVersionButton
             onPublish={() => onPublishVersion?.()}
-            label={publishVersionLabel}
+            label={publishVersionLabel || "Publish"}
             disabled={publishVersionDisabled || !onPublishVersion}
             publishVersionDisabled={!!publishVersionDisabled}
             publishVersionDisabledTooltip={publishVersionDisabledTooltip}
@@ -520,43 +393,5 @@ function PublishVersionButton({
     <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
       {label}
     </UIButton>
-  );
-}
-
-function AgentSidebarToolbarTrigger({
-  showAgentSidebarToggle,
-  isAgentSidebarOpen,
-  onToggleAgentSidebar,
-  agentSidebarHasPendingProposal,
-}: {
-  showAgentSidebarToggle?: boolean;
-  isAgentSidebarOpen?: boolean;
-  onToggleAgentSidebar?: () => void;
-  agentSidebarHasPendingProposal?: boolean;
-}) {
-  return (
-    <div className="relative z-10 flex shrink-0 items-center">
-      {showAgentSidebarToggle && onToggleAgentSidebar && !isAgentSidebarOpen ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="relative inline-flex">
-              <UIButton
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 bg-white border-slate-300"
-                aria-label="Open SuperPlane Agent"
-                onClick={onToggleAgentSidebar}
-              >
-                <Sparkles className="h-3 w-3 text-slate-700" />
-              </UIButton>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8}>
-            Open SuperPlane Agent
-          </TooltipContent>
-        </Tooltip>
-      ) : null}
-    </div>
   );
 }

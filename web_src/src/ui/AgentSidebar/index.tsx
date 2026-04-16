@@ -1,6 +1,5 @@
 import type { CanvasChangesetChange } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-export const AGENT_SIDEBAR_WIDTH_STORAGE_KEY = "agentSidebarWidth";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AiBuilderChatPanel } from "../BuildingBlocksSidebar/AiBuilderChatPanel";
@@ -18,6 +17,8 @@ import {
   sendChatPrompt,
 } from "../BuildingBlocksSidebar/agentChat";
 
+export const AGENT_SIDEBAR_WIDTH_STORAGE_KEY = "agentSidebarWidth";
+
 const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
 export interface AgentSidebarProps {
@@ -29,8 +30,6 @@ export interface AgentSidebarProps {
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   disabled?: boolean;
   disabledMessage?: string;
-  /** Notifies parent for UI such as the agent toolbar control indicator. */
-  onPendingProposalChange?: (pending: boolean) => void;
 }
 
 export function AgentSidebar({
@@ -42,7 +41,6 @@ export function AgentSidebar({
   onApplyAiOperations,
   disabled = false,
   disabledMessage,
-  onPendingProposalChange,
 }: AgentSidebarProps) {
   if (!isOpen || !agentContext.enabled) {
     return null;
@@ -57,7 +55,6 @@ export function AgentSidebar({
       onApplyAiOperations={onApplyAiOperations}
       disabled={disabled}
       disabledMessage={disabledMessage}
-      onPendingProposalChange={onPendingProposalChange}
     />
   );
 }
@@ -70,7 +67,6 @@ interface OpenAgentSidebarProps {
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   disabled: boolean;
   disabledMessage?: string;
-  onPendingProposalChange?: (pending: boolean) => void;
 }
 
 function OpenAgentSidebar({
@@ -81,7 +77,6 @@ function OpenAgentSidebar({
   onApplyAiOperations,
   disabled,
   disabledMessage: _disabledMessage,
-  onPendingProposalChange,
 }: OpenAgentSidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
@@ -115,10 +110,6 @@ function OpenAgentSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
-
-  useEffect(() => {
-    onPendingProposalChange?.(Boolean(pendingProposal));
-  }, [onPendingProposalChange, pendingProposal]);
 
   const handleSendPrompt = useCallback(
     async (value?: string) => {
