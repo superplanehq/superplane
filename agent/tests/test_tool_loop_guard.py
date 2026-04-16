@@ -74,5 +74,7 @@ def test_tool_loop_guard_resets_after_progress() -> None:
     )
 
     guard.register_call("call-2", "list_integration_resources", args)
-    assert guard.observe_result("call-2", "list_integration_resources", [{"name": "repo-a"}]) is None
+    assert (
+        guard.observe_result("call-2", "list_integration_resources", [{"name": "repo-a"}]) is None
+    )
     assert guard.consecutive_no_progress_count == 0
