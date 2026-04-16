@@ -100,9 +100,17 @@ func UpdateCanvasVersionWithUsage(
 		return nil, err
 	}
 
-	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, organizationID, &usagepb.OrganizationState{}, &usagepb.CanvasState{
-		Nodes: int32(len(expandedNodes)),
-	}); err != nil {
+	err = usage.EnsureOrganizationWithinLimits(
+		ctx,
+		usageService,
+		organizationID,
+		&usagepb.OrganizationState{},
+		&usagepb.CanvasState{
+			Nodes: int32(len(expandedNodes)),
+		},
+	)
+
+	if err != nil {
 		return nil, err
 	}
 
