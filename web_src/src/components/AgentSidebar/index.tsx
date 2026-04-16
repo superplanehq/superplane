@@ -12,8 +12,10 @@ import {
   sendChatPrompt,
 } from "./agentChat";
 import type { AgentState } from "./useAgentState";
-
-export const AGENT_SIDEBAR_WIDTH_STORAGE_KEY = "agentSidebarWidth";
+import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
+import { useFormatOperation } from "./useFormatOperation";
+import { useApplyShortcutHint } from "./useApplyShortcutHint";
+import { useSidebarWidth } from "./useSidebarWidth";
 
 const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
@@ -72,14 +74,7 @@ function OpenAgentSidebar({
 }: OpenAgentSidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    if (typeof window === "undefined") {
-      return 400;
-    }
-
-    const saved = window.localStorage.getItem(AGENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    return saved ? parseInt(saved, 10) : 400;
-  });
+  const [sidebarWidth, setSidebarWidth] = useSidebarWidth();
   const [isResizing, setIsResizing] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
@@ -94,14 +89,7 @@ function OpenAgentSidebar({
   const [aiError, setAiError] = useState<string | null>(null);
   const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
 
-  const applyShortcutHint = useMemo(() => {
-    if (typeof navigator === "undefined") {
-      return "Ctrl+Enter";
-    }
-
-    const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
-    return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
-  }, []);
+  const applyShortcutHint = useApplyShortcutHint();
 
   const handleSendPrompt = useCallback(
     async (value?: string) => {
@@ -174,24 +162,7 @@ function OpenAgentSidebar({
     setPendingProposal(null);
   }, []);
 
-  const formatOperation = useCallback((change: CanvasChangesetChange) => {
-    const getNodeId = (nodeId?: string) => nodeId || "node";
-
-    switch (change.type) {
-      case "ADD_NODE":
-        return `Add node ${getNodeId(change.node?.id)} (${change.node?.block || "unknown"})`;
-      case "UPDATE_NODE":
-        return `Update node ${getNodeId(change.node?.id)}`;
-      case "DELETE_NODE":
-        return `Delete node ${getNodeId(change.node?.id)}`;
-      case "ADD_EDGE":
-        return `Connect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
-      case "DELETE_EDGE":
-        return `Disconnect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
-      default:
-        return "Update canvas";
-    }
-  }, []);
+  const formatOperation = useFormatOperation();
 
   const pendingProposalSummaries = useMemo(() => {
     if (!pendingProposal) {
@@ -228,37 +199,14 @@ function OpenAgentSidebar({
     }
   }, [onApplyAiOperations, pendingProposal]);
 
-  useEffect(() => {
-    if (!pendingProposal || (pendingProposal.changeset.changes || []).length === 0) {
-      return;
-    }
+  const canApplyProposalWithShortcut = !!pendingProposal && (pendingProposal.changeset.changes || []).length > 0;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.isComposing || event.key !== "Enter") {
-        return;
-      }
-
-      if (!(event.metaKey || event.ctrlKey)) {
-        return;
-      }
-
-      if (disabled || isApplyingProposal) {
-        return;
-      }
-
-      event.preventDefault();
-      void handleApplyProposal();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [disabled, handleApplyProposal, isApplyingProposal, pendingProposal]);
-
-  useEffect(() => {
-    localStorage.setItem(AGENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
+  useApplyOnCmdEnter({
+    enabled: canApplyProposalWithShortcut,
+    disabled,
+    isApplying: isApplyingProposal,
+    onApply: handleApplyProposal,
+  });
 
   useEffect(() => {
     setCurrentChatId(null);
@@ -479,6 +427,3 @@ function OpenAgentSidebar({
     </div>
   );
 }
-
-export type { AgentState, UseAgentStateOptions } from "./useAgentState";
-export { CANVAS_AGENT_SIDEBAR_STORAGE_KEY, useAgentState } from "./useAgentState";

@@ -53,7 +53,8 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
-import { AgentSidebar, useAgentState, type AgentState } from "@/components/AgentSidebar";
+import { AgentSidebar } from "@/components/AgentSidebar";
+import { useAgentState, type AgentState } from "@/components/AgentSidebar/useAgentState";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
@@ -2950,5 +2951,5 @@ function CanvasContent({
 
 export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
-export { CANVAS_AGENT_SIDEBAR_STORAGE_KEY } from "@/components/AgentSidebar";
+export { CANVAS_AGENT_SIDEBAR_STORAGE_KEY } from "@/components/AgentSidebar/useAgentState";
 export { CanvasPage };

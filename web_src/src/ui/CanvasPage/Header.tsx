@@ -1,4 +1,4 @@
-import type { AgentState } from "@/components/AgentSidebar";
+import type { AgentState } from "@/components/AgentSidebar/useAgentState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
