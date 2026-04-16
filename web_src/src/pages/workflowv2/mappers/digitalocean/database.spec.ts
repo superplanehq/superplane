@@ -18,7 +18,7 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
     id: "node-1",
     name: "Test Node",
-    componentName: "digitalocean.createDatabase",
+    componentName: "digitalocean.getDatabase",
     isCollapsed: false,
     configuration: {},
     metadata: {},
