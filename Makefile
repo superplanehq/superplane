@@ -40,8 +40,8 @@ test.setup.build:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
-	$(MAKE) test.e2e.ui.setup
 	$(MAKE) gen.setup.backend
+	$(MAKE) test.e2e.ui.setup
 
 test.setup:
 	$(MAKE) test.setup.build
@@ -64,7 +64,7 @@ test.e2e.setup:
 	$(MAKE) test.setup
 
 test.e2e.ui.setup:
-	$(COMPOSE) run --rm --no-deps app bash -lc "cd /app/web_src && npm ci"
+	$(MAKE) openapi.web.client.gen
 
 test.e2e:
 	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
