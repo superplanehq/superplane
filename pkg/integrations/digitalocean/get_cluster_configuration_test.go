@@ -12,8 +12,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__GetDatabaseCluster__Setup(t *testing.T) {
-	component := &GetDatabaseCluster{}
+func Test__GetClusterConfiguration__Setup(t *testing.T) {
+	component := &GetClusterConfiguration{}
 
 	t.Run("missing cluster returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
@@ -24,8 +24,7 @@ func Test__GetDatabaseCluster__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "databaseCluster is required")
 	})
 
-	t.Run("valid cluster resolves metadata", func(t *testing.T) {
-		metadataCtx := &contexts.MetadataContext{}
+	t.Run("valid config resolves metadata", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"databaseCluster": "cluster-1",
@@ -35,45 +34,31 @@ func Test__GetDatabaseCluster__Setup(t *testing.T) {
 					{
 						StatusCode: http.StatusOK,
 						Body: io.NopCloser(strings.NewReader(`{
-							"databases": [
-								{"id": "cluster-1", "name": "superplane-db"}
-							]
+							"databases": [{"id":"cluster-1","name":"superplane-db"}]
 						}`)),
 					},
 				},
 			},
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"apiToken": "test-token"},
-			},
-			Metadata: metadataCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Metadata:    &contexts.MetadataContext{},
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, DatabaseNodeMetadata{
-			DatabaseClusterID:   "cluster-1",
-			DatabaseClusterName: "superplane-db",
-		}, metadataCtx.Metadata)
 	})
 }
 
-func Test__GetDatabaseCluster__Execute(t *testing.T) {
-	component := &GetDatabaseCluster{}
+func Test__GetClusterConfiguration__Execute(t *testing.T) {
+	component := &GetClusterConfiguration{}
 
-	t.Run("successful retrieval emits cluster", func(t *testing.T) {
+	t.Run("successful fetch emits configuration", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`{
-						"database": {
-							"id": "cluster-1",
-							"name": "superplane-db",
-							"engine": "pg",
-							"version": "18.0",
-							"region": "nyc1",
-							"size": "db-s-1vcpu-1gb",
-							"num_nodes": 1,
-							"status": "online"
+						"config": {
+							"autovacuum_naptime": 60,
+							"jit": true
 						}
 					}`)),
 				},
@@ -85,14 +70,18 @@ func Test__GetDatabaseCluster__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"databaseCluster": "cluster-1",
 			},
-			HTTP: httpContext,
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{"apiToken": "test-token"},
-			},
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			NodeMetadata: &contexts.MetadataContext{Metadata: map[string]any{
+				"databaseClusterName": "superplane-db",
+			}},
 			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "digitalocean.database.cluster.fetched", executionState.Type)
+		assert.Equal(t, "digitalocean.database.cluster.config.fetched", executionState.Type)
+		payload := executionState.Payloads[0].(map[string]any)["data"].(map[string]any)
+		assert.Equal(t, "cluster-1", payload["databaseClusterId"])
+		assert.Equal(t, "superplane-db", payload["databaseClusterName"])
 	})
 }
