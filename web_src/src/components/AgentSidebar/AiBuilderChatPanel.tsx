@@ -1,9 +1,10 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { AiBuilderConversationMessageList } from "./AiBuilderConversationMessageList";
 import { ConversationList } from "./AiBuilderConversationList";
+import { AiBuilderConversationMessageList } from "./AiBuilderConversationMessageList";
 import { InputForm } from "./AiBuilderInputForm";
 import { ProposalsList } from "./AiBuilderProposalsList";
 import { type AiBuilderMessage, type AiBuilderProposal, type AiChatSession } from "./agentChat";
+import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
 
 type AiBuilderChatPanelProps = {
   chatSessions: AiChatSession[];
@@ -13,8 +14,7 @@ type AiBuilderChatPanelProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  applyShortcutHint: string;
-  onApplyProposal: () => void;
+  onApplyProposal: () => void | Promise<void>;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
   aiError: string | null;
@@ -37,7 +37,6 @@ export function AiBuilderChatPanel({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
@@ -127,7 +126,6 @@ export function AiBuilderChatPanel({
               aiMessages={aiMessages}
               isGeneratingResponse={isGeneratingResponse}
               pendingProposal={pendingProposal}
-              applyShortcutHint={applyShortcutHint}
               onApplyProposal={onApplyProposal}
               onDiscardProposal={onDiscardProposal}
               isApplyingProposal={isApplyingProposal}
@@ -158,8 +156,7 @@ type ConversationContentProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  applyShortcutHint: string;
-  onApplyProposal: () => void;
+  onApplyProposal: () => void | Promise<void>;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
   aiError: string | null;
@@ -172,13 +169,21 @@ function ConversationContent({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
   aiError,
   disabled,
 }: ConversationContentProps) {
+  const canApplyProposalWithShortcut = !!pendingProposal && (pendingProposal.changeset.changes || []).length > 0;
+
+  useApplyOnCmdEnter({
+    enabled: canApplyProposalWithShortcut,
+    disabled,
+    isApplying: isApplyingProposal,
+    onApply: onApplyProposal,
+  });
+
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
@@ -192,7 +197,6 @@ function ConversationContent({
         <ProposalsList
           disabled={disabled}
           pendingProposal={pendingProposal}
-          applyShortcutHint={applyShortcutHint}
           onApplyProposal={onApplyProposal}
           onDiscardProposal={onDiscardProposal}
           isApplyingProposal={isApplyingProposal}

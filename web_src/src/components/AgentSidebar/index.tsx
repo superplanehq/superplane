@@ -7,8 +7,6 @@ import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession }
 import { sendChatPrompt } from "./agentChat";
 import type { AgentState } from "./useAgentState";
 import { useApplyAiProposal } from "./useApplyAiProposal";
-import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
-import { useApplyShortcutHint } from "./useApplyShortcutHint";
 import { useDeleteChatSession } from "./useDeleteChatSession";
 import { useLoadChatConversation } from "./useLoadChatConversation";
 import { useLoadChatSessions } from "./useLoadChatSessions";
@@ -55,7 +53,7 @@ interface OpenAgentSidebarProps {
   agentContext: AgentContext;
   canvasId?: string;
   organizationId?: string;
-  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
+  onApplyAiOperations: (changes: CanvasChangesetChange[]) => Promise<void>;
   disabled: boolean;
 }
 
@@ -77,11 +75,14 @@ function OpenAgentSidebar({
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
-  const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
 
-  const applyShortcutHint = useApplyShortcutHint();
+  const { isApplyingProposal, setPendingProposal, pendingProposal, handleDiscardProposal, onApplyProposal } =
+    useProposalState({
+      setAiError,
+      setAiMessages,
+      onApplyAiOperations,
+    });
 
   const handleSendPrompt = useCallback(
     async (value?: string) => {
@@ -131,29 +132,6 @@ function OpenAgentSidebar({
     setAiMessages,
     setPendingProposal,
     setAiError,
-  });
-
-  const handleDiscardProposal = useCallback(() => {
-    setPendingProposal(null);
-  }, []);
-
-  const handleApplyProposal = useApplyAiProposal({
-    onApplyAiOperations,
-    pendingProposal,
-    setAiError,
-    setIsApplyingProposal,
-    setAiMessages,
-    setPendingProposal,
-  });
-
-  const canApplyProposalWithShortcut = !!pendingProposal && (pendingProposal.changeset.changes || []).length > 0;
-
-  // apply proposal with shortcut (Cmd+Enter)
-  useApplyOnCmdEnter({
-    enabled: canApplyProposalWithShortcut,
-    disabled,
-    isApplying: isApplyingProposal,
-    onApply: handleApplyProposal,
   });
 
   // reset state when canvasId changes
@@ -207,8 +185,7 @@ function OpenAgentSidebar({
           aiMessages={aiMessages}
           isGeneratingResponse={isGeneratingResponse}
           pendingProposal={pendingProposal}
-          applyShortcutHint={applyShortcutHint}
-          onApplyProposal={() => void handleApplyProposal()}
+          onApplyProposal={onApplyProposal}
           onDiscardProposal={handleDiscardProposal}
           isApplyingProposal={isApplyingProposal}
           aiError={aiError}
@@ -262,4 +239,38 @@ function CloseButton({ onToggle }: { onToggle: (open: boolean) => void }) {
       <X size={16} />
     </button>
   );
+}
+
+function useProposalState({
+  setAiError,
+  setAiMessages,
+  onApplyAiOperations,
+}: {
+  setAiError: (error: string | null) => void;
+  setAiMessages: (messages: AiBuilderMessage[]) => void;
+  onApplyAiOperations: (changes: CanvasChangesetChange[]) => Promise<void>;
+}) {
+  const [isApplyingProposal, setIsApplyingProposal] = useState(false);
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
+
+  const handleDiscardProposal = useCallback(() => {
+    setPendingProposal(null);
+  }, []);
+
+  const handleApplyProposal = useApplyAiProposal({
+    onApplyAiOperations,
+    pendingProposal,
+    setAiError,
+    setIsApplyingProposal,
+    setAiMessages,
+    setPendingProposal,
+  });
+
+  return {
+    isApplyingProposal,
+    setPendingProposal,
+    pendingProposal,
+    handleDiscardProposal,
+    onApplyProposal: handleApplyProposal,
+  };
 }

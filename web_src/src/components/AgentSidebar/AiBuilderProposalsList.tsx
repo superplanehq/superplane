@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { useMemo } from "react";
 import type { AiBuilderProposal } from "./agentChat";
+import { useApplyShortcutHint } from "./useApplyShortcutHint";
 import { useFormatOperation } from "./useFormatOperation";
 
 export type ProposalsListProps = {
   pendingProposal: AiBuilderProposal;
-  applyShortcutHint: string;
-  onApplyProposal: () => void;
+  onApplyProposal: () => void | Promise<void>;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
   aiError: string | null;
@@ -15,7 +15,6 @@ export type ProposalsListProps = {
 
 export function ProposalsList({
   pendingProposal,
-  applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
@@ -29,6 +28,7 @@ export function ProposalsList({
   );
 
   const isDisabled = disabled || isApplyingProposal || (pendingProposal.changeset.changes || []).length === 0;
+  const applyShortcutHint = useApplyShortcutHint();
 
   return (
     <div className="relative rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">

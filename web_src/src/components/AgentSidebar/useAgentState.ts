@@ -101,7 +101,7 @@ export function useAgentState({
     organizationId,
     showAgentSidebarToggle,
     readOnly,
-    onApplyAiOperations,
+    onApplyAiOperations: onApplyAiOperations ?? (async () => {}),
   };
 }
 
