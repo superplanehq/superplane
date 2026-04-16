@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field
-
 from superplaneapi.models.canvas_changeset_change import CanvasChangesetChange
 from superplaneapi.models.canvas_changeset_change_edge import CanvasChangesetChangeEdge
 from superplaneapi.models.canvas_changeset_change_node import CanvasChangesetChangeNode
