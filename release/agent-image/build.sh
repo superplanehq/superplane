@@ -20,6 +20,8 @@ IMAGE_REPO="${AGENT_IMAGE_REPO:-ghcr.io/superplanehq/superplane-agent}"
 
 echo "Building SuperPlane Agent image (${IMAGE_REPO})"
 
+make gen.setup.agent
+
 docker buildx build \
   --platform "linux/${ARCH}" \
   --progress=plain \
