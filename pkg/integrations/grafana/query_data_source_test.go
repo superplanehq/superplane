@@ -385,6 +385,31 @@ func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
 	}
 }
 
+func Test__parseGrafanaQueryTimezone__zoneNameMatchesOffset(t *testing.T) {
+	tests := map[string]string{
+		"5.75":  "GMT+05:45",
+		"5.5":   "GMT+05:30",
+		"-5.5":  "GMT-05:30",
+		"0":     "GMT+00:00",
+		"-3.5":  "GMT-03:30",
+		"12.75": "GMT+12:45",
+	}
+	for offset, wantName := range tests {
+		t.Run(offset, func(t *testing.T) {
+			o := offset
+			loc, err := parseGrafanaQueryTimezone(&o)
+			require.NoError(t, err)
+			require.Equal(t, wantName, loc.String())
+		})
+	}
+}
+
+func Test__fixedZoneNameFromOffsetSeconds(t *testing.T) {
+	require.Equal(t, "GMT+00:00", fixedZoneNameFromOffsetSeconds(0))
+	require.Equal(t, "GMT+05:30", fixedZoneNameFromOffsetSeconds(5*3600+30*60))
+	require.Equal(t, "GMT-03:30", fixedZoneNameFromOffsetSeconds(-(3*3600 + 30*60)))
+}
+
 func decodeJSONBody(t *testing.T, body io.ReadCloser) map[string]any {
 	t.Helper()
 

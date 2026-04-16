@@ -352,7 +352,23 @@ func parseGrafanaQueryTimezone(timezone *string) (*time.Location, error) {
 	}
 
 	offsetSeconds := int(math.Round(offsetHours * 3600))
-	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds), nil
+	return time.FixedZone(fixedZoneNameFromOffsetSeconds(offsetSeconds), offsetSeconds), nil
+}
+
+// fixedZoneNameFromOffsetSeconds builds a GMT±HH:MM label that matches the FixedZone offset
+// (unlike formatting fractional hours with %.1f, which rounds and mislabels e.g. 5.75h as GMT+5.8).
+func fixedZoneNameFromOffsetSeconds(offsetSeconds int) string {
+	if offsetSeconds == 0 {
+		return "GMT+00:00"
+	}
+	sign := "+"
+	if offsetSeconds < 0 {
+		sign = "-"
+		offsetSeconds = -offsetSeconds
+	}
+	hours := offsetSeconds / 3600
+	minutes := (offsetSeconds % 3600) / 60
+	return fmt.Sprintf("GMT%s%02d:%02d", sign, hours, minutes)
 }
 
 func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
