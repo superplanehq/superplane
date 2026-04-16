@@ -81,9 +81,7 @@ def test_run_cleanup_does_not_propagate_errors() -> None:
 def test_run_cleanup_continues_after_per_org_error() -> None:
     store = MagicMock()
     store.list_distinct_org_ids = MagicMock(return_value=["org-bad", "org-good"])
-    store.delete_expired_chats_for_org = MagicMock(
-        side_effect=[RuntimeError("lock timeout"), 3]
-    )
+    store.delete_expired_chats_for_org = MagicMock(side_effect=[RuntimeError("lock timeout"), 3])
     checker = _make_limit_checker(retention_days=14)
 
     with patch("ai.chat_retention.config") as mock_config:
