@@ -2,7 +2,6 @@ import re
 import warnings
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode
 
 # Suppress a known pydantic warning emitted by generated OpenAPI models.
 # Keep this narrow to avoid hiding unrelated warnings.
@@ -17,6 +16,7 @@ warnings.filterwarnings(
 
 from ai.config import config as app_config
 from ai.models import (
+    CanvasChangeset,
     CanvasEdge,
     CanvasNode,
     CanvasShape,
@@ -38,6 +38,9 @@ from superplaneapi.api_client import ApiClient
 from superplaneapi.configuration import Configuration
 from superplaneapi.exceptions import ApiException
 from superplaneapi.models.canvases_canvas_version import CanvasesCanvasVersion
+from superplaneapi.models.canvases_create_canvas_version_response import (
+    CanvasesCreateCanvasVersionResponse,
+)
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_describe_canvas_version_response import (
     CanvasesDescribeCanvasVersionResponse,
@@ -45,6 +48,12 @@ from superplaneapi.models.canvases_describe_canvas_version_response import (
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.canvases_list_node_executions_response import (
     CanvasesListNodeExecutionsResponse,
+)
+from superplaneapi.models.canvases_validate_canvas_version_changeset_body import (
+    CanvasesValidateCanvasVersionChangesetBody,
+)
+from superplaneapi.models.canvases_validate_canvas_version_changeset_response import (
+    CanvasesValidateCanvasVersionChangesetResponse,
 )
 from superplaneapi.models.components_component import ComponentsComponent
 from superplaneapi.models.components_describe_component_response import (
@@ -301,6 +310,46 @@ class SuperplaneClient:
         return self._canvas_summary_from_describe_response(
             self._fetch_describe_canvas_response(canvas_id), canvas_id
         )
+
+    def create_canvas_version(self, canvas_id: str) -> str:
+        response = self._api_request(
+            lambda: self._canvas_version_api.canvases_create_canvas_version(
+                canvas_id,
+                {},
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_create_canvas_version",
+            fields={"canvas_id": canvas_id},
+        )
+        if not isinstance(response, CanvasesCreateCanvasVersionResponse):
+            raise ValueError("Expected typed response from Superplane API.")
+
+        version = response.version
+        metadata = version.metadata if version is not None else None
+        version_id = metadata.id if metadata is not None and isinstance(metadata.id, str) else None
+        if not version_id:
+            raise ValueError("Canvas version create response is missing version metadata id.")
+        return version_id
+
+    def validate_canvas_version_changeset(
+        self,
+        canvas_id: str,
+        canvas_version_id: str,
+        changeset: CanvasChangeset,
+    ) -> CanvasesValidateCanvasVersionChangesetResponse:
+        response = self._api_request(
+            lambda: self._canvas_version_api.canvases_validate_canvas_version_changeset(
+                canvas_id,
+                canvas_version_id,
+                CanvasesValidateCanvasVersionChangesetBody(changeset=changeset),
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_validate_canvas_version_changeset",
+            fields={"canvas_id": canvas_id, "version_id": canvas_version_id},
+        )
+        if not isinstance(response, CanvasesValidateCanvasVersionChangesetResponse):
+            raise ValueError("Expected typed response from Superplane API.")
+        return response
 
     @staticmethod
     def _provider_from_name(name: str | None) -> str | None:
@@ -716,6 +765,37 @@ class SuperplaneClient:
             if isinstance(integration, OrganizationsIntegration)
         ]
 
+    # This endpoint expects top-level query keys (e.g. `?type=project`) so grpc-gateway
+    # can map them into req.parameters["type"]. The generated OpenAPI clients model it as
+    # a single `parameters` query field, which sends `?parameters=type%3Dproject` and
+    # causes a 400 ("resource type is required"), so we build the request manually here.
+    def _list_integration_resources_raw(
+        self, integration_id: str, query_params: dict[str, str]
+    ) -> OrganizationsListIntegrationResourcesResponse | None:
+        request = self._api_client.param_serialize(
+            method="GET",
+            resource_path="/api/v1/organizations/{id}/integrations/{integrationId}/resources",
+            path_params={"id": self._config.organization_id, "integrationId": integration_id},
+            query_params=list(query_params.items()),
+            header_params={"Accept": "application/json"},
+            post_params=[],
+            files={},
+            auth_settings=[],
+            collection_formats={},
+        )
+        response_data = self._api_client.call_api(
+            *request,
+            _request_timeout=self._config.timeout_seconds,
+        )
+        response_data.read()  # type: ignore[no-untyped-call]
+        deserialized = self._api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map={"200": "OrganizationsListIntegrationResourcesResponse"},
+        )
+        if isinstance(deserialized.data, OrganizationsListIntegrationResourcesResponse):
+            return deserialized.data
+        return None
+
     def list_integration_resources(
         self,
         integration_id: str,
@@ -727,14 +807,8 @@ class SuperplaneClient:
             query_params.update(
                 {str(key): str(value) for key, value in parameters.items() if key and value}
             )
-        encoded_parameters = urlencode(query_params)
         response = self._api_request(
-            lambda: self._organization_api.organizations_list_integration_resources(
-                self._config.organization_id,
-                integration_id,
-                parameters=encoded_parameters,
-                _request_timeout=self._config.timeout_seconds,
-            ),
+            lambda: self._list_integration_resources_raw(integration_id, query_params),
             operation="organizations_list_integration_resources",
         )
         if not isinstance(response, OrganizationsListIntegrationResourcesResponse):

@@ -28,10 +28,10 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
-// EnterEditMode clicks the Edit button in the header to create a draft version.
+// EnterEditMode clicks the Editor segment in the header to create a draft version.
 // This must be called before making any canvas changes.
 func (s *CanvasSteps) EnterEditMode() {
-	editButton := q.Locator(`header button:has-text("Edit")`).Run(s.session)
+	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
 
 	deadline := time.Now().Add(15 * time.Second)
 	for {
@@ -41,7 +41,7 @@ func (s *CanvasSteps) EnterEditMode() {
 			break
 		}
 		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
+			s.t.Fatalf("editor control did not become enabled")
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
@@ -108,7 +108,7 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 	}
 
 	openButton := q.TestID("open-sidebar-button").Run(s.session)
-	editButton := q.Locator(`button:has-text("Edit")`).Run(s.session)
+	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {

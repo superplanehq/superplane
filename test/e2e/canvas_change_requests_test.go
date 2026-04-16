@@ -82,7 +82,7 @@ func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationChangeManagementEn
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.session.AssertVisible(q.Locator(`header button:has-text("Edit")`))
+	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
 }
 
 func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled bool) {
@@ -95,7 +95,7 @@ func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled b
 }
 
 func (s *canvasChangeRequestSteps) enterEditMode() {
-	editButton := q.Locator(`header button:has-text("Edit")`).Run(s.session)
+	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
 	deadline := time.Now().Add(15 * time.Second)
 
 	for {
@@ -106,7 +106,7 @@ func (s *canvasChangeRequestSteps) enterEditMode() {
 		}
 
 		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
+			s.t.Fatalf("editor control did not become enabled")
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -116,7 +116,7 @@ func (s *canvasChangeRequestSteps) enterEditMode() {
 	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
 }
 
-// headerProposeChangeButton matches "Propose Change" or "Propose Change (n)" in the canvas header.
+// headerProposeChangeButton matches the Propose Change button in the canvas header.
 func (s *canvasChangeRequestSteps) headerProposeChangeButton() pw.Locator {
 	return s.session.Page().Locator("header").GetByRole("button", pw.LocatorGetByRoleOptions{
 		Name: regexp.MustCompile(`Propose Change`),

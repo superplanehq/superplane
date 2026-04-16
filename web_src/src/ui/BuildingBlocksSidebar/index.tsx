@@ -1,4 +1,5 @@
 import type {
+  CanvasChangesetChange,
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
@@ -8,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { CanvasOperation } from "@/lib/ai";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Search, Settings2, X } from "lucide-react";
@@ -45,7 +45,7 @@ export interface BuildingBlocksSidebarProps {
     edges?: ComponentsEdge[];
   };
   selectedNodeIds?: string[];
-  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
   disabled?: boolean;
@@ -96,7 +96,7 @@ interface OpenBuildingBlocksSidebarProps {
   agentContext: AgentContext;
   canvasId?: string;
   organizationId?: string;
-  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   integrations: OrganizationsIntegration[];
   canvasZoom: number;
   disabled: boolean;
@@ -199,49 +199,31 @@ function OpenBuildingBlocksSidebar({
     setPendingProposal(null);
   }, []);
 
-  const formatOperation = useCallback((operation: CanvasOperation, proposal?: AiBuilderProposal) => {
-    const operationNodeLabels = new Map<string, string>();
-    if (proposal) {
-      for (const op of proposal.operations) {
-        if (op.type === "add_node" && op.nodeKey) {
-          operationNodeLabels.set(op.nodeKey, op.nodeName || op.blockName);
-        }
-      }
-    }
+  const formatOperation = useCallback((change: CanvasChangesetChange) => {
+    const getNodeId = (nodeId?: string) => nodeId || "node";
 
-    const resolveRefLabel = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
-      if (!ref) return "step";
-      if (ref.nodeName) return ref.nodeName;
-      if (ref.nodeKey && operationNodeLabels.has(ref.nodeKey)) {
-        return operationNodeLabels.get(ref.nodeKey) || "step";
-      }
-      if (ref.nodeId) return ref.nodeId;
-      return "step";
-    };
-
-    switch (operation.type) {
-      case "add_node":
-        return `Add node ${operation.nodeName || operation.blockName} (${operation.blockName})`;
-      case "connect_nodes":
-        return `Connect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
-      case "disconnect_nodes":
-        return `Disconnect ${resolveRefLabel(operation.source)} -> ${resolveRefLabel(operation.target)}`;
-      case "update_node_config":
-        return `Update configuration for ${operation.nodeName || operation.target.nodeName || "node"}`;
-      case "delete_node":
-        return `Delete node ${resolveRefLabel(operation.target)}`;
+    switch (change.type) {
+      case "ADD_NODE":
+        return `Add node ${getNodeId(change.node?.id)} (${change.node?.block || "unknown"})`;
+      case "UPDATE_NODE":
+        return `Update node ${getNodeId(change.node?.id)}`;
+      case "DELETE_NODE":
+        return `Delete node ${getNodeId(change.node?.id)}`;
+      case "ADD_EDGE":
+        return `Connect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
+      case "DELETE_EDGE":
+        return `Disconnect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
       default:
         return "Update canvas";
     }
   }, []);
+
   const pendingProposalSummaries = useMemo(() => {
     if (!pendingProposal) {
       return [];
     }
 
-    return pendingProposal.operations
-      .filter((operation) => operation.type !== "connect_nodes")
-      .map((operation) => formatOperation(operation, pendingProposal));
+    return (pendingProposal.changeset.changes || []).map((change) => formatOperation(change));
   }, [formatOperation, pendingProposal]);
 
   const handleApplyProposal = useCallback(async () => {
@@ -255,7 +237,7 @@ function OpenBuildingBlocksSidebar({
     setAiError(null);
     setIsApplyingProposal(true);
     try {
-      await onApplyAiOperations(pendingProposal.operations);
+      await onApplyAiOperations(pendingProposal.changeset.changes || []);
       setAiMessages((prev) =>
         pushAiMessages(prev, {
           id: `assistant-${Date.now()}`,
@@ -272,7 +254,7 @@ function OpenBuildingBlocksSidebar({
   }, [onApplyAiOperations, pendingProposal]);
 
   useEffect(() => {
-    if (activeTab !== "ai" || !pendingProposal || pendingProposal.operations.length === 0) {
+    if (activeTab !== "ai" || !pendingProposal || (pendingProposal.changeset.changes || []).length === 0) {
       return;
     }
 

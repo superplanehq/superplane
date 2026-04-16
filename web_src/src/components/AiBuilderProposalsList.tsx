@@ -22,7 +22,7 @@ export function ProposalsList({
   aiError,
   disabled,
 }: ProposalsListProps) {
-  const isDisabled = disabled || isApplyingProposal || pendingProposal.operations.length === 0;
+  const isDisabled = disabled || isApplyingProposal || (pendingProposal.changeset.changes || []).length === 0;
 
   return (
     <div className="relative rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">

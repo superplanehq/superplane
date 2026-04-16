@@ -2,11 +2,8 @@ import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xy
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CanvasPageProps } from ".";
-import type { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
-  breadcrumbs: BreadcrumbItem[];
-
   nodes: Node[];
   edges: Edge[];
 
@@ -260,7 +257,6 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const componentSidebar = useComponentSidebarState(props.initialSidebar, props.onSidebarChange);
 
   return {
-    breadcrumbs: props.breadcrumbs || [{ label: "Workflows" }, { label: props.title || "Untitled Workflow" }],
     nodes,
     componentSidebar,
     edges,

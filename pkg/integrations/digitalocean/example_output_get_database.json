@@ -1,0 +1,24 @@
+{
+  "data": {
+    "name": "app_db",
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test",
+    "engine": "pg",
+    "version": "17",
+    "region": "nyc1",
+    "status": "online",
+    "connection": {
+      "host": "superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com",
+      "port": 25060,
+      "user": "doadmin",
+      "database": "defaultdb",
+      "ssl": true,
+      "uri": "postgresql://doadmin@superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com:25060/defaultdb?sslmode=require"
+    },
+    "database": {
+      "name": "app_db"
+    }
+  },
+  "timestamp": "2026-03-27T11:12:00.000000000Z",
+  "type": "digitalocean.database.fetched"
+}
