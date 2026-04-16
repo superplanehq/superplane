@@ -33,7 +33,7 @@ function makeExecution(outputs?: { default?: OutputPayload[] }): ExecutionInfo {
   };
 }
 
-function makeComponentContext(node: NodeInfo): ComponentBaseContext {
+function makeComponentContext(node: NodeInfo, lastExecutions: ExecutionInfo[] = []): ComponentBaseContext {
   return {
     nodes: [],
     node,
@@ -44,7 +44,7 @@ function makeComponentContext(node: NodeInfo): ComponentBaseContext {
       icon: "grafana",
       color: "blue",
     },
-    lastExecutions: [],
+    lastExecutions,
     currentUser: undefined,
     actions: {
       invokeNodeExecutionAction: async () => {},
@@ -61,6 +61,20 @@ function makeExecutionContext(node: NodeInfo, outputs?: { default?: OutputPayloa
 }
 
 describe("grafana dashboard mappers", () => {
+  it("getDashboardMapper omits trigger event section when execution has no root event", () => {
+    const node = makeNode("getDashboard", { dashboard: "dash-prod" }, { dashboardTitle: "Production Overview" });
+    const props = getDashboardMapper.props(makeComponentContext(node, [makeExecution()]));
+
+    expect(props.eventSections).toEqual([]);
+  });
+
+  it("renderPanelMapper omits trigger event section when execution has no root event", () => {
+    const node = makeNode("renderPanel", { dashboard: "dash-prod", panel: 7 });
+    const props = renderPanelMapper.props(makeComponentContext(node, [makeExecution()]));
+
+    expect(props.eventSections).toEqual([]);
+  });
+
   it("getDashboardMapper uses dashboard metadata fallback and handles sparse outputs", () => {
     const node = makeNode("getDashboard", { dashboard: "dash-prod" }, { dashboardTitle: "Production Overview" });
 

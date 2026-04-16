@@ -11,8 +11,8 @@ func Test__validateRenderPanelSpec__rejectsNegativeDimensions(t *testing.T) {
 		err := validateRenderPanelSpec(RenderPanelSpec{
 			DashboardUID: "d1",
 			PanelID:      1,
-			Width:        -100,
-			Height:       500,
+			Width:        intPtr(-100),
+			Height:       intPtr(500),
 		})
 		require.ErrorContains(t, err, "width")
 	})
@@ -21,18 +21,26 @@ func Test__validateRenderPanelSpec__rejectsNegativeDimensions(t *testing.T) {
 		err := validateRenderPanelSpec(RenderPanelSpec{
 			DashboardUID: "d1",
 			PanelID:      1,
-			Width:        1000,
-			Height:       -1,
+			Width:        intPtr(1000),
+			Height:       intPtr(-1),
 		})
 		require.ErrorContains(t, err, "height")
 	})
 
-	t.Run("zero dimensions are allowed", func(t *testing.T) {
+	t.Run("zero dimensions are rejected when explicitly set", func(t *testing.T) {
 		err := validateRenderPanelSpec(RenderPanelSpec{
 			DashboardUID: "d1",
 			PanelID:      1,
-			Width:        0,
-			Height:       0,
+			Width:        intPtr(0),
+			Height:       intPtr(0),
+		})
+		require.ErrorContains(t, err, "width")
+	})
+
+	t.Run("omitted dimensions are valid", func(t *testing.T) {
+		err := validateRenderPanelSpec(RenderPanelSpec{
+			DashboardUID: "d1",
+			PanelID:      1,
 		})
 		require.NoError(t, err)
 	})

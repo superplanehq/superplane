@@ -17,8 +17,8 @@ type RenderPanel struct{}
 type RenderPanelSpec struct {
 	DashboardUID string `json:"dashboard" mapstructure:"dashboard"`
 	PanelID      int    `json:"panel" mapstructure:"panel"`
-	Width        int    `json:"width" mapstructure:"width"`
-	Height       int    `json:"height" mapstructure:"height"`
+	Width        *int   `json:"width,omitempty" mapstructure:"width"`
+	Height       *int   `json:"height,omitempty" mapstructure:"height"`
 	From         string `json:"from" mapstructure:"from"`
 	To           string `json:"to" mapstructure:"to"`
 }
@@ -172,14 +172,14 @@ func (c *RenderPanel) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error getting dashboard: %w", err)
 	}
 
-	width := spec.Width
-	if width == 0 {
-		width = 1000
+	width := 1000
+	if spec.Width != nil {
+		width = *spec.Width
 	}
 
-	height := spec.Height
-	if height == 0 {
-		height = 500
+	height := 500
+	if spec.Height != nil {
+		height = *spec.Height
 	}
 
 	from, err := resolveGrafanaTimeInput(spec.From, nil, ctx.Expressions)
@@ -265,11 +265,15 @@ func validateRenderPanelSpec(spec RenderPanelSpec) error {
 	if spec.PanelID == 0 {
 		return errors.New("panel is required")
 	}
-	if spec.Width < 0 {
-		return errors.New("width must be greater than or equal to 0")
+	if spec.Width != nil {
+		if *spec.Width <= 0 {
+			return errors.New("width must be greater than 0")
+		}
 	}
-	if spec.Height < 0 {
-		return errors.New("height must be greater than or equal to 0")
+	if spec.Height != nil {
+		if *spec.Height <= 0 {
+			return errors.New("height must be greater than 0")
+		}
 	}
 
 	return nil

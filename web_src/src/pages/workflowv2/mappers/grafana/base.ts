@@ -19,8 +19,12 @@ export function buildGrafanaEventSections(
 ): EventSection[] {
   const strict = options?.strict === true;
 
+  if (!execution.rootEvent?.id) {
+    return [];
+  }
+
   if (strict) {
-    if (!execution.rootEvent?.id || !execution.createdAt) {
+    if (!execution.createdAt) {
       return [];
     }
     const strictTrigger = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
@@ -61,7 +65,7 @@ function resolveGrafanaEventReceivedAt(execution: ExecutionInfo): Date | undefin
 }
 
 function resolveGrafanaEventId(execution: ExecutionInfo): string {
-  return execution.rootEvent?.id ?? execution.id;
+  return execution.rootEvent?.id ?? "";
 }
 
 export function grafanaComponentBaseProps(context: ComponentBaseContext, metadata: MetadataItem[]): ComponentBaseProps {
