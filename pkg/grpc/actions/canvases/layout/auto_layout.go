@@ -522,9 +522,11 @@ func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[s
 		if _, exists := flowNodeSet[nodeID]; !exists {
 			return nil, fmt.Errorf("auto layout node ids contains unknown node: %s", nodeID)
 		}
+
 		if _, exists := seen[nodeID]; exists {
 			continue
 		}
+
 		seen[nodeID] = struct{}{}
 		seedNodeIDs = append(seedNodeIDs, nodeID)
 	}
