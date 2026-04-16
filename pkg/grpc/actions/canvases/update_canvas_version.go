@@ -100,10 +100,18 @@ func UpdateCanvasVersionWithUsage(
 		return nil, err
 	}
 
-	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, organizationID, &usagepb.OrganizationState{}, &usagepb.CanvasState{
-		Nodes: int32(len(expandedNodes)),
-	}); err != nil {
-		return nil, err
+	err = usage.EnsureOrganizationWithinLimits(
+		ctx,
+		usageService,
+		organizationID,
+		&usagepb.OrganizationState{},
+		&usagepb.CanvasState{
+			Nodes: int32(len(expandedNodes)),
+		},
+	)
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to ensure organization within limits: %v", err)
 	}
 
 	requestedVersionID := strings.TrimSpace(versionID)
