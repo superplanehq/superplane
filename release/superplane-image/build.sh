@@ -20,8 +20,10 @@ IMAGE_REPO="${STANDARD_IMAGE_REPO:-ghcr.io/superplanehq/superplane}"
 
 echo "Building SuperPlane image (${IMAGE_REPO})"
 
+make gen.setup.backend
+make gen.setup.ui
+
 docker buildx build \
-  --platform "linux/${ARCH}" \
   --progress=plain \
   --provenance=false \
   --push \
