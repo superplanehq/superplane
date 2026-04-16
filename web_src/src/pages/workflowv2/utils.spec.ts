@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasNodeExecutionRef } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
-import { buildRunItemFromExecutionRef } from "./utils";
+import type { LogEntry } from "@/ui/CanvasLogSidebar";
+import { buildRunItemFromExecutionRef, mapCanvasNodesToLogEntries, mergeWorkflowLogEntries } from "./utils";
 
 function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {}): CanvasesCanvasNodeExecutionRef {
   return {
@@ -39,5 +40,72 @@ describe("buildRunItemFromExecutionRef", () => {
     });
 
     expect(runItem.type).toBe("resolved-error");
+  });
+});
+
+describe("mergeWorkflowLogEntries", () => {
+  it("keeps canvas warnings visible outside live mode", () => {
+    const canvasEntries = mapCanvasNodesToLogEntries({
+      nodes: [
+        makeComponentsNode({
+          id: "draft-node",
+          name: "Draft Node",
+          warningMessage: "Draft contains a warning",
+        }),
+      ],
+      workflowUpdatedAt: "2026-04-03T12:00:00Z",
+      onNodeSelect: vi.fn(),
+    });
+
+    const result = mergeWorkflowLogEntries({
+      isViewingLiveVersion: false,
+      runEntries: [
+        {
+          id: "run-1",
+          source: "runs",
+          timestamp: "2026-04-04T12:00:00Z",
+          title: "Live run",
+          type: "run",
+        } satisfies LogEntry,
+      ],
+      liveRunEntries: [],
+      canvasEntries,
+      liveCanvasEntries: [],
+      resolvedExecutionIds: new Set(["execution-1"]),
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.type).toBe("warning");
+    expect(result[0]?.source).toBe("canvas");
+    expect(result[0]?.searchText).toContain("Draft contains a warning");
+  });
+
+  it("preserves resolved run item state in live mode", () => {
+    const result = mergeWorkflowLogEntries({
+      isViewingLiveVersion: true,
+      runEntries: [
+        {
+          id: "run-1",
+          source: "runs",
+          timestamp: "2026-04-04T12:00:00Z",
+          title: "Live run",
+          type: "run",
+          runItems: [
+            {
+              id: "execution-1",
+              type: "error",
+              title: "Execution failed",
+              timestamp: "2026-04-04T12:00:00Z",
+            },
+          ],
+        } satisfies LogEntry,
+      ],
+      liveRunEntries: [],
+      canvasEntries: [],
+      liveCanvasEntries: [],
+      resolvedExecutionIds: new Set(["execution-1"]),
+    });
+
+    expect(result[0]?.runItems?.[0]?.type).toBe("resolved-error");
   });
 });
