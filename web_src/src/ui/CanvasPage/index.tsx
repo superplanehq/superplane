@@ -20,17 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import {
-  CircleX,
-  Copy,
-  Group,
-  LayoutDashboard,
-  LayoutGrid,
-  Loader2,
-  Play,
-  Trash2,
-  TriangleAlert,
-} from "lucide-react";
+import { CircleX, Copy, Group, LayoutDashboard, LayoutGrid, Loader2, Play, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,

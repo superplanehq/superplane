@@ -509,6 +509,60 @@ export function mapCanvasNodesToLogEntries(options: {
   return entries;
 }
 
+export function mergeWorkflowLogEntries(options: {
+  isViewingLiveVersion: boolean;
+  runEntries: LogEntry[];
+  liveRunEntries: LogEntry[];
+  canvasEntries: LogEntry[];
+  liveCanvasEntries: LogEntry[];
+  resolvedExecutionIds: Set<string>;
+}): LogEntry[] {
+  const { isViewingLiveVersion, runEntries, liveRunEntries, canvasEntries, liveCanvasEntries, resolvedExecutionIds } =
+    options;
+  const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
+
+  if (!isViewingLiveVersion) {
+    return allCanvasEntries.sort((a, b) => {
+      const aTime = Date.parse(a.timestamp || "") || 0;
+      const bTime = Date.parse(b.timestamp || "") || 0;
+      return bTime - aTime;
+    });
+  }
+
+  const mergedRunEntries = new Map<string, LogEntry>();
+  runEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
+  liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
+  const allRunEntries = Array.from(mergedRunEntries.values());
+
+  return [...allRunEntries, ...allCanvasEntries]
+    .map((entry) => {
+      if (!entry.runItems?.length || resolvedExecutionIds.size === 0) {
+        return entry;
+      }
+
+      const runItems = entry.runItems.map((item) => {
+        if (!resolvedExecutionIds.has(item.id)) {
+          return item;
+        }
+
+        return {
+          ...item,
+          type: "resolved-error" as const,
+        };
+      });
+
+      return {
+        ...entry,
+        runItems,
+      };
+    })
+    .sort((a, b) => {
+      const aTime = Date.parse(a.timestamp || "") || 0;
+      const bTime = Date.parse(b.timestamp || "") || 0;
+      return aTime - bTime;
+    });
+}
+
 export function buildCanvasStatusLogEntry(options: {
   id: string;
   message: string;
