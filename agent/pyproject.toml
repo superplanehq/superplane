@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Bootstrap repository for PydanticAI services"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "APScheduler>=3.10,<4",
   "fastapi>=0.135.1",
   "grpcio>=1.71.0",
   "opentelemetry-sdk>=1.39.0",
@@ -60,3 +61,7 @@ exclude = ["src/private", "src/superplaneapi"]
 [[tool.mypy.overrides]]
 module = "usage_pb2"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "apscheduler.*"
+ignore_missing_imports = true
