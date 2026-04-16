@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { isChangeManagementSettingsEnabled } from "@/lib/env";
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { normalizeApprovers, validateApproverConfig } from "./approverUtils";
+import { ChangeManagementFieldset } from "./ChangeManagementFieldset";
 import { IdentityFields } from "./IdentityFields";
 import type { ChangeRequestApproverType, SettingsApprover, SettingsViewProps } from "./types";
-import { ChangeManagementFieldset } from "./ChangeManagementFieldset";
-import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 export function SettingsView({
   initialValues,
@@ -92,8 +92,6 @@ export function SettingsView({
           approvals: effectiveChangeManagementEnabled ? normalizeApprovers(approvers) : undefined,
         },
       });
-      setSaveMessage("Canvas updated successfully");
-      setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
       const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to update canvas";
