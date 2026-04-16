@@ -154,7 +154,6 @@ func (p *CanvasPatcher) handleChange(change *pb.CanvasChangeset_Change) error {
 }
 
 func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
-
 	//
 	// These initial checks are hard checks.
 	// If they fail, we should return an error immediately.
@@ -178,17 +177,23 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	}
 
 	newNode := models.Node{
-		ID:   nodeID,
-		Name: node.GetName(),
+		ID:          nodeID,
+		Name:        node.GetName(),
+		IsCollapsed: node.GetIsCollapsed(),
 	}
 
 	nodeType, nodeRef, err := p.findBlock(node)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find block: %v", err)
 	}
 
 	newNode.Type = nodeType
 	newNode.Ref = *nodeRef
+
+	if node.GetPosition() != nil {
+		newNode.Position.X = int(node.GetPosition().GetX())
+		newNode.Position.Y = int(node.GetPosition().GetY())
+	}
 
 	//
 	// From here on out, we don't return errors,
@@ -196,6 +201,7 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	// This still allows the changeset to be applied, but
 	// node will be in an error state.
 	//
+
 	integrationID, err := p.validateIntegration(node)
 	if err != nil {
 		errorMessage := err.Error()
@@ -311,6 +317,15 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		currentNode.Name = node.GetName()
 	}
 
+	if node.GetPosition() != nil {
+		currentNode.Position.X = int(node.GetPosition().GetX())
+		currentNode.Position.Y = int(node.GetPosition().GetY())
+	}
+
+	if node.IsCollapsed != nil {
+		currentNode.IsCollapsed = node.GetIsCollapsed()
+	}
+
 	//
 	// From here on out, we don't return errors,
 	// we save the error message alongside the new invalid configuration.
@@ -318,9 +333,6 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 	// node will be in an error state.
 	//
 
-	//
-	// We only update the configuration if it is provided
-	//
 	if node.GetConfiguration() != nil {
 		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
 		if err != nil {
