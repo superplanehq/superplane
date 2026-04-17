@@ -60,6 +60,11 @@ func (c *createCommand) buildGroup(ctx core.CommandContext) (openapi_client.Grou
 		if len(ctx.Args) > 0 {
 			return openapi_client.GroupsGroup{}, fmt.Errorf("cannot combine a positional name with --file")
 		}
+		if ctx.Cmd.Flags().Changed("display-name") ||
+			ctx.Cmd.Flags().Changed("description") ||
+			ctx.Cmd.Flags().Changed("role") {
+			return openapi_client.GroupsGroup{}, fmt.Errorf("cannot combine --display-name, --description, or --role with --file")
+		}
 		resource, err := parseGroupFile(filePath)
 		if err != nil {
 			return openapi_client.GroupsGroup{}, err

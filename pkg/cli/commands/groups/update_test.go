@@ -173,6 +173,17 @@ func TestUpdateRequiresPositionalOrFile(t *testing.T) {
 	require.Contains(t, err.Error(), "group name positional argument is required")
 }
 
+func TestUpdateRejectsInlineFlagsWithFile(t *testing.T) {
+	cmd, got := newUpdateContext(t, newMeOnlyServer(t), map[string]string{
+		"file":         "/tmp/group.yaml",
+		"display-name": "Engineers",
+	})
+
+	err := cmd.Execute(got.ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot combine --display-name, --description, or --role with --file")
+}
+
 func TestUpdateRequiresAtLeastOneFlag(t *testing.T) {
 	cmd, got := newUpdateContext(t, newMeOnlyServer(t), map[string]string{})
 	got.ctx.Args = []string{"engineers"}

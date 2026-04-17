@@ -146,6 +146,31 @@ func TestCreateFromFileRequiresMetadataName(t *testing.T) {
 	require.Contains(t, err.Error(), "metadata.name is required")
 }
 
+func TestCreateRejectsInlineFlagsWithFile(t *testing.T) {
+	ctx, _ := newTestContext(t, newMeOnlyServer(t), "text")
+
+	// Register the inline flags on the cobra command so Flags().Changed can
+	// detect that the user supplied one alongside --file.
+	var displayName, description, role, filePath string
+	cobraCmd := ctx.Cmd
+	cobraCmd.Flags().StringVar(&displayName, "display-name", "", "")
+	cobraCmd.Flags().StringVar(&description, "description", "", "")
+	cobraCmd.Flags().StringVar(&role, "role", "", "")
+	cobraCmd.Flags().StringVarP(&filePath, "file", "f", "", "")
+	require.NoError(t, cobraCmd.Flags().Set("display-name", "Engineers"))
+	require.NoError(t, cobraCmd.Flags().Set("file", "/tmp/group.yaml"))
+
+	cmd := &createCommand{
+		file:        &filePath,
+		displayName: &displayName,
+		description: &description,
+		role:        &role,
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot combine --display-name, --description, or --role with --file")
+}
+
 func TestCreateRequiresNameOrFile(t *testing.T) {
 	ctx, _ := newTestContext(t, newMeOnlyServer(t), "text")
 	empty := ""
