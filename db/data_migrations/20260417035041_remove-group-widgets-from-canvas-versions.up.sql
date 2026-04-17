@@ -12,8 +12,8 @@ AS $$
       COALESCE((node->'position'->>'x')::numeric, 0) AS group_x,
       COALESCE((node->'position'->>'y')::numeric, 0) AS group_y
     FROM jsonb_array_elements(input_nodes) WITH ORDINALITY AS items(node, ordinality)
-    WHERE node->>'type' = 'TYPE_WIDGET'
-      AND node->'widget'->>'name' = 'group'
+    WHERE node->>'type' = 'widget'
+      AND node->'ref'->'widget'->>'name' = 'group'
       AND COALESCE(node->>'id', '') <> ''
   ),
   direct_group_children AS (
@@ -93,8 +93,8 @@ AS $$
   LEFT JOIN resolved_offsets
     ON resolved_offsets.node_id = items.node->>'id'
   WHERE NOT (
-    items.node->>'type' = 'TYPE_WIDGET'
-    AND items.node->'widget'->>'name' = 'group'
+    items.node->>'type' = 'widget'
+    AND items.node->'ref'->'widget'->>'name' = 'group'
   );
 $$;
 
@@ -103,8 +103,8 @@ SET nodes = flatten_group_widget_nodes(nodes)
 WHERE EXISTS (
   SELECT 1
   FROM jsonb_array_elements(nodes) AS node(item)
-  WHERE item->>'type' = 'TYPE_WIDGET'
-    AND item->'widget'->>'name' = 'group'
+  WHERE item->>'type' = 'widget'
+    AND item->'ref'->'widget'->>'name' = 'group'
 );
 
 DROP FUNCTION flatten_group_widget_nodes(jsonb);
