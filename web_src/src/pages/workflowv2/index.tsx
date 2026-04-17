@@ -4428,8 +4428,10 @@ export function WorkflowPageV2() {
       activeCanvasVersionIdRef.current = isCurrentLive ? "" : versionID;
 
       if (isCurrentLive) {
+        setDraftCanvasSpec(null);
         setActiveCanvasVersion(null);
       } else {
+        setDraftCanvasSpec(version.spec ?? null);
         setActiveCanvasVersion(version);
       }
 
