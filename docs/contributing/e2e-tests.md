@@ -140,6 +140,22 @@ Common test IDs:
 - Canvas: `canvas-drop-area`, `save-canvas-button`, `canvas-group-node` (group container), `multi-select-group` (multi-select toolbar)
 - Modals/Forms: `canvas-name-input`, `component-name-input`, `save-node-button`
 - Building blocks: `building-block-<name>` (e.g., `building-block-noop`, `building-block-approval`)
+- Agent chat: `open-agent-sidebar`, `agent-sidebar`, `agent-sidebar-back-button`, `agent-chat-input`, `agent-chat-send`, `agent-chat-message` (with `data-role="user|assistant"`), `agent-chat-session-item`, `agent-chat-session-button`
+
+## Agent Chat E2E Tests
+
+Agent chat tests in `test/e2e/agent_chat_test.go` drive the real Python
+`agent` service end-to-end. Because running a real LLM in CI is slow and
+flaky, these tests use pydantic-ai's `TestModel` via the `AI_MODEL=test`
+environment variable (see [docker-compose.e2e.yml](../../docker-compose.e2e.yml)).
+The agent container is started with `make test.start`, which applies that
+override so the agent points at `agents_test` with a JWT secret that matches
+the e2e Go server.
+
+The tests rely on a small helper in `test/e2e/agents_db.go` to truncate
+`agent_chats` / `agent_chat_messages` / `agent_chat_runs` in the
+`agents_test` database before each subtest so that session lists and
+persistence assertions are deterministic.
 
 ## Writing a New E2E Test (Pattern)
 

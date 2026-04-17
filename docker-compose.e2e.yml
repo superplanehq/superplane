@@ -1,0 +1,14 @@
+# Compose overrides applied on top of docker-compose.dev.yml when running e2e tests.
+# Only overrides that differ from dev should live here.
+services:
+  agent:
+    environment:
+      # Use the e2e-specific agent DB that is created by `make test.setup.db`.
+      DB_NAME: agents_test
+      # Deterministic, no external LLM calls. The TestModel branch in ai/web.py is used.
+      AI_MODEL: test
+      # The in-process e2e Go app binds to 8001 (see test/e2e/test_context.go Start()).
+      SUPERPLANE_BASE_URL: http://app:8001
+      # Must match the JWT_SECRET used by the e2e Go test server (see test/e2e/test_context.go Start()).
+      JWT_SECRET: test-jwt-secret
+      AGENT_HTTP_DEBUG: "true"

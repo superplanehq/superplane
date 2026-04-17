@@ -59,6 +59,14 @@ func (s *TestContext) Start() {
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
+	os.Setenv("AGENT_ENABLED", "yes")
+	// AGENT_GRPC_URL is used by the Go test server (running inside the app container)
+	// to talk to the Python agent service via its internal gRPC port.
+	os.Setenv("AGENT_GRPC_URL", "agent:50061")
+	// AGENT_HTTP_URL is returned to the browser as the SSE stream URL.
+	// The Playwright browser runs inside the app container, so it resolves the
+	// `agent` service hostname via the docker network.
+	os.Setenv("AGENT_HTTP_URL", "http://agent:8090")
 
 	s.startVite()
 	s.startAppServer()

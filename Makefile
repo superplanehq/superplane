@@ -11,6 +11,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
+E2E_COMPOSE=docker compose -f docker-compose.dev.yml -f docker-compose.e2e.yml
 DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger/superplane.swagger.json agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
@@ -55,7 +56,7 @@ test.setup.db:
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
-	$(COMPOSE) up -d --wait
+	$(E2E_COMPOSE) up -d --wait
 
 test.down:
 	$(COMPOSE) down --remove-orphans
