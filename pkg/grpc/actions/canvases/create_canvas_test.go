@@ -296,16 +296,13 @@ func TestCreateCanvasTemplateSkipsSetupValidationForOrgSpecificIntegrationNodes(
 		},
 	}
 
-	response, err := CreateCanvasWithAutoLayoutAndUsageAndSetup(
+	response, err := CreateCanvasWithAutoLayoutAndUsage(
 		ctx,
 		nil,
-		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvas,
 		nil,
-		"",
-		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -375,16 +372,13 @@ func TestCreateCanvasTemplateExpandsBlueprintsUsingCreatorOrganization(t *testin
 		},
 	}
 
-	response, err := CreateCanvasWithAutoLayoutAndUsageAndSetup(
+	response, err := CreateCanvasWithAutoLayoutAndUsage(
 		ctx,
 		nil,
-		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvas,
 		nil,
-		"",
-		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -433,16 +427,13 @@ func TestCreateCanvasSkipsRuntimeSetupForNonTemplateNodes(t *testing.T) {
 		},
 	}
 
-	response, err := CreateCanvasWithAutoLayoutAndUsageAndSetup(
+	response, err := CreateCanvasWithAutoLayoutAndUsage(
 		ctx,
 		nil,
-		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvas,
 		nil,
-		"",
-		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -481,18 +472,15 @@ func TestCreateCanvasTemplateAutoLayoutReturnsInvalidArgument(t *testing.T) {
 		},
 	}
 
-	_, err := CreateCanvasWithAutoLayoutAndUsageAndSetup(
+	_, err := CreateCanvasWithAutoLayoutAndUsage(
 		ctx,
 		nil,
-		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
 		canvas,
 		&pb.CanvasAutoLayout{
 			Algorithm: pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED,
 		},
-		"",
-		r.AuthService,
 	)
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))

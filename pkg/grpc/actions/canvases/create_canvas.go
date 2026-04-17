@@ -9,8 +9,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -38,17 +36,7 @@ func CreateCanvasWithAutoLayout(
 	pbCanvas *pb.Canvas,
 	autoLayout *pb.CanvasAutoLayout,
 ) (*pb.CreateCanvasResponse, error) {
-	return CreateCanvasWithAutoLayoutAndUsageAndSetup(
-		ctx,
-		nil,
-		nil,
-		registry,
-		organizationID,
-		pbCanvas,
-		autoLayout,
-		"",
-		nil,
-	)
+	return CreateCanvasWithAutoLayoutAndUsage(ctx, nil, registry, organizationID, pbCanvas, autoLayout)
 }
 
 func CreateCanvasWithAutoLayoutAndUsage(
@@ -58,30 +46,6 @@ func CreateCanvasWithAutoLayoutAndUsage(
 	organizationID string,
 	pbCanvas *pb.Canvas,
 	autoLayout *pb.CanvasAutoLayout,
-) (*pb.CreateCanvasResponse, error) {
-	return CreateCanvasWithAutoLayoutAndUsageAndSetup(
-		ctx,
-		usageService,
-		nil,
-		registry,
-		organizationID,
-		pbCanvas,
-		autoLayout,
-		"",
-		nil,
-	)
-}
-
-func CreateCanvasWithAutoLayoutAndUsageAndSetup(
-	ctx context.Context,
-	usageService usage.Service,
-	encryptor crypto.Encryptor,
-	registry *registry.Registry,
-	organizationID string,
-	pbCanvas *pb.Canvas,
-	autoLayout *pb.CanvasAutoLayout,
-	webhookBaseURL string,
-	authService authorization.Authorization,
 ) (*pb.CreateCanvasResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -185,6 +149,7 @@ func CreateCanvasWithAutoLayoutAndUsageAndSetup(
 		//
 		// Create the workflow node records (including internal blueprint nodes)
 		//
+		// Canvas creation persists validated nodes but defers runtime setup.
 		if err := persistCanvasNodesWithoutSetupInTransaction(tx, canvas.ID, expandedNodes, &now); err != nil {
 			return err
 		}
