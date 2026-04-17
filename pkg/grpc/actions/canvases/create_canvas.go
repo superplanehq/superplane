@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -57,9 +56,12 @@ func CreateCanvas(
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	nodes := actions.ProtoToNodes(pbCanvas.Spec.Nodes)
-	edges := actions.ProtoToEdges(pbCanvas.Spec.Edges)
-	nodes, edges, err := layout.ApplyLayout(nodes, edges, autoLayout)
+	nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
 	}
