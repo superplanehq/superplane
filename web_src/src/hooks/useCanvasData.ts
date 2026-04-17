@@ -156,7 +156,7 @@ export const useCanvasTemplates = (organizationId: string) => {
   });
 };
 
-export const useCanvas = (organizationId: string, canvasId: string) => {
+export const useCanvas = (organizationId: string, canvasId: string, enabled: boolean = true) => {
   return useQuery({
     queryKey: canvasKeys.detail(organizationId, canvasId),
     queryFn: async () => {
@@ -167,9 +167,11 @@ export const useCanvas = (organizationId: string, canvasId: string) => {
       );
       return response.data?.canvas;
     },
-    staleTime: 0,
+    staleTime: 30_000,
     refetchOnWindowFocus: false,
-    enabled: !!organizationId && !!canvasId,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    enabled: enabled && !!organizationId && !!canvasId,
   });
 };
 
