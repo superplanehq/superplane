@@ -64,7 +64,6 @@ import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
-import { buildChildToGroupMap } from "@/lib/canvas/groups";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -89,13 +88,6 @@ import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
-import {
-  deleteNodesFromCanvas,
-  groupCanvasNodes,
-  prepareGroupNode,
-  ungroupCanvasNode,
-  wireGroupParentChildRelationships,
-} from "./lib/canvas-groups";
 import {
   CANVAS_BUNDLE_COLOR,
   CANVAS_BUNDLE_ICON_SLUG,
@@ -417,7 +409,7 @@ export function WorkflowPageV2() {
   }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions, pendingApprovalVersionIds]);
   const latestDraftVersion = draftVersions[0];
   const createChangeRequestNodeDiffSummary = useMemo(
-    () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion),
+    () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion || undefined),
     [liveCanvasVersion, createChangeRequestVersion],
   );
   const isCreateChangeRequestDraftOutdated = useMemo(() => {
@@ -2952,48 +2944,6 @@ export function WorkflowPageV2() {
     [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, debouncedAutoSave, isReadOnly],
   );
 
-  const handleGroupUpdate = useCallback(
-    (nodeId: string, updates: { label?: string; description?: string; color?: string }) => {
-      if (!canvas || !organizationId || !canvasId) return;
-      if (Object.keys(updates).length === 0) return;
-
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-
-      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
-        if (node.id !== nodeId || node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") {
-          return node;
-        }
-
-        return {
-          ...node,
-          configuration: {
-            ...node.configuration,
-            ...updates,
-          },
-        };
-      });
-
-      const updatedWorkflow = {
-        ...latestWorkflow,
-        spec: {
-          ...latestWorkflow.spec,
-          nodes: updatedNodes,
-        },
-      };
-
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
-      if (!isReadOnly) {
-        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
-        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
-        setIsAnnotationAutoSaveQueued(true);
-        debouncedAnnotationAutoSave();
-      }
-    },
-    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, isReadOnly],
-  );
-
   const handleNodeAdd = useCallback(
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
@@ -3408,7 +3358,7 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
 
       const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromCanvas(specNodes, [nodeId]);
+      const updatedNodes = specNodes.filter((node) => node.id !== nodeId);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
 
       const updatedEdges = canvas.spec?.edges?.filter(
@@ -3440,8 +3390,9 @@ export function WorkflowPageV2() {
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
+      const nodeIdSet = new Set(nodeIds);
       const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromCanvas(specNodes, nodeIds);
+      const updatedNodes = specNodes.filter((node) => !node.id || !nodeIdSet.has(node.id));
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
       const updatedEdges = canvas.spec?.edges?.filter(
         (edge) =>
@@ -3487,62 +3438,17 @@ export function WorkflowPageV2() {
     [canvas, components, blueprints, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
   );
 
-  const handleGroupNodes = useCallback(
-    async (
-      bounds: { x: number; y: number; width: number; height: number },
-      nodePositions: Array<{ id: string; x: number; y: number }>,
-    ) => {
-      if (!canvas || !organizationId || !canvasId || nodePositions.length < 2) return;
-
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-
-      const updatedWorkflow = groupCanvasNodes(latestWorkflow, bounds, nodePositions);
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
-    },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
-  );
-
-  const handleUngroupNodes = useCallback(
-    async (groupNodeId: string) => {
-      if (!canvas || !organizationId || !canvasId) return;
-
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
-
-      const updatedWorkflow = ungroupCanvasNode(latestWorkflow, groupNodeId);
-      if (!updatedWorkflow) return;
-
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
-    },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
-  );
-
   const handleNodesDuplicate = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
       const specNodes = canvas.spec?.nodes || [];
-      const childToGroup = buildChildToGroupMap(specNodes);
-
-      const filteredNodeIds = nodeIds.filter((id) => {
-        const node = specNodes.find((n) => n.id === id);
-        return node && !(node.type === "TYPE_WIDGET" && node.widget?.name === "group");
-      });
 
       const existingNodeNames = specNodes.map((n) => n.name || "").filter(Boolean);
       const newNodes: ComponentsNode[] = [];
       const nodeIdMap: Record<string, string> = {};
 
-      for (const nodeId of filteredNodeIds) {
+      for (const nodeId of nodeIds) {
         const nodeToDuplicate = specNodes.find((node) => node.id === nodeId);
         if (!nodeToDuplicate) continue;
 
@@ -3566,18 +3472,13 @@ export function WorkflowPageV2() {
 
         nodeIdMap[nodeId] = newNodeId;
 
-        const groupId = childToGroup.get(nodeId);
-        const groupNode = groupId ? specNodes.find((n) => n.id === groupId) : undefined;
-        const absoluteX = (nodeToDuplicate.position?.x || 0) + (groupNode?.position?.x || 0);
-        const absoluteY = (nodeToDuplicate.position?.y || 0) + (groupNode?.position?.y || 0);
-
         newNodes.push({
           ...nodeToDuplicate,
           id: newNodeId,
           name: uniqueNodeName,
           position: {
-            x: absoluteX + 50,
-            y: absoluteY + 50,
+            x: (nodeToDuplicate.position?.x || 0) + 50,
+            y: (nodeToDuplicate.position?.y || 0) + 50,
           },
           isCollapsed: false,
         });
@@ -3585,7 +3486,7 @@ export function WorkflowPageV2() {
 
       if (newNodes.length === 0) return;
 
-      const duplicatedNodeIds = new Set(filteredNodeIds);
+      const duplicatedNodeIds = new Set(nodeIds);
       const newEdges = (canvas.spec?.edges || [])
         .filter(
           (edge) =>
@@ -5199,9 +5100,6 @@ export function WorkflowPageV2() {
           configurationSaveMode={isReadOnly ? "manual" : "auto"}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
-          onGroupUpdate={!isReadOnly ? handleGroupUpdate : undefined}
-          onGroupNodes={!isReadOnly ? handleGroupNodes : undefined}
-          onUngroupNodes={!isReadOnly ? handleUngroupNodes : undefined}
           onSave={isTemplate ? undefined : handleSave}
           onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
           onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
@@ -5579,8 +5477,7 @@ function prepareData(
         dragHandle: ".canvas-node-drag-handle",
       })) || [];
 
-  const sortedNodes = wireGroupParentChildRelationships(workflow, nodes);
-  return { nodes: sortedNodes, edges };
+  return { nodes, edges };
 }
 
 function prepareNode(
@@ -5619,9 +5516,6 @@ function prepareNode(
       return compositeNode;
     }
     case "TYPE_WIDGET":
-      if (node.widget?.name === "group") {
-        return prepareGroupNode(node, nodes);
-      }
       return prepareAnnotationNode(node);
 
     default:

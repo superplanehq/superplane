@@ -72,33 +72,6 @@ describe("CanvasNodeErrorBoundary", () => {
     consoleSpy.mockRestore();
   });
 
-  it("isolates group node render failures", () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    render(
-      <>
-        <CanvasNodeErrorBoundary
-          nodeId="group-1"
-          nodeData={{ label: "Broken Group", state: "pending", type: "group" }}
-          fallback={<div>group fallback</div>}
-        >
-          <ThrowingNode />
-        </CanvasNodeErrorBoundary>
-        <CanvasNodeErrorBoundary
-          nodeId="node-3"
-          nodeData={{ label: "Healthy", state: "pending", type: "component" }}
-          fallback={<div>unused fallback</div>}
-        >
-          <div>another healthy node</div>
-        </CanvasNodeErrorBoundary>
-      </>,
-    );
-
-    expect(screen.getByText("group fallback")).toBeInTheDocument();
-    expect(screen.getByText("another healthy node")).toBeInTheDocument();
-    consoleSpy.mockRestore();
-  });
-
   it("does not retry a broken node when rerendered with equivalent data", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
