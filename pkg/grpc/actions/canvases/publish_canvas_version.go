@@ -111,7 +111,12 @@ func publishDraftVersionInTransaction(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
-		publisher, err := changesets.NewCanvasPublisher(tx, version, changesets.CanvasPublisherOptions{
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
+		if err != nil {
+			return err
+		}
+
+		publisher, err := changesets.NewCanvasPublisher(tx, version, liveVersion, changesets.CanvasPublisherOptions{
 			Registry:       reg,
 			OrgID:          organizationUUID,
 			Encryptor:      encryptor,

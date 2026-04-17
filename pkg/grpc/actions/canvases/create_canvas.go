@@ -9,7 +9,10 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -19,14 +22,151 @@ import (
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 const ErrDuplicateCanvasName = "duplicate key value violates unique constraint"
 
-func CreateCanvas(ctx context.Context, registry *registry.Registry, organizationID string, pbCanvas *pb.Canvas) (*pb.CreateCanvasResponse, error) {
-	return CreateCanvasWithAutoLayout(ctx, registry, organizationID, pbCanvas, nil)
+func CreateCanvas(
+	ctx context.Context,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+	organizationID uuid.UUID,
+	pbCanvas *pb.Canvas,
+	autoLayout *pb.CanvasAutoLayout,
+	usageService usage.Service,
+) (*pb.CreateCanvasResponse, error) {
+	if pbCanvas == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+	}
+
+	if pbCanvas.GetMetadata() == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
+	}
+
+	if pbCanvas.Metadata.GetIsTemplate() {
+		return nil, status.Error(codes.InvalidArgument, "templates cannot be created")
+	}
+
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
+	nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
+	}
+
+	createdBy := uuid.MustParse(userID)
+	changeManagementEnabled, err := models.IsChangeManagementEnabled(organizationID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load organization change management setting: %v", err)
+	}
+
+	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to count organization canvases: %v", err)
+	}
+
+	err = usage.EnsureOrganizationWithinLimits(
+		ctx,
+		usageService,
+		organizationID.String(),
+		&usagepb.OrganizationState{Canvases: int32(canvasCount + 1)},
+		&usagepb.CanvasState{Nodes: int32(len(nodes))},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	canvasID := uuid.New()
+	versionID := uuid.New()
+
+	now := time.Now()
+	canvas := models.Canvas{
+		ID:                      canvasID,
+		OrganizationID:          organizationID,
+		LiveVersionID:           &versionID,
+		IsTemplate:              false,
+		ChangeManagementEnabled: changeManagementEnabled,
+		Name:                    pbCanvas.Metadata.Name,
+		Description:             pbCanvas.Metadata.Description,
+		CreatedBy:               &createdBy,
+		CreatedAt:               &now,
+		UpdatedAt:               &now,
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Returning{}).Create(&canvas).Error; err != nil {
+			if strings.Contains(err.Error(), ErrDuplicateCanvasName) {
+				return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+			}
+			return err
+		}
+
+		emptyVersion := models.CanvasVersion{
+			ID:          versionID,
+			WorkflowID:  canvasID,
+			OwnerID:     &createdBy,
+			State:       models.CanvasVersionStatePublished,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
+			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		}
+
+		if err := tx.Create(&emptyVersion).Error; err != nil {
+			return err
+		}
+
+		if len(nodes) == 0 {
+			return nil
+		}
+
+		changeset, err := changesets.NewChangesetBuilder([]models.Node{}, []models.Edge{}, nodes, edges).Build()
+		if err != nil {
+			return err
+		}
+
+		patcher := changesets.NewCanvasPatcher(tx, organizationID, registry, &emptyVersion)
+		if err := patcher.ApplyChangeset(changeset, nil); err != nil {
+			return err
+		}
+
+		updatedVersion := patcher.GetVersion()
+		if err := tx.Save(updatedVersion).Error; err != nil {
+			return err
+		}
+
+		publisher, err := changesets.NewCanvasPublisher(tx, updatedVersion, &emptyVersion, changesets.CanvasPublisherOptions{
+			Registry:       registry,
+			OrgID:          organizationID,
+			Encryptor:      encryptor,
+			AuthService:    authService,
+			WebhookBaseURL: webhookBaseURL,
+		})
+		if err != nil {
+			return err
+		}
+
+		return publisher.Publish(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return createCanvasResponse(&canvas, organizationID.String())
 }
 
 func CreateCanvasWithAutoLayout(
@@ -47,6 +187,14 @@ func CreateCanvasWithAutoLayoutAndUsage(
 	pbCanvas *pb.Canvas,
 	autoLayout *pb.CanvasAutoLayout,
 ) (*pb.CreateCanvasResponse, error) {
+	if pbCanvas == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+	}
+
+	if pbCanvas.GetMetadata() == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
+	}
+
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -54,8 +202,7 @@ func CreateCanvasWithAutoLayoutAndUsage(
 
 	createdBy := uuid.MustParse(userID)
 	var err error
-	isTemplate := pbCanvas.Metadata.GetIsTemplate()
-	if isTemplate {
+	if pbCanvas.Metadata.GetIsTemplate() {
 		var canvas *models.Canvas
 		err = database.Conn().Transaction(func(tx *gorm.DB) error {
 			var txErr error
@@ -102,8 +249,7 @@ func CreateCanvasWithAutoLayoutAndUsage(
 
 	now := time.Now()
 	targetOrganizationID := uuid.MustParse(organizationID)
-	changeManagementEnabled := false
-	changeManagementEnabled, err = models.IsChangeManagementEnabled(targetOrganizationID)
+	changeManagementEnabled, err := models.IsChangeManagementEnabled(targetOrganizationID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load organization change management setting: %v", err)
 	}
@@ -120,6 +266,7 @@ func CreateCanvasWithAutoLayoutAndUsage(
 	}); err != nil {
 		return nil, err
 	}
+
 	canvas := &models.Canvas{
 		ID:                      uuid.New(),
 		OrganizationID:          targetOrganizationID,
@@ -134,22 +281,14 @@ func CreateCanvasWithAutoLayoutAndUsage(
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-
-		//
-		// Create the workflow record
-		//
-		err := tx.Clauses(clause.Returning{}).Create(canvas).Error
-		if err != nil {
+		if err := tx.Clauses(clause.Returning{}).Create(canvas).Error; err != nil {
 			if strings.Contains(err.Error(), ErrDuplicateCanvasName) {
 				return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
 			}
 			return err
 		}
 
-		//
-		// Create the workflow node records (including internal blueprint nodes)
-		//
-		// Canvas creation persists validated nodes but defers runtime setup.
+		// This helper persists validated nodes as data only and intentionally skips runtime setup.
 		if err := persistCanvasNodesWithoutSetupInTransaction(tx, canvas.ID, expandedNodes, &now); err != nil {
 			return err
 		}
@@ -169,7 +308,6 @@ func CreateCanvasWithAutoLayoutAndUsage(
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

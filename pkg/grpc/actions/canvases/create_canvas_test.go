@@ -128,10 +128,11 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 		},
 	}
 
-	_, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), workflow)
+	baseURL := "https://example.com"
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.NoError(t, err)
 
-	_, err = CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), workflow)
+	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.AlreadyExists, status.Code(err))
 }
@@ -153,7 +154,8 @@ func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.
 		},
 	}
 
-	response, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), workflow)
+	baseURL := "https://example.com"
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -186,7 +188,8 @@ func TestCreateCanvasOnFreshOrganization(t *testing.T) {
 		},
 	}
 
-	response, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), canvas)
+	baseURL := "https://example.com"
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -230,7 +233,8 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 		},
 	}
 
-	_, err := CreateCanvasWithAutoLayoutAndUsage(ctx, service, r.Registry, r.Organization.ID.String(), workflow, nil)
+	baseURL := "https://example.com"
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, service)
 	require.Error(t, err)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
