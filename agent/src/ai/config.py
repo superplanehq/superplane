@@ -9,7 +9,7 @@ class Config:
 
         self.superplane_base_url: str = self._parse_str("SUPERPLANE_BASE_URL")
         self.superplane_user_agent: str = self._parse_str(
-            "SUPERPLANE_USER_AGENT", default="curl/8.7.1"
+            "SUPERPLANE_USER_AGENT", default="superplane-agent"
         )
         self.drain_timeout: float = self._parse_float(
             "DRAIN_TIMEOUT",
