@@ -671,13 +671,17 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			warningMessage = &node.WarningMessage
 		}
 
+		//
+		// NOTE: we do not include metadata in here,
+		// to avoid allowing requests to override node metadata.
+		// Metadata is something only triggers/components implementations can set.
+		//
 		result[i] = models.Node{
 			ID:             node.Id,
 			Name:           node.Name,
 			Type:           ProtoToNodeType(node.Type),
 			Ref:            ProtoToNodeRef(node),
 			Configuration:  node.Configuration.AsMap(),
-			Metadata:       node.Metadata.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
 			IntegrationID:  integrationID,
