@@ -1,14 +1,12 @@
-import { AiBuilderConversationMessageList } from "@/components/AiBuilderConversationMessageList";
-import { ConversationList } from "@/components/AiBuilderConversationList";
-import { InputForm } from "@/components/AiBuilderInputForm";
-import { ProposalsList } from "@/components/AiBuilderProposalsList";
-import { TabsContent } from "@/components/ui/tabs";
-import {
-  type AiBuilderMessage,
-  type AiBuilderProposal,
-  type AiChatSession,
-} from "@/ui/BuildingBlocksSidebar/agentChat";
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useRef, type RefObject } from "react";
+import { ConversationList } from "./AiBuilderConversationList";
+import { AiBuilderConversationMessageList } from "./AiBuilderConversationMessageList";
+import { InputForm } from "./AiBuilderInputForm";
+import { ProposalsList } from "./AiBuilderProposalsList";
+import { type AiBuilderMessage, type AiBuilderProposal, type AiChatSession } from "./agentChat";
+import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
+import { useDeleteChatSession } from "./useDeleteChatSession";
 
 type AiBuilderChatPanelProps = {
   chatSessions: AiChatSession[];
@@ -18,19 +16,21 @@ type AiBuilderChatPanelProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  pendingProposalSummaries: string[];
-  applyShortcutHint: string;
-  onApplyProposal: () => void;
+  onApplyProposal: () => void | Promise<void>;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
   aiError: string | null;
   disabled: boolean;
   canvasId?: string;
+  organizationId?: string;
+  setChatSessions: Dispatch<SetStateAction<AiChatSession[]>>;
+  setCurrentChatId: Dispatch<SetStateAction<string | null>>;
+  setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
+  setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
+  setAiError: Dispatch<SetStateAction<string | null>>;
   aiInput: string;
   onAiInputChange: (value: string) => void;
   onSelectChat: (chatId: string) => void;
-  onDeleteChat?: (chatId: string) => void;
-  onStartNewSession: () => void;
   onSendPrompt: () => void;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
 };
@@ -43,27 +43,42 @@ export function AiBuilderChatPanel({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  pendingProposalSummaries,
-  applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
   aiError,
   disabled,
   canvasId,
+  organizationId,
+  setChatSessions,
+  setCurrentChatId,
+  setAiMessages,
+  setPendingProposal,
+  setAiError,
   aiInput,
   onAiInputChange,
   onSelectChat,
-  onDeleteChat,
-  onStartNewSession,
   onSendPrompt,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
+  const currentChatIdRef = useRef(currentChatId);
+  currentChatIdRef.current = currentChatId;
+
+  const handleDeleteChatSession = useDeleteChatSession({
+    canvasId,
+    organizationId,
+    currentChatIdRef,
+    setChatSessions,
+    setCurrentChatId,
+    setAiMessages,
+    setPendingProposal,
+    setAiError,
+  });
+
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
   const hasConversationState =
     aiMessages.length > 0 || isGeneratingResponse || pendingProposal !== null || aiError !== null;
   const isNewChatView = currentChatId === null && !hasConversationState;
-  const showConversationList = currentChatId !== null;
   const maxAiInputHeight = isNewChatView ? 240 : 160;
 
   useEffect(() => {
@@ -75,20 +90,13 @@ export function AiBuilderChatPanel({
     container.scrollTop = container.scrollHeight;
   }, [aiMessages, pendingProposal, isGeneratingResponse, aiError]);
 
-  useEffect(() => {
-    if (!aiInputRef.current) {
-      return;
-    }
-
-    aiInputRef.current.style.height = "auto";
-    aiInputRef.current.style.height = `${Math.min(aiInputRef.current.scrollHeight, maxAiInputHeight)}px`;
-  }, [aiInput, aiInputRef, maxAiInputHeight]);
+  useAutoInputHeight(aiInputRef, maxAiInputHeight, aiInput);
 
   return (
-    <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
-      <div className="h-full rounded-md bg-slate-50/30 flex flex-col">
+    <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      <div className="h-full min-h-0 flex flex-col">
         {isNewChatView ? (
-          <>
+          <div className="m-3">
             <InputForm
               aiInputRef={aiInputRef}
               aiInput={aiInput}
@@ -107,35 +115,19 @@ export function AiBuilderChatPanel({
               isLoadingChatSessions={isLoadingChatSessions}
               isGeneratingResponse={isGeneratingResponse}
               onSelectChat={onSelectChat}
-              onDeleteChat={onDeleteChat}
-              onStartNewSession={onStartNewSession}
-              title="Previous chats"
+              onDeleteChat={handleDeleteChatSession}
               className="flex-1 min-h-0 px-2 py-2 space-y-2"
               fillAvailable
             />
-          </>
+          </div>
         ) : (
-          <>
-            {showConversationList ? (
-              <ConversationList
-                chatSessions={chatSessions}
-                currentChatId={currentChatId}
-                isLoadingChatSessions={isLoadingChatSessions}
-                isGeneratingResponse={isGeneratingResponse}
-                onSelectChat={onSelectChat}
-                onDeleteChat={onDeleteChat}
-                onStartNewSession={onStartNewSession}
-              />
-            ) : null}
-
+          <div className="mx-2 mb-2 h-full flex flex-col">
             <ConversationContent
               aiMessagesContainerRef={aiMessagesContainerRef}
               isLoadingChatMessages={isLoadingChatMessages}
               aiMessages={aiMessages}
               isGeneratingResponse={isGeneratingResponse}
               pendingProposal={pendingProposal}
-              pendingProposalSummaries={pendingProposalSummaries}
-              applyShortcutHint={applyShortcutHint}
               onApplyProposal={onApplyProposal}
               onDiscardProposal={onDiscardProposal}
               isApplyingProposal={isApplyingProposal}
@@ -153,10 +145,10 @@ export function AiBuilderChatPanel({
               isGeneratingResponse={isGeneratingResponse}
               maxAiInputHeight={maxAiInputHeight}
             />
-          </>
+          </div>
         )}
       </div>
-    </TabsContent>
+    </div>
   );
 }
 
@@ -166,9 +158,7 @@ type ConversationContentProps = {
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
-  pendingProposalSummaries: string[];
-  applyShortcutHint: string;
-  onApplyProposal: () => void;
+  onApplyProposal: () => void | Promise<void>;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
   aiError: string | null;
@@ -181,14 +171,21 @@ function ConversationContent({
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
-  pendingProposalSummaries,
-  applyShortcutHint,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
   aiError,
   disabled,
 }: ConversationContentProps) {
+  const canApplyProposalWithShortcut = !!pendingProposal && (pendingProposal.changeset.changes || []).length > 0;
+
+  useApplyOnCmdEnter({
+    enabled: canApplyProposalWithShortcut,
+    disabled,
+    isApplying: isApplyingProposal,
+    onApply: onApplyProposal,
+  });
+
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
@@ -202,8 +199,6 @@ function ConversationContent({
         <ProposalsList
           disabled={disabled}
           pendingProposal={pendingProposal}
-          applyShortcutHint={applyShortcutHint}
-          pendingProposalSummaries={pendingProposalSummaries}
           onApplyProposal={onApplyProposal}
           onDiscardProposal={onDiscardProposal}
           isApplyingProposal={isApplyingProposal}
@@ -214,4 +209,20 @@ function ConversationContent({
       {!pendingProposal && aiError ? <p className="text-xs text-red-700 px-1">{aiError}</p> : null}
     </div>
   );
+}
+
+function useAutoInputHeight(
+  aiInputRef: RefObject<HTMLTextAreaElement | null>,
+  maxAiInputHeight: number,
+  aiInput: string,
+): void {
+  useEffect(() => {
+    const textarea = aiInputRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxAiInputHeight)}px`;
+  }, [aiInput, aiInputRef, maxAiInputHeight]);
 }

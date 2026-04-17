@@ -53,7 +53,9 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
-import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import { AgentSidebar } from "@/components/AgentSidebar";
+import { useAgentState, type AgentState } from "@/components/AgentSidebar/useAgentState";
+import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import type { EventState, EventStateMap } from "../componentBase";
@@ -258,7 +260,10 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  agentContext: AgentContext;
+  /** When true with a non-empty `activeCanvasVersionId`, the agent may run in build mode. */
+  isEditing: boolean;
+  /** Active canvas version id (draft when editing); drives agent build mode. */
+  activeCanvasVersionId: string;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
@@ -696,6 +701,16 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
+  const agentState = useAgentState({
+    isEditing: props.isEditing,
+    canvasVersion: props.activeCanvasVersionId,
+    hideAddControls: props.hideAddControls,
+    readOnly,
+    canvasId: props.canvasId,
+    organizationId: props.organizationId,
+    onApplyAiOperations: props.onApplyAiOperations,
+  });
+
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
@@ -704,17 +719,6 @@ function CanvasPage(props: CanvasPageProps) {
     channels: string[];
     initialData?: string;
   } | null>(null);
-  const canvasNodesForAiContext = useMemo(
-    () =>
-      (props.workflowNodes || []).map((node) => ({
-        id: node.id || "",
-        name: node.name || "",
-        label: node.name || "",
-        type: node.type || "",
-      })),
-    [props.workflowNodes],
-  );
-
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
       return;
@@ -1176,6 +1180,7 @@ function CanvasPage(props: CanvasPageProps) {
           onOpenVersionControl={props.onOpenVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
+          agentState={agentState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1183,6 +1188,8 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
         {props.versionControlSidebar}
+
+        <AgentSidebar agentState={agentState} />
 
         <RightSideControls
           mode={readOnly ? "live" : "edit"}
@@ -1197,11 +1204,6 @@ function CanvasPage(props: CanvasPageProps) {
             isOpen
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
-            agentContext={props.agentContext}
-            canvasId={props.canvasId}
-            organizationId={props.organizationId}
-            canvasNodes={canvasNodesForAiContext}
-            onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
             disabled={readOnly}
@@ -1679,6 +1681,7 @@ function CanvasContentHeader({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
+  agentState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1708,6 +1711,7 @@ function CanvasContentHeader({
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
+  agentState: AgentState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1754,6 +1758,7 @@ function CanvasContentHeader({
       onOpenVersionControl={onOpenVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
+      agentState={agentState}
     />
   );
 }

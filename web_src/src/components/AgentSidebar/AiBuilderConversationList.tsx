@@ -1,9 +1,6 @@
-import { useState } from "react";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
-import type { AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +11,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/alertDialog";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
+import type { AiChatSession } from "./agentChat";
 
 export type ConversationListProps = {
   chatSessions: AiChatSession[];
@@ -22,8 +22,6 @@ export type ConversationListProps = {
   isGeneratingResponse: boolean;
   onSelectChat: (chatId: string) => void;
   onDeleteChat?: (chatId: string) => void;
-  onStartNewSession: () => void;
-  title?: string;
   className?: string;
   fillAvailable?: boolean;
 };
@@ -79,28 +77,6 @@ function DeleteConfirmDialog({
   );
 }
 
-function CurrentSessionHeader({ session, isLoading }: { session: AiChatSession | undefined; isLoading: boolean }) {
-  if (isLoading) {
-    return <span className="text-xs text-slate-500">Loading…</span>;
-  }
-
-  if (session) {
-    return (
-      <div
-        className="flex min-w-0 flex-1 items-center justify-between gap-2"
-        title={session.createdAt ? formatSessionDate(session.createdAt) : undefined}
-      >
-        <div className="min-w-0 truncate text-sm font-medium text-slate-800">{session.title}</div>
-        {session.createdAt ? (
-          <TimeAgo date={session.createdAt} className="shrink-0 text-[11px] tabular-nums text-slate-500" />
-        ) : null}
-      </div>
-    );
-  }
-
-  return <span className="text-sm text-slate-600">Conversation</span>;
-}
-
 export function ConversationList({
   chatSessions,
   currentChatId,
@@ -108,42 +84,13 @@ export function ConversationList({
   isGeneratingResponse,
   onSelectChat,
   onDeleteChat,
-  onStartNewSession,
-  title,
   className,
   fillAvailable = false,
 }: ConversationListProps) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const currentSession = currentChatId ? chatSessions.find((s) => s.id === currentChatId) : undefined;
-
   return (
-    <div
-      className={cn("border-b border-border px-2 py-2 space-y-2", fillAvailable && "flex min-h-0 flex-col", className)}
-    >
-      <div className="flex min-w-0 items-center gap-2">
-        {currentChatId ? (
-          <>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              onClick={onStartNewSession}
-              disabled={isGeneratingResponse}
-              aria-label="Back to new chat"
-              title="Back"
-              className="shrink-0"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <CurrentSessionHeader session={currentSession} isLoading={isLoadingChatSessions} />
-          </>
-        ) : (
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
-            {title ?? "Conversations"}
-          </p>
-        )}
-      </div>
-
+    <div className={cn("space-y-2", fillAvailable && "flex min-h-0 flex-col", className)}>
       {!currentChatId ? (
         <div
           className={cn(
