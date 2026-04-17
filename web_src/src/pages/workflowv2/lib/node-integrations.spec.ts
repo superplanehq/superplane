@@ -40,7 +40,7 @@ describe("getNodeIntegrationName", () => {
       getNodeIntegrationName(
         {
           type: "TYPE_WIDGET",
-          widget: { name: "group" },
+          widget: { name: "annotation" },
         },
         availableIntegrations,
       ),

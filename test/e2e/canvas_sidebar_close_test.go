@@ -15,7 +15,7 @@ import (
 )
 
 func TestCanvasSidebarClose(t *testing.T) {
-	t.Run("sidebar close button works after exiting edit mode on versioned canvas", func(t *testing.T) {
+	t.Run("building blocks sidebar is not shown after exiting edit mode on versioned canvas", func(t *testing.T) {
 		steps := &sidebarCloseSteps{t: t}
 		steps.start()
 		steps.givenCanvasWithChangeManagementEnabled("E2E Sidebar Close")
@@ -23,8 +23,6 @@ func TestCanvasSidebarClose(t *testing.T) {
 		steps.openBuildingBlocksSidebar()
 		steps.assertSidebarVisible()
 		steps.exitEditMode()
-		steps.assertSidebarVisible()
-		steps.closeSidebarViaButton()
 		steps.assertSidebarHidden()
 	})
 }
@@ -107,9 +105,4 @@ func (s *sidebarCloseSteps) exitEditMode() {
 	require.NoError(s.t, liveButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
 	s.session.Sleep(500)
-}
-
-func (s *sidebarCloseSteps) closeSidebarViaButton() {
-	closeButton := q.TestID("close-sidebar-button").Run(s.session)
-	require.NoError(s.t, closeButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 }
