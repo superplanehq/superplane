@@ -19,12 +19,12 @@ export function CanvasModeToggle({ mode, onSelectEditor, onSelectLive }: CanvasM
 
   return (
     <Tabs value={mode} onValueChange={handleValueChange} className="inline-flex w-auto" aria-label="Canvas view">
-      <TabsList className="h-8 w-fit gap-0 p-0 bg-transparent border border-slate-300 rounded-sm">
+      <TabsList className="h-8 w-fit gap-0 rounded-sm border border-slate-300 bg-white/80 p-0">
         <TabsTrigger
           value="version-edit"
           data-testid="canvas-view-mode-editor"
           aria-label="Editor"
-          className="rounded-sm rounded-br-none rounded-tr-none border-none py-1 px-3"
+          className="rounded-sm rounded-br-none rounded-tr-none border-none px-3 py-1 text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none"
         >
           Editor
         </TabsTrigger>
@@ -33,7 +33,7 @@ export function CanvasModeToggle({ mode, onSelectEditor, onSelectLive }: CanvasM
           value="version-live"
           data-testid="canvas-view-mode-live"
           aria-label="Live Canvas"
-          className="rounded-sm rounded-bl-none rounded-tl-none border-none py-1 px-3"
+          className="rounded-sm rounded-bl-none rounded-tl-none border-none px-3 py-1 text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none"
         >
           Live Canvas
         </TabsTrigger>
