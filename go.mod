@@ -1,6 +1,6 @@
 module github.com/superplanehq/superplane
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.13.0
@@ -100,7 +100,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-isatty v0.0.17
 	github.com/mattn/go-sqlite3 v1.14.28 // indirect
 	github.com/microsoft/go-mssqldb v1.7.2 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
