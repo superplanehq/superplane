@@ -29,17 +29,21 @@ func (e *templateCanvasAutoLayoutError) Unwrap() []error {
 }
 
 // CreatePublishedTemplateCanvasWithoutSetupInTransaction persists a shared template
-// as data only. It never runs runtime node setup or caller-org-specific behavior.
+// as data only in the template org. The resolution org controls node validation
+// and blueprint expansion, but runtime node setup never runs here.
 func CreatePublishedTemplateCanvasWithoutSetupInTransaction(
 	tx *gorm.DB,
 	registry *registry.Registry,
 	template *pb.Canvas,
 	autoLayout *pb.CanvasAutoLayout,
 	createdBy *uuid.UUID,
+	resolutionOrganizationID string,
 ) (*models.Canvas, error) {
-	organizationID := models.TemplateOrganizationID.String()
+	if strings.TrimSpace(resolutionOrganizationID) == "" {
+		resolutionOrganizationID = models.TemplateOrganizationID.String()
+	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID, template)
+	nodes, edges, err := ParseCanvas(registry, resolutionOrganizationID, template)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +53,7 @@ func CreatePublishedTemplateCanvasWithoutSetupInTransaction(
 		return nil, &templateCanvasAutoLayoutError{cause: err}
 	}
 
-	expandedNodes, err := expandNodes(organizationID, nodes)
+	expandedNodes, err := expandNodes(resolutionOrganizationID, nodes)
 	if err != nil {
 		return nil, err
 	}
