@@ -10,24 +10,42 @@ import { waitMapper } from "./wait";
 import type { ComponentBaseContext, ExecutionInfo, TriggerRendererContext } from "./types";
 
 function makeExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
+  const now = new Date().toISOString();
+
   return {
     id: "execution-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
     state: "STATE_PENDING",
     result: "RESULT_PASSED",
     resultReason: "RESULT_REASON_OK",
     resultMessage: "",
     metadata: {},
     configuration: {},
-    rootEvent: undefined,
+    rootEvent: {
+      id: "event-1",
+      createdAt: now,
+      customName: "Start event",
+      data: {},
+      nodeId: "trigger-1",
+      type: "trigger",
+    },
     ...overrides,
   };
 }
 
 function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
   return {
-    nodes: [],
+    nodes: [
+      {
+        id: "trigger-1",
+        name: "Start",
+        componentName: "start",
+        isCollapsed: false,
+        configuration: {},
+        metadata: {},
+      },
+    ],
     node: {
       id: "node-1",
       name: "Node",
