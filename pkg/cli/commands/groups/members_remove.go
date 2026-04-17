@@ -30,7 +30,7 @@ func (c *membersRemoveCommand) Execute(ctx core.CommandContext) error {
 		emailFlag = *c.email
 	}
 
-	userID, userEmail, err := splitUserIdentifier(positional, emailFlag)
+	userID, userEmail, err := core.SplitUserIdentifier(positional, emailFlag)
 	if err != nil {
 		return err
 	}

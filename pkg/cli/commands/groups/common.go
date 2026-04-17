@@ -28,31 +28,6 @@ func organizationDomainType() openapi_client.AuthorizationDomainType {
 	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
 }
 
-// splitUserIdentifier picks between a user id and a user email. A positional
-// containing "@" is treated as an email, so CLI commands can accept either
-// form in the positional slot. Returns (userID, userEmail, error). Exactly one
-// non-empty on success; both empty when no identifier was provided; error
-// when the caller supplied both a positional and --email.
-func splitUserIdentifier(positional string, emailFlag string) (string, string, error) {
-	positional = strings.TrimSpace(positional)
-	emailFlag = strings.TrimSpace(emailFlag)
-
-	if positional != "" && emailFlag != "" {
-		return "", "", fmt.Errorf("pass either a positional user id or --email, not both")
-	}
-
-	if positional != "" {
-		if strings.Contains(positional, "@") {
-			return "", positional, nil
-		}
-		return positional, "", nil
-	}
-	if emailFlag != "" {
-		return "", emailFlag, nil
-	}
-	return "", "", nil
-}
-
 func parseGroupFile(path string) (*groupResource, error) {
 	// #nosec
 	data, err := os.ReadFile(path)

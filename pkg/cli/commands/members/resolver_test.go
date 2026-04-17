@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
 func newResolverServer(t *testing.T) *httptest.Server {
@@ -92,13 +93,13 @@ func TestResolveMemberTrimsWhitespaceOnID(t *testing.T) {
 }
 
 func TestSplitUserIdentifierAmbiguous(t *testing.T) {
-	_, _, err := splitUserIdentifier("user-1", "alice@example.com")
+	_, _, err := core.SplitUserIdentifier("user-1", "alice@example.com")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not both")
 }
 
 func TestSplitUserIdentifierEmailPositional(t *testing.T) {
-	id, email, err := splitUserIdentifier("alice@example.com", "")
+	id, email, err := core.SplitUserIdentifier("alice@example.com", "")
 	require.NoError(t, err)
 	require.Empty(t, id)
 	require.Equal(t, "alice@example.com", email)
