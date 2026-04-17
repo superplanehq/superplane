@@ -1,4 +1,4 @@
-package secrets
+package groups
 
 import (
 	"io"
@@ -6,16 +6,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type getCommand struct{}
+type membersListCommand struct{}
 
-func (c *getCommand) Execute(ctx core.CommandContext) error {
+func (c *membersListCommand) Execute(ctx core.CommandContext) error {
 	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
 
-	response, _, err := ctx.API.SecretAPI.
-		SecretsDescribeSecret(ctx.Context, ctx.Args[0]).
+	response, _, err := ctx.API.GroupsAPI.
+		GroupsListGroupUsers(ctx.Context, ctx.Args[0]).
 		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		Execute()
@@ -23,12 +23,12 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	secret := response.GetSecret()
+	users := response.GetUsers()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(secret)
+		return ctx.Renderer.Render(users)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		return renderSecretText(stdout, secret)
+		return renderGroupUsersText(stdout, users)
 	})
 }
