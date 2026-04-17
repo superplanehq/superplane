@@ -127,6 +127,7 @@ func (s *TestContext) Shutdown() {
 	if s.viteCmd != nil && s.viteCmd.Process != nil {
 		_ = s.viteCmd.Process.Kill()
 	}
+	closeAgentsDB()
 }
 
 func (s *TestContext) startVite() {

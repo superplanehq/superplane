@@ -155,7 +155,32 @@ the e2e Go server.
 The tests rely on a small helper in `test/e2e/agents_db.go` to truncate
 `agent_chats` / `agent_chat_messages` / `agent_chat_runs` in the
 `agents_test` database before each subtest so that session lists and
-persistence assertions are deterministic.
+persistence assertions are deterministic. Because that truncation is global,
+agent chat subtests must run serially (no `t.Parallel()`).
+
+### Agent chat patterns to follow
+
+When authoring new agent chat scenarios, follow these patterns to avoid
+flakiness:
+
+- **Wait for the stream to finish before acting on post-stream state.** The
+  assistant message bubble appears as soon as the stream starts, but the
+  client only assigns `currentChatId` (and therefore renders the back
+  button) in the `finally` of `sendChatPrompt`. Use
+  `thenTheStreamIsComplete()` — which waits for the send button to
+  re-enable — before clicking the back button, reloading the page, or
+  asserting DB persistence.
+- **Guard the test model.** At least one subtest should call
+  `thenTheAgentIsRunningInTestMode()` so the suite fails fast if
+  `AI_MODEL` is misconfigured instead of silently running against a real
+  LLM. The assertion looks for the client-side "test mode" hint rendered
+  by `applyStreamOutcome` when the server reports `runModel === "test"`.
+- **Prefer waiting for a DOM signal over `Sleep`.** For example, after
+  clicking the back button, wait for `agent-sidebar-back-button` to
+  disappear rather than sleeping a fixed number of milliseconds.
+- **Named timeouts.** Reuse the constants at the top of
+  `agent_chat_test.go` (`agentSidebarTimeoutMs`, `agentStreamCompleteTimeout`,
+  etc.) rather than sprinkling literals across steps.
 
 ## Writing a New E2E Test (Pattern)
 

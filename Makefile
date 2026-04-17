@@ -59,7 +59,7 @@ test.start:
 	$(E2E_COMPOSE) up -d --wait
 
 test.down:
-	$(COMPOSE) down --remove-orphans
+	$(E2E_COMPOSE) down --remove-orphans
 
 test.e2e.setup:
 	$(MAKE) test.setup
