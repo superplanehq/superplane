@@ -132,3 +132,31 @@ func (c *NodeWebhookContext) findOrCreateWebhook() (*models.Webhook, error) {
 func (c *NodeWebhookContext) GetBaseURL() string {
 	return c.baseURL
 }
+
+type NoOpNodeWebhookContext struct {
+	baseURL string
+}
+
+func NewNoOpNodeWebhookContext(baseURL string) *NoOpNodeWebhookContext {
+	return &NoOpNodeWebhookContext{baseURL: baseURL}
+}
+
+func (c *NoOpNodeWebhookContext) Setup() (string, error) {
+	return c.baseURL + "/api/v1/webhooks/" + uuid.New().String(), nil
+}
+
+func (c *NoOpNodeWebhookContext) GetBaseURL() string {
+	return c.baseURL
+}
+
+func (c *NoOpNodeWebhookContext) GetSecret() ([]byte, error) {
+	return nil, nil
+}
+
+func (c *NoOpNodeWebhookContext) SetSecret(secret []byte) error {
+	return nil
+}
+
+func (c *NoOpNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return nil, nil, nil
+}

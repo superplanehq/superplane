@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -20,7 +19,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("applies mixed operations", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{
 				{
@@ -91,7 +90,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("builds deterministic node and edge ordering", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{
 				{ID: "node-c", Name: "Node C"},
@@ -127,7 +126,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("returns error when auto layout is invalid", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{
 				{
@@ -162,7 +161,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("does not apply layout when auto layout is omitted", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{
 				{
@@ -349,7 +348,7 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+				steps := &CanvasPatcherSteps{t: t, rr: r}
 				steps.givenCanvasVersion(nil, nil)
 
 				steps.whenHandling(tc.changeset, nil)
@@ -362,7 +361,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("update node -> no configuration provided, previous configuration is preserved", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{{
 				ID:            "node-a",
@@ -390,7 +389,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("update node -> no collapsed change provided, previous collapsed state is preserved", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{{
 				ID:            "node-a",
@@ -419,7 +418,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("update node -> explicit false collapsed change uncollapses node", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{{
 				ID:            "node-a",
@@ -452,7 +451,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("update node -> invalid configuration sets node error without returning error", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{
 				{
@@ -487,7 +486,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("rejects self-loop edge", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{{ID: "node-a", Name: "Node A"}},
 			nil,
@@ -510,7 +509,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("rejects block that does not exist", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -531,7 +530,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("rejects unknown operation type", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -546,7 +545,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("rejects graph with cycles", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(
 			[]models.Node{
 				{ID: "node-a", Name: "Node A"},
@@ -573,7 +572,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("add component node -> invalid configuration sets node error without returning error", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -597,7 +596,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("add trigger node -> invalid configuration sets node error without returning error", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -621,7 +620,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("add widget node -> invalid configuration sets node error without returning error", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -644,7 +643,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("add integration component without integration id -> sets node error without returning error", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -672,7 +671,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("add integration component with invalid integration id -> sets node error without returning error", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -701,7 +700,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("add integration component with integration id that does not exist -> sets node error without returning error", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		missingIntegrationID := uuid.New().String()
@@ -732,7 +731,7 @@ func Test__CanvasPatcher(t *testing.T) {
 	})
 
 	t.Run("accepts integration component with existing integration id", func(t *testing.T) {
-		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps := &CanvasPatcherSteps{t: t, rr: r}
 		steps.givenCanvasVersion(nil, nil)
 
 		integration, err := models.CreateIntegration(
@@ -775,20 +774,30 @@ func Test__CanvasPatcher(t *testing.T) {
 
 type CanvasPatcherSteps struct {
 	t            *testing.T
-	registry     *registry.Registry
-	orgID        uuid.UUID
+	rr           *support.ResourceRegistry
 	patcher      *CanvasPatcher
 	err          error
 	finalVersion *models.CanvasVersion
 }
 
 func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []models.Edge) {
-	s.patcher = NewCanvasPatcher(database.Conn(), s.orgID, s.registry, &models.CanvasVersion{
+	version := &models.CanvasVersion{
 		ID:         uuid.New(),
 		WorkflowID: uuid.New(),
 		Nodes:      datatypes.NewJSONSlice(nodes),
 		Edges:      datatypes.NewJSONSlice(edges),
+	}
+
+	patcher, err := NewCanvasPatcher(database.Conn(), version, &CanvasPatcherOptions{
+		OrgID:             s.rr.Organization.ID,
+		Registry:          s.rr.Registry,
+		BaseURL:           "http://localhost:8000",
+		AuthService:       s.rr.AuthService,
+		AuthenticatedUser: s.rr.UserModel,
 	})
+
+	require.NoError(s.t, err)
+	s.patcher = patcher
 }
 
 func (s *CanvasPatcherSteps) whenHandling(operations *pb.CanvasChangeset, autoLayout *pb.CanvasAutoLayout) {

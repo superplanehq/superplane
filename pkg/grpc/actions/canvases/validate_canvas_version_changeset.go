@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -20,6 +21,7 @@ import (
 func ValidateCanvasVersionChangeset(
 	ctx context.Context,
 	registry *registry.Registry,
+	authService authorization.Authorization,
 	organizationID uuid.UUID,
 	canvasID uuid.UUID,
 	versionID uuid.UUID,
@@ -30,9 +32,9 @@ func ValidateCanvasVersionChangeset(
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
 
-	user, err := uuid.Parse(userID)
+	activeUser, err := models.FindActiveUserByID(organizationID.String(), userID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get active user: %v", err)
 	}
 
 	if changeset == nil || len(changeset.Changes) == 0 {
@@ -49,7 +51,7 @@ func ValidateCanvasVersionChangeset(
 		return nil, status.Error(codes.Internal, "failed to find canvas version")
 	}
 
-	if version.OwnerID == nil || *version.OwnerID != user {
+	if version.OwnerID == nil || *version.OwnerID != activeUser.ID {
 		return nil, status.Error(codes.PermissionDenied, "version owner mismatch")
 	}
 
@@ -57,7 +59,18 @@ func ValidateCanvasVersionChangeset(
 		return nil, status.Error(codes.FailedPrecondition, "published versions are immutable")
 	}
 
-	patcher := changesets.NewCanvasPatcher(database.Conn(), organizationID, registry, version)
+	patcher, err := changesets.NewCanvasPatcher(database.Conn(), version, &changesets.CanvasPatcherOptions{
+		OrgID:             organizationID,
+		Registry:          registry,
+		BaseURL:           "http://localhost:8000",
+		AuthService:       authService,
+		AuthenticatedUser: activeUser,
+	})
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create canvas patcher: %v", err)
+	}
+
 	err = patcher.ApplyChangeset(changeset, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "changeset is invalid: %v", err)

@@ -106,3 +106,13 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 
 	return &resolvedName, nil
 }
+
+type NoOpEventContext struct{}
+
+func NewNoOpEventContext() *NoOpEventContext {
+	return &NoOpEventContext{}
+}
+
+func (c *NoOpEventContext) Emit(payloadType string, payload any) error {
+	return nil
+}

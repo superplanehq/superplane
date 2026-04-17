@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -22,6 +23,8 @@ import (
 func ApplyCanvasVersionChangeset(
 	ctx context.Context,
 	registry *registry.Registry,
+	authService authorization.Authorization,
+	webhookBaseURL string,
 	organizationID uuid.UUID,
 	canvasID uuid.UUID,
 	versionID uuid.UUID,
@@ -33,9 +36,9 @@ func ApplyCanvasVersionChangeset(
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
 
-	user, err := uuid.Parse(userID)
+	activeUser, err := models.FindActiveUserByID(organizationID.String(), userID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get active user: %v", err)
 	}
 
 	if changeset == nil || len(changeset.Changes) == 0 {
@@ -55,7 +58,7 @@ func ApplyCanvasVersionChangeset(
 			return status.Error(codes.Internal, "failed to find canvas version")
 		}
 
-		if version.OwnerID == nil || *version.OwnerID != user {
+		if version.OwnerID == nil || version.OwnerID.String() != userID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
@@ -66,7 +69,16 @@ func ApplyCanvasVersionChangeset(
 		//
 		// Apply operations to version.
 		//
-		patcher := changesets.NewCanvasPatcher(tx, organizationID, registry, version)
+		patcher, err := changesets.NewCanvasPatcher(tx, version, &changesets.CanvasPatcherOptions{
+			OrgID:             organizationID,
+			Registry:          registry,
+			BaseURL:           webhookBaseURL,
+			AuthService:       authService,
+			AuthenticatedUser: activeUser,
+		})
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to create canvas patcher: %v", err)
+		}
 		err = patcher.ApplyChangeset(changeset, autoLayout)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "failed to update canvas version: %v", err)

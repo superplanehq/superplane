@@ -37,6 +37,7 @@ func Test__ValidateCanvasVersionChangeset(t *testing.T) {
 		response, err := ValidateCanvasVersionChangeset(
 			ctx,
 			r.Registry,
+			r.AuthService,
 			r.Organization.ID,
 			canvas.ID,
 			draftVersion.ID,

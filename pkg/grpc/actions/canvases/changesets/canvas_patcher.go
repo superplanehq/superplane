@@ -5,18 +5,59 @@ import (
 	"sort"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
 
+type CanvasPatcherOptions struct {
+	OrgID             uuid.UUID
+	Registry          *registry.Registry
+	Encryptor         crypto.Encryptor
+	BaseURL           string
+	AuthService       authorization.Authorization
+	AuthenticatedUser *models.User
+}
+
+func (o *CanvasPatcherOptions) Validate() error {
+	if o.OrgID == uuid.Nil {
+		return fmt.Errorf("org ID is required")
+	}
+
+	if o.Encryptor == nil {
+		return fmt.Errorf("encryptor is required")
+	}
+
+	if o.Registry == nil {
+		return fmt.Errorf("registry is required")
+	}
+
+	if o.BaseURL == "" {
+		return fmt.Errorf("base URL is required")
+	}
+
+	if o.AuthService == nil {
+		return fmt.Errorf("auth service is required")
+	}
+
+	if o.AuthenticatedUser == nil {
+		return fmt.Errorf("authenticated user is required")
+	}
+
+	return nil
+}
+
 type CanvasPatcher struct {
 	tx              *gorm.DB
-	orgID           uuid.UUID
-	registry        *registry.Registry
+	options         *CanvasPatcherOptions
 	originalVersion *models.CanvasVersion
 	finalVersion    *models.CanvasVersion
 
@@ -27,11 +68,14 @@ type CanvasPatcher struct {
 	edges map[string]models.Edge
 }
 
-func NewCanvasPatcher(tx *gorm.DB, orgID uuid.UUID, registry *registry.Registry, canvas *models.CanvasVersion) *CanvasPatcher {
+func NewCanvasPatcher(tx *gorm.DB, canvas *models.CanvasVersion, options *CanvasPatcherOptions) (*CanvasPatcher, error) {
+	if err := options.Validate(); err != nil {
+		return nil, err
+	}
+
 	p := &CanvasPatcher{
 		tx:              tx,
-		orgID:           orgID,
-		registry:        registry,
+		options:         options,
 		originalVersion: canvas,
 		nodes:           make(map[string]models.Node),
 		edges:           make(map[string]models.Edge),
@@ -45,7 +89,7 @@ func NewCanvasPatcher(tx *gorm.DB, orgID uuid.UUID, registry *registry.Registry,
 		p.edges[p.edgeKey(edge.SourceID, edge.TargetID, edge.Channel)] = edge
 	}
 
-	return p
+	return p, nil
 }
 
 func (p *CanvasPatcher) edgeKey(sourceID, targetID, channel string) string {
@@ -193,7 +237,7 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	// node will be in an error state.
 	//
 
-	integrationID, err := p.validateIntegration(node)
+	integration, err := p.validateIntegration(node)
 	if err != nil {
 		errorMessage := err.Error()
 		newNode.ErrorMessage = &errorMessage
@@ -201,7 +245,8 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		return nil
 	}
 
-	newNode.IntegrationID = integrationID
+	integrationID := integration.ID.String()
+	newNode.IntegrationID = &integrationID
 	schema, err := p.findConfigurationSchemaForNode(nodeType, *nodeRef)
 	if err != nil {
 		errorMessage := err.Error()
@@ -215,22 +260,30 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		nodeConfiguration = node.GetConfiguration().AsMap()
 	}
 
+	newNode.Configuration = nodeConfiguration
 	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
 	if err != nil {
 		errorMessage := err.Error()
 		newNode.ErrorMessage = &errorMessage
-		newNode.Configuration = nodeConfiguration
 		p.nodes[nodeID] = newNode
 		return nil
 	}
 
-	newNode.Configuration = nodeConfiguration
+	//
+	// Run Setup() for the node
+	//
+	err = p.setupNode(integration, newNode)
+	if err != nil {
+		errorMessage := err.Error()
+		newNode.ErrorMessage = &errorMessage
+	}
+
 	p.nodes[nodeID] = newNode
 	return nil
 }
 
-func (p *CanvasPatcher) validateIntegration(node *pb.CanvasChangeset_Change_Node) (*string, error) {
-	if p.registry.IsCoreBlock(node.GetBlock()) {
+func (p *CanvasPatcher) validateIntegration(node *pb.CanvasChangeset_Change_Node) (*models.Integration, error) {
+	if p.options.Registry.IsCoreBlock(node.GetBlock()) {
 		return nil, nil
 	}
 
@@ -238,18 +291,17 @@ func (p *CanvasPatcher) validateIntegration(node *pb.CanvasChangeset_Change_Node
 		return nil, fmt.Errorf("integration is required for %s", node.GetBlock())
 	}
 
-	integration := node.GetIntegrationId()
-	integrationID, err := uuid.Parse(integration)
+	integrationID, err := uuid.Parse(node.GetIntegrationId())
 	if err != nil {
 		return nil, fmt.Errorf("invalid integration id: %v", err)
 	}
 
-	_, err = models.FindIntegrationInTransaction(p.tx, p.orgID, integrationID)
+	integration, err := models.FindIntegrationInTransaction(p.tx, p.options.OrgID, integrationID)
 	if err != nil {
 		return nil, fmt.Errorf("integration %s not found", node.GetIntegrationId())
 	}
 
-	return &integration, nil
+	return integration, nil
 }
 
 func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
@@ -320,29 +372,48 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 	// node will be in an error state.
 	//
 
-	if node.GetConfiguration() != nil {
-		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
-		if err != nil {
-			errorMessage := err.Error()
-			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.GetConfiguration().AsMap()
-			p.nodes[nodeID] = currentNode
-			return nil
-		}
-
-		err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
-		if err != nil {
-			errorMessage := err.Error()
-			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.GetConfiguration().AsMap()
-			p.nodes[nodeID] = currentNode
-			return nil
-		}
-
-		currentNode.Configuration = node.GetConfiguration().AsMap()
-		currentNode.ErrorMessage = nil
+	integration, err := p.validateIntegration(node)
+	if err != nil {
+		errorMessage := err.Error()
+		currentNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = currentNode
+		return nil
 	}
 
+	integrationID := integration.ID.String()
+	currentNode.IntegrationID = &integrationID
+
+	if node.GetConfiguration() == nil {
+		p.nodes[nodeID] = currentNode
+		return nil
+	}
+
+	currentNode.Configuration = node.GetConfiguration().AsMap()
+	schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
+	if err != nil {
+		errorMessage := err.Error()
+		currentNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = currentNode
+		return nil
+	}
+
+	err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
+	if err != nil {
+		errorMessage := err.Error()
+		currentNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = currentNode
+		return nil
+	}
+
+	err = p.setupNode(integration, currentNode)
+	if err != nil {
+		errorMessage := err.Error()
+		currentNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = currentNode
+		return nil
+	}
+
+	currentNode.ErrorMessage = nil
 	p.nodes[nodeID] = currentNode
 	return nil
 }
@@ -350,7 +421,7 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef models.NodeRef) ([]configuration.Field, error) {
 	switch nodeType {
 	case models.NodeTypeComponent:
-		component, err := p.registry.GetComponent(nodeRef.Component.Name)
+		component, err := p.options.Registry.GetComponent(nodeRef.Component.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -358,7 +429,7 @@ func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef 
 		return component.Configuration(), nil
 
 	case models.NodeTypeTrigger:
-		trigger, err := p.registry.GetTrigger(nodeRef.Trigger.Name)
+		trigger, err := p.options.Registry.GetTrigger(nodeRef.Trigger.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +437,7 @@ func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef 
 		return trigger.Configuration(), nil
 
 	case models.NodeTypeWidget:
-		widget, err := p.registry.GetWidget(nodeRef.Widget.Name)
+		widget, err := p.options.Registry.GetWidget(nodeRef.Widget.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -457,7 +528,7 @@ func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string,
 	//
 	// Check if the block is a component
 	//
-	_, err := p.registry.GetComponent(node.GetBlock())
+	_, err := p.options.Registry.GetComponent(node.GetBlock())
 	if err == nil {
 		return models.NodeTypeComponent, &models.NodeRef{
 			Component: &models.ComponentRef{Name: node.GetBlock()},
@@ -467,7 +538,7 @@ func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string,
 	//
 	// Otherwise, check if the block is a trigger
 	//
-	_, err = p.registry.GetTrigger(node.GetBlock())
+	_, err = p.options.Registry.GetTrigger(node.GetBlock())
 	if err == nil {
 		return models.NodeTypeTrigger, &models.NodeRef{
 			Trigger: &models.TriggerRef{Name: node.GetBlock()},
@@ -477,7 +548,7 @@ func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string,
 	//
 	// Otherwise, check if the block is a widget
 	//
-	_, err = p.registry.GetWidget(node.GetBlock())
+	_, err = p.options.Registry.GetWidget(node.GetBlock())
 	if err == nil {
 		return models.NodeTypeWidget, &models.NodeRef{
 			Widget: &models.WidgetRef{Name: node.GetBlock()},
@@ -488,4 +559,57 @@ func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string,
 	// If the block is not any of the above, return an error
 	//
 	return "", nil, fmt.Errorf("block %s not found in registry", node.GetBlock())
+}
+
+func (p *CanvasPatcher) setupNode(integration *models.Integration, node models.Node) error {
+	switch node.Type {
+	case models.NodeTypeComponent:
+		return p.setupComponent(integration, node)
+	case models.NodeTypeTrigger:
+		return p.setupTrigger(integration, node)
+	case models.NodeTypeWidget:
+		return nil
+	}
+
+	return fmt.Errorf("unknown node type: %s", node.Type)
+}
+
+func (p *CanvasPatcher) setupComponent(integration *models.Integration, node models.Node) error {
+	component, err := p.options.Registry.GetComponent(node.Ref.Component.Name)
+	if err != nil {
+		return err
+	}
+
+	setupCtx := core.SetupContext{
+		Logger:        &logrus.Entry{},
+		Configuration: node.Configuration,
+		HTTP:          p.options.Registry.HTTPContext(),
+		Metadata:      contexts.NewNodeMetadataReader(node.Metadata),
+		Requests:      contexts.NewNoOpRequestContext(),
+		Webhook:       contexts.NewNoOpNodeWebhookContext(p.options.BaseURL),
+		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, p.options.AuthenticatedUser),
+		Integration:   contexts.NewIntegrationReader(p.tx, nil, integration, p.options.Encryptor, p.options.Registry),
+	}
+
+	return component.Setup(setupCtx)
+}
+
+func (p *CanvasPatcher) setupTrigger(integration *models.Integration, node models.Node) error {
+	component, err := p.options.Registry.GetTrigger(node.Ref.Trigger.Name)
+	if err != nil {
+		return err
+	}
+
+	setupCtx := core.TriggerContext{
+		Logger:        &logrus.Entry{},
+		Configuration: node.Configuration,
+		HTTP:          p.options.Registry.HTTPContext(),
+		Metadata:      contexts.NewNodeMetadataReader(node.Metadata),
+		Requests:      contexts.NewNoOpRequestContext(),
+		Webhook:       contexts.NewNoOpNodeWebhookContext(p.options.BaseURL),
+		Integration:   contexts.NewIntegrationReader(p.tx, nil, integration, p.options.Encryptor, p.options.Registry),
+		Events:        contexts.NewNoOpEventContext(),
+	}
+
+	return component.Setup(setupCtx)
 }

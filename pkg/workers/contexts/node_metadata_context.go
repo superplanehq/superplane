@@ -39,3 +39,31 @@ func (m *NodeMetadataContext) Set(value any) error {
 		Update("metadata", v).
 		Error
 }
+
+type NodeMetadataReader struct {
+	metadata any
+}
+
+func NewNodeMetadataReader(metadata any) *NodeMetadataReader {
+	return &NodeMetadataReader{metadata: metadata}
+}
+
+func (r *NodeMetadataReader) Get() any {
+	return r.metadata
+}
+
+func (r *NodeMetadataReader) Set(value any) error {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	var v map[string]any
+	err = json.Unmarshal(b, &v)
+	if err != nil {
+		return err
+	}
+
+	r.metadata = v
+	return nil
+}

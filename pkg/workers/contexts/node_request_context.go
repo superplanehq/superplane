@@ -49,3 +49,13 @@ func (c *NodeRequestContext) completeCurrentRequestForNode() error {
 
 	return err
 }
+
+type NoOpRequestContext struct{}
+
+func NewNoOpRequestContext() *NoOpRequestContext {
+	return &NoOpRequestContext{}
+}
+
+func (c *NoOpRequestContext) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
+	return nil
+}

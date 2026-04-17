@@ -455,3 +455,91 @@ func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSub
 
 	return nil, nil
 }
+
+type IntegrationReader struct {
+	underlying IntegrationContext
+}
+
+func NewIntegrationReader(tx *gorm.DB, node *models.CanvasNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationReader {
+	underlying := NewIntegrationContext(tx, node, integration, encryptor, registry, nil)
+	return &IntegrationReader{
+		underlying: *underlying,
+	}
+}
+
+func (r *IntegrationReader) ID() uuid.UUID {
+	return r.underlying.ID()
+}
+
+func (r *IntegrationReader) GetMetadata() any {
+	return r.underlying.GetMetadata()
+}
+
+func (r *IntegrationReader) SetMetadata(value any) {
+	r.underlying.SetMetadata(value)
+}
+
+func (r *IntegrationReader) GetConfig(name string) ([]byte, error) {
+	return r.underlying.GetConfig(name)
+}
+
+func (r *IntegrationReader) GetOptionalConfig(name string) ([]byte, error) {
+	return r.underlying.GetOptionalConfig(name)
+}
+
+func (r *IntegrationReader) GetState() string {
+	return r.underlying.GetState()
+}
+
+func (r *IntegrationReader) GetSecrets() ([]core.IntegrationSecret, error) {
+	return r.underlying.GetSecrets()
+}
+
+//
+// Every operation that changes the state of the integration is a no-op here.
+//
+
+func (r *IntegrationReader) Ready() {
+	// no-op
+}
+
+func (r *IntegrationReader) Error(message string) {
+	// No-op
+}
+
+func (r *IntegrationReader) NewBrowserAction(action core.BrowserAction) {
+	// No-op
+}
+
+func (r *IntegrationReader) RemoveBrowserAction() {
+	// No-op
+}
+
+func (r *IntegrationReader) SetSecret(name string, value []byte) error {
+	return nil
+}
+
+func (r *IntegrationReader) RequestWebhook(configuration any) error {
+	return nil
+}
+
+func (r *IntegrationReader) Subscribe(configuration any) (*uuid.UUID, error) {
+	id := uuid.New()
+	return &id, nil
+}
+
+func (r *IntegrationReader) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+	return nil, nil
+}
+
+func (r *IntegrationReader) FindSubscription(predicate func(core.IntegrationSubscriptionContext) bool) (core.IntegrationSubscriptionContext, error) {
+	return nil, nil
+}
+
+func (r *IntegrationReader) ScheduleResync(interval time.Duration) error {
+	return nil
+}
+
+func (r *IntegrationReader) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
+	return nil
+}
