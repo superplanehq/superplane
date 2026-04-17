@@ -329,7 +329,9 @@ export function General({ organization }: GeneralProps) {
                     placeholder="sk-..."
                     disabled={!canUpdateOrg || agentSettingsBusy}
                     data-testid="agent-openai-key-input"
-                    className={agentApiKeyError ? "border-red-300 focus-visible:ring-red-200 ph-no-capture" : "ph-no-capture"}
+                    className={
+                      agentApiKeyError ? "border-red-300 focus-visible:ring-red-200 ph-no-capture" : "ph-no-capture"
+                    }
                     aria-invalid={agentApiKeyError ? "true" : "false"}
                   />
                   {agentApiKeyError && (

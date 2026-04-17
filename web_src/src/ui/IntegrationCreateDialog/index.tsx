@@ -322,29 +322,29 @@ export function IntegrationCreateDialog({
                 </div>
               </div>
               <div className="ph-no-capture">
-              {(integrationDefinition?.configuration ?? [])
-                .filter((f: ConfigurationField) => {
-                  if (!f.name) return false;
-                  if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
-                  return f.name === "signingSecret" || f.name === "webhookSigningSecret";
-                })
-                .map((field) => (
-                  <ConfigurationFieldRenderer
-                    key={field.name}
-                    field={field}
-                    value={configuration[field.name!]}
-                    onChange={(value) =>
-                      setConfiguration((prev) => ({
-                        ...prev,
-                        [field.name!]: value,
-                      }))
-                    }
-                    allValues={configuration}
-                    domainId={organizationId}
-                    domainType="DOMAIN_TYPE_ORGANIZATION"
-                    organizationId={organizationId}
-                  />
-                ))}
+                {(integrationDefinition?.configuration ?? [])
+                  .filter((f: ConfigurationField) => {
+                    if (!f.name) return false;
+                    if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
+                    return f.name === "signingSecret" || f.name === "webhookSigningSecret";
+                  })
+                  .map((field) => (
+                    <ConfigurationFieldRenderer
+                      key={field.name}
+                      field={field}
+                      value={configuration[field.name!]}
+                      onChange={(value) =>
+                        setConfiguration((prev) => ({
+                          ...prev,
+                          [field.name!]: value,
+                        }))
+                      }
+                      allValues={configuration}
+                      domainId={organizationId}
+                      domainType="DOMAIN_TYPE_ORGANIZATION"
+                      organizationId={organizationId}
+                    />
+                  ))}
               </div>
             </>
           ) : (
