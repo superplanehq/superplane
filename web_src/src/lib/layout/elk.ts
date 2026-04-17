@@ -6,15 +6,12 @@ import type {
 } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
-import { buildChildToGroupMap } from "@/lib/canvas/groups";
 
 const DEFAULT_NODE_WIDTH = 420;
 const DEFAULT_NODE_HEIGHT = 180;
 const ANNOTATION_NODE_WIDTH = 320;
 const ANNOTATION_NODE_HEIGHT = 200;
 const DISCONNECTED_COMPONENT_VERTICAL_GAP = 220;
-const GROUP_NODE_WIDTH = 480;
-const GROUP_NODE_HEIGHT = 320;
 
 type LayoutPosition = {
   x: number;
@@ -26,10 +23,6 @@ export class ElkLayoutEngine implements LayoutEngine {
 
   estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
     if (node.type === "TYPE_WIDGET") {
-      if (node.widget?.name === "group") {
-        return { width: GROUP_NODE_WIDTH, height: GROUP_NODE_HEIGHT };
-      }
-
       return {
         width: Number(node.configuration?.width) || ANNOTATION_NODE_WIDTH,
         height: Number(node.configuration?.height) || ANNOTATION_NODE_HEIGHT,
@@ -48,13 +41,12 @@ export class ElkLayoutEngine implements LayoutEngine {
       return workflow;
     }
 
-    const childToGroup = buildChildToGroupMap(nodes);
-    const flowNodes = this.resolveFlowNodes(nodes, childToGroup);
+    const flowNodes = this.resolveFlowNodes(nodes);
     if (flowNodes.length === 0) {
       return workflow;
     }
 
-    const scopedNodeIDs = this.resolveScopedNodeIDs(workflow, flowNodes, options, childToGroup);
+    const scopedNodeIDs = this.resolveScopedNodeIDs(workflow, flowNodes, options);
     const layoutNodes = this.resolveLayoutNodes(flowNodes, scopedNodeIDs);
     if (layoutNodes.length === 0) {
       return workflow;
@@ -65,12 +57,7 @@ export class ElkLayoutEngine implements LayoutEngine {
       options?.components || [],
       options?.blueprints || [],
     );
-    const layoutedPositions = await this.resolvePackedLayoutedPositions(
-      workflow,
-      layoutNodes,
-      outputChannelsByNodeId,
-      childToGroup,
-    );
+    const layoutedPositions = await this.resolvePackedLayoutedPositions(workflow, layoutNodes, outputChannelsByNodeId);
 
     if (layoutedPositions.size === 0) {
       return workflow;
@@ -99,25 +86,16 @@ export class ElkLayoutEngine implements LayoutEngine {
   }
 
   private isAnnotationWidget(node: ComponentsNode): boolean {
-    return node.type === "TYPE_WIDGET" && node.widget?.name !== "group";
+    return node.type === "TYPE_WIDGET";
   }
 
-  private resolveFlowNodes(nodes: ComponentsNode[], childToGroup: Map<string, string>): ComponentsNode[] {
-    return nodes.filter((node) => !!node.id && !this.isAnnotationWidget(node) && !childToGroup.has(node.id!));
+  private resolveFlowNodes(nodes: ComponentsNode[]): ComponentsNode[] {
+    return nodes.filter((node) => !!node.id && !this.isAnnotationWidget(node));
   }
 
-  private normalizeRequestedNodeIDs(
-    flowNodes: ComponentsNode[],
-    requestedNodeIDs: string[],
-    childToGroup: Map<string, string>,
-  ): string[] {
+  private normalizeRequestedNodeIDs(flowNodes: ComponentsNode[], requestedNodeIDs: string[]): string[] {
     const normalizedRequestedNodeIDs = Array.from(
-      new Set(
-        requestedNodeIDs
-          .map((nodeId) => nodeId.trim())
-          .filter((nodeId) => nodeId.length > 0)
-          .map((nodeId) => childToGroup.get(nodeId) ?? nodeId),
-      ),
+      new Set(requestedNodeIDs.map((nodeId) => nodeId.trim()).filter((nodeId) => nodeId.length > 0)),
     );
 
     const flowNodeIDs = new Set(flowNodes.map((node) => node.id as string));
@@ -132,7 +110,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     return hasSeedNodeIDs ? "connected-component" : "full-canvas";
   }
 
-  private buildFlowAdjacency(workflow: CanvasesCanvas, flowNodes: ComponentsNode[], childToGroup: Map<string, string>) {
+  private buildFlowAdjacency(workflow: CanvasesCanvas, flowNodes: ComponentsNode[]) {
     const flowNodeIDSet = new Set(flowNodes.map((node) => node.id as string));
     const adjacencyByNodeID = new Map<string, string[]>();
 
@@ -141,8 +119,8 @@ export class ElkLayoutEngine implements LayoutEngine {
     }
 
     for (const edge of workflow.spec?.edges || []) {
-      const sourceID = edge.sourceId ? this.remapEdgeEndpoint(edge.sourceId, childToGroup) : edge.sourceId;
-      const targetID = edge.targetId ? this.remapEdgeEndpoint(edge.targetId, childToGroup) : edge.targetId;
+      const sourceID = edge.sourceId;
+      const targetID = edge.targetId;
       if (!sourceID || !targetID || sourceID === targetID) {
         continue;
       }
@@ -162,13 +140,12 @@ export class ElkLayoutEngine implements LayoutEngine {
     workflow: CanvasesCanvas,
     flowNodes: ComponentsNode[],
     seedNodeIDs: string[],
-    childToGroup: Map<string, string>,
   ): string[] {
     if (seedNodeIDs.length === 0) {
       return flowNodes.map((node) => node.id as string);
     }
 
-    const adjacencyByNodeID = this.buildFlowAdjacency(workflow, flowNodes, childToGroup);
+    const adjacencyByNodeID = this.buildFlowAdjacency(workflow, flowNodes);
     const visitedNodeIDs = new Set<string>();
     const queue = [...seedNodeIDs];
 
@@ -194,13 +171,12 @@ export class ElkLayoutEngine implements LayoutEngine {
     workflow: CanvasesCanvas,
     flowNodes: ComponentsNode[],
     options: LayoutEngineApplyOptions | undefined,
-    childToGroup: Map<string, string>,
   ): string[] {
-    const seedNodeIDs = this.normalizeRequestedNodeIDs(flowNodes, options?.nodeIds || [], childToGroup);
+    const seedNodeIDs = this.normalizeRequestedNodeIDs(flowNodes, options?.nodeIds || []);
     const scope = this.resolveLayoutScope(options, seedNodeIDs.length > 0);
 
     if (scope === "connected-component") {
-      return this.resolveConnectedComponentNodeIDs(workflow, flowNodes, seedNodeIDs, childToGroup);
+      return this.resolveConnectedComponentNodeIDs(workflow, flowNodes, seedNodeIDs);
     }
 
     return flowNodes.map((node) => node.id as string);
@@ -215,31 +191,17 @@ export class ElkLayoutEngine implements LayoutEngine {
     return flowNodes.filter((node) => scopedNodeIDSet.has(node.id as string));
   }
 
-  private remapEdgeEndpoint(nodeId: string, childToGroup: Map<string, string>): string {
-    return childToGroup.get(nodeId) ?? nodeId;
-  }
-
-  private resolveLayoutEdges(
-    workflow: CanvasesCanvas,
-    layoutNodes: ComponentsNode[],
-    childToGroup: Map<string, string>,
-  ) {
+  private resolveLayoutEdges(workflow: CanvasesCanvas, layoutNodes: ComponentsNode[]) {
     const layoutNodeIDs = new Set(layoutNodes.map((node) => node.id as string));
 
-    return (workflow.spec?.edges || [])
-      .map((edge) => ({
-        ...edge,
-        sourceId: edge.sourceId ? this.remapEdgeEndpoint(edge.sourceId, childToGroup) : edge.sourceId,
-        targetId: edge.targetId ? this.remapEdgeEndpoint(edge.targetId, childToGroup) : edge.targetId,
-      }))
-      .filter(
-        (edge) =>
-          !!edge.sourceId &&
-          !!edge.targetId &&
-          edge.sourceId !== edge.targetId &&
-          layoutNodeIDs.has(edge.sourceId) &&
-          layoutNodeIDs.has(edge.targetId),
-      );
+    return (workflow.spec?.edges || []).filter(
+      (edge) =>
+        !!edge.sourceId &&
+        !!edge.targetId &&
+        edge.sourceId !== edge.targetId &&
+        layoutNodeIDs.has(edge.sourceId) &&
+        layoutNodeIDs.has(edge.targetId),
+    );
   }
 
   private buildLayoutAdjacency(
@@ -346,9 +308,8 @@ export class ElkLayoutEngine implements LayoutEngine {
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
-    childToGroup: Map<string, string>,
   ) {
-    const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes, childToGroup);
+    const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
     const edgeChannelsBySourceNodeID = new Map<string, Set<string>>();
 
     for (const edge of layoutEdges) {
@@ -493,12 +454,11 @@ export class ElkLayoutEngine implements LayoutEngine {
     workflow: CanvasesCanvas,
     layoutNodes: ComponentsNode[],
     outputChannelsByNodeId: Map<string, string[]>,
-    childToGroup: Map<string, string>,
   ): Promise<Map<string, LayoutPosition>> {
-    const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes, childToGroup);
+    const layoutEdges = this.resolveLayoutEdges(workflow, layoutNodes);
     const components = this.resolveDisconnectedLayoutComponents(layoutNodes, layoutEdges);
     if (components.length <= 1) {
-      const graph = this.buildElkGraph(workflow, layoutNodes, outputChannelsByNodeId, childToGroup);
+      const graph = this.buildElkGraph(workflow, layoutNodes, outputChannelsByNodeId);
       const layoutedGraph = await this.elk.layout(graph);
       return this.extractLayoutedPositions(layoutedGraph);
     }
@@ -508,7 +468,7 @@ export class ElkLayoutEngine implements LayoutEngine {
     let currentTopY = 0;
 
     for (const componentNodes of sortedComponents) {
-      const graph = this.buildElkGraph(workflow, componentNodes, outputChannelsByNodeId, childToGroup);
+      const graph = this.buildElkGraph(workflow, componentNodes, outputChannelsByNodeId);
       const layoutedGraph = await this.elk.layout(graph);
       const componentPositions = this.extractLayoutedPositions(layoutedGraph);
       if (componentPositions.size === 0) {
