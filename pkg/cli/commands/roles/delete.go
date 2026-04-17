@@ -1,4 +1,4 @@
-package secrets
+package roles
 
 import (
 	"fmt"
@@ -15,8 +15,8 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	response, _, err := ctx.API.SecretAPI.
-		SecretsDeleteSecret(ctx.Context, ctx.Args[0]).
+	response, _, err := ctx.API.RolesAPI.
+		RolesDeleteRole(ctx.Context, ctx.Args[0]).
 		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		Execute()
@@ -26,7 +26,7 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, err := fmt.Fprintf(stdout, "Secret deleted: %s\n", ctx.Args[0])
+			_, err := fmt.Fprintf(stdout, "Role deleted: %s\n", ctx.Args[0])
 			return err
 		})
 	}
