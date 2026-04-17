@@ -30,7 +30,7 @@ import type {
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ import {
   useCreateCanvas,
   useCreateCanvasChangeRequest,
   useCreateCanvasVersion,
+  useApplyCanvasVersionChangeset,
   useDeleteCanvasMemoryEntry,
   useDeleteCanvasVersion,
   usePublishCanvasVersion,
@@ -203,6 +204,7 @@ export function WorkflowPageV2() {
   const deleteCanvasVersionMutation = useDeleteCanvasVersion(organizationId!, canvasId!);
   const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
+  const applyCanvasVersionChangesetMutation = useApplyCanvasVersionChangeset(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
   const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
@@ -1376,6 +1378,72 @@ export function WorkflowPageV2() {
     [isAutoLayoutOnUpdateEnabled, components, blueprints],
   );
 
+  const applyChangeset = useCallback(
+    async (operations: CanvasChangesetChange[]) => {
+      if (!operations.length || !organizationId || !canvasId) {
+        return;
+      }
+
+      const versionId = activeCanvasVersionIdRef.current || activeCanvasVersionId;
+      if (!versionId) {
+        throw new Error("Enable edit mode before applying changes.");
+      }
+
+      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(versionId);
+      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
+      const autoLayoutNodeIds = Array.from(
+        new Set(
+          operations
+            .filter((operation) => operation.type === "ADD_NODE")
+            .map((operation) => operation.node?.id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+
+      try {
+        const response = await applyCanvasVersionChangesetMutation.mutateAsync({
+          versionId,
+          changes: operations,
+          ...(autoLayoutNodeIds.length > 0
+            ? {
+                autoLayout: {
+                  algorithm: "ALGORITHM_HORIZONTAL",
+                  scope: "SCOPE_CONNECTED_COMPONENT",
+                  nodeIds: autoLayoutNodeIds,
+                },
+              }
+            : {}),
+        });
+
+        const version = response.data?.version;
+        if (!version) {
+          throw new Error("Failed to apply changes.");
+        }
+
+        setActiveCanvasVersion(version);
+        setLastSavedWorkflowSnapshot(
+          queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? null,
+        );
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+      } catch (error) {
+        releaseCanvasUpdatedEcho();
+        releaseCanvasVersionUpdatedEcho();
+        throw error;
+      }
+    },
+    [
+      activeCanvasVersionId,
+      applyCanvasVersionChangesetMutation,
+      canvasId,
+      organizationId,
+      queryClient,
+      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasVersionUpdatedEcho,
+      setLastSavedWorkflowSnapshot,
+    ],
+  );
+
   /**
    * Ref to track pending position updates that need to be auto-saved.
    * Maps node ID to its updated position.
@@ -1387,7 +1455,6 @@ export function WorkflowPageV2() {
       { text?: string; color?: string; width?: number; height?: number; label?: string; description?: string }
     >
   >(new Map());
-  const logNodeSelectRef = useRef<(nodeId: string) => void>(() => {});
 
   /**
    * Debounced auto-save function for node position changes.
@@ -1418,80 +1485,42 @@ export function WorkflowPageV2() {
               return;
             }
 
-            // Fetch the latest workflow from the cache
+            if (!activeCanvasVersionIdRef.current) {
+              return;
+            }
+
             const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(
               canvasKeys.detail(organizationId, canvasId),
             );
-
             if (!latestWorkflow?.spec?.nodes) return;
 
-            // Apply only position updates to the current state
-            const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
-              if (!node.id) return node;
-
-              const positionUpdate = positionUpdates.get(node.id);
-              if (positionUpdate) {
-                return {
-                  ...node,
-                  position: positionUpdate,
-                };
+            const existingNodeIds = new Set(latestWorkflow.spec.nodes.map((node) => node.id).filter(Boolean));
+            const operations: CanvasChangesetChange[] = [];
+            positionUpdates.forEach((position, nodeId) => {
+              if (existingNodeIds.has(nodeId)) {
+                operations.push({
+                  type: "UPDATE_NODE",
+                  node: {
+                    id: nodeId,
+                    position: {
+                      x: position.x,
+                      y: position.y,
+                    },
+                  },
+                });
               }
-              return node;
             });
 
-            const updatedWorkflow = {
-              ...latestWorkflow,
-              spec: {
-                ...latestWorkflow.spec,
-                nodes: updatedNodes,
-              },
-            };
-
-            const changeSummary = summarizeWorkflowChanges({
-              before: lastSavedWorkflowRef.current,
-              after: updatedWorkflow,
-              onNodeSelect: (nodeId: string) => logNodeSelectRef.current(nodeId),
-            });
-            const changeMessage = changeSummary.changeCount
-              ? `${changeSummary.changeCount} Canvas changes saved`
-              : "Canvas changes saved";
-
-            // Save the workflow with updated positions
-            if (!activeCanvasVersionId) {
-              return;
-            }
-            const savingVersionID = activeCanvasVersionId || undefined;
-
-            const saveResult = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
-            if (saveResult.status !== "saved") {
-              return;
-            }
-            if (
-              saveResult.response?.data?.version &&
-              savingVersionID &&
-              activeCanvasVersionIdRef.current === savingVersionID
-            ) {
-              setActiveCanvasVersion(saveResult.response.data.version);
-            }
-            if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
+            if (operations.length === 0) {
+              positionUpdates.forEach((_, nodeId) => {
+                if (pendingPositionUpdatesRef.current.get(nodeId) === positionUpdates.get(nodeId)) {
+                  pendingPositionUpdatesRef.current.delete(nodeId);
+                }
+              });
               return;
             }
 
-            if (changeSummary.detail) {
-              setLiveCanvasEntries((prev) => [
-                buildCanvasStatusLogEntry({
-                  id: `canvas-save-${Date.now()}`,
-                  message: changeMessage,
-                  type: "success",
-                  timestamp: new Date().toISOString(),
-                  detail: changeSummary.detail,
-                  searchText: changeSummary.searchText,
-                }),
-                ...prev,
-              ]);
-            }
-
-            setLastSavedWorkflowSnapshot(updatedWorkflow);
+            await applyChangeset(operations);
 
             // Clear the saved position updates after successful save
             // Keep any new updates that came in during the save
@@ -1543,16 +1572,7 @@ export function WorkflowPageV2() {
         },
         isReadOnly ? 2000 : 100,
       ),
-    [
-      organizationId,
-      canvasId,
-      activeCanvasVersionId,
-      queryClient,
-      hasNonPositionalUnsavedChanges,
-      isReadOnly,
-      enqueueCanvasSave,
-      setLastSavedWorkflowSnapshot,
-    ],
+    [organizationId, canvasId, queryClient, hasNonPositionalUnsavedChanges, isReadOnly, applyChangeset],
   );
 
   const handleNodeWebsocketEvent = useCallback(
@@ -1769,10 +1789,6 @@ export function WorkflowPageV2() {
     },
     [handleSidebarChange],
   );
-
-  useEffect(() => {
-    logNodeSelectRef.current = handleLogNodeSelect;
-  }, [handleLogNodeSelect]);
 
   const handleLogRunNodeSelect = useCallback(
     (nodeId: string) => {
@@ -3092,121 +3108,6 @@ export function WorkflowPageV2() {
     [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, applyAutoLayoutOnAddedNode, isReadOnly],
   );
 
-  const handleApplyAiOperations = useCallback(
-    async (operations: CanvasChangesetChange[]) => {
-      if (!operations.length || !organizationId || !canvasId) {
-        return;
-      }
-
-      const versionId = activeCanvasVersionIdRef.current || activeCanvasVersionId;
-      if (!versionId) {
-        throw new Error("Enable edit mode before applying AI changes.");
-      }
-
-      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(versionId);
-      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
-      const autoLayoutNodeIds = Array.from(
-        new Set(
-          operations
-            .filter((operation) => operation.type === "ADD_NODE")
-            .map((operation) => operation.node?.id)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      );
-
-      try {
-        const response = await canvasesApplyCanvasVersionChangeset(
-          withOrganizationHeader({
-            path: {
-              canvasId,
-              versionId,
-            },
-            body: {
-              changeset: {
-                changes: operations,
-              },
-              ...(autoLayoutNodeIds.length > 0
-                ? {
-                    autoLayout: {
-                      algorithm: "ALGORITHM_HORIZONTAL",
-                      scope: "SCOPE_CONNECTED_COMPONENT",
-                      nodeIds: autoLayoutNodeIds,
-                    },
-                  }
-                : {}),
-            },
-          }),
-        );
-
-        const version = response.data?.version;
-        if (!version) {
-          throw new Error("Failed to apply AI changes.");
-        }
-
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), version);
-        queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          let found = false;
-          const next = current.map((item) => {
-            if (item?.metadata?.id === version.metadata?.id) {
-              found = true;
-              return version;
-            }
-            return item;
-          });
-
-          if (!found) {
-            next.unshift(version);
-          }
-
-          next.sort(
-            (left, right) =>
-              versionSortValue(right.metadata?.publishedAt || right.metadata?.updatedAt || right.metadata?.createdAt) -
-              versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
-          );
-          return next;
-        });
-
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
-          if (!current || !version.spec) {
-            return current;
-          }
-
-          return {
-            ...current,
-            spec: {
-              ...current.spec,
-              ...version.spec,
-            },
-          };
-        });
-
-        setActiveCanvasVersion(version);
-        setLastSavedWorkflowSnapshot(
-          queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? null,
-        );
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
-      } catch (error) {
-        releaseCanvasUpdatedEcho();
-        releaseCanvasVersionUpdatedEcho();
-        throw error;
-      }
-    },
-    [
-      activeCanvasVersionId,
-      canvasId,
-      organizationId,
-      queryClient,
-      registerIgnoredCanvasUpdatedEcho,
-      registerIgnoredCanvasVersionUpdatedEcho,
-      setLastSavedWorkflowSnapshot,
-    ],
-  );
-
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
@@ -3368,8 +3269,6 @@ export function WorkflowPageV2() {
     async (sourceId: string, targetId: string, sourceHandle?: string | null) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      // Save snapshot before making changes
-
       // Create the new edge
       const newEdge: ComponentsEdge = {
         sourceId,
@@ -3377,91 +3276,100 @@ export function WorkflowPageV2() {
         channel: sourceHandle || "default",
       };
 
-      // Add the new edge to the workflow
-      const updatedEdges = [...(canvas.spec?.edges || []), newEdge];
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          edges: updatedEdges,
-        },
-      };
-
-      // Update local cache
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
       if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        try {
+          await applyChangeset([
+            {
+              type: "ADD_EDGE",
+              edge: {
+                sourceId: newEdge.sourceId,
+                targetId: newEdge.targetId,
+                channel: newEdge.channel,
+              },
+            },
+          ]);
+        } catch (error) {
+          const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
+          showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+        }
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+    [canvas, organizationId, canvasId, applyChangeset, isReadOnly],
+  );
+
+  const applyNodeDeleteChangeset = useCallback(
+    async (nodeIds: string[]) => {
+      if (!canvas || !organizationId || !canvasId || isReadOnly) return;
+      if (nodeIds.length === 0) return;
+
+      const specNodes = canvas.spec?.nodes || [];
+      const updatedNodes = deleteNodesFromCanvas(specNodes, nodeIds);
+      const remainingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
+
+      const deletedNodeIds = specNodes
+        .map((node) => node.id)
+        .filter((id): id is string => Boolean(id) && !remainingNodeIds.has(id));
+      const previousNodeByID = new Map(specNodes.filter((node) => node.id).map((node) => [node.id!, node]));
+
+      const updateOperations: CanvasChangesetChange[] = updatedNodes
+        .filter((node): node is ComponentsNode => Boolean(node.id))
+        .flatMap((node) => {
+          const previousNode = previousNodeByID.get(node.id!);
+          if (!previousNode) {
+            return [];
+          }
+
+          const previousConfiguration = JSON.stringify(previousNode.configuration ?? {});
+          const currentConfiguration = JSON.stringify(node.configuration ?? {});
+          if (previousConfiguration === currentConfiguration) {
+            return [];
+          }
+
+          return [
+            {
+              type: "UPDATE_NODE",
+              node: {
+                id: node.id,
+                configuration: node.configuration ?? {},
+              },
+            },
+          ];
+        });
+
+      const deleteOperations: CanvasChangesetChange[] = deletedNodeIds.map((id) => ({
+        type: "DELETE_NODE",
+        node: {
+          id,
+        },
+      }));
+
+      const operations = [...updateOperations, ...deleteOperations];
+      if (operations.length === 0) {
+        return;
+      }
+
+      try {
+        await applyChangeset(operations);
+      } catch (error) {
+        const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
+        showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+      }
+    },
+    [canvas, organizationId, canvasId, isReadOnly, applyChangeset],
   );
 
   const handleNodeDelete = useCallback(
     async (nodeId: string) => {
-      if (!canvas || !organizationId || !canvasId) return;
-
-      // Save snapshot before making changes
-
-      const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromCanvas(specNodes, [nodeId]);
-      const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
-
-      const updatedEdges = canvas.spec?.edges?.filter(
-        (edge) =>
-          (!edge.sourceId || survivingNodeIds.has(edge.sourceId)) &&
-          (!edge.targetId || survivingNodeIds.has(edge.targetId)),
-      );
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-          edges: updatedEdges,
-        },
-      };
-
-      // Update local cache
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+      await applyNodeDeleteChangeset([nodeId]);
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+    [applyNodeDeleteChangeset],
   );
 
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
-      if (!canvas || !organizationId || !canvasId) return;
-
-      const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromCanvas(specNodes, nodeIds);
-      const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
-      const updatedEdges = canvas.spec?.edges?.filter(
-        (edge) =>
-          (!edge.sourceId || survivingNodeIds.has(edge.sourceId)) &&
-          (!edge.targetId || survivingNodeIds.has(edge.targetId)),
-      );
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-          edges: updatedEdges,
-        },
-      };
-
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+      await applyNodeDeleteChangeset(nodeIds);
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+    [applyNodeDeleteChangeset],
   );
 
   const handleAutoLayoutNodes = useCallback(
@@ -3619,8 +3527,6 @@ export function WorkflowPageV2() {
     async (edgeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      // Save snapshot before making changes
-
       // Parse edge IDs to extract sourceId, targetId, and channel
       // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
       const edgesToRemove = edgeIds.map((edgeId) => {
@@ -3633,32 +3539,52 @@ export function WorkflowPageV2() {
         };
       });
 
-      // Remove the edges from the workflow
-      const updatedEdges = canvas.spec?.edges?.filter((edge) => {
-        return !edgesToRemove.some(
-          (toRemove) =>
-            edge.sourceId === toRemove.sourceId &&
-            edge.targetId === toRemove.targetId &&
-            edge.channel === toRemove.channel,
-        );
-      });
+      const validEdgesToRemove = edgesToRemove.filter((edge) => edge.sourceId && edge.targetId && edge.channel);
+      if (validEdgesToRemove.length === 0) {
+        return;
+      }
 
-      const updatedWorkflow = {
-        ...canvas,
+      const operations: CanvasChangesetChange[] = validEdgesToRemove.map((edge) => ({
+        type: "DELETE_EDGE",
+        edge: {
+          sourceId: edge.sourceId,
+          targetId: edge.targetId,
+          channel: edge.channel,
+        },
+      }));
+
+      const currentWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      const updatedEdges = (currentWorkflow.spec?.edges || []).filter(
+        (edge) =>
+          !validEdgesToRemove.some(
+            (toRemove) =>
+              edge.sourceId === toRemove.sourceId &&
+              edge.targetId === toRemove.targetId &&
+              edge.channel === toRemove.channel,
+          ),
+      );
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), {
+        ...currentWorkflow,
         spec: {
-          ...canvas.spec,
+          ...currentWorkflow.spec,
           edges: updatedEdges,
         },
-      };
-
-      // Update local cache
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      });
 
       if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        try {
+          await applyChangeset(operations);
+        } catch (error) {
+          queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), currentWorkflow);
+          const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
+          showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+        }
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+    [canvas, organizationId, canvasId, queryClient, applyChangeset, isReadOnly],
   );
 
   /**
@@ -3756,8 +3682,6 @@ export function WorkflowPageV2() {
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      // Save snapshot before making changes
-
       // Find the current node to determine its collapsed state
       const currentNode = canvas.spec?.nodes?.find((node) => node.id === nodeId);
       if (!currentNode) return;
@@ -3765,30 +3689,24 @@ export function WorkflowPageV2() {
       // Toggle the collapsed state
       const newIsCollapsed = !currentNode.isCollapsed;
 
-      const updatedNodes = canvas.spec?.nodes?.map((node) =>
-        node.id === nodeId
-          ? {
-              ...node,
-              isCollapsed: newIsCollapsed,
-            }
-          : node,
-      );
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-        },
-      };
-
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-
       if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+        try {
+          await applyChangeset([
+            {
+              type: "UPDATE_NODE",
+              node: {
+                id: nodeId,
+                isCollapsed: newIsCollapsed,
+              },
+            },
+          ]);
+        } catch (error) {
+          const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
+          showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+        }
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+    [canvas, organizationId, canvasId, applyChangeset, isReadOnly],
   );
 
   const handleRun = useCallback(
@@ -5217,7 +5135,7 @@ export function WorkflowPageV2() {
           isEditing={isEditing}
           activeCanvasVersionId={activeCanvasVersionId}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
-          onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
+          onApplyAiOperations={!isReadOnly ? applyChangeset : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
