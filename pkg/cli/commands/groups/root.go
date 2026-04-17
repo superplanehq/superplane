@@ -36,7 +36,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Long:  "Create a group by passing a name positional with --display-name / --description / --role, or by passing --file pointing to a YAML resource definition.",
 		Args:  cobra.MaximumNArgs(1),
 	}
-	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
+	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "path to a YAML file describing the group")
 	createCmd.Flags().StringVar(&createDisplayName, "display-name", "", "group display name")
 	createCmd.Flags().StringVar(&createDescription, "description", "", "group description")
 	createCmd.Flags().StringVar(&createRole, "role", "", "role assigned to members of the group")
@@ -56,7 +56,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Update a group inline or from a file",
 		Args:  cobra.MaximumNArgs(1),
 	}
-	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
+	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "path to a YAML file describing the group")
 	updateCmd.Flags().StringVar(&updateDisplayName, "display-name", "", "group display name")
 	updateCmd.Flags().StringVar(&updateDescription, "description", "", "group description")
 	updateCmd.Flags().StringVar(&updateRole, "role", "", "role assigned to members of the group")
