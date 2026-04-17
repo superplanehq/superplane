@@ -211,12 +211,11 @@ export function WorkflowPageV2() {
   const canUpdateIntegrations = canAct("integrations", "update");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
-    data: rawLiveCanvas,
+    data: liveCanvas,
     isLoading: canvasLoading,
     isFetching: canvasFetching,
     error: canvasError,
   } = useCanvas(organizationId!, canvasId!);
-  const liveCanvas = rawLiveCanvas;
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
