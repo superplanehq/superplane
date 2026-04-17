@@ -190,15 +190,6 @@ function renderBlockByType(args: {
           actionProps={actionProps}
         />
       );
-    case "group":
-      return renderFallbackBlock({
-        data,
-        fallbackTitle: "Group",
-        selected,
-        showHeader,
-        canvasMode,
-        actionProps,
-      });
     default:
       return renderFallbackBlock({
         data,
