@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
-import type { AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { useMemo } from "react";
+import type { AiBuilderProposal } from "./agentChat";
+import { useApplyShortcutHint } from "./useApplyShortcutHint";
+import { useFormatOperation } from "./useFormatOperation";
 
 export type ProposalsListProps = {
   pendingProposal: AiBuilderProposal;
-  applyShortcutHint: string;
-  pendingProposalSummaries: string[];
-  onApplyProposal: () => void;
+  onApplyProposal: () => void | Promise<void>;
   onDiscardProposal: () => void;
   isApplyingProposal: boolean;
   aiError: string | null;
@@ -14,15 +15,20 @@ export type ProposalsListProps = {
 
 export function ProposalsList({
   pendingProposal,
-  applyShortcutHint,
-  pendingProposalSummaries,
   onApplyProposal,
   onDiscardProposal,
   isApplyingProposal,
   aiError,
   disabled,
 }: ProposalsListProps) {
+  const formatOperation = useFormatOperation();
+  const pendingProposalSummaries = useMemo(
+    () => (pendingProposal.changeset.changes || []).map((change) => formatOperation(change)),
+    [formatOperation, pendingProposal],
+  );
+
   const isDisabled = disabled || isApplyingProposal || (pendingProposal.changeset.changes || []).length === 0;
+  const applyShortcutHint = useApplyShortcutHint();
 
   return (
     <div className="relative rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">

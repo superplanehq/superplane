@@ -1,4 +1,4 @@
-import type { AiBuilderMessage } from "@/ui/BuildingBlocksSidebar/agentChat";
+import type { AiBuilderMessage } from "./agentChat";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 
