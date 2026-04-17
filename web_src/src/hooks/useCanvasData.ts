@@ -377,7 +377,7 @@ export const useCreateCanvas = (organizationId: string) => {
           canvasKeys.detail(organizationId, response.data.canvas.metadata.id),
           response.data.canvas,
         );
-        analytics.canvasCreated(response.data.canvas.metadata.id, organizationId);
+        analytics.canvasCreate(response.data.canvas.metadata.id, organizationId);
       }
     },
   });
@@ -458,7 +458,7 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       if (response?.data?.version?.metadata?.id) {
-        analytics.canvasPublished(canvasId, organizationId);
+        analytics.versionPublish(canvasId, organizationId);
       }
     },
   });
@@ -759,7 +759,7 @@ export const useDeleteCanvas = (organizationId: string) => {
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-      analytics.canvasDeleted(canvasId, organizationId);
+      analytics.canvasDelete(canvasId, organizationId);
     },
   });
 };

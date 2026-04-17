@@ -1,27 +1,29 @@
 import { posthog } from "@/posthog";
 
 export const analytics = {
-  organizationCreated: (organizationId: string) => {
-    posthog.capture("organization created", { organization_id: organizationId });
+
+  memberAccept: (organizationId: string) => {
+    posthog.capture("settings:member_accept", { organization_id: organizationId });
   },
 
-  canvasCreated: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas created", { canvas_id: canvasId, organization_id: organizationId });
+  canvasCreate: (canvasId: string, organizationId: string) => {
+    posthog.capture("canvas:canvas_create", { canvas_id: canvasId, organization_id: organizationId });
   },
 
-  canvasDeleted: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas deleted", { canvas_id: canvasId, organization_id: organizationId });
+  canvasDelete: (canvasId: string, organizationId: string) => {
+    posthog.capture("canvas:canvas_delete", { canvas_id: canvasId, organization_id: organizationId });
   },
 
-  integrationConnected: (integrationType: string, organizationId: string) => {
-    posthog.capture("integration connected", { integration_type: integrationType, organization_id: organizationId });
+  versionPublish: (canvasId: string, organizationId: string) => {
+    posthog.capture("canvas:version_publish", { canvas_id: canvasId, organization_id: organizationId });
   },
 
-  organizationJoined: (organizationId: string) => {
-    posthog.capture("organization joined", { organization_id: organizationId });
+  integrationCreate: (integrationType: string, organizationId: string) => {
+    posthog.capture("integration:integration_create", { integration_type: integrationType, organization_id: organizationId });
   },
 
-  canvasPublished: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas published", { canvas_id: canvasId, organization_id: organizationId });
+  orgCreate: (organizationId: string) => {
+    posthog.capture("auth:org_create", { organization_id: organizationId });
   },
+
 };
