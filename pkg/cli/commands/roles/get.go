@@ -1,4 +1,4 @@
-package secrets
+package roles
 
 import (
 	"io"
@@ -14,8 +14,8 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	response, _, err := ctx.API.SecretAPI.
-		SecretsDescribeSecret(ctx.Context, ctx.Args[0]).
+	response, _, err := ctx.API.RolesAPI.
+		RolesDescribeRole(ctx.Context, ctx.Args[0]).
 		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		Execute()
@@ -23,12 +23,12 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	secret := response.GetSecret()
+	role := response.GetRole()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(secret)
+		return ctx.Renderer.Render(role)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		return renderSecretText(stdout, secret)
+		return renderRoleText(stdout, role)
 	})
 }

@@ -16,7 +16,7 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 
 	response, _, err := ctx.API.SecretAPI.
 		SecretsListSecrets(ctx.Context).
-		DomainType(string(organizationDomainType())).
+		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		Execute()
 	if err != nil {
