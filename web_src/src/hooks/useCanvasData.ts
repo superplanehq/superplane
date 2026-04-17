@@ -9,6 +9,7 @@ import {
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
   canvasesUpdateCanvasVersion2,
+  canvasesApplyCanvasVersionChangeset,
   canvasesCreateCanvasChangeRequest,
   canvasesActOnCanvasChangeRequest,
   canvasesResolveCanvasChangeRequest,
@@ -31,6 +32,7 @@ import {
   widgetsDescribeWidget,
 } from "../api-client/sdk.gen";
 import type {
+  CanvasChangesetChange,
   CanvasesCanvas,
   CanvasesCanvasVersion,
   SuperplaneComponentsNode,
@@ -625,6 +627,76 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       }
+    },
+  });
+};
+
+export const useApplyCanvasVersionChangeset = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      versionId: string;
+      changes: CanvasChangesetChange[];
+      autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
+    }) => {
+      return await canvasesApplyCanvasVersionChangeset(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            versionId: data.versionId,
+          },
+          body: {
+            changeset: {
+              changes: data.changes,
+            },
+            ...(data.autoLayout ? { autoLayout: data.autoLayout } : {}),
+          },
+        }),
+      );
+    },
+    onSuccess: (response, variables) => {
+      const version = response?.data?.version;
+      if (!version) {
+        return;
+      }
+
+      queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
+      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
+        if (!current) {
+          return current;
+        }
+
+        let found = false;
+        const next = current.map((item) => {
+          if (item?.metadata?.id === version.metadata?.id) {
+            found = true;
+            return version;
+          }
+          return item;
+        });
+
+        if (!found) {
+          next.unshift(version);
+        }
+
+        next.sort((left, right) => versionSortTimestamp(right) - versionSortTimestamp(left));
+        return next;
+      });
+
+      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+        if (!current || !version.spec) {
+          return current;
+        }
+
+        return {
+          ...current,
+          spec: {
+            ...current.spec,
+            ...version.spec,
+          },
+        };
+      });
     },
   });
 };
