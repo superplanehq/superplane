@@ -2,8 +2,12 @@ import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 
 function getWorkflowSpecSignature(
   spec: CanvasesCanvas["spec"] | CanvasesCanvasVersion["spec"] | null | undefined,
-): string {
-  return JSON.stringify(spec ?? null);
+): string | null {
+  if (spec == null) {
+    return null;
+  }
+
+  return JSON.stringify(spec);
 }
 
 export function shouldPreserveDraftSpec({
@@ -34,5 +38,5 @@ export function shouldPreserveDraftSpec({
   }
 
   const selectedDraftVersionSignature = getWorkflowSpecSignature(selectedDraftVersionSpec);
-  return !!selectedDraftVersionSignature && selectedDraftVersionSignature !== incomingSignature;
+  return selectedDraftVersionSignature != null && selectedDraftVersionSignature !== incomingSignature;
 }

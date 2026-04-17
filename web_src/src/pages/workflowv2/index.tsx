@@ -216,7 +216,13 @@ export function WorkflowPageV2() {
     isLoading: canvasLoading,
     isFetching: canvasFetching,
     error: canvasError,
-  } = useCanvas(organizationId!, canvasId!, !activeCanvasVersion?.metadata?.id);
+  } = useCanvas(organizationId!, canvasId!, {
+    enabled: !activeCanvasVersion?.metadata?.id,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);

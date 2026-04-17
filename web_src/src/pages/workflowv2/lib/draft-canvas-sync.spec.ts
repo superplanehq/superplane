@@ -57,4 +57,15 @@ describe("shouldPreserveDraftSpec", () => {
       }),
     ).toBe(true);
   });
+
+  it("does not preserve the draft when the selected draft version already matches the incoming spec", () => {
+    expect(
+      shouldPreserveDraftSpec({
+        incomingSpec: liveVersionSpec,
+        draftSpec: null,
+        selectedDraftVersionSpec: liveVersionSpec,
+        liveVersionSpec,
+      }),
+    ).toBe(false);
+  });
 });
