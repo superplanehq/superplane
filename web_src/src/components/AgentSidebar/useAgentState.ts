@@ -102,6 +102,7 @@ export function useAgentState({
     showAgentSidebarToggle,
     readOnly,
     onApplyAiOperations: onApplyAiOperations ?? (async () => {}),
+    closeSidebar: closeAgentSidebar,
   };
 }
 

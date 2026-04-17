@@ -1,4 +1,5 @@
 import type { CanvasChangesetChange } from "@/api-client";
+import type { Dispatch, SetStateAction } from "react";
 import { useCallback } from "react";
 import type { AiBuilderMessage, AiBuilderProposal } from "./agentChat";
 import { pushAiMessages } from "./agentChat";
@@ -6,10 +7,10 @@ import { pushAiMessages } from "./agentChat";
 export type UseApplyAiProposalParams = {
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   pendingProposal: AiBuilderProposal | null;
-  setAiError: (error: string | null) => void;
-  setIsApplyingProposal: (isApplying: boolean) => void;
-  setAiMessages: (messages: AiBuilderMessage[]) => void;
-  setPendingProposal: (proposal: AiBuilderProposal | null) => void;
+  setAiError: Dispatch<SetStateAction<string | null>>;
+  setIsApplyingProposal: Dispatch<SetStateAction<boolean>>;
+  setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
+  setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
 };
 
 export function useApplyAiProposal({

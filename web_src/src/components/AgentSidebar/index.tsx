@@ -1,13 +1,12 @@
 import type { CanvasChangesetChange } from "@/api-client";
 import { X } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
-import type { AgentContext, AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
+import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
 import { sendChatPrompt } from "./agentChat";
 import type { AgentState } from "./useAgentState";
 import { useApplyAiProposal } from "./useApplyAiProposal";
-import { useDeleteChatSession } from "./useDeleteChatSession";
 import { useLoadChatConversation } from "./useLoadChatConversation";
 import { useLoadChatSessions } from "./useLoadChatSessions";
 import { useSidebarWidth } from "./useSidebarWidth";
@@ -17,61 +16,25 @@ export interface AgentSidebarProps {
 }
 
 export function AgentSidebar({ agentState }: AgentSidebarProps) {
-  const {
-    agentContext,
-    isAgentSidebarOpen,
-    handleAgentSidebarOpenChange,
-    canvasId,
-    organizationId,
-    readOnly,
-    onApplyAiOperations,
-    showAgentSidebarToggle,
-  } = agentState;
-
-  if (!showAgentSidebarToggle) {
+  if (!agentState.showAgentSidebarToggle) {
     return null;
   }
 
-  if (!isAgentSidebarOpen || !agentContext.enabled) {
+  if (!agentState.isAgentSidebarOpen || !agentState.agentContext.enabled) {
     return null;
   }
 
-  return (
-    <OpenAgentSidebar
-      onToggle={handleAgentSidebarOpenChange}
-      agentContext={agentContext}
-      canvasId={canvasId}
-      organizationId={organizationId}
-      onApplyAiOperations={onApplyAiOperations}
-      disabled={readOnly}
-    />
-  );
+  return <OpenAgentSidebar agentState={agentState} />;
 }
 
-interface OpenAgentSidebarProps {
-  onToggle: (open: boolean) => void;
-  agentContext: AgentContext;
-  canvasId?: string;
-  organizationId?: string;
-  onApplyAiOperations: (changes: CanvasChangesetChange[]) => Promise<void>;
-  disabled: boolean;
-}
+function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
+  const { canvasId, organizationId, agentContext, onApplyAiOperations } = agentState;
 
-function OpenAgentSidebar({
-  onToggle,
-  agentContext,
-  canvasId,
-  organizationId,
-  onApplyAiOperations,
-  disabled,
-}: OpenAgentSidebarProps) {
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
-  const { sidebarRef, isResizing, onResizeMouseDown, sidebarStyle } = useSidebarWidth();
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const currentChatIdRef = useRef(currentChatId);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -117,17 +80,6 @@ function OpenAgentSidebar({
     setAiError(null);
   };
 
-  const handleDeleteChatSession = useDeleteChatSession({
-    canvasId,
-    organizationId,
-    currentChatIdRef,
-    setChatSessions,
-    setCurrentChatId,
-    setAiMessages,
-    setPendingProposal,
-    setAiError,
-  });
-
   // reset state when canvasId changes
   useEffect(() => {
     setCurrentChatId(null);
@@ -157,6 +109,44 @@ function OpenAgentSidebar({
   });
 
   return (
+    <AgentSidebarContainer onClose={agentState.closeSidebar}>
+      <AiBuilderChatPanel
+        chatSessions={chatSessions}
+        currentChatId={currentChatId}
+        isLoadingChatSessions={isLoadingChatSessions}
+        isLoadingChatMessages={isLoadingChatMessages}
+        aiMessages={aiMessages}
+        isGeneratingResponse={isGeneratingResponse}
+        pendingProposal={pendingProposal}
+        onApplyProposal={onApplyProposal}
+        onDiscardProposal={handleDiscardProposal}
+        isApplyingProposal={isApplyingProposal}
+        aiError={aiError}
+        disabled={agentState.readOnly}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        setChatSessions={setChatSessions}
+        setCurrentChatId={setCurrentChatId}
+        setAiMessages={setAiMessages}
+        setPendingProposal={setPendingProposal}
+        setAiError={setAiError}
+        aiInput={aiInput}
+        onAiInputChange={setAiInput}
+        onSelectChat={handleSelectChatSession}
+        onStartNewSession={handleStartNewChatSession}
+        onSendPrompt={() => void handleSendPrompt()}
+        aiInputRef={aiInputRef}
+      />
+    </AgentSidebarContainer>
+  );
+}
+
+type OnMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => void;
+
+function AgentSidebarContainer({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  const { sidebarRef, isResizing, onResizeMouseDown, sidebarStyle } = useSidebarWidth();
+
+  return (
     <div
       ref={sidebarRef}
       className="relative border-r border-border shrink-0 h-full z-21 flex flex-col overflow-hidden bg-white"
@@ -165,40 +155,15 @@ function OpenAgentSidebar({
     >
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border shrink-0">
         <h2 className="text-base font-medium">SuperPlane Agent</h2>
-        <CloseButton onToggle={onToggle} />
+        <CloseButton onClose={onClose} />
       </div>
 
-      <div className="flex flex-1 flex-col min-h-0">
-        <AiBuilderChatPanel
-          chatSessions={chatSessions}
-          currentChatId={currentChatId}
-          isLoadingChatSessions={isLoadingChatSessions}
-          isLoadingChatMessages={isLoadingChatMessages}
-          aiMessages={aiMessages}
-          isGeneratingResponse={isGeneratingResponse}
-          pendingProposal={pendingProposal}
-          onApplyProposal={onApplyProposal}
-          onDiscardProposal={handleDiscardProposal}
-          isApplyingProposal={isApplyingProposal}
-          aiError={aiError}
-          disabled={disabled}
-          canvasId={canvasId}
-          aiInput={aiInput}
-          onAiInputChange={setAiInput}
-          onSelectChat={handleSelectChatSession}
-          onDeleteChat={handleDeleteChatSession}
-          onStartNewSession={handleStartNewChatSession}
-          onSendPrompt={() => void handleSendPrompt()}
-          aiInputRef={aiInputRef}
-        />
-      </div>
+      <div className="flex flex-1 flex-col min-h-0">{children}</div>
 
       <AgentSidebarResizeHandle isResizing={isResizing} onMouseDown={onResizeMouseDown} />
     </div>
   );
 }
-
-type OnMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => void;
 
 function AgentSidebarResizeHandle({ isResizing, onMouseDown }: { isResizing: boolean; onMouseDown: OnMouseDown }) {
   return (
@@ -219,11 +184,11 @@ function AgentSidebarResizeHandle({ isResizing, onMouseDown }: { isResizing: boo
   );
 }
 
-function CloseButton({ onToggle }: { onToggle: (open: boolean) => void }) {
+function CloseButton({ onClose }: { onClose: () => void }) {
   return (
     <button
       type="button"
-      onClick={() => onToggle(false)}
+      onClick={onClose}
       data-testid="close-agent-sidebar-button"
       className="z-40 w-8 h-8 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
       aria-label="Close SuperPlane Agent"
@@ -238,8 +203,8 @@ function useProposalState({
   setAiMessages,
   onApplyAiOperations,
 }: {
-  setAiError: (error: string | null) => void;
-  setAiMessages: (messages: AiBuilderMessage[]) => void;
+  setAiError: Dispatch<SetStateAction<string | null>>;
+  setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
   onApplyAiOperations: (changes: CanvasChangesetChange[]) => Promise<void>;
 }) {
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);

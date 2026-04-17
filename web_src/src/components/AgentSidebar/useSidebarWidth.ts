@@ -85,17 +85,20 @@ export function useSidebarWidth() {
     }
   }, [isResizing, handleResizeMouseMove, handleResizeMouseUp]);
 
-  const sidebarStyle = useMemo(() => ({
-    width: `${sidebarWidth}px`,
-    minWidth: `${sidebarWidth}px`,
-    maxWidth: `${sidebarWidth}px`,
-  }), [sidebarWidth]);
+  const sidebarStyle = useMemo(
+    () => ({
+      width: `${sidebarWidth}px`,
+      minWidth: `${sidebarWidth}px`,
+      maxWidth: `${sidebarWidth}px`,
+    }),
+    [sidebarWidth],
+  );
 
   return {
     sidebarRef,
     sidebarWidth,
     isResizing,
     onResizeMouseDown,
-    sidebarStyle
+    sidebarStyle,
   };
 }

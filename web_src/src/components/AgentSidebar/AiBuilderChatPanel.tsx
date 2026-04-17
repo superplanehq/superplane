@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useRef, type RefObject } from "react";
 import { ConversationList } from "./AiBuilderConversationList";
 import { AiBuilderConversationMessageList } from "./AiBuilderConversationMessageList";
@@ -5,6 +6,7 @@ import { InputForm } from "./AiBuilderInputForm";
 import { ProposalsList } from "./AiBuilderProposalsList";
 import { type AiBuilderMessage, type AiBuilderProposal, type AiChatSession } from "./agentChat";
 import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
+import { useDeleteChatSession } from "./useDeleteChatSession";
 
 type AiBuilderChatPanelProps = {
   chatSessions: AiChatSession[];
@@ -20,10 +22,15 @@ type AiBuilderChatPanelProps = {
   aiError: string | null;
   disabled: boolean;
   canvasId?: string;
+  organizationId?: string;
+  setChatSessions: Dispatch<SetStateAction<AiChatSession[]>>;
+  setCurrentChatId: Dispatch<SetStateAction<string | null>>;
+  setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
+  setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
+  setAiError: Dispatch<SetStateAction<string | null>>;
   aiInput: string;
   onAiInputChange: (value: string) => void;
   onSelectChat: (chatId: string) => void;
-  onDeleteChat?: (chatId: string) => void;
   onStartNewSession: () => void;
   onSendPrompt: () => void;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
@@ -43,14 +50,33 @@ export function AiBuilderChatPanel({
   aiError,
   disabled,
   canvasId,
+  organizationId,
+  setChatSessions,
+  setCurrentChatId,
+  setAiMessages,
+  setPendingProposal,
+  setAiError,
   aiInput,
   onAiInputChange,
   onSelectChat,
-  onDeleteChat,
   onStartNewSession,
   onSendPrompt,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
+  const currentChatIdRef = useRef(currentChatId);
+  currentChatIdRef.current = currentChatId;
+
+  const handleDeleteChatSession = useDeleteChatSession({
+    canvasId,
+    organizationId,
+    currentChatIdRef,
+    setChatSessions,
+    setCurrentChatId,
+    setAiMessages,
+    setPendingProposal,
+    setAiError,
+  });
+
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
   const hasConversationState =
     aiMessages.length > 0 || isGeneratingResponse || pendingProposal !== null || aiError !== null;
@@ -99,7 +125,7 @@ export function AiBuilderChatPanel({
               isLoadingChatSessions={isLoadingChatSessions}
               isGeneratingResponse={isGeneratingResponse}
               onSelectChat={onSelectChat}
-              onDeleteChat={onDeleteChat}
+              onDeleteChat={handleDeleteChatSession}
               onStartNewSession={onStartNewSession}
               title="Previous chats"
               className="flex-1 min-h-0 px-2 py-2 space-y-2"
@@ -115,7 +141,7 @@ export function AiBuilderChatPanel({
                 isLoadingChatSessions={isLoadingChatSessions}
                 isGeneratingResponse={isGeneratingResponse}
                 onSelectChat={onSelectChat}
-                onDeleteChat={onDeleteChat}
+                onDeleteChat={handleDeleteChatSession}
                 onStartNewSession={onStartNewSession}
               />
             ) : null}
