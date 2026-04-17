@@ -161,6 +161,50 @@ func Test__CanvasPatcher(t *testing.T) {
 		require.Nil(t, steps.finalVersion)
 	})
 
+	t.Run("does not apply layout when auto layout is omitted", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{
+					ID:   "node-a",
+					Name: "Node A",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					},
+					Position: models.Position{X: 125, Y: 240},
+				},
+				{
+					ID:   "node-b",
+					Name: "Node B",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					},
+					Position: models.Position{X: 780, Y: 95},
+				},
+			},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_EDGE,
+					Edge: &pb.CanvasChangeset_Change_Edge{
+						SourceId: "node-a",
+						TargetId: "node-b",
+						Channel:  "default",
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertNodePosition("node-a", 125, 240)
+		steps.assertNodePosition("node-b", 780, 95)
+	})
+
 	t.Run("returns error when change object is misconfigured", func(t *testing.T) {
 		testCases := []struct {
 			name            string
@@ -826,6 +870,16 @@ func (s *CanvasPatcherSteps) assertNodeErrorContains(nodeID string, text string)
 	require.True(s.t, i != -1, "expected node %s", nodeID)
 	require.NotNil(s.t, s.finalVersion.Nodes[i].ErrorMessage)
 	require.Contains(s.t, *s.finalVersion.Nodes[i].ErrorMessage, text)
+}
+
+func (s *CanvasPatcherSteps) assertNodePosition(nodeID string, x int, y int) {
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.Equal(s.t, x, s.finalVersion.Nodes[i].Position.X)
+	require.Equal(s.t, y, s.finalVersion.Nodes[i].Position.Y)
 }
 
 func (s *CanvasPatcherSteps) findBlockName(node models.Node) string {
