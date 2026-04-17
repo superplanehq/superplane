@@ -79,13 +79,8 @@ func (o *CanvasPublisherOptions) Validate() error {
 	return nil
 }
 
-func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
+func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
 	if err := options.Validate(); err != nil {
-		return nil, err
-	}
-
-	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, draft.WorkflowID)
-	if err != nil {
 		return nil, err
 	}
 
