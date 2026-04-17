@@ -18,48 +18,48 @@ describe("analytics", () => {
     capture.mockClear();
   });
 
-  it("captures organization created", () => {
-    analytics.organizationCreated("org-123");
-    expect(capture).toHaveBeenCalledWith("organization created", {
+  it("captures org create", () => {
+    analytics.orgCreate("org-123");
+    expect(capture).toHaveBeenCalledWith("auth:org_create", {
       organization_id: "org-123",
     });
   });
 
-  it("captures canvas created", () => {
-    analytics.canvasCreated("canvas-123", "org-123");
-    expect(capture).toHaveBeenCalledWith("canvas created", {
+  it("captures canvas create", () => {
+    analytics.canvasCreate("canvas-123", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:canvas_create", {
       canvas_id: "canvas-123",
       organization_id: "org-123",
     });
   });
 
-  it("captures canvas deleted", () => {
-    analytics.canvasDeleted("canvas-123", "org-123");
-    expect(capture).toHaveBeenCalledWith("canvas deleted", {
+  it("captures canvas delete", () => {
+    analytics.canvasDelete("canvas-123", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:canvas_delete", {
       canvas_id: "canvas-123",
       organization_id: "org-123",
     });
   });
 
-  it("captures canvas published", () => {
-    analytics.canvasPublished("canvas-123", "org-123");
-    expect(capture).toHaveBeenCalledWith("canvas published", {
+  it("captures version publish", () => {
+    analytics.versionPublish("canvas-123", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:version_publish", {
       canvas_id: "canvas-123",
       organization_id: "org-123",
     });
   });
 
-  it("captures integration connected", () => {
-    analytics.integrationConnected("github", "org-123");
-    expect(capture).toHaveBeenCalledWith("integration connected", {
+  it("captures integration create", () => {
+    analytics.integrationCreate("github", "org-123");
+    expect(capture).toHaveBeenCalledWith("integration:integration_create", {
       integration_type: "github",
       organization_id: "org-123",
     });
   });
 
-  it("captures organization joined", () => {
-    analytics.organizationJoined("org-123");
-    expect(capture).toHaveBeenCalledWith("organization joined", {
+  it("captures member accept", () => {
+    analytics.memberAccept("org-123");
+    expect(capture).toHaveBeenCalledWith("settings:member_accept", {
       organization_id: "org-123",
     });
   });
