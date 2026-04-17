@@ -409,7 +409,7 @@ export function WorkflowPageV2() {
   }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions, pendingApprovalVersionIds]);
   const latestDraftVersion = draftVersions[0];
   const createChangeRequestNodeDiffSummary = useMemo(
-    () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion || undefined),
+    () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion),
     [liveCanvasVersion, createChangeRequestVersion],
   );
   const isCreateChangeRequestDraftOutdated = useMemo(() => {
