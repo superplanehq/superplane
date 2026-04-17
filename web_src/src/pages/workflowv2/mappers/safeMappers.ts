@@ -144,6 +144,7 @@ function buildNormalizedComponentBaseProps(
     metadata: sanitizeArray(record.metadata),
     customField: sanitizeCustomField(record.customField as ComponentBaseProps["customField"], fallbackTitle),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
+    customFieldVisibility: record.customFieldVisibility === "live-only" ? "live-only" : "always",
     eventStateMap: isRecord(record.eventStateMap)
       ? (record.eventStateMap as ComponentBaseProps["eventStateMap"])
       : undefined,
@@ -264,6 +265,7 @@ function buildNormalizedTriggerProps(
     metadata,
     customField: normalizeTriggerCustomField(record.customField),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
+    customFieldVisibility: record.customFieldVisibility === "live-only" ? "live-only" : "always",
     eventStateMap: isRecord(record.eventStateMap)
       ? (record.eventStateMap as ComponentBaseProps["eventStateMap"])
       : undefined,

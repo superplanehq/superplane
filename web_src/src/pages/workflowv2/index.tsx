@@ -1618,6 +1618,7 @@ export function WorkflowPageV2() {
     () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
     [triggers, components, availableIntegrations],
   );
+  const canvasMode = hasEditableVersion ? "edit" : "live";
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
     if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
@@ -1635,6 +1636,7 @@ export function WorkflowPageV2() {
       canvasId!,
       queryClient,
       me,
+      canvasMode,
     );
   }, [
     canvas,
@@ -1653,6 +1655,7 @@ export function WorkflowPageV2() {
     integrationsLoading,
     organizationId,
     me,
+    canvasMode,
   ]);
 
   const nodesWithIntegrationStatus = useMemo(
@@ -5100,7 +5103,7 @@ export function WorkflowPageV2() {
     canvasDeletedRemotely,
     isPreparingVersionAction,
   });
-  const headerMode = hasEditableVersion ? "version-edit" : "version-live";
+  const headerMode = canvasMode === "edit" ? "version-edit" : "version-live";
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
   const canvasStateMode = hasEditableVersion
@@ -5526,6 +5529,7 @@ function prepareData(
   workflowId: string,
   queryClient: QueryClient,
   user?: SuperplaneMeUser | null,
+  canvasMode: "live" | "edit" = "live",
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -5550,6 +5554,7 @@ function prepareData(
           queryClient,
           currentUser,
           workflowEdges,
+          canvasMode,
         );
       })
       .map((node) => ({
@@ -5574,10 +5579,11 @@ function prepareNode(
   queryClient: QueryClient,
   currentUser?: User,
   edges?: ComponentsEdge[],
+  canvasMode: "live" | "edit" = "live",
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
-      return prepareTriggerNode(node, triggers, nodeEventsMap);
+      return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode);
     case "TYPE_BLUEPRINT": {
       const componentMetadata = components.find((c) => c.name === node.component?.name);
       const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
@@ -5612,6 +5618,7 @@ function prepareNode(
         queryClient,
         currentUser,
         edges,
+        canvasMode,
       });
   }
 }
