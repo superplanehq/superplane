@@ -345,7 +345,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ph-no-capture">
                 <Input
                   readOnly
                   value={newToken}

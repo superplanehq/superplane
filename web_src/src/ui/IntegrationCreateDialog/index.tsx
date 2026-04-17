@@ -321,6 +321,7 @@ export function IntegrationCreateDialog({
                   </Button>
                 </div>
               </div>
+              <div className="ph-no-capture">
               {(integrationDefinition?.configuration ?? [])
                 .filter((f: ConfigurationField) => {
                   if (!f.name) return false;
@@ -344,6 +345,7 @@ export function IntegrationCreateDialog({
                     organizationId={organizationId}
                   />
                 ))}
+              </div>
             </>
           ) : (
             <>
@@ -363,7 +365,7 @@ export function IntegrationCreateDialog({
                 </div>
               )}
               {configurationFields.length > 0 && (
-                <div className="space-y-4">
+                <div className="space-y-4 ph-no-capture">
                   {configurationFields.map((field: ConfigurationField) => {
                     if (!field.name) return null;
                     return (
