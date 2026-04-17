@@ -1,8 +1,5 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
-import { useMemo } from "react";
-import { Diff, Hunk, parseDiff } from "react-diff-view";
 import * as yaml from "js-yaml";
-import "react-diff-view/style/index.css";
 
 export type DraftDiffLine = {
   prefix: "meta" | "context" | "+" | "-";
@@ -22,6 +19,42 @@ export type DraftNodeDiffSummary = {
   updatedCount: number;
   removedCount: number;
 };
+
+function comparableEdgesSnapshot(edges: unknown): string {
+  const list = (Array.isArray(edges) ? edges : []) as Array<Record<string, unknown>>;
+  const normalized = list.map((edge) => ({
+    sourceId: String(edge.sourceId ?? ""),
+    targetId: String(edge.targetId ?? ""),
+    channel: String(edge.channel ?? "default"),
+  }));
+  normalized.sort((left, right) => {
+    const bySource = left.sourceId.localeCompare(right.sourceId);
+    if (bySource !== 0) {
+      return bySource;
+    }
+
+    const byTarget = left.targetId.localeCompare(right.targetId);
+    if (byTarget !== 0) {
+      return byTarget;
+    }
+
+    return left.channel.localeCompare(right.channel);
+  });
+  return JSON.stringify(normalized);
+}
+
+/** True when draft workflow graph differs from live (nodes and/or edges). */
+export function hasDraftVersusLiveGraphDiff(
+  liveVersion?: CanvasesCanvasVersion,
+  draftVersion?: CanvasesCanvasVersion,
+): boolean {
+  const { items } = buildDraftNodeDiffSummary(liveVersion, draftVersion);
+  if (items.length > 0) {
+    return true;
+  }
+
+  return comparableEdgesSnapshot(liveVersion?.spec?.edges) !== comparableEdgesSnapshot(draftVersion?.spec?.edges);
+}
 
 export function buildDraftNodeDiffSummary(
   liveVersion?: CanvasesCanvasVersion,
@@ -174,49 +207,4 @@ export function buildDraftNodeDiffSummary(
   });
 
   return { items, addedCount, updatedCount, removedCount };
-}
-
-function toUnifiedDiffText(lines: DraftDiffLine[]): string {
-  return lines
-    .map((line) => {
-      if (line.prefix === "meta") {
-        return line.text;
-      }
-
-      if (line.prefix === "context") {
-        if (line.text.startsWith("@@")) {
-          return line.text;
-        }
-
-        return ` ${line.text}`;
-      }
-
-      return `${line.prefix}${line.text}`;
-    })
-    .join("\n");
-}
-
-export function DraftNodeDiffView({ nodeID, lines }: { nodeID: string; lines: DraftDiffLine[] }) {
-  const files = useMemo(() => parseDiff(toUnifiedDiffText(lines), { nearbySequences: "zip" }), [lines]);
-
-  if (!files.length) {
-    return <p className="text-xs text-slate-600">No diff available for this node.</p>;
-  }
-
-  return (
-    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-      <div className="max-h-96 overflow-auto">
-        {files.map((file) => (
-          <Diff
-            key={`${nodeID}-${file.oldRevision}-${file.newRevision}`}
-            viewType="split"
-            diffType={file.type}
-            hunks={file.hunks}
-          >
-            {(hunks) => hunks.map((hunk) => <Hunk key={`${nodeID}-${hunk.content}`} hunk={hunk} />)}
-          </Diff>
-        ))}
-      </div>
-    </div>
-  );
 }

@@ -74,20 +74,24 @@ function SingleRightHandle({
   connectingFrom,
   nodeId,
   allEdges,
+  isConnectionInteractive,
 }: {
   channel: string;
   hoveredEdge?: BlockEdgeState;
   connectingFrom?: BlockConnectionState;
   nodeId?: string;
   allEdges: BlockEdgeState[];
+  isConnectionInteractive: boolean;
 }) {
-  const isHighlighted = getSingleChannelHighlight({
-    hoveredEdge,
-    connectingFrom,
-    nodeId,
-    channel,
-    allEdges,
-  });
+  const isHighlighted =
+    isConnectionInteractive &&
+    getSingleChannelHighlight({
+      hoveredEdge,
+      connectingFrom,
+      nodeId,
+      channel,
+      allEdges,
+    });
 
   return (
     <Handle
@@ -98,6 +102,7 @@ function SingleRightHandle({
         ...HANDLE_STYLE,
         right: -15,
         top: 18,
+        pointerEvents: isConnectionInteractive ? "auto" : "none",
       }}
       className={isHighlighted ? "highlighted" : undefined}
     />
@@ -138,12 +143,14 @@ function MultiRightHandle({
   connectingFrom,
   nodeId,
   allEdges,
+  isConnectionInteractive,
 }: {
   channels: string[];
   hoveredEdge?: BlockEdgeState;
   connectingFrom?: BlockConnectionState;
   nodeId?: string;
   allEdges: BlockEdgeState[];
+  isConnectionInteractive: boolean;
 }) {
   const getChannelHighlight = getChannelHighlightResolver({
     hoveredEdge,
@@ -167,7 +174,7 @@ function MultiRightHandle({
   const channelPositions = channels.map((channel, index) => ({
     channel,
     offsetY: (index - (channels.length - 1) / 2) * channelSpacing,
-    isHighlighted: getChannelHighlight(channel),
+    isHighlighted: isConnectionInteractive && getChannelHighlight(channel),
   }));
 
   return (
@@ -229,7 +236,7 @@ function MultiRightHandle({
               left: handleLeftX,
               top: `calc(50% + ${offsetY}px)`,
               transform: "translateY(-50%)",
-              pointerEvents: "auto",
+              pointerEvents: isConnectionInteractive ? "auto" : "none",
             }}
             className={isHighlighted ? "highlighted" : undefined}
           />
@@ -239,7 +246,11 @@ function MultiRightHandle({
   );
 }
 
-export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">) {
+export function LeftHandle({
+  data,
+  nodeId,
+  isConnectionInteractive = true,
+}: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
   if (shouldHideLeftHandle(data)) return null;
 
   const hoveredEdge = data._hoveredEdge;
@@ -252,11 +263,12 @@ export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">
     connectingFrom?.handleId,
   );
   const isHighlighted =
-    (hoveredEdge && hoveredEdge.target === nodeId) ||
-    (connectingFrom &&
-      connectingFrom.nodeId !== nodeId &&
-      connectingFrom.handleType === "source" &&
-      !isAlreadyConnected);
+    isConnectionInteractive &&
+    ((hoveredEdge && hoveredEdge.target === nodeId) ||
+      (connectingFrom &&
+        connectingFrom.nodeId !== nodeId &&
+        connectingFrom.handleType === "source" &&
+        !isAlreadyConnected));
 
   return (
     <Handle
@@ -266,13 +278,18 @@ export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">
         ...HANDLE_STYLE,
         left: -15,
         top: 18,
+        pointerEvents: isConnectionInteractive ? "auto" : "none",
       }}
       className={isHighlighted ? "highlighted" : undefined}
     />
   );
 }
 
-export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">) {
+export function RightHandle({
+  data,
+  nodeId,
+  isConnectionInteractive = true,
+}: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
   if (shouldHideRightHandle(data)) return null;
 
   const channels = getOutputChannels(data);
@@ -288,6 +305,7 @@ export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId"
         connectingFrom={connectingFrom}
         nodeId={nodeId}
         allEdges={allEdges}
+        isConnectionInteractive={isConnectionInteractive}
       />
     );
   }
@@ -299,6 +317,7 @@ export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId"
       connectingFrom={connectingFrom}
       nodeId={nodeId}
       allEdges={allEdges}
+      isConnectionInteractive={isConnectionInteractive}
     />
   );
 }

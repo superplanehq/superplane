@@ -55,6 +55,15 @@
   transition: stroke 0.2s ease-in-out;
 }
 
+.sp-canvas.sp-canvas-live .react-flow__edge,
+.sp-canvas.sp-canvas-live .react-flow__edge * {
+  cursor: default !important;
+}
+
+.sp-canvas.sp-canvas-live .react-flow__edge path {
+  transition: none;
+}
+
 .sp-canvas .react-flow__connectionline path {
   stroke: #A1AEC0 !important;
   stroke-width: 3 !important;
@@ -63,6 +72,11 @@
 
 .sp-canvas .react-flow__handle {
   transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.sp-canvas.sp-canvas-live .react-flow__handle {
+  cursor: default !important;
+  transition: none !important;
 }
 
 .sp-canvas .react-flow__handle::before {
@@ -76,10 +90,20 @@
   pointer-events: auto;
 }
 
+.sp-canvas.sp-canvas-live .react-flow__handle::before {
+  pointer-events: none;
+}
+
 .sp-canvas .react-flow__handle:hover {
   box-shadow: 0 0 0 3px #A1AEC0;
   border-color: #F1F5F9 !important;
   z-index: 10;
+}
+
+.sp-canvas.sp-canvas-live .react-flow__handle:hover {
+  box-shadow: none;
+  border-color: #C9D5E1 !important;
+  z-index: auto;
 }
 
 .sp-canvas .react-flow__handle.highlighted {

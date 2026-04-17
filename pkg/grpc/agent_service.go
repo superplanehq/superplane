@@ -115,6 +115,21 @@ func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentCha
 	return agents.ListAgentChats(ctx, url, organizationID, userID, req.CanvasId)
 }
 
+func (s *AgentsService) DeleteAgentChat(ctx context.Context, req *pb.DeleteAgentChatRequest) (*pb.DeleteAgentChatResponse, error) {
+	url := config.AgentGRPCURL()
+	if url == "" {
+		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return agents.DeleteAgentChat(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+}
+
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
 	url := config.AgentGRPCURL()
 	if url == "" {
