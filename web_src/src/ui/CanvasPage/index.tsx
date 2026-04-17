@@ -2951,5 +2951,4 @@ function CanvasContent({
 
 export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
-export { CANVAS_AGENT_SIDEBAR_STORAGE_KEY } from "@/components/AgentSidebar/useAgentState";
 export { CanvasPage };
