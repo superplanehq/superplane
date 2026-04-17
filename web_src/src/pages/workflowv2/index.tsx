@@ -5117,6 +5117,7 @@ export function WorkflowPageV2() {
     publishPending: publishCanvasVersionMutation.isPending,
     canvasDeletedRemotely,
     isPreparingVersionAction,
+    hasDraftDiffVersusLive: !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0,
   });
   const headerMode = canvasMode === "edit" ? "version-edit" : "version-live";
   const hasUnpublishedDraftChanges =
