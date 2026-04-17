@@ -178,6 +178,34 @@ func Test__ChangesetBuilder(t *testing.T) {
 		steps.assertHasError()
 		steps.assertHasNoOperations()
 	})
+
+	t.Run("add node keeps integration id", func(t *testing.T) {
+		steps := &ChangesetBuilderSteps{t: t}
+		integrationID := "f453f7c2-a507-41ea-bf5d-8c7482f6dfd4"
+		steps.whenBuilding(
+			nil,
+			nil,
+			[]models.Node{
+				{
+					ID:            "node-a",
+					Name:          "Node A",
+					Type:          models.NodeTypeComponent,
+					IntegrationID: &integrationID,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "github.runWorkflow"},
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.assertNoError()
+		steps.assertOperationCount(1)
+
+		op := steps.findNodeOperation(pb.CanvasChangeset_Change_ADD_NODE, "node-a")
+		require.NotNil(t, op)
+		require.Equal(t, integrationID, op.GetNode().GetIntegrationId())
+	})
 }
 
 type ChangesetBuilderSteps struct {
