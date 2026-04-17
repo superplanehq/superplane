@@ -224,7 +224,7 @@ export function WorkflowPageV2() {
     isLoading: canvasLoading,
     isFetching: canvasFetching,
     error: canvasError,
-  } = useCanvas(organizationId!, canvasId!);
+  } = useCanvas(organizationId!, canvasId!, !activeCanvasVersion?.metadata?.id);
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
@@ -4165,6 +4165,31 @@ export function WorkflowPageV2() {
     setSearchParams,
   ]);
 
+  const refreshLatestLiveCanvasData = useCallback(async () => {
+    if (!organizationId || !canvasId) {
+      return;
+    }
+
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.detail(organizationId, canvasId),
+        refetchType: "all",
+      }),
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.versionList(canvasId),
+        refetchType: "all",
+      }),
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.versionHistory(canvasId),
+        refetchType: "all",
+      }),
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.changeRequestList(canvasId),
+        refetchType: "all",
+      }),
+    ]);
+  }, [organizationId, canvasId, queryClient]);
+
   const handlePublishVersion = useCallback(async () => {
     if (!organizationId || !canvasId || !activeCanvasVersionId) {
       return;
@@ -4185,12 +4210,14 @@ export function WorkflowPageV2() {
       }
 
       await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
+      activeCanvasVersionIdRef.current = "";
       setActiveCanvasVersion(null);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
         return next;
       });
+      await refreshLatestLiveCanvasData();
       showSuccessToast("Version published");
     } catch (error) {
       showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to publish version")));
@@ -4203,6 +4230,7 @@ export function WorkflowPageV2() {
     activeCanvasVersionId,
     ensureVersionActionDraftReady,
     publishCanvasVersionMutation,
+    refreshLatestLiveCanvasData,
     setSearchParams,
   ]);
 
@@ -4218,7 +4246,7 @@ export function WorkflowPageV2() {
       action: ChangeRequestAction;
       successMessage: string;
       fallbackErrorMessage: string;
-      onSuccess?: (actedChangeRequestId: string) => void;
+      onSuccess?: (actedChangeRequestId: string) => void | Promise<void>;
     }) => {
       if (!organizationId || !canvasId || !changeRequestId) {
         return;
@@ -4232,7 +4260,7 @@ export function WorkflowPageV2() {
 
         const actedChangeRequestId = response?.data?.changeRequest?.metadata?.id || changeRequestId;
         setSelectedChangeRequestId(actedChangeRequestId);
-        onSuccess?.(actedChangeRequestId);
+        await onSuccess?.(actedChangeRequestId);
         showSuccessToast(successMessage);
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, fallbackErrorMessage)));
@@ -4272,17 +4300,19 @@ export function WorkflowPageV2() {
         action: "ACTION_PUBLISH",
         successMessage: "Change request published",
         fallbackErrorMessage: "Failed to publish",
-        onSuccess: () => {
+        onSuccess: async () => {
+          activeCanvasVersionIdRef.current = "";
           setActiveCanvasVersion(null);
           setSearchParams((current) => {
             const next = new URLSearchParams(current);
             next.delete("version");
             return next;
           });
+          await refreshLatestLiveCanvasData();
         },
       });
     },
-    [handleActOnChangeRequest, setSearchParams],
+    [handleActOnChangeRequest, refreshLatestLiveCanvasData, setSearchParams],
   );
 
   const handleRejectChangeRequest = useCallback(
@@ -4482,6 +4512,10 @@ export function WorkflowPageV2() {
       const previousDraftVersionId = activeCanvasVersionIdRef.current;
       if (previousDraftVersionId && draftCanvasSpec) {
         draftCanvasSpecsRef.current.set(previousDraftVersionId, draftCanvasSpec);
+      }
+
+      if (!isCurrentLive) {
+        void queryClient.cancelQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       }
 
       activeCanvasVersionIdRef.current = isCurrentLive ? "" : versionID;
