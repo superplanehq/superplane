@@ -31,7 +31,6 @@ type AiBuilderChatPanelProps = {
   aiInput: string;
   onAiInputChange: (value: string) => void;
   onSelectChat: (chatId: string) => void;
-  onStartNewSession: () => void;
   onSendPrompt: () => void;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
 };
@@ -59,7 +58,6 @@ export function AiBuilderChatPanel({
   aiInput,
   onAiInputChange,
   onSelectChat,
-  onStartNewSession,
   onSendPrompt,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
@@ -81,7 +79,6 @@ export function AiBuilderChatPanel({
   const hasConversationState =
     aiMessages.length > 0 || isGeneratingResponse || pendingProposal !== null || aiError !== null;
   const isNewChatView = currentChatId === null && !hasConversationState;
-  const showConversationList = currentChatId !== null;
   const maxAiInputHeight = isNewChatView ? 240 : 160;
 
   useEffect(() => {
@@ -93,20 +90,13 @@ export function AiBuilderChatPanel({
     container.scrollTop = container.scrollHeight;
   }, [aiMessages, pendingProposal, isGeneratingResponse, aiError]);
 
-  useEffect(() => {
-    if (!aiInputRef.current) {
-      return;
-    }
-
-    aiInputRef.current.style.height = "auto";
-    aiInputRef.current.style.height = `${Math.min(aiInputRef.current.scrollHeight, maxAiInputHeight)}px`;
-  }, [aiInput, aiInputRef, maxAiInputHeight]);
+  useAutoInputHeight(aiInputRef, maxAiInputHeight, aiInput);
 
   return (
-    <div className="mt-0 flex flex-1 min-h-0 flex-col overflow-hidden px-5 pb-5">
-      <div className="h-full min-h-0 rounded-md bg-slate-50/30 flex flex-col">
+    <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      <div className="h-full min-h-0 flex flex-col">
         {isNewChatView ? (
-          <>
+          <div className="m-3">
             <InputForm
               aiInputRef={aiInputRef}
               aiInput={aiInput}
@@ -126,26 +116,12 @@ export function AiBuilderChatPanel({
               isGeneratingResponse={isGeneratingResponse}
               onSelectChat={onSelectChat}
               onDeleteChat={handleDeleteChatSession}
-              onStartNewSession={onStartNewSession}
-              title="Previous chats"
               className="flex-1 min-h-0 px-2 py-2 space-y-2"
               fillAvailable
             />
-          </>
+          </div>
         ) : (
-          <>
-            {showConversationList ? (
-              <ConversationList
-                chatSessions={chatSessions}
-                currentChatId={currentChatId}
-                isLoadingChatSessions={isLoadingChatSessions}
-                isGeneratingResponse={isGeneratingResponse}
-                onSelectChat={onSelectChat}
-                onDeleteChat={handleDeleteChatSession}
-                onStartNewSession={onStartNewSession}
-              />
-            ) : null}
-
+          <div className="mx-2 mb-2 h-full flex flex-col">
             <ConversationContent
               aiMessagesContainerRef={aiMessagesContainerRef}
               isLoadingChatMessages={isLoadingChatMessages}
@@ -169,7 +145,7 @@ export function AiBuilderChatPanel({
               isGeneratingResponse={isGeneratingResponse}
               maxAiInputHeight={maxAiInputHeight}
             />
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -233,4 +209,20 @@ function ConversationContent({
       {!pendingProposal && aiError ? <p className="text-xs text-red-700 px-1">{aiError}</p> : null}
     </div>
   );
+}
+
+function useAutoInputHeight(
+  aiInputRef: RefObject<HTMLTextAreaElement | null>,
+  maxAiInputHeight: number,
+  aiInput: string,
+): void {
+  useEffect(() => {
+    const textarea = aiInputRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxAiInputHeight)}px`;
+  }, [aiInput, aiInputRef, maxAiInputHeight]);
 }

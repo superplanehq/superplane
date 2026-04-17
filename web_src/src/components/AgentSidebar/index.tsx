@@ -1,7 +1,7 @@
 import type { CanvasChangesetChange } from "@/api-client";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "./agentChat";
 import { sendChatPrompt } from "./agentChat";
@@ -108,8 +108,22 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
     setAiError,
   });
 
+  const sidebarTitle = useMemo(() => {
+    if (!currentChatId) {
+      return "Agent";
+    }
+
+    const session = chatSessions.find((s) => s.id === currentChatId);
+    return session?.title ?? "Agent";
+  }, [chatSessions, currentChatId]);
+
   return (
-    <AgentSidebarContainer onClose={agentState.closeSidebar}>
+    <AgentSidebarContainer
+      onClose={agentState.closeSidebar}
+      title={sidebarTitle}
+      showBack={currentChatId !== null}
+      onBack={handleStartNewChatSession}
+    >
       <AiBuilderChatPanel
         chatSessions={chatSessions}
         currentChatId={currentChatId}
@@ -133,7 +147,6 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
         aiInput={aiInput}
         onAiInputChange={setAiInput}
         onSelectChat={handleSelectChatSession}
-        onStartNewSession={handleStartNewChatSession}
         onSendPrompt={() => void handleSendPrompt()}
         aiInputRef={aiInputRef}
       />
@@ -143,7 +156,19 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
 
 type OnMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => void;
 
-function AgentSidebarContainer({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function AgentSidebarContainer({
+  children,
+  onClose,
+  title,
+  showBack,
+  onBack,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  title: string;
+  showBack: boolean;
+  onBack: () => void;
+}) {
   const { sidebarRef, isResizing, onResizeMouseDown, sidebarStyle } = useSidebarWidth();
 
   return (
@@ -153,9 +178,16 @@ function AgentSidebarContainer({ children, onClose }: { children: React.ReactNod
       style={sidebarStyle}
       data-testid="agent-sidebar"
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border shrink-0">
-        <h2 className="text-base font-medium">SuperPlane Agent</h2>
-        <CloseButton onClose={onClose} />
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border shrink-0 min-w-0">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          {showBack ? <BackButton onBack={onBack} /> : null}
+          <h2 className="text-base font-medium min-w-0 flex-1 truncate" title={title}>
+            {title}
+          </h2>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col min-h-0">{children}</div>
@@ -184,13 +216,27 @@ function AgentSidebarResizeHandle({ isResizing, onMouseDown }: { isResizing: boo
   );
 }
 
+function BackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      data-testid="agent-sidebar-back-button"
+      className="z-40 shrink-0 w-6 h-6 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
+      aria-label="Leave conversation"
+    >
+      <ChevronLeft size={18} />
+    </button>
+  );
+}
+
 function CloseButton({ onClose }: { onClose: () => void }) {
   return (
     <button
       type="button"
       onClick={onClose}
       data-testid="close-agent-sidebar-button"
-      className="z-40 w-8 h-8 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
+      className="z-40 w-6 h-6 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
       aria-label="Close SuperPlane Agent"
     >
       <X size={16} />
