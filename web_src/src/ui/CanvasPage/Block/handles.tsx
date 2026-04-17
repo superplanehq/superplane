@@ -35,11 +35,11 @@ function getBlockEdges(data: CanvasBlockData): BlockEdgeState[] {
 }
 
 function shouldHideLeftHandle(data: CanvasBlockData) {
-  return data.type === "trigger" || data.type === "annotation" || data.type === "group";
+  return data.type === "trigger" || data.type === "annotation";
 }
 
 function shouldHideRightHandle(data: CanvasBlockData) {
-  return data.isTemplate || data.isPendingConnection || data.type === "annotation" || data.type === "group";
+  return data.isTemplate || data.isPendingConnection || data.type === "annotation";
 }
 
 function getSingleChannelHighlight(args: {
