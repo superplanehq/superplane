@@ -193,7 +193,7 @@ func canvasChangeRequestApproverTypeToProto(value string) pb.Canvas_ChangeManage
 }
 
 func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*compb.Node, error) {
-	serialized := actions.NodesToProto(normalizeCanvasNodesWithoutGroups(nodes))
+	serialized := actions.NodesToProto(nodes)
 	if len(serialized) == 0 {
 		return serialized, nil
 	}

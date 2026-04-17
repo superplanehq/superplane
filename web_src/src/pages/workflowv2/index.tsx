@@ -64,7 +64,6 @@ import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
-import { normalizeCanvasWithoutGroups } from "@/lib/canvas/normalize";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -217,26 +216,14 @@ export function WorkflowPageV2() {
     isFetching: canvasFetching,
     error: canvasError,
   } = useCanvas(organizationId!, canvasId!);
-  const liveCanvas = useMemo(() => normalizeCanvasWithoutGroups(rawLiveCanvas), [rawLiveCanvas]);
+  const liveCanvas = rawLiveCanvas;
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
-  const { data: rawCanvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
-  const canvasVersions = useMemo(
-    () =>
-      rawCanvasVersions
-        .map((version) => normalizeCanvasWithoutGroups(version))
-        .filter((version): version is CanvasesCanvasVersion => Boolean(version)),
-    [rawCanvasVersions],
-  );
+  const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
   const { data: canvasChangeRequests = [] } = useCanvasChangeRequests(organizationId!, canvasId!);
   const paginatedVersionPages = canvasLiveVersionsQuery.data?.pages || [];
   const paginatedVersions = useMemo(
-    () =>
-      paginatedVersionPages.flatMap((page) =>
-        (page?.versions || [])
-          .map((version) => normalizeCanvasWithoutGroups(version))
-          .filter((version): version is CanvasesCanvasVersion => Boolean(version)),
-      ),
+    () => paginatedVersionPages.flatMap((page) => page?.versions || []),
     [paginatedVersionPages],
   );
   const liveCanvasVersion = useMemo(() => {
@@ -400,19 +387,13 @@ export function WorkflowPageV2() {
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
   const activeCanvasVersionId = activeCanvasVersion?.metadata?.id || "";
-  const { data: rawLoadedCanvasVersion } = useCanvasVersion(
+  const { data: loadedCanvasVersion } = useCanvasVersion(
     organizationId!,
     canvasId!,
     activeCanvasVersionId,
     !!activeCanvasVersionId,
   );
-  const loadedCanvasVersion = useMemo(
-    () => normalizeCanvasWithoutGroups(rawLoadedCanvasVersion),
-    [rawLoadedCanvasVersion],
-  );
-  const selectedCanvasVersion = activeCanvasVersionId
-    ? loadedCanvasVersion || normalizeCanvasWithoutGroups(activeCanvasVersion)
-    : null;
+  const selectedCanvasVersion = activeCanvasVersionId ? loadedCanvasVersion || activeCanvasVersion : null;
   const createChangeRequestVersion = useMemo(() => {
     const selectedVersionID = selectedCanvasVersion?.metadata?.id || "";
     const isPendingApprovalVersion = pendingApprovalVersionIds.has(selectedVersionID);
@@ -468,21 +449,11 @@ export function WorkflowPageV2() {
       return liveCanvas;
     }
 
-    return normalizeCanvasWithoutGroups({
+    return {
       ...liveCanvas,
       spec: versionSpec,
-    });
+    };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
-
-  useEffect(() => {
-    if (!organizationId || !canvasId) {
-      return;
-    }
-
-    queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
-      normalizeCanvasWithoutGroups(current),
-    );
-  }, [organizationId, canvasId, queryClient, liveCanvas]);
   // changeManagement lives on Canvas.Spec but is NOT part of CanvasVersion.Spec.
   // Optimistic cache updates that spread version.spec into canvas.spec can
   // temporarily wipe the field, so we latch to the last truthy API value.
