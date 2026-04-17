@@ -3105,6 +3105,14 @@ export function WorkflowPageV2() {
 
       const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(versionId);
       const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
+      const autoLayoutNodeIds = Array.from(
+        new Set(
+          operations
+            .filter((operation) => operation.type === "ADD_NODE")
+            .map((operation) => operation.node?.id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
 
       try {
         const response = await canvasesApplyCanvasVersionChangeset(
@@ -3117,6 +3125,15 @@ export function WorkflowPageV2() {
               changeset: {
                 changes: operations,
               },
+              ...(autoLayoutNodeIds.length > 0
+                ? {
+                    autoLayout: {
+                      algorithm: "ALGORITHM_HORIZONTAL",
+                      scope: "SCOPE_CONNECTED_COMPONENT",
+                      nodeIds: autoLayoutNodeIds,
+                    },
+                  }
+                : {}),
             },
           }),
         );
