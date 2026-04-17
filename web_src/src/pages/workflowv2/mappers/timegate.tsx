@@ -55,6 +55,7 @@ export const timeGateMapper: ComponentBaseMapper = {
       specs: getTimeGateSpecs(context.node),
       eventStateMap: getStateMap(componentName),
       customField: getTimeGateCustomField(context),
+      customFieldVisibility: "live-only",
     };
   },
   subtitle(context: SubtitleContext): React.ReactNode {
