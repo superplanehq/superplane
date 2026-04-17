@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export const AGENT_SIDEBAR_WIDTH_STORAGE_KEY = "agentSidebarWidth";
 
@@ -85,10 +85,17 @@ export function useSidebarWidth() {
     }
   }, [isResizing, handleResizeMouseMove, handleResizeMouseUp]);
 
+  const sidebarStyle = useMemo(() => ({
+    width: `${sidebarWidth}px`,
+    minWidth: `${sidebarWidth}px`,
+    maxWidth: `${sidebarWidth}px`,
+  }), [sidebarWidth]);
+
   return {
     sidebarRef,
     sidebarWidth,
     isResizing,
     onResizeMouseDown,
+    sidebarStyle
   };
 }

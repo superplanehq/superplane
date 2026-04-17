@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { AiBuilderMessage, AiChatSession } from "./agentChat";
 import { loadChatSessions } from "./agentChat";
 
@@ -9,7 +9,6 @@ export type UseLoadChatSessionsParams = {
   setChatSessions: Dispatch<SetStateAction<AiChatSession[]>>;
   setCurrentChatId: Dispatch<SetStateAction<string | null>>;
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
-  setIsLoadingChatSessions: Dispatch<SetStateAction<boolean>>;
 };
 
 export function useLoadChatSessions({
@@ -18,8 +17,9 @@ export function useLoadChatSessions({
   setChatSessions,
   setCurrentChatId,
   setAiMessages,
-  setIsLoadingChatSessions,
-}: UseLoadChatSessionsParams): void {
+}: UseLoadChatSessionsParams): boolean {
+  const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -66,4 +66,6 @@ export function useLoadChatSessions({
       cancelled = true;
     };
   }, [canvasId, organizationId, setAiMessages, setChatSessions, setCurrentChatId, setIsLoadingChatSessions]);
+
+  return isLoadingChatSessions;
 }

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { AiBuilderMessage, AiBuilderProposal } from "./agentChat";
 import { loadChatConversation } from "./agentChat";
 
@@ -9,7 +9,6 @@ export type UseLoadChatConversationParams = {
   currentChatId: string | null;
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
   setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
-  setIsLoadingChatMessages: Dispatch<SetStateAction<boolean>>;
   setAiError: Dispatch<SetStateAction<string | null>>;
 };
 
@@ -19,9 +18,10 @@ export function useLoadChatConversation({
   currentChatId,
   setAiMessages,
   setPendingProposal,
-  setIsLoadingChatMessages,
   setAiError,
-}: UseLoadChatConversationParams): void {
+}: UseLoadChatConversationParams): boolean {
+  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -74,4 +74,6 @@ export function useLoadChatConversation({
     setIsLoadingChatMessages,
     setPendingProposal,
   ]);
+
+  return isLoadingChatMessages;
 }

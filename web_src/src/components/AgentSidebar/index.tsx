@@ -66,14 +66,12 @@ function OpenAgentSidebar({
   disabled,
 }: OpenAgentSidebarProps) {
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
-  const { sidebarRef, sidebarWidth, isResizing, onResizeMouseDown } = useSidebarWidth();
+  const { sidebarRef, isResizing, onResizeMouseDown, sidebarStyle } = useSidebarWidth();
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const currentChatIdRef = useRef(currentChatId);
-  const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
-  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -84,30 +82,26 @@ function OpenAgentSidebar({
       onApplyAiOperations,
     });
 
-  const handleSendPrompt = useCallback(
-    async (value?: string) => {
-      await sendChatPrompt({
-        value,
-        aiInput,
-        canvasId,
-        organizationId,
-        agentContext,
-        currentChatId,
-        isGeneratingResponse,
-        setChatSessions,
-        setCurrentChatId,
-        setAiMessages,
-        setAiInput,
-        setAiError,
-        setIsGeneratingResponse,
-        setPendingProposal,
-        focusInput: () => aiInputRef.current?.focus(),
-      });
-    },
-    [agentContext, aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
-  );
+  const handleSendPrompt = async (value?: string) =>
+    await sendChatPrompt({
+      value,
+      aiInput,
+      canvasId,
+      organizationId,
+      agentContext,
+      currentChatId,
+      isGeneratingResponse,
+      setChatSessions,
+      setCurrentChatId,
+      setAiMessages,
+      setAiInput,
+      setAiError,
+      setIsGeneratingResponse,
+      setPendingProposal,
+      focusInput: () => aiInputRef.current?.focus(),
+    });
 
-  const handleStartNewChatSession = useCallback(() => {
+  const handleStartNewChatSession = () => {
     setCurrentChatId(null);
     setAiMessages([]);
     setPendingProposal(null);
@@ -115,13 +109,13 @@ function OpenAgentSidebar({
     requestAnimationFrame(() => {
       aiInputRef.current?.focus();
     });
-  }, []);
+  };
 
-  const handleSelectChatSession = useCallback((chatId: string) => {
+  const handleSelectChatSession = (chatId: string) => {
     setCurrentChatId(chatId);
     setPendingProposal(null);
     setAiError(null);
-  }, []);
+  };
 
   const handleDeleteChatSession = useDeleteChatSession({
     canvasId,
@@ -141,26 +135,24 @@ function OpenAgentSidebar({
     setPendingProposal(null);
     setAiError(null);
     setAiInput("");
-  }, [canvasId]);
+  }, [canvasId, setCurrentChatId, setAiMessages, setPendingProposal, setAiError, setAiInput]);
 
   // load previous chat sessions
-  useLoadChatSessions({
+  const isLoadingChatSessions = useLoadChatSessions({
     canvasId,
     organizationId,
     setChatSessions,
     setCurrentChatId,
     setAiMessages,
-    setIsLoadingChatSessions,
   });
 
   // load chat conversation when currentChatId changes
-  useLoadChatConversation({
+  const isLoadingChatMessages = useLoadChatConversation({
     canvasId,
     organizationId,
     currentChatId,
     setAiMessages,
     setPendingProposal,
-    setIsLoadingChatMessages,
     setAiError,
   });
 
@@ -168,7 +160,7 @@ function OpenAgentSidebar({
     <div
       ref={sidebarRef}
       className="relative border-r border-border shrink-0 h-full z-21 flex flex-col overflow-hidden bg-white"
-      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+      style={sidebarStyle}
       data-testid="agent-sidebar"
     >
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border shrink-0">
