@@ -88,7 +88,7 @@ import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
-import { shouldIgnoreIncomingLiveSpecWhileEditingDraft } from "./lib/draft-canvas-sync";
+import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import {
   CANVAS_BUNDLE_COLOR,
   CANVAS_BUNDLE_ICON_SLUG,
@@ -463,7 +463,7 @@ export function WorkflowPageV2() {
     }
 
     if (
-      shouldIgnoreIncomingLiveSpecWhileEditingDraft({
+      shouldPreserveDraftSpec({
         incomingSpec: liveCanvas.spec,
         draftSpec: draftCanvasSpec,
         selectedDraftVersionSpec: selectedCanvasVersion?.spec,

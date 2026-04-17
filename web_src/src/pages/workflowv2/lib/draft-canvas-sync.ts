@@ -6,7 +6,7 @@ function getWorkflowSpecSignature(
   return JSON.stringify(spec ?? null);
 }
 
-export function shouldIgnoreIncomingLiveSpecWhileEditingDraft({
+export function shouldPreserveDraftSpec({
   incomingSpec,
   draftSpec,
   selectedDraftVersionSpec,
