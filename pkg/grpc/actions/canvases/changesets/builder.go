@@ -221,6 +221,9 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 	}
 
 	n.Block = blockName
+	if proposedNode.IntegrationID != nil {
+		n.IntegrationId = *proposedNode.IntegrationID
+	}
 
 	if proposedNode.Configuration != nil {
 		configuration, err := structpb.NewStruct(proposedNode.Configuration)
