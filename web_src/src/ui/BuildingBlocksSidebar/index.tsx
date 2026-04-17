@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { getBackgroundColorClass } from "@/lib/colors";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Search, Settings2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { CategorySection } from "./CategorySection";
@@ -37,6 +37,13 @@ export function BuildingBlocksSidebar({
   onBlockClick,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
+  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveTab("components");
+    setCurrentChatId(null);
+  }, [canvasId]);
 
   if (!isOpen) {
     return null;
@@ -51,6 +58,10 @@ export function BuildingBlocksSidebar({
       disabled={disabled}
       disabledTooltip={disabledTooltip}
       onBlockClick={onBlockClick}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      currentChatId={currentChatId}
+      setCurrentChatId={setCurrentChatId}
     />
   );
 }
@@ -63,6 +74,10 @@ interface OpenBuildingBlocksSidebarProps {
   disabled: boolean;
   disabledTooltip: string;
   onBlockClick?: (block: BuildingBlock) => void;
+  activeTab: "components" | "ai";
+  setActiveTab: Dispatch<SetStateAction<"components" | "ai">>;
+  currentChatId: string | null;
+  setCurrentChatId: Dispatch<SetStateAction<string | null>>;
 }
 
 function OpenBuildingBlocksSidebar({
@@ -73,6 +88,10 @@ function OpenBuildingBlocksSidebar({
   disabled,
   disabledTooltip,
   onBlockClick,
+  activeTab,
+  setActiveTab,
+  currentChatId,
+  setCurrentChatId,
 }: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "component">("all");
@@ -92,11 +111,252 @@ function OpenBuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const [aiInput, setAiInput] = useState("");
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
+  const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
+  const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
+  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [isApplyingProposal, setIsApplyingProposal] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
+  const applyShortcutHint = useMemo(() => {
+    if (typeof navigator === "undefined") {
+      return "Ctrl+Enter";
+    }
+
+    const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
+    return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
+  }, []);
+  const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const handleSendPrompt = useCallback(
+    async (value?: string) => {
+      await sendChatPrompt({
+        value,
+        aiInput,
+        canvasId,
+        organizationId,
+        agentContext,
+        currentChatId,
+        isGeneratingResponse,
+        setChatSessions,
+        setCurrentChatId,
+        setAiMessages,
+        setAiInput,
+        setAiError,
+        setIsGeneratingResponse,
+        setPendingProposal,
+        focusInput: () => aiInputRef.current?.focus(),
+      });
+    },
+    [agentContext, aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId, setCurrentChatId],
+  );
+
+  const handleStartNewChatSession = useCallback(() => {
+    setCurrentChatId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
+    setAiError(null);
+    requestAnimationFrame(() => {
+      aiInputRef.current?.focus();
+    });
+  }, [setCurrentChatId]);
+
+  const handleSelectChatSession = useCallback(
+    (chatId: string) => {
+      setCurrentChatId(chatId);
+      setPendingProposal(null);
+      setAiError(null);
+    },
+    [setCurrentChatId],
+  );
+
+  const handleDiscardProposal = useCallback(() => {
+    setPendingProposal(null);
+  }, []);
+
+  const formatOperation = useCallback((change: CanvasChangesetChange) => {
+    const getNodeId = (nodeId?: string) => nodeId || "node";
+
+    switch (change.type) {
+      case "ADD_NODE":
+        return `Add node ${getNodeId(change.node?.id)} (${change.node?.block || "unknown"})`;
+      case "UPDATE_NODE":
+        return `Update node ${getNodeId(change.node?.id)}`;
+      case "DELETE_NODE":
+        return `Delete node ${getNodeId(change.node?.id)}`;
+      case "ADD_EDGE":
+        return `Connect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
+      case "DELETE_EDGE":
+        return `Disconnect ${getNodeId(change.edge?.sourceId)} -> ${getNodeId(change.edge?.targetId)}`;
+      default:
+        return "Update canvas";
+    }
+  }, []);
+
+  const pendingProposalSummaries = useMemo(() => {
+    if (!pendingProposal) {
+      return [];
+    }
+
+    return (pendingProposal.changeset.changes || []).map((change) => formatOperation(change));
+  }, [formatOperation, pendingProposal]);
+
+  const handleApplyProposal = useCallback(async () => {
+    if (!pendingProposal) return;
+
+    if (!onApplyAiOperations) {
+      setAiError("Canvas apply handlers are not available.");
+      return;
+    }
+
+    setAiError(null);
+    setIsApplyingProposal(true);
+    try {
+      await onApplyAiOperations(pendingProposal.changeset.changes || []);
+      setAiMessages((prev) =>
+        pushAiMessages(prev, {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: "Applied the proposed changes to the canvas.",
+        }),
+      );
+      setPendingProposal(null);
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "Failed to apply AI proposal.");
+    } finally {
+      setIsApplyingProposal(false);
+    }
+  }, [onApplyAiOperations, pendingProposal]);
 
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
+  useEffect(() => {
+    if (!agentContext.enabled && activeTab === "ai") {
+      setActiveTab("components");
+    }
+  }, [agentContext.enabled, activeTab, setActiveTab]);
+
+  useEffect(() => {
+    setAiMessages([]);
+    setPendingProposal(null);
+    setAiError(null);
+    setAiInput("");
+  }, [canvasId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const keysToRemove: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(AI_BUILDER_STORAGE_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId) {
+      setChatSessions([]);
+      setCurrentChatId(null);
+      setAiMessages([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingChatSessions(true);
+      try {
+        const sessions = await loadChatSessions({
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setChatSessions(sessions);
+        setCurrentChatId((previousChatId) => {
+          if (previousChatId && sessions.some((session) => session.id === previousChatId)) {
+            return previousChatId;
+          }
+
+          return null;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat sessions:", error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatSessions(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, organizationId, setCurrentChatId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId || !currentChatId) {
+      if (!currentChatId) {
+        setAiMessages([]);
+        setPendingProposal(null);
+      }
+      setIsLoadingChatMessages(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingChatMessages(true);
+      try {
+        const messages = await loadChatConversation({
+          chatId: currentChatId,
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setAiMessages(messages);
+        setAiError(null);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat conversation:", error);
+          setAiError(error instanceof Error ? error.message : "Failed to load chat conversation.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatMessages(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, currentChatId, organizationId]);
+
+  // Auto-focus search input when sidebar opens
   useEffect(() => {
     if (!searchInputRef.current) {
       return;
