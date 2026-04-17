@@ -323,6 +323,45 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Equal(t, activeMetadata, publishedNode.Metadata)
 	})
 
+	t.Run("add schedule trigger to live canvas creates pending node request", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{},
+			nil,
+		)
+
+		draft, err := models.SaveCanvasDraftInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			[]models.Node{
+				triggerNode("schedule-trigger", "Schedule Trigger", "schedule", map[string]any{
+					"type":            "minutes",
+					"minutesInterval": 1,
+				}),
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		request, err := models.FindPendingRequestForNode(database.Conn(), canvas.ID, "schedule-trigger")
+		require.NoError(t, err)
+		require.Equal(t, models.NodeRequestTypeInvokeAction, request.Type)
+		require.NotNil(t, request.Spec.Data().InvokeAction)
+		require.Equal(t, "emitEvent", request.Spec.Data().InvokeAction.ActionName)
+		require.Equal(t, map[string]any{}, request.Spec.Data().InvokeAction.Parameters)
+	})
+
 	t.Run("add node skips setup when node already has error", func(t *testing.T) {
 		r := support.Setup(t)
 
@@ -631,6 +670,18 @@ func componentNode(nodeID string, name string, component string, configuration m
 		Name:          name,
 		Type:          models.NodeTypeComponent,
 		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: component}},
+		Configuration: configuration,
+		Metadata:      map[string]any{},
+		Position:      models.Position{X: 10, Y: 20},
+	}
+}
+
+func triggerNode(nodeID string, name string, trigger string, configuration map[string]any) models.Node {
+	return models.Node{
+		ID:            nodeID,
+		Name:          name,
+		Type:          models.NodeTypeTrigger,
+		Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: trigger}},
 		Configuration: configuration,
 		Metadata:      map[string]any{},
 		Position:      models.Position{X: 10, Y: 20},

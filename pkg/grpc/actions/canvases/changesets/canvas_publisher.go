@@ -225,12 +225,22 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	}
 
 	//
+	// When adding a node, we need to insert it first,
+	// so when we Setup() it, the contexts can create
+	// records pointing to the new workflow_node record.
+	//
+	err := p.tx.Create(&newNode).Error
+	if err != nil {
+		return err
+	}
+
+	//
 	// If node is already in error state, no need to run Setup() for it.
 	//
 	if newNode.State == models.CanvasNodeStateError {
 		node.Metadata = newNode.Metadata.Data()
 		p.finalNodes[node.ID] = node
-		return p.tx.Create(&newNode).Error
+		return nil
 	}
 
 	//
@@ -239,7 +249,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 	// If an error happens when setting up the node, we propagate that into
 	// the finalNodes that are going to be saved into workflow_versions.nodes.
 	//
-	err := p.setupNode(ctx, &newNode)
+	err = p.setupNode(ctx, &newNode)
 	if err != nil {
 		errorMsg := err.Error()
 		newNode.State = models.CanvasNodeStateError
@@ -249,7 +259,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 
 	node.Metadata = newNode.Metadata.Data()
 	p.finalNodes[node.ID] = node
-	return p.tx.Create(&newNode).Error
+	return p.tx.Save(&newNode).Error
 }
 
 func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChangeset_Change) error {
