@@ -10,6 +10,7 @@ describe("getVersionActionAvailability", () => {
       publishPending: false,
       canvasDeletedRemotely: false,
       isPreparingVersionAction: false,
+      hasDraftDiffVersusLive: true,
     });
 
     expect(result.publishVersionDisabled).toBe(false);
@@ -24,6 +25,7 @@ describe("getVersionActionAvailability", () => {
       publishPending: false,
       canvasDeletedRemotely: false,
       isPreparingVersionAction: false,
+      hasDraftDiffVersusLive: true,
     });
 
     expect(result.publishVersionDisabled).toBe(false);
@@ -38,6 +40,7 @@ describe("getVersionActionAvailability", () => {
       publishPending: false,
       canvasDeletedRemotely: false,
       isPreparingVersionAction: false,
+      hasDraftDiffVersusLive: true,
     });
 
     expect(result.createChangeRequestDisabled).toBe(false);
@@ -45,4 +48,22 @@ describe("getVersionActionAvailability", () => {
     expect(result.publishVersionDisabled).toBe(false);
     expect(result.publishVersionDisabledTooltip).toBeUndefined();
   });
+
+  it.each([true, false])(
+    "disables publish/propose when the latest draft matches live (change management %s)",
+    (isChangeManagementDisabled) => {
+      const result = getVersionActionAvailability({
+        isChangeManagementDisabled,
+        hasEditableVersion: true,
+        createChangeRequestPending: false,
+        publishPending: false,
+        canvasDeletedRemotely: false,
+        isPreparingVersionAction: false,
+        hasDraftDiffVersusLive: false,
+      });
+
+      expect(result.publishVersionDisabled).toBe(true);
+      expect(result.publishVersionDisabledTooltip).toBeUndefined();
+    },
+  );
 });

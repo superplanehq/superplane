@@ -3,11 +3,10 @@ import type { ComponentActionsProps } from "../../types/componentActions";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
 import type { CompositeProps } from "../../composite";
-import type { GroupNodeProps } from "../../groupNode";
 import type { TriggerProps } from "../../trigger";
 
 export type BlockState = "pending" | "working" | "success" | "failed" | "running";
-export type BlockType = "trigger" | "component" | "composite" | "annotation" | "group";
+export type BlockType = "trigger" | "component" | "composite" | "annotation";
 export type BlockRenderFallbackSource = "mapper" | "additional-data" | "custom-field" | "node-render";
 
 export interface BlockData {
@@ -24,7 +23,6 @@ export interface BlockData {
   component?: ComponentBaseProps;
   composite?: CompositeProps;
   annotation?: AnnotationComponentProps;
-  group?: GroupNodeProps;
 }
 
 type BlockHandleType = "source" | "target";
@@ -69,6 +67,7 @@ export interface BlockProps extends ComponentActionsProps {
   nodeId?: string;
   selected?: boolean;
   showHeader?: boolean;
+  canvasMode?: "live" | "edit";
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },

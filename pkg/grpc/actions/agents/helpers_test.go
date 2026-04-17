@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	internalpb "github.com/superplanehq/superplane/pkg/protos/private/agents"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/stats"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -38,6 +40,13 @@ func (m *mockAgentsServer) ListAgentChatMessages(ctx context.Context, req *inter
 			{Id: "msg-1", Role: "user", Content: "hello"},
 		},
 	}, nil
+}
+
+func (m *mockAgentsServer) DeleteAgentChat(ctx context.Context, req *internalpb.DeleteAgentChatRequest) (*internalpb.DeleteAgentChatResponse, error) {
+	if req.ChatId == "not-found" {
+		return nil, status.Error(codes.NotFound, "chat not found")
+	}
+	return &internalpb.DeleteAgentChatResponse{}, nil
 }
 
 // connTracker is a gRPC stats handler that counts open connections.

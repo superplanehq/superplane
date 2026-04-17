@@ -46,6 +46,7 @@ type PrepareComponentNodeArgs = {
   organizationId?: string;
   currentUser?: User;
   edges?: ComponentsEdge[];
+  canvasMode?: "live" | "edit";
 };
 
 type PrepareComponentBaseNodeArgs = {
@@ -58,6 +59,7 @@ type PrepareComponentBaseNodeArgs = {
   queryClient: QueryClient;
   currentUser?: User;
   edges?: ComponentsEdge[];
+  canvasMode?: "live" | "edit";
 };
 
 type NodePosition = {
@@ -94,14 +96,16 @@ function buildPreparedTriggerCanvasNode(args: {
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   displayLabel: string;
   position: NodePosition;
+  canvasMode?: "live" | "edit";
 }): CanvasNode {
-  const { node, triggerMetadata, nodeEventsMap, displayLabel, position } = args;
+  const { node, triggerMetadata, nodeEventsMap, displayLabel, position, canvasMode = "live" } = args;
   const renderer = getTriggerRenderer(node.trigger?.name || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps({
     node: buildNodeInfo(node),
     definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
+    canvasMode,
   });
 
   return {
@@ -245,6 +249,7 @@ function buildPlaceholderComponentNode(node: ComponentsNode): CanvasNode {
         emptyStateProps: {
           icon: Puzzle,
           title: "Select a component from the sidebar",
+          purpose: "setup",
         },
         error: "Select a component from the sidebar",
         parameters: [],
@@ -268,6 +273,7 @@ function resolveComponentEmptyStateProps(
     ...componentBaseProps.emptyStateProps,
     icon: componentBaseProps.emptyStateProps?.icon || Puzzle,
     title: "Finish configuring this component",
+    purpose: "setup",
   };
 }
 
@@ -275,6 +281,7 @@ export function prepareTriggerNode(
   node: ComponentsNode,
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
+  canvasMode: "live" | "edit" = "live",
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const displayLabel = getTriggerDisplayLabel(node, triggerMetadata);
@@ -287,6 +294,7 @@ export function prepareTriggerNode(
       nodeEventsMap,
       displayLabel,
       position,
+      canvasMode,
     });
   } catch (error) {
     console.error(`[CanvasPage] Failed to prepare trigger node "${node.id}":`, error);
@@ -346,6 +354,7 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     queryClient,
     currentUser,
     edges,
+    canvasMode: args.canvasMode,
   });
 }
 
@@ -370,6 +379,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
       nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
       currentUser: buildUserInfo(currentUser),
       actions: buildActionContext(queryClient, canvasId, node.id!),
+      canvasMode: args.canvasMode,
     });
 
     if (!componentBaseProps.iconSrc) {

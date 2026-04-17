@@ -82,6 +82,20 @@ class AgentsServicer:
 
         return agents_pb2.DescribeAgentChatResponse(chat=_serialize_chat(chat))  # type: ignore[attr-defined]
 
+    def DeleteAgentChat(self, request: Any, context: Any) -> Any:  # noqa: N802
+        try:
+            self._store.delete_agent_chat(
+                org_id=request.org_id,
+                user_id=request.user_id,
+                canvas_id=request.canvas_id,
+                chat_id=request.chat_id,
+            )
+        except AgentChatNotFoundError as error:
+            context.abort(grpc.StatusCode.NOT_FOUND, "chat not found")
+            raise error
+
+        return agents_pb2.DeleteAgentChatResponse()  # type: ignore[attr-defined]
+
     def ListAgentChatMessages(self, request: Any, context: Any) -> Any:  # noqa: N802
         try:
             messages = self._store.list_agent_chat_messages(
@@ -131,6 +145,11 @@ def add_agents_servicer_to_server(servicer: AgentsServicer, server: grpc.Server)
             servicer.DescribeAgentChat,
             request_deserializer=agents_pb2.DescribeAgentChatRequest.FromString,  # type: ignore[attr-defined]
             response_serializer=agents_pb2.DescribeAgentChatResponse.SerializeToString,  # type: ignore[attr-defined]
+        ),
+        "DeleteAgentChat": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteAgentChat,
+            request_deserializer=agents_pb2.DeleteAgentChatRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.DeleteAgentChatResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
         "ListAgentChatMessages": grpc.unary_unary_rpc_method_handler(
             servicer.ListAgentChatMessages,
