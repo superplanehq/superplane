@@ -96,6 +96,7 @@ import {
   ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
+import { shouldIgnoreIncomingLiveSpecWhileEditingDraft } from "./lib/draft-canvas-sync";
 import {
   CANVAS_BUNDLE_COLOR,
   CANVAS_BUNDLE_ICON_SLUG,
@@ -440,6 +441,42 @@ export function WorkflowPageV2() {
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
+  const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
+
+  useEffect(() => {
+    if (!isViewingDraftVersion) {
+      setDraftCanvasSpec(null);
+      return;
+    }
+
+    setDraftCanvasSpec(selectedCanvasVersion?.spec ?? liveCanvas?.spec ?? null);
+  }, [isViewingDraftVersion, activeCanvasVersionId, selectedCanvasVersion?.metadata?.id, selectedCanvasVersion?.spec]);
+
+  useEffect(() => {
+    if (!isViewingDraftVersion || !liveCanvas?.spec) {
+      return;
+    }
+
+    if (
+      shouldIgnoreIncomingLiveSpecWhileEditingDraft({
+        incomingSpec: liveCanvas.spec,
+        draftSpec: draftCanvasSpec,
+        selectedDraftVersionSpec: selectedCanvasVersion?.spec,
+        liveVersionSpec: liveCanvasVersion?.spec,
+      })
+    ) {
+      return;
+    }
+
+    setDraftCanvasSpec((currentDraftSpec) => {
+      if (currentDraftSpec === liveCanvas.spec) {
+        return currentDraftSpec;
+      }
+
+      return liveCanvas.spec;
+    });
+  }, [isViewingDraftVersion, liveCanvas?.spec, liveCanvasVersion?.spec, selectedCanvasVersion?.spec, draftCanvasSpec]);
+
   const canvas = useMemo(() => {
     if (!liveCanvas) {
       return liveCanvas;
@@ -448,6 +485,13 @@ export function WorkflowPageV2() {
     // Draft editing uses the local query cache as source of truth so
     // optimistic/local edits are not overwritten by slower version fetches.
     if (isViewingDraftVersion) {
+      if (draftCanvasSpec) {
+        return {
+          ...liveCanvas,
+          spec: draftCanvasSpec,
+        };
+      }
+
       return liveCanvas;
     }
 
@@ -460,7 +504,7 @@ export function WorkflowPageV2() {
       ...liveCanvas,
       spec: versionSpec,
     };
-  }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion]);
+  }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftCanvasSpec]);
   // changeManagement lives on Canvas.Spec but is NOT part of CanvasVersion.Spec.
   // Optimistic cache updates that spread version.spec into canvas.spec can
   // temporarily wipe the field, so we latch to the last truthy API value.
@@ -1305,6 +1349,7 @@ export function WorkflowPageV2() {
         return;
       }
 
+      activeCanvasVersionIdRef.current = version.metadata?.id || "";
       setActiveCanvasVersion(version);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
@@ -4410,6 +4455,8 @@ export function WorkflowPageV2() {
       }
 
       clearPendingAutoSaveWork();
+
+      activeCanvasVersionIdRef.current = isCurrentLive ? "" : versionID;
 
       if (isCurrentLive) {
         setActiveCanvasVersion(null);
