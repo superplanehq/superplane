@@ -1,4 +1,4 @@
-package members
+package groups
 
 import (
 	"fmt"
@@ -8,20 +8,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-type updateCommand struct {
+type membersRemoveCommand struct {
 	email *string
-	role  *string
 }
 
-func (c *updateCommand) Execute(ctx core.CommandContext) error {
+func (c *membersRemoveCommand) Execute(ctx core.CommandContext) error {
 	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
 
+	groupName := ctx.Args[0]
+
 	positional := ""
-	if len(ctx.Args) > 0 {
-		positional = ctx.Args[0]
+	if len(ctx.Args) > 1 {
+		positional = ctx.Args[1]
 	}
 
 	emailFlag := ""
@@ -37,7 +38,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("a user id positional argument or --email is required")
 	}
 
-	body := openapi_client.RolesAssignRoleBody{}
+	body := openapi_client.GroupsRemoveUserFromGroupBody{}
 	domain := organizationDomainType()
 	body.SetDomainType(domain)
 	body.SetDomainId(organizationID)
@@ -47,8 +48,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		body.SetUserEmail(userEmail)
 	}
 
-	_, _, err = ctx.API.RolesAPI.
-		RolesAssignRole(ctx.Context, *c.role).
+	response, _, err := ctx.API.GroupsAPI.
+		GroupsRemoveUserFromGroup(ctx.Context, groupName).
 		Body(body).
 		Execute()
 	if err != nil {
@@ -62,13 +63,10 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, err := fmt.Fprintf(stdout, "Role %q assigned to %s\n", *c.role, who)
+			_, err := fmt.Fprintf(stdout, "Removed %s from group %s\n", who, groupName)
 			return err
 		})
 	}
 
-	return ctx.Renderer.Render(map[string]string{
-		"user":     who,
-		"roleName": *c.role,
-	})
+	return ctx.Renderer.Render(response)
 }
