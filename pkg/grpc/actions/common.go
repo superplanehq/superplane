@@ -677,6 +677,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Type:           ProtoToNodeType(node.Type),
 			Ref:            ProtoToNodeRef(node),
 			Configuration:  node.Configuration.AsMap(),
+			Metadata:       node.Metadata.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
 			IntegrationID:  integrationID,
