@@ -1,4 +1,4 @@
-package secrets
+package roles
 
 import (
 	"fmt"
@@ -29,32 +29,34 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	resource, err := parseSecretFile(filePath)
+	resource, err := parseRoleFile(filePath)
 	if err != nil {
 		return err
 	}
-	if resource.Metadata == nil || resource.Metadata.GetId() == "" {
-		return fmt.Errorf("secret metadata.id is required for update")
+	if resource.Metadata == nil || resource.Metadata.GetName() == "" {
+		return fmt.Errorf("role metadata.name is required for update")
 	}
 
-	secret := resourceToSecret(*resource)
+	body := openapi_client.RolesUpdateRoleBody{}
+	domain := core.OrganizationDomainType()
+	body.SetDomainType(domain)
+	body.SetDomainId(organizationID)
+	body.SetRole(resourceToRole(*resource))
 
-	request := openapi_client.SecretsUpdateSecretBody{}
-	request.SetSecret(secret)
-	request.SetDomainType(core.OrganizationDomainType())
-	request.SetDomainId(organizationID)
-
-	response, _, err := ctx.API.SecretAPI.SecretsUpdateSecret(ctx.Context, resource.Metadata.GetId()).Body(request).Execute()
+	response, _, err := ctx.API.RolesAPI.
+		RolesUpdateRole(ctx.Context, resource.Metadata.GetName()).
+		Body(body).
+		Execute()
 	if err != nil {
 		return err
 	}
 
-	updatedSecret := response.GetSecret()
+	updated := response.GetRole()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(updatedSecret)
+		return ctx.Renderer.Render(updated)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		return renderSecretText(stdout, updatedSecret)
+		return renderRoleText(stdout, updated)
 	})
 }

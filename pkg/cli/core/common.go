@@ -12,6 +12,14 @@ const (
 	APIVersion = "v1"
 )
 
+// OrganizationDomainType returns the authorization domain type used for all
+// organization-scoped CLI requests. Packages should use this instead of
+// referencing the openapi_client enum directly so the scoping rule lives in
+// one place.
+func OrganizationDomainType() openapi_client.AuthorizationDomainType {
+	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
+}
+
 func ParseYamlResourceHeaders(raw []byte) (string, string, error) {
 	m := make(map[string]interface{})
 
