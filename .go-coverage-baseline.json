@@ -56,7 +56,6 @@
     "pkg/utils": 20,
     "pkg/web": 0,
     "pkg/widgets/annotation": 0,
-    "pkg/widgets/group": 0,
     "pkg/workers": 39.7,
     "pkg/workers/contexts": 42.7,
     "pkg/workers/eventdistributer": 0
