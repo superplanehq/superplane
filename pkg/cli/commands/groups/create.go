@@ -64,6 +64,9 @@ func (c *createCommand) buildGroup(ctx core.CommandContext) (openapi_client.Grou
 		if err != nil {
 			return openapi_client.GroupsGroup{}, err
 		}
+		if resource.Metadata == nil || resource.Metadata.GetName() == "" {
+			return openapi_client.GroupsGroup{}, fmt.Errorf("group metadata.name is required")
+		}
 		return resourceToGroup(*resource), nil
 	}
 

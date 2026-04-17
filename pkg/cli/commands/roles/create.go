@@ -30,6 +30,9 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
+	if resource.Metadata == nil || resource.Metadata.GetName() == "" {
+		return fmt.Errorf("role metadata.name is required")
+	}
 
 	request := openapi_client.RolesCreateRoleRequest{}
 	domain := organizationDomainType()

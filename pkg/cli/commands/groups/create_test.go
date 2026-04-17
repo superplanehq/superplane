@@ -126,6 +126,26 @@ func TestCreateRejectsPositionalWithFile(t *testing.T) {
 	require.Contains(t, err.Error(), "cannot combine a positional name with --file")
 }
 
+func TestCreateFromFileRequiresMetadataName(t *testing.T) {
+	ctx, _ := newTestContext(t, newMeOnlyServer(t), "text")
+
+	dir := t.TempDir()
+	path := dir + "/group.yaml"
+	content := []byte("apiVersion: v1\nkind: Group\nspec:\n  displayName: No Name\n")
+	require.NoError(t, os.WriteFile(path, content, 0644))
+
+	empty := ""
+	cmd := &createCommand{
+		file:        &path,
+		displayName: &empty,
+		description: &empty,
+		role:        &empty,
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "metadata.name is required")
+}
+
 func TestCreateRequiresNameOrFile(t *testing.T) {
 	ctx, _ := newTestContext(t, newMeOnlyServer(t), "text")
 	empty := ""
