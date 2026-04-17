@@ -111,6 +111,12 @@ function normalizeEmptyStateProps(
         : undefined,
     title: sanitizeString(emptyStateProps.title),
     description: sanitizeString(emptyStateProps.description),
+    purpose:
+      emptyStateProps.purpose === "runtime" ||
+      emptyStateProps.purpose === "setup" ||
+      emptyStateProps.purpose === "fallback"
+        ? emptyStateProps.purpose
+        : undefined,
   };
 }
 
@@ -138,6 +144,7 @@ function buildNormalizedComponentBaseProps(
     metadata: sanitizeArray(record.metadata),
     customField: sanitizeCustomField(record.customField as ComponentBaseProps["customField"], fallbackTitle),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
+    customFieldVisibility: record.customFieldVisibility === "live-only" ? "live-only" : "always",
     eventStateMap: isRecord(record.eventStateMap)
       ? (record.eventStateMap as ComponentBaseProps["eventStateMap"])
       : undefined,
@@ -159,6 +166,7 @@ function applyComponentBaseFallbacks(
     icon: undefined,
     title: CANVAS_NODE_FALLBACK_MESSAGE,
     description: undefined,
+    purpose: "fallback",
   };
   const isFallback = !isRecord(props) || typeof record.title !== "string";
 
@@ -257,6 +265,7 @@ function buildNormalizedTriggerProps(
     metadata,
     customField: normalizeTriggerCustomField(record.customField),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
+    customFieldVisibility: record.customFieldVisibility === "live-only" ? "live-only" : "always",
     eventStateMap: isRecord(record.eventStateMap)
       ? (record.eventStateMap as ComponentBaseProps["eventStateMap"])
       : undefined,
@@ -284,6 +293,7 @@ function applyTriggerFallbacks(
       icon: undefined,
       title: CANVAS_NODE_FALLBACK_MESSAGE,
       description: undefined,
+      purpose: "fallback",
     },
   };
 }
@@ -323,6 +333,7 @@ export function createSafeComponentMapper(mapper: ComponentBaseMapper, mapperNam
           emptyStateProps: {
             title: CANVAS_NODE_FALLBACK_MESSAGE,
             description: undefined,
+            purpose: "fallback",
           },
         };
         return fallbackProps;
@@ -372,6 +383,7 @@ export function createSafeTriggerRenderer(renderer: TriggerRenderer, rendererNam
           emptyStateProps: {
             title: CANVAS_NODE_FALLBACK_MESSAGE,
             description: undefined,
+            purpose: "fallback",
           },
         };
         return fallbackProps;

@@ -16,6 +16,7 @@ import {
   canvasesDescribeCanvasChangeRequest,
   canvasesDeleteCanvas,
   canvasesDeleteCanvasVersion,
+  canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
   canvasesListCanvasMemories,
@@ -36,6 +37,7 @@ import type {
   ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
+import { analytics } from "../lib/analytics";
 import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
 
 // Query Keys
@@ -154,7 +156,23 @@ export const useCanvasTemplates = (organizationId: string) => {
   });
 };
 
-export const useCanvas = (organizationId: string, canvasId: string) => {
+type UseCanvasOptions = {
+  enabled?: boolean;
+  staleTime?: number;
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  refetchOnMount?: boolean;
+};
+
+export const useCanvas = (organizationId: string, canvasId: string, options: UseCanvasOptions = {}) => {
+  const {
+    enabled = true,
+    staleTime = 0,
+    refetchOnWindowFocus = true,
+    refetchOnReconnect = true,
+    refetchOnMount = true,
+  } = options;
+
   return useQuery({
     queryKey: canvasKeys.detail(organizationId, canvasId),
     queryFn: async () => {
@@ -165,9 +183,11 @@ export const useCanvas = (organizationId: string, canvasId: string) => {
       );
       return response.data?.canvas;
     },
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-    enabled: !!organizationId && !!canvasId,
+    staleTime,
+    refetchOnWindowFocus,
+    refetchOnReconnect,
+    refetchOnMount,
+    enabled: enabled && !!organizationId && !!canvasId,
   });
 };
 
@@ -375,6 +395,7 @@ export const useCreateCanvas = (organizationId: string) => {
           canvasKeys.detail(organizationId, response.data.canvas.metadata.id),
           response.data.canvas,
         );
+        analytics.canvasCreated(response.data.canvas.metadata.id, organizationId);
       }
     },
   });
@@ -387,9 +408,9 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     mutationFn: async (data: {
       name?: string;
       description?: string;
-      versioningEnabled?: boolean;
-      changeRequestApprovalConfig?: {
-        items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
+      changeManagement?: {
+        enabled?: boolean;
+        approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
       };
     }) => {
       return await canvasesUpdateCanvas(
@@ -398,8 +419,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           body: {
             name: data.name,
             description: data.description,
-            versioningEnabled: data.versioningEnabled,
-            changeRequestApprovalConfig: data.changeRequestApprovalConfig,
+            changeManagement: data.changeManagement,
           },
         }),
       );
@@ -418,6 +438,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           }
 
           const updatedMetadata = updatedCanvas.metadata;
+          const updatedSpec = updatedCanvas.spec;
 
           return {
             ...current,
@@ -425,14 +446,11 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               ...current.metadata,
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
-              versioningEnabled:
-                updatedMetadata?.versioningEnabled ??
-                variables.versioningEnabled ??
-                current.metadata?.versioningEnabled,
-              changeRequestApprovalConfig:
-                updatedMetadata?.changeRequestApprovalConfig ??
-                variables.changeRequestApprovalConfig ??
-                current.metadata?.changeRequestApprovalConfig,
+            },
+            spec: {
+              ...current.spec,
+              changeManagement:
+                updatedSpec?.changeManagement ?? variables.changeManagement ?? current.spec?.changeManagement,
             },
           };
         });
@@ -453,10 +471,13 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      if (response?.data?.version?.metadata?.id) {
+        analytics.canvasPublished(canvasId, organizationId);
+      }
     },
   });
 };
@@ -469,6 +490,26 @@ export const useDeleteCanvasVersion = (organizationId: string, canvasId: string)
       return await canvasesDeleteCanvasVersion(
         withOrganizationHeader({
           path: { canvasId, versionId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    },
+  });
+};
+
+export const usePublishCanvasVersion = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (versionId: string) => {
+      return await canvasesPublishCanvasVersion(
+        withOrganizationHeader({
+          path: { canvasId, versionId },
+          body: {},
         }),
       );
     },
@@ -569,7 +610,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
           // local node positions to avoid overwriting positions that changed
           // while the save was in flight.
           if (variables.autoLayout) {
-            return { ...current, spec: version.spec };
+            return { ...current, spec: { ...current.spec, ...version.spec } };
           }
 
           const currentPositionsByNodeId = new Map(
@@ -592,7 +633,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
 
           return {
             ...current,
-            spec: { ...version.spec, nodes: mergedNodes },
+            spec: { ...current.spec, ...version.spec, nodes: mergedNodes },
           };
         });
       }
@@ -736,6 +777,7 @@ export const useDeleteCanvas = (organizationId: string) => {
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      analytics.canvasDeleted(canvasId, organizationId);
     },
   });
 };

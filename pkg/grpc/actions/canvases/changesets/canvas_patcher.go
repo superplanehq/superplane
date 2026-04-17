@@ -127,6 +127,10 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 		v.Edges = append(v.Edges, p.edges[edgeKey])
 	}
 
+	if autoLayout == nil {
+		return v, nil
+	}
+
 	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, autoLayout)
 	if err != nil {
 		return nil, err
@@ -198,21 +202,37 @@ func (p *CanvasPatcher) addNode(tx *gorm.DB, change *pb.CanvasChangeset_Change) 
 	}
 
 	newNode := models.Node{
-		ID:   nodeID,
-		Name: node.GetName(),
+		ID:          nodeID,
+		Name:        node.GetName(),
+		IsCollapsed: node.GetIsCollapsed(),
 	}
 
 	nodeType, nodeRef, err := p.findBlock(node)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find block: %v", err)
 	}
 
 	newNode.Type = nodeType
 	newNode.Ref = *nodeRef
 
-	integration, err := p.validateIntegration(tx, node)
+	if node.GetPosition() != nil {
+		newNode.Position.X = int(node.GetPosition().GetX())
+		newNode.Position.Y = int(node.GetPosition().GetY())
+	}
+
+	//
+	// From here on out, we don't return errors,
+	// we just save the error message in the node.ErrorMessage field.
+	// This still allows the changeset to be applied, but
+	// node will be in an error state.
+	//
+
+	integrationID, err := p.validateIntegration(node)
 	if err != nil {
-		return err
+		errorMessage := err.Error()
+		newNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = newNode
+		return nil
 	}
 
 	if integration != nil {
@@ -222,7 +242,10 @@ func (p *CanvasPatcher) addNode(tx *gorm.DB, change *pb.CanvasChangeset_Change) 
 
 	schema, err := p.findConfigurationSchemaForNode(nodeType, *nodeRef)
 	if err != nil {
-		return err
+		errorMessage := err.Error()
+		newNode.ErrorMessage = &errorMessage
+		p.nodes[nodeID] = newNode
+		return nil
 	}
 
 	var nodeConfiguration map[string]any
@@ -232,7 +255,11 @@ func (p *CanvasPatcher) addNode(tx *gorm.DB, change *pb.CanvasChangeset_Change) 
 
 	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
 	if err != nil {
-		return err
+		errorMessage := err.Error()
+		newNode.ErrorMessage = &errorMessage
+		newNode.Configuration = nodeConfiguration
+		p.nodes[nodeID] = newNode
+		return nil
 	}
 
 	newNode.Configuration = nodeConfiguration
@@ -243,7 +270,6 @@ func (p *CanvasPatcher) addNode(tx *gorm.DB, change *pb.CanvasChangeset_Change) 
 	}
 
 	p.nodes[nodeID] = newNode
-
 	return nil
 }
 
@@ -352,6 +378,11 @@ func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
 }
 
 func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
+
+	//
+	// These initial checks are hard checks.
+	// If they fail, we should return an error immediately.
+	//
 	node := change.GetNode()
 	if node == nil {
 		return fmt.Errorf("node is required for %s", change.Type)
@@ -362,32 +393,52 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("node id is required for %s", change.Type)
 	}
 
-	if node.GetName() == "" {
-		return fmt.Errorf("node name is required for %s", change.Type)
-	}
-
 	currentNode, exists := p.nodes[nodeID]
 	if !exists {
 		return fmt.Errorf("node %s not found", nodeID)
 	}
 
-	currentNode.Name = node.GetName()
+	if node.GetName() != "" {
+		currentNode.Name = node.GetName()
+	}
+
+	if node.GetPosition() != nil {
+		currentNode.Position.X = int(node.GetPosition().GetX())
+		currentNode.Position.Y = int(node.GetPosition().GetY())
+	}
+
+	if node.IsCollapsed != nil {
+		currentNode.IsCollapsed = node.GetIsCollapsed()
+	}
 
 	//
-	// We only update the configuration if it is provided
+	// From here on out, we don't return errors,
+	// we save the error message alongside the new invalid configuration.
+	// This still allows the changeset to be applied, but
+	// node will be in an error state.
 	//
+
 	if node.GetConfiguration() != nil {
 		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
 		if err != nil {
-			return err
+			errorMessage := err.Error()
+			currentNode.ErrorMessage = &errorMessage
+			currentNode.Configuration = node.GetConfiguration().AsMap()
+			p.nodes[nodeID] = currentNode
+			return nil
 		}
 
 		err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
 		if err != nil {
-			return err
+			errorMessage := err.Error()
+			currentNode.ErrorMessage = &errorMessage
+			currentNode.Configuration = node.GetConfiguration().AsMap()
+			p.nodes[nodeID] = currentNode
+			return nil
 		}
 
 		currentNode.Configuration = node.GetConfiguration().AsMap()
+		currentNode.ErrorMessage = nil
 	}
 
 	p.nodes[nodeID] = currentNode

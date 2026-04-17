@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -55,14 +56,6 @@ func PublishCanvasVersion(
 
 	if canvas.IsTemplate {
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
-	versioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", err)
-	}
-	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
 	}
 
 	publishedVersion, err := publishDraftVersionInTransaction(
@@ -118,21 +111,35 @@ func publishDraftVersionInTransaction(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
-		nodes, edges, applyErr := applyCanvasSpecInTransaction(
-			ctx, tx, encryptor, reg, organizationID, organizationUUID,
-			canvasUUID, version.Nodes, version.Edges, authService, webhookBaseURL,
-		)
-		if applyErr != nil {
-			return applyErr
-		}
+		publisher, err := changesets.NewCanvasPublisher(tx, version, changesets.CanvasPublisherOptions{
+			Registry:       reg,
+			OrgID:          organizationUUID,
+			Encryptor:      encryptor,
+			AuthService:    authService,
+			WebhookBaseURL: webhookBaseURL,
+		})
 
-		if err := models.PromoteToLiveInTransaction(tx, version, nodes, edges); err != nil {
+		if err != nil {
+			log.Errorf("failed to create canvas publisher: %v", err)
 			return err
 		}
 
+		err = publisher.Publish(ctx)
+		if err != nil {
+			log.Errorf("failed to publish canvas version: %v", err)
+			return err
+		}
+
+		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
+		if refreshErr != nil {
+			log.Errorf("failed to refresh open canvas change requests: %v", refreshErr)
+			return refreshErr
+		}
+
 		publishedVersion = version
-		return refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
+		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}

@@ -57,6 +57,7 @@ services:
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
@@ -84,6 +85,7 @@ services:
       OWNER_SETUP_ENABLED: "yes"
       USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
+      VITE_CHANGE_MANAGEMENT_SETTINGS: ${VITE_CHANGE_MANAGEMENT_SETTINGS:-true}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}

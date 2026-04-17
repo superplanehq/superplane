@@ -27,8 +27,7 @@ func UpdateCanvas(
 	id string,
 	name *string,
 	description *string,
-	versioningEnabled *bool,
-	changeRequestApprovalConfig *pb.CanvasChangeRequestApprovalConfig,
+	changeManagement *pb.Canvas_ChangeManagement,
 ) (*pb.UpdateCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
@@ -67,32 +66,34 @@ func UpdateCanvas(
 		changed = true
 	}
 
-	if changeRequestApprovalConfig != nil {
-		approvers, parseErr := parseCanvasChangeRequestApprovalConfig(changeRequestApprovalConfig)
+	if changeManagement != nil {
+		approvers, parseErr := parseCanvasChangeRequestApprovalConfig(changeManagement)
 		if parseErr != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", parseErr)
 		}
 
-		validateErr := validateCanvasChangeRequestApprovers(
-			authService,
-			organizationID,
-			approvers,
-		)
-		if validateErr != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", validateErr)
+		if approvers != nil {
+			validateErr := validateCanvasChangeRequestApprovers(
+				authService,
+				organizationID,
+				approvers,
+			)
+			if validateErr != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", validateErr)
+			}
+
+			if !slices.EqualFunc(canvas.ChangeRequestApprovers, approvers, func(left, right models.CanvasChangeRequestApprover) bool {
+				return left.Type == right.Type && left.User == right.User && left.Role == right.Role
+			}) {
+				canvas.ChangeRequestApprovers = approvers
+				changed = true
+			}
 		}
 
-		if !slices.EqualFunc(canvas.ChangeRequestApprovers, approvers, func(left, right models.CanvasChangeRequestApprover) bool {
-			return left.Type == right.Type && left.User == right.User && left.Role == right.Role
-		}) {
-			canvas.ChangeRequestApprovers = approvers
+		if canvas.ChangeManagementEnabled != changeManagement.Enabled {
+			canvas.ChangeManagementEnabled = changeManagement.Enabled
 			changed = true
 		}
-	}
-
-	if versioningEnabled != nil && canvas.VersioningEnabled != *versioningEnabled {
-		canvas.VersioningEnabled = *versioningEnabled
-		changed = true
 	}
 
 	if changed {

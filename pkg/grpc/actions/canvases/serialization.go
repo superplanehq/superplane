@@ -68,7 +68,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	canvasVersioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, err := isChangeManagementEnabledForCanvas(canvas)
 	if err != nil {
 		return nil, err
 	}
@@ -86,22 +86,19 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:                canvas.ID.String(),
-				OrganizationId:    canvas.OrganizationID.String(),
-				Name:              canvas.Name,
-				Description:       canvas.Description,
-				CreatedAt:         timestamppb.New(*canvas.CreatedAt),
-				UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
-				CreatedBy:         createdBy,
-				IsTemplate:        canvas.IsTemplate,
-				VersioningEnabled: canvasVersioningEnabled,
-				ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
-					canvas.EffectiveChangeRequestApprovers(),
-				),
+				Id:             canvas.ID.String(),
+				OrganizationId: canvas.OrganizationID.String(),
+				Name:           canvas.Name,
+				Description:    canvas.Description,
+				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:      createdBy,
+				IsTemplate:     canvas.IsTemplate,
 			},
 			Spec: &pb.Canvas_Spec{
-				Nodes: serializedNodes,
-				Edges: actions.EdgesToProto(liveVersion.Edges),
+				Nodes:            serializedNodes,
+				Edges:            actions.EdgesToProto(liveVersion.Edges),
+				ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
 			},
 			Status: nil,
 		}, nil
@@ -141,22 +138,19 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:                canvas.ID.String(),
-			OrganizationId:    canvas.OrganizationID.String(),
-			Name:              canvas.Name,
-			Description:       canvas.Description,
-			CreatedAt:         timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:         createdBy,
-			IsTemplate:        canvas.IsTemplate,
-			VersioningEnabled: canvasVersioningEnabled,
-			ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
-				canvas.EffectiveChangeRequestApprovers(),
-			),
+			Id:             canvas.ID.String(),
+			OrganizationId: canvas.OrganizationID.String(),
+			Name:           canvas.Name,
+			Description:    canvas.Description,
+			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:      createdBy,
+			IsTemplate:     canvas.IsTemplate,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: serializedNodes,
-			Edges: actions.EdgesToProto(liveVersion.Edges),
+			Nodes:            serializedNodes,
+			Edges:            actions.EdgesToProto(liveVersion.Edges),
+			ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
@@ -165,34 +159,36 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 	}, nil
 }
 
-func serializeCanvasChangeRequestApprovalConfig(
+func serializeChangeManagement(
+	enabled bool,
 	approvers []models.CanvasChangeRequestApprover,
-) *pb.CanvasChangeRequestApprovalConfig {
-	config := &pb.CanvasChangeRequestApprovalConfig{
-		Items: make([]*pb.CanvasChangeRequestApprover, 0, len(approvers)),
+) *pb.Canvas_ChangeManagement {
+	cm := &pb.Canvas_ChangeManagement{
+		Enabled:   enabled,
+		Approvals: make([]*pb.Canvas_ChangeManagement_Approver, 0, len(approvers)),
 	}
 
 	for _, approver := range approvers {
-		config.Items = append(config.Items, &pb.CanvasChangeRequestApprover{
+		cm.Approvals = append(cm.Approvals, &pb.Canvas_ChangeManagement_Approver{
 			Type:     canvasChangeRequestApproverTypeToProto(approver.Type),
 			UserId:   approver.User,
 			RoleName: approver.Role,
 		})
 	}
 
-	return config
+	return cm
 }
 
-func canvasChangeRequestApproverTypeToProto(value string) pb.CanvasChangeRequestApprover_Type {
+func canvasChangeRequestApproverTypeToProto(value string) pb.Canvas_ChangeManagement_Approver_Type {
 	switch value {
 	case models.CanvasChangeRequestApproverTypeAnyone:
-		return pb.CanvasChangeRequestApprover_TYPE_ANYONE
+		return pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE
 	case models.CanvasChangeRequestApproverTypeUser:
-		return pb.CanvasChangeRequestApprover_TYPE_USER
+		return pb.Canvas_ChangeManagement_Approver_TYPE_USER
 	case models.CanvasChangeRequestApproverTypeRole:
-		return pb.CanvasChangeRequestApprover_TYPE_ROLE
+		return pb.Canvas_ChangeManagement_Approver_TYPE_ROLE
 	default:
-		return pb.CanvasChangeRequestApprover_TYPE_UNSPECIFIED
+		return pb.Canvas_ChangeManagement_Approver_TYPE_UNSPECIFIED
 	}
 }
 
@@ -286,47 +282,6 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
-		}
-	}
-
-	groupNodeIDs := make(map[string]bool)
-	for _, node := range canvas.Spec.Nodes {
-		if node.Type == compb.Node_TYPE_WIDGET && node.Widget != nil && node.Widget.Name == "group" {
-			groupNodeIDs[node.Id] = true
-		}
-	}
-
-	claimedChildren := make(map[string]string)
-	for _, node := range canvas.Spec.Nodes {
-		if node.Type != compb.Node_TYPE_WIDGET || node.Widget == nil || node.Widget.Name != "group" {
-			continue
-		}
-
-		config := node.Configuration.AsMap()
-		childIDs, _ := config["childNodeIds"].([]any)
-		for _, raw := range childIDs {
-			childID, ok := raw.(string)
-			if !ok || childID == "" {
-				continue
-			}
-
-			if !nodeIDs[childID] {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s not found", node.Id, childID)
-			}
-
-			if childID == node.Id {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: cannot reference itself as a child", node.Id)
-			}
-
-			if groupNodeIDs[childID] {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is a group (nested groups are not supported)", node.Id, childID)
-			}
-
-			if ownerID, taken := claimedChildren[childID]; taken {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is already claimed by group %s", node.Id, childID, ownerID)
-			}
-
-			claimedChildren[childID] = node.Id
 		}
 	}
 

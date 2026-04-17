@@ -16,7 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DraftNodeDiffSummary } from "./draftNodeDiff";
-import { DraftNodeDiffView } from "./draftNodeDiff";
+import { DraftNodeDiffView } from "./DraftNodeDiffView";
 import { NodeDiffSummaryCounts } from "./VersionNodeDiff";
 
 interface CreateChangeRequestModalProps {

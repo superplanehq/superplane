@@ -671,6 +671,11 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			warningMessage = &node.WarningMessage
 		}
 
+		//
+		// NOTE: we do not include metadata in here,
+		// to avoid allowing requests to override node metadata.
+		// Metadata is something only triggers/components implementations can set.
+		//
 		result[i] = models.Node{
 			ID:             node.Id,
 			Name:           node.Name,

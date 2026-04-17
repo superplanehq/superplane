@@ -433,8 +433,7 @@ message UpdateCanvasRequest {
   string id = 1;
   optional string name = 2;
   optional string description = 3;
-  optional bool versioning_enabled = 4;
-  optional CanvasChangeRequestApprovalConfig change_request_approval_config = 5;
+  Canvas.ChangeManagement change_management = 4;
 }
 
 message UpdateCanvasResponse {
@@ -633,13 +632,30 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     bool is_template = 8;
-    bool versioning_enabled = 9;
-    CanvasChangeRequestApprovalConfig change_request_approval_config = 10;
+  }
+
+  message ChangeManagement {
+    message Approver {
+      enum Type {
+        TYPE_UNSPECIFIED = 0;
+        TYPE_ANYONE = 1;
+        TYPE_USER = 2;
+        TYPE_ROLE = 3;
+      }
+
+      Type type = 1;
+      string user_id = 2;
+      string role_name = 3;
+    }
+
+    bool enabled = 1;
+    repeated Approver approvals = 2;
   }
 
   message Spec {
     repeated Components.Node nodes = 1;
     repeated Components.Edge edges = 2;
+    ChangeManagement change_management = 3;
   }
 
   message Status {
@@ -679,22 +695,6 @@ message CanvasChangeRequestDiff {
   repeated string conflicting_node_ids = 2;
 }
 
-message CanvasChangeRequestApprover {
-  enum Type {
-    TYPE_UNSPECIFIED = 0;
-    TYPE_ANYONE = 1;
-    TYPE_USER = 2;
-    TYPE_ROLE = 3;
-  }
-
-  Type type = 1;
-  string user_id = 2;
-  string role_name = 3;
-}
-
-message CanvasChangeRequestApprovalConfig {
-  repeated CanvasChangeRequestApprover items = 1;
-}
 
 message CanvasChangeRequestApproval {
   enum State {
@@ -705,7 +705,7 @@ message CanvasChangeRequestApproval {
   }
 
   UserRef actor = 1;
-  CanvasChangeRequestApprover approver = 2;
+  Canvas.ChangeManagement.Approver approver = 2;
   State state = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp invalidated_at = 5;
@@ -1010,6 +1010,8 @@ message CanvasChangeset {
       string block = 3;
       google.protobuf.Struct configuration = 4;
       string integration_id = 5;
+      Components.Position position = 6;
+      optional bool is_collapsed = 7;
     }
 
     message Edge {

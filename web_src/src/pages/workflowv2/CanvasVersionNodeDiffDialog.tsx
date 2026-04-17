@@ -1,8 +1,4 @@
-import type {
-  CanvasesCanvasChangeRequest,
-  CanvasesCanvasChangeRequestApprovalConfig,
-  CanvasesCanvasVersion,
-} from "@/api-client";
+import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -37,7 +33,7 @@ export function CanvasVersionNodeDiffDialog({
   context: CanvasVersionNodeDiffContext | null;
   onOpenChange: (open: boolean) => void;
   liveVersionOwnerProfilesById?: Map<string, { name: string; avatarUrl?: string }>;
-  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
+  changeRequestApprovalConfig?: CanvasChangeManagement;
   canActOnChangeRequests?: boolean;
   currentUserId?: string;
   changeRequestActionPending?: boolean;

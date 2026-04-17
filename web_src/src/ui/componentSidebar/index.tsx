@@ -55,6 +55,7 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
+  canvasMode?: "live" | "edit";
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
@@ -163,6 +164,7 @@ interface ComponentSidebarProps {
 
 export const ComponentSidebar = ({
   isOpen,
+  canvasMode = "live",
   nodeId,
   iconSrc,
   iconSlug,
@@ -244,7 +246,21 @@ export const ComponentSidebar = ({
   const [activeExecutionChainEventId, setActiveExecutionChainEventId] = useState<string | null>(null);
   const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
-  const activeTab = currentTab || "latest";
+  const shouldShowRunsTab = !hideRunsTab && canvasMode === "live";
+  const activeTab = useMemo(() => {
+    if (shouldShowRunsTab || currentTab !== "latest") {
+      return currentTab || "latest";
+    }
+
+    return "settings";
+  }, [currentTab, shouldShowRunsTab]);
+
+  useEffect(() => {
+    if (!shouldShowRunsTab && currentTab === "latest") {
+      onTabChange?.("settings");
+    }
+  }, [currentTab, onTabChange, shouldShowRunsTab]);
+
   const [justCopied, setJustCopied] = useState(false);
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
@@ -658,7 +674,7 @@ export const ComponentSidebar = ({
             {showSettingsTab && (
               <div className="border-border border-b-1">
                 <div className="flex px-4">
-                  {!hideRunsTab && (
+                  {shouldShowRunsTab && (
                     <button
                       onClick={() => onTabChange?.("latest")}
                       className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
@@ -699,32 +715,34 @@ export const ComponentSidebar = ({
               </div>
             )}
 
-            <TabsContent
-              value="latest"
-              className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
-              style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
-            >
-              <LatestTab
-                latestEvents={latestEvents}
-                nextInQueueEvents={nextInQueueEvents}
-                totalInQueueCount={totalInQueueCount}
-                hideQueueEvents={hideQueueEvents}
-                openEventIds={openEventIds}
-                onToggleOpen={handleToggleOpen}
-                onEventClick={onEventClick}
-                onSeeFullHistory={handleSeeFullHistory}
-                onSeeQueue={handleSeeQueue}
-                onSeeExecutionChain={handleSeeExecutionChain}
-                getTabData={getTabData}
-                onCancelQueueItem={onCancelQueueItem}
-                onCancelExecution={onCancelExecution}
-                onReEmit={onReEmit}
-                loadExecutionChain={loadExecutionChain}
-                getExecutionState={getExecutionState}
-                workflowNodes={workflowNodes}
-                components={components}
-              />
-            </TabsContent>
+            {shouldShowRunsTab && (
+              <TabsContent
+                value="latest"
+                className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
+                style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
+              >
+                <LatestTab
+                  latestEvents={latestEvents}
+                  nextInQueueEvents={nextInQueueEvents}
+                  totalInQueueCount={totalInQueueCount}
+                  hideQueueEvents={hideQueueEvents}
+                  openEventIds={openEventIds}
+                  onToggleOpen={handleToggleOpen}
+                  onEventClick={onEventClick}
+                  onSeeFullHistory={handleSeeFullHistory}
+                  onSeeQueue={handleSeeQueue}
+                  onSeeExecutionChain={handleSeeExecutionChain}
+                  getTabData={getTabData}
+                  onCancelQueueItem={onCancelQueueItem}
+                  onCancelExecution={onCancelExecution}
+                  onReEmit={onReEmit}
+                  loadExecutionChain={loadExecutionChain}
+                  getExecutionState={getExecutionState}
+                  workflowNodes={workflowNodes}
+                  components={components}
+                />
+              </TabsContent>
+            )}
 
             {showSettingsTab && (
               <TabsContent value="settings" className="mt-0">

@@ -70,7 +70,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const resolvedCanvasId = canvas.metadata!.id!;
   const canvasName = canvas.metadata?.name || "Canvas";
   const baseCanvasPath = `/${orgId}/canvases/${resolvedCanvasId}`;
-  const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled ?? false;
+  const isOrgChangeManagementEnabled = organization?.spec?.changeManagementEnabled ?? false;
 
   usePageTitle([`${canvasName} · Settings`]);
 
@@ -95,7 +95,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
         <SettingsView
           initialValues={initialValues}
           canUpdateCanvas={canUpdateCanvas}
-          orgVersioningEnabled={isOrgVersioningEnabled}
+          orgChangeManagementEnabled={isOrgChangeManagementEnabled}
           isSaving={updateCanvasMutation.isPending}
           availableUsers={approverUsers}
           availableRoles={approverRoles}
@@ -146,7 +146,9 @@ function useApproverRoles(organizationRoles: RolesRole[]) {
 }
 
 function useSaveCallback(canvasId: string, organizationId: string): (values: SettingsSavePayload) => Promise<void> {
+  const navigate = useNavigate();
   const updateCanvasMutation = useUpdateCanvas(organizationId, canvasId);
+  const baseCanvasPath = `/${organizationId}/canvases/${canvasId}`;
 
   return useCallback(
     async (values: SettingsSavePayload) => {
@@ -156,10 +158,11 @@ function useSaveCallback(canvasId: string, organizationId: string): (values: Set
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
-        versioningEnabled: values.versioningEnabled,
-        changeRequestApprovalConfig: values.changeRequestApprovalConfig,
+        changeManagement: values.changeManagement,
       });
+
+      navigate(baseCanvasPath, { replace: true });
     },
-    [canvasId, updateCanvasMutation],
+    [canvasId, updateCanvasMutation, navigate, baseCanvasPath],
   );
 }

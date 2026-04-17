@@ -65,6 +65,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/launchdarkly"
+	_ "github.com/superplanehq/superplane/pkg/integrations/logfire"
 	_ "github.com/superplanehq/superplane/pkg/integrations/newrelic"
 	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
@@ -86,7 +87,6 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
-	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
 func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {

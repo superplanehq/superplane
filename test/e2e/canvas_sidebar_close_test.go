@@ -15,16 +15,14 @@ import (
 )
 
 func TestCanvasSidebarClose(t *testing.T) {
-	t.Run("sidebar close button works after exiting edit mode on versioned canvas", func(t *testing.T) {
+	t.Run("building blocks sidebar is not shown after exiting edit mode on versioned canvas", func(t *testing.T) {
 		steps := &sidebarCloseSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithVersioningEnabled("E2E Sidebar Close")
+		steps.givenCanvasWithChangeManagementEnabled("E2E Sidebar Close")
 		steps.enterEditMode()
 		steps.openBuildingBlocksSidebar()
 		steps.assertSidebarVisible()
 		steps.exitEditMode()
-		steps.assertSidebarVisible()
-		steps.closeSidebarViaButton()
 		steps.assertSidebarHidden()
 	})
 }
@@ -41,11 +39,11 @@ func (s *sidebarCloseSteps) start() {
 	s.session.Login()
 }
 
-func (s *sidebarCloseSteps) givenCanvasWithVersioningEnabled(name string) {
+func (s *sidebarCloseSteps) givenCanvasWithChangeManagementEnabled(name string) {
 	err := database.Conn().
 		Model(&models.Organization{}).
 		Where("id = ?", s.session.OrgID).
-		Update("versioning_enabled", true).
+		Update("change_management_enabled", true).
 		Error
 	require.NoError(s.t, err)
 
@@ -53,11 +51,11 @@ func (s *sidebarCloseSteps) givenCanvasWithVersioningEnabled(name string) {
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.session.AssertVisible(q.Locator(`header button:has-text("Edit")`))
+	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
 }
 
 func (s *sidebarCloseSteps) enterEditMode() {
-	editButton := q.Locator(`header button:has-text("Edit")`).Run(s.session)
+	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
 	deadline := time.Now().Add(15 * time.Second)
 
 	for {
@@ -68,7 +66,7 @@ func (s *sidebarCloseSteps) enterEditMode() {
 		}
 
 		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
+			s.t.Fatalf("editor control did not become enabled")
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -91,13 +89,20 @@ func (s *sidebarCloseSteps) assertSidebarHidden() {
 }
 
 func (s *sidebarCloseSteps) exitEditMode() {
-	exitButton := q.Locator(`button[aria-label="Exit edit mode"]`).Run(s.session)
-	require.NoError(s.t, exitButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.Locator(`header button:has-text("Edit")`))
+	liveButton := q.TestID("canvas-view-mode-live").Run(s.session)
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		disabled, err := liveButton.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			break
+		}
+		if time.Now().After(deadline) {
+			s.t.Fatalf("live canvas control did not become enabled")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	require.NoError(s.t, liveButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
 	s.session.Sleep(500)
-}
-
-func (s *sidebarCloseSteps) closeSidebarViaButton() {
-	closeButton := q.TestID("close-sidebar-button").Run(s.session)
-	require.NoError(s.t, closeButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 }

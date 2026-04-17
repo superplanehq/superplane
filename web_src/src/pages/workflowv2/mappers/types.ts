@@ -55,6 +55,7 @@ export type TriggerRendererContext = {
   node: NodeInfo;
   definition: ComponentDefinition;
   lastEvent: EventInfo;
+  canvasMode?: "live" | "edit";
 };
 
 export type EventInfo =
@@ -121,6 +122,7 @@ export type ComponentBaseContext = {
   nodeQueueItems?: QueueItemInfo[];
   currentUser: User | undefined;
   actions: ActionContext;
+  canvasMode?: "live" | "edit";
 };
 
 export type ActionContext = {

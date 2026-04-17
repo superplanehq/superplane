@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -30,7 +31,7 @@ func PublishCanvasChangeRequest(
 	webhookBaseURL string,
 	authService authorization.Authorization,
 ) (*models.CanvasChangeRequest, *models.CanvasVersion, error) {
-	_, ok := authentication.GetUserIdFromMetadata(ctx)
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
@@ -40,6 +41,7 @@ func PublishCanvasChangeRequest(
 		return nil, nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 	organizationUUID := uuid.MustParse(organizationID)
+	actorUserUUID := uuid.MustParse(userID)
 
 	changeRequestUUID, err := uuid.Parse(changeRequestID)
 	if err != nil {
@@ -55,12 +57,12 @@ func PublishCanvasChangeRequest(
 		return nil, nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
+		return nil, nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
 	}
-	if !versioningEnabled {
-		return nil, nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
+	if !changeManagementEnabled {
+		return nil, nil, status.Error(codes.FailedPrecondition, "change management is disabled for this canvas")
 	}
 
 	var version *models.CanvasVersion
@@ -133,24 +135,38 @@ func PublishCanvasChangeRequest(
 			request.ChangedNodeIDs,
 		)
 
-		mergedNodes, mergedEdges, applyErr := applyCanvasSpecInTransaction(
-			ctx, tx, encryptor, registry, organizationID, organizationUUID,
-			canvasUUID, mergedNodes, mergedEdges, authService, webhookBaseURL,
-		)
-		if applyErr != nil {
-			return applyErr
+		publisherOwnerID := actorUserUUID
+		if request.OwnerID != nil {
+			publisherOwnerID = *request.OwnerID
 		}
 
-		liveVersion, err = models.CreatePublishedCanvasVersionInTransaction(
+		mergedVersion, createVersionErr := models.CreateCanvasSnapshotVersionInTransaction(
 			tx,
 			canvasUUID,
-			request.OwnerID,
+			publisherOwnerID,
 			mergedNodes,
 			mergedEdges,
 		)
+		if createVersionErr != nil {
+			return createVersionErr
+		}
+
+		publisher, err := changesets.NewCanvasPublisher(tx, mergedVersion, changesets.CanvasPublisherOptions{
+			Registry:       registry,
+			OrgID:          organizationUUID,
+			Encryptor:      encryptor,
+			AuthService:    authService,
+			WebhookBaseURL: webhookBaseURL,
+		})
 		if err != nil {
 			return err
 		}
+
+		if err := publisher.Publish(ctx); err != nil {
+			return err
+		}
+
+		liveVersion = mergedVersion
 		canvasForUpdate.LiveVersionID = &liveVersion.ID
 		canvasForUpdate.UpdatedAt = liveVersion.UpdatedAt
 
