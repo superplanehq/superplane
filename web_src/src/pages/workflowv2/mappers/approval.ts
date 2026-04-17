@@ -303,6 +303,7 @@ function approvalItemPropsForRecord(
   isAwaitingApproval: boolean,
 ): ApprovalItemProps {
   const canAct =
+    context.canvasMode !== "edit" &&
     record.state === "pending" &&
     isAwaitingApproval &&
     canCurrentUserActOnRecord(record, context.currentUser) &&

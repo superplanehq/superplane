@@ -83,6 +83,7 @@ export const waitMapper: ComponentBaseMapper = {
       hideMetadataList: false,
       eventStateMap: getStateMap(componentName),
       customField: getWaitCustomField(context),
+      customFieldVisibility: "live-only",
     };
   },
 
