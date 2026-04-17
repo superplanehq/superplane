@@ -1,9 +1,9 @@
-import type { AiBuilderMessage } from "@/ui/BuildingBlocksSidebar/agentChat";
+import type { AiBuilderMessage } from "./agentChat";
 import { Activity } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { cn } from "../lib/utils";
+import { cn } from "@/lib/utils";
 
 export type AiMessageProps = {
   message: AiBuilderMessage;

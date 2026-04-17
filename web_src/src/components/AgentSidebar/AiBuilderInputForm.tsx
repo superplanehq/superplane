@@ -21,6 +21,8 @@ const TEXT_AREA_CLASSNAME = cn(
   "focus-visible:ring-0 focus-visible:border-transparent",
 );
 
+const READ_ONLY_INPUT_TITLE = "You don't have permission to edit this canvas.";
+
 const SUBMIT_BUTTON_CLASSNAME = cn(
   "p-1 rounded-full bg-slate-600 text-white hover:bg-slate-700",
   "cursor-pointer",
@@ -65,6 +67,7 @@ export function InputForm({
           onChange={(e) => onAiInputChange(e.target.value)}
           onKeyDown={keyDownHandler}
           placeholder="What would you like to build?"
+          title={disabled ? READ_ONLY_INPUT_TITLE : undefined}
           disabled={disabled || !canvasId}
           rows={expanded ? 4 : 1}
           className={cn(TEXT_AREA_CLASSNAME, expanded && "min-h-[112px] text-[15px] leading-6")}
