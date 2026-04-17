@@ -23,6 +23,42 @@ export type DraftNodeDiffSummary = {
   removedCount: number;
 };
 
+function comparableEdgesSnapshot(edges: unknown): string {
+  const list = (Array.isArray(edges) ? edges : []) as Array<Record<string, unknown>>;
+  const normalized = list.map((edge) => ({
+    sourceId: String(edge.sourceId ?? ""),
+    targetId: String(edge.targetId ?? ""),
+    channel: String(edge.channel ?? "default"),
+  }));
+  normalized.sort((left, right) => {
+    const bySource = left.sourceId.localeCompare(right.sourceId);
+    if (bySource !== 0) {
+      return bySource;
+    }
+
+    const byTarget = left.targetId.localeCompare(right.targetId);
+    if (byTarget !== 0) {
+      return byTarget;
+    }
+
+    return left.channel.localeCompare(right.channel);
+  });
+  return JSON.stringify(normalized);
+}
+
+/** True when draft workflow graph differs from live (nodes and/or edges). */
+export function hasDraftVersusLiveGraphDiff(
+  liveVersion?: CanvasesCanvasVersion,
+  draftVersion?: CanvasesCanvasVersion,
+): boolean {
+  const { items } = buildDraftNodeDiffSummary(liveVersion, draftVersion);
+  if (items.length > 0) {
+    return true;
+  }
+
+  return comparableEdgesSnapshot(liveVersion?.spec?.edges) !== comparableEdgesSnapshot(draftVersion?.spec?.edges);
+}
+
 export function buildDraftNodeDiffSummary(
   liveVersion?: CanvasesCanvasVersion,
   draftVersion?: CanvasesCanvasVersion,
