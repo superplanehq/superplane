@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, Group, LayoutDashboard, LayoutGrid, Loader2, Play, Trash2, TriangleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Play, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -63,12 +63,10 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { EmitEventModal } from "../EmitEventModal";
-import { GroupNode } from "../groupNode";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
-import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
 import type { CanvasPageState } from "./useCanvasState";
@@ -210,12 +208,6 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  onGroupUpdate?: (nodeId: string, updates: { label?: string; description?: string; color?: string }) => void;
-  onGroupNodes?: (
-    bounds: { x: number; y: number; width: number; height: number },
-    nodePositions: Array<{ id: string; x: number; y: number }>,
-  ) => void;
-  onUngroupNodes?: (groupNodeId: string) => void;
   getCustomField?: (
     nodeId: string,
     onRun?: (initialData?: string) => void,
@@ -372,12 +364,6 @@ type CanvasAnnotationUpdate = {
   y?: number;
 };
 
-type CanvasGroupUpdate = {
-  label?: string;
-  description?: string;
-  color?: string;
-};
-
 type PendingRunData = {
   nodeId?: string;
   initialData?: string;
@@ -394,8 +380,6 @@ type CanvasNodeRendererCallbacks = {
   onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
-  onGroupUpdate: React.MutableRefObject<CanvasPageProps["onGroupUpdate"] | undefined>;
-  onUngroupNodes: React.MutableRefObject<CanvasPageProps["onUngroupNodes"] | undefined>;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   showHeader: boolean;
@@ -423,7 +407,6 @@ function createNodeRenderFallbackData(data: BlockData): BlockData {
     component: undefined,
     composite: undefined,
     annotation: undefined,
-    group: undefined,
     renderFallback: {
       source: "node-render",
       message: CANVAS_NODE_FALLBACK_MESSAGE,
@@ -440,7 +423,6 @@ const NODE_ERROR_LABEL_GETTERS: Record<BlockData["type"], (data: BlockData) => s
   component: (data) => getNonEmptyString(data.component?.title),
   composite: (data) => getNonEmptyString(data.composite?.title),
   annotation: (data) => getNonEmptyString(data.annotation?.title),
-  group: (data) => getNonEmptyString(data.group?.groupLabel),
 };
 
 function getNodeErrorDisplayName(data: BlockData): string {
@@ -469,7 +451,6 @@ function didNodeErrorBoundaryDataChange(previous: BlockData, next: BlockData) {
     previous.component !== next.component ||
     previous.composite !== next.composite ||
     previous.annotation !== next.annotation ||
-    previous.group !== next.group ||
     previous.renderFallback?.source !== next.renderFallback?.source ||
     previous.renderFallback?.message !== next.renderFallback?.message ||
     !areOutputChannelsEqual(previous.outputChannels, next.outputChannels)
@@ -613,52 +594,8 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
   );
 });
 
-const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
-  data: CanvasBlockNodeData;
-  id: string;
-  selected?: boolean;
-  width?: number;
-  height?: number;
-}) {
-  const { _callbacksRef, ...blockData } = nodeProps.data;
-  const callbacks = _callbacksRef?.current;
-  const groupData = blockData.group || {};
-
-  const handleGroupUpdate = callbacks?.onGroupUpdate?.current
-    ? (updates: CanvasGroupUpdate) => callbacks.onGroupUpdate.current?.(nodeProps.id, updates)
-    : undefined;
-
-  const handleUngroup = callbacks?.onUngroupNodes?.current
-    ? () => callbacks.onUngroupNodes.current?.(nodeProps.id)
-    : undefined;
-
-  const handleDelete = callbacks?.onNodeDelete?.current
-    ? () => callbacks.onNodeDelete.current?.(nodeProps.id)
-    : undefined;
-  const fallback = (
-    <div style={{ width: nodeProps.width, height: nodeProps.height }}>
-      <Block data={createNodeRenderFallbackData(blockData)} nodeId={nodeProps.id} selected={nodeProps.selected} />
-    </div>
-  );
-
-  return (
-    <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
-      <div data-testid="canvas-group-node" style={{ width: nodeProps.width, height: nodeProps.height }}>
-        <GroupNode
-          {...groupData}
-          selected={nodeProps.selected}
-          onGroupUpdate={handleGroupUpdate}
-          onUngroup={handleUngroup}
-          onDelete={handleDelete}
-        />
-      </div>
-    </CanvasNodeErrorBoundary>
-  );
-});
-
 const nodeTypes = {
   default: DefaultNodeRenderer,
-  group: GroupNodeRenderer,
 };
 
 function CanvasPage(props: CanvasPageProps) {
@@ -1271,9 +1208,6 @@ function CanvasPage(props: CanvasPageProps) {
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
               onAnnotationBlur={props.onAnnotationBlur}
-              onGroupUpdate={props.onGroupUpdate}
-              onGroupNodes={props.onGroupNodes}
-              onUngroupNodes={props.onUngroupNodes}
               onTogglePause={props.onTogglePause}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
@@ -1812,9 +1746,6 @@ function CanvasContent({
   onToggleView,
   onAnnotationUpdate,
   onAnnotationBlur,
-  onGroupUpdate,
-  onGroupNodes,
-  onUngroupNodes,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1869,12 +1800,6 @@ function CanvasContent({
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  onGroupUpdate?: (nodeId: string, updates: { label?: string; description?: string; color?: string }) => void;
-  onGroupNodes?: (
-    bounds: { x: number; y: number; width: number; height: number },
-    nodePositions: Array<{ id: string; x: number; y: number }>,
-  ) => void;
-  onUngroupNodes?: (groupNodeId: string) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1930,28 +1855,6 @@ function CanvasContent({
     const isMac = navigator.platform.toLowerCase().includes("mac");
     return isMac ? "Meta" : "Control";
   }, []);
-
-  const computeSelectionBounds = useCallback(
-    (nodes: CanvasNode[]) => {
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-      const nodePositions = nodes.map((n) => {
-        const rect = resolveAbsoluteNodeRect(n, getInternalNode);
-        if (rect.x < minX) minX = rect.x;
-        if (rect.y < minY) minY = rect.y;
-        if (rect.x + rect.w > maxX) maxX = rect.x + rect.w;
-        if (rect.y + rect.h > maxY) maxY = rect.y + rect.h;
-        return { id: n.id, x: rect.x, y: rect.y };
-      });
-      return {
-        bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
-        nodePositions,
-      };
-    },
-    [getInternalNode],
-  );
 
   // Use refs to avoid recreating callbacks when state changes
   const stateRef = useRef(state);
@@ -2095,12 +1998,11 @@ function CanvasContent({
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
       const isAnnotationNode = clickedNode?.data?.type === "annotation";
-      const isGroupNode = clickedNode?.data?.type === "group";
 
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
       const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
-      if (isAnnotationNode || isGroupNode) {
+      if (isAnnotationNode) {
         return;
       }
 
@@ -2164,10 +2066,6 @@ function CanvasContent({
   onAnnotationUpdateRef.current = onAnnotationUpdate;
   const onAnnotationBlurRef = useRef(onAnnotationBlur);
   onAnnotationBlurRef.current = onAnnotationBlur;
-  const onGroupUpdateRef = useRef(onGroupUpdate);
-  onGroupUpdateRef.current = onGroupUpdate;
-  const onUngroupNodesRef = useRef(onUngroupNodes);
-  onUngroupNodesRef.current = onUngroupNodes;
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -2343,8 +2241,6 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
-    onGroupUpdate: onGroupUpdateRef,
-    onUngroupNodes: onUngroupNodesRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -2362,8 +2258,6 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
-    onGroupUpdate: onGroupUpdateRef,
-    onUngroupNodes: onUngroupNodesRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -2493,7 +2387,6 @@ function CanvasContent({
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const prev = previouslySelectedRef.current;
-      const nodes = stateRef.current.nodes ?? [];
 
       if (prev.size > 0) {
         changes = changes.map((c) => {
@@ -2505,8 +2398,7 @@ function CanvasContent({
       }
 
       if (!isReadOnly) {
-        state.onNodesChange(clampGroupChildNodePositionChanges(changes, nodes));
-        resizeGroupsAfterChildChanges(changes, nodes, state.setNodes);
+        state.onNodesChange(changes);
         return;
       }
 
@@ -2514,10 +2406,8 @@ function CanvasContent({
       if (filteredChanges.length > 0) {
         state.onNodesChange(filteredChanges);
       }
-
-      resizeGroupsAfterChildChanges(changes, stateRef.current.nodes ?? [], state.setNodes);
     },
-    [isReadOnly, state.onNodesChange, state.setNodes],
+    [isReadOnly, state.onNodesChange],
   );
 
   const handleEdgesChange = useCallback(
@@ -2780,7 +2670,7 @@ function CanvasContent({
             {selectionToolbarFlowPos &&
               !isSelecting &&
               !isReadOnly &&
-              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes || onGroupNodes) && (
+              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
                 <ViewportPortal>
                   <div
                     style={{
@@ -2800,34 +2690,6 @@ function CanvasContent({
                         pointerEvents: "all",
                       }}
                     >
-                      {onGroupNodes &&
-                        multiSelectedNodes.filter((n) => n.data?.type !== "group" && !n.parentId).length >= 2 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                data-testid="multi-select-group"
-                                aria-label="Group"
-                                onPointerDown={stopCanvasPointerEvent}
-                                onMouseDown={stopCanvasPointerEvent}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  const groupable = multiSelectedNodes.filter(
-                                    (n) => n.data?.type !== "group" && !n.parentId,
-                                  );
-                                  const { bounds, nodePositions } = computeSelectionBounds(groupable);
-                                  onGroupNodes(bounds, nodePositions);
-                                  setMultiSelectedNodes([]);
-                                }}
-                                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                              >
-                                <Group className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Group</TooltipContent>
-                          </Tooltip>
-                        )}
                       {onAutoLayoutNodes && (
                         <Tooltip>
                           <TooltipTrigger asChild>
