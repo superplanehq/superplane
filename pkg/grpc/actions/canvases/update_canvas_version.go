@@ -136,6 +136,8 @@ func UpdateCanvasVersionWithUsage(
 			return err
 		}
 
+		nodes := injectMetadataIntoNodes(version.Nodes, nodes)
+
 		if version.OwnerID == nil || *version.OwnerID != userUUID {
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
@@ -173,4 +175,19 @@ func UpdateCanvasVersionWithUsage(
 	return &pb.UpdateCanvasVersionResponse{
 		Version: SerializeCanvasVersion(version, organizationID),
 	}, nil
+}
+
+func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.Node) []models.Node {
+	result := make([]models.Node, len(proposedNodes))
+	copy(result, proposedNodes)
+
+	for i, proposedNode := range result {
+		for _, versionNode := range versionNodes {
+			if proposedNode.ID == versionNode.ID {
+				result[i].Metadata = versionNode.Metadata
+			}
+		}
+	}
+
+	return result
 }
