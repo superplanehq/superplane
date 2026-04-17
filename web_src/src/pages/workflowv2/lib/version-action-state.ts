@@ -5,6 +5,8 @@ type VersionActionAvailabilityInput = {
   publishPending: boolean;
   canvasDeletedRemotely: boolean;
   isPreparingVersionAction: boolean;
+  /** Live vs latest draft has node-level differences (same basis as draft discard UI). */
+  hasDraftDiffVersusLive: boolean;
 };
 
 type VersionActionAvailability = {
@@ -115,6 +117,7 @@ export function getVersionActionAvailability({
   publishPending,
   canvasDeletedRemotely,
   isPreparingVersionAction,
+  hasDraftDiffVersusLive,
 }: VersionActionAvailabilityInput): VersionActionAvailability {
   const createChangeRequestDisabled = getCreateChangeRequestDisabled({
     isChangeManagementDisabled,
@@ -130,7 +133,7 @@ export function getVersionActionAvailability({
     hasEditableVersion,
   });
 
-  const publishVersionDisabled = getPublishVersionDisabled({
+  const publishVersionDisabledBase = getPublishVersionDisabled({
     isChangeManagementDisabled,
     hasEditableVersion,
     publishPending,
@@ -139,12 +142,15 @@ export function getVersionActionAvailability({
     createChangeRequestDisabled,
   });
 
-  const publishVersionDisabledTooltip = getPublishVersionDisabledTooltip({
+  const publishVersionDisabledTooltipBase = getPublishVersionDisabledTooltip({
     isChangeManagementDisabled,
     canvasDeletedRemotely,
     hasEditableVersion,
     createChangeRequestDisabledTooltip,
   });
+
+  const publishVersionDisabled = publishVersionDisabledBase || !hasDraftDiffVersusLive;
+  const publishVersionDisabledTooltip = publishVersionDisabledBase ? publishVersionDisabledTooltipBase : undefined;
 
   return {
     createChangeRequestDisabled,

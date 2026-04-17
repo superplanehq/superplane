@@ -1,5 +1,5 @@
 {
-  "maxAllowedTotalIssues": 747,
+  "maxAllowedTotalIssues": 746,
   "maxAllowedByRule": {
     "complexity": 238,
     "@typescript-eslint/no-explicit-any": 171,
@@ -7,10 +7,10 @@
     "max-lines-per-function": 79,
     "max-statements": 79,
     "react-hooks/exhaustive-deps": 38,
-    "react-refresh/only-export-components": 25,
+    "react-refresh/only-export-components": 24,
     "max-lines": 19,
     "max-depth": 9,
     "max-params": 6
   },
-  "updatedAt": "2026-04-17T00:47:54.023Z"
+  "updatedAt": "2026-04-17T10:39:37.589Z"
 }
