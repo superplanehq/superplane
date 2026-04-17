@@ -311,8 +311,11 @@ func TestCreateCanvasTemplateSkipsSetupValidationForOrgSpecificIntegrationNodes(
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
 	require.NotNil(t, response.Canvas.Metadata)
+	require.NotNil(t, response.Canvas.Spec)
 	require.Equal(t, models.TemplateOrganizationID.String(), response.Canvas.Metadata.OrganizationId)
 	require.True(t, response.Canvas.Metadata.IsTemplate)
+	require.Len(t, response.Canvas.Spec.Nodes, 1)
+	require.Empty(t, response.Canvas.Spec.Nodes[0].GetErrorMessage())
 
 	canvasID, err := uuid.Parse(response.Canvas.Metadata.Id)
 	require.NoError(t, err)
@@ -326,6 +329,82 @@ func TestCreateCanvasTemplateSkipsSetupValidationForOrgSpecificIntegrationNodes(
 	require.Equal(t, models.CanvasNodeStateReady, node.State)
 	require.Nil(t, node.StateReason)
 	require.Nil(t, node.AppInstallationID)
+}
+
+func TestCreateCanvasTemplateExpandsBlueprintsUsingCreatorOrganization(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	blueprint := support.CreateBlueprint(
+		t,
+		r.Organization.ID,
+		[]models.Node{
+			{
+				ID:   "inner",
+				Name: "Inner noop",
+				Type: models.NodeTypeComponent,
+				Ref: models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				},
+				Configuration: map[string]any{},
+				Metadata:      map[string]any{},
+			},
+		},
+		[]models.Edge{},
+		nil,
+	)
+
+	canvas := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:       "Template with org blueprint",
+			IsTemplate: true,
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:   "node-a",
+					Name: "Org blueprint",
+					Type: componentpb.Node_TYPE_BLUEPRINT,
+					Blueprint: &componentpb.Node_BlueprintRef{
+						Id: blueprint.ID.String(),
+					},
+					Configuration: mustStruct(t, map[string]any{}),
+				},
+			},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	response, err := CreateCanvasWithAutoLayoutAndUsageAndSetup(
+		ctx,
+		nil,
+		r.Encryptor,
+		r.Registry,
+		r.Organization.ID.String(),
+		canvas,
+		nil,
+		"",
+		r.AuthService,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotNil(t, response.Canvas)
+	require.NotNil(t, response.Canvas.Spec)
+	require.Len(t, response.Canvas.Spec.Nodes, 2)
+
+	nodeIDs := map[string]bool{}
+	for _, node := range response.Canvas.Spec.Nodes {
+		nodeIDs[node.Id] = true
+	}
+	require.True(t, nodeIDs["node-a"])
+	require.True(t, nodeIDs["node-a:inner"])
+
+	canvasID, err := uuid.Parse(response.Canvas.Metadata.Id)
+	require.NoError(t, err)
+
+	internalNode, err := models.FindCanvasNode(database.Conn(), canvasID, "node-a:inner")
+	require.NoError(t, err)
+	require.Equal(t, "Inner noop", internalNode.Name)
 }
 
 func TestCreateCanvasSkipsRuntimeSetupForNonTemplateNodes(t *testing.T) {

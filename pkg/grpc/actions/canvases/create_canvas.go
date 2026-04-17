@@ -101,6 +101,7 @@ func CreateCanvasWithAutoLayoutAndUsageAndSetup(
 				pbCanvas,
 				autoLayout,
 				&createdBy,
+				organizationID,
 			)
 			if txErr != nil {
 				if strings.Contains(txErr.Error(), ErrDuplicateCanvasName) {

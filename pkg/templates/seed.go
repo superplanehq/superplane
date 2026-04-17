@@ -142,6 +142,7 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 		template,
 		nil,
 		nil,
+		models.TemplateOrganizationID.String(),
 	)
 	return err
 }
