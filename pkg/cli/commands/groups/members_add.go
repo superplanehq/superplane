@@ -39,7 +39,7 @@ func (c *membersAddCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	body := openapi_client.GroupsAddUserToGroupBody{}
-	domain := organizationDomainType()
+	domain := core.OrganizationDomainType()
 	body.SetDomainType(domain)
 	body.SetDomainId(organizationID)
 	if userID != "" {

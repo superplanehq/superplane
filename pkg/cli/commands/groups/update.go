@@ -27,7 +27,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	body := openapi_client.GroupsUpdateGroupBody{}
-	domain := organizationDomainType()
+	domain := core.OrganizationDomainType()
 	body.SetDomainType(domain)
 	body.SetDomainId(organizationID)
 	body.SetGroup(group)

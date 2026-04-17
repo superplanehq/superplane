@@ -38,7 +38,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	body := openapi_client.RolesUpdateRoleBody{}
-	domain := organizationDomainType()
+	domain := core.OrganizationDomainType()
 	body.SetDomainType(domain)
 	body.SetDomainId(organizationID)
 	body.SetRole(resourceToRole(*resource))

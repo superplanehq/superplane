@@ -35,7 +35,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	request := openapi_client.RolesCreateRoleRequest{}
-	domain := organizationDomainType()
+	domain := core.OrganizationDomainType()
 	request.SetDomainType(domain)
 	request.SetDomainId(organizationID)
 	request.SetRole(resourceToRole(*resource))

@@ -39,7 +39,7 @@ func (c *membersRemoveCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	body := openapi_client.GroupsRemoveUserFromGroupBody{}
-	domain := organizationDomainType()
+	domain := core.OrganizationDomainType()
 	body.SetDomainType(domain)
 	body.SetDomainId(organizationID)
 	if userID != "" {

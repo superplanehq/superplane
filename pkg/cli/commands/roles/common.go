@@ -24,10 +24,6 @@ type roleResource struct {
 	Spec       *openapi_client.RolesRoleSpec     `json:"spec,omitempty"`
 }
 
-func organizationDomainType() openapi_client.AuthorizationDomainType {
-	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
-}
-
 func parseRoleFile(path string) (*roleResource, error) {
 	// #nosec
 	data, err := os.ReadFile(path)

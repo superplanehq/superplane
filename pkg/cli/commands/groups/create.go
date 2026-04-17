@@ -27,7 +27,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	request := openapi_client.GroupsCreateGroupRequest{}
-	domain := organizationDomainType()
+	domain := core.OrganizationDomainType()
 	request.SetDomainType(domain)
 	request.SetDomainId(organizationID)
 	request.SetGroup(group)

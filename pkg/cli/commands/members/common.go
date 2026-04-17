@@ -11,16 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-func organizationDomainType() openapi_client.AuthorizationDomainType {
-	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
-}
-
 // findMember locates a user by id or email within the organization's member list.
 // Returns the user and true if found. The search is case-insensitive for emails.
 func findMember(ctx core.CommandContext, organizationID string, identifier string) (openapi_client.SuperplaneUsersUser, bool, error) {
 	response, _, err := ctx.API.UsersAPI.
 		UsersListUsers(ctx.Context).
-		DomainType(string(organizationDomainType())).
+		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		IncludeRoles(true).
 		Execute()

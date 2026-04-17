@@ -16,7 +16,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 
 	response, _, err := ctx.API.GroupsAPI.
 		GroupsDescribeGroup(ctx.Context, ctx.Args[0]).
-		DomainType(string(organizationDomainType())).
+		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		Execute()
 	if err != nil {

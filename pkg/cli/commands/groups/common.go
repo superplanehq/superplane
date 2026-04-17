@@ -24,10 +24,6 @@ type groupResource struct {
 	Spec       *openapi_client.GroupsGroupSpec     `json:"spec,omitempty"`
 }
 
-func organizationDomainType() openapi_client.AuthorizationDomainType {
-	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
-}
-
 func parseGroupFile(path string) (*groupResource, error) {
 	// #nosec
 	data, err := os.ReadFile(path)
