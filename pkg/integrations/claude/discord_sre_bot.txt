@@ -1,0 +1,5 @@
+Identify the cause of this crash and provide a fix.
+Logs: 
+%s
+
+Keep the explanation short and use a code block for the solution.
