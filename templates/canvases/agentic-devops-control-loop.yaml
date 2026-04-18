@@ -1,0 +1,399 @@
+metadata:
+  name: "Agentic DevOps control loop"
+  description: "Manual-driven loop: structure intent with AI, call an external orchestrator API (OpenAI Symphony-style), apply policy filters, pause for human approval, run GitHub Actions and/or Cursor agents, then verify health with Dash0."
+  isTemplate: true
+spec:
+  nodes:
+    - id: "ann-agentic-control-w4k2n8"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 260
+        text: "### Control layer\n\nThe **Structure task intent** node uses **OpenAI** to turn a free-form task into **structured JSON text** (for example priority and constraints).\n\nConnect your OpenAI integration in the node sidebar, then tune the prompt to match your policy vocabulary.\n\nSuperPlane represents branching with **components and edges**, not inline `if` blocks in YAML."
+        width: 380
+      metadata: null
+      position:
+        x: 120
+        "y": 24
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "ann-agentic-orch-h7p3m1"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 300
+        text: "### Orchestration (Symphony sidecar)\n\n**Symphony API (HTTP)** sends a **GET** request to your long-running Symphony (or similar) process. OpenAI’s Symphony exposes an optional JSON API when started with `--port` (for example `/api/v1/state`).\n\nReplace the **URL** with your Symphony base URL and add **headers** if you use auth. SuperPlane does not ship a dedicated Symphony integration today: this is the supported **HTTP** pattern."
+        width: 380
+      metadata: null
+      position:
+        x: 520
+        "y": 24
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "ann-agentic-gov-b2n9q4"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 240
+        text: "### Governance\n\n**Policy gate** is a **Filter** that evaluates a boolean **expression** on payload fields (for example substrings in the model output). Adjust the expression to encode **priority**, **risk**, or **environment** rules.\n\nFalse stops the branch without emitting downstream—use this to enforce guardrails before a human or execution step."
+        width: 380
+      metadata: null
+      position:
+        x: 920
+        "y": 24
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "ann-agentic-human-j5t8w2"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 240
+        text: "### Human loop\n\n**Human approval** pauses the run until someone **approves** or **rejects**.\n\n- Edges on the **approved** channel continue to automated execution.\n- Edges on the **rejected** channel model *reject strategy*—here they route to a **Cursor Cloud Agent** for an alternative path."
+        width: 380
+      metadata: null
+      position:
+        x: 1320
+        "y": 24
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "ann-agentic-exec-c9v3k6"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 280
+        text: "### Execution\n\n**Run GitHub workflow** dispatches Actions (tests, deploy, or rollback workflows) and waits for completion.\n\n**Cursor alternative path** launches a **Cursor Cloud Agent** when approval is rejected—configure repository/PR settings in the sidebar.\n\nBoth require their respective integrations."
+        width: 380
+      metadata: null
+      position:
+        x: 1720
+        "y": 24
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "ann-agentic-fb-m2r7p5"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 300
+        text: "### Feedback\n\nAfter a successful workflow, **Wait** gives the system time to settle, then **Dash0 List Issues** reads observability issue signals.\n\nUse the **clear**, **degraded**, and **critical** channels to branch notifications or remediation. **HTTP: incident webhook** is a generic receiver—swap the URL for Slack, PagerDuty, or your internal bridge."
+        width: 400
+      metadata: null
+      position:
+        x: 2120
+        "y": 24
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "ann-agentic-learn-d8f4h1"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 220
+        text: "### Learning\n\nTreat this template as a **skeleton**: capture outcomes (approvals, failures, Dash0 states) and periodically **export YAML** from the UI in dev or connect downstream analytics.\n\nLinear, ticketing, or experiment tracking live outside SuperPlane unless you add integrations or webhook triggers."
+        width: 400
+      metadata: null
+      position:
+        x: 2560
+        "y": 24
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "agentic-start-manual-7f3k2"
+      name: "Manual run"
+      type: "TYPE_TRIGGER"
+      configuration: {}
+      metadata: null
+      position:
+        x: 120
+        "y": 380
+      component: null
+      blueprint: null
+      trigger:
+        name: "start"
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "structure-task-openai-8d2nw"
+      name: "Structure task intent"
+      type: "TYPE_COMPONENT"
+      configuration:
+        input: |
+          Turn the following manual-run context into ONE JSON object with keys:
+          - summary (string)
+          - priority ("high" | "medium" | "low")
+          - constraints (array of strings)
+          - suggested_checks (array of strings)
+
+          Rules:
+          - Output JSON only. No Markdown fences.
+          - If data is missing, still return valid JSON with best-effort defaults.
+
+          Context: {{ root().data }}
+        model: "gpt-5.2"
+      metadata: null
+      position:
+        x: 520
+        "y": 380
+      component:
+        name: "openai.textPrompt"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "symphony-http-9xm2p"
+      name: "Symphony API (HTTP)"
+      type: "TYPE_COMPONENT"
+      configuration:
+        method: "GET"
+        successCodes: "2xx"
+        timeoutSeconds: 30
+        url: "https://replace-with-your-symphony-host.example/api/v1/state"
+      metadata: null
+      position:
+        x: 920
+        "y": 380
+      component:
+        name: "http"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "policy-filter-2j8kw"
+      name: "Policy gate"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: "contains($[\"Structure task intent\"].data.text, \"priority\")"
+      metadata: null
+      position:
+        x: 1320
+        "y": 380
+      component:
+        name: "filter"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "human-approval-3nk8w"
+      name: "Human approval"
+      type: "TYPE_COMPONENT"
+      configuration:
+        items:
+          - type: "anyone"
+      metadata: null
+      position:
+        x: 1720
+        "y": 380
+      component:
+        name: "approval"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "run-github-ci-4pl9s"
+      name: "Run GitHub workflow"
+      type: "TYPE_COMPONENT"
+      configuration:
+        ref: "main"
+        repository: "configure-your-github-repository"
+        workflowFile: ".github/workflows/ci.yml"
+      metadata: null
+      position:
+        x: 2120
+        "y": 320
+      component:
+        name: "github.runWorkflow"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "cursor-alt-5qm8x"
+      name: "Cursor alternative path"
+      type: "TYPE_COMPONENT"
+      configuration:
+        autoCreatePr: true
+        branch: "main"
+        prompt: "Approval was rejected. Propose a minimal follow-up using this structured context: {{ $['Structure task intent'].data.text }}"
+        repository: "https://github.com/your-org/your-repo"
+        sourceMode: "repository"
+        useCursorBot: true
+      metadata: null
+      position:
+        x: 2120
+        "y": 520
+      component:
+        name: "cursor.launchAgent"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "wait-stabilize-6rn2k"
+      name: "Wait for stabilization"
+      type: "TYPE_COMPONENT"
+      configuration:
+        mode: "interval"
+        unit: "minutes"
+        waitFor: "2"
+      metadata: null
+      position:
+        x: 2520
+        "y": 280
+      component:
+        name: "wait"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "dash0-list-8tm4n"
+      name: "Dash0 health signals"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata: null
+      position:
+        x: 2920
+        "y": 280
+      component:
+        name: "dash0.listIssues"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "notify-http-7sk3m"
+      name: "HTTP: incident webhook"
+      type: "TYPE_COMPONENT"
+      configuration:
+        json:
+          message: "Replace this JSON body; wire your incident endpoint."
+          source: "agentic-devops-control-loop template"
+        method: "POST"
+        successCodes: "2xx"
+        timeoutSeconds: 30
+        url: "https://replace-with-your-incident-endpoint.example/hooks/superplane"
+      metadata: null
+      position:
+        x: 2920
+        "y": 480
+      component:
+        name: "http"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+  edges:
+    - sourceId: "agentic-start-manual-7f3k2"
+      targetId: "structure-task-openai-8d2nw"
+      channel: "default"
+    - sourceId: "structure-task-openai-8d2nw"
+      targetId: "symphony-http-9xm2p"
+      channel: "default"
+    - sourceId: "symphony-http-9xm2p"
+      targetId: "policy-filter-2j8kw"
+      channel: "success"
+    - sourceId: "symphony-http-9xm2p"
+      targetId: "notify-http-7sk3m"
+      channel: "failure"
+    - sourceId: "policy-filter-2j8kw"
+      targetId: "human-approval-3nk8w"
+      channel: "default"
+    - sourceId: "human-approval-3nk8w"
+      targetId: "run-github-ci-4pl9s"
+      channel: "approved"
+    - sourceId: "human-approval-3nk8w"
+      targetId: "cursor-alt-5qm8x"
+      channel: "rejected"
+    - sourceId: "run-github-ci-4pl9s"
+      targetId: "wait-stabilize-6rn2k"
+      channel: "passed"
+    - sourceId: "run-github-ci-4pl9s"
+      targetId: "notify-http-7sk3m"
+      channel: "failed"
+    - sourceId: "wait-stabilize-6rn2k"
+      targetId: "dash0-list-8tm4n"
+      channel: "default"
+    - sourceId: "dash0-list-8tm4n"
+      targetId: "notify-http-7sk3m"
+      channel: "degraded"
+    - sourceId: "dash0-list-8tm4n"
+      targetId: "notify-http-7sk3m"
+      channel: "critical"
