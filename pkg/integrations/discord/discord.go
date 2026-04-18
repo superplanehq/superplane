@@ -72,6 +72,7 @@ func (d *Discord) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
 		&GetLastMention{},
+		&DiscordAddPeople{},
 	}
 }
 
