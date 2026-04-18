@@ -1,6 +1,5 @@
 from typing import Any
 
-from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
 from superplaneapi.models.canvases_create_canvas_version_response import (
     CanvasesCreateCanvasVersionResponse,
@@ -29,6 +28,8 @@ from superplaneapi.models.superplane_integrations_list_integrations_response imp
     SuperplaneIntegrationsListIntegrationsResponse,
 )
 from superplaneapi.models.triggers_list_triggers_response import TriggersListTriggersResponse
+
+from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
 
 class FakeCanvasApi:
