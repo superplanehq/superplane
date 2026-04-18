@@ -51,6 +51,8 @@ func (i *Claude) Configuration() []configuration.Field {
 func (i *Claude) Components() []core.Component {
 	return []core.Component{
 		&TextPrompt{},
+		&IncidentReport{},
+		&PromptAI{},
 	}
 }
 

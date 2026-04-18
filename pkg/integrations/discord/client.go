@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -115,6 +116,40 @@ func (c *Client) GetChannel(channelID string) (*Channel, error) {
 	return &channel, nil
 }
 
+// AddMemberToChannel grants a guild member access to a channel by creating/updating
+// a member-specific permission overwrite.
+func (c *Client) AddMemberToChannel(channelID string, userID string) error {
+	const (
+		permissionViewChannel      = 1 << 10
+		permissionSendMessages     = 1 << 11
+		permissionReadMessageHistory = 1 << 16
+	)
+
+	allowBits := int64(permissionViewChannel | permissionSendMessages | permissionReadMessageHistory)
+
+	reqBody := EditChannelPermissionsRequest{
+		Allow: strconv.FormatInt(allowBits, 10),
+		Deny:  "0",
+		Type:  1, // member overwrite
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal permission overwrite request: %w", err)
+	}
+
+	_, err = c.doRequest(
+		http.MethodPut,
+		fmt.Sprintf("/channels/%s/permissions/%s", channelID, userID),
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to grant user %s access to channel %s: %w", userID, channelID, err)
+	}
+
+	return nil
+}
+
 // Embed represents a Discord message embed
 type Embed struct {
 	Title       string       `json:"title,omitempty"`
@@ -148,6 +183,12 @@ type EmbedField struct {
 
 type EmbedMedia struct {
 	URL string `json:"url"`
+}
+
+type EditChannelPermissionsRequest struct {
+	Allow string `json:"allow"`
+	Deny  string `json:"deny"`
+	Type  int    `json:"type"` // 0 = role, 1 = member
 }
 
 // CreateMessageRequest represents the request body for creating a message
