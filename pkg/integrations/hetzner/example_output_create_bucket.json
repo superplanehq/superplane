@@ -1,0 +1,5 @@
+{
+  "bucket": "my-artifacts",
+  "region": "fsn1",
+  "endpoint": "https://fsn1.your-objectstorage.com/my-artifacts"
+}

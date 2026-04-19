@@ -17,7 +17,10 @@ func init() {
 type Hetzner struct{}
 
 type Configuration struct {
-	APIToken string `json:"apiToken" mapstructure:"apiToken"`
+	APIToken      string `json:"apiToken" mapstructure:"apiToken"`
+	S3AccessKeyId string `json:"s3AccessKeyId" mapstructure:"s3AccessKeyId"`
+	S3SecretKey   string `json:"s3SecretAccessKey" mapstructure:"s3SecretAccessKey"`
+	S3Region      string `json:"s3Region" mapstructure:"s3Region"`
 }
 
 func (h *Hetzner) Name() string {
@@ -33,12 +36,14 @@ func (h *Hetzner) Icon() string {
 }
 
 func (h *Hetzner) Description() string {
-	return "Create and delete Hetzner Cloud servers/load balancers and create/delete server snapshots"
+	return "Create and delete Hetzner Cloud servers/load balancers, manage snapshots, and interact with Hetzner Object Storage via the S3-compatible API"
 }
 
 func (h *Hetzner) Instructions() string {
 	return `
 **API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
+
+**Object Storage (optional):** To use S3 components, go to **Object Storage** in the Hetzner Cloud Console and create S3 credentials (Access Key + Secret Key). Set the region to match your bucket location (e.g. fsn1 or nbg1).
 `
 }
 
@@ -52,6 +57,37 @@ func (h *Hetzner) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "Hetzner Cloud API token with Read & Write access",
 		},
+		{
+			Name:        "s3AccessKeyId",
+			Label:       "S3 Access Key ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Object Storage S3 Access Key ID (required for S3 components)",
+		},
+		{
+			Name:        "s3SecretAccessKey",
+			Label:       "S3 Secret Access Key",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Object Storage S3 Secret Access Key (required for S3 components)",
+		},
+		{
+			Name:        "s3Region",
+			Label:       "S3 Region",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "Object Storage region (required for S3 components)",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Falkenstein (fsn1)", Value: "fsn1"},
+						{Label: "Nuremberg (nbg1)", Value: "nbg1"},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -63,6 +99,13 @@ func (h *Hetzner) Components() []core.Component {
 		&DeleteServer{},
 		&CreateLoadBalancer{},
 		&DeleteLoadBalancer{},
+		&CreateBucket{},
+		&DeleteBucket{},
+		&UploadObject{},
+		&DownloadObject{},
+		&DeleteObject{},
+		&ListObjects{},
+		&PresignedURL{},
 	}
 }
 
@@ -89,6 +132,24 @@ func (h *Hetzner) Sync(ctx core.SyncContext) error {
 	if err := client.Verify(); err != nil {
 		return fmt.Errorf("failed to verify Hetzner credentials: %w", err)
 	}
+
+	// Verify S3 credentials if any are provided — all three must be set together.
+	hasS3Key := strings.TrimSpace(config.S3AccessKeyId) != ""
+	hasS3Secret := strings.TrimSpace(config.S3SecretKey) != ""
+	hasS3Region := strings.TrimSpace(config.S3Region) != ""
+	if hasS3Key || hasS3Secret || hasS3Region {
+		if !hasS3Key || !hasS3Secret || !hasS3Region {
+			return fmt.Errorf("s3AccessKeyId, s3SecretAccessKey, and s3Region must all be provided together")
+		}
+		s3Client, err := NewHetznerS3Client(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create S3 client: %w", err)
+		}
+		if _, err := s3Client.ListBuckets(); err != nil {
+			return fmt.Errorf("failed to verify S3 credentials: %w", err)
+		}
+	}
+
 	ctx.Integration.Ready()
 	return nil
 }
@@ -270,6 +331,20 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 				ID:   "least_connections",
 			},
 		}, nil
+	case "bucket":
+		s3Client, err := NewHetznerS3Client(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+		buckets, err := s3Client.ListBuckets()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(buckets))
+		for _, b := range buckets {
+			resources = append(resources, core.IntegrationResource{Type: "bucket", Name: b.Name, ID: b.Name})
+		}
+		return resources, nil
 	default:
 		return nil, nil
 	}
