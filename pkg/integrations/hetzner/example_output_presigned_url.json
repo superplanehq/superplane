@@ -1,0 +1,6 @@
+{
+  "bucket": "my-artifacts",
+  "key": "releases/v1.2.3/app.tar.gz",
+  "url": "https://fsn1.your-objectstorage.com/my-artifacts/releases/v1.2.3/app.tar.gz?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&X-Amz-Date=...&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=...",
+  "expiresAt": "2024-03-15T11:30:00Z"
+}
