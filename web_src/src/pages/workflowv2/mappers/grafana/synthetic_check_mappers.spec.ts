@@ -266,7 +266,7 @@ describe("grafana synthetic check mappers", () => {
                   settings: { http: { method: "GET" } },
                 },
                 metrics: {
-                  lastOutcome: "Healthy",
+                  lastOutcome: "Up",
                   totalRuns24h: 1440,
                   successRuns24h: 1438,
                   failureRuns24h: 2,
@@ -282,7 +282,7 @@ describe("grafana synthetic check mappers", () => {
     );
 
     expect(Object.keys(details).length).toBeLessThanOrEqual(6);
-    expect(details["Last Outcome"]).toBe("Healthy");
+    expect(details["Last Outcome"]).toBe("Up");
     expect(details.Job).toBe("API health check");
     expect(details.Target).toBe("GET https://api.example.com/health");
     expect(details.Schedule).toBe("Every 1m · 3s timeout");

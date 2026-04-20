@@ -42,7 +42,7 @@
       ]
     },
     "metrics": {
-      "lastOutcome": "Healthy",
+      "lastOutcome": "Up",
       "successRuns24h": 1438,
       "failureRuns24h": 2,
       "totalRuns24h": 1440,

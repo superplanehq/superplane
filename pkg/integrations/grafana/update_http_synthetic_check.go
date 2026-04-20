@@ -66,25 +66,20 @@ func (c *UpdateHTTPSyntheticCheck) Configuration() []configuration.Field {
 }
 
 func (c *UpdateHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
-	merged, id, _, _, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration)
+	merged, id, _, existing, client, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration)
 	if err != nil {
 		return err
 	}
-	if err := resolveSyntheticCheckNodeMetadata(ctx, id); err != nil {
+	if err := resolveSyntheticCheckNodeMetadata(ctx, id, existing); err != nil {
 		return err
 	}
-	return resolveSyntheticProbeSummaryMetadata(ctx, merged.Probes)
+	return resolveSyntheticProbeSummaryMetadata(ctx, merged.Probes, client)
 }
 
 func (c *UpdateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
-	merged, id, raw, existing, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration)
+	merged, id, raw, existing, client, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration)
 	if err != nil {
 		return err
-	}
-
-	client, err := NewSyntheticsClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("error creating grafana synthetics client: %w", err)
 	}
 
 	payload, err := buildSyntheticCheckPayload(merged)

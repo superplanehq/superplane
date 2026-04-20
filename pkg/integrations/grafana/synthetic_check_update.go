@@ -34,45 +34,45 @@ func prepareSyntheticCheckUpdate(
 	httpCtx core.HTTPContext,
 	integration core.IntegrationContext,
 	config any,
-) (merged SyntheticCheckSpecBase, syntheticCheckID string, raw map[string]any, existing *SyntheticCheck, err error) {
+) (merged SyntheticCheckSpecBase, syntheticCheckID string, raw map[string]any, existing *SyntheticCheck, client *SyntheticsClient, err error) {
 	raw, err = decodeSyntheticCheckConfigMap(config)
 	if err != nil {
-		return SyntheticCheckSpecBase{}, "", nil, nil, err
+		return SyntheticCheckSpecBase{}, "", nil, nil, nil, err
 	}
 
 	id := strings.TrimSpace(fmt.Sprint(raw["syntheticCheck"]))
 	if id == "" || id == "<nil>" {
-		return SyntheticCheckSpecBase{}, "", raw, nil, errors.New("syntheticCheck is required")
+		return SyntheticCheckSpecBase{}, "", raw, nil, nil, errors.New("syntheticCheck is required")
 	}
 	if err := validateSyntheticCheckSelection(SyntheticCheckSelectionSpec{SyntheticCheck: id}); err != nil {
-		return SyntheticCheckSpecBase{}, "", raw, nil, err
+		return SyntheticCheckSpecBase{}, "", raw, nil, nil, err
 	}
 
-	client, err := NewSyntheticsClient(httpCtx, integration)
+	client, err = NewSyntheticsClient(httpCtx, integration)
 	if err != nil {
-		return SyntheticCheckSpecBase{}, "", raw, nil, err
+		return SyntheticCheckSpecBase{}, "", raw, nil, nil, err
 	}
 
 	existing, err = client.GetCheck(id)
 	if err != nil {
-		return SyntheticCheckSpecBase{}, "", raw, nil, fmt.Errorf("error loading synthetic check: %w", err)
+		return SyntheticCheckSpecBase{}, "", raw, nil, client, fmt.Errorf("error loading synthetic check: %w", err)
 	}
 
 	base, err := syntheticCheckToSpecBase(existing)
 	if err != nil {
-		return SyntheticCheckSpecBase{}, "", raw, existing, err
+		return SyntheticCheckSpecBase{}, "", raw, existing, client, err
 	}
 
 	merged, err = mergeSyntheticUpdatePatch(base, raw)
 	if err != nil {
-		return SyntheticCheckSpecBase{}, "", raw, existing, err
+		return SyntheticCheckSpecBase{}, "", raw, existing, client, err
 	}
 
 	if err := validateSyntheticCheckBase(merged); err != nil {
-		return SyntheticCheckSpecBase{}, "", raw, existing, err
+		return SyntheticCheckSpecBase{}, "", raw, existing, client, err
 	}
 
-	return merged, id, raw, existing, nil
+	return merged, id, raw, existing, client, nil
 }
 
 func syntheticCheckToSpecBase(check *SyntheticCheck) (SyntheticCheckSpecBase, error) {

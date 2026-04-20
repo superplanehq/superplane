@@ -751,7 +751,7 @@ Returns a combined payload containing:
 
 - **configuration**: the Grafana synthetic check definition
 - **alerts**: the configured per-check synthetic alerts when available
-- **metrics**: best-effort operational metrics derived from Grafana synthetic monitoring metrics
+- **metrics**: best-effort operational metrics derived from Grafana synthetic monitoring metrics; when present, **lastOutcome** is one of **Up**, **Partial**, or **Down**, matching the output channels
 
 ### Example Output
 
@@ -814,7 +814,7 @@ Returns a combined payload containing:
       "averageLatencySeconds24h": 0.142,
       "failureRuns24h": 2,
       "lastExecutionAt": "2026-04-15T10:25:00Z",
-      "lastOutcome": "Healthy",
+      "lastOutcome": "Up",
       "successRuns24h": 1438,
       "totalRuns24h": 1440
     }

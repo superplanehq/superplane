@@ -246,7 +246,6 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 		Responses: []*http.Response{
 			grafanaSyntheticDataSourceResponse(),
 			grafanaSyntheticCheckListResponse(checkJSON),
-			grafanaSyntheticDataSourceResponse(),
 			{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(checkJSON)),
@@ -288,9 +287,9 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "grafana.syntheticCheck.updated", execCtx.Type)
-	require.Len(t, httpContext.Requests, 5)
+	require.Len(t, httpContext.Requests, 4)
 
-	body, err := io.ReadAll(httpContext.Requests[3].Body)
+	body, err := io.ReadAll(httpContext.Requests[2].Body)
 	require.NoError(t, err)
 	var requestPayload map[string]any
 	require.NoError(t, json.Unmarshal(body, &requestPayload))

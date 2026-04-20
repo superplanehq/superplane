@@ -348,35 +348,43 @@ func validateSyntheticCheckAlerts(alerts []SyntheticCheckAlertInput) error {
 	return nil
 }
 
-func resolveSyntheticCheckNodeMetadata(ctx core.SetupContext, syntheticCheck string) error {
+// resolveSyntheticCheckNodeMetadata resolves workflow node metadata for a synthetic check.
+// When loadedCheck is non-nil (e.g. after prepareSyntheticCheckUpdate), it is used and no extra HTTP calls are made.
+func resolveSyntheticCheckNodeMetadata(ctx core.SetupContext, syntheticCheck string, loadedCheck *SyntheticCheck) error {
 	if strings.Contains(syntheticCheck, "{{") || ctx.Metadata == nil || ctx.HTTP == nil {
 		return nil
 	}
 
-	var existing SyntheticCheckNodeMetadata
-	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
-	if existing.CheckLabel != "" && existing.SyntheticCheck == syntheticCheck {
+	var nodeMeta SyntheticCheckNodeMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &nodeMeta)
+	if nodeMeta.CheckLabel != "" && nodeMeta.SyntheticCheck == syntheticCheck {
 		return nil
 	}
 
-	client, err := NewSyntheticsClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil
+	var check *SyntheticCheck
+	if loadedCheck != nil {
+		check = loadedCheck
+	} else {
+		client, err := NewSyntheticsClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil
+		}
+		var err2 error
+		check, err2 = client.GetCheck(syntheticCheck)
+		if err2 != nil {
+			return nil
+		}
 	}
 
-	check, err := client.GetCheck(syntheticCheck)
-	if err != nil {
-		return nil
-	}
-
-	existing.CheckLabel = syntheticCheckLabel(check)
-	existing.SyntheticCheck = syntheticCheck
-	return ctx.Metadata.Set(existing)
+	nodeMeta.CheckLabel = syntheticCheckLabel(check)
+	nodeMeta.SyntheticCheck = syntheticCheck
+	return ctx.Metadata.Set(nodeMeta)
 }
 
 // resolveSyntheticProbeSummaryMetadata resolves configured probe IDs to human-readable labels
 // (probe name and region) for workflow node metadata. It is best-effort: failures are ignored.
-func resolveSyntheticProbeSummaryMetadata(ctx core.SetupContext, probeIDStrings []string) error {
+// When client is non-nil (e.g. from prepareSyntheticCheckUpdate), it is reused instead of building a new client.
+func resolveSyntheticProbeSummaryMetadata(ctx core.SetupContext, probeIDStrings []string, client *SyntheticsClient) error {
 	if ctx.Metadata == nil || ctx.HTTP == nil || len(probeIDStrings) == 0 {
 		return nil
 	}
@@ -387,9 +395,12 @@ func resolveSyntheticProbeSummaryMetadata(ctx core.SetupContext, probeIDStrings 
 		}
 	}
 
-	client, err := NewSyntheticsClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil
+	if client == nil {
+		var err error
+		client, err = NewSyntheticsClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil
+		}
 	}
 
 	probes, err := client.ListProbes()
