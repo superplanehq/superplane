@@ -159,11 +159,28 @@ services:
       - .:/app
       - ./tmp/agent/evals:/app/tmp/agent/evals
       - uv-cache:/root/.cache/uv
+    # Probe the gRPC port (:50061) because it is started last — in FastAPI's
+    # lifespan startup inside ai/web.py (create_app), AFTER uvicorn has already
+    # bound :8090. If :50061 accepts a TCP connection the agent is fully ready
+    # to serve the Go app; checking anything earlier lets `docker compose up
+    # --wait` (and any `run --rm app ...` that depends_on agent being healthy)
+    # return before the agent is reachable, which races the first agent-using
+    # e2e tests into "connection refused".
+    # Bash's /dev/tcp pseudo-device avoids an extra curl/nc dependency; the
+    # dev stage of agent/Dockerfile doesn't ship curl.
+    #
+    # start_period is intentionally large: the dev target runs `uv run ...`
+    # with a fresh uv-cache volume on CI, so the first boot synchronises all
+    # Python deps before uvicorn can even start listening. During start_period,
+    # failed probes do not count against retries, so a warm container still
+    # reports healthy within seconds; the ceiling only matters on a cold CI
+    # job where uv sync from scratch can take ~60-90s.
     healthcheck:
-      test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
+      test: ["CMD", "bash", "-lc", "exec 3<>/dev/tcp/localhost/50061"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 12
+      start_period: 120s
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
