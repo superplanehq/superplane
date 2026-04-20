@@ -65,8 +65,20 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 	if req.Canvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
 	}
+
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CreateCanvasWithAutoLayoutAndUsage(ctx, s.usageService, s.registry, organizationID, req.Canvas, req.AutoLayout)
+
+	return canvases.CreateCanvas(
+		ctx,
+		s.registry,
+		s.encryptor,
+		s.authService,
+		s.webhookBaseURL,
+		uuid.MustParse(organizationID),
+		req.Canvas,
+		req.AutoLayout,
+		s.usageService,
+	)
 }
 
 func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {

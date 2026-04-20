@@ -151,7 +151,12 @@ func PublishCanvasChangeRequest(
 			return createVersionErr
 		}
 
-		publisher, err := changesets.NewCanvasPublisher(tx, mergedVersion, changesets.CanvasPublisherOptions{
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
+		if err != nil {
+			return err
+		}
+
+		publisher, err := changesets.NewCanvasPublisher(tx, mergedVersion, liveVersion, changesets.CanvasPublisherOptions{
 			Registry:       registry,
 			OrgID:          organizationUUID,
 			Encryptor:      encryptor,
