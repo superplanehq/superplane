@@ -40,8 +40,9 @@ test.setup.build:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
-	$(COMPOSE) run --rm app go mod download || { $(MAKE) test.dump.diagnostics STAGE=test.setup.build; exit 1; }
 	$(MAKE) gen.setup.backend
+	$(MAKE) openapi.python.client.gen
+	$(COMPOSE) run --rm app go mod download || { $(MAKE) test.dump.diagnostics STAGE=test.setup.build; exit 1; }
 	$(MAKE) test.e2e.ui.setup
 
 test.setup:
@@ -73,10 +74,10 @@ test.dump.diagnostics:
 	@docker ps -a --filter name=superplane-agent-1 --format 'table {{.Names}}\t{{.Status}}\t{{.State}}' || true
 	@docker inspect superplane-agent-1 --format '{{json .State.Health}}' 2>/dev/null || true
 	@echo
-	@echo "---- agent process tree inside the container (best-effort) ----"
-	@docker exec superplane-agent-1 sh -lc 'ps -ef 2>/dev/null || ps aux 2>/dev/null || true' || true
-	@echo "---- port :50061 listeners inside the container (best-effort) ----"
-	@docker exec superplane-agent-1 sh -lc 'ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || (command -v bash >/dev/null && bash -lc "exec 3<>/dev/tcp/localhost/50061 && echo LISTENING || echo REFUSED") || true' || true
+	@echo "---- agent process tree inside the container (via /proc; ps is not installed in python:3.12-slim) ----"
+	@docker exec superplane-agent-1 sh -lc 'for pid in $$(ls /proc 2>/dev/null | grep -E "^[0-9]+$$"); do cmd=$$(tr "\0" " " </proc/$$pid/cmdline 2>/dev/null); status=$$(awk "/^State:/ {print \$$2 \$$3}" /proc/$$pid/status 2>/dev/null); [ -n "$$cmd" ] && printf "pid=%s state=%s cmd=%s\n" "$$pid" "$$status" "$$cmd"; done' || true
+	@echo "---- :50061 listeners inside the container (via /proc/net/tcp; ss/netstat not installed) ----"
+	@docker exec superplane-agent-1 sh -lc 'printf "state:listening entries for port 50061 (C38D hex):\n"; awk "\$$2 ~ /:C38D\$$/ && \$$4 == \"0A\" {print}" /proc/net/tcp /proc/net/tcp6 2>/dev/null; bash -lc "exec 3<>/dev/tcp/localhost/50061 && echo ACTIVE-CONNECT=OK || echo ACTIVE-CONNECT=REFUSED"' || true
 	@echo "==== [diag] end ===="
 
 test.down:
