@@ -160,10 +160,11 @@ services:
       - ./tmp/agent/evals:/app/tmp/agent/evals
       - uv-cache:/root/.cache/uv
     healthcheck:
-      test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
-      interval: 5s
+      test: ["CMD", "bash", "-lc", "exec 3<>/dev/tcp/localhost/50061"]
+      interval: 2s
       timeout: 3s
-      retries: 10
+      retries: 30
+      start_period: 5s
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
