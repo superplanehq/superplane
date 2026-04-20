@@ -1,0 +1,119 @@
+---
+title: "Logfire"
+---
+
+Set up Logfire for AI Observability
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Alert Received" href="#on-alert-received" description="Trigger when a Logfire alert is received via webhook" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Query Logfire" href="#query-logfire" description="Execute a read-only SQL query against Logfire Query API" />
+</CardGrid>
+
+## Instructions
+
+## Create a Logfire API key for SuperPlane
+
+1. Open **Settings** in Logfire.
+2. Under **ORG: &lt;your-username&gt;**, select **API Keys**.
+3. Click **New API Key**.
+4. Enter a key name.
+5. Enable these **five** scopes:
+   - **Organization scopes**: `organization:write_channel` (required for auto-creating webhook channels)
+   - **Project scopes**: `project:read `, `project:read_token `, `project:read_alert `, and `project:write_alert`
+6. Select **All Project** or a specific project from the dropdown.
+7. Click **Create API Key**.
+8. Copy the API key and paste it.
+
+<a id="on-alert-received"></a>
+
+## On Alert Received
+
+The On Alert Received trigger starts a workflow execution when Logfire sends an alert payload to your SuperPlane webhook URL.
+
+### Configuration
+Select the Logfire Project and Alert you want to trigger the workflow.
+
+### Webhook setup
+
+After you save this trigger, SuperPlane provides a webhook URL. Add that URL as a Logfire notification webhook target so alert events are sent to this workflow.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "alertId": "alt_123",
+    "alertName": "Latency spike",
+    "eventType": "firing",
+    "message": "p95 latency exceeded threshold",
+    "severity": "warning",
+    "url": "https://logfire-us.pydantic.dev/my-org/my-project/alerts/alt_123"
+  },
+  "timestamp": "2026-03-23T12:00:00.000000000Z",
+  "type": "logfire.alert.received"
+}
+```
+
+<a id="query-logfire"></a>
+
+## Query Logfire
+
+The Query Logfire component executes a read-only SQL query against Logfire and returns query results for use in downstream steps.
+
+### Use Cases
+
+- **Investigate traces and spans**: Query recent records for errors, latency spikes, or specific services
+- **Build reporting workflows**: Export Logfire data into Slack, email, dashboards, or data stores
+- **Conditional automation**: Query for specific conditions, then branch workflow logic based on returned rows
+- **Scheduled analytics**: Run recurring SQL queries to monitor usage and operational metrics
+
+### Configuration
+
+- **Project**: Required Logfire project to query (scopes the generated read token)
+- **SQL**: Required SQL query (supports expressions). Example: `SELECT start_timestamp, message FROM records LIMIT 10`
+- **Time Window**: Optional preset time window (e.g., Last 5 minutes, Last 1 hour). Select "Custom" to specify exact timestamps
+- **Limit**: Optional maximum rows to return. If omitted, Logfire defaults to `500`; maximum is `10000`
+- **Row Oriented**: Optional JSON format toggle. `false` returns column-oriented JSON; `true` returns row-oriented JSON
+
+### Output
+
+Emits one `logfire.query` event containing the Logfire query response (for example `columns` and/or `rows`, depending on format options).
+
+Use this output to transform, filter, or route query results to other components.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "columns": [
+      {
+        "name": "start_timestamp",
+        "type": "timestamp"
+      },
+      {
+        "name": "message",
+        "type": "text"
+      }
+    ],
+    "rows": [
+      [
+        "2026-01-01T00:00:00Z",
+        "Example Logfire record"
+      ]
+    ]
+  },
+  "timestamp": "2026-03-23T12:00:00.000000000Z",
+  "type": "logfire.query"
+}
+```
+

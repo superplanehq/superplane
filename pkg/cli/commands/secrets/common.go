@@ -8,7 +8,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -45,7 +44,7 @@ func parseSecretFile(path string) (*secretResource, error) {
 	}
 
 	resource := secretResource{}
-	if err := yaml.Unmarshal(data, &resource); err != nil {
+	if err := core.NewDecoder(data).DecodeYAML(&resource); err != nil {
 		return nil, fmt.Errorf("failed to parse secret resource: %w", err)
 	}
 
