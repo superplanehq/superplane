@@ -11,4 +11,3 @@ services:
       SUPERPLANE_BASE_URL: http://app:8001
       # Must match the JWT_SECRET used by the e2e Go test server (see test/e2e/test_context.go Start()).
       JWT_SECRET: test-jwt-secret
-      AGENT_HTTP_DEBUG: "true"
