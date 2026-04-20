@@ -40,7 +40,7 @@ test.setup.build:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
-	$(COMPOSE) run --rm app go mod download
+	$(COMPOSE) run --rm app go mod download || { $(MAKE) test.dump.diagnostics STAGE=test.setup.build; exit 1; }
 	$(MAKE) gen.setup.backend
 	$(MAKE) test.e2e.ui.setup
 
@@ -56,7 +56,28 @@ test.setup.db:
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
-	$(E2E_COMPOSE) up -d --wait
+	$(E2E_COMPOSE) up -d --wait || { $(MAKE) test.dump.diagnostics STAGE=test.start; exit 1; }
+
+
+test.dump.diagnostics:
+	@echo "==== [diag] failing stage: $(STAGE) ===="
+	@echo "---- docker compose ps --all ----"
+	@$(COMPOSE) ps --all || true
+	@echo "---- docker compose logs --tail=500 agent ----"
+	@$(COMPOSE) logs --tail=500 --no-color --timestamps agent || true
+	@echo "---- docker compose logs --tail=200 db ----"
+	@$(COMPOSE) logs --tail=200 --no-color --timestamps db || true
+	@echo "---- docker compose logs --tail=200 rabbitmq ----"
+	@$(COMPOSE) logs --tail=200 --no-color --timestamps rabbitmq || true
+	@echo "---- docker inspect agent (State + Health) ----"
+	@docker ps -a --filter name=superplane-agent-1 --format 'table {{.Names}}\t{{.Status}}\t{{.State}}' || true
+	@docker inspect superplane-agent-1 --format '{{json .State.Health}}' 2>/dev/null || true
+	@echo
+	@echo "---- agent process tree inside the container (best-effort) ----"
+	@docker exec superplane-agent-1 sh -lc 'ps -ef 2>/dev/null || ps aux 2>/dev/null || true' || true
+	@echo "---- port :50061 listeners inside the container (best-effort) ----"
+	@docker exec superplane-agent-1 sh -lc 'ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || (command -v bash >/dev/null && bash -lc "exec 3<>/dev/tcp/localhost/50061 && echo LISTENING || echo REFUSED") || true' || true
+	@echo "==== [diag] end ===="
 
 test.down:
 	$(E2E_COMPOSE) down --remove-orphans
