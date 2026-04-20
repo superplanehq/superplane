@@ -41,13 +41,13 @@ export const analytics = {
     posthog.capture("canvas:yaml_import", {});
   },
 
-  nodeAdd: (
-    nodeType: string,
-    integration: string | undefined,
-    nodeRef: string | undefined,
-    organizationId: string,
-  ) => {
-    posthog.capture("canvas:node_add", { node_type: nodeType, integration, node_ref: nodeRef, organization_id: organizationId });
+  nodeAdd: (nodeType: string, integration: string | undefined, nodeRef: string | undefined, organizationId: string) => {
+    posthog.capture("canvas:node_add", {
+      node_type: nodeType,
+      integration,
+      node_ref: nodeRef,
+      organization_id: organizationId,
+    });
   },
 
   nodeRemove: (
@@ -56,16 +56,33 @@ export const analytics = {
     nodeRef: string | undefined,
     organizationId: string,
   ) => {
-    posthog.capture("canvas:node_remove", { node_type: nodeType, integration, node_ref: nodeRef, organization_id: organizationId });
+    posthog.capture("canvas:node_remove", {
+      node_type: nodeType,
+      integration,
+      node_ref: nodeRef,
+      organization_id: organizationId,
+    });
   },
 
-  nodeConfigure: (
-    nodeType: string,
-    integration: string | undefined,
-    fieldCount: number,
-    organizationId: string,
-  ) => {
-    posthog.capture("canvas:node_configure", { node_type: nodeType, integration, field_count: fieldCount, organization_id: organizationId });
+  nodeConfigure: (nodeType: string, integration: string | undefined, fieldCount: number, organizationId: string) => {
+    posthog.capture("canvas:node_configure", {
+      node_type: nodeType,
+      integration,
+      field_count: fieldCount,
+      organization_id: organizationId,
+    });
+  },
+
+  edgeCreate: (organizationId: string) => {
+    posthog.capture("canvas:edge_create", { organization_id: organizationId });
+  },
+
+  edgeRemove: (organizationId: string) => {
+    posthog.capture("canvas:edge_remove", { organization_id: organizationId });
+  },
+
+  autoLayout: (nodeCount: number, organizationId: string) => {
+    posthog.capture("canvas:auto_layout", { node_count: nodeCount, organization_id: organizationId });
   },
 
   versionPublish: (canvasId: string, organizationId: string) => {

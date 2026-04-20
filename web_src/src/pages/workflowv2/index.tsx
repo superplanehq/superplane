@@ -1351,10 +1351,13 @@ export function WorkflowPageV2() {
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     const newValue = !isAutoLayoutOnUpdateEnabled;
     setIsAutoLayoutOnUpdateEnabled(newValue);
+    if (newValue && organizationId) {
+      analytics.autoLayout(canvas?.spec?.nodes?.length ?? 0, organizationId);
+    }
     if (typeof window !== "undefined") {
       window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
     }
-  }, [isAutoLayoutOnUpdateEnabled]);
+  }, [isAutoLayoutOnUpdateEnabled, organizationId, canvas]);
 
   const applyAutoLayoutOnAddedNode = useCallback(
     async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {
@@ -2741,7 +2744,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-        [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
   );
   const debouncedAnnotationAutoSave = useMemo(
     () =>
@@ -3324,10 +3327,11 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (!isReadOnly) {
+        analytics.edgeCreate(organizationId);
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-        [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
   );
   const handleNodeDelete = useCallback(
     async (nodeId: string) => {
@@ -3366,7 +3370,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-        [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
   );
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
@@ -3407,7 +3411,7 @@ export function WorkflowPageV2() {
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
-
+    
       const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
         nodeIds,
         scope: "connected-component",
@@ -3595,6 +3599,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (!isReadOnly) {
+        analytics.edgeRemove(organizationId);
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },

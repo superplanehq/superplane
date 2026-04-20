@@ -347,7 +347,14 @@ export const useCreateCanvas = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; method?: "ui" | "cli" | "yaml_import" | "template"; templateId?: string } & CanvasGraphData) => {
+    mutationFn: async (
+      data: {
+        name: string;
+        description?: string;
+        method?: "ui" | "cli" | "yaml_import" | "template";
+        templateId?: string;
+      } & CanvasGraphData,
+    ) => {
       const payload = {
         metadata: {
           name: data.name,
@@ -386,7 +393,7 @@ export const useCreateCanvas = (organizationId: string) => {
         );
       }
     },
-    });
+  });
 };
 
 export const useUpdateCanvas = (organizationId: string, canvasId: string) => {

@@ -117,6 +117,28 @@ describe("analytics", () => {
     });
   });
 
+  it("captures edge create", () => {
+    analytics.edgeCreate("org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:edge_create", {
+      organization_id: "org-123",
+    });
+  });
+
+  it("captures edge remove", () => {
+    analytics.edgeRemove("org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:edge_remove", {
+      organization_id: "org-123",
+    });
+  });
+
+  it("captures auto layout", () => {
+    analytics.autoLayout(5, "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:auto_layout", {
+      node_count: 5,
+      organization_id: "org-123",
+    });
+  });
+
   it("captures version publish", () => {
     analytics.versionPublish("canvas-123", "org-123");
     expect(capture).toHaveBeenCalledWith("canvas:version_publish", {
