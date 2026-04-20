@@ -98,39 +98,31 @@ func SeedTemplates(registry *registry.Registry) error {
 }
 
 func deleteAllTemplateWorkflows(tx *gorm.DB) error {
-	var err error
-
 	var workflowIDs []uuid.UUID
 
-	err = tx.
+	if err := tx.
 		Unscoped().
 		Model(&models.Canvas{}).
 		Where("organization_id = ?", models.TemplateOrganizationID).
 		Where("is_template = ?", true).
-		Pluck("id", &workflowIDs).Error
-
-	if err != nil {
+		Pluck("id", &workflowIDs).Error; err != nil {
 		return err
 	}
 
-	err = tx.
+	if err := tx.
 		Unscoped().
 		Model(&models.CanvasNode{}).
 		Where("workflow_id IN (?)", workflowIDs).
-		Delete(&models.CanvasNode{}).Error
-
-	if err != nil {
+		Delete(&models.CanvasNode{}).Error; err != nil {
 		return err
 	}
 
-	err = tx.
+	if err := tx.
 		Unscoped().
 		Model(&models.Canvas{}).
 		Where("organization_id = ?", models.TemplateOrganizationID).
 		Where("is_template = ?", true).
-		Delete(&models.Canvas{}).Error
-
-	if err != nil {
+		Delete(&models.Canvas{}).Error; err != nil {
 		return err
 	}
 
