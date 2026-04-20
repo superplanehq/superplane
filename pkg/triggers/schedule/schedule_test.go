@@ -455,7 +455,7 @@ func TestEmitEvent(t *testing.T) {
 				Minute:       intPtr(0),
 				Timezone:     stringPtr("-5"),
 			},
-			timezone:           "GMT-5.0 (UTC-05:00)",
+			timezone:           "GMT-05:00 (UTC-05:00)",
 			shouldHaveTimezone: true,
 		},
 		{
@@ -468,7 +468,7 @@ func TestEmitEvent(t *testing.T) {
 				Minute:        intPtr(30),
 				Timezone:      stringPtr("1"),
 			},
-			timezone:           "GMT+1.0 (UTC+01:00)",
+			timezone:           "GMT+01:00 (UTC+01:00)",
 			shouldHaveTimezone: true,
 		},
 		{
@@ -478,7 +478,7 @@ func TestEmitEvent(t *testing.T) {
 				CronExpression: stringPtr("0 30 14 * * *"),
 				Timezone:       stringPtr("2"),
 			},
-			timezone:           "GMT+2.0 (UTC+02:00)",
+			timezone:           "GMT+02:00 (UTC+02:00)",
 			shouldHaveTimezone: true,
 		},
 	}

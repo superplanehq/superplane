@@ -90,7 +90,35 @@ export function grafanaCreatedAtSubtitle(context: SubtitleContext): string | Rea
 }
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  return grafanaEventSections(nodes, execution, componentName, "lenient");
+}
+
+/** Returns [] when root trigger metadata is missing (used by alert-rule mappers). */
+export function buildGrafanaEventSections(
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
+  componentName: string,
+): EventSection[] {
+  return grafanaEventSections(nodes, execution, componentName, "strict");
+}
+
+function grafanaEventSections(
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
+  componentName: string,
+  mode: "strict" | "lenient",
+): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+
+  if (mode === "strict") {
+    if (!execution.rootEvent?.id || !execution.createdAt) {
+      return [];
+    }
+    if (!rootTriggerNode?.componentName) {
+      return [];
+    }
+  }
+
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const eventTitle = title || "Trigger event";
@@ -98,7 +126,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
   return [
     {
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
+      eventTitle,
       eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",
