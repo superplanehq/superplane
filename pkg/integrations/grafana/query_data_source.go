@@ -71,7 +71,6 @@ func (q *QueryDataSource) Documentation() string {
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
 - **Time From / Time To**: Optional expressions for the query range (for example ` + "`now() - duration(\"5m\")`" + ` and ` + "`now()`" + `)
-- **Timezone**: Interprets datetime-local expression results using the selected timezone offset
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
@@ -130,14 +129,6 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			Required:    false,
 			Description: "Optional end of the query time range (expression text)",
 			Placeholder: `{{ now() }}`,
-		},
-		{
-			Name:        "timezone",
-			Label:       "Timezone",
-			Type:        configuration.FieldTypeTimezone,
-			Required:    false,
-			Default:     "current",
-			Description: "Timezone offset used for Time From / Time To picker values. Relative Grafana values like now-1h ignore this field.",
 		},
 		{
 			Name:        "format",

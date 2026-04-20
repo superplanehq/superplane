@@ -383,7 +383,7 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 func Test__parseGrafanaQueryTime__acceptsGoTimeStringOutput(t *testing.T) {
 	value := "2026-04-08 11:53:05.86655651 +0000 UTC"
 
-	parsed, ok, err := parseGrafanaQueryTime(value)
+	parsed, ok, err := parseGrafanaQueryTime(value, nil)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, time.Date(2026, time.April, 8, 11, 53, 5, 866556510, time.UTC), parsed.UTC())
