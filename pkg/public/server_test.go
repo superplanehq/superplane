@@ -9,9 +9,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -19,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
@@ -190,6 +193,63 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 
 	require.Equal(t, "", response.Body.String())
 	require.Equal(t, 200, response.Code)
+}
+
+type canvasesGatewayStubServer struct {
+	pbCanvases.UnimplementedCanvasesServer
+	createCanvasCalled bool
+}
+
+func (s *canvasesGatewayStubServer) CreateCanvas(
+	context.Context,
+	*pbCanvases.CreateCanvasRequest,
+) (*pbCanvases.CreateCanvasResponse, error) {
+	s.createCanvasCalled = true
+	return &pbCanvases.CreateCanvasResponse{}, nil
+}
+
+func Test__GRPCGatewayRejectsUnknownFields(t *testing.T) {
+	mux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+	)
+
+	server := &canvasesGatewayStubServer{}
+	err := pbCanvases.RegisterCanvasesHandlerServer(context.Background(), mux, server)
+	require.NoError(t, err)
+
+	requestBody := `{
+  "canvas": {
+    "metadata": { "name": "unknown-field-test" },
+    "spec": {
+      "nodes": [{
+        "id": "wait-1",
+        "name": "wait",
+        "type": "TYPE_COMPONENT",
+        "component": {
+          "name": "wait",
+          "hello": "what"
+        }
+      }],
+      "edges": []
+    }
+  }
+}`
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/canvases", strings.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	var statusBody struct {
+		Code    int32  `json:"code"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &statusBody))
+	require.Equal(t, int32(3), statusBody.Code)
+	require.Contains(t, statusBody.Message, `unknown field "hello"`)
+	require.False(t, server.createCanvasCalled)
 }
 
 // Helper function to check if the required Swagger files exist
