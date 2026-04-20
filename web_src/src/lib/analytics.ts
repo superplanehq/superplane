@@ -41,6 +41,33 @@ export const analytics = {
     posthog.capture("canvas:yaml_import", {});
   },
 
+  nodeAdd: (
+    nodeType: string,
+    integration: string | undefined,
+    nodeRef: string | undefined,
+    organizationId: string,
+  ) => {
+    posthog.capture("canvas:node_add", { node_type: nodeType, integration, node_ref: nodeRef, organization_id: organizationId });
+  },
+
+  nodeRemove: (
+    nodeType: string,
+    integration: string | undefined,
+    nodeRef: string | undefined,
+    organizationId: string,
+  ) => {
+    posthog.capture("canvas:node_remove", { node_type: nodeType, integration, node_ref: nodeRef, organization_id: organizationId });
+  },
+
+  nodeConfigure: (
+    nodeType: string,
+    integration: string | undefined,
+    fieldCount: number,
+    organizationId: string,
+  ) => {
+    posthog.capture("canvas:node_configure", { node_type: nodeType, integration, field_count: fieldCount, organization_id: organizationId });
+  },
+
   versionPublish: (canvasId: string, organizationId: string) => {
     posthog.capture("canvas:version_publish", { canvas_id: canvasId, organization_id: organizationId });
   },

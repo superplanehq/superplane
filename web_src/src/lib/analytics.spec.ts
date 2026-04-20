@@ -77,6 +77,46 @@ describe("analytics", () => {
     expect(capture).toHaveBeenCalledWith("canvas:yaml_import", {});
   });
 
+  it("captures node add action", () => {
+    analytics.nodeAdd("action", "github", "github.create_issue", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:node_add", {
+      node_type: "action",
+      integration: "github",
+      node_ref: "github.create_issue",
+      organization_id: "org-123",
+    });
+  });
+
+  it("captures node add trigger", () => {
+    analytics.nodeAdd("trigger", undefined, "cron.scheduled", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:node_add", {
+      node_type: "trigger",
+      integration: undefined,
+      node_ref: "cron.scheduled",
+      organization_id: "org-123",
+    });
+  });
+
+  it("captures node remove", () => {
+    analytics.nodeRemove("action", "slack", "slack.send_message", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:node_remove", {
+      node_type: "action",
+      integration: "slack",
+      node_ref: "slack.send_message",
+      organization_id: "org-123",
+    });
+  });
+
+  it("captures node configure", () => {
+    analytics.nodeConfigure("action", "github", 3, "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:node_configure", {
+      node_type: "action",
+      integration: "github",
+      field_count: 3,
+      organization_id: "org-123",
+    });
+  });
+
   it("captures version publish", () => {
     analytics.versionPublish("canvas-123", "org-123");
     expect(capture).toHaveBeenCalledWith("canvas:version_publish", {

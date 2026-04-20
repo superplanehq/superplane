@@ -26,6 +26,7 @@ import type {
   SuperplaneComponentsEdge as ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
+  IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
   SuperplaneMeUser,
   TriggersTrigger,
@@ -65,6 +66,7 @@ import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { buildChildToGroupMap } from "@/lib/canvas/groups";
+import { analytics } from "@/lib/analytics";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -137,6 +139,17 @@ import {
   mapWorkflowEventsToRunLogEntries,
   summarizeWorkflowChanges,
 } from "./utils";
+function getNodeAnalyticsProps(
+  node: ComponentsNode,
+  availableIntegrations: IntegrationsIntegrationDefinition[],
+): { nodeType: string; integration: string | undefined; nodeRef: string | undefined } {
+  return {
+    nodeType: node.type === "TYPE_TRIGGER" ? "trigger" : "action",
+    integration: getNodeIntegrationName(node, availableIntegrations),
+    nodeRef: node.trigger?.name ?? node.component?.name ?? node.blueprint?.id ?? node.widget?.name,
+  };
+}
+
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -2680,6 +2693,15 @@ export function WorkflowPageV2() {
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
+      const configuringNode = canvas.spec?.nodes?.find((n) => n.id === nodeId);
+      if (configuringNode) {
+        const fieldCount = Object.values(updatedConfiguration).filter(
+          (v) => v !== null && v !== undefined && v !== "",
+        ).length;
+        const { nodeType, integration } = getNodeAnalyticsProps(configuringNode, availableIntegrations);
+        analytics.nodeConfigure(nodeType, integration, fieldCount, organizationId);
+      }
+
       // Save snapshot before making changes
 
       // Update the node's configuration, name, and app installation ref in local cache only
@@ -2719,9 +2741,8 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+        [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
   );
-
   const debouncedAnnotationAutoSave = useMemo(
     () =>
       debounce(
@@ -2978,6 +2999,10 @@ export function WorkflowPageV2() {
       } else if (buildingBlock.type === "blueprint") {
         newNode.blueprint = { id: buildingBlock.id };
       }
+
+      // Track node addition
+      const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(newNode, availableIntegrations);
+      analytics.nodeAdd(nodeType, integration, nodeRef, organizationId);
 
       // Add the new node to the workflow
       const updatedNodes = [...(latestWorkflow.spec?.nodes || []), newNode];
@@ -3302,9 +3327,8 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+        [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
   );
-
   const handleNodeDelete = useCallback(
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -3312,6 +3336,11 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
 
       const specNodes = canvas.spec?.nodes || [];
+      const nodeBeingDeleted = specNodes.find((n) => n.id === nodeId);
+      if (nodeBeingDeleted) {
+        const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(nodeBeingDeleted, availableIntegrations);
+        analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
+      }
       const updatedNodes = deleteNodesFromCanvas(specNodes, [nodeId]);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
 
@@ -3337,14 +3366,19 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+        [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
   );
-
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
       const specNodes = canvas.spec?.nodes || [];
+      specNodes
+        .filter((n) => nodeIds.includes(n.id || ""))
+        .forEach((node) => {
+          const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(node, availableIntegrations);
+          analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
+        });
       const updatedNodes = deleteNodesFromCanvas(specNodes, nodeIds);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
       const updatedEdges = canvas.spec?.edges?.filter(
@@ -3368,9 +3402,8 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, availableIntegrations],
   );
-
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
