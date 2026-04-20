@@ -98,7 +98,7 @@ func (t *OnIncidentTimelineEvent) Color() string {
 }
 
 func (t *OnIncidentTimelineEvent) DefaultRunTitle() string {
-	return "{{ $.data.event }}"
+	return "{{ root().data.event }}"
 }
 
 func (t *OnIncidentTimelineEvent) Configuration() []configuration.Field {

@@ -47,6 +47,7 @@ func EmitNodeEvent(
 	runTitle, err := contexts.ResolveRootEventRunTitle(
 		database.Conn(),
 		node,
+		data,
 		buildEmitNodeEventRunTitleInput(data, event.ID, now, channel),
 	)
 	if err == nil && runTitle != nil {

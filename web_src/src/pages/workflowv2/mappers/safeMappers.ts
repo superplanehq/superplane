@@ -1,10 +1,13 @@
 import React from "react";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
+  RendererComponentBaseProps,
+  RendererEventSection,
+  RendererTriggerProps,
   TriggerRenderer,
   TriggerRendererContext,
 } from "./types";
@@ -97,6 +100,18 @@ function sanitizeCustomField(
   return sanitizeReactNodeValue(customField);
 }
 
+function normalizeRendererEventSections(eventSections: unknown): EventSection[] | undefined {
+  const sections = sanitizeArray<RendererEventSection>(eventSections);
+  if (!sections) {
+    return undefined;
+  }
+
+  return sections.map((section) => ({
+    ...section,
+    eventTitle: undefined,
+  }));
+}
+
 function normalizeEmptyStateProps(
   emptyStateProps: unknown,
 ): NonNullable<ComponentBaseProps["emptyStateProps"]> | undefined {
@@ -142,7 +157,7 @@ function buildNormalizedComponentBaseProps(
     collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
     collapsedBackground: asString(record.collapsedBackground),
     defaultEventTitle: sanitizeNonEmptyString(record.defaultEventTitle, defaultEventTitle),
-    eventSections: sanitizeArray(record.eventSections),
+    eventSections: normalizeRendererEventSections(record.eventSections),
     selected: asBoolean(record.selected),
     metadata: sanitizeArray(record.metadata),
     customField: sanitizeCustomField(record.customField as ComponentBaseProps["customField"], fallbackTitle),
@@ -160,7 +175,7 @@ function buildNormalizedComponentBaseProps(
 
 function applyComponentBaseFallbacks(
   normalized: ComponentBaseProps,
-  props: ComponentBaseProps | unknown,
+  props: RendererComponentBaseProps | unknown,
   record: UnknownRecord,
   fallbackTitle: string,
   fallbackIconSlug: string,
@@ -188,7 +203,7 @@ function applyComponentBaseFallbacks(
 }
 
 export function normalizeComponentBaseProps(
-  props: ComponentBaseProps | unknown,
+  props: RendererComponentBaseProps | unknown,
   context: ComponentBaseContext,
 ): ComponentBaseProps {
   const fallbackTitle = getComponentTitle(context);
@@ -213,10 +228,8 @@ function buildLastEventData(lastEventData: unknown): TriggerProps["lastEventData
   }
 
   const subtitle = lastEventData.subtitle;
-  const title = asString(lastEventData.title);
 
   return {
-    title: title && title.trim() ? title : undefined,
     subtitle:
       typeof subtitle === "string" || React.isValidElement(subtitle)
         ? (subtitle as NonNullable<TriggerProps["lastEventData"]>["subtitle"])
@@ -285,7 +298,7 @@ function buildNormalizedTriggerProps(
 
 function applyTriggerFallbacks(
   normalized: TriggerProps,
-  props: TriggerProps | unknown,
+  props: RendererTriggerProps | unknown,
   record: UnknownRecord,
 ): TriggerProps {
   if (isRecord(props) && typeof record.title === "string") {
@@ -304,7 +317,10 @@ function applyTriggerFallbacks(
   };
 }
 
-export function normalizeTriggerProps(props: TriggerProps | unknown, context: TriggerRendererContext): TriggerProps {
+export function normalizeTriggerProps(
+  props: RendererTriggerProps | unknown,
+  context: TriggerRendererContext,
+): TriggerProps {
   const fallbackProps = buildFallbackTriggerProps(context);
   const record = isRecord(props) ? props : {};
   const normalizedTriggerProps = buildNormalizedTriggerProps(record, context, fallbackProps);

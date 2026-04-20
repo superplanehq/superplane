@@ -2,7 +2,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import type React from "react";
 import type { Predicate } from "../utils";
 import { formatPredicate } from "../utils";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";

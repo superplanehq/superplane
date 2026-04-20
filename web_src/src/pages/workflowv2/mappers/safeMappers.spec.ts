@@ -19,8 +19,8 @@ import type {
   TriggerRenderer,
   TriggerRendererContext,
 } from "./types";
-import type { ComponentBaseProps } from "@/ui/componentBase";
-import type { TriggerProps } from "@/ui/trigger";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 
 const DEFAULT_NODE = { id: "n1", name: "Test Node", componentName: "test", isCollapsed: false };
 const DEFAULT_DEFINITION = { name: "test", label: "Test", description: "", icon: "zap", color: "blue" };
@@ -334,7 +334,10 @@ describe("createSafeTriggerRenderer normalization", () => {
         iconSlug: "",
         metadata: [],
         lastEventData: {
-          title: "",
+          subtitle: "",
+          receivedAt: new Date(),
+          state: "triggered",
+          eventId: "ev-1",
         },
       } as unknown as TriggerProps,
       makeTriggerRendererContext(),
@@ -342,7 +345,7 @@ describe("createSafeTriggerRenderer normalization", () => {
 
     expect(result.title).toBe("Test Trigger");
     expect(result.iconSlug).toBe("bolt");
-    expect(result.lastEventData?.title).toBeUndefined();
+    expect(result.lastEventData?.subtitle).toBe("");
   });
 
   it("injects defaultEventTitle from the latest execution root event", () => {
@@ -370,7 +373,7 @@ describe("createSafeTriggerRenderer normalization", () => {
 
     expect(result.defaultEventTitle).toBe("Root event title");
     expect(result.eventSections?.[0]?.eventTitle).toBeUndefined();
-    expect(result.eventSections?.[1]?.eventTitle).toBe("Explicit title");
+    expect(result.eventSections?.[1]?.eventTitle).toBeUndefined();
   });
 
   it("preserves trigger customField identity and valid trigger-specific fields", () => {

@@ -70,7 +70,7 @@ func (t *OnIssue) Color() string {
 }
 
 func (t *OnIssue) DefaultRunTitle() string {
-	return `{{ $.data.displayTitle != "" ? $.data.displayTitle : "Issue" }}`
+	return `{{ root().data.displayTitle != "" ? root().data.displayTitle : "Issue" }}`
 }
 
 func (t *OnIssue) Configuration() []configuration.Field {

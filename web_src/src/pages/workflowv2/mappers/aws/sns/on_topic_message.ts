@@ -1,7 +1,7 @@
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";

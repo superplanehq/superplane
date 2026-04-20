@@ -4,9 +4,26 @@ import type {
   CanvasesCanvasNodeExecutionState,
   OrganizationsIntegration,
 } from "@/api-client";
-import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
-import type { TriggerProps } from "@/ui/trigger";
+import type {
+  ComponentBaseProps as UIComponentBaseProps,
+  EventSection as UIEventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
+import type { TriggerProps as UITriggerProps } from "@/ui/trigger";
 import type { ReactNode } from "react";
+
+export type RendererEventSection = Omit<UIEventSection, "eventTitle">;
+
+export type RendererComponentBaseProps = Omit<UIComponentBaseProps, "eventSections"> & {
+  eventSections?: RendererEventSection[];
+};
+
+export type RendererTriggerLastEventData = Omit<NonNullable<UITriggerProps["lastEventData"]>, "title">;
+
+export type RendererTriggerProps = Omit<UITriggerProps, "lastEventData"> & {
+  lastEventData?: RendererTriggerLastEventData;
+};
 
 /**
  * A trigger renderer converts backend data into UI props for a specific trigger type.
@@ -24,7 +41,7 @@ export interface TriggerRenderer {
    * @param context The context for the trigger renderer
    * @returns the props needed to render the Trigger UI component
    */
-  getTriggerProps: (context: TriggerRendererContext) => TriggerProps;
+  getTriggerProps: (context: TriggerRendererContext) => RendererTriggerProps;
 
   /**
    * Display values for the root event.
@@ -108,7 +125,7 @@ export interface ComponentDefinition {
 }
 
 export interface ComponentBaseMapper {
-  props(context: ComponentBaseContext): ComponentBaseProps;
+  props(context: ComponentBaseContext): RendererComponentBaseProps;
   subtitle(context: SubtitleContext): string | React.ReactNode;
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any>;
 }

@@ -53,7 +53,7 @@ func (m *OnMilestone) Color() string {
 }
 
 func (m *OnMilestone) DefaultRunTitle() string {
-	return "{{ $.data.object_attributes.title }}"
+	return "{{ root().data.object_attributes.title }}"
 }
 
 func (m *OnMilestone) Configuration() []configuration.Field {

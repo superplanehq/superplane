@@ -82,7 +82,7 @@ func (t *OnMessage) Color() string {
 }
 
 func (t *OnMessage) DefaultRunTitle() string {
-	return "{{ $.data.text }}"
+	return "{{ root().data.text }}"
 }
 
 func (t *OnMessage) Configuration() []configuration.Field {

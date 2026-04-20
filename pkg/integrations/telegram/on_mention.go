@@ -71,7 +71,7 @@ func (t *OnMention) Color() string {
 }
 
 func (t *OnMention) DefaultRunTitle() string {
-	return "{{ $.data.text }}"
+	return "{{ root().data.text }}"
 }
 
 func (t *OnMention) Configuration() []configuration.Field {

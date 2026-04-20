@@ -79,7 +79,7 @@ The webhook acts as a signal. When it fires, SuperPlane queries Elasticsearch fo
 }
 
 func (t *OnDocumentIndexed) DefaultRunTitle() string {
-	return "New document in {{ $.data.index }}"
+	return "New document in {{ root().data.index }}"
 }
 
 func (t *OnDocumentIndexed) Configuration() []configuration.Field {

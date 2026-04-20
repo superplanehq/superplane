@@ -68,7 +68,7 @@ func (t *OnIncidentStatusUpdate) Color() string {
 }
 
 func (t *OnIncidentStatusUpdate) DefaultRunTitle() string {
-	return "{{ $.data.data.incident.summary }}"
+	return "{{ root().data.data.incident.summary }}"
 }
 
 func (t *OnIncidentStatusUpdate) Configuration() []configuration.Field {

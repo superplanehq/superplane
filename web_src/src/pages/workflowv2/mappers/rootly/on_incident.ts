@@ -2,7 +2,7 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import type { Incident } from "./types";
 import { getDetailsForIncident } from "./base";

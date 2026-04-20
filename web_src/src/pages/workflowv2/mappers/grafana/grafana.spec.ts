@@ -439,6 +439,6 @@ describe("onAlertFiringTriggerRenderer.getTriggerProps", () => {
 
     const props = onAlertFiringTriggerRenderer.getTriggerProps(ctx);
     expect(props.lastEventData).toBeDefined();
-    expect(props.lastEventData?.title).toBeUndefined();
+    expect(props.lastEventData?.subtitle).toBeDefined();
   });
 });

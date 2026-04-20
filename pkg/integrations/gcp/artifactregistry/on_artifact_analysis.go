@@ -76,7 +76,7 @@ func (t *OnArtifactAnalysis) Icon() string  { return "gcp" }
 func (t *OnArtifactAnalysis) Color() string { return "gray" }
 
 func (t *OnArtifactAnalysis) DefaultRunTitle() string {
-	return "{{ $.data.resourceUri }}"
+	return "{{ root().data.resourceUri }}"
 }
 
 func (t *OnArtifactAnalysis) Configuration() []configuration.Field {

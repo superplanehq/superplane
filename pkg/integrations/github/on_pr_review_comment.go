@@ -65,7 +65,7 @@ func (p *OnPRReviewComment) Color() string {
 }
 
 func (p *OnPRReviewComment) DefaultRunTitle() string {
-	return "#{{ $.data.pull_request.number }} - {{ $.data.pull_request.title }}"
+	return "#{{ root().data.pull_request.number }} - {{ root().data.pull_request.title }}"
 }
 
 func (p *OnPRReviewComment) Configuration() []configuration.Field {

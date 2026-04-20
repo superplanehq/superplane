@@ -7,8 +7,13 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type {
+  ComponentBaseProps,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/pages/workflowv2/mappers/rendererTypes";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";

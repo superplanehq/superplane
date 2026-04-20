@@ -6,7 +6,7 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";

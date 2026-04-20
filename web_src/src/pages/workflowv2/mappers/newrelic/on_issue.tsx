@@ -6,7 +6,7 @@ import type {
   TriggerRendererContext,
 } from "../types";
 import React from "react";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";

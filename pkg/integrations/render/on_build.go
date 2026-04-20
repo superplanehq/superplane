@@ -68,7 +68,7 @@ func (t *OnBuild) Color() string {
 }
 
 func (t *OnBuild) DefaultRunTitle() string {
-	return `{{ ($.data.serviceName != "" ? $.data.serviceName : ($.data.serviceId != "" ? $.data.serviceId : "Service")) + " · " + ($.event.type == "render.build.ended" ? "Build Ended" : ($.event.type == "render.build.started" ? "Build Started" : "Render Event")) }}`
+	return `{{ (root().data.serviceName != "" ? root().data.serviceName : (root().data.serviceId != "" ? root().data.serviceId : "Service")) + " · " + (root().type == "render.build.ended" ? "Build Ended" : (root().type == "render.build.started" ? "Build Started" : "Render Event")) }}`
 }
 
 func (t *OnBuild) Configuration() []configuration.Field {

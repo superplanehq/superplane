@@ -89,7 +89,7 @@ func (t *OnEmailEvent) Color() string {
 }
 
 func (t *OnEmailEvent) DefaultRunTitle() string {
-	return `{{ $.data.email != "" ? $.data.email : "Email Event" }} · {{ $.data.event == "processed" ? "Processed" : ($.data.event == "delivered" ? "Delivered" : ($.data.event == "deferred" ? "Deferred" : ($.data.event == "bounce" ? "Bounced" : ($.data.event == "dropped" ? "Dropped" : ($.data.event == "open" ? "Opened" : ($.data.event == "click" ? "Clicked" : ($.data.event == "spamreport" ? "Spam Report" : ($.data.event == "unsubscribe" ? "Unsubscribed" : ($.data.event == "group_unsubscribe" ? "Group Unsubscribe" : ($.data.event == "group_resubscribe" ? "Group Resubscribe" : "Email Event")))))))))) }}`
+	return `{{ root().data.email != "" ? root().data.email : "Email Event" }} · {{ root().data.event == "processed" ? "Processed" : (root().data.event == "delivered" ? "Delivered" : (root().data.event == "deferred" ? "Deferred" : (root().data.event == "bounce" ? "Bounced" : (root().data.event == "dropped" ? "Dropped" : (root().data.event == "open" ? "Opened" : (root().data.event == "click" ? "Clicked" : (root().data.event == "spamreport" ? "Spam Report" : (root().data.event == "unsubscribe" ? "Unsubscribed" : (root().data.event == "group_unsubscribe" ? "Group Unsubscribe" : (root().data.event == "group_resubscribe" ? "Group Resubscribe" : "Email Event")))))))))) }}`
 }
 
 func (t *OnEmailEvent) Configuration() []configuration.Field {

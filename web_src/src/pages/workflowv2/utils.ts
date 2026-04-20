@@ -149,7 +149,7 @@ export function mapExecutionsToSidebarEvents(
 
     return {
       id: execution.id!,
-      title: getEventRunTitle(eventInfo, execution.id || "Execution"),
+      title: getEventRunTitle(eventInfo),
       subtitle: componentSubtitle || subtitle || renderTimeAgo(new Date(execution.createdAt!)),
       state,
       isOpen: false,
@@ -191,7 +191,7 @@ export function getNextInQueueInfo(
       : "";
 
   return {
-    title: getEventRunTitle(eventInfo, queueItem.id || "Execution"),
+    title: getEventRunTitle(eventInfo),
     subtitle: subtitle || (queueItem.createdAt ? renderTimeAgo(new Date(queueItem.createdAt)) : ""),
     receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : new Date(),
   };
@@ -220,7 +220,7 @@ export function mapQueueItemsToSidebarEvents(
 
     return {
       id: item.id!,
-      title: getEventRunTitle(eventInfo, item.id || "Execution"),
+      title: getEventRunTitle(eventInfo),
       subtitle: subtitle || renderTimeAgo(new Date(item.createdAt!)),
       state: "queued" as const,
       isOpen: false,

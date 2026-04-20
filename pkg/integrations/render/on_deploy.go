@@ -77,7 +77,7 @@ func (t *OnDeploy) Color() string {
 }
 
 func (t *OnDeploy) DefaultRunTitle() string {
-	return `{{ ($.data.serviceName != "" ? $.data.serviceName : ($.data.serviceId != "" ? $.data.serviceId : "Service")) + " · " + ($.event.type == "render.deploy.ended" ? "Deploy Ended" : ($.event.type == "render.deploy.started" ? "Deploy Started" : ($.event.type == "render.image.pull.failed" ? "Image Pull Failed" : ($.event.type == "render.pipeline.minutes.exhausted" ? "Pipeline Minutes Exhausted" : ($.event.type == "render.pre.deploy.ended" ? "Pre-Deploy Ended" : ($.event.type == "render.pre.deploy.started" ? "Pre-Deploy Started" : "Render Event")))))) }}`
+	return `{{ (root().data.serviceName != "" ? root().data.serviceName : (root().data.serviceId != "" ? root().data.serviceId : "Service")) + " · " + (root().type == "render.deploy.ended" ? "Deploy Ended" : (root().type == "render.deploy.started" ? "Deploy Started" : (root().type == "render.image.pull.failed" ? "Image Pull Failed" : (root().type == "render.pipeline.minutes.exhausted" ? "Pipeline Minutes Exhausted" : (root().type == "render.pre.deploy.ended" ? "Pre-Deploy Ended" : (root().type == "render.pre.deploy.started" ? "Pre-Deploy Started" : "Render Event")))))) }}`
 }
 
 func (t *OnDeploy) Configuration() []configuration.Field {

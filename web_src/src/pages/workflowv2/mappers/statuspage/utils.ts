@@ -1,6 +1,5 @@
-import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
-import type { ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionInfo, NodeInfo, RendererEventSection } from "../types";
 import type { StatuspageIncident } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/timezone";
@@ -82,13 +81,16 @@ export function getDetailsForIncident(
   return details;
 }
 
-export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+export function baseEventSections(
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
+  componentName: string,
+): RendererEventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   if (!rootTriggerNode || !execution.rootEvent?.id) {
     return [
       {
         receivedAt: new Date(execution.createdAt!),
-        eventTitle: "Execution",
         eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
         eventState: getState(componentName)(execution),
         eventId: execution.id ?? "",
@@ -100,7 +102,6 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     return [
       {
         receivedAt: new Date(execution.createdAt!),
-        eventTitle: "Execution",
         eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
         eventState: getState(componentName)(execution),
         eventId: execution.rootEvent.id,

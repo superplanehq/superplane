@@ -1,4 +1,4 @@
-import type { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "..";

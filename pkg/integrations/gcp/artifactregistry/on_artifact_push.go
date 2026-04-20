@@ -72,7 +72,7 @@ func (t *OnArtifactPush) Icon() string  { return "gcp" }
 func (t *OnArtifactPush) Color() string { return "gray" }
 
 func (t *OnArtifactPush) DefaultRunTitle() string {
-	return "{{ $.data.tag }}"
+	return "{{ root().data.tag }}"
 }
 
 func (t *OnArtifactPush) Configuration() []configuration.Field {

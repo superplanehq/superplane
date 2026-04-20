@@ -2,7 +2,7 @@ import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 
 interface OnMentionConfiguration {

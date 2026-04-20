@@ -69,7 +69,7 @@ func (t *OnAppMention) Color() string {
 }
 
 func (t *OnAppMention) DefaultRunTitle() string {
-	return "{{ $.data.text }}"
+	return "{{ root().data.text }}"
 }
 
 func (t *OnAppMention) Configuration() []configuration.Field {

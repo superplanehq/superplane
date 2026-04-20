@@ -80,7 +80,7 @@ The trigger emits the full case details including id, title, status, severity, v
 }
 
 func (t *OnCaseStatusChange) DefaultRunTitle() string {
-	return "Case \"{{ $.data.title }}\" changed to {{ $.data.status }}"
+	return "Case \"{{ root().data.title }}\" changed to {{ root().data.status }}"
 }
 
 func (t *OnCaseStatusChange) Configuration() []configuration.Field {

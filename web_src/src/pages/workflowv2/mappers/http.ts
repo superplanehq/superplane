@@ -14,7 +14,7 @@ import type {
   EventSection,
   EventStateMap,
   EventState,
-} from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";

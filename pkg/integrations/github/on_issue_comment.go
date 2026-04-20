@@ -67,7 +67,7 @@ func (i *OnIssueComment) Color() string {
 }
 
 func (i *OnIssueComment) DefaultRunTitle() string {
-	return "#{{ $.data.issue.number }} - {{ $.data.issue.title }}"
+	return "#{{ root().data.issue.number }} - {{ root().data.issue.title }}"
 }
 
 func (i *OnIssueComment) Configuration() []configuration.Field {

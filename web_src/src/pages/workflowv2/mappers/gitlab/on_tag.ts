@@ -1,6 +1,6 @@
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { Predicate } from "../utils";
 import { formatPredicate, stringOrDash } from "../utils";

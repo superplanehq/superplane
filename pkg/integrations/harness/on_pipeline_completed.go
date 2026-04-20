@@ -118,7 +118,7 @@ func (t *OnPipelineCompleted) Color() string {
 }
 
 func (t *OnPipelineCompleted) DefaultRunTitle() string {
-	return "Pipeline Completed · {{ $.data.pipelineIdentifier }}"
+	return "Pipeline Completed · {{ root().data.pipelineIdentifier }}"
 }
 
 func (t *OnPipelineCompleted) Configuration() []configuration.Field {

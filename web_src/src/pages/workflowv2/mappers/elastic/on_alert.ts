@@ -2,7 +2,7 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 
@@ -72,8 +72,6 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
     const metadataItems: MetadataItem[] = buildMetadataItems(config, metadata);
 
     if (lastEvent) {
-      const payload = toAlertPayload(lastEvent.data);
-      const title = alertTitle(payload);
       const subtitle = renderTimeAgo(new Date(lastEvent.createdAt));
 
       return {
@@ -82,7 +80,6 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
         collapsedBackground: getBackgroundColorClass(definition.color),
         metadata: metadataItems,
         lastEventData: {
-          title,
           subtitle,
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
@@ -120,12 +117,6 @@ function buildMetadataItems(config: OnAlertConfiguration, metadata: OnAlertMetad
   if (statuses.length > 0) items.push({ icon: "activity", label: statuses.join(", ") });
 
   return items;
-}
-
-function alertTitle(payload: ElasticAlertPayload | undefined): string {
-  if (!payload) return "Elastic alert received";
-  const baseTitle = payload.ruleName || payload.alertName || payload.name || payload.title || "Elastic alert received";
-  return payload.spaceId ? `${baseTitle} · ${payload.spaceId}` : baseTitle;
 }
 
 function toOnAlertConfiguration(value: unknown): OnAlertConfiguration {

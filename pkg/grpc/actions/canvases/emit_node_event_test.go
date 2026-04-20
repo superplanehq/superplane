@@ -138,7 +138,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		runTitleTemplate := "Run: {{ $[\"node-1\"].message }}"
+		runTitleTemplate := "Run: {{ root().message }}"
 		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
 		require.NoError(t, database.Conn().Save(liveVersion).Error)
 
@@ -161,7 +161,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		assert.Equal(t, "Run: hello", *event.RunTitle)
 	})
 
-	t.Run("run title input exposes payload fields and event metadata", func(t *testing.T) {
+	t.Run("legacy run title input exposes payload fields and event metadata", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,

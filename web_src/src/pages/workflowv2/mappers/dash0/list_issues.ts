@@ -4,8 +4,8 @@ import type {
   ComponentBaseSpec,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/rendererTypes";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getState, getStateMap } from "..";
 import type React from "react";
 import type {

@@ -1,5 +1,5 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";

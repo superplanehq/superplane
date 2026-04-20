@@ -106,7 +106,7 @@ func (t *OnVMStarted) Color() string {
 }
 
 func (t *OnVMStarted) DefaultRunTitle() string {
-	return "{{ $.data.subject }}"
+	return "{{ root().data.subject }}"
 }
 
 func (t *OnVMStarted) Configuration() []configuration.Field {

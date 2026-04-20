@@ -85,7 +85,7 @@ func (p *OnPipelineDone) Color() string {
 }
 
 func (p *OnPipelineDone) DefaultRunTitle() string {
-	return "{{ $.data.pipeline.working_directory }}/{{ $.data.pipeline.yaml_file_name }} ({{ $.data.pipeline.name }})"
+	return "{{ root().data.pipeline.working_directory }}/{{ root().data.pipeline.yaml_file_name }} ({{ root().data.pipeline.name }})"
 }
 
 func (p *OnPipelineDone) Configuration() []configuration.Field {

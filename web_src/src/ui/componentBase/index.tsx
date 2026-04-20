@@ -11,6 +11,7 @@ import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
+import { formatTimestamp } from "@/pages/workflowv2/mappers/utils";
 
 interface EventSectionDisplayProps {
   section: EventSection;
@@ -54,7 +55,10 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
 
   const currentState = section.eventState || "neutral";
   const stateStyle = stateMap[currentState] || stateMap["neutral"];
-  const eventTitle = section.eventTitle?.trim() || defaultEventTitle || "";
+  const eventTitle =
+    section.eventTitle?.trim() ||
+    defaultEventTitle ||
+    "Event received at " + formatTimestamp(section.receivedAt?.toISOString() || "");
 
   const LastEventBackground = stateStyle.backgroundColor;
   const LastEventStateColor = stateStyle.badgeColor;

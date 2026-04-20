@@ -1,4 +1,4 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import type {
   ComponentBaseMapper,

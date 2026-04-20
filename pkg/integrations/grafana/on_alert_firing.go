@@ -70,7 +70,7 @@ func (t *OnAlertFiring) Color() string {
 }
 
 func (t *OnAlertFiring) DefaultRunTitle() string {
-	return "{{ $.data.title }}"
+	return "{{ root().data.title }}"
 }
 
 func (t *OnAlertFiring) Configuration() []configuration.Field {

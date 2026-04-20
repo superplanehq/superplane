@@ -66,7 +66,7 @@ func (t *OnTagCreated) Color() string {
 }
 
 func (t *OnTagCreated) DefaultRunTitle() string {
-	return "Tag: {{ $.data.ref }}"
+	return "Tag: {{ root().data.ref }}"
 }
 
 func (t *OnTagCreated) Configuration() []configuration.Field {

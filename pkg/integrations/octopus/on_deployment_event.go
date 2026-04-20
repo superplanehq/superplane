@@ -107,7 +107,7 @@ func (t *OnDeploymentEvent) Color() string {
 }
 
 func (t *OnDeploymentEvent) DefaultRunTitle() string {
-	return `{{ ($.data.projectName != "" ? $.data.projectName : "") + (($.data.projectName != "" ? " · " : "") + ($.event.type == "octopus.deployment.queued" ? "Deployment Queued" : ($.event.type == "octopus.deployment.started" ? "Deployment Started" : ($.event.type == "octopus.deployment.succeeded" ? "Deployment Succeeded" : ($.event.type == "octopus.deployment.failed" ? "Deployment Failed" : "Octopus Event"))))) }}`
+	return `{{ (root().data.projectName != "" ? root().data.projectName : "") + ((root().data.projectName != "" ? " · " : "") + (root().type == "octopus.deployment.queued" ? "Deployment Queued" : (root().type == "octopus.deployment.started" ? "Deployment Started" : (root().type == "octopus.deployment.succeeded" ? "Deployment Succeeded" : (root().type == "octopus.deployment.failed" ? "Deployment Failed" : "Octopus Event"))))) }}`
 }
 
 func (t *OnDeploymentEvent) Configuration() []configuration.Field {

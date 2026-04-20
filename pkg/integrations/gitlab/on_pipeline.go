@@ -57,7 +57,7 @@ func (p *OnPipeline) Color() string {
 }
 
 func (p *OnPipeline) DefaultRunTitle() string {
-	return "Pipeline #{{ $.data.object_attributes.iid }}"
+	return "Pipeline #{{ root().data.object_attributes.iid }}"
 }
 
 func (p *OnPipeline) Configuration() []configuration.Field {

@@ -5,7 +5,6 @@ import { type MetadataItem } from "../metadataList";
 type LastEventState = string;
 
 interface TriggerLastEventData {
-  title?: string;
   subtitle?: string | React.ReactNode;
   receivedAt: Date;
   state: LastEventState;
@@ -25,7 +24,6 @@ export const Trigger: React.FC<TriggerProps> = ({ lastEventData, ...componentBas
       {
         receivedAt: lastEventData.receivedAt,
         eventState: lastEventData.state,
-        eventTitle: lastEventData.title,
         eventSubtitle: lastEventData.subtitle,
         eventId: lastEventData.eventId,
       },

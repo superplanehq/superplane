@@ -172,7 +172,7 @@ describe("onAlertReceivedTriggerRenderer.getTriggerProps", () => {
     };
     const props = onAlertReceivedTriggerRenderer.getTriggerProps(ctx);
     expect(props.lastEventData).toBeDefined();
-    expect(props.lastEventData!.title).toBeUndefined();
+    expect(props.lastEventData!.subtitle).toBeDefined();
     expect(props.lastEventData!.state).toBe("triggered");
   });
 

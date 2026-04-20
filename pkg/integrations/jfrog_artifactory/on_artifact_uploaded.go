@@ -68,7 +68,7 @@ func (t *OnArtifactUploaded) Color() string {
 }
 
 func (t *OnArtifactUploaded) DefaultRunTitle() string {
-	return "{{ $.data.name }} in {{ $.data.repo }}"
+	return "{{ root().data.name }} in {{ root().data.repo }}"
 }
 
 func (t *OnArtifactUploaded) Configuration() []configuration.Field {

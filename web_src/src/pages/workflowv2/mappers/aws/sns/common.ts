@@ -1,6 +1,6 @@
 import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
 import type React from "react";
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap } from "../..";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";

@@ -59,10 +59,23 @@ func Test__EventContext__Emit(t *testing.T) {
 	})
 
 	t.Run("uses default run title from trigger definition", func(t *testing.T) {
-		node := nodes[0]
-		node.Ref = datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "bitbucket.onPush"}})
+		bitbucketCanvas, bitbucketNodes := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID:        triggerNodeID,
+					Name:          triggerNodeID,
+					Type:          models.NodeTypeTrigger,
+					Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "bitbucket.onPush"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{}),
+				},
+			},
+			nil,
+		)
 
-		ctx := NewEventContext(database.Conn(), &node, nil)
+		ctx := NewEventContext(database.Conn(), &bitbucketNodes[0], nil)
 		require.NoError(t, ctx.Emit("bitbucket.push", map[string]any{
 			"repository": map[string]any{"full_name": "superplanehq/superplane"},
 			"push": map[string]any{
@@ -76,7 +89,7 @@ func Test__EventContext__Emit(t *testing.T) {
 			},
 		}))
 
-		events, err := models.ListCanvasEvents(canvas.ID, triggerNodeID, 10, nil)
+		events, err := models.ListCanvasEvents(bitbucketCanvas.ID, triggerNodeID, 10, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, events)
 		require.NotNil(t, events[len(events)-1].RunTitle)

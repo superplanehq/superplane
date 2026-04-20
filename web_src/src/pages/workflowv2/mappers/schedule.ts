@@ -8,7 +8,7 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 

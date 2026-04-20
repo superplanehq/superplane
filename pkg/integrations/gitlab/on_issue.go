@@ -65,7 +65,7 @@ func (i *OnIssue) Color() string {
 }
 
 func (i *OnIssue) DefaultRunTitle() string {
-	return "#{{ $.data.object_attributes.iid }} - {{ $.data.object_attributes.title }}"
+	return "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}"
 }
 
 func (i *OnIssue) Configuration() []configuration.Field {

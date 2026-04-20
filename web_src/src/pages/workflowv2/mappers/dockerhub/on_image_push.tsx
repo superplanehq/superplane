@@ -7,7 +7,7 @@ import type {
   TriggerRenderer,
   TriggerRendererContext,
 } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import type { Repository, RepositoryMetadata } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";

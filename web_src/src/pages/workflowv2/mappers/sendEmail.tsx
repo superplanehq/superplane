@@ -8,7 +8,12 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import type {
+  ComponentBaseProps,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/pages/workflowv2/mappers/rendererTypes";
 import React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";

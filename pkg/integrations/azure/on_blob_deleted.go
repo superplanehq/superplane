@@ -78,7 +78,7 @@ func (t *OnBlobDeleted) Color() string {
 }
 
 func (t *OnBlobDeleted) DefaultRunTitle() string {
-	return `{{ $.data.container != "" ? $.data.container + "/" + $.data.blobName : "Blob deleted" }}`
+	return `{{ root().data.container != "" ? root().data.container + "/" + root().data.blobName : "Blob deleted" }}`
 }
 
 func (t *OnBlobDeleted) Configuration() []configuration.Field {

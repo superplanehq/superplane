@@ -1,15 +1,14 @@
-import type { EventSection } from "@/ui/componentBase";
 import { formatTimeAgo } from "@/lib/date";
 import type {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
   OutputPayload,
+  RendererEventSection,
   StateFunction,
   SubtitleContext,
   TriggerRenderer,
 } from "../types";
-import { getEventRunTitle } from "../../utils";
 
 export function buildEventSections(
   _nodes: NodeInfo[],
@@ -17,7 +16,7 @@ export function buildEventSections(
   componentName: string,
   _getTriggerRenderer: (name: string) => TriggerRenderer,
   getState: (componentName: string) => StateFunction,
-): EventSection[] | undefined {
+): RendererEventSection[] | undefined {
   const rootEvent = execution.rootEvent;
   const createdAt = execution.createdAt;
 
@@ -28,7 +27,6 @@ export function buildEventSections(
   return [
     {
       receivedAt: new Date(createdAt),
-      eventTitle: getEventRunTitle(rootEvent),
       eventSubtitle: formatTimeAgo(new Date(createdAt)),
       eventState: getState(componentName)(execution),
       eventId: rootEvent.id || "",

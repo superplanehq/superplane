@@ -25,9 +25,13 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]mo
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
+	now := time.Now()
+	eventID := uuid.New()
 	structuredPayload := map[string]any{
+		"id":        eventID.String(),
 		"type":      payloadType,
-		"timestamp": time.Now(),
+		"timestamp": now.UTC().Format(time.RFC3339Nano),
+		"channel":   "default",
 		"data":      payload,
 	}
 
@@ -39,9 +43,6 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	if len(data) > s.maxPayloadSize {
 		return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
 	}
-
-	now := time.Now()
-	eventID := uuid.New()
 
 	//
 	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
@@ -59,7 +60,8 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	runTitle, err := ResolveRootEventRunTitle(
 		s.tx,
 		s.node,
-		buildRootEventRunTitleInput(payload, event.ID, now, payloadType, event.Channel),
+		structuredPayload,
+		structuredPayload,
 	)
 	if err == nil && runTitle != nil {
 		event.RunTitle = runTitle
@@ -77,7 +79,7 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, payload any) (*string, error) {
+func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, rootPayload any, input any) (*string, error) {
 	template, err := resolveRootEventRunTitleTemplate(tx, node)
 	if err != nil {
 		return nil, err
@@ -89,7 +91,8 @@ func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, payload any)
 
 	builder := NewNodeConfigurationBuilder(tx, node.WorkflowID).
 		WithNodeID(node.NodeID).
-		WithInput(map[string]any{node.NodeID: payload})
+		WithRootPayload(rootPayload).
+		WithInput(map[string]any{node.NodeID: input})
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
@@ -101,18 +104,6 @@ func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, payload any)
 	}
 
 	return &resolvedName, nil
-}
-
-func buildRootEventRunTitleInput(payload any, eventID uuid.UUID, createdAt time.Time, payloadType string, channel string) map[string]any {
-	return map[string]any{
-		"data": payload,
-		"event": map[string]any{
-			"id":        eventID.String(),
-			"createdAt": createdAt.UTC().Format(time.RFC3339Nano),
-			"type":      payloadType,
-			"channel":   channel,
-		},
-	}
 }
 
 func resolveRootEventRunTitleTemplate(tx *gorm.DB, node *models.CanvasNode) (string, error) {

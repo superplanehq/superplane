@@ -77,7 +77,7 @@ func (t *OnImageDeleted) Color() string {
 }
 
 func (t *OnImageDeleted) DefaultRunTitle() string {
-	return `{{ $.data.repository != "" ? $.data.repository + ($.data.shortDigest != "" ? "@" + $.data.shortDigest : "") : "Image deleted" }}`
+	return `{{ root().data.repository != "" ? root().data.repository + (root().data.shortDigest != "" ? "@" + root().data.shortDigest : "") : "Image deleted" }}`
 }
 
 func (t *OnImageDeleted) Configuration() []configuration.Field {

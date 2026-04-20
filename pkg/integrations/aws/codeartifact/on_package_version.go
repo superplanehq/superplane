@@ -65,7 +65,7 @@ func (p *OnPackageVersion) Color() string {
 }
 
 func (p *OnPackageVersion) DefaultRunTitle() string {
-	return "{{ $.data.detail.packageName }}@{{ $.data.detail.packageVersion }}"
+	return "{{ root().data.detail.packageName }}@{{ root().data.detail.packageVersion }}"
 }
 
 func (p *OnPackageVersion) Configuration() []configuration.Field {

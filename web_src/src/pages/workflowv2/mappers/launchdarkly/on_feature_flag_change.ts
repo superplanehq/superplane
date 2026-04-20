@@ -1,7 +1,7 @@
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { Predicate } from "../utils";
 import { formatPredicate, buildSubtitle } from "../utils";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";

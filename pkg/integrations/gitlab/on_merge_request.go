@@ -53,7 +53,7 @@ func (m *OnMergeRequest) Color() string {
 }
 
 func (m *OnMergeRequest) DefaultRunTitle() string {
-	return "#{{ $.data.object_attributes.iid }} - {{ $.data.object_attributes.title }}"
+	return "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}"
 }
 
 func (m *OnMergeRequest) Configuration() []configuration.Field {

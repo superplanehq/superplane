@@ -87,7 +87,7 @@ func (p *OnAlarm) Color() string {
 }
 
 func (p *OnAlarm) DefaultRunTitle() string {
-	return "{{ $.data.detail.alarmName }}"
+	return "{{ root().data.detail.alarmName }}"
 }
 
 func (p *OnAlarm) Configuration() []configuration.Field {

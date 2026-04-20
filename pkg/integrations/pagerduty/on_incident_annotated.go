@@ -67,7 +67,7 @@ func (t *OnIncidentAnnotated) Color() string {
 }
 
 func (t *OnIncidentAnnotated) DefaultRunTitle() string {
-	return "{{ $.data.data.incident.id }} - {{ $.data.data.incident.title }}"
+	return "{{ root().data.data.incident.id }} - {{ root().data.data.incident.title }}"
 }
 
 func (t *OnIncidentAnnotated) Configuration() []configuration.Field {

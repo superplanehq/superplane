@@ -2,7 +2,7 @@ import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { OnAlertFiringConfiguration, OnAlertFiringEventData } from "./types";

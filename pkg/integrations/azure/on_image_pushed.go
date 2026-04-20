@@ -79,7 +79,7 @@ func (t *OnImagePushed) Color() string {
 }
 
 func (t *OnImagePushed) DefaultRunTitle() string {
-	return "{{ $.data.target.repository }}:{{ $.data.target.tag }}"
+	return "{{ root().data.target.repository }}:{{ root().data.target.tag }}"
 }
 
 func (t *OnImagePushed) Configuration() []configuration.Field {

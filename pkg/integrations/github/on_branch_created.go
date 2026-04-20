@@ -66,7 +66,7 @@ func (t *OnBranchCreated) Color() string {
 }
 
 func (t *OnBranchCreated) DefaultRunTitle() string {
-	return "Branch: {{ $.data.ref }}"
+	return "Branch: {{ root().data.ref }}"
 }
 
 func (t *OnBranchCreated) Configuration() []configuration.Field {

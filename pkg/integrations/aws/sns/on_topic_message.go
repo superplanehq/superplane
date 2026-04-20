@@ -69,7 +69,7 @@ func (t *OnTopicMessage) Color() string {
 }
 
 func (t *OnTopicMessage) DefaultRunTitle() string {
-	return "{{ $.data.MessageId }}"
+	return "{{ root().data.MessageId }}"
 }
 
 func (t *OnTopicMessage) Configuration() []configuration.Field {

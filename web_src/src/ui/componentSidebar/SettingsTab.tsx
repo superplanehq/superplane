@@ -577,7 +577,7 @@ export function SettingsTab({
               disabled={isReadOnly}
             />
             <p className="text-xs text-gray-500">
-              Optional run title template. Supports expressions like {`{{ $.data }}`}.{" "}
+              Optional run title template. Supports expressions like {`Event: {{ root().data.exampleField }}`}.{" "}
             </p>
           </div>
         )}

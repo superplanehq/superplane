@@ -97,7 +97,7 @@ func (p *OnImagePush) ExampleData() map[string]any {
 }
 
 func (p *OnImagePush) DefaultRunTitle() string {
-	return "{{ $.data.repository.repo_name }}:{{ $.data.push_data.tag }}"
+	return "{{ root().data.repository.repo_name }}:{{ root().data.push_data.tag }}"
 }
 
 func (p *OnImagePush) Configuration() []configuration.Field {

@@ -32,7 +32,7 @@ func (p *OnPush) Description() string {
 }
 
 func (p *OnPush) DefaultRunTitle() string {
-	return "{{ $.data.push.changes[0].new.target.message }}"
+	return "{{ root().data.push.changes[0].new.target.message }}"
 }
 
 func (p *OnPush) Documentation() string {

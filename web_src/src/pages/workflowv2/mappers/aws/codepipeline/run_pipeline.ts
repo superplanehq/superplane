@@ -9,8 +9,13 @@ import type {
   StateFunction,
   SubtitleContext,
 } from "../../types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type {
+  ComponentBaseProps,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/pages/workflowv2/mappers/rendererTypes";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";

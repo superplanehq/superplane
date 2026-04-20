@@ -74,7 +74,7 @@ func (p *OnImageScan) Color() string {
 }
 
 func (p *OnImageScan) DefaultRunTitle() string {
-	return `{{ $.data.detail["repository-name"] != "" ? $.data.detail["repository-name"] : "ECR image scan" }}{{ len($.data.detail["image-tags"]) > 0 ? ":" + $.data.detail["image-tags"][0] : "" }}`
+	return `{{ root().data.detail["repository-name"] != "" ? root().data.detail["repository-name"] : "ECR image scan" }}{{ len(root().data.detail["image-tags"]) > 0 ? ":" + root().data.detail["image-tags"][0] : "" }}`
 }
 
 func (p *OnImageScan) Configuration() []configuration.Field {

@@ -77,7 +77,7 @@ func (t *OnMessage) Icon() string  { return "gcp" }
 func (t *OnMessage) Color() string { return "gray" }
 
 func (t *OnMessage) DefaultRunTitle() string {
-	return "{{ $.data.messageId }}"
+	return "{{ root().data.messageId }}"
 }
 
 func (t *OnMessage) Configuration() []configuration.Field {
