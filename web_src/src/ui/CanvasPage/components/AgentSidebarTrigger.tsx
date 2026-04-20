@@ -23,6 +23,7 @@ export function AgentSidebarTrigger({ agentState }: AgentSidebarTriggerProps) {
                 className="h-8 w-8 bg-white border-slate-300"
                 aria-label="Open SuperPlane Agent"
                 onClick={handleAgentSidebarToggle}
+                data-testid="open-agent-sidebar"
               >
                 <Sparkles className="h-3 w-3 text-slate-700" />
               </UIButton>
