@@ -4735,6 +4735,8 @@ export function WorkflowPageV2() {
   );
 
   const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
+    canvasId: canvasId!,
+    organizationId: organizationId!,
     nodes,
     getYamlExportPayload,
   });

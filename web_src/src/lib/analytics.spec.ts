@@ -56,6 +56,27 @@ describe("analytics", () => {
     });
   });
 
+  it("captures canvas rename", () => {
+    analytics.canvasRename("canvas-123", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:canvas_rename", {
+      canvas_id: "canvas-123",
+      organization_id: "org-123",
+    });
+  });
+
+  it("captures yaml export", () => {
+    analytics.yamlExport("canvas-123", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:yaml_export", {
+      canvas_id: "canvas-123",
+      organization_id: "org-123",
+    });
+  });
+
+  it("captures yaml import", () => {
+    analytics.yamlImport();
+    expect(capture).toHaveBeenCalledWith("canvas:yaml_import", {});
+  });
+
   it("captures version publish", () => {
     analytics.versionPublish("canvas-123", "org-123");
     expect(capture).toHaveBeenCalledWith("canvas:version_publish", {

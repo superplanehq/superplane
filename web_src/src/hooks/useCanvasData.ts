@@ -401,7 +401,10 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
         approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
       };
     }) => {
-      return await canvasesUpdateCanvas(
+      const currentCanvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+      const previousName = currentCanvas?.metadata?.name;
+
+      const result = await canvasesUpdateCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
           body: {
@@ -411,12 +414,17 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           },
         }),
       );
+      return { result, previousName };
     },
-    onSuccess: (response, variables) => {
+    onSuccess: ({ result: response, previousName }, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+
+      if (variables.name !== undefined && variables.name !== previousName) {
+        analytics.canvasRename(canvasId, organizationId);
+      }
 
       const updatedCanvas = response?.data?.canvas;
       if (updatedCanvas) {
