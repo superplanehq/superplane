@@ -15,6 +15,7 @@ import (
 )
 
 var errTemplateCanvasAutoLayout = errors.New("template canvas auto layout failed")
+var errTemplateCanvasDuplicateName = errors.New("template canvas duplicate name")
 
 type templateCanvasAutoLayoutError struct {
 	cause error
@@ -26,6 +27,18 @@ func (e *templateCanvasAutoLayoutError) Error() string {
 
 func (e *templateCanvasAutoLayoutError) Unwrap() []error {
 	return []error{errTemplateCanvasAutoLayout, e.cause}
+}
+
+type templateCanvasDuplicateNameError struct {
+	cause error
+}
+
+func (e *templateCanvasDuplicateNameError) Error() string {
+	return e.cause.Error()
+}
+
+func (e *templateCanvasDuplicateNameError) Unwrap() []error {
+	return []error{errTemplateCanvasDuplicateName, e.cause}
 }
 
 // CreatePublishedTemplateCanvasWithoutSetupInTransaction persists a shared template
@@ -72,6 +85,9 @@ func CreatePublishedTemplateCanvasWithoutSetupInTransaction(
 	}
 
 	if err := tx.Create(canvas).Error; err != nil {
+		if strings.Contains(err.Error(), ErrDuplicateCanvasName) {
+			return nil, &templateCanvasDuplicateNameError{cause: err}
+		}
 		return nil, err
 	}
 

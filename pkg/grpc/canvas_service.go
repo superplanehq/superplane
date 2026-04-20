@@ -71,9 +71,6 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 	return canvases.CreateCanvas(
 		ctx,
 		s.registry,
-		s.encryptor,
-		s.authService,
-		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
 		req.Canvas,
 		req.AutoLayout,

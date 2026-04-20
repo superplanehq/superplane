@@ -9,8 +9,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -30,9 +28,6 @@ const ErrDuplicateCanvasName = "duplicate key value violates unique constraint"
 func CreateCanvas(
 	ctx context.Context,
 	registry *registry.Registry,
-	encryptor crypto.Encryptor,
-	authService authorization.Authorization,
-	webhookBaseURL string,
 	organizationID uuid.UUID,
 	pbCanvas *pb.Canvas,
 	autoLayout *pb.CanvasAutoLayout,
@@ -95,13 +90,7 @@ func CreateCanvasWithAutoLayoutAndUsage(
 				organizationID,
 			)
 			if txErr != nil {
-				if strings.Contains(txErr.Error(), ErrDuplicateCanvasName) {
-					return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
-				}
-				if errors.Is(txErr, errTemplateCanvasAutoLayout) {
-					return status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", txErr)
-				}
-				return txErr
+				return mapTemplateCanvasCreateError(txErr)
 			}
 			return nil
 		})
@@ -193,6 +182,16 @@ func CreateCanvasWithAutoLayoutAndUsage(
 	}
 
 	return createCanvasResponse(canvas, organizationID)
+}
+
+func mapTemplateCanvasCreateError(err error) error {
+	if errors.Is(err, errTemplateCanvasDuplicateName) {
+		return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+	}
+	if errors.Is(err, errTemplateCanvasAutoLayout) {
+		return status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
+	}
+	return err
 }
 
 func ptrUUID(id uuid.UUID) *uuid.UUID {

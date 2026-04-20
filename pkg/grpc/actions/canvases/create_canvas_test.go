@@ -128,11 +128,10 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 		},
 	}
 
-	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Organization.ID, workflow, nil, nil)
 	require.NoError(t, err)
 
-	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	_, err = CreateCanvas(ctx, r.Registry, r.Organization.ID, workflow, nil, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.AlreadyExists, status.Code(err))
 }
@@ -154,8 +153,7 @@ func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.
 		},
 	}
 
-	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Organization.ID, workflow, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -188,8 +186,7 @@ func TestCreateCanvasOnFreshOrganization(t *testing.T) {
 		},
 	}
 
-	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Organization.ID, canvas, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -233,8 +230,7 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 		},
 	}
 
-	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, service)
+	_, err := CreateCanvas(ctx, r.Registry, r.Organization.ID, workflow, nil, service)
 	require.Error(t, err)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
@@ -497,6 +493,27 @@ func TestTemplateCanvasAutoLayoutErrorUnwrapMatchesSentinelAndCause(t *testing.T
 
 	require.True(t, errors.Is(err, errTemplateCanvasAutoLayout))
 	require.True(t, errors.Is(err, cause))
+}
+
+func TestTemplateCanvasDuplicateNameErrorUnwrapMatchesSentinelAndCause(t *testing.T) {
+	cause := errors.New("duplicate key value violates unique constraint workflows_org_id_name_key")
+	err := &templateCanvasDuplicateNameError{cause: cause}
+
+	require.True(t, errors.Is(err, errTemplateCanvasDuplicateName))
+	require.True(t, errors.Is(err, cause))
+}
+
+func TestMapTemplateCanvasCreateErrorMapsOnlyWrappedDuplicateNameErrors(t *testing.T) {
+	wrapped := &templateCanvasDuplicateNameError{
+		cause: errors.New("duplicate key value violates unique constraint workflows_org_id_name_key"),
+	}
+
+	mapped := mapTemplateCanvasCreateError(wrapped)
+	require.Equal(t, codes.AlreadyExists, status.Code(mapped))
+	require.Equal(t, "Canvas with the same name already exists", status.Convert(mapped).Message())
+
+	otherConstraint := errors.New("duplicate key value violates unique constraint workflow_versions_pkey")
+	require.Same(t, otherConstraint, mapTemplateCanvasCreateError(otherConstraint))
 }
 
 func mustStruct(t *testing.T, value map[string]any) *structpb.Struct {
