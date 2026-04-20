@@ -110,13 +110,14 @@ export function ConversationList({
 
           {chatSessions.map((session) => {
             return (
-              <div key={session.id} className="group relative">
+              <div key={session.id} className="group relative" data-testid="agent-chat-session-item">
                 <button
                   type="button"
                   onClick={() => onSelectChat(session.id)}
                   disabled={isGeneratingResponse}
                   title={session.createdAt ? formatSessionDate(session.createdAt) : undefined}
                   className="w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50"
+                  data-testid="agent-chat-session-button"
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2">
                     <div className="min-w-0 truncate text-sm font-medium">{session.title}</div>
