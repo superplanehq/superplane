@@ -366,7 +366,7 @@ export interface SyntheticCheckHeaderMatchInput {
   allowMissing?: boolean;
 }
 
-export interface SyntheticCheckTLSInput {
+export interface GrafanaSyntheticCheckTLSConfig {
   insecureSkipVerify?: boolean;
   serverName?: string;
   caCert?: string;
@@ -390,7 +390,6 @@ export interface HttpSyntheticCheckRequestConfiguration {
   noFollowRedirects?: boolean;
   basicAuth?: SyntheticCheckBasicAuthInput;
   bearerToken?: string;
-  tls?: SyntheticCheckTLSInput;
 }
 
 /** Grouped schedule / probe settings. */
@@ -434,7 +433,6 @@ export interface CreateHttpSyntheticCheckConfiguration {
   failIfBodyMatchesRegexp?: string[];
   failIfBodyNotMatchesRegexp?: string[];
   failIfHeaderMatchesRegexp?: SyntheticCheckHeaderMatchInput[];
-  tls?: SyntheticCheckTLSInput;
   basicAuth?: SyntheticCheckBasicAuthInput;
   bearerToken?: string;
 }
@@ -471,7 +469,7 @@ export interface GrafanaSyntheticCheckHTTPSettings {
   failIfSSL?: boolean;
   failIfNotSSL?: boolean;
   failIfHeaderMatchesRegexp?: SyntheticCheckHeaderMatchInput[];
-  tlsConfig?: SyntheticCheckTLSInput;
+  tlsConfig?: GrafanaSyntheticCheckTLSConfig;
 }
 
 export interface GrafanaSyntheticCheckAlert {

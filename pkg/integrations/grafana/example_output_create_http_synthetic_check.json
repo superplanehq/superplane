@@ -27,10 +27,6 @@
             "Accept:application/json"
           ],
           "ipVersion": "V4",
-          "tlsConfig": {
-            "serverName": "api.example.com",
-            "insecureSkipVerify": false
-          },
           "noFollowRedirects": false,
           "failIfSSL": false,
           "failIfNotSSL": true,

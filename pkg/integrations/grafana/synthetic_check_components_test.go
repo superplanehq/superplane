@@ -30,10 +30,25 @@ func Test__CreateHTTPSyntheticCheck__Setup__ValidatesSpec(t *testing.T) {
 	require.ErrorContains(t, err, "at least one probe is required")
 }
 
+func grafanaSyntheticDataSourceResponse() *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`[{"uid":"sm-ds","name":"Synthetic Monitoring","type":"synthetic-monitoring-datasource","jsonData":{"metrics":{"uid":"prom-ds"}}}]`)),
+	}
+}
+
+func grafanaSyntheticCheckListResponse(checkJSON string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("[" + checkJSON + "]")),
+	}
+}
+
 func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 	component := &CreateHTTPSyntheticCheck{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
+			grafanaSyntheticDataSourceResponse(),
 			{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
@@ -71,11 +86,6 @@ func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 					"allowMissing": true,
 				},
 			},
-			"tls": map[string]any{
-				"insecureSkipVerify": true,
-				"serverName":         "api.example.com",
-				"caCert":             "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----",
-			},
 			"alerts": []map[string]any{
 				{
 					"name":      "HTTPRequestDurationTooHighAvg",
@@ -87,9 +97,8 @@ func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"baseURL":               "https://grafana.example.com",
-				"syntheticsBaseURL":     "https://synthetic-monitoring-api.grafana.net",
-				"syntheticsAccessToken": "sm-token",
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "grafana-token",
 			},
 		},
 		ExecutionState: execCtx,
@@ -102,8 +111,8 @@ func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 	data := payload["data"].(map[string]any)
 	assert.Equal(t, "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101", data["checkUrl"])
 
-	require.Len(t, httpContext.Requests, 2)
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.Len(t, httpContext.Requests, 3)
+	body, err := io.ReadAll(httpContext.Requests[1].Body)
 	require.NoError(t, err)
 
 	var requestPayload map[string]any
@@ -116,11 +125,9 @@ func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 	assert.Equal(t, "X-Canary", match["header"])
 	assert.Equal(t, "failed", match["regexp"])
 	assert.Equal(t, true, match["allowMissing"])
-	tlsConfig := settings["tlsConfig"].(map[string]any)
-	assert.Equal(t, "api.example.com", tlsConfig["serverName"])
-	assert.Equal(t, true, tlsConfig["insecureSkipVerify"])
+	assert.NotContains(t, settings, "tlsConfig")
 
-	alertsBody, err := io.ReadAll(httpContext.Requests[1].Body)
+	alertsBody, err := io.ReadAll(httpContext.Requests[2].Body)
 	require.NoError(t, err)
 	var alertPayload map[string]any
 	require.NoError(t, json.Unmarshal(alertsBody, &alertPayload))
@@ -130,29 +137,26 @@ func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 }
 
 func grafanaGetCheckResponses(reachability string) []*http.Response {
+	checkJSON := `{
+		"id": 101,
+		"job": "API health",
+		"target": "https://api.example.com/health",
+		"frequency": 60000,
+		"timeout": 3000,
+		"enabled": true,
+		"basicMetricsOnly": true,
+		"settings": {"http": {"method": "GET"}},
+		"probes": [1]
+	}`
+
 	return []*http.Response{
-		{
-			StatusCode: http.StatusOK,
-			Body: io.NopCloser(strings.NewReader(`{
-				"id": 101,
-				"job": "API health",
-				"target": "https://api.example.com/health",
-				"frequency": 60000,
-				"timeout": 3000,
-				"enabled": true,
-				"basicMetricsOnly": true,
-				"settings": {"http": {"method": "GET"}},
-				"probes": [1]
-			}`)),
-		},
+		grafanaSyntheticDataSourceResponse(),
+		grafanaSyntheticCheckListResponse(checkJSON),
 		{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(`{"alerts":[{"name":"ProbeFailedExecutionsTooHigh","threshold":1,"period":"5m"}]}`)),
 		},
-		{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(`[{"uid":"sm-ds","name":"Synthetic Monitoring","type":"synthetic-monitoring-datasource","jsonData":{"metrics":{"uid":"prom-ds"}}}]`)),
-		},
+		grafanaSyntheticDataSourceResponse(),
 		// success runs
 		{
 			StatusCode: http.StatusOK,
@@ -205,10 +209,8 @@ func Test__GetHTTPSyntheticCheck__Execute__ReturnsConfigurationAndMetrics(t *tes
 				HTTP: httpContext,
 				Integration: &contexts.IntegrationContext{
 					Configuration: map[string]any{
-						"baseURL":               "https://grafana.example.com",
-						"apiToken":              "grafana-token",
-						"syntheticsBaseURL":     "https://synthetic-monitoring-api.grafana.net",
-						"syntheticsAccessToken": "sm-token",
+						"baseURL":  "https://grafana.example.com",
+						"apiToken": "grafana-token",
 					},
 				},
 				ExecutionState: execCtx,
@@ -237,15 +239,14 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 					"timeout": 5000,
 					"enabled": true,
 					"basicMetricsOnly": true,
-					"settings": {"http": {"method": "GET"}},
+					"settings": {"http": {"method": "GET", "tlsConfig": {"serverName": "api.example.com", "insecureSkipVerify": true}}},
 					"probes": [1,2]
 				}`
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(checkJSON)),
-			},
+			grafanaSyntheticDataSourceResponse(),
+			grafanaSyntheticCheckListResponse(checkJSON),
+			grafanaSyntheticDataSourceResponse(),
 			{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(checkJSON)),
@@ -278,9 +279,8 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"baseURL":               "https://grafana.example.com",
-				"syntheticsBaseURL":     "https://synthetic-monitoring-api.grafana.net",
-				"syntheticsAccessToken": "sm-token",
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "grafana-token",
 			},
 		},
 		ExecutionState: execCtx,
@@ -288,27 +288,34 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "grafana.syntheticCheck.updated", execCtx.Type)
-	require.Len(t, httpContext.Requests, 3)
+	require.Len(t, httpContext.Requests, 5)
+
+	body, err := io.ReadAll(httpContext.Requests[3].Body)
+	require.NoError(t, err)
+	var requestPayload map[string]any
+	require.NoError(t, json.Unmarshal(body, &requestPayload))
+	settings := requestPayload["settings"].(map[string]any)["http"].(map[string]any)
+	tlsConfig := settings["tlsConfig"].(map[string]any)
+	assert.Equal(t, "api.example.com", tlsConfig["serverName"])
+	assert.Equal(t, true, tlsConfig["insecureSkipVerify"])
 }
 
 func Test__DeleteHTTPSyntheticCheck__Execute(t *testing.T) {
 	component := &DeleteHTTPSyntheticCheck{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`{
-					"id": 101,
-					"job": "API health",
-					"target": "https://api.example.com/health",
-					"frequency": 60000,
-					"timeout": 3000,
-					"enabled": true,
-					"basicMetricsOnly": true,
-					"settings": {"http": {"method": "GET"}},
-					"probes": [1]
-				}`)),
-			},
+			grafanaSyntheticDataSourceResponse(),
+			grafanaSyntheticCheckListResponse(`{
+				"id": 101,
+				"job": "API health",
+				"target": "https://api.example.com/health",
+				"frequency": 60000,
+				"timeout": 3000,
+				"enabled": true,
+				"basicMetricsOnly": true,
+				"settings": {"http": {"method": "GET"}},
+				"probes": [1]
+			}`),
 			{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{"msg":"Check deleted","checkId":101}`)),
@@ -324,8 +331,8 @@ func Test__DeleteHTTPSyntheticCheck__Execute(t *testing.T) {
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"syntheticsBaseURL":     "https://synthetic-monitoring-api.grafana.net",
-				"syntheticsAccessToken": "sm-token",
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "grafana-token",
 			},
 		},
 		ExecutionState: execCtx,

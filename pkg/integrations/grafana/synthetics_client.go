@@ -21,11 +21,8 @@ const (
 )
 
 type SyntheticsClient struct {
-	BaseURL       string
-	AccessToken   string
 	DataSourceUID string
 	GrafanaClient *Client
-	http          core.HTTPContext
 }
 
 type SyntheticCheckLabel struct {
@@ -132,110 +129,20 @@ func (p SyntheticProbe) IDString() string {
 }
 
 func NewSyntheticsClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*SyntheticsClient, error) {
-	baseURL := readOptionalSyntheticsBaseURL(ctx)
-	accessToken, err := readSyntheticsAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if baseURL != "" && accessToken != "" {
-		return &SyntheticsClient{
-			BaseURL:     baseURL,
-			AccessToken: accessToken,
-			http:        httpCtx,
-		}, nil
-	}
-
 	grafanaClient, err := NewClient(httpCtx, ctx, true)
 	if err != nil {
-		if baseURL != "" || accessToken != "" {
-			return nil, fmt.Errorf("syntheticsBaseURL and syntheticsAccessToken must both be configured together")
-		}
 		return nil, err
 	}
 
 	dataSourceUID, err := findSyntheticMonitoringDataSourceUID(grafanaClient)
 	if err != nil {
-		if baseURL != "" || accessToken != "" {
-			return nil, fmt.Errorf("syntheticsBaseURL and syntheticsAccessToken must both be configured together")
-		}
-		return nil, fmt.Errorf("synthetic monitoring datasource not found and direct synthetics credentials are not configured")
+		return nil, err
 	}
 
 	return &SyntheticsClient{
 		DataSourceUID: dataSourceUID,
 		GrafanaClient: grafanaClient,
-		http:          httpCtx,
 	}, nil
-}
-
-func readSyntheticsBaseURL(ctx core.IntegrationContext) (string, error) {
-	baseURLConfig, err := ctx.GetConfig("syntheticsBaseURL")
-	if err != nil {
-		return "", fmt.Errorf("error reading syntheticsBaseURL: %v", err)
-	}
-	if baseURLConfig == nil {
-		return "", fmt.Errorf("syntheticsBaseURL is required")
-	}
-
-	baseURLRaw := strings.TrimSpace(string(baseURLConfig))
-	if baseURLRaw == "" {
-		return "", fmt.Errorf("syntheticsBaseURL is required")
-	}
-
-	parsed, err := url.Parse(baseURLRaw)
-	if err != nil {
-		return "", fmt.Errorf("invalid syntheticsBaseURL: %v", err)
-	}
-	if parsed.Scheme == "" || parsed.Host == "" {
-		return "", fmt.Errorf("invalid syntheticsBaseURL: must include scheme and host")
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", fmt.Errorf("invalid syntheticsBaseURL: unsupported scheme %q", parsed.Scheme)
-	}
-
-	return strings.TrimSuffix(baseURLRaw, "/"), nil
-}
-
-func readOptionalSyntheticsBaseURL(ctx core.IntegrationContext) string {
-	baseURL, err := readSyntheticsBaseURL(ctx)
-	if err != nil {
-		return ""
-	}
-
-	return baseURL
-}
-
-func readSyntheticsAccessToken(ctx core.IntegrationContext) (string, error) {
-	type optionalConfigReader interface {
-		GetOptionalConfig(name string) ([]byte, error)
-	}
-
-	var (
-		accessTokenConfig []byte
-		err               error
-	)
-
-	if optionalCtx, ok := ctx.(optionalConfigReader); ok {
-		accessTokenConfig, err = optionalCtx.GetOptionalConfig("syntheticsAccessToken")
-	} else {
-		accessTokenConfig, err = ctx.GetConfig("syntheticsAccessToken")
-		if err != nil && (strings.Contains(err.Error(), "config syntheticsAccessToken not found") || strings.Contains(err.Error(), "config not found: syntheticsAccessToken")) {
-			return "", nil
-		}
-	}
-	if err != nil {
-		return "", fmt.Errorf("error reading syntheticsAccessToken: %v", err)
-	}
-	if accessTokenConfig == nil {
-		return "", nil
-	}
-
-	return strings.TrimSpace(string(accessTokenConfig)), nil
-}
-
-func (c *SyntheticsClient) buildURL(path string) string {
-	return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.BaseURL, "/"), strings.TrimPrefix(path, "/"))
 }
 
 func (c *SyntheticsClient) buildProxyPath(path string) string {
@@ -243,46 +150,15 @@ func (c *SyntheticsClient) buildProxyPath(path string) string {
 }
 
 func (c *SyntheticsClient) execRequest(method, path string, body io.Reader, contentType string) ([]byte, int, error) {
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		return c.GrafanaClient.execRequest(method, c.buildProxyPath(path), body, contentType)
+	if c.GrafanaClient == nil || strings.TrimSpace(c.DataSourceUID) == "" {
+		return nil, 0, fmt.Errorf("grafana synthetic monitoring datasource is not configured")
 	}
 
-	req, err := http.NewRequest(method, c.buildURL(path), body)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.AccessToken))
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-
-	res, err := c.http.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error executing request: %v", err)
-	}
-	defer res.Body.Close()
-
-	limitedReader := io.LimitReader(res.Body, int64(maxResponseSize)+1)
-	responseBody, err := io.ReadAll(limitedReader)
-	if err != nil {
-		return nil, res.StatusCode, fmt.Errorf("error reading body: %v", err)
-	}
-	if len(responseBody) > maxResponseSize {
-		return nil, res.StatusCode, fmt.Errorf("response too large: exceeds maximum size of %d bytes", maxResponseSize)
-	}
-
-	return responseBody, res.StatusCode, nil
+	return c.GrafanaClient.execRequest(method, c.buildProxyPath(path), body, contentType)
 }
 
 func (c *SyntheticsClient) ListChecks() ([]SyntheticCheck, error) {
-	path := "/api/v1/check"
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		path = "/sm/check/list?includeAlerts=true"
-	}
-
-	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	responseBody, status, err := c.execRequest(http.MethodGet, "/sm/check/list?includeAlerts=true", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing synthetic checks: %v", err)
 	}
@@ -299,31 +175,18 @@ func (c *SyntheticsClient) ListChecks() ([]SyntheticCheck, error) {
 }
 
 func (c *SyntheticsClient) GetCheck(id string) (*SyntheticCheck, error) {
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		checks, err := c.ListChecks()
-		if err == nil {
-			for _, check := range checks {
-				if check.IDString() == strings.TrimSpace(id) {
-					return &check, nil
-				}
-			}
+	checks, err := c.ListChecks()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, check := range checks {
+		if check.IDString() == strings.TrimSpace(id) {
+			return &check, nil
 		}
 	}
 
-	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/api/v1/check/%s", url.PathEscape(id)), nil, "")
-	if err != nil {
-		return nil, fmt.Errorf("error getting synthetic check: %v", err)
-	}
-	if status < 200 || status >= 300 {
-		return nil, newAPIStatusError("grafana synthetic check get", status, responseBody)
-	}
-
-	var check SyntheticCheck
-	if err := json.Unmarshal(responseBody, &check); err != nil {
-		return nil, fmt.Errorf("error parsing synthetic check response: %v", err)
-	}
-
-	return &check, nil
+	return nil, fmt.Errorf("synthetic check %q not found", strings.TrimSpace(id))
 }
 
 func (c *SyntheticsClient) CreateCheck(check SyntheticCheck) (*SyntheticCheck, error) {
@@ -332,12 +195,7 @@ func (c *SyntheticsClient) CreateCheck(check SyntheticCheck) (*SyntheticCheck, e
 		return nil, fmt.Errorf("error marshaling synthetic check payload: %v", err)
 	}
 
-	path := "/api/v1/check"
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		path = "/sm/check/add"
-	}
-
-	responseBody, status, err := c.execRequest(http.MethodPost, path, bytes.NewReader(body), "application/json")
+	responseBody, status, err := c.execRequest(http.MethodPost, "/sm/check/add", bytes.NewReader(body), "application/json")
 	if err != nil {
 		return nil, fmt.Errorf("error creating synthetic check: %v", err)
 	}
@@ -366,12 +224,7 @@ func (c *SyntheticsClient) UpdateCheck(check SyntheticCheck) (*SyntheticCheck, e
 		return nil, fmt.Errorf("error marshaling synthetic check payload: %v", err)
 	}
 
-	path := "/api/v1/check/update"
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		path = "/sm/check/update"
-	}
-
-	responseBody, status, err := c.execRequest(http.MethodPost, path, bytes.NewReader(body), "application/json")
+	responseBody, status, err := c.execRequest(http.MethodPost, "/sm/check/update", bytes.NewReader(body), "application/json")
 	if err != nil {
 		return nil, fmt.Errorf("error updating synthetic check: %v", err)
 	}
@@ -388,12 +241,7 @@ func (c *SyntheticsClient) UpdateCheck(check SyntheticCheck) (*SyntheticCheck, e
 }
 
 func (c *SyntheticsClient) DeleteCheck(id string) (map[string]any, error) {
-	path := fmt.Sprintf("/api/v1/check/%s", url.PathEscape(id))
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		path = fmt.Sprintf("/sm/check/delete/%s", url.PathEscape(id))
-	}
-
-	responseBody, status, err := c.execRequest(http.MethodDelete, path, nil, "")
+	responseBody, status, err := c.execRequest(http.MethodDelete, fmt.Sprintf("/sm/check/delete/%s", url.PathEscape(id)), nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error deleting synthetic check: %v", err)
 	}
@@ -413,12 +261,7 @@ func (c *SyntheticsClient) DeleteCheck(id string) (map[string]any, error) {
 }
 
 func (c *SyntheticsClient) ListProbes() ([]SyntheticProbe, error) {
-	path := "/api/v1/probe"
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		path = "/sm/probe/list"
-	}
-
-	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	responseBody, status, err := c.execRequest(http.MethodGet, "/sm/probe/list", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing synthetic probes: %v", err)
 	}
@@ -435,12 +278,7 @@ func (c *SyntheticsClient) ListProbes() ([]SyntheticProbe, error) {
 }
 
 func (c *SyntheticsClient) ListCheckAlerts(id string) ([]SyntheticCheckAlert, error) {
-	path := fmt.Sprintf("/api/v1/check/%s/alerts", url.PathEscape(id))
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		path = fmt.Sprintf("/sm/check/%s/alerts", url.PathEscape(id))
-	}
-
-	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/sm/check/%s/alerts", url.PathEscape(id)), nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing synthetic check alerts: %v", err)
 	}
@@ -464,12 +302,7 @@ func (c *SyntheticsClient) UpdateCheckAlerts(id string, alerts []SyntheticCheckA
 		return fmt.Errorf("error marshaling synthetic check alerts payload: %v", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/check/%s/alerts", url.PathEscape(id))
-	if c.GrafanaClient != nil && c.DataSourceUID != "" {
-		path = fmt.Sprintf("/sm/check/%s/alerts", url.PathEscape(id))
-	}
-
-	responseBody, status, err := c.execRequest(http.MethodPut, path, bytes.NewReader(body), "application/json")
+	responseBody, status, err := c.execRequest(http.MethodPut, fmt.Sprintf("/sm/check/%s/alerts", url.PathEscape(id)), bytes.NewReader(body), "application/json")
 	if err != nil {
 		return fmt.Errorf("error updating synthetic check alerts: %v", err)
 	}

@@ -1,7 +1,6 @@
 package grafana
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -51,14 +50,6 @@ type SyntheticCheckHeaderMatchInput struct {
 	AllowMissing *bool  `json:"allowMissing,omitempty" mapstructure:"allowMissing"`
 }
 
-type SyntheticCheckTLSInput struct {
-	InsecureSkipVerify *bool   `json:"insecureSkipVerify,omitempty" mapstructure:"insecureSkipVerify"`
-	ServerName         string  `json:"serverName,omitempty" mapstructure:"serverName"`
-	CACert             *string `json:"caCert,omitempty" mapstructure:"caCert"`
-	ClientCert         *string `json:"clientCert,omitempty" mapstructure:"clientCert"`
-	ClientKey          *string `json:"clientKey,omitempty" mapstructure:"clientKey"`
-}
-
 type SyntheticCheckAlertInput struct {
 	Name       string  `json:"name" mapstructure:"name"`
 	Threshold  *int64  `json:"threshold,omitempty" mapstructure:"threshold"`
@@ -84,7 +75,6 @@ type SyntheticCheckSpecBase struct {
 	FailIfBodyMatchesRegexp    []string                         `json:"failIfBodyMatchesRegexp,omitempty" mapstructure:"failIfBodyMatchesRegexp"`
 	FailIfBodyNotMatchesRegexp []string                         `json:"failIfBodyNotMatchesRegexp,omitempty" mapstructure:"failIfBodyNotMatchesRegexp"`
 	FailIfHeaderMatchesRegexp  []SyntheticCheckHeaderMatchInput `json:"failIfHeaderMatchesRegexp,omitempty" mapstructure:"failIfHeaderMatchesRegexp"`
-	TLS                        *SyntheticCheckTLSInput          `json:"tls,omitempty" mapstructure:"tls"`
 	BasicAuth                  *SyntheticCheckBasicAuthInput    `json:"basicAuth,omitempty" mapstructure:"basicAuth"`
 	BearerToken                *string                          `json:"bearerToken,omitempty" mapstructure:"bearerToken"`
 	Alerts                     []SyntheticCheckAlertInput       `json:"alerts,omitempty" mapstructure:"alerts"`
@@ -167,9 +157,6 @@ func validateSyntheticCheckBase(spec SyntheticCheckSpecBase) error {
 			return errors.New("failIfHeaderMatchesRegexp regex is required")
 		}
 	}
-	if err := validateSyntheticTLS(spec.TLS); err != nil {
-		return err
-	}
 	return validateSyntheticCheckAlerts(spec.Alerts)
 }
 
@@ -213,7 +200,6 @@ func buildSyntheticCheckPayload(spec SyntheticCheckSpecBase) (SyntheticCheck, er
 				FailIfBodyMatchesRegexp:    append([]string(nil), spec.FailIfBodyMatchesRegexp...),
 				FailIfBodyNotMatchesRegexp: append([]string(nil), spec.FailIfBodyNotMatchesRegexp...),
 				FailIfHeaderMatchesRegexp:  buildSyntheticHeaderMatches(spec.FailIfHeaderMatchesRegexp),
-				TLSConfig:                  buildSyntheticTLSConfig(spec.TLS),
 			},
 		},
 	}
@@ -279,26 +265,6 @@ func buildSyntheticHeaderMatches(values []SyntheticCheckHeaderMatchInput) []Synt
 	return matches
 }
 
-func buildSyntheticTLSConfig(input *SyntheticCheckTLSInput) *SyntheticCheckTLSConfig {
-	if input == nil {
-		return nil
-	}
-
-	config := &SyntheticCheckTLSConfig{
-		ServerName:         strings.TrimSpace(input.ServerName),
-		InsecureSkipVerify: input.InsecureSkipVerify != nil && *input.InsecureSkipVerify,
-		CACert:             encodeSyntheticPEM(input.CACert),
-		ClientCert:         encodeSyntheticPEM(input.ClientCert),
-		ClientKey:          encodeSyntheticPEM(input.ClientKey),
-	}
-
-	if !config.InsecureSkipVerify && config.ServerName == "" && config.CACert == "" && config.ClientCert == "" && config.ClientKey == "" {
-		return nil
-	}
-
-	return config
-}
-
 func buildSyntheticAlertDrafts(alerts []SyntheticCheckAlertInput) []SyntheticCheckAlert {
 	drafts := make([]SyntheticCheckAlert, 0, len(alerts))
 	for _, alert := range alerts {
@@ -328,19 +294,6 @@ func buildSyntheticAlertDrafts(alerts []SyntheticCheckAlertInput) []SyntheticChe
 	return drafts
 }
 
-func encodeSyntheticPEM(value *string) string {
-	if value == nil {
-		return ""
-	}
-
-	trimmed := strings.TrimSpace(*value)
-	if trimmed == "" {
-		return ""
-	}
-
-	return base64.StdEncoding.EncodeToString([]byte(trimmed))
-}
-
 func normalizeSyntheticFrequency(value int64) int64 {
 	if value >= 1000 && value%1000 == 0 {
 		return value
@@ -368,46 +321,6 @@ func parseSyntheticProbeIDs(probes []string) ([]int64, error) {
 	}
 
 	return parsed, nil
-}
-
-func validateSyntheticTLS(input *SyntheticCheckTLSInput) error {
-	if input == nil {
-		return nil
-	}
-
-	if err := validateSyntheticPEM("caCert", input.CACert, "CERTIFICATE"); err != nil {
-		return err
-	}
-	if err := validateSyntheticPEM("clientCert", input.ClientCert, "CERTIFICATE"); err != nil {
-		return err
-	}
-	return validateSyntheticPrivateKey(input.ClientKey)
-}
-
-func validateSyntheticPEM(fieldName string, value *string, blockType string) error {
-	if value == nil || strings.TrimSpace(*value) == "" {
-		return nil
-	}
-
-	trimmed := strings.TrimSpace(*value)
-	if !strings.Contains(trimmed, "-----BEGIN "+blockType+"-----") || !strings.Contains(trimmed, "-----END "+blockType+"-----") {
-		return fmt.Errorf("%s must be in PEM format", fieldName)
-	}
-
-	return nil
-}
-
-func validateSyntheticPrivateKey(value *string) error {
-	if value == nil || strings.TrimSpace(*value) == "" {
-		return nil
-	}
-
-	trimmed := strings.TrimSpace(*value)
-	if !strings.Contains(trimmed, "-----BEGIN") || !strings.Contains(trimmed, "-----END") {
-		return errors.New("clientKey must be in PEM format")
-	}
-
-	return nil
 }
 
 func validateSyntheticCheckAlerts(alerts []SyntheticCheckAlertInput) error {

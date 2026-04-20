@@ -11,7 +11,6 @@ var (
 		"noFollowRedirects",
 		"basicAuth",
 		"bearerToken",
-		"tls",
 	}
 	syntheticCheckScheduleFlatKeys = []string{
 		"enabled",

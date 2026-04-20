@@ -1,7 +1,6 @@
 package grafana
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"strconv"
@@ -127,7 +126,6 @@ func syntheticCheckToSpecBase(check *SyntheticCheck) (SyntheticCheckSpecBase, er
 		FailIfBodyMatchesRegexp:    append([]string(nil), http.FailIfBodyMatchesRegexp...),
 		FailIfBodyNotMatchesRegexp: append([]string(nil), http.FailIfBodyNotMatchesRegexp...),
 		FailIfHeaderMatchesRegexp:  syntheticHeaderMatchesToInputs(http.FailIfHeaderMatchesRegexp),
-		TLS:                        syntheticTLSConfigToInput(http.TLSConfig),
 		Alerts:                     syntheticAlertsToInputs(check.Alerts),
 	}
 
@@ -207,52 +205,6 @@ func parseSyntheticHeaderStringsToInputs(headers []string) []SyntheticCheckHeade
 		})
 	}
 	return out
-}
-
-func syntheticTLSConfigToInput(cfg *SyntheticCheckTLSConfig) *SyntheticCheckTLSInput {
-	if cfg == nil {
-		return nil
-	}
-	insecure := cfg.InsecureSkipVerify
-	input := &SyntheticCheckTLSInput{
-		ServerName:         strings.TrimSpace(cfg.ServerName),
-		InsecureSkipVerify: &insecure,
-	}
-	if cfg.CACert != "" {
-		if s, err := decodeSyntheticPEMFromAPI(cfg.CACert); err == nil && strings.TrimSpace(s) != "" {
-			input.CACert = &s
-		}
-	}
-	if cfg.ClientCert != "" {
-		if s, err := decodeSyntheticPEMFromAPI(cfg.ClientCert); err == nil && strings.TrimSpace(s) != "" {
-			input.ClientCert = &s
-		}
-	}
-	if cfg.ClientKey != "" {
-		if s, err := decodeSyntheticPEMFromAPI(cfg.ClientKey); err == nil && strings.TrimSpace(s) != "" {
-			input.ClientKey = &s
-		}
-	}
-	hasPEM := input.CACert != nil || input.ClientCert != nil || input.ClientKey != nil
-	if !insecure && input.ServerName == "" && !hasPEM {
-		return nil
-	}
-	return input
-}
-
-func decodeSyntheticPEMFromAPI(encoded string) (string, error) {
-	trimmed := strings.TrimSpace(encoded)
-	if trimmed == "" {
-		return "", errors.New("empty")
-	}
-	if strings.Contains(trimmed, "-----BEGIN") {
-		return trimmed, nil
-	}
-	data, err := base64.StdEncoding.DecodeString(trimmed)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
 
 func mergeSyntheticUpdatePatch(base SyntheticCheckSpecBase, m map[string]any) (SyntheticCheckSpecBase, error) {
@@ -343,17 +295,6 @@ func overlaySyntheticRequest(base *SyntheticCheckSpecBase, req map[string]any) e
 		} else {
 			s := strings.TrimSpace(fmt.Sprint(req["bearerToken"]))
 			base.BearerToken = &s
-		}
-	}
-	if _, ok := req["tls"]; ok {
-		if req["tls"] == nil {
-			base.TLS = nil
-		} else {
-			var tlsInput SyntheticCheckTLSInput
-			if err := mapstructure.Decode(req["tls"], &tlsInput); err != nil {
-				return fmt.Errorf("request.tls: %w", err)
-			}
-			base.TLS = &tlsInput
 		}
 	}
 	return nil

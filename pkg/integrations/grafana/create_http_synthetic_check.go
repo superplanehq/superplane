@@ -41,7 +41,7 @@ func (c *CreateHTTPSyntheticCheck) Documentation() string {
 Fields are grouped like other synthetic check components:
 
 - **Job** and **Labels**: Check display name and optional key/value labels
-- **Request**: URL, HTTP method, headers, body, redirects, basic auth, bearer token, and TLS client settings
+- **Request**: URL, HTTP method, headers, body, redirects, basic auth, and bearer token
 - **Schedule**: Whether the check is enabled, frequency (seconds), timeout (ms), and probe locations
 - **Response validation**: SSL expectations, accepted status codes, and body/header regex rules (optional)
 - **Per-Check Alerts**: Optional Grafana synthetic monitoring alerts configured after check creation

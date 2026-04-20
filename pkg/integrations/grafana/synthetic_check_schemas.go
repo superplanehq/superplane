@@ -237,57 +237,6 @@ func syntheticCheckRequestObjectSchema() []configuration.Field {
 			Sensitive:   true,
 			Description: "Optional bearer token sent with the HTTP request",
 		},
-		{
-			Name:        "tls",
-			Label:       "TLS",
-			Type:        configuration.FieldTypeObject,
-			Required:    false,
-			Togglable:   true,
-			Description: "Optional TLS settings and certificates for HTTPS requests",
-			TypeOptions: &configuration.TypeOptions{
-				Object: &configuration.ObjectTypeOptions{
-					Schema: []configuration.Field{
-						{
-							Name:        "insecureSkipVerify",
-							Label:       "Disable Target Certificate Validation",
-							Type:        configuration.FieldTypeBool,
-							Required:    false,
-							Default:     false,
-							Description: "Skip target certificate validation",
-						},
-						{
-							Name:        "serverName",
-							Label:       "Server Name",
-							Type:        configuration.FieldTypeString,
-							Required:    false,
-							Description: "Optional TLS server name override",
-						},
-						{
-							Name:        "caCert",
-							Label:       "CA Certificate",
-							Type:        configuration.FieldTypeText,
-							Required:    false,
-							Description: "Optional PEM-encoded CA certificate",
-						},
-						{
-							Name:        "clientCert",
-							Label:       "Client Certificate",
-							Type:        configuration.FieldTypeText,
-							Required:    false,
-							Description: "Optional PEM-encoded client certificate",
-						},
-						{
-							Name:        "clientKey",
-							Label:       "Client Key",
-							Type:        configuration.FieldTypeText,
-							Required:    false,
-							Sensitive:   true,
-							Description: "Optional PEM-encoded client private key",
-						},
-					},
-				},
-			},
-		},
 	}
 }
 
