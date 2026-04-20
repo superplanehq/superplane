@@ -21,6 +21,15 @@ export const analytics = {
     });
   },
 
+  canvasView: (canvasId: string, nodeCount: number, edgeCount: number, organizationId: string) => {
+    posthog.capture("canvas:canvas_view", {
+      canvas_id: canvasId,
+      node_count: nodeCount,
+      edge_count: edgeCount,
+      organization_id: organizationId,
+    });
+  },
+
   canvasDelete: (canvasId: string, organizationId: string, nodeCount: number) => {
     posthog.capture("canvas:canvas_delete", {
       canvas_id: canvasId,

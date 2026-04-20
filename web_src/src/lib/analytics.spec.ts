@@ -25,6 +25,16 @@ describe("analytics", () => {
     });
   });
 
+  it("captures canvas view", () => {
+    analytics.canvasView("canvas-123", 5, 3, "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:canvas_view", {
+      canvas_id: "canvas-123",
+      node_count: 5,
+      edge_count: 3,
+      organization_id: "org-123",
+    });
+  });
+
   it("captures canvas create", () => {
     analytics.canvasCreate("canvas-123", "org-123", "ui", undefined, false);
     expect(capture).toHaveBeenCalledWith("canvas:canvas_create", {
@@ -147,7 +157,6 @@ describe("analytics", () => {
       organization_id: "org-123",
     });
   });
-
 
   it("captures version publish", () => {
     analytics.versionPublish("canvas-123", "org-123");

@@ -667,6 +667,7 @@ export function WorkflowPageV2() {
   const activeCanvasVersionIdRef = useRef<string>(activeCanvasVersionId);
   const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
   const isDrainingCanvasSaveQueueRef = useRef(false);
+  const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
@@ -705,7 +706,18 @@ export function WorkflowPageV2() {
       }
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
-
+  useEffect(() => {
+    if (hasTrackedCanvasView.current) return;
+    if (!canvas || !canvasId || !organizationId) return;
+    if (canvasLoading) return;
+      hasTrackedCanvasView.current = true;
+      analytics.canvasView(
+        canvasId,
+        canvas.spec?.nodes?.length ?? 0,
+        canvas.spec?.edges?.length ?? 0,
+        organizationId,
+      );
+    }, [canvas, canvasId, organizationId, canvasLoading]);
   // Initialize store from workflow.status on workflow load.
   // On canvas switch with cached data, the store initializes immediately from the
   // cache (no loading gap) and then re-initializes once when the background refetch
@@ -3809,11 +3821,6 @@ export function WorkflowPageV2() {
 
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
         showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
-        if (updatedPaused) {
-          analytics.nodePause("action", organizationId);
-        } else {
-          analytics.nodeUnpause("action", organizationId);
-        }
       } catch (error) {
         const parsedError = error as { message: string };
         if (parsedError?.message) {
