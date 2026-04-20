@@ -11,6 +11,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
+E2E_COMPOSE=docker compose -f docker-compose.dev.yml -f docker-compose.e2e.yml
 DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger/superplane.swagger.json agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
@@ -39,8 +40,9 @@ test.setup.build:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
-	$(COMPOSE) run --rm app go mod download
 	$(MAKE) gen.setup.backend
+	$(MAKE) openapi.python.client.gen
+	$(COMPOSE) run --rm app go mod download || { $(MAKE) test.dump.diagnostics STAGE=test.setup.build; exit 1; }
 	$(MAKE) test.e2e.ui.setup
 
 test.setup:
@@ -55,10 +57,31 @@ test.setup.db:
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
-	$(COMPOSE) up -d --wait
+	$(E2E_COMPOSE) up -d --wait || { $(MAKE) test.dump.diagnostics STAGE=test.start; exit 1; }
+
+
+test.dump.diagnostics:
+	@echo "==== [diag] failing stage: $(STAGE) ===="
+	@echo "---- docker compose ps --all ----"
+	@$(COMPOSE) ps --all || true
+	@echo "---- docker compose logs --tail=500 agent ----"
+	@$(COMPOSE) logs --tail=500 --no-color --timestamps agent || true
+	@echo "---- docker compose logs --tail=200 db ----"
+	@$(COMPOSE) logs --tail=200 --no-color --timestamps db || true
+	@echo "---- docker compose logs --tail=200 rabbitmq ----"
+	@$(COMPOSE) logs --tail=200 --no-color --timestamps rabbitmq || true
+	@echo "---- docker inspect agent (State + Health) ----"
+	@docker ps -a --filter name=superplane-agent-1 --format 'table {{.Names}}\t{{.Status}}\t{{.State}}' || true
+	@docker inspect superplane-agent-1 --format '{{json .State.Health}}' 2>/dev/null || true
+	@echo
+	@echo "---- agent process tree inside the container (via /proc; ps is not installed in python:3.12-slim) ----"
+	@docker exec superplane-agent-1 sh -lc 'for pid in $$(ls /proc 2>/dev/null | grep -E "^[0-9]+$$"); do cmd=$$(tr "\0" " " </proc/$$pid/cmdline 2>/dev/null); status=$$(awk "/^State:/ {print \$$2 \$$3}" /proc/$$pid/status 2>/dev/null); [ -n "$$cmd" ] && printf "pid=%s state=%s cmd=%s\n" "$$pid" "$$status" "$$cmd"; done' || true
+	@echo "---- :50061 listeners inside the container (via /proc/net/tcp; ss/netstat not installed) ----"
+	@docker exec superplane-agent-1 sh -lc 'printf "state:listening entries for port 50061 (C38D hex):\n"; awk "\$$2 ~ /:C38D\$$/ && \$$4 == \"0A\" {print}" /proc/net/tcp /proc/net/tcp6 2>/dev/null; bash -lc "exec 3<>/dev/tcp/localhost/50061 && echo ACTIVE-CONNECT=OK || echo ACTIVE-CONNECT=REFUSED"' || true
+	@echo "==== [diag] end ===="
 
 test.down:
-	$(COMPOSE) down --remove-orphans
+	$(E2E_COMPOSE) down --remove-orphans
 
 test.e2e.setup:
 	$(MAKE) test.setup
