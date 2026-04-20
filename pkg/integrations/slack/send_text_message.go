@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+
 type SendTextMessage struct{}
 
 type SendTextMessageConfiguration struct {
@@ -92,7 +93,7 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 		{
 			Name:     "text",
 			Label:    "Text",
-			Type:     configuration.FieldTypeText,
+			Type:     configuration.FieldTypeExpression,
 			Required: true,
 		},
 	}
