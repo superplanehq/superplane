@@ -91,6 +91,12 @@ var exampleOutputRemoveIssueAssigneeBytes []byte
 //go:embed example_output_get_workflow_usage.json
 var exampleOutputGetWorkflowUsageBytes []byte
 
+//go:embed example_output_create_pull_request.json
+var exampleOutputCreatePullRequestBytes []byte
+
+//go:embed example_output_merge_pull_request.json
+var exampleOutputMergePullRequestBytes []byte
+
 var exampleOutputCreateIssueOnce sync.Once
 var exampleOutputCreateIssue map[string]any
 
@@ -174,6 +180,12 @@ var exampleOutputRemoveIssueAssignee map[string]any
 
 var exampleOutputGetWorkflowUsageOnce sync.Once
 var exampleOutputGetWorkflowUsage map[string]any
+
+var exampleOutputCreatePullRequestOnce sync.Once
+var exampleOutputCreatePullRequest map[string]any
+
+var exampleOutputMergePullRequestOnce sync.Once
+var exampleOutputMergePullRequest map[string]any
 
 func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
@@ -305,4 +317,12 @@ func (c *RemoveIssueAssignee) ExampleOutput() map[string]any {
 
 func (g *GetWorkflowUsage) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetWorkflowUsageOnce, exampleOutputGetWorkflowUsageBytes, &exampleOutputGetWorkflowUsage)
+}
+
+func (c *CreatePullRequest) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreatePullRequestOnce, exampleOutputCreatePullRequestBytes, &exampleOutputCreatePullRequest)
+}
+
+func (c *MergePullRequest) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputMergePullRequestOnce, exampleOutputMergePullRequestBytes, &exampleOutputMergePullRequest)
 }
