@@ -76,6 +76,10 @@ Each event contains the decoded message payload plus Pub/Sub metadata:
 func (t *OnMessage) Icon() string  { return "gcp" }
 func (t *OnMessage) Color() string { return "gray" }
 
+func (t *OnMessage) DefaultRunTitle() string {
+	return "{{ $.data.messageId }}"
+}
+
 func (t *OnMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -79,6 +79,10 @@ Provisioning happens when the live version is published. Autosave on a draft ver
 The trigger emits the full case details including id, title, status, severity, version, tags, description, and timestamps.`
 }
 
+func (t *OnCaseStatusChange) DefaultRunTitle() string {
+	return "Case \"{{ $.data.title }}\" changed to {{ $.data.status }}"
+}
+
 func (t *OnCaseStatusChange) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

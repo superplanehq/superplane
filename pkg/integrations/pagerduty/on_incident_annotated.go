@@ -66,6 +66,10 @@ func (t *OnIncidentAnnotated) Color() string {
 	return "gray"
 }
 
+func (t *OnIncidentAnnotated) DefaultRunTitle() string {
+	return "{{ $.data.data.incident.id }} - {{ $.data.data.incident.title }}"
+}
+
 func (t *OnIncidentAnnotated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

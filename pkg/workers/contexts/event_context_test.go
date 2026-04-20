@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -55,5 +56,30 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 1}))
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 2}))
 		assert.Len(t, newEvents, 2)
+	})
+
+	t.Run("uses default run title from trigger definition", func(t *testing.T) {
+		node := nodes[0]
+		node.Ref = datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "bitbucket.onPush"}})
+
+		ctx := NewEventContext(database.Conn(), &node, nil)
+		require.NoError(t, ctx.Emit("bitbucket.push", map[string]any{
+			"repository": map[string]any{"full_name": "superplanehq/superplane"},
+			"push": map[string]any{
+				"changes": []any{
+					map[string]any{
+						"new": map[string]any{
+							"target": map[string]any{"hash": "abcdef1234567890"},
+						},
+					},
+				},
+			},
+		}))
+
+		events, err := models.ListCanvasEvents(canvas.ID, triggerNodeID, 10, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, events)
+		require.NotNil(t, events[len(events)-1].RunTitle)
+		assert.Equal(t, "Push superplanehq/superplane @ abcdef1234567890", *events[len(events)-1].RunTitle)
 	})
 }

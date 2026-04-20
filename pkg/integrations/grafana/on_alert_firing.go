@@ -69,6 +69,10 @@ func (t *OnAlertFiring) Color() string {
 	return "gray"
 }
 
+func (t *OnAlertFiring) DefaultRunTitle() string {
+	return "{{ $.data.title }}"
+}
+
 func (t *OnAlertFiring) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

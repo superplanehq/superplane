@@ -11,7 +11,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
+    return { title: context.event?.runTitle?.trim() || "", subtitle: "" };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -30,7 +30,7 @@ export const defaultTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       props.lastEventData = {
-        title: "Event emitted by trigger",
+        title: lastEvent.runTitle?.trim() || "",
         subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

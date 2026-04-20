@@ -65,6 +65,10 @@ func (r *OnRelease) Color() string {
 	return "gray"
 }
 
+func (r *OnRelease) DefaultRunTitle() string {
+	return "{{ $.data.release.tag_name }}"
+}
+
 func (r *OnRelease) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

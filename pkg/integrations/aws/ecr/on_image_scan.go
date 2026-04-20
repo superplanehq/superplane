@@ -73,6 +73,10 @@ func (p *OnImageScan) Color() string {
 	return "gray"
 }
 
+func (p *OnImageScan) DefaultRunTitle() string {
+	return "{{ $.data.detail[\"repository-name\"] }}"
+}
+
 func (p *OnImageScan) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -66,6 +66,10 @@ func (p *OnPush) Color() string {
 	return "gray"
 }
 
+func (p *OnPush) DefaultRunTitle() string {
+	return "{{ $.data.head_commit.message }}"
+}
+
 func (p *OnPush) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -81,6 +81,10 @@ func (t *OnMessage) Color() string {
 	return "gray"
 }
 
+func (t *OnMessage) DefaultRunTitle() string {
+	return "{{ $.data.text }}"
+}
+
 func (t *OnMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

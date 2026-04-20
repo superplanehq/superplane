@@ -76,6 +76,10 @@ func (t *OnImageDeleted) Color() string {
 	return "blue"
 }
 
+func (t *OnImageDeleted) DefaultRunTitle() string {
+	return "{{ $.data.target.repository }}@{{ $.data.target.digest }}"
+}
+
 func (t *OnImageDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

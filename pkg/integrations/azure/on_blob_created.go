@@ -80,6 +80,10 @@ func (t *OnBlobCreated) Color() string {
 	return "blue"
 }
 
+func (t *OnBlobCreated) DefaultRunTitle() string {
+	return "{{ $.data.subject }}"
+}
+
 func (t *OnBlobCreated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

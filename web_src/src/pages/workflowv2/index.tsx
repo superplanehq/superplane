@@ -2588,6 +2588,11 @@ export function WorkflowPageV2() {
         displayLabel,
         configuration: node.configuration || {},
         configurationFields,
+        runTitleTemplate: node.runTitleTemplate,
+        defaultRunTitleTemplate:
+          node.type === "TYPE_TRIGGER"
+            ? allTriggers.find((t) => t.name === node.trigger?.name)?.defaultRunTitle
+            : undefined,
         integrationName,
         integrationLabel,
         blockName,
@@ -2728,6 +2733,7 @@ export function WorkflowPageV2() {
       nodeId: string,
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
+      runTitleTemplate?: string,
       integrationRef?: ComponentsIntegrationRef,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -2750,6 +2756,7 @@ export function WorkflowPageV2() {
             ...node,
             configuration: updatedConfiguration,
             name: updatedNodeName,
+            runTitleTemplate,
             integration: integrationRef,
           };
         }

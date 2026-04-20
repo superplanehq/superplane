@@ -76,6 +76,10 @@ func (t *OnDeploy) Color() string {
 	return "gray"
 }
 
+func (t *OnDeploy) DefaultRunTitle() string {
+	return "{{ $.data.serviceName }}"
+}
+
 func (t *OnDeploy) Configuration() []configuration.Field {
 	return onResourceEventConfigurationFields(deployEventTypeOptions, deployDefaultEventTypes)
 }

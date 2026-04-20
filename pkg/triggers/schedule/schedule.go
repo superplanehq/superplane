@@ -124,6 +124,10 @@ func (s *Schedule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 	return http.StatusOK, nil, nil
 }
 
+func (s *Schedule) DefaultRunTitle() string {
+	return "Scheduled run"
+}
+
 func (s *Schedule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

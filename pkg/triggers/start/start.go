@@ -59,6 +59,10 @@ func (s *Start) Color() string {
 	return "purple"
 }
 
+func (s *Start) DefaultRunTitle() string {
+	return "Manual run"
+}
+
 func (s *Start) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -63,6 +63,10 @@ func (t *OnSyntheticCheckNotification) ExampleData() map[string]any {
 	return onSyntheticCheckNotificationExampleData()
 }
 
+func (t *OnSyntheticCheckNotification) DefaultRunTitle() string {
+	return "{{ $.data.issue.summary }}"
+}
+
 func (t *OnSyntheticCheckNotification) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

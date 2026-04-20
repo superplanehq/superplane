@@ -65,6 +65,10 @@ func (i *OnIssue) Color() string {
 	return "gray"
 }
 
+func (i *OnIssue) DefaultRunTitle() string {
+	return "#{{ $.data.issue.number }} - {{ $.data.issue.title }}"
+}
+
 func (i *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -68,6 +68,10 @@ func (w *OnWorkflowRun) Color() string {
 	return "gray"
 }
 
+func (w *OnWorkflowRun) DefaultRunTitle() string {
+	return "{{ $.data.workflow_run.name }}"
+}
+
 func (w *OnWorkflowRun) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

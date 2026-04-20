@@ -84,6 +84,10 @@ func (p *OnPipelineDone) Color() string {
 	return "gray"
 }
 
+func (p *OnPipelineDone) DefaultRunTitle() string {
+	return "{{ $.data.pipeline.working_directory }}/{{ $.data.pipeline.yaml_file_name }}"
+}
+
 func (p *OnPipelineDone) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

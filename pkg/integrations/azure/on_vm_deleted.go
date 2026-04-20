@@ -101,6 +101,10 @@ func (t *OnVMDeleted) Color() string {
 	return "blue"
 }
 
+func (t *OnVMDeleted) DefaultRunTitle() string {
+	return "{{ $.data.subject }}"
+}
+
 func (t *OnVMDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

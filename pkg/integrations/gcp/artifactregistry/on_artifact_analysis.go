@@ -75,6 +75,10 @@ Each event contains the full Container Analysis Occurrence resource, including `
 func (t *OnArtifactAnalysis) Icon() string  { return "gcp" }
 func (t *OnArtifactAnalysis) Color() string { return "gray" }
 
+func (t *OnArtifactAnalysis) DefaultRunTitle() string {
+	return "{{ $.data.resourceUri }}"
+}
+
 func (t *OnArtifactAnalysis) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

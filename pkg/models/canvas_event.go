@@ -20,7 +20,7 @@ type CanvasEvent struct {
 	WorkflowID  uuid.UUID
 	NodeID      string
 	Channel     string
-	CustomName  *string
+	RunTitle    *string
 	Data        datatypes.JSONType[any]
 	ExecutionID *uuid.UUID
 	State       string

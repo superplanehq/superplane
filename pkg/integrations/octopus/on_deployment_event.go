@@ -106,6 +106,10 @@ func (t *OnDeploymentEvent) Color() string {
 	return "blue"
 }
 
+func (t *OnDeploymentEvent) DefaultRunTitle() string {
+	return "{{ $.data.projectName }}"
+}
+
 func (t *OnDeploymentEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

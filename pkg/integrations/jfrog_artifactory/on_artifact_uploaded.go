@@ -67,6 +67,10 @@ func (t *OnArtifactUploaded) Color() string {
 	return "green"
 }
 
+func (t *OnArtifactUploaded) DefaultRunTitle() string {
+	return "{{ $.data.name }} in {{ $.data.repo }}"
+}
+
 func (t *OnArtifactUploaded) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

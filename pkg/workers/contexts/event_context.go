@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -53,9 +54,9 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload)
-	if err == nil && customName != nil {
-		event.CustomName = customName
+	runTitle, err := ResolveRootEventRunTitle(s.tx, s.node, wrappedPayload)
+	if err == nil && runTitle != nil {
+		event.RunTitle = runTitle
 	}
 
 	err = s.tx.Create(&event).Error
@@ -70,30 +71,19 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func (s *EventContext) resolveCustomName(payload any) (*string, error) {
-	config := s.node.Configuration.Data()
-	if config == nil {
-		return nil, nil
+func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, payload any) (*string, error) {
+	template, err := resolveRootEventRunTitleTemplate(tx, node)
+	if err != nil {
+		return nil, err
 	}
 
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return nil, nil
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return nil, nil
-	}
-
-	template = strings.TrimSpace(template)
 	if template == "" {
 		return nil, nil
 	}
 
-	builder := NewNodeConfigurationBuilder(s.tx, s.node.WorkflowID).
-		WithNodeID(s.node.NodeID).
-		WithInput(map[string]any{s.node.NodeID: payload})
+	builder := NewNodeConfigurationBuilder(tx, node.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithInput(map[string]any{node.NodeID: payload})
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
@@ -105,4 +95,37 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 	}
 
 	return &resolvedName, nil
+}
+
+func resolveRootEventRunTitleTemplate(tx *gorm.DB, node *models.CanvasNode) (string, error) {
+	if node == nil {
+		return "", nil
+	}
+
+	ref := node.Ref.Data()
+	if ref.Trigger == nil || ref.Trigger.Name == "" {
+		return "", nil
+	}
+
+	liveNodes, _, err := models.FindLiveCanvasSpecInTransaction(tx, node.WorkflowID)
+	if err != nil {
+		return "", err
+	}
+
+	for _, liveNode := range liveNodes {
+		if liveNode.ID != node.NodeID {
+			continue
+		}
+
+		if liveNode.RunTitleTemplate != nil {
+			template := strings.TrimSpace(*liveNode.RunTitleTemplate)
+			if template != "" {
+				return template, nil
+			}
+		}
+
+		break
+	}
+
+	return registry.DefaultRunTitleForTrigger(ref.Trigger.Name), nil
 }

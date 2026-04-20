@@ -52,6 +52,10 @@ func (m *OnMilestone) Color() string {
 	return "orange"
 }
 
+func (m *OnMilestone) DefaultRunTitle() string {
+	return "{{ $.data.object_attributes.title }}"
+}
+
 func (m *OnMilestone) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

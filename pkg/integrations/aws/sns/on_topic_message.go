@@ -68,6 +68,10 @@ func (t *OnTopicMessage) Color() string {
 	return "gray"
 }
 
+func (t *OnTopicMessage) DefaultRunTitle() string {
+	return "{{ $.data.MessageId }}"
+}
+
 func (t *OnTopicMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),

@@ -118,7 +118,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		assert.Equal(t, float64(42), dataMap["count"])
 	})
 
-	t.Run("custom name is resolved from node configuration", func(t *testing.T) {
+	t.Run("run title is resolved from live node run title template", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
@@ -136,12 +136,11 @@ func Test__EmitNodeEvent(t *testing.T) {
 			[]models.Edge{},
 		)
 
-		node, err := canvas.FindNode("node-1")
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		node.Configuration = datatypes.NewJSONType(map[string]any{
-			"customName": "Run: {{ $[\"node-1\"].message }}",
-		})
-		require.NoError(t, database.Conn().Save(node).Error)
+		runTitleTemplate := "Run: {{ $[\"node-1\"].message }}"
+		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
+		require.NoError(t, database.Conn().Save(liveVersion).Error)
 
 		response, err := EmitNodeEvent(
 			ctx,
@@ -158,8 +157,8 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
-		require.NotNil(t, event.CustomName)
-		assert.Equal(t, "Run: hello", *event.CustomName)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
 	})
 
 	t.Run("successful event emission publishes RabbitMQ message", func(t *testing.T) {

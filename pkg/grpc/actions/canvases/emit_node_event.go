@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,9 +43,9 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	customName, err := resolveCustomName(node, data)
-	if err == nil && customName != nil {
-		event.CustomName = customName
+	runTitle, err := contexts.ResolveRootEventRunTitle(database.Conn(), node, data)
+	if err == nil && runTitle != nil {
+		event.RunTitle = runTitle
 	}
 
 	if err := database.Conn().Create(&event).Error; err != nil {
@@ -63,41 +62,4 @@ func EmitNodeEvent(
 	return &pb.EmitNodeEventResponse{
 		EventId: event.ID.String(),
 	}, nil
-}
-
-func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string, error) {
-	config := node.Configuration.Data()
-	if config == nil {
-		return nil, nil
-	}
-
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return nil, nil
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return nil, nil
-	}
-
-	template = strings.TrimSpace(template)
-	if template == "" {
-		return nil, nil
-	}
-
-	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
-		WithNodeID(node.NodeID).
-		WithInput(map[string]any{node.NodeID: payload})
-	resolved, err := builder.ResolveTemplateExpressions(template)
-	if err != nil {
-		return nil, err
-	}
-
-	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedName == "" {
-		return nil, nil
-	}
-
-	return &resolvedName, nil
 }

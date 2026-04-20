@@ -80,6 +80,10 @@ func (t *OnFeatureFlagChange) Color() string {
 	return "gray"
 }
 
+func (t *OnFeatureFlagChange) DefaultRunTitle() string {
+	return "{{ $.data.name }}"
+}
+
 func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

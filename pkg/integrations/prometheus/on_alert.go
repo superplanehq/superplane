@@ -95,6 +95,10 @@ func (t *OnAlert) Color() string {
 	return "gray"
 }
 
+func (t *OnAlert) DefaultRunTitle() string {
+	return "Alert {{ $.data.status }} · {{ $.data.labels.alertname }}"
+}
+
 func (t *OnAlert) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

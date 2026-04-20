@@ -67,6 +67,10 @@ func (t *OnIncidentStatusUpdate) Color() string {
 	return "gray"
 }
 
+func (t *OnIncidentStatusUpdate) DefaultRunTitle() string {
+	return "{{ $.data.data.incident.summary }}"
+}
+
 func (t *OnIncidentStatusUpdate) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,5 +32,19 @@ func Test__DescribeTrigger(t *testing.T) {
 		require.Equal(t, "dummy", response.Trigger.Name)
 		require.Equal(t, "dummy", response.Trigger.Label)
 		require.Equal(t, "Just a dummy trigger used in unit tests", response.Trigger.Description)
+	})
+
+	t.Run("describe trigger with default run title", func(t *testing.T) {
+		r.Registry.Triggers["bitbucket.onPush"] = &bitbucket.OnPush{}
+
+		response, err := DescribeTrigger(context.Background(), r.Registry, "bitbucket.onPush")
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Trigger)
+		require.Equal(
+			t,
+			"Push {{ $.data.repository.full_name }} @ {{ $.data.push.changes[0].new.target.hash }}",
+			response.Trigger.DefaultRunTitle,
+		)
 	})
 }

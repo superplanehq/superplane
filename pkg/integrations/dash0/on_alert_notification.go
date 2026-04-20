@@ -58,6 +58,10 @@ func (t *OnAlertNotification) ExampleData() map[string]any {
 	return onAlertNotificationExampleData()
 }
 
+func (t *OnAlertNotification) DefaultRunTitle() string {
+	return "{{ $.data.issue.summary }}"
+}
+
 func (t *OnAlertNotification) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

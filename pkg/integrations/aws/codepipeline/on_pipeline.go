@@ -85,6 +85,10 @@ func (p *OnPipeline) Color() string {
 	return "gray"
 }
 
+func (p *OnPipeline) DefaultRunTitle() string {
+	return "{{ $.data.detail.pipeline }} - {{ $.data.detail.state }}"
+}
+
 func (p *OnPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -96,6 +96,10 @@ SuperPlane generates a random signing secret and configures the Kibana connector
 Each received alert emits the parsed JSON body sent by Kibana directly as the event data. Use the workflow event timestamp to know when SuperPlane received it.`
 }
 
+func (t *OnAlertFires) DefaultRunTitle() string {
+	return "{{ $.data.ruleName }}"
+}
+
 func (t *OnAlertFires) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

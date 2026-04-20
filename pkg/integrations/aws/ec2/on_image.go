@@ -74,6 +74,10 @@ func (p *OnImage) Color() string {
 	return "gray"
 }
 
+func (p *OnImage) DefaultRunTitle() string {
+	return "{{ $.data.detail.ImageId }}"
+}
+
 func (p *OnImage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
