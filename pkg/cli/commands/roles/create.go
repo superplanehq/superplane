@@ -1,4 +1,4 @@
-package secrets
+package roles
 
 import (
 	"fmt"
@@ -26,29 +26,34 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	resource, err := parseSecretFile(filePath)
+	resource, err := parseRoleFile(filePath)
 	if err != nil {
 		return err
 	}
+	if resource.Metadata == nil || resource.Metadata.GetName() == "" {
+		return fmt.Errorf("role metadata.name is required")
+	}
 
-	secret := resourceToSecret(*resource)
-
-	request := openapi_client.SecretsCreateSecretRequest{}
-	request.SetSecret(secret)
-	request.SetDomainType(core.OrganizationDomainType())
+	request := openapi_client.RolesCreateRoleRequest{}
+	domain := core.OrganizationDomainType()
+	request.SetDomainType(domain)
 	request.SetDomainId(organizationID)
+	request.SetRole(resourceToRole(*resource))
 
-	response, _, err := ctx.API.SecretAPI.SecretsCreateSecret(ctx.Context).Body(request).Execute()
+	response, _, err := ctx.API.RolesAPI.
+		RolesCreateRole(ctx.Context).
+		Body(request).
+		Execute()
 	if err != nil {
 		return err
 	}
 
-	createdSecret := response.GetSecret()
+	created := response.GetRole()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(createdSecret)
+		return ctx.Renderer.Render(created)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		return renderSecretText(stdout, createdSecret)
+		return renderRoleText(stdout, created)
 	})
 }

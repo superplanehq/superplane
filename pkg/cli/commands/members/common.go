@@ -11,41 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-func organizationDomainType() openapi_client.AuthorizationDomainType {
-	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
-}
-
-// splitUserIdentifier picks between a user id and a user email. A positional
-// containing "@" is treated as an email, so CLI commands can accept either
-// form in the positional slot. Returns (userID, userEmail, error). Exactly one
-// non-empty on success; both empty when no identifier was provided; error
-// when the caller supplied both a positional and --email.
-func splitUserIdentifier(positional string, emailFlag string) (string, string, error) {
-	positional = strings.TrimSpace(positional)
-	emailFlag = strings.TrimSpace(emailFlag)
-
-	if positional != "" && emailFlag != "" {
-		return "", "", fmt.Errorf("pass either a positional user id or --email, not both")
-	}
-
-	if positional != "" {
-		if strings.Contains(positional, "@") {
-			return "", positional, nil
-		}
-		return positional, "", nil
-	}
-	if emailFlag != "" {
-		return "", emailFlag, nil
-	}
-	return "", "", nil
-}
-
 // findMember locates a user by id or email within the organization's member list.
 // Returns the user and true if found. The search is case-insensitive for emails.
 func findMember(ctx core.CommandContext, organizationID string, identifier string) (openapi_client.SuperplaneUsersUser, bool, error) {
 	response, _, err := ctx.API.UsersAPI.
 		UsersListUsers(ctx.Context).
-		DomainType(string(organizationDomainType())).
+		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		IncludeRoles(true).
 		Execute()

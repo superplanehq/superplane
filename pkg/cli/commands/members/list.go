@@ -16,7 +16,7 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 
 	response, _, err := ctx.API.UsersAPI.
 		UsersListUsers(ctx.Context).
-		DomainType(string(organizationDomainType())).
+		DomainType(string(core.OrganizationDomainType())).
 		DomainId(organizationID).
 		IncludeRoles(true).
 		Execute()

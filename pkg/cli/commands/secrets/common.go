@@ -24,10 +24,6 @@ type secretResource struct {
 	Spec       *openapi_client.SecretsSecretSpec     `json:"spec,omitempty"`
 }
 
-func organizationDomainType() openapi_client.AuthorizationDomainType {
-	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
-}
-
 func parseSecretFile(path string) (*secretResource, error) {
 	// #nosec
 	data, err := os.ReadFile(path)
