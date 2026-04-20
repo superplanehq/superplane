@@ -72,10 +72,17 @@ export function InputForm({
           rows={expanded ? 4 : 1}
           className={cn(TEXT_AREA_CLASSNAME, expanded && "min-h-[112px] text-[15px] leading-6")}
           style={{ maxHeight: `${maxAiInputHeight}px` }}
+          data-testid="agent-chat-input"
         />
 
         <div className="flex items-center justify-end">
-          <button type="submit" className={SUBMIT_BUTTON_CLASSNAME} disabled={isDisabled} aria-label="Send prompt">
+          <button
+            type="submit"
+            className={SUBMIT_BUTTON_CLASSNAME}
+            disabled={isDisabled}
+            aria-label="Send prompt"
+            data-testid="agent-chat-send"
+          >
             <ArrowUp size={14} />
           </button>
         </div>
