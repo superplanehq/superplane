@@ -10,8 +10,8 @@ import { renderTimeAgo } from "@/components/TimeAgo";
  * Uses basic icon/color configuration from the trigger metadata.
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    return { title: context.event?.runTitle?.trim() || "", subtitle: "" };
+  subtitle: (_context: TriggerEventContext): string | React.ReactNode => {
+    return "";
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -30,7 +30,6 @@ export const defaultTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       props.lastEventData = {
-        title: lastEvent.runTitle?.trim() || "",
         subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

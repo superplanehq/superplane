@@ -39,36 +39,31 @@ function buildEvent(overrides?: Partial<NonNullable<EventInfo>>): EventInfo {
   };
 }
 
-// ── getTitleAndSubtitle ─────────────────────────────────────────────
+// ── subtitle ─────────────────────────────────────────────
 
-describe("onAlertReceivedTriggerRenderer.getTitleAndSubtitle", () => {
-  it("uses alert name as title", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: { alertName: "High Error Rate" } }) };
-    expect(onAlertReceivedTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("High Error Rate");
-  });
-
-  it("falls back to message when alert name is empty", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: { alertName: "", message: "5 matching rows" } }) };
-    expect(onAlertReceivedTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("5 matching rows");
-  });
-
-  it("falls back to default when both alertName and message are missing", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: {} }) };
-    expect(onAlertReceivedTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("Logfire alert received");
-  });
-
+describe("onAlertReceivedTriggerRenderer.subtitle", () => {
   it("builds subtitle from eventType and severity", () => {
     const ctx: TriggerEventContext = {
       event: buildEvent({ data: { alertName: "Test", eventType: "alert.fired", severity: "critical" } }),
     };
-    const { subtitle } = onAlertReceivedTriggerRenderer.getTitleAndSubtitle(ctx);
+    const subtitle = onAlertReceivedTriggerRenderer.subtitle(ctx);
     expect(subtitle).toContain("alert.fired");
     expect(subtitle).toContain("critical");
   });
 
+  it("falls back to time-ago when event data is empty", () => {
+    const ctx: TriggerEventContext = { event: buildEvent({ data: { alertName: "", message: "5 matching rows" } }) };
+    expect(onAlertReceivedTriggerRenderer.subtitle(ctx)).toContain("ago");
+  });
+
+  it("falls back to time-ago when no event fields are present", () => {
+    const ctx: TriggerEventContext = { event: buildEvent({ data: {} }) };
+    expect(onAlertReceivedTriggerRenderer.subtitle(ctx)).toContain("ago");
+  });
+
   it("handles undefined event data gracefully", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: undefined }) };
-    expect(() => onAlertReceivedTriggerRenderer.getTitleAndSubtitle(ctx)).not.toThrow();
+    expect(() => onAlertReceivedTriggerRenderer.subtitle(ctx)).not.toThrow();
   });
 });
 
@@ -173,11 +168,11 @@ describe("onAlertReceivedTriggerRenderer.getTriggerProps", () => {
     const ctx: TriggerRendererContext = {
       node: buildNode(),
       definition: buildDefinition(),
-      lastEvent: buildEvent({ data: { alertName: "Test Alert", severity: "warning" } }),
+      lastEvent: buildEvent({ runTitle: "Test Alert", data: { alertName: "Test Alert", severity: "warning" } }),
     };
     const props = onAlertReceivedTriggerRenderer.getTriggerProps(ctx);
     expect(props.lastEventData).toBeDefined();
-    expect(props.lastEventData!.title).toBe("Test Alert");
+    expect(props.lastEventData!.title).toBeUndefined();
     expect(props.lastEventData!.state).toBe("triggered");
   });
 

@@ -67,26 +67,12 @@ interface WebhookEventData {
   headers?: Record<string, string>;
 }
 
-function getWebhookEventTitle(context: TriggerEventContext): string {
-  // Check for run_name in the webhook request body
-  const runName = (context.event?.data?.data as { body?: { run_name?: string } })?.body?.run_name;
-  if (runName) {
-    return `${runName}`;
-  }
-
-  // Fallback to method and date
-  return `Webhook ${context.event?.id} at ${new Date(context.event?.createdAt || "").toLocaleString()}`;
-}
-
 /**
  * Renderer for the "webhook" trigger type
  */
 export const webhookTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    return {
-      title: getWebhookEventTitle(context),
-      subtitle: renderTimeAgo(new Date(context.event?.createdAt || "")),
-    };
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
+    return renderTimeAgo(new Date(context.event?.createdAt || ""));
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -149,7 +135,6 @@ export const webhookTriggerRenderer: TriggerRenderer = {
       const eventDate = new Date(lastEvent.createdAt);
 
       props.lastEventData = {
-        title: getWebhookEventTitle({ event: lastEvent }),
         subtitle: renderTimeAgo(eventDate),
         receivedAt: eventDate,
         state: "triggered",

@@ -89,7 +89,7 @@ func (t *OnEmailEvent) Color() string {
 }
 
 func (t *OnEmailEvent) DefaultRunTitle() string {
-	return "{{ $.data.email }}"
+	return `{{ $.data.email != "" ? $.data.email : "Email Event" }} · {{ $.data.event == "processed" ? "Processed" : ($.data.event == "delivered" ? "Delivered" : ($.data.event == "deferred" ? "Deferred" : ($.data.event == "bounce" ? "Bounced" : ($.data.event == "dropped" ? "Dropped" : ($.data.event == "open" ? "Opened" : ($.data.event == "click" ? "Clicked" : ($.data.event == "spamreport" ? "Spam Report" : ($.data.event == "unsubscribe" ? "Unsubscribed" : ($.data.event == "group_unsubscribe" ? "Group Unsubscribe" : ($.data.event == "group_resubscribe" ? "Group Resubscribe" : "Email Event")))))))))) }}`
 }
 
 func (t *OnEmailEvent) Configuration() []configuration.Field {

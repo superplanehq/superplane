@@ -9,7 +9,6 @@ import type {
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";
@@ -96,17 +95,13 @@ export const deleteMemoryMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title: fallbackTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt),
-      eventTitle: fallbackTitle,
       eventSubtitle,
       eventState: getDeleteMemoryState(execution),
       eventId: execution.rootEvent?.id || "",

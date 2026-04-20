@@ -6,7 +6,7 @@ import type {
   EventStateMap,
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type React from "react";
 import type {
   ComponentBaseMapper,
@@ -337,11 +337,7 @@ function getIssueCounts(execution: ExecutionInfo): { critical: number; degraded:
   return { critical, degraded };
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const { critical, degraded } = getIssueCounts(execution);
   const date = new Date(execution.createdAt!);
 
@@ -363,7 +359,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

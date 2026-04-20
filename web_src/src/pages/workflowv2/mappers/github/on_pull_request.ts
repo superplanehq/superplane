@@ -19,13 +19,10 @@ interface OnPullRequestEventData {
  * Renderer for the "github.onPullRequest" trigger
  */
 export const onPullRequestTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPullRequestEventData;
 
-    return {
-      title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
-    };
+    return buildGithubSubtitle(eventData?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -71,7 +68,6 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnPullRequestEventData;
 
       props.lastEventData = {
-        title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

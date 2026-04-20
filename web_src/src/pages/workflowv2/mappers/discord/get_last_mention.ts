@@ -12,7 +12,7 @@ import type {
 import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
@@ -160,18 +160,13 @@ function getLastMentionMetadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function getLastMentionEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",
     },

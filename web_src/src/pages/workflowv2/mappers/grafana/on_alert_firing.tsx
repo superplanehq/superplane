@@ -12,16 +12,12 @@ import { stringOrDash, formatTimestamp } from "../utils";
  * Renderer for the "grafana.onAlertFiring" trigger
  */
 export const onAlertFiringTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnAlertFiringEventData | undefined;
-    const alertName = getAlertName(eventData);
     const status = eventData?.status || "firing";
     const subtitle = buildSubtitle(status, context.event?.createdAt);
 
-    return {
-      title: alertName || "Grafana alert firing",
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -128,11 +124,9 @@ function buildLastEventData(lastEvent: TriggerRendererContext["lastEvent"]): Tri
 
   const eventData = lastEvent.data as OnAlertFiringEventData | undefined;
   const status = eventData?.status || "firing";
-  const alertName = getAlertName(eventData);
   const subtitle = buildSubtitle(status, lastEvent.createdAt);
 
   return {
-    title: alertName || "Grafana alert firing",
     subtitle,
     receivedAt: new Date(lastEvent.createdAt),
     state: "triggered",

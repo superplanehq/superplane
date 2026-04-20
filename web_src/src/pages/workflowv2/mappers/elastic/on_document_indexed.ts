@@ -20,11 +20,9 @@ interface OnDocumentIndexedPayload {
 }
 
 export const onDocumentIndexedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const payload = context.event?.data as OnDocumentIndexedPayload | undefined;
-    const title = payload?.index ? `New document in ${payload.index}` : "New document indexed";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -48,15 +46,12 @@ export const onDocumentIndexedTriggerRenderer: TriggerRenderer = {
     const metadata = buildMetadata(config);
 
     if (lastEvent) {
-      const payload = lastEvent.data as OnDocumentIndexedPayload | undefined;
-      const title = payload?.index ? `New document in ${payload.index}` : "New document indexed";
       return {
         title: node.name || definition.label || "Unnamed trigger",
         iconSrc: elasticIcon,
         collapsedBackground: getBackgroundColorClass(definition.color),
         metadata,
         lastEventData: {
-          title,
           subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",

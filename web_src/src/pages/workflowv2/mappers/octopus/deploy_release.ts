@@ -13,7 +13,7 @@ import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/compo
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
@@ -155,18 +155,13 @@ function deployReleaseMetadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function deployReleaseEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

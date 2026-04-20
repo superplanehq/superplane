@@ -307,28 +307,28 @@ describe("queryDataSourceMapper.getExecutionDetails", () => {
 
 // ===== On Alert Firing Trigger Renderer Tests =====
 
-describe("onAlertFiringTriggerRenderer.getTitleAndSubtitle", () => {
-  it("returns default title when event data is missing", () => {
+describe("onAlertFiringTriggerRenderer.subtitle", () => {
+  it("returns a subtitle when event data is present", () => {
     const ctx = {
       event: { ...defaultTriggerEvent, id: "e1", createdAt: new Date().toISOString(), data: undefined },
     };
-    const { title } = onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx);
-    expect(title).toBe("Grafana alert firing");
+    expect(onAlertFiringTriggerRenderer.subtitle(ctx)).toBeTruthy();
   });
 
-  it("uses event title field as alert name", () => {
+  it("returns a subtitle node for a firing event", () => {
     const ctx = {
       event: {
         ...defaultTriggerEvent,
         id: "e1",
         createdAt: new Date().toISOString(),
+        runTitle: "High CPU",
         data: { title: "High CPU", status: "firing" },
       },
     };
-    expect(onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("High CPU");
+    expect(onAlertFiringTriggerRenderer.subtitle(ctx)).toBeTruthy();
   });
 
-  it("falls back to commonLabels.alertname", () => {
+  it("returns a subtitle node when labels are present", () => {
     const ctx = {
       event: {
         ...defaultTriggerEvent,
@@ -337,10 +337,10 @@ describe("onAlertFiringTriggerRenderer.getTitleAndSubtitle", () => {
         data: { commonLabels: { alertname: "DiskWarn" }, status: "firing" },
       },
     };
-    expect(onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("DiskWarn");
+    expect(onAlertFiringTriggerRenderer.subtitle(ctx)).toBeTruthy();
   });
 
-  it("falls back to first alert labels.alertname", () => {
+  it("returns a subtitle node when alerts are present", () => {
     const ctx = {
       event: {
         ...defaultTriggerEvent,
@@ -349,7 +349,7 @@ describe("onAlertFiringTriggerRenderer.getTitleAndSubtitle", () => {
         data: { alerts: [{ labels: { alertname: "MemoryLeak" } }], status: "firing" },
       },
     };
-    expect(onAlertFiringTriggerRenderer.getTitleAndSubtitle(ctx).title).toBe("MemoryLeak");
+    expect(onAlertFiringTriggerRenderer.subtitle(ctx)).toBeTruthy();
   });
 });
 
@@ -433,12 +433,12 @@ describe("onAlertFiringTriggerRenderer.getTriggerProps", () => {
         data: { title: "Recent Alert", status: "firing" },
         nodeId: "node-1",
         type: "grafana.alert.firing",
-        customName: undefined,
+        runTitle: "Recent Alert",
       },
     });
 
     const props = onAlertFiringTriggerRenderer.getTriggerProps(ctx);
     expect(props.lastEventData).toBeDefined();
-    expect(props.lastEventData?.title).toBe("Recent Alert");
+    expect(props.lastEventData?.title).toBeUndefined();
   });
 });

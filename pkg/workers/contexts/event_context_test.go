@@ -69,7 +69,7 @@ func Test__EventContext__Emit(t *testing.T) {
 				"changes": []any{
 					map[string]any{
 						"new": map[string]any{
-							"target": map[string]any{"hash": "abcdef1234567890"},
+							"target": map[string]any{"hash": "abcdef1234567890", "message": "Ship it"},
 						},
 					},
 				},
@@ -80,6 +80,6 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, events)
 		require.NotNil(t, events[len(events)-1].RunTitle)
-		assert.Equal(t, "Push superplanehq/superplane @ abcdef1234567890", *events[len(events)-1].RunTitle)
+		assert.Equal(t, "Ship it", *events[len(events)-1].RunTitle)
 	})
 }

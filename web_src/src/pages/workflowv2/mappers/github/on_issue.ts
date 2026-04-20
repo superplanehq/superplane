@@ -19,13 +19,10 @@ interface OnIssueEventData {
  * Renderer for the "github.onIssue" trigger
  */
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueEventData;
 
-    return {
-      title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
-    };
+    return buildGithubSubtitle(eventData?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -66,7 +63,6 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnIssueEventData;
 
       props.lastEventData = {
-        title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

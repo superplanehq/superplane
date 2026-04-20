@@ -140,9 +140,9 @@ func TestConfigurationFieldToProto(t *testing.T) {
 func TestTriggerDefaultRunTitle(t *testing.T) {
 	assert.Equal(
 		t,
-		"Push {{ $.data.repository.full_name }} @ {{ $.data.push.changes[0].new.target.hash }}",
+		"{{ $.data.push.changes[0].new.target.message }}",
 		TriggerDefaultRunTitle(testTrigger{
-			defaultRunTitle: "Push {{ $.data.repository.full_name }} @ {{ $.data.push.changes[0].new.target.hash }}",
+			defaultRunTitle: "{{ $.data.push.changes[0].new.target.message }}",
 		}),
 	)
 
@@ -178,7 +178,7 @@ func TestNodeRunTitleTemplateProtoDropsTriggerDefault(t *testing.T) {
 			Id:               "node-1",
 			Name:             "Node 1",
 			Type:             componentpb.Node_TYPE_TRIGGER,
-			RunTitleTemplate: proto.String("Push {{ $.data.repository.full_name }} @ {{ $.data.push.changes[0].new.target.hash }}"),
+			RunTitleTemplate: proto.String("{{ $.data.push.changes[0].new.target.message }}"),
 			Trigger:          &componentpb.Node_TriggerRef{Name: "bitbucket.onPush"},
 		},
 	})

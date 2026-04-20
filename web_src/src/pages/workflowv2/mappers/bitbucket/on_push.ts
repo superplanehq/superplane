@@ -92,16 +92,12 @@ function buildBitbucketSubtitle(shortSha: string, createdAt?: string): string | 
  * Renderer for the "bitbucket.onPush" trigger
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as BitbucketPush;
     const firstChange = eventData?.push?.changes?.[0];
-    const commitMessage = firstChange?.new?.target?.message?.trim() || "";
     const shortSha = firstChange?.new?.target?.hash?.slice(0, 7) || "";
 
-    return {
-      title: commitMessage,
-      subtitle: buildBitbucketSubtitle(shortSha, context.event?.createdAt),
-    };
+    return buildBitbucketSubtitle(shortSha, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -150,7 +146,6 @@ export const onPushTriggerRenderer: TriggerRenderer = {
       const shortSha = firstChange?.new?.target?.hash?.slice(0, 7) || "";
 
       props.lastEventData = {
-        title: firstChange?.new?.target?.message?.trim() || "",
         subtitle: buildBitbucketSubtitle(shortSha, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

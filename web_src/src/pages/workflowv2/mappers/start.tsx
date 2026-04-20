@@ -26,8 +26,8 @@ interface StartConfiguration {
  * Default renderer for the start trigger
  */
 export const startTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
+  subtitle: (_context: TriggerEventContext): string | React.ReactNode => {
+    return "";
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -73,7 +73,6 @@ export const startTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       props.lastEventData = {
-        title: "Event emitted by trigger",
         subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

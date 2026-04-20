@@ -77,7 +77,7 @@ func (t *OnImageDeleted) Color() string {
 }
 
 func (t *OnImageDeleted) DefaultRunTitle() string {
-	return "{{ $.data.target.repository }}@{{ $.data.target.digest }}"
+	return `{{ $.data.repository != "" ? $.data.repository + ($.data.shortDigest != "" ? "@" + $.data.shortDigest : "") : "Image deleted" }}`
 }
 
 func (t *OnImageDeleted) Configuration() []configuration.Field {
@@ -250,6 +250,13 @@ func (t *OnImageDeleted) handleImageDeletedEvent(
 	}
 
 	ctx.Logger.Infof("Image deleted: %s@%s", repository, digest)
+
+	rawEvent["repository"] = repository
+	if len(digest) > 19 {
+		rawEvent["shortDigest"] = digest[:19]
+	} else {
+		rawEvent["shortDigest"] = digest
+	}
 
 	if err := ctx.Events.Emit("azure.image.deleted", rawEvent); err != nil {
 		return fmt.Errorf("failed to emit event: %w", err)

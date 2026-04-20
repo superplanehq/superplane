@@ -19,15 +19,10 @@ interface OnPRCommentEventData {
  * Renderer for the "github.onPRComment" trigger
  */
 export const onPRCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPRCommentEventData;
-    const prNumber = eventData?.issue?.number || "";
-    const title = eventData?.issue?.title || "PR Comment";
 
-    return {
-      title: `#${prNumber} - ${title}`,
-      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt),
-    };
+    return buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -74,11 +69,8 @@ export const onPRCommentTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnPRCommentEventData;
-      const prNumber = eventData?.issue?.number || "";
-      const title = eventData?.issue?.title || "PR Comment";
 
       props.lastEventData = {
-        title: `#${prNumber} - ${title}`,
         subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

@@ -45,22 +45,20 @@ interface OnFeatureFlagChangeEventData {
   flagKey?: string;
 }
 
-function getEventTitleAndSubtitle(
+function getEventSubtitle(
   eventData: OnFeatureFlagChangeEventData | undefined,
   createdAt?: string,
-): { title: string; subtitle: string | React.ReactNode } {
-  const title = eventData?.name || eventData?.flagKey || "Feature Flag";
+): string | React.ReactNode {
   const verb = eventData?.titleVerb;
   const kind = eventData?.kind ? formatEventLabel(eventData.kind) : "";
   const contentParts = [verb || kind].filter(Boolean).join(" · ");
-  const subtitle = buildSubtitle(contentParts, createdAt);
-  return { title, subtitle };
+  return buildSubtitle(contentParts, createdAt);
 }
 
 export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnFeatureFlagChangeEventData;
-    return getEventTitleAndSubtitle(eventData, context.event?.createdAt);
+    return getEventSubtitle(eventData, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -114,10 +112,8 @@ export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnFeatureFlagChangeEventData;
-      const { title, subtitle } = getEventTitleAndSubtitle(eventData, lastEvent.createdAt);
       props.lastEventData = {
-        title,
-        subtitle,
+        subtitle: getEventSubtitle(eventData, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,

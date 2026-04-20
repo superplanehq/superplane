@@ -24,14 +24,14 @@ interface OnIncidentEventData {
 }
 
 export const onIncidentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnIncidentEventData;
     const incident = eventData?.incident;
     const severityName = incident?.severity?.name;
     const statusName = incident?.incident_status?.name;
     const contentParts = [severityName, statusName].filter(Boolean).join(" · ");
     const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
-    return { title: incident?.name || "Incident", subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -59,7 +59,6 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       const contentParts = [incident?.severity?.name, incident?.incident_status?.name].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
       props.lastEventData = {
-        title: incident?.name || "Incident",
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

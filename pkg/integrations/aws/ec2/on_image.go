@@ -75,7 +75,7 @@ func (p *OnImage) Color() string {
 }
 
 func (p *OnImage) DefaultRunTitle() string {
-	return "{{ $.data.detail.ImageId }}"
+	return `{{ $.data.detail.ImageId != "" ? $.data.detail.ImageId : "EC2 AMI state change" }}`
 }
 
 func (p *OnImage) Configuration() []configuration.Field {

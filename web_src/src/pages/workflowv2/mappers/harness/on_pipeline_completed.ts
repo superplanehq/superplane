@@ -17,16 +17,15 @@ interface OnPipelineCompletedEventData {
 }
 
 export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnPipelineCompletedEventData;
-    const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
     const status = eventData?.status || "";
     const subtitle =
       status && context.event?.createdAt
         ? renderWithTimeAgo(status, new Date(context.event.createdAt))
         : status || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -61,7 +60,6 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnPipelineCompletedEventData;
-      const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
       const status = eventData?.status || "";
       const subtitle =
         status && lastEvent.createdAt
@@ -69,7 +67,6 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
           : status || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
 
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

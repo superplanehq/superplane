@@ -34,15 +34,10 @@ function extractBlobName(subject?: string): string | undefined {
 }
 
 export const onBlobCreatedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const envelope = context.event?.data as AzureBlobEvent | undefined;
-    const container = extractBlobContainer(envelope?.subject);
-    const blobName = extractBlobName(envelope?.subject);
-
-    const title = container ? `${container}/${blobName ?? ""}` : "Blob created";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -80,9 +75,8 @@ export const onBlobCreatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onBlobCreatedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onBlobCreatedTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

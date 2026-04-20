@@ -81,7 +81,7 @@ func (t *OnBlobCreated) Color() string {
 }
 
 func (t *OnBlobCreated) DefaultRunTitle() string {
-	return "{{ $.data.subject }}"
+	return `{{ $.data.container != "" ? $.data.container + "/" + $.data.blobName : "Blob created" }}`
 }
 
 func (t *OnBlobCreated) Configuration() []configuration.Field {
@@ -259,6 +259,9 @@ func (t *OnBlobCreated) handleBlobCreatedEvent(
 	}
 
 	ctx.Logger.Infof("Blob created: %s/%s", container, blobName)
+
+	rawEvent["container"] = container
+	rawEvent["blobName"] = blobName
 
 	if err := ctx.Events.Emit("azure.blob.created", rawEvent); err != nil {
 		return fmt.Errorf("failed to emit event: %w", err)

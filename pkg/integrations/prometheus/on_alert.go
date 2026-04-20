@@ -96,7 +96,7 @@ func (t *OnAlert) Color() string {
 }
 
 func (t *OnAlert) DefaultRunTitle() string {
-	return "Alert {{ $.data.status }} · {{ $.data.labels.alertname }}"
+	return `Alert {{ $.data.status }} · {{ $.data.labels.alertname }}{{ $.data.labels.instance != "" ? " · " + $.data.labels.instance : "" }}{{ $.data.labels.job != "" ? " · " + $.data.labels.job : "" }}`
 }
 
 func (t *OnAlert) Configuration() []configuration.Field {

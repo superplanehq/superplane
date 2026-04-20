@@ -79,7 +79,7 @@ func (t *OnIssue) Color() string {
 }
 
 func (t *OnIssue) DefaultRunTitle() string {
-	return "{{ $.data.title }}"
+	return `{{ $.data.title != "" ? $.data.title : "Issue" }}{{ $.data.state != "" ? " · " + ($.data.state == "CREATED" ? "Created" : ($.data.state == "ACTIVATED" ? "Activated" : ($.data.state == "ACKNOWLEDGED" ? "Acknowledged" : ($.data.state == "CLOSED" ? "Closed" : $.data.state)))) : "" }}`
 }
 
 func (t *OnIssue) Configuration() []configuration.Field {

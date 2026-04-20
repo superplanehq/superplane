@@ -10,7 +10,7 @@ import type {
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap } from "../..";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
@@ -93,15 +93,10 @@ function getScanMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getScanEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function getScanEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

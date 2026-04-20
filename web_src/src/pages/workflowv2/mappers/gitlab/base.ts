@@ -1,6 +1,6 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { NodeInfo, ComponentDefinition, ExecutionInfo } from "../types";
@@ -40,15 +40,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
-
+function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventState: getState(componentName)(execution),
       eventSubtitle: buildGitlabExecutionSubtitle(execution),
       eventId: execution.rootEvent!.id!,

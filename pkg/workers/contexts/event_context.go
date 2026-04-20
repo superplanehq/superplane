@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
@@ -40,11 +41,13 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	now := time.Now()
+	eventID := uuid.New()
 
 	//
 	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
 	//
 	event := models.CanvasEvent{
+		ID:         eventID,
 		WorkflowID: s.node.WorkflowID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
@@ -53,8 +56,11 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		CreatedAt:  &now,
 	}
 
-	wrappedPayload := map[string]any{"data": payload}
-	runTitle, err := ResolveRootEventRunTitle(s.tx, s.node, wrappedPayload)
+	runTitle, err := ResolveRootEventRunTitle(
+		s.tx,
+		s.node,
+		buildRootEventRunTitleInput(payload, event.ID, now, payloadType, event.Channel),
+	)
 	if err == nil && runTitle != nil {
 		event.RunTitle = runTitle
 	}
@@ -97,13 +103,20 @@ func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, payload any)
 	return &resolvedName, nil
 }
 
+func buildRootEventRunTitleInput(payload any, eventID uuid.UUID, createdAt time.Time, payloadType string, channel string) map[string]any {
+	return map[string]any{
+		"data": payload,
+		"event": map[string]any{
+			"id":        eventID.String(),
+			"createdAt": createdAt.UTC().Format(time.RFC3339Nano),
+			"type":      payloadType,
+			"channel":   channel,
+		},
+	}
+}
+
 func resolveRootEventRunTitleTemplate(tx *gorm.DB, node *models.CanvasNode) (string, error) {
 	if node == nil {
-		return "", nil
-	}
-
-	ref := node.Ref.Data()
-	if ref.Trigger == nil || ref.Trigger.Name == "" {
 		return "", nil
 	}
 
@@ -125,6 +138,11 @@ func resolveRootEventRunTitleTemplate(tx *gorm.DB, node *models.CanvasNode) (str
 		}
 
 		break
+	}
+
+	ref := node.Ref.Data()
+	if ref.Trigger == nil || ref.Trigger.Name == "" {
+		return "", nil
 	}
 
 	return registry.DefaultRunTitleForTrigger(ref.Trigger.Name), nil

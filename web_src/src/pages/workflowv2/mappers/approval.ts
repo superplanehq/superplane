@@ -19,7 +19,6 @@ import type {
   EventStateMap,
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";
@@ -378,16 +377,11 @@ function getApprovalSpecs(items: ApprovalRecord[]): ComponentBaseSpec[] {
   ];
 }
 
-function getApprovalEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function getApprovalEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const eventSubtitle = getComponentSubtitle(execution);
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: eventTitle,
     eventSubtitle: eventSubtitle,
     eventState: approvalStateFunction(execution),
     eventId: execution.rootEvent!.id!,

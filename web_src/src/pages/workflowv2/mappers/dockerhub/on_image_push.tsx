@@ -42,15 +42,10 @@ interface ImagePushEvent {
  * Renderer for the "dockerhub.onImagePush" trigger
  */
 export const onImagePushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as ImagePushEvent;
-    const repository = eventData?.repository?.repo_name;
-    const tag = eventData?.push_data?.tag;
-
-    const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "Image push";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -101,9 +96,8 @@ export const onImagePushTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImagePushTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onImagePushTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

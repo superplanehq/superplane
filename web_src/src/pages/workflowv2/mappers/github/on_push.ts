@@ -14,14 +14,11 @@ interface GithubConfiguration {
  * Renderer for the "github.onPush" trigger
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as Push;
     const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
 
-    return {
-      title: eventData?.head_commit?.message || "",
-      subtitle: buildGithubSubtitle(shortSha, context.event?.createdAt),
-    };
+    return buildGithubSubtitle(shortSha, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -51,7 +48,6 @@ export const onPushTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as Push;
       const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
       props.lastEventData = {
-        title: eventData?.head_commit?.message || "",
         subtitle: buildGithubSubtitle(shortSha, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

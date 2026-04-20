@@ -12,9 +12,8 @@ export const onBuildCompleteTriggerRenderer: TriggerRenderer = {
     return cloudBuildStatusToTriggerState(data?.status);
   },
 
-  getTitleAndSubtitle: (_context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const title = "Cloud Build event";
-    return { title, subtitle: "" };
+  subtitle: (_context: TriggerEventContext): string | React.ReactNode => {
+    return "";
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -36,7 +35,6 @@ export const onBuildCompleteTriggerRenderer: TriggerRenderer = {
       metadata: [],
       ...(lastEvent && {
         lastEventData: {
-          title: "Cloud Build event",
           subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: cloudBuildStatusToTriggerState(data?.status),

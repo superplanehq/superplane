@@ -33,14 +33,11 @@ interface OnIssueEventData {
 }
 
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueEventData;
     const issue = eventData?.object_attributes;
 
-    return {
-      title: `#${issue?.iid ?? ""} - ${issue?.title || "Issue"}`,
-      subtitle: buildGitlabSubtitle(issue?.action || "", context.event?.createdAt),
-    };
+    return buildGitlabSubtitle(issue?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -99,7 +96,6 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
       const issue = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: `#${issue?.iid ?? ""} - ${issue?.title || "Issue"}`,
         subtitle: buildGitlabSubtitle(issue?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

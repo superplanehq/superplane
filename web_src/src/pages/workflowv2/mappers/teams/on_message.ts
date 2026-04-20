@@ -34,15 +34,11 @@ interface MessageEventData {
  * Renderer for the "teams.onMessage" trigger
  */
 export const onMessageTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as MessageEventData | undefined;
-    const title = eventData?.text?.trim() ? eventData.text : "Channel message";
     const subtitle = buildSubtitle(eventData?.from?.name || eventData?.from?.id || "", context.event?.createdAt);
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -88,11 +84,9 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as MessageEventData | undefined;
-      const title = eventData?.text?.trim() ? eventData.text : "Channel message";
       const subtitle = buildSubtitle(eventData?.from?.name || eventData?.from?.id || "", lastEvent.createdAt);
 
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

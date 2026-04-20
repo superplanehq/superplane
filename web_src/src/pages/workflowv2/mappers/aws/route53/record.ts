@@ -10,7 +10,7 @@ import type {
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap } from "../..";
 import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -53,15 +53,10 @@ function recordMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function recordEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function recordEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id ?? "",

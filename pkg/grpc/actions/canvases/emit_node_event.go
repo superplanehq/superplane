@@ -35,6 +35,7 @@ func EmitNodeEvent(
 
 	now := time.Now()
 	event := models.CanvasEvent{
+		ID:         uuid.New(),
 		WorkflowID: canvas.ID,
 		NodeID:     nodeID,
 		Channel:    channel,
@@ -43,7 +44,11 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	runTitle, err := contexts.ResolveRootEventRunTitle(database.Conn(), node, data)
+	runTitle, err := contexts.ResolveRootEventRunTitle(
+		database.Conn(),
+		node,
+		buildEmitNodeEventRunTitleInput(data, event.ID, now, channel),
+	)
 	if err == nil && runTitle != nil {
 		event.RunTitle = runTitle
 	}
@@ -62,4 +67,21 @@ func EmitNodeEvent(
 	return &pb.EmitNodeEventResponse{
 		EventId: event.ID.String(),
 	}, nil
+}
+
+func buildEmitNodeEventRunTitleInput(data map[string]any, eventID uuid.UUID, createdAt time.Time, channel string) map[string]any {
+	input := make(map[string]any, len(data)+2)
+	for key, value := range data {
+		input[key] = value
+	}
+
+	input["data"] = data
+	input["event"] = map[string]any{
+		"id":        eventID.String(),
+		"createdAt": createdAt.UTC().Format(time.RFC3339Nano),
+		"type":      "",
+		"channel":   channel,
+	}
+
+	return input
 }

@@ -15,16 +15,10 @@ export interface OnImageDeletedConfiguration {
 }
 
 export const onImageDeletedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as ACREventData;
-    const repository = eventData?.target?.repository;
-    const digest = eventData?.target?.digest;
-
-    const shortDigest = digest ? digest.slice(0, 19) : undefined;
-    const title = repository ? `${repository}${shortDigest ? `@${shortDigest}` : ""}` : "Image deleted";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -62,9 +56,8 @@ export const onImageDeletedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImageDeletedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onImageDeletedTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

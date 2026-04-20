@@ -59,20 +59,16 @@ function formatSyntheticCheckLabels(labels?: SyntheticCheckLabelTuple[]): string
 }
 
 export const onSyntheticCheckNotificationTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as SyntheticCheckNotificationEventData | undefined;
     const issue = eventData?.issue;
-    const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 synthetic check notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
     const subtitle =
       subtitleParts && context.event?.createdAt
         ? renderWithTimeAgo(subtitleParts, new Date(context.event.createdAt))
         : subtitleParts || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -110,11 +106,10 @@ export const onSyntheticCheckNotificationTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onSyntheticCheckNotificationTriggerRenderer.getTitleAndSubtitle({
+      const subtitle = onSyntheticCheckNotificationTriggerRenderer.subtitle({
         event: lastEvent,
       });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

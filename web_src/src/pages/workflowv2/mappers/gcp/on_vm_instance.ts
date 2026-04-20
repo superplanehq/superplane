@@ -7,12 +7,11 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 
 export const onVMInstanceTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const data = context.event?.data as { resourceName?: string } | undefined;
     const resourceName = data?.resourceName ?? "";
-    const title = "VM instance event";
     const subtitle = resourceName || "";
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -30,7 +29,6 @@ export const onVMInstanceTriggerRenderer: TriggerRenderer = {
       metadata: [],
       ...(lastEvent && {
         lastEventData: {
-          title: "VM instance event",
           subtitle:
             (lastEvent.data as { resourceName?: string })?.resourceName ?? renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),

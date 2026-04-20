@@ -3,7 +3,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../types";
 
 export type BuildGrafanaEventSectionsOptions = {
@@ -33,15 +33,9 @@ export function buildGrafanaEventSections(
     }
   }
 
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  const triggerName = rootTriggerNode?.componentName ?? "";
-  const rootTriggerRenderer = getTriggerRenderer(triggerName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: resolveGrafanaEventReceivedAt(execution),
-      eventTitle: title || "Trigger event",
       eventSubtitle: resolveGrafanaEventSubtitle(execution),
       eventState: getState(componentName)(execution),
       eventId: resolveGrafanaEventId(execution),
@@ -89,16 +83,10 @@ export function grafanaCreatedAtSubtitle(context: SubtitleContext): string | Rea
   return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
-export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Trigger event";
-
+export function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
       eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",

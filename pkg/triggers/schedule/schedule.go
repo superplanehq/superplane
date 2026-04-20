@@ -125,7 +125,7 @@ func (s *Schedule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 }
 
 func (s *Schedule) DefaultRunTitle() string {
-	return "Scheduled run"
+	return `Schedule: {{ date($.event.createdAt).Format("Jan 2, 2006, 3:04:05 PM MST") }}`
 }
 
 func (s *Schedule) Configuration() []configuration.Field {

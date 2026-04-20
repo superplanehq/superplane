@@ -79,13 +79,13 @@ export function mapTriggerEventsToSidebarEvents(
 export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: ComponentsNode): SidebarEvent {
   const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
   const eventInfo = buildEventInfo(event);
-  const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: eventInfo });
+  const subtitle = triggerRenderer.subtitle({ event: eventInfo });
   const values = triggerRenderer.getRootEventValues({ event: eventInfo });
   const state = triggerRenderer.getEventState?.({ event: eventInfo }) || "triggered";
 
   return {
     id: event.id!,
-    title,
+    title: getEventRunTitle(eventInfo),
     subtitle: subtitle || renderTimeAgo(new Date(event.createdAt!)),
     state,
     isOpen: false,
@@ -138,20 +138,18 @@ export function mapExecutionsToSidebarEvents(
       execution: buildExecutionInfo(execution),
     });
 
-    const { title, subtitle } = execution.rootEvent
-      ? rootTriggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(execution.rootEvent!) })
-      : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
+    const eventInfo = execution.rootEvent ? buildEventInfo(execution.rootEvent!) : undefined;
+    const subtitle = eventInfo
+      ? rootTriggerRenderer.subtitle({ event: eventInfo })
+      : execution.createdAt
+        ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "")
+        : "";
 
-    const values = execution.rootEvent
-      ? rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(execution.rootEvent!) })
-      : {};
+    const values = eventInfo ? rootTriggerRenderer.getRootEventValues({ event: eventInfo }) : {};
 
     return {
       id: execution.id!,
-      title,
+      title: getEventRunTitle(eventInfo, execution.id || "Execution"),
       subtitle: componentSubtitle || subtitle || renderTimeAgo(new Date(execution.createdAt!)),
       state,
       isOpen: false,
@@ -183,17 +181,17 @@ export function getNextInQueueInfo(
   const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
-  const { title, subtitle } = queueItem.rootEvent
-    ? rootTriggerRenderer.getTitleAndSubtitle({
-        event: buildEventInfo(queueItem.rootEvent!),
+  const eventInfo = queueItem.rootEvent ? buildEventInfo(queueItem.rootEvent!) : undefined;
+  const subtitle = eventInfo
+    ? rootTriggerRenderer.subtitle({
+        event: eventInfo,
       })
-    : {
-        title: queueItem.id || "Execution",
-        subtitle: queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)).replace(" ago", "") : "",
-      };
+    : queueItem.createdAt
+      ? formatTimeAgo(new Date(queueItem.createdAt)).replace(" ago", "")
+      : "";
 
   return {
-    title,
+    title: getEventRunTitle(eventInfo, queueItem.id || "Execution"),
     subtitle: subtitle || (queueItem.createdAt ? renderTimeAgo(new Date(queueItem.createdAt)) : ""),
     receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : new Date(),
   };
@@ -209,22 +207,20 @@ export function mapQueueItemsToSidebarEvents(
     const rootTriggerNode = nodes.find((n) => n.id === item.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
-    const { title, subtitle } = item.rootEvent
-      ? rootTriggerRenderer.getTitleAndSubtitle({
-          event: buildEventInfo(item.rootEvent!),
+    const eventInfo = item.rootEvent ? buildEventInfo(item.rootEvent!) : undefined;
+    const subtitle = eventInfo
+      ? rootTriggerRenderer.subtitle({
+          event: eventInfo,
         })
-      : {
-          title: item.id || "Execution",
-          subtitle: item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "",
-        };
+      : item.createdAt
+        ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "")
+        : "";
 
-    const values = item.rootEvent
-      ? rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(item.rootEvent!) })
-      : {};
+    const values = eventInfo ? rootTriggerRenderer.getRootEventValues({ event: eventInfo }) : {};
 
     return {
       id: item.id!,
-      title,
+      title: getEventRunTitle(eventInfo, item.id || "Execution"),
       subtitle: subtitle || renderTimeAgo(new Date(item.createdAt!)),
       state: "queued" as const,
       isOpen: false,
@@ -387,8 +383,10 @@ export function buildRunEntryFromEvent(options: {
   const { event, nodes, runItems = [] } = options;
   const triggerNode = nodes.find((node) => node.id === event.nodeId);
   const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
-  const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(event) });
-  const rootValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(event) });
+  const eventInfo = buildEventInfo(event);
+  const subtitle = triggerRenderer.subtitle({ event: eventInfo });
+  const rootValues = triggerRenderer.getRootEventValues({ event: eventInfo });
+  const title = getEventRunTitle(eventInfo);
 
   return {
     id: event.id || `run-${Date.now()}`,
@@ -1300,10 +1298,15 @@ export function buildEventInfo(event: CanvasesCanvasEvent): EventInfo | undefine
   return {
     id: event.id!,
     createdAt: event.createdAt!,
+    runTitle: event.runTitle || undefined,
     data: event.data?.data || {},
     nodeId: event.nodeId!,
     type: (event.data?.type as string) || "",
   };
+}
+
+export function getEventRunTitle(event: EventInfo, fallback = ""): string {
+  return event?.runTitle?.trim() || fallback;
 }
 
 export function buildQueueItemInfo(queueItem: CanvasesCanvasNodeQueueItem): QueueItemInfo {

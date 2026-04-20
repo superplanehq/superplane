@@ -16,15 +16,10 @@ export interface OnImagePushedConfiguration {
 }
 
 export const onImagePushedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as ACREventData;
-    const repository = eventData?.target?.repository;
-    const tag = eventData?.target?.tag;
-
-    const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "Image pushed";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -62,9 +57,8 @@ export const onImagePushedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImagePushedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onImagePushedTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

@@ -69,7 +69,7 @@ func (w *OnWorkflowRun) Color() string {
 }
 
 func (w *OnWorkflowRun) DefaultRunTitle() string {
-	return "{{ $.data.workflow_run.name }}"
+	return `{{ $.data.workflow_run.display_title != "" ? $.data.workflow_run.display_title : ($.data.workflow_run.name != "" ? $.data.workflow_run.name : ($.data.workflow.name != "" ? $.data.workflow.name : "Workflow")) }}`
 }
 
 func (w *OnWorkflowRun) Configuration() []configuration.Field {

@@ -96,7 +96,7 @@ func (w *Webhook) Color() string {
 }
 
 func (w *Webhook) DefaultRunTitle() string {
-	return "Webhook received"
+	return `{{ $.data.data.body.run_name != "" ? $.data.data.body.run_name : "Webhook " + $.event.id + " at " + date($.event.createdAt).Format("1/2/2006, 3:04:05 PM") }}`
 }
 
 func (w *Webhook) Configuration() []configuration.Field {

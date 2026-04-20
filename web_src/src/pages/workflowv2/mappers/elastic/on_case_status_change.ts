@@ -25,12 +25,9 @@ interface OnCaseStatusChangeEventData {
 }
 
 export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const payload = context.event?.data as OnCaseStatusChangeEventData | undefined;
-    const status = payload?.status ? ` to ${payload.status}` : "";
-    const title = payload?.title ? `Case "${payload.title}" changed${status}` : "Case status changed";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -70,16 +67,12 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
     }
 
     if (lastEvent) {
-      const payload = lastEvent.data as OnCaseStatusChangeEventData | undefined;
-      const status = payload?.status ? ` to ${payload.status}` : "";
-      const title = payload?.title ? `Case "${payload.title}" changed${status}` : "Case status changed";
       return {
         title: node.name || definition.label || "Unnamed trigger",
         iconSrc: elasticIcon,
         collapsedBackground: getBackgroundColorClass(definition.color),
         metadata,
         lastEventData: {
-          title,
           subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",

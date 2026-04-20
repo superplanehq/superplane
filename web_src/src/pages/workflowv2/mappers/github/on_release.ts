@@ -18,15 +18,10 @@ interface OnReleaseEventData {
  * Renderer for the "github.onRelease" trigger
  */
 export const onReleaseTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnReleaseEventData;
-    const assetCount = eventData?.release?.assets?.length || 0;
-    const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
-    return {
-      title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
-    };
+    return buildGithubSubtitle(eventData?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -76,11 +71,8 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnReleaseEventData;
-      const assetCount = eventData?.release?.assets?.length || 0;
-      const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
       props.lastEventData = {
-        title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

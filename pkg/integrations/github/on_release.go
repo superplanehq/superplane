@@ -66,7 +66,7 @@ func (r *OnRelease) Color() string {
 }
 
 func (r *OnRelease) DefaultRunTitle() string {
-	return "{{ $.data.release.tag_name }}"
+	return `{{ $.data.release.name != "" ? $.data.release.name : ($.data.release.tag_name != "" ? $.data.release.tag_name : "Release") }} ({{ len($.data.release.assets) }} asset{{ len($.data.release.assets) != 1 ? "s" : "" }})`
 }
 
 func (r *OnRelease) Configuration() []configuration.Field {

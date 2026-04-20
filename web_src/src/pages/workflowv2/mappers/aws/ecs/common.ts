@@ -2,7 +2,7 @@ import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } f
 import type React from "react";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap } from "../..";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -47,18 +47,13 @@ export function buildEcsComponentProps(
 }
 
 export function buildEcsEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id ?? "",

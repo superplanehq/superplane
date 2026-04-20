@@ -81,7 +81,7 @@ func (t *OnFeatureFlagChange) Color() string {
 }
 
 func (t *OnFeatureFlagChange) DefaultRunTitle() string {
-	return "{{ $.data.name }}"
+	return `{{ $.data.name != "" ? $.data.name : ($.data.flagKey != "" ? $.data.flagKey : "Feature Flag") }}`
 }
 
 func (t *OnFeatureFlagChange) Configuration() []configuration.Field {

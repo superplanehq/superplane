@@ -8,7 +8,7 @@ import type {
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type {
   ComponentBaseMapper,
   OutputPayload,
@@ -270,11 +270,7 @@ export const LIST_INCIDENTS_STATE_REGISTRY: EventStateRegistry = {
   getState: listIncidentsStateFunction,
 };
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
-
+function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const incidents = getIncidents(execution);
   const date = new Date(execution.createdAt!);
 
@@ -303,7 +299,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

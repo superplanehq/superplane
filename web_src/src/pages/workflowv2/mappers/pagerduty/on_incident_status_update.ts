@@ -39,16 +39,12 @@ interface OnIncidentStatusUpdateEventData {
  * Renderer for the "pagerduty.onIncidentStatusUpdate" trigger type
  */
 export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data?.data as OnIncidentStatusUpdateEventData;
-    const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
     const subtitle = buildSubtitle(truncate(statusUpdate?.message, 50), context.event?.createdAt);
 
-    return {
-      title: incident?.summary || incident?.id || "Status Update",
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -101,12 +97,10 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnIncidentStatusUpdateEventData;
-      const incident = eventData?.incident;
       const statusUpdate = eventData?.status_update;
       const subtitle = buildSubtitle(truncate(statusUpdate?.message, 50), lastEvent.createdAt);
 
       props.lastEventData = {
-        title: incident?.summary || incident?.id || "Status Update",
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

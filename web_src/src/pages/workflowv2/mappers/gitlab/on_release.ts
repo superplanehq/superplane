@@ -24,23 +24,11 @@ interface OnReleaseEventData {
   };
 }
 
-function getReleaseTitle(eventData: OnReleaseEventData): string {
-  const releaseName = eventData?.name || eventData?.tag || "Release";
-  if (eventData?.tag) {
-    return `${releaseName} (${eventData.tag})`;
-  }
-
-  return releaseName;
-}
-
 export const onReleaseTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnReleaseEventData;
 
-    return {
-      title: getReleaseTitle(eventData),
-      subtitle: buildGitlabSubtitle(eventData?.action || "", context.event?.createdAt),
-    };
+    return buildGitlabSubtitle(eventData?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -91,7 +79,6 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnReleaseEventData;
 
       props.lastEventData = {
-        title: getReleaseTitle(eventData),
         subtitle: buildGitlabSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

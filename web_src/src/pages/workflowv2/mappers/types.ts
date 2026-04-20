@@ -34,11 +34,10 @@ export interface TriggerRenderer {
   getRootEventValues: (context: TriggerEventContext) => Record<string, any>;
 
   /**
-   * Get the title and subtitle for the trigger.
-   * @param context The context for the trigger event
-   * @returns The title and subtitle to display
+   * Get the subtitle for the trigger event.
+   * The event title is resolved centrally from rootEvent.runTitle.
    */
-  getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string | React.ReactNode };
+  subtitle: (context: TriggerEventContext) => string | React.ReactNode;
 
   /**
    * Optional event-state mapper for triggers that have meaningful terminal/running states.
@@ -62,7 +61,7 @@ export type EventInfo =
   | {
       id: string;
       createdAt: string;
-      customName?: string;
+      runTitle?: string;
       data: any;
       nodeId: string;
       type: string;

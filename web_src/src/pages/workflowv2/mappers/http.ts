@@ -19,7 +19,6 @@ import type React from "react";
 import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
 
 // Custom state map for HTTP component with error state
@@ -454,14 +453,10 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
 }
 
 function getHTTPEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   stateFunction: (execution: ExecutionInfo) => EventState,
 ): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
 
@@ -511,7 +506,6 @@ function getHTTPEventSections(
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventSubtitle: generateEventSubtitle(),
     eventState: stateFunction(execution),
     eventId: execution.rootEvent!.id!,

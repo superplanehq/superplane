@@ -68,7 +68,7 @@ func (t *OnBuild) Color() string {
 }
 
 func (t *OnBuild) DefaultRunTitle() string {
-	return "{{ $.data.serviceName }}"
+	return `{{ ($.data.serviceName != "" ? $.data.serviceName : ($.data.serviceId != "" ? $.data.serviceId : "Service")) + " · " + ($.event.type == "render.build.ended" ? "Build Ended" : ($.event.type == "render.build.started" ? "Build Started" : "Render Event")) }}`
 }
 
 func (t *OnBuild) Configuration() []configuration.Field {

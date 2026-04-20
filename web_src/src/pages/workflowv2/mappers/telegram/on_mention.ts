@@ -31,15 +31,14 @@ interface OnMentionEventData {
 }
 
 export const onMentionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnMentionEventData | undefined;
-    const title = eventData?.text?.trim() ? eventData.text : "Bot mention";
     const subtitle = buildSubtitle(
       eventData?.from?.username ? `Mention by @${eventData.from.username}` : "Mention",
       context.event?.createdAt,
     );
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -76,14 +75,12 @@ export const onMentionTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnMentionEventData | undefined;
-      const title = eventData?.text?.trim() ? eventData.text : "Bot mention";
       const subtitle = buildSubtitle(
         eventData?.from?.username ? `Mention by @${eventData.from.username}` : "Mention",
         lastEvent.createdAt,
       );
 
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

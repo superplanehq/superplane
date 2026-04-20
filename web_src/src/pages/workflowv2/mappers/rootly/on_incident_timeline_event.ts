@@ -24,17 +24,13 @@ interface OnEventEventData extends IncidentEvent {
  * Renderer for the "rootly.onIncidentTimelineEvent" trigger type
  */
 export const onEventTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnEventEventData;
     const incident = eventData?.incident;
-    const title = eventData?.event || incident?.title || "Incident event";
     const contentParts = [incident?.title, incident?.severity, incident?.status].filter(Boolean).join(" · ");
     const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -106,12 +102,10 @@ export const onEventTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as OnEventEventData;
       const incident = eventData?.incident;
-      const title = eventData?.event || incident?.title || "Incident event";
       const contentParts = [eventData?.kind, incident?.severity, incident?.status].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
 
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

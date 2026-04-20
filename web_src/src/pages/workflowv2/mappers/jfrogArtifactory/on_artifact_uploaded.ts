@@ -18,14 +18,10 @@ interface OnArtifactUploadedEventData {
 }
 
 export const onArtifactUploadedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as OnArtifactUploadedEventData;
-    const name = eventData?.name || "Artifact";
-    const repo = eventData?.repo;
-    const title = repo ? `${name} in ${repo}` : name;
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -75,14 +71,9 @@ export const onArtifactUploadedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnArtifactUploadedEventData;
-      const name = eventData?.name || "Artifact";
-      const repo = eventData?.repo;
-      const title = repo ? `${name} in ${repo}` : name;
       const subtitle = lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "";
 
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

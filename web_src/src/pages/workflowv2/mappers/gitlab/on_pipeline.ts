@@ -30,26 +30,12 @@ interface OnPipelineEventData {
   };
 }
 
-function getPipelineTitle(eventData: OnPipelineEventData): string {
-  const attrs = eventData?.object_attributes;
-  if (attrs?.iid) {
-    return `Pipeline #${attrs.iid}`;
-  }
-  if (attrs?.id) {
-    return `Pipeline #${attrs.id}`;
-  }
-  return "Pipeline";
-}
-
 export const onPipelineTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPipelineEventData;
     const attrs = eventData?.object_attributes;
 
-    return {
-      title: getPipelineTitle(eventData),
-      subtitle: buildGitlabSubtitle(attrs?.status || "", context.event?.createdAt),
-    };
+    return buildGitlabSubtitle(attrs?.status || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -104,7 +90,6 @@ export const onPipelineTriggerRenderer: TriggerRenderer = {
       const attrs = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: getPipelineTitle(eventData),
         subtitle: buildGitlabSubtitle(attrs?.status || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

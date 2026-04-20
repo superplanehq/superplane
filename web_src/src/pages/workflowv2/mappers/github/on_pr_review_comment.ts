@@ -25,22 +25,12 @@ interface OnPRReviewCommentEventData {
  * Renderer for the "github.onPRReviewComment" trigger
  */
 export const onPRReviewCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPRReviewCommentEventData;
-    const prNumber = eventData?.pull_request?.number || "";
-    const fileName = eventData?.comment?.path || "";
-    const title = fileName
-      ? `#${prNumber} - Review Comment on ${fileName}`
-      : eventData?.review
-        ? `#${prNumber} - PR Review`
-        : `#${prNumber} - PR Review Comment`;
 
     const author = eventData?.comment?.user?.login || eventData?.review?.user?.login || "unknown";
 
-    return {
-      title,
-      subtitle: buildGithubSubtitle(`By ${author}`, context.event?.createdAt),
-    };
+    return buildGithubSubtitle(`By ${author}`, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -103,18 +93,10 @@ export const onPRReviewCommentTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnPRReviewCommentEventData;
-      const prNumber = eventData?.pull_request?.number || "";
-      const fileName = eventData?.comment?.path || "";
-      const title = fileName
-        ? `#${prNumber} - Review Comment on ${fileName}`
-        : eventData?.review
-          ? `#${prNumber} - PR Review`
-          : `#${prNumber} - PR Review Comment`;
 
       const author = eventData?.comment?.user?.login || eventData?.review?.user?.login || "unknown";
 
       props.lastEventData = {
-        title,
         subtitle: buildGithubSubtitle(`By ${author}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

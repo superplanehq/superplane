@@ -32,7 +32,7 @@ func (p *OnPush) Description() string {
 }
 
 func (p *OnPush) DefaultRunTitle() string {
-	return "Push {{ $.data.repository.full_name }} @ {{ $.data.push.changes[0].new.target.hash }}"
+	return "{{ $.data.push.changes[0].new.target.message }}"
 }
 
 func (p *OnPush) Documentation() string {

@@ -5,7 +5,7 @@ import { type MetadataItem } from "../metadataList";
 type LastEventState = string;
 
 interface TriggerLastEventData {
-  title: string;
+  title?: string;
   subtitle?: string | React.ReactNode;
   receivedAt: Date;
   state: LastEventState;

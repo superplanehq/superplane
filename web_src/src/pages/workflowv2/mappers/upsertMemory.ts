@@ -8,7 +8,7 @@ import type {
 } from "./types";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
-import { getStateMap, getTriggerRenderer } from ".";
+import { getStateMap } from ".";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";
 
@@ -83,17 +83,13 @@ export const upsertMemoryMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title: fallbackTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt),
-      eventTitle: fallbackTitle,
       eventSubtitle,
       eventState: defaultStateFunction(execution),
       eventId: execution.rootEvent?.id || "",

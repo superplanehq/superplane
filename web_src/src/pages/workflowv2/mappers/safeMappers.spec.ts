@@ -101,7 +101,7 @@ function baseTriggerRenderer(): TriggerRenderer {
   return {
     getTriggerProps: () => ({ title: "T", iconSlug: "bolt", metadata: [] }),
     getRootEventValues: () => ({}),
-    getTitleAndSubtitle: () => ({ title: "", subtitle: "" }),
+    subtitle: () => "",
   };
 }
 
@@ -225,13 +225,13 @@ describe("createSafeTriggerRenderer core behavior", () => {
       ...baseTriggerRenderer(),
       getTriggerProps: () => expectedProps,
       getRootEventValues: () => ({ key: "val" }),
-      getTitleAndSubtitle: () => ({ title: "T", subtitle: "S" }),
+      subtitle: () => "S",
     };
     const safe = createSafeTriggerRenderer(underlying, "test");
 
     expect(safe.getTriggerProps(makeTriggerRendererContext())).toMatchObject(expectedProps);
     expect(safe.getRootEventValues(makeTriggerEventContext())).toEqual({ key: "val" });
-    expect(safe.getTitleAndSubtitle(makeTriggerEventContext())).toEqual({ title: "T", subtitle: "S" });
+    expect(safe.subtitle(makeTriggerEventContext())).toBe("S");
   });
 
   it("recovers from an error in getTriggerProps() and returns fallback", () => {
@@ -272,20 +272,19 @@ describe("createSafeTriggerRenderer core behavior", () => {
     consoleSpy.mockRestore();
   });
 
-  it("recovers from an error in getTitleAndSubtitle() and returns safe defaults", () => {
+  it("recovers from an error in subtitle() and returns safe defaults", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const safe = createSafeTriggerRenderer(
       {
         ...baseTriggerRenderer(),
-        getTitleAndSubtitle: () => {
+        subtitle: () => {
           throw new Error("undefined");
         },
       },
       "broken",
     );
-    const result = safe.getTitleAndSubtitle(makeTriggerEventContext());
-    expect(result.title).toBe("Event");
-    expect(result.subtitle).toBe("");
+    const result = safe.subtitle(makeTriggerEventContext());
+    expect(result).toBe("");
     consoleSpy.mockRestore();
   });
 
@@ -343,7 +342,35 @@ describe("createSafeTriggerRenderer normalization", () => {
 
     expect(result.title).toBe("Test Trigger");
     expect(result.iconSlug).toBe("bolt");
-    expect(result.lastEventData?.title).toBe("Test Trigger");
+    expect(result.lastEventData?.title).toBeUndefined();
+  });
+
+  it("injects defaultEventTitle from the latest execution root event", () => {
+    const result = normalizeComponentBaseProps(
+      {
+        title: "Component",
+        iconSlug: "zap",
+        eventSections: [{ eventId: "ev-1" }, { eventId: "ev-2", eventTitle: "Explicit title" }],
+      } as unknown as ComponentBaseProps,
+      makeComponentBaseContext({
+        lastExecutions: [
+          makeExecution({
+            rootEvent: {
+              id: "root-1",
+              createdAt: new Date().toISOString(),
+              runTitle: "Root event title",
+              data: {},
+              nodeId: "n1",
+              type: "trigger",
+            },
+          }),
+        ],
+      }),
+    );
+
+    expect(result.defaultEventTitle).toBe("Root event title");
+    expect(result.eventSections?.[0]?.eventTitle).toBeUndefined();
+    expect(result.eventSections?.[1]?.eventTitle).toBe("Explicit title");
   });
 
   it("preserves trigger customField identity and valid trigger-specific fields", () => {
