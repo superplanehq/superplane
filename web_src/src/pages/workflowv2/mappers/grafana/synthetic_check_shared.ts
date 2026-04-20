@@ -10,8 +10,7 @@ import type {
 import type { NodeInfo, OutputPayload } from "../types";
 import { formatTimestamp } from "../utils";
 
-/** Resolves grouped (request/schedule/validation) or legacy flat configuration for UI mappers. */
-export function getGrafanaSyntheticCheckFlatView(c: CreateHttpSyntheticCheckConfiguration | undefined): {
+type SyntheticCheckFlatView = {
   target?: string;
   method?: string;
   headers?: CreateHttpSyntheticCheckConfiguration["headers"];
@@ -29,31 +28,55 @@ export function getGrafanaSyntheticCheckFlatView(c: CreateHttpSyntheticCheckConf
   failIfBodyMatchesRegexp?: string[];
   failIfBodyNotMatchesRegexp?: string[];
   failIfHeaderMatchesRegexp?: CreateHttpSyntheticCheckConfiguration["failIfHeaderMatchesRegexp"];
-} {
+};
+
+/** Resolves grouped (request/schedule/validation) or legacy flat configuration for UI mappers. */
+export function getGrafanaSyntheticCheckFlatView(
+  c: CreateHttpSyntheticCheckConfiguration | undefined,
+): SyntheticCheckFlatView {
   if (!c) {
     return {};
   }
-  const req = c.request;
-  const sch = c.schedule;
-  const val = c.validation;
+
   return {
-    target: req?.target ?? c.target,
-    method: req?.method ?? c.method,
-    headers: req?.headers ?? c.headers,
-    body: req?.body ?? c.body,
-    noFollowRedirects: req?.noFollowRedirects ?? c.noFollowRedirects,
-    basicAuth: req?.basicAuth ?? c.basicAuth,
-    bearerToken: req?.bearerToken ?? c.bearerToken,
-    enabled: sch?.enabled ?? c.enabled,
-    frequency: sch?.frequency ?? c.frequency,
-    timeout: sch?.timeout ?? c.timeout,
-    probes: sch?.probes ?? c.probes,
-    failIfSSL: val?.failIfSSL ?? c.failIfSSL,
-    failIfNotSSL: val?.failIfNotSSL ?? c.failIfNotSSL,
-    validStatusCodes: val?.validStatusCodes ?? c.validStatusCodes,
-    failIfBodyMatchesRegexp: val?.failIfBodyMatchesRegexp ?? c.failIfBodyMatchesRegexp,
-    failIfBodyNotMatchesRegexp: val?.failIfBodyNotMatchesRegexp ?? c.failIfBodyNotMatchesRegexp,
-    failIfHeaderMatchesRegexp: val?.failIfHeaderMatchesRegexp ?? c.failIfHeaderMatchesRegexp,
+    ...getSyntheticCheckRequestFlatView(c),
+    ...getSyntheticCheckScheduleFlatView(c),
+    ...getSyntheticCheckValidationFlatView(c),
+  };
+}
+
+function getSyntheticCheckRequestFlatView(c: CreateHttpSyntheticCheckConfiguration): SyntheticCheckFlatView {
+  const request = c.request;
+  return {
+    target: request?.target ?? c.target,
+    method: request?.method ?? c.method,
+    headers: request?.headers ?? c.headers,
+    body: request?.body ?? c.body,
+    noFollowRedirects: request?.noFollowRedirects ?? c.noFollowRedirects,
+    basicAuth: request?.basicAuth ?? c.basicAuth,
+    bearerToken: request?.bearerToken ?? c.bearerToken,
+  };
+}
+
+function getSyntheticCheckScheduleFlatView(c: CreateHttpSyntheticCheckConfiguration): SyntheticCheckFlatView {
+  const schedule = c.schedule;
+  return {
+    enabled: schedule?.enabled ?? c.enabled,
+    frequency: schedule?.frequency ?? c.frequency,
+    timeout: schedule?.timeout ?? c.timeout,
+    probes: schedule?.probes ?? c.probes,
+  };
+}
+
+function getSyntheticCheckValidationFlatView(c: CreateHttpSyntheticCheckConfiguration): SyntheticCheckFlatView {
+  const validation = c.validation;
+  return {
+    failIfSSL: validation?.failIfSSL ?? c.failIfSSL,
+    failIfNotSSL: validation?.failIfNotSSL ?? c.failIfNotSSL,
+    validStatusCodes: validation?.validStatusCodes ?? c.validStatusCodes,
+    failIfBodyMatchesRegexp: validation?.failIfBodyMatchesRegexp ?? c.failIfBodyMatchesRegexp,
+    failIfBodyNotMatchesRegexp: validation?.failIfBodyNotMatchesRegexp ?? c.failIfBodyNotMatchesRegexp,
+    failIfHeaderMatchesRegexp: validation?.failIfHeaderMatchesRegexp ?? c.failIfHeaderMatchesRegexp,
   };
 }
 
@@ -72,42 +95,79 @@ export function buildSyntheticCheckMutationMetadata(
   const nodeMetadata = node.metadata as SyntheticCheckNodeMetadata | undefined;
   const flat = getGrafanaSyntheticCheckFlatView(configuration);
   const metadata: MetadataItem[] = [];
+  const headline = buildSyntheticCheckHeadlineMetadata(flat, nodeMetadata, updateConfiguration, variant);
 
-  if (variant === "update") {
-    const idFallback = updateConfiguration?.syntheticCheck?.trim();
-    const headline = nodeMetadata?.checkLabel?.trim() || (idFallback ? idFallback : undefined);
-    if (headline) {
-      metadata.push({ icon: "activity", label: truncate(headline, 48) });
-    } else if (flat.target) {
-      metadata.push({ icon: "globe", label: truncate(flat.target, 48) });
-    }
-  } else if (flat.target) {
-    metadata.push({ icon: "globe", label: truncate(flat.target, 48) });
+  if (headline) {
+    metadata.push(headline);
   }
 
   if (flat.method) {
     metadata.push({ icon: "arrow-right", label: flat.method.toUpperCase() });
   }
 
-  const probeText =
-    flat.probes && flat.probes.length > 0
-      ? nodeMetadata?.probeSummary?.trim()
-        ? truncate(nodeMetadata.probeSummary, 48)
-        : probeSummary(flat.probes)
-      : "";
+  const schedule = buildSyntheticCheckScheduleMetadata(flat, nodeMetadata);
+  if (schedule) {
+    metadata.push(schedule);
+  }
 
+  return metadata.slice(0, 3);
+}
+
+function buildSyntheticCheckHeadlineMetadata(
+  flat: SyntheticCheckFlatView,
+  nodeMetadata: SyntheticCheckNodeMetadata | undefined,
+  updateConfiguration: UpdateHttpSyntheticCheckConfiguration | undefined,
+  variant: SyntheticCheckCanvasVariant,
+): MetadataItem | undefined {
+  if (variant === "update") {
+    const idFallback = updateConfiguration?.syntheticCheck?.trim();
+    const headline = nodeMetadata?.checkLabel?.trim() || idFallback;
+    if (headline) {
+      return { icon: "activity", label: truncate(headline, 48) };
+    }
+  }
+
+  if (!flat.target) {
+    return undefined;
+  }
+
+  return { icon: "globe", label: truncate(flat.target, 48) };
+}
+
+function buildSyntheticCheckScheduleMetadata(
+  flat: SyntheticCheckFlatView,
+  nodeMetadata: SyntheticCheckNodeMetadata | undefined,
+): MetadataItem | undefined {
+  const probeText = formatSyntheticCheckProbeText(flat.probes, nodeMetadata);
   const scheduleParts: string[] = [];
+
   if (probeText) {
     scheduleParts.push(probeText);
   }
   if (flat.frequency) {
     scheduleParts.push(`Every ${formatConfiguredFrequency(flat.frequency)}`);
   }
-  if (scheduleParts.length > 0) {
-    metadata.push({ icon: "map-pin", label: scheduleParts.join(" · ") });
+  if (scheduleParts.length === 0) {
+    return undefined;
   }
 
-  return metadata.slice(0, 3);
+  return { icon: "map-pin", label: scheduleParts.join(" · ") };
+}
+
+function formatSyntheticCheckProbeText(
+  probes: string[] | undefined,
+  nodeMetadata: SyntheticCheckNodeMetadata | undefined,
+): string {
+  if (!probes || probes.length === 0) {
+    return "";
+  }
+
+  const probeMetadata = nodeMetadata?.probeSummary?.trim();
+  if (probeMetadata) {
+    return truncate(probeMetadata, 48);
+  }
+
+  return probeSummary(probes);
 }
 
 export function buildSyntheticCheckSelectionMetadata(
@@ -144,18 +204,34 @@ export function buildMutationDetails(
 export function buildGetSyntheticCheckDetails(payload: OutputPayload | undefined): Record<string, string> {
   const output = payload?.data as GetHttpSyntheticCheckOutput | undefined;
   const configuration = output?.configuration;
-  const details: Record<string, string> = {};
 
   if (!configuration) {
-    if (payload?.timestamp) {
-      details["Fetched At"] = formatTimestamp(payload.timestamp);
-    }
-    return details;
+    return buildEmptyGetSyntheticCheckDetails(payload);
   }
 
+  const details: Record<string, string> = {};
   const metrics = output?.metrics;
-  const http = configuration.settings?.http;
 
+  addGetSyntheticCheckSummaryDetails(details, configuration, metrics);
+  addGetSyntheticCheckScheduleDetails(details, configuration);
+  addGetSyntheticCheckMetricDetails(details, metrics, payload);
+
+  return details;
+}
+
+function buildEmptyGetSyntheticCheckDetails(payload: OutputPayload | undefined): Record<string, string> {
+  if (!payload?.timestamp) {
+    return {};
+  }
+
+  return { "Fetched At": formatTimestamp(payload.timestamp) };
+}
+
+function addGetSyntheticCheckSummaryDetails(
+  details: Record<string, string>,
+  configuration: NonNullable<GetHttpSyntheticCheckOutput["configuration"]>,
+  metrics: GetHttpSyntheticCheckOutput["metrics"] | undefined,
+): void {
   if (metrics?.lastOutcome) {
     details["Last Outcome"] = metrics.lastOutcome;
   }
@@ -164,29 +240,56 @@ export function buildGetSyntheticCheckDetails(payload: OutputPayload | undefined
     details.Job = configuration.job;
   }
 
-  if (configuration.target) {
-    const method = (http?.method || "GET").toUpperCase();
-    details.Target = `${method} ${configuration.target}`;
+  if (!configuration.target) {
+    return;
   }
 
+  const method = (configuration.settings?.http?.method || "GET").toUpperCase();
+  details.Target = `${method} ${configuration.target}`;
+}
+
+function addGetSyntheticCheckScheduleDetails(
+  details: Record<string, string>,
+  configuration: NonNullable<GetHttpSyntheticCheckOutput["configuration"]>,
+): void {
   const scheduleLine = buildGetCheckScheduleLine(configuration.frequency, configuration.timeout);
   if (scheduleLine) {
     details.Schedule = scheduleLine;
   }
+}
 
+function addGetSyntheticCheckMetricDetails(
+  details: Record<string, string>,
+  metrics: GetHttpSyntheticCheckOutput["metrics"] | undefined,
+  payload: OutputPayload | undefined,
+): void {
   if (metrics && syntheticCheckHasRunCounts(metrics)) {
     details["Runs (24h)"] = formatSyntheticCheckRuns24hLine(metrics);
   }
 
+  const probeActivity = formatSyntheticCheckProbeActivity(metrics, payload);
+  if (probeActivity) {
+    details[probeActivity.label] = probeActivity.value;
+  }
+}
+
+function formatSyntheticCheckProbeActivity(
+  metrics: GetHttpSyntheticCheckOutput["metrics"] | undefined,
+  payload: OutputPayload | undefined,
+): { label: string; value: string } | undefined {
   if (metrics?.averageLatencySeconds24h != null) {
-    details["Avg Latency (24h)"] = `${metrics.averageLatencySeconds24h.toFixed(3)}s`;
-  } else if (metrics?.lastExecutionAt) {
-    details["Last Probe"] = formatTimestamp(metrics.lastExecutionAt);
-  } else if (payload?.timestamp) {
-    details["Fetched At"] = formatTimestamp(payload.timestamp);
+    return { label: "Avg Latency (24h)", value: `${metrics.averageLatencySeconds24h.toFixed(3)}s` };
   }
 
-  return details;
+  if (metrics?.lastExecutionAt) {
+    return { label: "Last Probe", value: formatTimestamp(metrics.lastExecutionAt) };
+  }
+
+  if (!payload?.timestamp) {
+    return undefined;
+  }
+
+  return { label: "Fetched At", value: formatTimestamp(payload.timestamp) };
 }
 
 export function buildDeleteHttpSyntheticCheckDetails(payload: OutputPayload | undefined): Record<string, string> {

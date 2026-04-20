@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";
 import { deleteHttpSyntheticCheckMapper } from "./delete_http_synthetic_check";
 import { getHttpSyntheticCheckMapper } from "./get_http_synthetic_check";
+import { getGrafanaSyntheticCheckFlatView } from "./synthetic_check_shared";
 import { updateHttpSyntheticCheckMapper } from "./update_http_synthetic_check";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
 
@@ -113,6 +114,33 @@ describe("grafana synthetic check mappers", () => {
       expect.objectContaining({ icon: "arrow-right", label: "POST" }),
       expect.objectContaining({ icon: "map-pin", label: "9 · Every 2m" }),
     ]);
+  });
+
+  it("does not surface legacy or nested TLS configuration in the frontend flat view", () => {
+    const flat = getGrafanaSyntheticCheckFlatView({
+      target: "https://legacy.example.com",
+      method: "GET",
+      request: {
+        target: "https://nested.example.com",
+        method: "POST",
+        tls: {
+          insecureSkipVerify: true,
+          serverName: "nested.example.com",
+        },
+      },
+      tls: {
+        insecureSkipVerify: true,
+        serverName: "legacy.example.com",
+      },
+    } as unknown as Parameters<typeof getGrafanaSyntheticCheckFlatView>[0]);
+
+    expect(flat).toEqual(
+      expect.objectContaining({
+        target: "https://nested.example.com",
+        method: "POST",
+      }),
+    );
+    expect(flat).not.toHaveProperty("tls");
   });
 
   it("create mapper prefers probe summary from node metadata over raw probe ids", () => {
