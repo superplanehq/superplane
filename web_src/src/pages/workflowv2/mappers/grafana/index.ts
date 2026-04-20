@@ -18,6 +18,8 @@ import { listAnnotationsMapper } from "./list_annotations";
 import { listSilencesMapper } from "./list_silences";
 import { onAlertFiringTriggerRenderer } from "./on_alert_firing";
 import { queryDataSourceMapper } from "./query_data_source";
+import { queryLogsMapper } from "./query_logs";
+import { queryTracesMapper } from "./query_traces";
 import { renderPanelMapper } from "./render_panel";
 import { resolveIncidentMapper } from "./resolve_incident";
 import { updateAlertRuleMapper } from "./update_alert_rule";
@@ -30,6 +32,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getDashboard: getDashboardMapper,
   listAlertRules: listAlertRulesMapper,
   queryDataSource: queryDataSourceMapper,
+  queryLogs: queryLogsMapper,
+  queryTraces: queryTracesMapper,
   renderPanel: renderPanelMapper,
   updateAlertRule: updateAlertRuleMapper,
   createAnnotation: createAnnotationMapper,
@@ -59,6 +63,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getDashboard: buildActionStateRegistry("fetched"),
   listAlertRules: buildActionStateRegistry("listed"),
   queryDataSource: buildActionStateRegistry("queried"),
+  queryLogs: buildActionStateRegistry("queried"),
+  queryTraces: buildActionStateRegistry("queried"),
   renderPanel: buildActionStateRegistry("rendered"),
   updateAlertRule: buildActionStateRegistry("updated"),
   createAnnotation: buildActionStateRegistry("created"),

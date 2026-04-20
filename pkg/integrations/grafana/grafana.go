@@ -97,6 +97,8 @@ func (g *Grafana) Components() []core.Component {
 		&GetDashboard{},
 		&ListAlertRules{},
 		&QueryDataSource{},
+		&QueryLogs{},
+		&QueryTraces{},
 		&RenderPanel{},
 		&UpdateAlertRule{},
 		&CreateAnnotation{},
