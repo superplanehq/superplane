@@ -26,7 +26,7 @@ func NewLocalProvider(tx *gorm.DB, encryptor crypto.Encryptor, record *models.Se
 
 func (p *LocalProvider) Load(ctx context.Context) (map[string]string, error) {
 	name := p.record.Name
-	decrypted, err := p.encryptor.Decrypt(context.TODO(), p.record.Data, []byte(name))
+	decrypted, err := p.encryptor.Decrypt(ctx, p.record.Data, []byte(name))
 	if err != nil {
 		return nil, fmt.Errorf("error decrypting secret %s: %v", name, err)
 	}

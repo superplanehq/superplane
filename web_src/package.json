@@ -129,5 +129,10 @@
   "prettier": {
     "printWidth": 120,
     "trailingComma": "all"
+  },
+  "overrides": {
+    "monaco-editor": {
+      "dompurify": "^3.4.0"
+    }
   }
 }

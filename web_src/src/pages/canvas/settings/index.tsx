@@ -146,7 +146,9 @@ function useApproverRoles(organizationRoles: RolesRole[]) {
 }
 
 function useSaveCallback(canvasId: string, organizationId: string): (values: SettingsSavePayload) => Promise<void> {
+  const navigate = useNavigate();
   const updateCanvasMutation = useUpdateCanvas(organizationId, canvasId);
+  const baseCanvasPath = `/${organizationId}/canvases/${canvasId}`;
 
   return useCallback(
     async (values: SettingsSavePayload) => {
@@ -158,7 +160,9 @@ function useSaveCallback(canvasId: string, organizationId: string): (values: Set
         description: values.description,
         changeManagement: values.changeManagement,
       });
+
+      navigate(baseCanvasPath, { replace: true });
     },
-    [canvasId, updateCanvasMutation],
+    [canvasId, updateCanvasMutation, navigate, baseCanvasPath],
   );
 }
