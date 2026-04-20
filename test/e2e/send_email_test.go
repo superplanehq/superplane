@@ -19,6 +19,7 @@ func TestSendEmailComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Send Email User")
 		steps.addSendEmailWithUser("Notify User", "Test Subject", "Test Body")
+		steps.canvas.Save()
 		steps.canvas.Publish()
 		steps.assertSendEmailSavedToDB("Notify User", "Test Subject")
 	})
