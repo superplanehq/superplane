@@ -347,7 +347,7 @@ export const useCreateCanvas = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string } & CanvasGraphData) => {
+    mutationFn: async (data: { name: string; description?: string; method?: "ui" | "cli" | "yaml_import" | "template"; templateId?: string } & CanvasGraphData) => {
       const payload = {
         metadata: {
           name: data.name,
@@ -367,7 +367,7 @@ export const useCreateCanvas = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
 
@@ -377,10 +377,16 @@ export const useCreateCanvas = (organizationId: string) => {
           canvasKeys.detail(organizationId, response.data.canvas.metadata.id),
           response.data.canvas,
         );
-        analytics.canvasCreate(response.data.canvas.metadata.id, organizationId);
+        analytics.canvasCreate(
+          response.data.canvas.metadata.id,
+          organizationId,
+          variables.method ?? "ui",
+          variables.templateId,
+          !!variables.description,
+        );
       }
     },
-  });
+    });
 };
 
 export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
@@ -745,21 +751,29 @@ export const useDeleteCanvas = (organizationId: string) => {
 
   return useMutation({
     mutationFn: async (canvasId: string) => {
+      // Capture node count before removing from cache.
+      // Fall back to the list cache if the detail page was never opened.
+      const cachedDetail = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+      const cachedList = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId));
+      const cachedCanvas = cachedDetail ?? cachedList?.find((c) => c.metadata?.id === canvasId);
+      const nodeCount = cachedCanvas?.spec?.nodes?.length ?? 0;
+
       // Remove from cache immediately before deletion to prevent 404 flash
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
 
-      return await canvasesDeleteCanvas(
+      const result = await canvasesDeleteCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
         }),
       );
+      return { result, nodeCount };
     },
-    onSuccess: (_, canvasId) => {
+    onSuccess: ({ nodeCount }, canvasId) => {
       // Ensure it's removed (in case it wasn't already)
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-      analytics.canvasDelete(canvasId, organizationId);
+      analytics.canvasDelete(canvasId, organizationId, nodeCount);
     },
   });
 };

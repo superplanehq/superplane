@@ -88,6 +88,9 @@ describe("CreateCanvasPage analytics", () => {
       expect(capture).toHaveBeenCalledWith("canvas:canvas_create", {
         canvas_id: "canvas-123",
         organization_id: "org-123",
+        method: "ui",
+        template_id: undefined,
+        has_description: false,
       });
     });
   });

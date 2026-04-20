@@ -4625,6 +4625,8 @@ export function WorkflowPageV2() {
         description: data.description,
         nodes: latestWorkflow.spec?.nodes,
         edges: latestWorkflow.spec?.edges,
+        method: "template",
+        templateId: canvasId,
       });
 
       if (result?.data?.canvas?.metadata?.id) {

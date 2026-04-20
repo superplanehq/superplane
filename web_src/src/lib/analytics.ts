@@ -5,12 +5,28 @@ export const analytics = {
     posthog.capture("settings:member_accept", { organization_id: organizationId });
   },
 
-  canvasCreate: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas:canvas_create", { canvas_id: canvasId, organization_id: organizationId });
+  canvasCreate: (
+    canvasId: string,
+    organizationId: string,
+    method: "ui" | "cli" | "yaml_import" | "template",
+    templateId: string | undefined,
+    hasDescription: boolean,
+  ) => {
+    posthog.capture("canvas:canvas_create", {
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      method,
+      template_id: templateId,
+      has_description: hasDescription,
+    });
   },
 
-  canvasDelete: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas:canvas_delete", { canvas_id: canvasId, organization_id: organizationId });
+  canvasDelete: (canvasId: string, organizationId: string, nodeCount: number) => {
+    posthog.capture("canvas:canvas_delete", {
+      canvas_id: canvasId,
+      organization_id: organizationId,
+      node_count: nodeCount,
+    });
   },
 
   versionPublish: (canvasId: string, organizationId: string) => {

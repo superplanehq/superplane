@@ -26,18 +26,33 @@ describe("analytics", () => {
   });
 
   it("captures canvas create", () => {
-    analytics.canvasCreate("canvas-123", "org-123");
+    analytics.canvasCreate("canvas-123", "org-123", "ui", undefined, false);
     expect(capture).toHaveBeenCalledWith("canvas:canvas_create", {
       canvas_id: "canvas-123",
       organization_id: "org-123",
+      method: "ui",
+      template_id: undefined,
+      has_description: false,
+    });
+  });
+
+  it("captures canvas create from template", () => {
+    analytics.canvasCreate("canvas-123", "org-123", "template", "template-456", true);
+    expect(capture).toHaveBeenCalledWith("canvas:canvas_create", {
+      canvas_id: "canvas-123",
+      organization_id: "org-123",
+      method: "template",
+      template_id: "template-456",
+      has_description: true,
     });
   });
 
   it("captures canvas delete", () => {
-    analytics.canvasDelete("canvas-123", "org-123");
+    analytics.canvasDelete("canvas-123", "org-123", 5);
     expect(capture).toHaveBeenCalledWith("canvas:canvas_delete", {
       canvas_id: "canvas-123",
       organization_id: "org-123",
+      node_count: 5,
     });
   });
 
