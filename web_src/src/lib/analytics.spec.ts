@@ -139,6 +139,16 @@ describe("analytics", () => {
     });
   });
 
+  it("captures event emit", () => {
+    analytics.eventEmit("trigger", "github", "org-123");
+    expect(capture).toHaveBeenCalledWith("canvas:event_emit", {
+      node_type: "trigger",
+      integration: "github",
+      organization_id: "org-123",
+    });
+  });
+
+
   it("captures version publish", () => {
     analytics.versionPublish("canvas-123", "org-123");
     expect(capture).toHaveBeenCalledWith("canvas:version_publish", {

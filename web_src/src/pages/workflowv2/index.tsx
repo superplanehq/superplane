@@ -3411,7 +3411,7 @@ export function WorkflowPageV2() {
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
-    
+
       const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
         nodeIds,
         scope: "connected-component",
@@ -3754,12 +3754,17 @@ export function WorkflowPageV2() {
           }),
         );
         // Note: Success toast is shown by EmitEventModal
+        const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
+        if (node && organizationId) {
+          const { nodeType, integration } = getNodeAnalyticsProps(node, availableIntegrations);
+          analytics.eventEmit(nodeType, integration, organizationId);
+        }
       } catch (error) {
         showErrorToast("Failed to emit event");
         throw error; // Re-throw to let EmitEventModal handle it
       }
     },
-    [canvasId],
+    [canvasId, canvas, availableIntegrations, organizationId],
   );
 
   const handleTogglePause = useCallback(
@@ -3804,6 +3809,11 @@ export function WorkflowPageV2() {
 
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
         showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
+        if (updatedPaused) {
+          analytics.nodePause("action", organizationId);
+        } else {
+          analytics.nodeUnpause("action", organizationId);
+        }
       } catch (error) {
         const parsedError = error as { message: string };
         if (parsedError?.message) {

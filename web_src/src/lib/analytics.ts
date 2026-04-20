@@ -85,6 +85,10 @@ export const analytics = {
     posthog.capture("canvas:auto_layout", { node_count: nodeCount, organization_id: organizationId });
   },
 
+  eventEmit: (nodeType: string, integration: string | undefined, organizationId: string) => {
+    posthog.capture("canvas:event_emit", { node_type: nodeType, integration, organization_id: organizationId });
+  },
+
   versionPublish: (canvasId: string, organizationId: string) => {
     posthog.capture("canvas:version_publish", { canvas_id: canvasId, organization_id: organizationId });
   },
