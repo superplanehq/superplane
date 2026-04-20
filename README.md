@@ -46,6 +46,11 @@ A few concrete things teams build with SuperPlane:
 
 ## Quick start
 
+Then open http://localhost:3000 and follow the quick start guide.
+
+> **Note:** The demo container runs on port `3000`.
+> If you are setting up the full development environment for contributing, follow the instructions in `CONTRIBUTING.md`, where the local dev server starts on `http://localhost:8000`.
+
 Run the latest demo container:
 
 ```
