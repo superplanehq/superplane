@@ -111,6 +111,28 @@ func TestCreateRoleRequiresMetadataName(t *testing.T) {
 	require.Contains(t, err.Error(), "metadata.name is required")
 }
 
+func TestCreateRoleRejectsUnknownFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/me" {
+			writeMeResponse(w)
+			return
+		}
+		t.Fatalf("unexpected %s %s; create should fail client-side before any API call", r.Method, r.URL.Path)
+	}))
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	path := dir + "/role.yaml"
+	content := []byte("apiVersion: v1\nkind: Role\nmetadata:\n  name: release_manager\nspec:\n  displayName: Release Manager\n  unknown: true\n")
+	require.NoError(t, os.WriteFile(path, content, 0644))
+
+	ctx, _ := newTestContext(t, server, "text")
+	err := (&createCommand{file: &path}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown field")
+	require.Contains(t, err.Error(), "unknown")
+}
+
 func TestUpdateRoleFromFile(t *testing.T) {
 	var seen rolePayload
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
