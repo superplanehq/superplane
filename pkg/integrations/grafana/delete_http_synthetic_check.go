@@ -79,7 +79,7 @@ func (d *DeleteHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	if err := validateSyntheticCheckSelection(spec); err != nil {
 		return err
 	}
-	return resolveSyntheticCheckNodeMetadata(ctx, spec.SyntheticCheck)
+	return resolveSyntheticCheckNodeMetadata(ctx, spec.SyntheticCheck, nil)
 }
 
 func (d *DeleteHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {

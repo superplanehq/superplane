@@ -48,7 +48,7 @@ Returns a combined payload containing:
 
 - **configuration**: the Grafana synthetic check definition
 - **alerts**: the configured per-check synthetic alerts when available
-- **metrics**: best-effort operational metrics derived from Grafana synthetic monitoring metrics`
+- **metrics**: best-effort operational metrics derived from Grafana synthetic monitoring metrics; when present, **lastOutcome** is one of **Up**, **Partial**, or **Down**, matching the output channels`
 }
 
 func (g *GetHTTPSyntheticCheck) Icon() string {
@@ -98,7 +98,7 @@ func (g *GetHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	if err := validateSyntheticCheckSelection(spec); err != nil {
 		return err
 	}
-	return resolveSyntheticCheckNodeMetadata(ctx, spec.SyntheticCheck)
+	return resolveSyntheticCheckNodeMetadata(ctx, spec.SyntheticCheck, nil)
 }
 
 func (g *GetHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {

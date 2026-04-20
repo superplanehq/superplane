@@ -75,7 +75,7 @@ func (c *CreateHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 	if err := validateSyntheticCheckBase(spec.SyntheticCheckSpecBase); err != nil {
 		return err
 	}
-	return resolveSyntheticProbeSummaryMetadata(ctx, spec.Probes)
+	return resolveSyntheticProbeSummaryMetadata(ctx, spec.Probes, nil)
 }
 
 func (c *CreateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {

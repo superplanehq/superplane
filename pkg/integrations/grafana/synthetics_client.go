@@ -106,6 +106,8 @@ type SyntheticProbe struct {
 }
 
 type SyntheticCheckMetrics struct {
+	// LastOutcome is the derived probe reachability label: "Up", "Partial", or "Down"
+	// (see probeAvgToOutcome). It matches getHttpSyntheticCheck output channel routing.
 	LastOutcome              *string  `json:"lastOutcome,omitempty"`
 	SuccessRuns24h           *float64 `json:"successRuns24h,omitempty"`
 	FailureRuns24h           *float64 `json:"failureRuns24h,omitempty"`
