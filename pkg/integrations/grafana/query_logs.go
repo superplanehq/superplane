@@ -167,14 +167,14 @@ func (q *QueryLogs) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, nil)
+		request.From, err = resolveGrafanaTimeInput(*spec.TimeFrom, nil, ctx.Expressions)
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo, nil)
+		request.To, err = resolveGrafanaTimeInput(*spec.TimeTo, nil, ctx.Expressions)
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}

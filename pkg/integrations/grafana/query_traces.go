@@ -157,7 +157,7 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		timeFrom, resolveErr := resolveQueryTimeValue(*spec.TimeFrom, nil)
+		timeFrom, resolveErr := resolveGrafanaTimeInput(*spec.TimeFrom, nil, ctx.Expressions)
 		if resolveErr != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), resolveErr)
 		}
@@ -165,7 +165,7 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		timeTo, resolveErr := resolveQueryTimeValue(*spec.TimeTo, nil)
+		timeTo, resolveErr := resolveGrafanaTimeInput(*spec.TimeTo, nil, ctx.Expressions)
 		if resolveErr != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), resolveErr)
 		}
