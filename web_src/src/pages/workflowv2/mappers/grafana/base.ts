@@ -17,39 +17,50 @@ export function buildGrafanaEventSections(
   componentName: string,
   options?: BuildGrafanaEventSectionsOptions,
 ): EventSection[] {
-  const strict = options?.strict === true;
-
-  if (strict) {
-    if (!execution.rootEvent?.id) {
-      return [];
-    }
-    if (!execution.createdAt) {
-      return [];
-    }
-    const strictTrigger = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-    if (!strictTrigger?.componentName) {
-      return [];
-    }
+  if (!execution.rootEvent?.id) {
+    return [];
   }
 
+  const strict = options?.strict === true;
   const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
+
+  if (strict && (!execution.createdAt || !rootTriggerNode?.componentName)) {
+    return [];
+  }
+
   const triggerName = rootTriggerNode?.componentName ?? "";
   const rootTriggerRenderer = getTriggerRenderer(triggerName);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const eventTitle = title || "Trigger event";
 
   if (!strict) {
-    return [
-      {
-        receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-        eventTitle,
-        eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-        eventState: getState(componentName)(execution),
-        eventId: execution.rootEvent?.id || "",
-      },
-    ];
+    return buildDefaultGrafanaEventSections(execution, componentName, eventTitle);
   }
 
+  return buildStrictGrafanaEventSections(execution, componentName, eventTitle);
+}
+
+function buildDefaultGrafanaEventSections(
+  execution: ExecutionInfo,
+  componentName: string,
+  eventTitle: string,
+): EventSection[] {
+  return [
+    {
+      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
+      eventTitle,
+      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent?.id || "",
+    },
+  ];
+}
+
+function buildStrictGrafanaEventSections(
+  execution: ExecutionInfo,
+  componentName: string,
+  eventTitle: string,
+): EventSection[] {
   return [
     {
       receivedAt: resolveGrafanaEventReceivedAt(execution),

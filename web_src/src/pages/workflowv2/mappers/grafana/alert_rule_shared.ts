@@ -8,8 +8,6 @@ import type {
   UpdateAlertRuleConfiguration,
 } from "./types";
 
-export { buildGrafanaEventSections } from "./base";
-
 export function buildAlertRuleMetadata(
   node: NodeInfo,
   options?: {
