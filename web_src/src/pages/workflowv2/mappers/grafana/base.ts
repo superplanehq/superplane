@@ -19,11 +19,10 @@ export function buildGrafanaEventSections(
 ): EventSection[] {
   const strict = options?.strict === true;
 
-  if (!execution.rootEvent?.id) {
-    return [];
-  }
-
   if (strict) {
+    if (!execution.rootEvent?.id) {
+      return [];
+    }
     if (!execution.createdAt) {
       return [];
     }
@@ -37,11 +36,24 @@ export function buildGrafanaEventSections(
   const triggerName = rootTriggerNode?.componentName ?? "";
   const rootTriggerRenderer = getTriggerRenderer(triggerName);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const eventTitle = title || "Trigger event";
+
+  if (!strict) {
+    return [
+      {
+        receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
+        eventTitle,
+        eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
+        eventState: getState(componentName)(execution),
+        eventId: execution.rootEvent?.id || "",
+      },
+    ];
+  }
 
   return [
     {
       receivedAt: resolveGrafanaEventReceivedAt(execution),
-      eventTitle: title || "Trigger event",
+      eventTitle,
       eventSubtitle: resolveGrafanaEventSubtitle(execution),
       eventState: getState(componentName)(execution),
       eventId: resolveGrafanaEventId(execution),
@@ -49,7 +61,7 @@ export function buildGrafanaEventSections(
   ];
 }
 
-/** Single source for Grafana event display time so subtitle and receivedAt stay aligned. */
+/** Single source for Grafana event display time so subtitle and receivedAt stay aligned (strict / alert flows). */
 function resolveGrafanaEventDisplayTimestamp(execution: ExecutionInfo): string | undefined {
   return execution.createdAt || execution.updatedAt;
 }

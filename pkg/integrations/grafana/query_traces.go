@@ -158,20 +158,18 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
 		timeFrom, resolveErr := resolveQueryTimeValue(*spec.TimeFrom, nil)
-		request["from"] = timeFrom
-		err = resolveErr
-		if err != nil {
-			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
+		if resolveErr != nil {
+			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), resolveErr)
 		}
+		request["from"] = timeFrom
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
 		timeTo, resolveErr := resolveQueryTimeValue(*spec.TimeTo, nil)
-		request["to"] = timeTo
-		err = resolveErr
-		if err != nil {
-			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
+		if resolveErr != nil {
+			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), resolveErr)
 		}
+		request["to"] = timeTo
 	}
 
 	fromValue, _ := request["from"].(string)
