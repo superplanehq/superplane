@@ -14,12 +14,11 @@ import (
 )
 
 func TestTimeGateComponent(t *testing.T) {
-	steps := &TimeGateSteps{t: t}
-
 	weekendDays := []string{"saturday", "sunday"}
 	workweekDays := []string{"monday", "tuesday", "wednesday", "thursday", "friday"}
 
 	t.Run("add a TimeGate that blocks on weekends", func(t *testing.T) {
+		steps := &TimeGateSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Weekday Work Hours Gate")
 		steps.addTimeGate()
@@ -32,6 +31,7 @@ func TestTimeGateComponent(t *testing.T) {
 	})
 
 	t.Run("add a TimeGate that blocks on outside of work hours", func(t *testing.T) {
+		steps := &TimeGateSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Work Hours Gate")
 		steps.addTimeGate()
@@ -44,6 +44,7 @@ func TestTimeGateComponent(t *testing.T) {
 	})
 
 	t.Run("push through the time gate item", func(t *testing.T) {
+		steps := &TimeGateSteps{t: t}
 		steps.start()
 		now := time.Now().UTC()
 		tomorrow := now.Add(24 * time.Hour)
