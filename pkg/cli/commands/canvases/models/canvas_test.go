@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func TestParseCanvasPreservesPositionYFromUnquotedKey(t *testing.T) {
@@ -92,4 +93,154 @@ spec:
 
 	assert.ErrorContains(t, err, "failed to parse canvas yaml")
 	assert.ErrorContains(t, err, `unknown field "hello"`)
+}
+
+func TestParseCanvasValidationErrors(t *testing.T) {
+	t.Run("rejects unsupported kind", func(t *testing.T) {
+		raw := []byte(`
+apiVersion: v1
+kind: NotCanvas
+metadata:
+  name: invalid-kind
+spec:
+  nodes: []
+  edges: []
+`)
+
+		_, err := ParseCanvas(raw)
+		assert.EqualError(t, err, `unsupported resource kind "NotCanvas"`)
+	})
+
+	t.Run("rejects missing apiVersion", func(t *testing.T) {
+		raw := []byte(`
+kind: Canvas
+metadata:
+  name: missing-version
+spec:
+  nodes: []
+  edges: []
+`)
+
+		_, err := ParseCanvas(raw)
+		assert.EqualError(t, err, "canvas apiVersion is required")
+	})
+
+	t.Run("rejects missing metadata", func(t *testing.T) {
+		raw := []byte(`
+apiVersion: v1
+kind: Canvas
+spec:
+  nodes: []
+  edges: []
+`)
+
+		_, err := ParseCanvas(raw)
+		assert.EqualError(t, err, "canvas metadata is required")
+	})
+
+	t.Run("rejects missing metadata.name", func(t *testing.T) {
+		raw := []byte(`
+apiVersion: v1
+kind: Canvas
+metadata: {}
+spec:
+  nodes: []
+  edges: []
+`)
+
+		_, err := ParseCanvas(raw)
+		assert.EqualError(t, err, "canvas metadata.name is required")
+	})
+
+	t.Run("rejects invalid yaml", func(t *testing.T) {
+		raw := []byte("apiVersion: v1\nkind: Canvas\nmetadata: [\n")
+		_, err := ParseCanvas(raw)
+		assert.ErrorContains(t, err, "failed to parse canvas yaml")
+		assert.ErrorContains(t, err, "invalid yaml")
+	})
+}
+
+func TestCanvasConversions(t *testing.T) {
+	metadata := openapi_client.NewCanvasesCanvasMetadata()
+	metadata.SetName("my-canvas")
+	metadata.SetId("canvas-id")
+
+	spec := EmptyCanvasSpec()
+
+	resource := Canvas{
+		APIVersion: "v1",
+		Kind:       CanvasKind,
+		Metadata:   metadata,
+		Spec:       spec,
+	}
+
+	t.Run("CanvasFromCanvas", func(t *testing.T) {
+		canvas := CanvasFromCanvas(resource)
+		metadata := canvas.GetMetadata()
+		spec := canvas.GetSpec()
+		assert.Equal(t, "my-canvas", metadata.GetName())
+		assert.Equal(t, "canvas-id", metadata.GetId())
+		assert.NotNil(t, spec.GetNodes())
+		assert.NotNil(t, spec.GetEdges())
+	})
+
+	t.Run("CanvasResourceFromCanvas", func(t *testing.T) {
+		canvas := CanvasFromCanvas(resource)
+		resourceFromCanvas := CanvasResourceFromCanvas(canvas)
+
+		assert.Equal(t, "v1", resourceFromCanvas.APIVersion)
+		assert.Equal(t, CanvasKind, resourceFromCanvas.Kind)
+		assert.Equal(t, "my-canvas", resourceFromCanvas.Metadata.GetName())
+		assert.NotNil(t, resourceFromCanvas.Spec.GetNodes())
+		assert.NotNil(t, resourceFromCanvas.Spec.GetEdges())
+	})
+}
+
+func TestCreateCanvasRequestFromCanvas(t *testing.T) {
+	metadata := openapi_client.NewCanvasesCanvasMetadata()
+	metadata.SetName("my-canvas")
+
+	t.Run("without autoLayout", func(t *testing.T) {
+		resource := Canvas{
+			APIVersion: "v1",
+			Kind:       CanvasKind,
+			Metadata:   metadata,
+			Spec:       EmptyCanvasSpec(),
+		}
+
+		request := CreateCanvasRequestFromCanvas(resource)
+		assert.True(t, request.HasCanvas())
+		assert.False(t, request.HasAutoLayout())
+		canvas := request.GetCanvas()
+		metadata := canvas.GetMetadata()
+		assert.Equal(t, "my-canvas", metadata.GetName())
+	})
+
+	t.Run("with autoLayout", func(t *testing.T) {
+		autoLayout := openapi_client.NewCanvasesCanvasAutoLayout()
+		autoLayout.SetNodeIds([]string{"node-1", "node-2"})
+
+		resource := Canvas{
+			APIVersion: "v1",
+			Kind:       CanvasKind,
+			Metadata:   metadata,
+			Spec:       EmptyCanvasSpec(),
+			AutoLayout: autoLayout,
+		}
+
+		request := CreateCanvasRequestFromCanvas(resource)
+		assert.True(t, request.HasCanvas())
+		assert.True(t, request.HasAutoLayout())
+		requestAutoLayout := request.GetAutoLayout()
+		assert.Equal(t, []string{"node-1", "node-2"}, requestAutoLayout.GetNodeIds())
+	})
+}
+
+func TestEmptyCanvasSpec(t *testing.T) {
+	spec := EmptyCanvasSpec()
+	assert.NotNil(t, spec)
+	assert.NotNil(t, spec.Nodes)
+	assert.NotNil(t, spec.Edges)
+	assert.Len(t, spec.Nodes, 0)
+	assert.Len(t, spec.Edges, 0)
 }
