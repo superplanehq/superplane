@@ -1,14 +1,12 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
@@ -78,13 +76,18 @@ func TestAgentChat(t *testing.T) {
 }
 
 // newAgentChatScenario wires up the setup every agent chat subtest needs:
-// fresh agents DB, a logged-in session with the agent mode flag flipped on,
-// a canvas in edit mode, and the sidebar already open. Subtests should only
-// contain their own whens/thens on top of this.
+// fresh agents DB, a logged-in session, a canvas in edit mode, and the
+// sidebar already open. Subtests should only contain their own whens/thens
+// on top of this.
+//
+// Note: we do NOT flip OrganizationAgentSettings.AgentModeEnabled here.
+// Sidebar visibility is gated purely by window.SUPERPLANE_AGENT_ENABLED
+// (see useAgentState), which the e2e Go server sets from the AGENT_ENABLED=yes
+// env var in test_context.go. The DB setting is only consulted by the
+// organization settings UI today.
 func newAgentChatScenario(t *testing.T) *agentChatSteps {
 	steps := &agentChatSteps{t: t}
 	steps.start()
-	steps.givenAnOrgWithAgentModeEnabled()
 	steps.givenACanvasInEditMode()
 	steps.whenIOpenTheAgentSidebar()
 	return steps
@@ -104,15 +107,6 @@ func (s *agentChatSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	s.session.Login()
-}
-
-func (s *agentChatSteps) givenAnOrgWithAgentModeEnabled() {
-	err := models.UpsertOrganizationAgentSettings(&models.OrganizationAgentSettings{
-		OrganizationID:   s.session.OrgID,
-		AgentModeEnabled: true,
-		OpenAIKeyStatus:  models.OrganizationAgentOpenAIKeyStatusNotConfigured,
-	})
-	require.NoError(s.t, err)
 }
 
 func (s *agentChatSteps) givenACanvasInEditMode() {
@@ -173,9 +167,13 @@ func (s *agentChatSteps) thenISeeAnAssistantMessage() {
 	// stream fails. Match any assistant message whose text is non-empty and is
 	// not the failure string.
 	//
-	// Note: this only confirms the bubble has been rendered (streaming started);
-	// use thenTheStreamIsComplete before acting on post-stream state such as
-	// the back button, page reload, or persistence checks.
+	// AiMessage returns null for empty assistant content (see
+	// AiBuilderChatMessage.tsx), so the selector below can only match once at
+	// least one non-empty, non-failure content chunk has rendered — i.e. the
+	// stream has started producing output. This is still weaker than "the
+	// stream has fully completed": use thenTheStreamIsComplete before acting
+	// on post-stream state such as the back button, page reload, or
+	// persistence checks.
 	const genericFailure = "I couldn't generate changes right now. Please try again."
 	loc := s.session.Page().
 		Locator(`[data-testid="agent-chat-message"][data-role="assistant"]`).
@@ -202,28 +200,28 @@ func (s *agentChatSteps) thenTheStreamIsComplete() {
 	}), "agent stream did not finish (back button never appeared)")
 }
 
-// thenTheAgentIsRunningInTestMode asserts the assistant bubble rendered by
-// the suite contains the client-side "test mode" hint, which is only emitted
-// when the server reports runModel === "test" (see applyStreamOutcome in
-// agentChatUi.ts). This fails fast if someone misconfigures AI_MODEL so the
-// rest of the suite does not silently run against a real LLM.
+// thenTheAgentIsRunningInTestMode asserts that the most recent agent_chat_runs
+// row for the current (org, canvas) has model="test". This fails fast if
+// someone misconfigures AI_MODEL so the rest of the suite does not silently
+// run against a real LLM.
+//
+// We check the DB instead of the DOM on purpose: the client-side TEST_MODE_HINT
+// written by applyStreamOutcome is immediately overwritten when
+// setCurrentChatId (in sendChatPrompt's finally block) triggers
+// useLoadChatConversation to reload the conversation from agents_test — the
+// DB-stored assistant content is the raw TestModel sentinel, not the hint,
+// so polling the DOM for "test mode" is inherently racy. The
+// agent_chat_runs.model column, written by PersistedRunRecorder, does not
+// move and is the authoritative signal.
 func (s *agentChatSteps) thenTheAgentIsRunningInTestMode() {
-	all := s.session.Page().Locator(`[data-testid="agent-chat-message"][data-role="assistant"]`)
-	var lastTexts []string
+	var lastModel string
+	var lastErr error
 	require.Eventually(s.t, func() bool {
-		texts, err := all.AllTextContents()
-		if err != nil {
-			return false
-		}
-		lastTexts = texts
-		for _, text := range texts {
-			if strings.Contains(strings.ToLower(text), "test mode") {
-				return true
-			}
-		}
-		return false
+		model, err := lastRunModelForCanvas(s.session.OrgID.String(), s.canvas.WorkflowID.String())
+		lastModel, lastErr = model, err
+		return err == nil && model == "test"
 	}, agentTestModeAssertionBudget, 100*time.Millisecond,
-		"expected assistant output to contain the TEST model hint; is AI_MODEL=test set for the agent container? last observed texts=%#v", lastTexts)
+		"expected agent_chat_runs.model='test' for the current canvas; is AI_MODEL=test set for the agent container? last observed model=%q err=%v", lastModel, lastErr)
 }
 
 func (s *agentChatSteps) whenIClickBackToStartNewChat() {
@@ -244,21 +242,35 @@ func (s *agentChatSteps) thenISeeAtLeastOneSessionInTheList() {
 }
 
 func (s *agentChatSteps) thenTheChatIsPersistedInAgentsDB() {
-	// Persistence happens from the Python agent near the end of the stream;
-	// poll briefly to avoid racing the final save.
+	// The agent_chats row is written synchronously in the CreateAgentChat gRPC
+	// handler at the start of sendChatPrompt (before streaming), so its
+	// existence is nearly tautological once thenTheStreamIsComplete returned.
+	// The meaningful signal that persistence actually worked end-to-end is in
+	// agent_chat_messages, which PersistedRunRecorder.save_authoritative_messages
+	// writes near the end of _stream_agent_run. Poll that briefly to avoid
+	// racing the final save.
+	orgID := s.session.OrgID.String()
+	canvasID := s.canvas.WorkflowID.String()
+
+	chatCount, err := countAgentChatsForCanvas(orgID, canvasID)
+	require.NoError(s.t, err)
+	assert.GreaterOrEqual(s.t, chatCount, int64(1), "expected at least one agent_chats row in agents_test DB")
+
 	deadline := time.Now().Add(agentPersistencePollTimeout)
-	var lastCount int64
+	var lastMsgCount int64
 	var lastErr error
 	for time.Now().Before(deadline) {
-		count, err := countAgentChatsForCanvas(s.session.OrgID.String(), s.canvas.WorkflowID.String())
-		lastCount, lastErr = count, err
-		if err == nil && count >= 1 {
+		count, err := countAgentChatMessagesForCanvas(orgID, canvasID)
+		lastMsgCount, lastErr = count, err
+		// At least user + assistant messages for a single successful run.
+		if err == nil && count >= 2 {
 			return
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
 	require.NoError(s.t, lastErr)
-	assert.GreaterOrEqual(s.t, lastCount, int64(1), "expected at least one agent_chats row in agents_test DB")
+	assert.GreaterOrEqual(s.t, lastMsgCount, int64(2),
+		"expected at least 2 agent_chat_messages rows (user + assistant) in agents_test DB; got %d", lastMsgCount)
 }
 
 func (s *agentChatSteps) whenIReloadThePage() {
@@ -286,12 +298,14 @@ func (s *agentChatSteps) thenTheInputIsEmpty() {
 }
 
 func (s *agentChatSteps) thenThereAreNoVisibleMessages() {
-	// First await the DOM flush: AssertHidden on a TestID that matches no
-	// element resolves immediately in Playwright, so this guards against the
-	// bubbles simply not being unmounted yet.
+	// AssertHidden passes immediately when no element matches the selector
+	// (the desired state here) and otherwise waits for any existing match to
+	// become hidden — so it gives us a DOM-flush barrier if a previous bubble
+	// is still being unmounted.
 	s.session.AssertHidden(q.TestID("agent-chat-message"))
-	// Then do a strict count assertion as a final invariant check in case any
-	// non-bubble node ever starts carrying the same test ID.
+	// Belt-and-braces: a strict count == 0 guards against future reuse of the
+	// agent-chat-message test id on some non-bubble node that would still be
+	// considered "hidden" here.
 	count, err := s.session.Page().Locator(`[data-testid="agent-chat-message"]`).Count()
 	require.NoError(s.t, err)
 	assert.Equal(s.t, 0, count, "expected no visible chat messages after starting a new chat")

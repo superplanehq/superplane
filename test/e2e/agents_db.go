@@ -104,3 +104,56 @@ func countAgentChatsForCanvas(orgID, canvasID string) (int64, error) {
 	).Scan(&count).Error
 	return count, err
 }
+
+// countAgentChatMessagesForCanvas returns the number of agent_chat_messages
+// rows across all chats for the given (org_id, canvas_id) in agents_test.
+//
+// agent_chat_messages is written by PersistedRunRecorder.save_authoritative_messages
+// near the end of _stream_agent_run, so this is the right table to poll for
+// "did the run actually persist user + assistant messages?". agent_chats on its
+// own is written synchronously in CreateAgentChat before streaming begins, so
+// counting it is a near-tautology once the stream has completed.
+func countAgentChatMessagesForCanvas(orgID, canvasID string) (int64, error) {
+	db, err := agentsDBConn()
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	err = db.Raw(
+		`SELECT count(*) FROM agent_chat_messages m
+		 JOIN agent_chats c ON c.id = m.chat_id
+		 WHERE c.org_id = ? AND c.canvas_id = ?`,
+		orgID, canvasID,
+	).Scan(&count).Error
+	return count, err
+}
+
+// lastRunModelForCanvas returns the model recorded on the most recently created
+// agent_chat_runs row for any chat under (org_id, canvas_id). Used as a
+// race-free replacement for sniffing the client-side TEST_MODE_HINT in the
+// DOM: the hint is written by applyStreamOutcome but then immediately
+// overwritten when setCurrentChatId triggers useLoadChatConversation to reload
+// messages from the DB, whereas agent_chat_runs.model is persisted by
+// PersistedRunRecorder and doesn't move.
+//
+// When no matching run row exists yet this returns ("", nil) — gorm's Scan
+// does not raise ErrRecordNotFound on an empty result set, it just leaves the
+// destination at its zero value. Callers should therefore check both err and
+// the returned model string; a safe "poll again" predicate is
+// `err == nil && model == ""`.
+func lastRunModelForCanvas(orgID, canvasID string) (string, error) {
+	db, err := agentsDBConn()
+	if err != nil {
+		return "", err
+	}
+	var model string
+	err = db.Raw(
+		`SELECT r.model FROM agent_chat_runs r
+		 JOIN agent_chats c ON c.id = r.chat_id
+		 WHERE c.org_id = ? AND c.canvas_id = ?
+		 ORDER BY r.created_at DESC
+		 LIMIT 1`,
+		orgID, canvasID,
+	).Scan(&model).Error
+	return model, err
+}
