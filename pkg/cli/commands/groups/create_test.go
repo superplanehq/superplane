@@ -146,6 +146,27 @@ func TestCreateFromFileRequiresMetadataName(t *testing.T) {
 	require.Contains(t, err.Error(), "metadata.name is required")
 }
 
+func TestCreateFromFileRejectsUnknownFields(t *testing.T) {
+	ctx, _ := newTestContext(t, newMeOnlyServer(t), "text")
+
+	dir := t.TempDir()
+	path := dir + "/group.yaml"
+	content := []byte("apiVersion: v1\nkind: Group\nmetadata:\n  name: from-file\nspec:\n  displayName: FromFile\n  role: org_viewer\n  unknown: true\n")
+	require.NoError(t, os.WriteFile(path, content, 0644))
+
+	empty := ""
+	cmd := &createCommand{
+		file:        &path,
+		displayName: &empty,
+		description: &empty,
+		role:        &empty,
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown field")
+	require.Contains(t, err.Error(), "unknown")
+}
+
 func TestCreateRejectsInlineFlagsWithFile(t *testing.T) {
 	ctx, _ := newTestContext(t, newMeOnlyServer(t), "text")
 

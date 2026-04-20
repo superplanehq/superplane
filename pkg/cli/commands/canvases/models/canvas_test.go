@@ -1,6 +1,10 @@
 package models
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestParseCanvasPreservesPositionYFromUnquotedKey(t *testing.T) {
 	raw := []byte(`
@@ -60,4 +64,32 @@ spec:
 	if edges[0].GetTargetId() != "manual-plan-start" {
 		t.Fatalf("expected targetId=manual-plan-start, got %q", edges[0].GetTargetId())
 	}
+}
+
+func TestParseCanvasRejectsUnknownNodeComponentFields(t *testing.T) {
+	raw := []byte(`
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: unknown-field-test
+spec:
+  changeManagement:
+    enabled: false
+  edges: []
+  nodes:
+    - id: wait-1
+      name: wait
+      type: TYPE_COMPONENT
+      component:
+        name: wait
+        hello: what
+`)
+
+	_, err := ParseCanvas(raw)
+	if err == nil {
+		t.Fatalf("expected ParseCanvas to fail for unknown field")
+	}
+
+	assert.ErrorContains(t, err, "failed to parse canvas yaml")
+	assert.ErrorContains(t, err, `unknown field "hello"`)
 }
