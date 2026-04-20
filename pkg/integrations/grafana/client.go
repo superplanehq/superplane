@@ -42,8 +42,12 @@ type ContactPoint struct {
 }
 
 type DataSource struct {
-	UID  string `json:"uid"`
-	Name string `json:"name"`
+	ID        int    `json:"id"`
+	UID       string `json:"uid"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	URL       string `json:"url"`
+	IsDefault bool   `json:"isDefault"`
 }
 
 type Silence struct {
@@ -854,6 +858,28 @@ func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
 		return err
 	}
 	return c.putNotificationPolicies(root)
+}
+
+func (c *Client) GetDataSource(uid string) (*DataSource, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/datasources/uid/%s", url.PathEscape(uid)),
+		nil, "",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting data source: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana data source get", status, responseBody)
+	}
+
+	var source DataSource
+	if err := json.Unmarshal(responseBody, &source); err != nil {
+		return nil, fmt.Errorf("error parsing data source response: %v", err)
+	}
+
+	return &source, nil
 }
 
 func (c *Client) ListSilences(filter string) ([]Silence, error) {

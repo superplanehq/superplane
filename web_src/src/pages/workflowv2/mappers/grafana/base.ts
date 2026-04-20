@@ -17,31 +17,54 @@ export function buildGrafanaEventSections(
   componentName: string,
   options?: BuildGrafanaEventSectionsOptions,
 ): EventSection[] {
-  const strict = options?.strict === true;
-
   if (!execution.rootEvent?.id) {
     return [];
   }
 
-  if (strict) {
-    if (!execution.createdAt) {
-      return [];
-    }
-    const strictTrigger = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-    if (!strictTrigger?.componentName) {
-      return [];
-    }
+  const strict = options?.strict === true;
+  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
+
+  if (strict && (!execution.createdAt || !rootTriggerNode?.componentName)) {
+    return [];
   }
 
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
   const triggerName = rootTriggerNode?.componentName ?? "";
   const rootTriggerRenderer = getTriggerRenderer(triggerName);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const eventTitle = title || "Trigger event";
 
+  if (!strict) {
+    return buildDefaultGrafanaEventSections(execution, componentName, eventTitle);
+  }
+
+  return buildStrictGrafanaEventSections(execution, componentName, eventTitle);
+}
+
+function buildDefaultGrafanaEventSections(
+  execution: ExecutionInfo,
+  componentName: string,
+  eventTitle: string,
+): EventSection[] {
+  return [
+    {
+      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
+      eventTitle,
+      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent?.id || "",
+    },
+  ];
+}
+
+function buildStrictGrafanaEventSections(
+  execution: ExecutionInfo,
+  componentName: string,
+  eventTitle: string,
+): EventSection[] {
   return [
     {
       receivedAt: resolveGrafanaEventReceivedAt(execution),
-      eventTitle: title || "Trigger event",
+      eventTitle,
       eventSubtitle: resolveGrafanaEventSubtitle(execution),
       eventState: getState(componentName)(execution),
       eventId: resolveGrafanaEventId(execution),
@@ -49,7 +72,7 @@ export function buildGrafanaEventSections(
   ];
 }
 
-/** Single source for Grafana event display time so subtitle and receivedAt stay aligned. */
+/** Single source for Grafana event display time so subtitle and receivedAt stay aligned (strict / alert flows). */
 function resolveGrafanaEventDisplayTimestamp(execution: ExecutionInfo): string | undefined {
   return execution.createdAt || execution.updatedAt;
 }
@@ -90,18 +113,5 @@ export function grafanaCreatedAtSubtitle(context: SubtitleContext): string | Rea
 }
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Trigger event";
-
-  return [
-    {
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id || "",
-    },
-  ];
+  return buildGrafanaEventSections(nodes, execution, componentName);
 }
