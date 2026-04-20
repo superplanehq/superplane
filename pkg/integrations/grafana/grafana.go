@@ -78,21 +78,6 @@ func (g *Grafana) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Required:    false,
 		},
-		{
-			Name:        "syntheticsBaseURL",
-			Label:       "Synthetics Base URL",
-			Type:        configuration.FieldTypeString,
-			Description: "Optional Grafana Synthetic Monitoring API base URL (e.g. https://synthetic-monitoring-api.grafana.net)",
-			Required:    false,
-		},
-		{
-			Name:        "syntheticsAccessToken",
-			Label:       "Synthetics Access Token",
-			Type:        configuration.FieldTypeString,
-			Description: "Optional Grafana Synthetic Monitoring access token used for synthetic check components",
-			Sensitive:   true,
-			Required:    false,
-		},
 	}
 }
 

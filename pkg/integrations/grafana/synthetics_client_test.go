@@ -11,17 +11,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__readSyntheticsBaseURL__AcceptsAbsoluteURL(t *testing.T) {
-	baseURL, err := readSyntheticsBaseURL(&contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"syntheticsBaseURL": "https://synthetic-monitoring-api.grafana.net/",
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "https://synthetic-monitoring-api.grafana.net", baseURL)
-}
-
-func Test__SyntheticsClient__ListChecks__UsesBearerToken(t *testing.T) {
+func Test__SyntheticsClient__ListChecks__UsesGrafanaDatasourceProxy(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -32,20 +22,24 @@ func Test__SyntheticsClient__ListChecks__UsesBearerToken(t *testing.T) {
 	}
 
 	client := &SyntheticsClient{
-		BaseURL:     "https://synthetic-monitoring-api.grafana.net",
-		AccessToken: "sm-token",
-		http:        httpContext,
+		DataSourceUID: "sm-ds",
+		GrafanaClient: &Client{
+			BaseURL:  "https://grafana.example.com",
+			APIToken: "grafana-token",
+			http:     httpContext,
+		},
 	}
 
 	checks, err := client.ListChecks()
 	require.NoError(t, err)
 	assert.Empty(t, checks)
 	require.Len(t, httpContext.Requests, 1)
-	assert.Equal(t, "Bearer sm-token", httpContext.Requests[0].Header.Get("Authorization"))
-	assert.Equal(t, "/api/v1/check", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, "Bearer grafana-token", httpContext.Requests[0].Header.Get("Authorization"))
+	assert.Equal(t, "/api/datasources/proxy/uid/sm-ds/sm/check/list", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, "includeAlerts=true", httpContext.Requests[0].URL.RawQuery)
 }
 
-func Test__NewSyntheticsClient__FallsBackToGrafanaDatasourceProxy(t *testing.T) {
+func Test__NewSyntheticsClient__UsesGrafanaDatasourceProxy(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -84,7 +78,6 @@ func Test__SyntheticsClient__ListProbes__UsesGrafanaDatasourceProxy(t *testing.T
 			APIToken: "grafana-token",
 			http:     httpContext,
 		},
-		http: httpContext,
 	}
 
 	probes, err := client.ListProbes()
@@ -112,7 +105,6 @@ func Test__SyntheticsClient__UpdateCheckAlerts__UsesSmPathViaProxy(t *testing.T)
 			APIToken: "grafana-token",
 			http:     httpContext,
 		},
-		http: httpContext,
 	}
 
 	err := client.UpdateCheckAlerts("101", []SyntheticCheckAlert{{Name: "ProbeFailedExecutionsTooHigh", Threshold: 1, Period: "5m"}})
@@ -138,7 +130,6 @@ func Test__SyntheticsClient__ListCheckAlerts__UsesSmPathViaProxy(t *testing.T) {
 			APIToken: "grafana-token",
 			http:     httpContext,
 		},
-		http: httpContext,
 	}
 
 	alerts, err := client.ListCheckAlerts("101")

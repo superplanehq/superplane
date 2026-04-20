@@ -19,7 +19,6 @@ export function getGrafanaSyntheticCheckFlatView(c: CreateHttpSyntheticCheckConf
   noFollowRedirects?: boolean;
   basicAuth?: CreateHttpSyntheticCheckConfiguration["basicAuth"];
   bearerToken?: string;
-  tls?: CreateHttpSyntheticCheckConfiguration["tls"];
   enabled?: boolean;
   frequency?: number;
   timeout?: number;
@@ -45,7 +44,6 @@ export function getGrafanaSyntheticCheckFlatView(c: CreateHttpSyntheticCheckConf
     noFollowRedirects: req?.noFollowRedirects ?? c.noFollowRedirects,
     basicAuth: req?.basicAuth ?? c.basicAuth,
     bearerToken: req?.bearerToken ?? c.bearerToken,
-    tls: req?.tls ?? c.tls,
     enabled: sch?.enabled ?? c.enabled,
     frequency: sch?.frequency ?? c.frequency,
     timeout: sch?.timeout ?? c.timeout,

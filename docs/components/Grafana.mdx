@@ -295,7 +295,7 @@ The Create HTTP Synthetic Check component creates an HTTP synthetic check in Gra
 Fields are grouped like other synthetic check components:
 
 - **Job** and **Labels**: Check display name and optional key/value labels
-- **Request**: URL, HTTP method, headers, body, redirects, basic auth, bearer token, and TLS client settings
+- **Request**: URL, HTTP method, headers, body, redirects, basic auth, and bearer token
 - **Schedule**: Whether the check is enabled, frequency (seconds), timeout (ms), and probe locations
 - **Response validation**: SSL expectations, accepted status codes, and body/header regex rules (optional)
 - **Per-Check Alerts**: Optional Grafana synthetic monitoring alerts configured after check creation
@@ -359,10 +359,6 @@ Returns the created Grafana synthetic check, including its ID and HTTP configura
           "ipVersion": "V4",
           "method": "GET",
           "noFollowRedirects": false,
-          "tlsConfig": {
-            "insecureSkipVerify": false,
-            "serverName": "api.example.com"
-          },
           "validStatusCodes": [
             200
           ]
@@ -669,7 +665,6 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
 }
 ```
 
-<<<<<<< HEAD
 <a id="get-dashboard"></a>
 
 ## Get Dashboard
@@ -728,55 +723,6 @@ Returns the Grafana dashboard object, including title, slug, URL, folder, tags, 
 }
 ```
 
-<a id="get-silence"></a>
-
-## Get Silence
-
-The Get Silence component fetches the details of a single silence from Grafana Alertmanager using its ID.
-
-### Use Cases
-
-- **Inspect a silence**: Retrieve full details of a silence including state, comment, matchers, and times
-- **Verify a silence**: Confirm a silence is still active before taking action in a workflow
-
-### Configuration
-
-- **Silence**: The silence to retrieve (required)
-
-### Output
-
-Returns the silence object including ID, state, comment, matchers, start/end times, and the author.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "comment": "Deploy window for v2.1.0",
-    "createdBy": "devops-bot",
-    "endsAt": "2026-03-31T11:00:00.000Z",
-    "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
-    "matchers": [
-      {
-        "isEqual": true,
-        "isRegex": false,
-        "name": "env",
-        "value": "production"
-      }
-    ],
-    "startsAt": "2026-03-31T10:00:00.000Z",
-    "status": {
-      "state": "active"
-    },
-    "updatedAt": "2026-03-31T10:00:00.000Z"
-  },
-  "timestamp": "2026-03-31T10:24:30Z",
-  "type": "grafana.silence"
-}
-```
-
-=======
->>>>>>> b94c59829 (update component docs)
 <a id="get-http-synthetic-check"></a>
 
 ## Get HTTP Synthetic Check
@@ -1413,3 +1359,4 @@ Returns the updated Grafana synthetic check.
   "type": "grafana.syntheticCheck.updated"
 }
 ```
+

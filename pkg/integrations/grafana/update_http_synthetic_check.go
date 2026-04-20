@@ -94,6 +94,9 @@ func (c *UpdateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 	if existing != nil {
 		payload.ID = existing.ID
 		payload.TenantID = existing.TenantID
+		if existing.Settings.HTTP != nil && existing.Settings.HTTP.TLSConfig != nil && payload.Settings.HTTP != nil {
+			payload.Settings.HTTP.TLSConfig = existing.Settings.HTTP.TLSConfig
+		}
 	}
 
 	updated, err := client.UpdateCheck(payload)
