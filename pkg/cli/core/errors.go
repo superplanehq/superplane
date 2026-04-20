@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -8,28 +9,62 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
+const (
+	maxErrorBodyBytes       = 2048
+	badRequestDetailType    = "type.googleapis.com/google.rpc.BadRequest"
+	badRequestDetailTypeAlt = "google.rpc.BadRequest"
+)
+
 func FormatCommandError(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	var apiErr openapi_client.GenericOpenAPIError
+	var apiErr *openapi_client.GenericOpenAPIError
 	if !errors.As(err, &apiErr) {
 		return err
 	}
 
+	rpcStatus := extractGoogleRPCStatus(apiErr)
+	if formatted := formatGoogleRPCStatusError(rpcStatus); formatted != nil {
+		return appendFieldViolations(formatted, rpcStatus)
+	}
+
+	return fallbackAPIError(apiErr)
+}
+
+func extractGoogleRPCStatus(apiErr *openapi_client.GenericOpenAPIError) *openapi_client.GooglerpcStatus {
 	switch model := apiErr.Model().(type) {
 	case *openapi_client.GooglerpcStatus:
-		if formatted := formatGoogleRPCStatusError(model); formatted != nil {
-			return formatted
+		if model != nil && !isEmptyRPCStatus(model) {
+			return model
 		}
 	case openapi_client.GooglerpcStatus:
-		if formatted := formatGoogleRPCStatusError(&model); formatted != nil {
-			return formatted
+		if !isEmptyRPCStatus(&model) {
+			return &model
 		}
 	}
 
-	return err
+	body := apiErr.Body()
+	if len(body) == 0 {
+		return nil
+	}
+
+	var decoded openapi_client.GooglerpcStatus
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return nil
+	}
+	if isEmptyRPCStatus(&decoded) {
+		return nil
+	}
+	return &decoded
+}
+
+func isEmptyRPCStatus(status *openapi_client.GooglerpcStatus) bool {
+	if status == nil {
+		return true
+	}
+	return status.Message == nil && status.Code == nil && len(status.Details) == 0
 }
 
 func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
@@ -64,25 +99,102 @@ func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
 	return fmt.Errorf("%s", message)
 }
 
-// grpcCodePrefix returns a user-friendly prefix for known gRPC status codes.
-// See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
+func appendFieldViolations(base error, status *openapi_client.GooglerpcStatus) error {
+	violations := extractFieldViolations(status)
+	if len(violations) == 0 {
+		return base
+	}
+
+	var sb strings.Builder
+	sb.WriteString(base.Error())
+	for _, v := range violations {
+		sb.WriteString("\n  - ")
+		sb.WriteString(v)
+	}
+	return errors.New(sb.String())
+}
+
+func extractFieldViolations(status *openapi_client.GooglerpcStatus) []string {
+	if status == nil {
+		return nil
+	}
+
+	var out []string
+	for _, detail := range status.GetDetails() {
+		if !isBadRequestDetail(detail.GetType()) {
+			continue
+		}
+		raw, ok := detail.AdditionalProperties["fieldViolations"]
+		if !ok {
+			raw = detail.AdditionalProperties["field_violations"]
+		}
+		list, ok := raw.([]any)
+		if !ok {
+			continue
+		}
+		for _, item := range list {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			field, _ := entry["field"].(string)
+			desc, _ := entry["description"].(string)
+			switch {
+			case field != "" && desc != "":
+				out = append(out, fmt.Sprintf("%s: %s", field, desc))
+			case field != "":
+				out = append(out, field)
+			case desc != "":
+				out = append(out, desc)
+			}
+		}
+	}
+	return out
+}
+
+func isBadRequestDetail(typeURL string) bool {
+	trimmed := strings.TrimSpace(typeURL)
+	return trimmed == badRequestDetailType || trimmed == badRequestDetailTypeAlt
+}
+
+func fallbackAPIError(apiErr *openapi_client.GenericOpenAPIError) error {
+	status := strings.TrimSpace(apiErr.Error())
+	body := strings.TrimSpace(string(apiErr.Body()))
+
+	if body == "" {
+		if status == "" {
+			return apiErr
+		}
+		return errors.New(status)
+	}
+
+	if len(body) > maxErrorBodyBytes {
+		body = body[:maxErrorBodyBytes] + "... [truncated]"
+	}
+
+	if status == "" {
+		return errors.New(body)
+	}
+	return fmt.Errorf("%s\n%s", status, body)
+}
+
 func grpcCodePrefix(code int32) string {
 	switch code {
-	case 3: // InvalidArgument
+	case 3:
 		return "invalid request"
-	case 5: // NotFound
+	case 5:
 		return "not found"
-	case 6: // AlreadyExists
+	case 6:
 		return "already exists"
-	case 7: // PermissionDenied
+	case 7:
 		return "permission denied"
-	case 12: // Unimplemented
+	case 12:
 		return "not supported"
-	case 13: // Internal
+	case 13:
 		return "internal error"
-	case 14: // Unavailable
+	case 14:
 		return "service unavailable"
-	case 16: // Unauthenticated
+	case 16:
 		return "authentication required"
 	default:
 		return ""
