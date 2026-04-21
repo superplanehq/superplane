@@ -1,6 +1,6 @@
 import type { EventStateRegistry, OutputPayload, StateFunction } from "../types";
-import type { EventStateMap } from "@/pages/workflowv2/mappers/rendererTypes";
-import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { defaultStateFunction } from "../stateRegistry";
 
 interface ExecuteCommandOutput {

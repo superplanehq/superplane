@@ -1,4 +1,4 @@
-import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import circleCIIcon from "@/assets/icons/integrations/circleci.svg";

@@ -7,7 +7,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap } from "../..";

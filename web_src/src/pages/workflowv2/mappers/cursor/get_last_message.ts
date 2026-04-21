@@ -1,4 +1,4 @@
-import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getState, getStateMap } from "..";
 import { truncate } from "../safeMappers";

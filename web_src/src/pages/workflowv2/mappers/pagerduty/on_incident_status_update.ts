@@ -3,7 +3,7 @@ import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { truncate } from "../safeMappers";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import type { Agent } from "./types";
 

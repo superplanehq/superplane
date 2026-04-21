@@ -6,7 +6,7 @@ import type {
   NodeInfo,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getStateMap } from ".";
 import { renderTimeAgo } from "@/components/TimeAgo";

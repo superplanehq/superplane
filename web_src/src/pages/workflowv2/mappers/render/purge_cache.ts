@@ -1,5 +1,5 @@
-import type { ComponentBaseProps, EventStateMap } from "@/pages/workflowv2/mappers/rendererTypes";
-import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import type {
   ComponentBaseContext,

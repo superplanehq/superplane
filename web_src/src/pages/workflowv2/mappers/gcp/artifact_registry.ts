@@ -1,6 +1,6 @@
 import type { ExecutionInfo, OutputPayload, StateFunction } from "../types";
-import type { EventState } from "@/pages/workflowv2/mappers/rendererTypes";
-import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { EventState } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type { EventStateRegistry } from "../types";
 
 export type ArtifactPushData = {

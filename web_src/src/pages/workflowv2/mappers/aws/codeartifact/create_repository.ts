@@ -7,7 +7,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap } from "../..";
@@ -49,9 +49,7 @@ export const createRepositoryMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? createRepositoryEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? createRepositoryEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: createRepositoryMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -99,11 +97,7 @@ function createRepositoryMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function createRepositoryEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function createRepositoryEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

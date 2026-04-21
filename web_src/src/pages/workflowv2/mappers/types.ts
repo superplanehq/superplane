@@ -6,10 +6,12 @@ import type {
 } from "@/api-client";
 import type {
   ComponentBaseProps as UIComponentBaseProps,
+  ComponentBaseSpec,
   EventSection as UIEventSection,
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type { TriggerProps as UITriggerProps } from "@/ui/trigger";
 import type { ReactNode } from "react";
 
@@ -213,3 +215,14 @@ export interface OutputPayload {
   timestamp: string;
   data: any;
 }
+
+export type {
+  RendererComponentBaseProps as ComponentBaseProps,
+  RendererEventSection as EventSection,
+  RendererTriggerProps as TriggerProps,
+  ComponentBaseSpec,
+  EventState,
+  EventStateMap,
+};
+
+export { DEFAULT_EVENT_STATE_MAP };

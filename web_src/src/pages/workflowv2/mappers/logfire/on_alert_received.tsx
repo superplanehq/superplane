@@ -1,6 +1,6 @@
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext, NodeInfo, EventInfo } from "../types";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
 import logfireIcon from "@/assets/icons/integrations/logfire.svg";

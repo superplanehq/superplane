@@ -2,7 +2,7 @@ import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface OnAlertFiredConfiguration {

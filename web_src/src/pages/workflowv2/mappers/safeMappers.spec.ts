@@ -19,8 +19,8 @@ import type {
   TriggerRenderer,
   TriggerRendererContext,
 } from "./types";
-import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/rendererTypes";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 
 const DEFAULT_NODE = { id: "n1", name: "Test Node", componentName: "test", isCollapsed: false };
 const DEFAULT_DEFINITION = { name: "test", label: "Test", description: "", icon: "zap", color: "blue" };

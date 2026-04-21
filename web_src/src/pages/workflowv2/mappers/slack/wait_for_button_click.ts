@@ -15,7 +15,7 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/pages/workflowv2/mappers/rendererTypes";
+} from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";

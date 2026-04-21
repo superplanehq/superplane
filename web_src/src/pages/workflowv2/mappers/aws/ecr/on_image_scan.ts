@@ -1,7 +1,7 @@
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import type { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
 import { buildRepositoryMetadataItems, formatTags, getRepositoryLabel } from "./utils";

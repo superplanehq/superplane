@@ -1,6 +1,6 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type React from "react";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import type { ACREventData } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";

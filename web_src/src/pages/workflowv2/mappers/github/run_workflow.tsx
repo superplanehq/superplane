@@ -16,8 +16,8 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/pages/workflowv2/mappers/rendererTypes";
-import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import githubIcon from "@/assets/icons/integrations/github.svg";

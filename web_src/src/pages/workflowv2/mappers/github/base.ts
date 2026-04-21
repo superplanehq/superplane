@@ -1,5 +1,5 @@
 import type React from "react";
-import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";

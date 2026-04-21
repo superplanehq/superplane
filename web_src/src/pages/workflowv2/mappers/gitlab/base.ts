@@ -1,4 +1,4 @@
-import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap } from "..";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";

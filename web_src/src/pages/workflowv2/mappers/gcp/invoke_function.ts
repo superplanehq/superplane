@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type {

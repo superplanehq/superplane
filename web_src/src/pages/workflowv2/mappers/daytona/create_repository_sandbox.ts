@@ -1,7 +1,7 @@
 import type { MetadataItem } from "@/ui/metadataList";
 import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
 import { baseMapper } from "./base";
-import type { ComponentBaseSpec } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseSpec } from "@/pages/workflowv2/mappers/types";
 
 interface CreateRepositorySandboxConfiguration {
   snapshot?: string;

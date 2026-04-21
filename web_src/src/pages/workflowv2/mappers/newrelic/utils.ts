@@ -1,4 +1,4 @@
-import type { EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { EventSection } from "@/pages/workflowv2/mappers/types";
 import { getState } from "..";
 import type { ExecutionInfo, NodeInfo } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";

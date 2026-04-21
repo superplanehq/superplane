@@ -2,7 +2,7 @@ import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import type { NodeMetadata } from "./types";
 import type { Predicate } from "../utils";
 import { formatPredicate } from "../utils";

@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";

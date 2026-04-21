@@ -1,4 +1,4 @@
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";

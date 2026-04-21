@@ -4,8 +4,8 @@ import type {
   ComponentBaseSpec,
   EventState,
   EventStateMap,
-} from "@/pages/workflowv2/mappers/rendererTypes";
-import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

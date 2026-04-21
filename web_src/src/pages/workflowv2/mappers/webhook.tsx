@@ -10,7 +10,7 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
