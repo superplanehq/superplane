@@ -20,19 +20,19 @@ export function AgentSidebarTrigger({ agentState }: AgentSidebarTriggerProps) {
               <UIButton
                 type="button"
                 variant="outline"
-                size="icon"
+                size="sm"
                 aria-pressed={isAgentSidebarOpen}
                 aria-label={isAgentSidebarOpen ? "Close SuperPlane Agent" : "Open SuperPlane Agent"}
                 onClick={handleAgentSidebarToggle}
                 className={cn(
-                  "h-8 w-8 border transition-colors",
+                  "border transition-colors",
                   isAgentSidebarOpen
                     ? "border-violet-300 bg-violet-100 text-violet-700 hover:bg-violet-100/90 hover:text-violet-800"
                     : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
                 )}
               >
                 <Sparkles
-                  className={cn("h-3 w-3", isAgentSidebarOpen ? "text-violet-600" : "text-slate-700")}
+                  className={cn("size-3.5", isAgentSidebarOpen ? "text-violet-600" : "text-slate-700")}
                   aria-hidden
                 />
               </UIButton>
