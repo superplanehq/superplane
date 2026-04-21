@@ -220,16 +220,14 @@ export const IntegrationResourceFieldRenderer = ({
         value={selectedValue}
         onChange={(val) => {
           onChange(val || undefined);
-          setSelectQueryValue("");
-          setCachedExpressionValue("");
           setCachedFixedValue(val || "");
+          setSelectQueryValue(""); // Clear search after selection
         }}
-        query={selectQueryValue}
-        onQueryChange={(query) => {
-              setSelectQueryValue(query || "");
-              setCachedExpressionValue(query || "");
-          }
-        }
+        // query={selectQueryValue}
+        // onQueryChange={(query) => {
+        //   setSelectQueryValue(query || "");
+        //   setCachedExpressionValue(query || "");
+        // }}
         placeholder={field.placeholder ?? `Select ${resourceType}`}
       />
     ) : (
@@ -282,10 +280,12 @@ export const IntegrationResourceFieldRenderer = ({
         const hasBraces = /[{}]/.test(selectQueryValue);
   
         if (nextExpression) {
+          // Switching to expression mode
           setCachedFixedValue(selectedValue);
-          const newValue = selectQueryValue && !hasBraces ? `{{${selectQueryValue}}}` : cachedExpressionValue;
+          const newValue = selectQueryValue && !hasBraces ? `{{ ${selectQueryValue} }}` : cachedExpressionValue;
           onChange(newValue || undefined);
         } else {
+          // Switching to fixed mode
           setCachedExpressionValue(expressionValue);
           onChange(cachedFixedValue || undefined);
         }

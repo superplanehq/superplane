@@ -57,7 +57,7 @@ export function AutoCompleteSelect({
   });
 
   // Use external query if provided (controlled), otherwise use internal state (uncontrolled)
-  const query = !!externalQuery ? externalQuery : internalQuery;
+  const query = externalQuery !== undefined ? externalQuery : internalQuery;
 
   // Find the selected option
   const selectedOption = options.find((option) => option.value === value);
@@ -102,6 +102,7 @@ export function AutoCompleteSelect({
     setTimeout(() => {
       inputRef.current?.blur();
       setInternalQuery("");
+      onQueryChange?.("");
       setIsOpen(false);
     }, 150);
   };
@@ -116,6 +117,7 @@ export function AutoCompleteSelect({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       setIsOpen(false);
+      onQueryChange?.("");
       setInternalQuery("");
       inputRef.current?.blur();
     }
