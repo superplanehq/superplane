@@ -26,6 +26,7 @@ import type {
   SuperplaneComponentsEdge as ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
+  IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
   SuperplaneMeUser,
   TriggersTrigger,
@@ -64,6 +65,7 @@ import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
+import { analytics } from "@/lib/analytics";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -130,6 +132,17 @@ import {
   mapWorkflowEventsToRunLogEntries,
   summarizeWorkflowChanges,
 } from "./utils";
+function getNodeAnalyticsProps(
+  node: ComponentsNode,
+  availableIntegrations: IntegrationsIntegrationDefinition[],
+): { nodeType: string; integration: string | undefined; nodeRef: string | undefined } {
+  return {
+    nodeType: node.type === "TYPE_TRIGGER" ? "trigger" : "action",
+    integration: getNodeIntegrationName(node, availableIntegrations),
+    nodeRef: node.trigger?.name ?? node.component?.name ?? node.blueprint?.id ?? node.widget?.name,
+  };
+}
+
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -720,6 +733,7 @@ export function WorkflowPageV2() {
   const draftCanvasSpecsRef = useRef<Map<string, CanvasesCanvas["spec"] | null>>(new Map());
   const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
   const isDrainingCanvasSaveQueueRef = useRef(false);
+  const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
@@ -794,7 +808,13 @@ export function WorkflowPageV2() {
       }
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
-
+  useEffect(() => {
+    if (hasTrackedCanvasView.current) return;
+    if (!canvas || !canvasId || !organizationId) return;
+    if (canvasLoading) return;
+    hasTrackedCanvasView.current = true;
+    analytics.canvasView(canvasId, canvas.spec?.nodes?.length ?? 0, canvas.spec?.edges?.length ?? 0, organizationId);
+  }, [canvas, canvasId, organizationId, canvasLoading]);
   // Initialize store from workflow.status on workflow load.
   // On canvas switch with cached data, the store initializes immediately from the
   // cache (no loading gap) and then re-initializes once when the background refetch
@@ -1441,10 +1461,13 @@ export function WorkflowPageV2() {
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     const newValue = !isAutoLayoutOnUpdateEnabled;
     setIsAutoLayoutOnUpdateEnabled(newValue);
+    if (newValue && organizationId) {
+      analytics.autoLayout(canvas?.spec?.nodes?.length ?? 0, organizationId);
+    }
     if (typeof window !== "undefined") {
       window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
     }
-  }, [isAutoLayoutOnUpdateEnabled]);
+  }, [isAutoLayoutOnUpdateEnabled, organizationId, canvas]);
 
   const applyAutoLayoutOnAddedNode = useCallback(
     async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {
@@ -2757,6 +2780,15 @@ export function WorkflowPageV2() {
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
+      const configuringNode = canvas.spec?.nodes?.find((n) => n.id === nodeId);
+      if (configuringNode) {
+        const fieldCount = Object.values(updatedConfiguration).filter(
+          (v) => v !== null && v !== undefined && v !== "",
+        ).length;
+        const { nodeType, integration } = getNodeAnalyticsProps(configuringNode, availableIntegrations);
+        analytics.nodeConfigure(nodeType, integration, fieldCount, organizationId);
+      }
+
       // Save snapshot before making changes
 
       // Update the node's configuration, name, and app installation ref in local cache only
@@ -2796,9 +2828,8 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
-
   const debouncedAnnotationAutoSave = useMemo(
     () =>
       debounce(
@@ -3114,6 +3145,10 @@ export function WorkflowPageV2() {
       } else if (buildingBlock.type === "blueprint") {
         newNode.blueprint = { id: buildingBlock.id };
       }
+
+      // Track node addition
+      const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(newNode, availableIntegrations);
+      analytics.nodeAdd(nodeType, integration, nodeRef, organizationId);
 
       // Add the new node to the workflow
       const updatedNodes = [...(latestWorkflow.spec?.nodes || []), newNode];
@@ -3470,12 +3505,12 @@ export function WorkflowPageV2() {
       applyLocalWorkflowUpdate(updatedWorkflow);
 
       if (!isReadOnly) {
+        analytics.edgeCreate(organizationId);
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
-
   const handleNodeDelete = useCallback(
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -3483,6 +3518,11 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
 
       const specNodes = canvas.spec?.nodes || [];
+      const nodeBeingDeleted = specNodes.find((n) => n.id === nodeId);
+      if (nodeBeingDeleted) {
+        const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(nodeBeingDeleted, availableIntegrations);
+        analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
+      }
       const updatedNodes = specNodes.filter((node) => node.id !== nodeId);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
 
@@ -3508,15 +3548,20 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
-
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
       const nodeIdSet = new Set(nodeIds);
       const specNodes = canvas.spec?.nodes || [];
+      specNodes
+        .filter((n) => nodeIds.includes(n.id || ""))
+        .forEach((node) => {
+          const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(node, availableIntegrations);
+          analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
+        });
       const updatedNodes = specNodes.filter((node) => !node.id || !nodeIdSet.has(node.id));
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
       const updatedEdges = canvas.spec?.edges?.filter(
@@ -3540,9 +3585,17 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      handleSaveWorkflow,
+      isReadOnly,
+      applyLocalWorkflowUpdate,
+      availableIntegrations,
+    ],
   );
-
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
@@ -3693,6 +3746,7 @@ export function WorkflowPageV2() {
       applyLocalWorkflowUpdate(updatedWorkflow);
 
       if (!isReadOnly) {
+        analytics.edgeRemove(organizationId);
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
@@ -3847,12 +3901,17 @@ export function WorkflowPageV2() {
           }),
         );
         // Note: Success toast is shown by EmitEventModal
+        const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
+        if (node && organizationId) {
+          const { nodeType, integration } = getNodeAnalyticsProps(node, availableIntegrations);
+          analytics.eventEmit(nodeType, integration, organizationId);
+        }
       } catch (error) {
         showErrorToast("Failed to emit event");
         throw error; // Re-throw to let EmitEventModal handle it
       }
     },
-    [canvasId],
+    [canvasId, canvas, availableIntegrations, organizationId],
   );
 
   const handleTogglePause = useCallback(
@@ -4836,6 +4895,8 @@ export function WorkflowPageV2() {
         description: data.description,
         nodes: latestWorkflow.spec?.nodes,
         edges: latestWorkflow.spec?.edges,
+        method: "template",
+        templateId: canvasId,
       });
 
       if (result?.data?.canvas?.metadata?.id) {
@@ -4944,6 +5005,8 @@ export function WorkflowPageV2() {
   );
 
   const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
+    canvasId: canvasId!,
+    organizationId: organizationId!,
     nodes,
     getYamlExportPayload,
   });
