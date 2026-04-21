@@ -2742,7 +2742,6 @@ export function WorkflowPageV2() {
       canvasId,
       integrationDialogName,
       availableIntegrations,
-      queryClient,
       handleSaveWorkflow,
       isReadOnly,
       applyLocalWorkflowUpdate,
@@ -2797,7 +2796,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const debouncedAnnotationAutoSave = useMemo(
@@ -3041,7 +3040,16 @@ export function WorkflowPageV2() {
         debouncedAutoSave();
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAnnotationAutoSave, debouncedAutoSave, isReadOnly],
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      debouncedAnnotationAutoSave,
+      debouncedAutoSave,
+      isReadOnly,
+      applyLocalWorkflowUpdate,
+    ],
   );
 
   const handleNodeAdd = useCallback(
@@ -3146,7 +3154,6 @@ export function WorkflowPageV2() {
       canvas,
       organizationId,
       canvasId,
-      queryClient,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       isReadOnly,
@@ -3432,7 +3439,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleEdgeCreate = useCallback(
@@ -3466,7 +3473,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleNodeDelete = useCallback(
@@ -3501,7 +3508,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleNodesDelete = useCallback(
@@ -3559,7 +3566,6 @@ export function WorkflowPageV2() {
       blueprints,
       organizationId,
       canvasId,
-      queryClient,
       handleSaveWorkflow,
       isReadOnly,
       applyLocalWorkflowUpdate,
@@ -3644,16 +3650,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      blueprints,
-      queryClient,
-      handleSaveWorkflow,
-      isReadOnly,
-      applyLocalWorkflowUpdate,
-    ],
+    [canvas, organizationId, canvasId, blueprints, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleEdgeDelete = useCallback(
@@ -3699,7 +3696,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   /**
@@ -3743,7 +3740,7 @@ export function WorkflowPageV2() {
         debouncedAutoSave();
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, debouncedAutoSave, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleNodesPositionChange = useCallback(
@@ -3790,7 +3787,7 @@ export function WorkflowPageV2() {
         debouncedAutoSave();
       }
     },
-    [canvas, organizationId, canvasId, queryClient, debouncedAutoSave, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, debouncedAutoSave, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleNodeCollapseChange = useCallback(
@@ -3829,7 +3826,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleRun = useCallback(
@@ -3909,7 +3906,7 @@ export function WorkflowPageV2() {
         }
       }
     },
-    [canvasId, organizationId, canvas, queryClient, applyLocalWorkflowUpdate],
+    [canvasId, organizationId, canvas, applyLocalWorkflowUpdate],
   );
 
   const handleReEmit = useCallback(
@@ -4088,6 +4085,7 @@ export function WorkflowPageV2() {
       isTemplate,
       enqueueCanvasSave,
       setLastSavedWorkflowSnapshot,
+      handleLogNodeSelect,
     ],
   );
 
@@ -4638,7 +4636,6 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       isChangeManagementDisabled,
-      activeCanvasVersionId,
       createChangeRequestVersion,
       createCanvasChangeRequestMutation,
       ensureVersionActionDraftReady,
