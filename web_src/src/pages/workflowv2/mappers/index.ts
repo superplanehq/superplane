@@ -1,11 +1,4 @@
-import type {
-  ComponentBaseMapper,
-  TriggerRenderer,
-  EventStateRegistry,
-  CustomFieldRenderer,
-  TriggerRendererContext,
-  TriggerEventContext,
-} from "./types";
+import type { ComponentBaseMapper, TriggerRenderer, EventStateRegistry, CustomFieldRenderer } from "./types";
 import type { SuperplaneComponentsNode as ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
@@ -451,17 +444,17 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
 
   const parts = name?.split(".");
   if (parts?.length === 1) {
-    return createSafeTriggerRenderer(withCustomName(triggerRenderers[name] || defaultTriggerRenderer), name);
+    return createSafeTriggerRenderer(triggerRenderers[name] || defaultTriggerRenderer, name);
   }
 
   const appName = parts[0];
   const appTriggers = appTriggerRenderers[appName];
   if (!appTriggers) {
-    return createSafeTriggerRenderer(withCustomName(defaultTriggerRenderer), name);
+    return createSafeTriggerRenderer(defaultTriggerRenderer, name);
   }
 
   const triggerName = parts.slice(1).join(".");
-  return createSafeTriggerRenderer(withCustomName(appTriggers[triggerName] || defaultTriggerRenderer), name);
+  return createSafeTriggerRenderer(appTriggers[triggerName] || defaultTriggerRenderer, name);
 }
 
 /**
@@ -571,34 +564,4 @@ function findRegisteredComponentMapper(name: string): ComponentBaseMapper | unde
   }
 
   return appMapper[parts.slice(1).join(".")];
-}
-
-function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
-  return {
-    ...renderer,
-    getTriggerProps: (context: TriggerRendererContext) => {
-      const props = renderer.getTriggerProps(context);
-      const customName = context.lastEvent?.customName?.trim();
-      if (customName && props.lastEventData) {
-        return {
-          ...props,
-          lastEventData: {
-            ...props.lastEventData,
-            title: customName,
-          },
-        };
-      }
-
-      return props;
-    },
-    getTitleAndSubtitle: (context: TriggerEventContext) => {
-      const { title, subtitle } = renderer.getTitleAndSubtitle(context);
-      const customName = context.event?.customName?.trim();
-      if (customName) {
-        return { title: customName, subtitle };
-      }
-
-      return { title, subtitle };
-    },
-  };
 }

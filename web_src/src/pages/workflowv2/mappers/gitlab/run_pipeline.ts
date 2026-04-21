@@ -1,6 +1,11 @@
 import type React from "react";
-import type { ComponentBaseProps, ComponentBaseSpec, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventState,
+  EventStateMap,
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -104,7 +109,7 @@ export const RUN_PIPELINE_STATE_REGISTRY: EventStateRegistry = {
 
 export const runPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const base = baseProps(context.node, context.componentDefinition, context.lastExecutions);
     const config = context.node.configuration as RunPipelineConfiguration;
     const metadata = base.metadata as MetadataItem[];
     if (config.ref) {

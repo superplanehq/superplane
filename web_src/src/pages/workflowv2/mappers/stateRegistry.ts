@@ -1,5 +1,5 @@
-import type { EventState } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { EventState } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type { EventStateRegistry, ExecutionInfo, StateFunction } from "./types";
 
 /**

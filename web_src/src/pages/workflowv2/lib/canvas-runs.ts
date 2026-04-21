@@ -7,8 +7,8 @@ import type {
 } from "@/api-client";
 import { formatDuration } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "../mappers";
-import { buildEventInfo, buildExecutionInfo } from "../utils";
+import { getState } from "../mappers";
+import { buildEventInfo, buildExecutionInfo, getEventRunTitle } from "../utils";
 
 export function resolveNodeIconSlug(
   node: ComponentsNode | undefined,
@@ -145,9 +145,8 @@ function matchesSearchQuery(
   query: string,
 ): boolean {
   const triggerNode = nodes.find((n) => n.id === event.nodeId);
-  const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
   const eventInfo = buildEventInfo(event);
-  const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "" };
+  const title = getEventRunTitle(eventInfo);
 
   const searchableText = [
     event.id,

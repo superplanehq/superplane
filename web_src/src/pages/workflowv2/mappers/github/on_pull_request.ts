@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import type { BaseNodeMetadata, PullRequest } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
@@ -19,13 +19,10 @@ interface OnPullRequestEventData {
  * Renderer for the "github.onPullRequest" trigger
  */
 export const onPullRequestTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPullRequestEventData;
 
-    return {
-      title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
-    };
+    return buildGithubSubtitle(eventData?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -71,7 +68,6 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnPullRequestEventData;
 
       props.lastEventData = {
-        title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

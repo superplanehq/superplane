@@ -7,10 +7,10 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap } from "../..";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -41,9 +41,7 @@ export const disposePackageVersionsMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? disposePackageVersionsEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? disposePackageVersionsEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: disposePackageVersionsMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -89,19 +87,10 @@ function disposePackageVersionsMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function disposePackageVersionsEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function disposePackageVersionsEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id ?? "",

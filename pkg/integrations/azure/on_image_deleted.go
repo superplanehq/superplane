@@ -76,6 +76,10 @@ func (t *OnImageDeleted) Color() string {
 	return "blue"
 }
 
+func (t *OnImageDeleted) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.data.target.repository != "" ? root().data.data.target.repository + (root().data.data.target.digest != "" ? "@" + root().data.data.target.digest : "") : "", root().data.subject, "Image deleted") }}`
+}
+
 func (t *OnImageDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

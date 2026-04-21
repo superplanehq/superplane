@@ -1,8 +1,8 @@
-import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -123,8 +123,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   if (!rootTriggerNode) {
     return [];
   }
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   const reservedIPEvent = outputs?.default?.find((output) => output.type?.startsWith("digitalocean.reservedip."));
@@ -137,7 +135,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: eventState,
       eventId: execution.rootEvent!.id!,

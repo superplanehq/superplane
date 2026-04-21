@@ -59,6 +59,10 @@ func (s *Start) Color() string {
 	return "purple"
 }
 
+func (s *Start) DefaultRunTitle() string {
+	return `Event received at {{ now().Format("1/2/2006, 3:04:05 PM") }}`
+}
+
 func (s *Start) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -1,10 +1,10 @@
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import type { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
-import { buildRepositoryMetadataItems, formatTagLabel, formatTags, getRepositoryLabel } from "./utils";
+import { buildRepositoryMetadataItems, formatTags, getRepositoryLabel } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { EcrImageScanDetail } from "./types";
 import { numberOrZero, stringOrDash } from "../../utils";
@@ -13,16 +13,10 @@ import { numberOrZero, stringOrDash } from "../../utils";
  * Renderer for the "aws.ecr.onImageScan" trigger
  */
 export const onImageScanTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as EcrImageScanEvent;
-    const detail = eventData?.detail;
-    const repository = getRepositoryLabel(undefined, undefined, detail?.["repository-name"]);
-    const tagLabel = formatTagLabel(detail?.["image-tags"]);
-
-    const title = repository ? `${repository}${tagLabel ? `:${tagLabel}` : ""}` : "ECR image scan";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -63,9 +57,8 @@ export const onImageScanTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImageScanTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onImageScanTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

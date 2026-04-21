@@ -1,10 +1,9 @@
-import type { EventSection } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "..";
-import type { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
+import { getState } from "..";
+import type { ExecutionInfo, OutputPayload, RendererEventSection } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { Incident } from "./types";
 
-export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+export function baseEventSections(execution: ExecutionInfo, componentName: string): RendererEventSection[] {
   const rootEvent = execution.rootEvent;
   const createdAt = execution.createdAt;
 
@@ -12,7 +11,6 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     return [
       {
         receivedAt: createdAt ? new Date(createdAt) : new Date(),
-        eventTitle: "Event",
         eventSubtitle: createdAt ? renderTimeAgo(new Date(createdAt)) : "",
         eventState: getState(componentName)(execution),
         eventId: execution.id ?? rootEvent?.id ?? "",
@@ -20,14 +18,9 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     ];
   }
 
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
   return [
     {
       receivedAt: new Date(createdAt),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(createdAt)),
       eventState: getState(componentName)(execution),
       eventId: rootEvent.id ?? execution.id ?? "",
