@@ -27,13 +27,7 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]mo
 func (s *EventContext) Emit(payloadType string, payload any) error {
 	now := time.Now()
 	eventID := uuid.New()
-	structuredPayload := map[string]any{
-		"id":        eventID.String(),
-		"type":      payloadType,
-		"timestamp": now.UTC().Format(time.RFC3339Nano),
-		"channel":   "default",
-		"data":      payload,
-	}
+	structuredPayload := BuildRootEventPayload(payload, payloadType, eventID, now, "default")
 
 	data, err := json.Marshal(structuredPayload)
 	if err != nil {
@@ -79,6 +73,16 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
+func BuildRootEventPayload(payload any, payloadType string, eventID uuid.UUID, createdAt time.Time, channel string) map[string]any {
+	return map[string]any{
+		"id":        eventID.String(),
+		"type":      payloadType,
+		"timestamp": createdAt.UTC().Format(time.RFC3339Nano),
+		"channel":   channel,
+		"data":      payload,
+	}
+}
+
 func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, rootPayload any, input any) (*string, error) {
 	template, err := resolveRootEventRunTitleTemplate(tx, node)
 	if err != nil {
@@ -107,10 +111,6 @@ func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, rootPayload 
 }
 
 func resolveRootEventRunTitleTemplate(tx *gorm.DB, node *models.CanvasNode) (string, error) {
-	if node == nil {
-		return "", nil
-	}
-
 	liveNodes, _, err := models.FindLiveCanvasSpecInTransaction(tx, node.WorkflowID)
 	if err != nil {
 		return "", err

@@ -1102,18 +1102,10 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 			Color:           trigger.Color(),
 			Configuration:   configuration,
 			ExampleData:     exampleData,
-			DefaultRunTitle: TriggerDefaultRunTitle(trigger),
+			DefaultRunTitle: strings.TrimSpace(trigger.DefaultRunTitle()),
 		}
 	}
 	return out
-}
-
-func TriggerDefaultRunTitle(trigger core.Trigger) string {
-	if title := strings.TrimSpace(trigger.DefaultRunTitle()); title != "" {
-		return title
-	}
-
-	return ""
 }
 
 func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {

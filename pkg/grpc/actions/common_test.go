@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -137,16 +138,17 @@ func TestConfigurationFieldToProto(t *testing.T) {
 	})
 }
 
-func TestTriggerDefaultRunTitle(t *testing.T) {
-	assert.Equal(
-		t,
-		"{{ $.data.push.changes[0].new.target.message }}",
-		TriggerDefaultRunTitle(testTrigger{
-			defaultRunTitle: "{{ $.data.push.changes[0].new.target.message }}",
-		}),
-	)
+func TestSerializeTriggersTrimsDefaultRunTitle(t *testing.T) {
+	triggers := SerializeTriggers([]core.Trigger{
+		testTrigger{
+			defaultRunTitle: "  {{ $.data.push.changes[0].new.target.message }}  ",
+		},
+		testTrigger{},
+	})
 
-	assert.Equal(t, "", TriggerDefaultRunTitle(testTrigger{}))
+	require.Len(t, triggers, 2)
+	assert.Equal(t, "{{ $.data.push.changes[0].new.target.message }}", triggers[0].GetDefaultRunTitle())
+	assert.Equal(t, strings.TrimSpace(testTrigger{}.DefaultRunTitle()), triggers[1].GetDefaultRunTitle())
 }
 
 func TestNodeRunTitleTemplateProtoRoundTrip(t *testing.T) {
@@ -178,7 +180,7 @@ func TestNodeRunTitleTemplateProtoDropsTriggerDefault(t *testing.T) {
 			Id:               "node-1",
 			Name:             "Node 1",
 			Type:             componentpb.Node_TYPE_TRIGGER,
-			RunTitleTemplate: proto.String("{{ $.data.push.changes[0].new.target.message }}"),
+			RunTitleTemplate: proto.String("{{ root().data.push.changes[0].new.target.message }}"),
 			Trigger:          &componentpb.Node_TriggerRef{Name: "bitbucket.onPush"},
 		},
 	})

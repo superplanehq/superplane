@@ -44,10 +44,11 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
+	rootPayload := contexts.BuildRootEventPayload(data, "", event.ID, now, channel)
 	runTitle, err := contexts.ResolveRootEventRunTitle(
 		database.Conn(),
 		node,
-		data,
+		rootPayload,
 		buildEmitNodeEventRunTitleInput(data, event.ID, now, channel),
 	)
 	if err == nil && runTitle != nil {

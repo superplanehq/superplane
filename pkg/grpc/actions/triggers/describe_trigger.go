@@ -2,6 +2,7 @@ package triggers
 
 import (
 	"context"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -38,7 +39,7 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 			Color:           trigger.Color(),
 			Configuration:   configuration,
 			ExampleData:     exampleData,
-			DefaultRunTitle: actions.TriggerDefaultRunTitle(trigger),
+			DefaultRunTitle: strings.TrimSpace(trigger.DefaultRunTitle()),
 		},
 	}, nil
 }
