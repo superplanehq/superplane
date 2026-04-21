@@ -1462,13 +1462,10 @@ export function WorkflowPageV2() {
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     const newValue = !isAutoLayoutOnUpdateEnabled;
     setIsAutoLayoutOnUpdateEnabled(newValue);
-    if (newValue && organizationId) {
-      analytics.autoLayout(canvas?.spec?.nodes?.length ?? 0, organizationId);
-    }
     if (typeof window !== "undefined") {
       window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
     }
-  }, [isAutoLayoutOnUpdateEnabled, organizationId, canvas]);
+  }, [isAutoLayoutOnUpdateEnabled]);
 
   const applyAutoLayoutOnAddedNode = useCallback(
     async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {
@@ -3600,6 +3597,8 @@ export function WorkflowPageV2() {
         components,
         blueprints,
       });
+
+      analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
 
       applyLocalWorkflowUpdate(updatedWorkflow);
 
