@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
@@ -55,7 +55,7 @@ export const createReleaseMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: lastExecution
-        ? buildEventSections(context.nodes, lastExecution, componentName, getTriggerRenderer, getState)
+        ? buildEventSections(lastExecution, componentName, getTriggerRenderer, getState)
         : undefined,
       metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,

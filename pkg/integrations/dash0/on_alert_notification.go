@@ -58,6 +58,10 @@ func (t *OnAlertNotification) ExampleData() map[string]any {
 	return onAlertNotificationExampleData()
 }
 
+func (t *OnAlertNotification) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.issue.summary, root().data.issue.issueIdentifier, root().data.issue.id, "Dash0 alert notification") }}`
+}
+
 func (t *OnAlertNotification) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

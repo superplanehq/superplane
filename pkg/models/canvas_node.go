@@ -39,6 +39,7 @@ type CanvasNode struct {
 	Configuration     datatypes.JSONType[map[string]any]
 	Metadata          datatypes.JSONType[map[string]any]
 	IsCollapsed       bool
+	RunTitleTemplate  *string
 	WebhookID         *uuid.UUID
 	AppInstallationID *uuid.UUID
 	CreatedAt         *time.Time

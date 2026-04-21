@@ -64,6 +64,10 @@ func (p *OnPackageVersion) Color() string {
 	return "gray"
 }
 
+func (p *OnPackageVersion) DefaultRunTitle() string {
+	return "{{ root().data.detail.packageName }}@{{ root().data.detail.packageVersion }}"
+}
+
 func (p *OnPackageVersion) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

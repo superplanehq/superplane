@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import type { BaseNodeMetadata, Comment, Issue } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
@@ -19,15 +19,10 @@ interface OnPRCommentEventData {
  * Renderer for the "github.onPRComment" trigger
  */
 export const onPRCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPRCommentEventData;
-    const prNumber = eventData?.issue?.number || "";
-    const title = eventData?.issue?.title || "PR Comment";
 
-    return {
-      title: `#${prNumber} - ${title}`,
-      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt),
-    };
+    return buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -74,11 +69,8 @@ export const onPRCommentTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnPRCommentEventData;
-      const prNumber = eventData?.issue?.number || "";
-      const title = eventData?.issue?.title || "PR Comment";
 
       props.lastEventData = {
-        title: `#${prNumber} - ${title}`,
         subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

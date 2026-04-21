@@ -2,6 +2,7 @@ package triggers
 
 import (
 	"context"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -19,7 +20,6 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 	}
 
 	configFields := trigger.Configuration()
-	configFields = actions.AppendGlobalTriggerFields(configFields)
 	configuration := make([]*configpb.Field, len(configFields))
 	for i, field := range configFields {
 		configuration[i] = actions.ConfigurationFieldToProto(field)
@@ -32,13 +32,14 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 
 	return &pb.DescribeTriggerResponse{
 		Trigger: &pb.Trigger{
-			Name:          trigger.Name(),
-			Label:         trigger.Label(),
-			Description:   trigger.Description(),
-			Icon:          trigger.Icon(),
-			Color:         trigger.Color(),
-			Configuration: configuration,
-			ExampleData:   exampleData,
+			Name:            trigger.Name(),
+			Label:           trigger.Label(),
+			Description:     trigger.Description(),
+			Icon:            trigger.Icon(),
+			Color:           trigger.Color(),
+			Configuration:   configuration,
+			ExampleData:     exampleData,
+			DefaultRunTitle: strings.TrimSpace(trigger.DefaultRunTitle()),
 		},
 	}, nil
 }

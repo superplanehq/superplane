@@ -66,6 +66,10 @@ func (p *OnPullRequest) Color() string {
 	return "gray"
 }
 
+func (p *OnPullRequest) DefaultRunTitle() string {
+	return "#{{ root().data.number }} - {{ root().data.pull_request.title }}"
+}
+
 func (p *OnPullRequest) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

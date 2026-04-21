@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import type { MetadataItem } from "@/ui/metadataList";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
@@ -26,7 +26,7 @@ export const listAlertRulesMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution
-        ? buildGrafanaEventSections(context.nodes, lastExecution, componentName, { strict: true })
+        ? buildGrafanaEventSections(lastExecution, componentName, { strict: true })
         : undefined,
       metadata: buildListAlertRulesMetadata(
         context.node.configuration as ListAlertRulesConfiguration | undefined,
