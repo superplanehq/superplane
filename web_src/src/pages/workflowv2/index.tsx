@@ -3590,7 +3590,6 @@ export function WorkflowPageV2() {
       canvas,
       organizationId,
       canvasId,
-      queryClient,
       handleSaveWorkflow,
       isReadOnly,
       applyLocalWorkflowUpdate,
