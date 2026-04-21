@@ -56,7 +56,7 @@ func SerializeNodeQueueItems(queueItems []models.CanvasNodeQueueItem) ([]*pb.Can
 	//
 	inputEvents, err := models.FindCanvasEvents(eventIDsFromQueueItems(queueItems))
 	if err != nil {
-		return nil, fmt.Errorf("error find input events: %v", err)
+		return nil, fmt.Errorf("error finding input events: %v", err)
 	}
 
 	//

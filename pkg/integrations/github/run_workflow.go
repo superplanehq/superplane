@@ -400,7 +400,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 
 	newMetadata, data, err := metadataFromPayload(payload)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error determing new metadata: %v", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("error determining new metadata: %v", err)
 	}
 
 	//

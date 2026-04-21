@@ -290,7 +290,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 
 	services, err := client.ListServices()
 	if err != nil {
-		return fmt.Errorf("error determing abilities: %v", err)
+		return fmt.Errorf("error determining abilities: %v", err)
 	}
 
 	ctx.Integration.SetMetadata(Metadata{Services: services})
