@@ -485,6 +485,28 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"statuses":                    "write",
 			"organization_administration": "read",
 		},
+		// Default events that the GitHub App should subscribe to.
+		// These match the events used by GitHub triggers:
+		// - onPush: push
+		// - onPullRequest: pull_request, pull_request_review, pull_request_review_comment
+		// - onIssue: issues
+		// - onIssueComment: issue_comment
+		// - onRelease: release
+		// - onTagCreated: create, delete
+		// - onBranchCreated: create, delete
+		// - onWorkflowRun: workflow_run
+		"default_events": []string{
+			"push",
+			"pull_request",
+			"pull_request_review",
+			"pull_request_review_comment",
+			"issues",
+			"issue_comment",
+			"release",
+			"create",
+			"delete",
+			"workflow_run",
+		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"hook_attributes": map[string]any{
