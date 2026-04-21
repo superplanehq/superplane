@@ -812,14 +812,9 @@ export function WorkflowPageV2() {
     if (hasTrackedCanvasView.current) return;
     if (!canvas || !canvasId || !organizationId) return;
     if (canvasLoading) return;
-      hasTrackedCanvasView.current = true;
-      analytics.canvasView(
-        canvasId,
-        canvas.spec?.nodes?.length ?? 0,
-        canvas.spec?.edges?.length ?? 0,
-        organizationId,
-      );
-    }, [canvas, canvasId, organizationId, canvasLoading]);
+    hasTrackedCanvasView.current = true;
+    analytics.canvasView(canvasId, canvas.spec?.nodes?.length ?? 0, canvas.spec?.edges?.length ?? 0, organizationId);
+  }, [canvas, canvasId, organizationId, canvasLoading]);
   // Initialize store from workflow.status on workflow load.
   // On canvas switch with cached data, the store initializes immediately from the
   // cache (no loading gap) and then re-initializes once when the background refetch
@@ -2833,7 +2828,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate,availableIntegrations],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
   const debouncedAnnotationAutoSave = useMemo(
     () =>
@@ -3514,7 +3509,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate,availableIntegrations],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
   const handleNodeDelete = useCallback(
     async (nodeId: string) => {
@@ -3553,7 +3548,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate,availableIntegrations],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
@@ -3590,7 +3585,16 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate,availableIntegrations],
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      handleSaveWorkflow,
+      isReadOnly,
+      applyLocalWorkflowUpdate,
+      availableIntegrations,
+    ],
   );
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {

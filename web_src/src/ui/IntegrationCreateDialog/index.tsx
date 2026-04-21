@@ -291,7 +291,7 @@ export function IntegrationCreateDialog({
           )}
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 ph-no-capture">
           {pendingWebhookSetup ? (
             <>
               {webhookStepDescription ?? (
@@ -321,31 +321,29 @@ export function IntegrationCreateDialog({
                   </Button>
                 </div>
               </div>
-              <div className="ph-no-capture">
-                {(integrationDefinition?.configuration ?? [])
-                  .filter((f: ConfigurationField) => {
-                    if (!f.name) return false;
-                    if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
-                    return f.name === "signingSecret" || f.name === "webhookSigningSecret";
-                  })
-                  .map((field) => (
-                    <ConfigurationFieldRenderer
-                      key={field.name}
-                      field={field}
-                      value={configuration[field.name!]}
-                      onChange={(value) =>
-                        setConfiguration((prev) => ({
-                          ...prev,
-                          [field.name!]: value,
-                        }))
-                      }
-                      allValues={configuration}
-                      domainId={organizationId}
-                      domainType="DOMAIN_TYPE_ORGANIZATION"
-                      organizationId={organizationId}
-                    />
-                  ))}
-              </div>
+              {(integrationDefinition?.configuration ?? [])
+                .filter((f: ConfigurationField) => {
+                  if (!f.name) return false;
+                  if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
+                  return f.name === "signingSecret" || f.name === "webhookSigningSecret";
+                })
+                .map((field) => (
+                  <ConfigurationFieldRenderer
+                    key={field.name}
+                    field={field}
+                    value={configuration[field.name!]}
+                    onChange={(value) =>
+                      setConfiguration((prev) => ({
+                        ...prev,
+                        [field.name!]: value,
+                      }))
+                    }
+                    allValues={configuration}
+                    domainId={organizationId}
+                    domainType="DOMAIN_TYPE_ORGANIZATION"
+                    organizationId={organizationId}
+                  />
+                ))}
             </>
           ) : (
             <>
@@ -365,7 +363,7 @@ export function IntegrationCreateDialog({
                 </div>
               )}
               {configurationFields.length > 0 && (
-                <div className="space-y-4 ph-no-capture">
+                <div className="space-y-4">
                   {configurationFields.map((field: ConfigurationField) => {
                     if (!field.name) return null;
                     return (
