@@ -88,6 +88,10 @@ func (t *OnEmailEvent) Color() string {
 	return "gray"
 }
 
+func (t *OnEmailEvent) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.email, "Email Event") }} · {{ {"processed": "Processed", "delivered": "Delivered", "deferred": "Deferred", "bounce": "Bounced", "dropped": "Dropped", "open": "Opened", "click": "Clicked", "spamreport": "Spam Report", "unsubscribe": "Unsubscribed", "group_unsubscribe": "Group Unsubscribe", "group_resubscribe": "Group Resubscribe"}[root().data.event] ?? "Email Event" }}`
+}
+
 func (t *OnEmailEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -8,7 +8,7 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
@@ -318,22 +318,10 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
  * Renderer for the "schedule" trigger type
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventDate = new Date(context.event?.createdAt || "");
-    const formattedDate = eventDate.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit",
-      timeZoneName: "short",
-    });
 
-    return {
-      title: `Schedule: ${formattedDate}`,
-      subtitle: renderTimeAgo(eventDate),
-    };
+    return renderTimeAgo(eventDate);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -362,19 +350,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventDate = new Date(lastEvent.createdAt || "");
-      const formattedDate = eventDate.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-        timeZoneName: "short",
-      });
-
       props.lastEventData = {
-        title: `Schedule: ${formattedDate}`,
         subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

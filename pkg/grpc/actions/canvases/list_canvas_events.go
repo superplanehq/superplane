@@ -83,14 +83,14 @@ func SerializeCanvasEvent(event models.CanvasEvent) (*pb.CanvasEvent, error) {
 	}
 
 	return &pb.CanvasEvent{
-		Id:         event.ID.String(),
-		CanvasId:   event.WorkflowID.String(),
-		NodeId:     event.NodeID,
-		Channel:    event.Channel,
-		CustomName: valueOrEmpty(event.CustomName),
-		Data:       s,
-		CreatedAt:  timestamppb.New(*event.CreatedAt),
-		Root:       event.ExecutionID == nil,
+		Id:        event.ID.String(),
+		CanvasId:  event.WorkflowID.String(),
+		NodeId:    event.NodeID,
+		Channel:   event.Channel,
+		RunTitle:  valueOrEmpty(event.RunTitle),
+		Data:      s,
+		CreatedAt: timestamppb.New(*event.CreatedAt),
+		Root:      event.ExecutionID == nil,
 	}, nil
 }
 
@@ -124,7 +124,7 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 		CanvasId:   event.WorkflowID.String(),
 		NodeId:     event.NodeID,
 		Channel:    event.Channel,
-		CustomName: valueOrEmpty(event.CustomName),
+		RunTitle:   valueOrEmpty(event.RunTitle),
 		Data:       s,
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
 		Executions: executionInfos,

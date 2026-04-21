@@ -1,6 +1,6 @@
-import type { EventSection } from "@/ui/componentBase";
+import type { EventSection } from "@/pages/workflowv2/mappers/types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getState, getTriggerRenderer } from "..";
+import { getState } from "..";
 import type { ExecutionInfo, NodeInfo } from "../types";
 
 export function formatIndexingStatus(status: string): string {
@@ -26,13 +26,9 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
   const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
   if (!rootTriggerNode?.componentName) return [];
 
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
       eventId: rootEvent.id,

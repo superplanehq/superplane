@@ -1,8 +1,8 @@
-import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
+import type { ComponentBaseContext, ExecutionInfo, SubtitleContext } from "../../types";
 import type React from "react";
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap } from "../..";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -37,28 +37,17 @@ export function buildEcsComponentProps(
     iconColor: getColorClass(context.componentDefinition.color),
     collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
     collapsed: context.node.isCollapsed,
-    eventSections: lastExecution
-      ? eventSections || buildEcsEventSections(context.nodes, lastExecution, componentName)
-      : undefined,
+    eventSections: lastExecution ? eventSections || buildEcsEventSections(lastExecution, componentName) : undefined,
     includeEmptyState: !lastExecution,
     metadata,
     eventStateMap: getStateMap(componentName),
   };
 }
 
-export function buildEcsEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+export function buildEcsEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id ?? "",

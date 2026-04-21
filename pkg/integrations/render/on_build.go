@@ -67,6 +67,10 @@ func (t *OnBuild) Color() string {
 	return "gray"
 }
 
+func (t *OnBuild) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.serviceName, root().data.serviceId, "Service") + " · " + ({"render.build.ended": "Build Ended", "render.build.started": "Build Started"}[root().type] ?? "Render Event") }}`
+}
+
 func (t *OnBuild) Configuration() []configuration.Field {
 	return onResourceEventConfigurationFields(buildEventTypeOptions, buildDefaultEventTypes)
 }

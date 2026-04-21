@@ -52,6 +52,10 @@ func (m *OnMergeRequest) Color() string {
 	return "orange"
 }
 
+func (m *OnMergeRequest) DefaultRunTitle() string {
+	return "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}"
+}
+
 func (m *OnMergeRequest) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

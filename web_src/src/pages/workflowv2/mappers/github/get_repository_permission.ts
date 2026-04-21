@@ -1,5 +1,5 @@
 import type React from "react";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import type { MetadataItem } from "@/ui/metadataList";
 import type {
   ComponentBaseContext,
@@ -43,7 +43,7 @@ function getRepositoryPermissionMetadataList(node: NodeInfo): MetadataItem[] {
 
 export const getRepositoryPermissionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const base = baseProps(context.node, context.componentDefinition, context.lastExecutions);
 
     return {
       ...base,

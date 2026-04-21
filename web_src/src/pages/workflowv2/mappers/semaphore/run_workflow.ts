@@ -15,12 +15,11 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
@@ -218,7 +217,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: lastExecution ? runWorkflowEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? runWorkflowEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: runWorkflowMetadataList(context.node),
       specs: runWorkflowSpecs(context.node),
@@ -331,16 +330,12 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+function runWorkflowEventSections(execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }
 
   const sections: EventSection[] = [];
-
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const executionState = runWorkflowStateFunction(execution);
   const subtitleTimestamp =
     executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
@@ -348,7 +343,6 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
 
   sections.push({
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventSubtitle,
     eventState: executionState,
     eventId: execution.rootEvent!.id!,
