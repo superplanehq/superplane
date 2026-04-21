@@ -9,11 +9,11 @@ import type {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
@@ -96,9 +96,7 @@ export const deployReleaseMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? deployReleaseEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? deployReleaseEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deployReleaseMetadataList(context.node),
       eventStateMap: DEPLOY_RELEASE_STATE_MAP,
@@ -154,19 +152,10 @@ function deployReleaseMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function deployReleaseEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function deployReleaseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

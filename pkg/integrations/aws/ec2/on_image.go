@@ -74,6 +74,10 @@ func (p *OnImage) Color() string {
 	return "gray"
 }
 
+func (p *OnImage) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.detail.ImageId, "EC2 AMI state change") }}`
+}
+
 func (p *OnImage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

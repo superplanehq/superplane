@@ -77,6 +77,10 @@ func (t *OnBlobDeleted) Color() string {
 	return "blue"
 }
 
+func (t *OnBlobDeleted) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.subject, "Blob deleted") }}`
+}
+
 func (t *OnBlobDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

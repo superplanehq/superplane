@@ -1,6 +1,6 @@
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { buildGitlabSubtitle } from "./utils";
 import type { GitLabNodeMetadata } from "./types";
@@ -34,14 +34,10 @@ interface OnMilestoneEventData {
 }
 
 export const onMilestoneTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnMilestoneEventData;
-    const milestone = eventData?.object_attributes;
 
-    return {
-      title: milestone?.title ? milestone.title : "Milestone",
-      subtitle: buildGitlabSubtitle(eventData?.action || "", context.event?.createdAt),
-    };
+    return buildGitlabSubtitle(eventData?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -93,10 +89,8 @@ export const onMilestoneTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnMilestoneEventData;
-      const milestone = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: milestone?.title ? milestone.title : "Milestone",
         subtitle: buildGitlabSubtitle(stringOrDash(eventData?.action), lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

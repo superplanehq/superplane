@@ -68,6 +68,10 @@ func (p *OnImagePush) Color() string {
 	return "gray"
 }
 
+func (p *OnImagePush) DefaultRunTitle() string {
+	return "{{ root().data.detail[\"repository-name\"] }}:{{ root().data.detail[\"image-tag\"] }}"
+}
+
 func (p *OnImagePush) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

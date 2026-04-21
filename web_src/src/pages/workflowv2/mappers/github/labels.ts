@@ -6,14 +6,14 @@ import type {
   SubtitleContext,
   ExecutionDetailsContext,
 } from "../types";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import type { Label } from "./types";
 
 export const labelsMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    return baseProps(context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {

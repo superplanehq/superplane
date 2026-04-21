@@ -6,8 +6,7 @@ import type {
   SuperplaneComponentsNode,
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
-import { buildEventInfo } from "@/pages/workflowv2/utils";
+import { buildEventInfo, getEventRunTitle } from "@/pages/workflowv2/utils";
 import { computeDuration, getAggregateStatus, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,9 +32,7 @@ export function RunRowHeader({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
-  const eventInfo = buildEventInfo(event);
-  const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "Run" };
+  const title = getEventRunTitle(buildEventInfo(event), "Run");
   const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions) : "queued";
   const totalSteps = executions.length + queueItemCount;
 

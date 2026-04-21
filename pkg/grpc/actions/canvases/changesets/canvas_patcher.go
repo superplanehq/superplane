@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -180,6 +181,7 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 
 	newNode.Type = nodeType
 	newNode.Ref = *nodeRef
+	newNode.RunTitleTemplate = normalizeNodeRunTitleTemplate(newNode.Ref, node.RunTitleTemplate)
 
 	if node.GetPosition() != nil {
 		newNode.Position.X = int(node.GetPosition().GetX())
@@ -313,6 +315,10 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		currentNode.IsCollapsed = node.GetIsCollapsed()
 	}
 
+	if node.RunTitleTemplate != nil {
+		currentNode.RunTitleTemplate = normalizeNodeRunTitleTemplate(currentNode.Ref, node.RunTitleTemplate)
+	}
+
 	//
 	// From here on out, we don't return errors,
 	// we save the error message alongside the new invalid configuration.
@@ -345,6 +351,26 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 
 	p.nodes[nodeID] = currentNode
 	return nil
+}
+
+func normalizeNodeRunTitleTemplate(nodeRef models.NodeRef, value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	if nodeRef.Trigger != nil {
+		trimmed = registry.NormalizeRunTitleTemplateForTrigger(nodeRef.Trigger.Name, trimmed)
+		if trimmed == "" {
+			return nil
+		}
+	}
+
+	return &trimmed
 }
 
 func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef models.NodeRef) ([]configuration.Field, error) {

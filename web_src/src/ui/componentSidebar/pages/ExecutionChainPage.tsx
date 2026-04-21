@@ -15,6 +15,7 @@ import type {
 import type { EventState, EventStateMap } from "../../componentBase";
 import type { ChildExecution } from "@/ui/chainItem/ChainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
+import { getSidebarEventTitle } from "../eventTitle";
 
 function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,
@@ -84,9 +85,10 @@ function convertSidebarEventToChainItem(
 ): ChainItemData {
   // Find the workflow node for this trigger event
   const workflowNode = workflowNodes.find((node) => node.id === triggerEvent.nodeId);
+  const triggerEventTitle = getSidebarEventTitle(triggerEvent);
 
   // Get metadata based on node type
-  let nodeDisplayName = triggerEvent.title || "Trigger Event";
+  let nodeDisplayName = triggerEventTitle;
   let nodeIconSlug = "play";
 
   if (workflowNode) {
@@ -102,8 +104,8 @@ function convertSidebarEventToChainItem(
   return {
     id: triggerEvent.id,
     nodeId: triggerEvent.nodeId || "",
-    componentName: triggerEvent.title || "Trigger Event",
-    nodeName: triggerEvent.title,
+    componentName: triggerEventTitle,
+    nodeName: triggerEventTitle,
     nodeDisplayName,
     nodeIcon: "play",
     nodeIconSlug,
@@ -160,6 +162,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   blueprints = [],
   onHighlightedNodesChange,
 }) => {
+  const triggerEventTitle = triggerEvent ? getSidebarEventTitle(triggerEvent) : "";
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -450,7 +453,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                   {triggerEvent.id && (
                     <span className="text-[13px] text-gray-500 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
                   )}
-                  {triggerEvent.title || "Execution Chain"}
+                  {triggerEventTitle}
                 </h2>
                 {summaryInfo && (
                   <div className="text-[13px] text-gray-500">

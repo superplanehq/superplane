@@ -1,12 +1,11 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import renderIcon from "@/assets/icons/integrations/render.svg";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type { ComponentDefinition, ExecutionInfo, NodeInfo } from "../types";
 
 export function baseProps(
-  nodes: NodeInfo[],
   node: NodeInfo,
   componentDefinition: ComponentDefinition,
   lastExecutions: ExecutionInfo[],
@@ -20,24 +19,19 @@ export function baseProps(
     iconColor: getColorClass(componentDefinition.color),
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,
-    eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
   };
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

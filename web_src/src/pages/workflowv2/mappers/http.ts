@@ -14,12 +14,11 @@ import type {
   EventSection,
   EventStateMap,
   EventState,
-} from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
 
 // Custom state map for HTTP component with error state
@@ -179,7 +178,7 @@ export const httpMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: context.lastExecutions[0]
-        ? getHTTPEventSections(context.nodes, context.lastExecutions[0], httpStateFunction)
+        ? getHTTPEventSections(context.lastExecutions[0], httpStateFunction)
         : undefined,
       includeEmptyState: !context.lastExecutions[0],
       metadata: getHTTPMetadataList(context.node),
@@ -454,14 +453,9 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
 }
 
 function getHTTPEventSections(
-  nodes: NodeInfo[],
   execution: ExecutionInfo,
   stateFunction: (execution: ExecutionInfo) => EventState,
 ): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
 
@@ -511,7 +505,6 @@ function getHTTPEventSections(
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventSubtitle: generateEventSubtitle(),
     eventState: stateFunction(execution),
     eventId: execution.rootEvent!.id!,

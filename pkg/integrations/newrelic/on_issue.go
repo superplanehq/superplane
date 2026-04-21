@@ -78,6 +78,10 @@ func (t *OnIssue) Color() string {
 	return "gray"
 }
 
+func (t *OnIssue) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.title, "Issue") }}{{ root().data.state != "" ? " · " + ({"CREATED": "Created", "ACTIVATED": "Activated", "ACKNOWLEDGED": "Acknowledged", "CLOSED": "Closed"}[root().data.state] ?? root().data.state) : "" }}`
+}
+
 func (t *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
