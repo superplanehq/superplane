@@ -3193,6 +3193,7 @@ export function WorkflowPageV2() {
       applyAutoLayoutOnAddedNode,
       isReadOnly,
       applyLocalWorkflowUpdate,
+      availableIntegrations,
     ],
   );
 
@@ -3509,7 +3510,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
   const handleNodeDelete = useCallback(
     async (nodeId: string) => {
