@@ -3492,6 +3492,8 @@ export function WorkflowPageV2() {
         channel: sourceHandle || "default",
       };
 
+      analytics.edgeCreate(organizationId);
+
       // Add the new edge to the workflow
       const updatedEdges = [...(canvas.spec?.edges || []), newEdge];
 
@@ -3507,7 +3509,6 @@ export function WorkflowPageV2() {
       applyLocalWorkflowUpdate(updatedWorkflow);
 
       if (!isReadOnly) {
-        analytics.edgeCreate(organizationId);
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
@@ -3717,6 +3718,8 @@ export function WorkflowPageV2() {
         };
       });
 
+      analytics.edgeRemove(organizationId);
+
       // Remove the edges from the workflow
       const updatedEdges = canvas.spec?.edges?.filter((edge) => {
         return !edgesToRemove.some(
@@ -3739,7 +3742,6 @@ export function WorkflowPageV2() {
       applyLocalWorkflowUpdate(updatedWorkflow);
 
       if (!isReadOnly) {
-        analytics.edgeRemove(organizationId);
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
