@@ -40,7 +40,7 @@ Note: **Plan requirement:** Render webhooks require a Professional plan or highe
 
 ## On Build
 
-The On Build trigger emits build-related Render events for one selected service.
+The On Build trigger emits build-related  events for a selected Render service.
 
 ### Use Cases
 
@@ -49,7 +49,7 @@ The On Build trigger emits build-related Render events for one selected service.
 
 ### Configuration
 
-- **Service**: Required Render service.
+- **Service**:The Render service you want to monitor or act on.
 - **Event Types**: Build event states to listen for. Defaults to `build_ended`.
 
 ### Webhook Verification
@@ -95,7 +95,7 @@ The On Deploy trigger emits deploy-related Render events for one selected servic
 ### Configuration
 
 - **Service**: Required Render service.
-- **Event Types**: Deploy event states to listen for. Defaults to `deploy_ended`.
+- **Event Types**: Deploy event states to listen for (e.g started, succeeded, failed). Defaults to `deploy.finished`.
 
 ### Webhook Verification
 
