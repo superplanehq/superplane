@@ -128,6 +128,7 @@ import {
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
+  getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
@@ -158,19 +159,6 @@ type QueuedCanvasSaveRequest = {
 };
 
 type CanvasEchoRelease = () => void;
-
-function getWorkflowSaveSignature(workflow: CanvasesCanvas | null | undefined): string {
-  if (!workflow) {
-    return "";
-  }
-
-  return JSON.stringify({
-    name: workflow.metadata?.name ?? "",
-    description: workflow.metadata?.description ?? "",
-    nodes: workflow.spec?.nodes ?? [],
-    edges: workflow.spec?.edges ?? [],
-  });
-}
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
