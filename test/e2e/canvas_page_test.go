@@ -66,6 +66,19 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodeDeletedInDB("DeleteMe")
 	})
 
+	t.Run("deleting a newly added node updates the canvas before publish", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addManualTrigger("Start")
+		steps.addNoop("DeleteMe")
+		steps.deleteNodeFromCanvas("DeleteMe")
+		steps.assertNodeIsHidden("DeleteMe")
+		steps.publishCanvas()
+		steps.assertNodeDeletedInDB("DeleteMe")
+		steps.assertNodeIsAdded("Start")
+	})
+
 	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
@@ -230,6 +243,10 @@ func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {
 	s.session.AssertText(nodeName)
 }
 
+func (s *CanvasPageSteps) assertNodeIsHidden(nodeName string) {
+	s.session.AssertHidden(q.TestID("node", nodeName, "header"))
+}
+
 func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 	s.canvas = shared.NewCanvasSteps("E2E Canvas With Noop", s.t, s.session)
 
@@ -249,9 +266,14 @@ func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
 
 func (s *CanvasPageSteps) deleteNodeFromCanvas(nodeName string) {
 	nodeHeader := q.TestID("node", nodeName, "header")
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	deleteButton := q.Locator(
+		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-delete"]`,
+	)
 	s.session.HoverOver(nodeHeader)
 	s.session.Sleep(100)
-	s.session.Click(q.TestID("node-action-delete"))
+	s.session.Click(deleteButton)
 	s.session.Sleep(300)
 }
 
