@@ -178,6 +178,7 @@ export interface CanvasPageProps {
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  onCloseVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
@@ -318,8 +319,6 @@ export interface CanvasPageProps {
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
 
-  /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
-  onPreviewPreviousVersionViewDetails?: () => void;
   /** Change request being previewed while awaiting approval (floating bar + versioning sidebar). */
   awaitingApprovalBanner?: {
     title: string;
@@ -1074,8 +1073,6 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.canvasStateMode, state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
-  const showPreviewFloatingBar =
-    canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
@@ -1083,7 +1080,7 @@ function CanvasPage(props: CanvasPageProps) {
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        props.headerMode === "version-live" && "sp-canvas-live",
+        props.headerMode === "version-live" && !props.isVersionControlOpen && "sp-canvas-live",
       )}
     >
       {/* Header at the top spanning full width */}
@@ -1115,6 +1112,7 @@ function CanvasPage(props: CanvasPageProps) {
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           isVersionControlOpen={props.isVersionControlOpen}
           onOpenVersionControl={props.onOpenVersionControl}
+          onCloseVersionControl={props.onCloseVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
           agentState={agentState}
@@ -1128,13 +1126,15 @@ function CanvasPage(props: CanvasPageProps) {
 
         <AgentSidebar agentState={agentState} />
 
-        <RightSideControls
-          mode={readOnly ? "live" : "edit"}
-          onSidebarOpen={() => handleSidebarToggle(true)}
-          onAddNote={handleAddNote}
-          onMemoryOpen={props.onMemoryOpen}
-          onYamlOpen={props.onYamlOpen}
-        />
+        {props.isVersionControlOpen ? null : (
+          <RightSideControls
+            mode={readOnly ? "live" : "edit"}
+            onSidebarOpen={() => handleSidebarToggle(true)}
+            onAddNote={handleAddNote}
+            onMemoryOpen={props.onMemoryOpen}
+            onYamlOpen={props.onYamlOpen}
+          />
+        )}
 
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
@@ -1150,43 +1150,26 @@ function CanvasPage(props: CanvasPageProps) {
         )}
 
         <div className="flex-1 relative">
-          {showPreviewFloatingBar || showAwaitingFloatingBar ? (
+          {showAwaitingFloatingBar ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
                 className={cn(
                   "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
-                  showAwaitingFloatingBar ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName : "bg-sky-50",
+                  props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName,
                 )}
               >
-                <span
-                  className={cn(
-                    "flex min-w-0 max-w-full items-center gap-1 text-sm",
-                    showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
-                  )}
-                >
-                  {showAwaitingFloatingBar ? (
-                    <>
-                      <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
-                      <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
-                        {props.awaitingApprovalBanner?.reviewUi.label}
-                      </span>
-                    </>
-                  ) : (
-                    "Previewing previous version"
-                  )}
+                <span className="flex min-w-0 max-w-full items-center gap-1 text-sm">
+                  <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
+                  <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
+                    {props.awaitingApprovalBanner?.reviewUi.label}
+                  </span>
                 </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="shrink-0"
-                  onClick={() => {
-                    if (showAwaitingFloatingBar) {
-                      props.awaitingApprovalBanner?.onViewNodeDiff?.();
-                    } else {
-                      props.onPreviewPreviousVersionViewDetails?.();
-                    }
-                  }}
+                  onClick={() => props.awaitingApprovalBanner?.onViewNodeDiff?.()}
                 >
                   View details
                 </Button>
@@ -1223,6 +1206,7 @@ function CanvasPage(props: CanvasPageProps) {
               setCurrentTab={setCurrentTab}
               showBottomStatusControls={props.showBottomStatusControls}
               headerMode={props.headerMode}
+              isVersionControlOpen={props.isVersionControlOpen}
               isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
               onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
               autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1273,7 +1257,7 @@ function CanvasPage(props: CanvasPageProps) {
             configurationSaveMode={props.configurationSaveMode}
             currentTab={currentTab}
             onTabChange={setCurrentTab}
-            canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
+            canvasMode={props.headerMode === "version-live" && !props.isVersionControlOpen ? "live" : "edit"}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
             integrations={props.integrations}
@@ -1613,6 +1597,7 @@ function CanvasContentHeader({
   showCanvasSettingsMenu,
   isVersionControlOpen,
   onOpenVersionControl,
+  onCloseVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
   agentState,
@@ -1643,6 +1628,7 @@ function CanvasContentHeader({
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  onCloseVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
   agentState: AgentState;
@@ -1690,6 +1676,7 @@ function CanvasContentHeader({
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       isVersionControlOpen={isVersionControlOpen}
       onOpenVersionControl={onOpenVersionControl}
+      onCloseVersionControl={onCloseVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
       agentState={agentState}
@@ -1760,6 +1747,7 @@ function CanvasContent({
   setCurrentTab,
   showBottomStatusControls = true,
   headerMode,
+  isVersionControlOpen,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -1817,6 +1805,7 @@ function CanvasContent({
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
   headerMode?: CanvasPageProps["headerMode"];
+  isVersionControlOpen?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1900,7 +1889,7 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const isLiveMode = headerMode === "version-live";
+  const isLiveMode = headerMode === "version-live" && !isVersionControlOpen;
   const isEditMode = !isLiveMode;
 
   useEffect(() => {
@@ -2532,10 +2521,12 @@ function CanvasContent({
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
-                  isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
-                  onSnapToGridToggle={isEditMode ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined}
+                  isSnapToGridEnabled={isEditMode && !isVersionControlOpen ? isSnapToGridEnabled : undefined}
+                  onSnapToGridToggle={
+                    isEditMode && !isVersionControlOpen ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined
+                  }
                 >
-                  {isEditMode ? (
+                  {isEditMode && !isVersionControlOpen ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="inline-flex">

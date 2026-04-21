@@ -19,7 +19,7 @@ export function CanvasModeToggle({ mode, onSelectEditor, onSelectLive }: CanvasM
 
   return (
     <Tabs value={mode} onValueChange={handleValueChange} className="inline-flex w-auto" aria-label="Canvas view">
-      <TabsList className="h-8 w-fit gap-0 rounded-sm border border-slate-300 bg-white/80 p-0">
+      <TabsList className="h-7 w-fit gap-0 rounded-sm border border-slate-300 bg-white/80 p-0">
         <TabsTrigger
           value="version-edit"
           data-testid="canvas-view-mode-editor"

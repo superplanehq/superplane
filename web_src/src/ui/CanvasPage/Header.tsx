@@ -3,7 +3,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Settings } from "lucide-react";
+import { ArrowLeft, History, MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
@@ -41,7 +41,10 @@ interface HeaderProps {
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
+  /** Opens the version history sidebar (not a toggle). */
   onOpenVersionControl?: () => void;
+  /** Closes the version history sidebar (e.g. "Exit Version History" in the secondary header). */
+  onCloseVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
   agentState: AgentState;
@@ -80,7 +83,7 @@ function PageHeader({
   const activeCanvasId = canvasIdParam || workflowId;
 
   return (
-    <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
+    <div className="relative z-40 flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
       </div>
@@ -117,9 +120,26 @@ function PageHeader({
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = props.mode === "version-live" || props.mode === "version-edit";
   const canvasViewMode = props.mode === "version-edit" ? "version-edit" : "version-live";
+  const showVersionHistoryExit = props.isVersionControlOpen && !!props.onCloseVersionControl;
+
+  if (showVersionHistoryExit) {
+    return (
+      <div className="relative z-10 flex h-11 items-center justify-start border-b border-border bg-slate-100 px-4">
+        <button
+          type="button"
+          onClick={props.onCloseVersionControl}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-slate-800"
+          aria-label="Exit version history"
+        >
+          <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+          Exit Version History
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
+    <div className="relative z-10 flex h-11 items-center border-b border-border bg-slate-100 px-4 gap-3">
       <AgentSidebarTrigger agentState={props.agentState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
@@ -141,7 +161,6 @@ function SecondaryHeader(props: HeaderProps) {
 
 function SecondaryHeaderActions({
   mode,
-  isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount = 0,
@@ -159,19 +178,10 @@ function SecondaryHeaderActions({
   publishVersionDisabled,
   publishVersionDisabledTooltip,
 }: HeaderProps) {
-  const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
+  const showVersionControlTrigger = !!onOpenVersionControl;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-      {showVersionControlTrigger ? (
-        <VersionControlButton
-          onToggle={onOpenVersionControl}
-          isOpen={!!isVersionControlOpen}
-          tooltip={versionControlButtonTooltip}
-          notificationCount={versionControlNotificationCount}
-        />
-      ) : null}
-
       {mode === "default" && onSave && !saveButtonHidden ? (
         <SaveButton
           onSave={onSave}
@@ -183,6 +193,13 @@ function SecondaryHeaderActions({
 
       {mode === "version-edit" ? (
         <div className="flex items-center gap-2">
+          {showVersionControlTrigger ? (
+            <VersionControlButton
+              onOpen={onOpenVersionControl}
+              tooltip={versionControlButtonTooltip}
+              notificationCount={versionControlNotificationCount}
+            />
+          ) : null}
           {hasUnpublishedDraftChanges ? (
             <DiscardDraftButton
               onDiscard={() => onDiscardVersion?.()}
@@ -204,13 +221,11 @@ function SecondaryHeaderActions({
 }
 
 function VersionControlButton({
-  onToggle,
-  isOpen,
+  onOpen,
   tooltip,
   notificationCount,
 }: {
-  onToggle: () => void;
-  isOpen: boolean;
+  onOpen?: () => void;
   tooltip?: string;
   notificationCount: number;
 }) {
@@ -218,25 +233,17 @@ function VersionControlButton({
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="relative inline-flex">
-          <UIButton
-            type="button"
-            variant="outline"
-            size="icon"
-            className={isOpen ? "h-8 w-8 bg-slate-200 border-slate-300" : "h-8 w-8"}
-            onClick={onToggle}
-            aria-label={isOpen ? "Close version control" : "Open version control"}
-            aria-pressed={isOpen}
-          >
-            <GitBranch className="h-4 w-4" />
+          <UIButton type="button" variant="outline" size="icon-xs" onClick={onOpen} aria-label="Open version history">
+            <History />
           </UIButton>
           {notificationCount > 0 ? (
-            <span className="absolute left-5 -top-1.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
+            <span className="absolute left-4 -top-1.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
               {notificationCount > 99 ? "99+" : notificationCount}
             </span>
           ) : null}
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top">{tooltip || "Open version control"}</TooltipContent>
+      <TooltipContent side="top">{tooltip || "View version history"}</TooltipContent>
     </Tooltip>
   );
 }
