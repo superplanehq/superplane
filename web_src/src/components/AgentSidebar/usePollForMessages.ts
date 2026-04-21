@@ -38,6 +38,10 @@ export function usePollForMessages({
     let timerId: number | null = null;
 
     const poll = async () => {
+      if (cancelled) {
+        return;
+      }
+
       // Skip a tick if the SSE stream is actively delivering events.
       if (isStreamingRef.current) {
         schedule();

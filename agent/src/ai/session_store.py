@@ -136,37 +136,8 @@ def _deserialize_model_message(payload: Any) -> ModelMessage:
     return messages[0]
 
 
-def _extract_output_tool_answer(payload: dict[str, Any]) -> str:
-    parts = payload.get("parts")
-    if not isinstance(parts, list):
-        return ""
-
-    for part in reversed(parts):
-        if not isinstance(part, dict):
-            continue
-        if part.get("part_kind") != "tool-call":
-            continue
-        if not _likely_output_tool_name(part.get("tool_name")):
-            continue
-
-        args = part.get("args")
-        if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except json.JSONDecodeError:
-                continue
-
-        if not isinstance(args, dict):
-            continue
-
-        answer = args.get("answer")
-        if isinstance(answer, str) and answer:
-            return answer
-
-    return ""
-
-
-def _extract_output_proposal(payload: dict[str, Any]) -> dict[str, Any] | None:
+def _extract_output_tool_arg(payload: dict[str, Any], key: str) -> Any:
+    """Return the value of *key* from the last output tool-call's args, or None."""
     parts = payload.get("parts")
     if not isinstance(parts, list):
         return None
@@ -189,11 +160,19 @@ def _extract_output_proposal(payload: dict[str, Any]) -> dict[str, Any] | None:
         if not isinstance(args, dict):
             continue
 
-        proposal = args.get("proposal")
-        if isinstance(proposal, dict):
-            return proposal
+        return args.get(key)
 
     return None
+
+
+def _extract_output_tool_answer(payload: dict[str, Any]) -> str:
+    value = _extract_output_tool_arg(payload, "answer")
+    return value if isinstance(value, str) and value else ""
+
+
+def _extract_output_proposal(payload: dict[str, Any]) -> dict[str, Any] | None:
+    value = _extract_output_tool_arg(payload, "proposal")
+    return value if isinstance(value, dict) else None
 
 
 @dataclass(frozen=True)
