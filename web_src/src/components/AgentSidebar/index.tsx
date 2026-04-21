@@ -16,15 +16,15 @@ export interface AgentSidebarProps {
 }
 
 export function AgentSidebar({ agentState }: AgentSidebarProps) {
-  if (!agentState.showAgentSidebarToggle) {
+  if (!agentState.showAgentSidebarToggle || !agentState.agentContext.enabled) {
     return null;
   }
 
-  if (!agentState.isAgentSidebarOpen || !agentState.agentContext.enabled) {
-    return null;
-  }
-
-  return <OpenAgentSidebar agentState={agentState} />;
+  return (
+    <div style={agentState.isAgentSidebarOpen ? undefined : { display: "none" }}>
+      <OpenAgentSidebar agentState={agentState} />
+    </div>
+  );
 }
 
 function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
