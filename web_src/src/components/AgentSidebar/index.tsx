@@ -9,6 +9,7 @@ import type { AgentState } from "./useAgentState";
 import { useApplyAiProposal } from "./useApplyAiProposal";
 import { useLoadChatConversation } from "./useLoadChatConversation";
 import { useLoadChatSessions } from "./useLoadChatSessions";
+import { usePollForMessages } from "./usePollForMessages";
 import { useSidebarWidth } from "./useSidebarWidth";
 
 export interface AgentSidebarProps {
@@ -28,15 +29,18 @@ export function AgentSidebar({ agentState }: AgentSidebarProps) {
 }
 
 function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
-  const { canvasId, organizationId, agentContext, onApplyAiOperations } = agentState;
+  const { canvasId, organizationId, agentContext, onApplyAiOperations, currentChatId, setCurrentChatId } = agentState;
 
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Track whether an SSE stream is actively delivering events so the polling
+  // hook knows to stand down.
+  const isStreamingRef = useRef(false);
 
   const { isApplyingProposal, setPendingProposal, pendingProposal, handleDiscardProposal, onApplyProposal } =
     useProposalState({
@@ -45,24 +49,30 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
       onApplyAiOperations,
     });
 
-  const handleSendPrompt = async (value?: string) =>
-    await sendChatPrompt({
-      value,
-      aiInput,
-      canvasId,
-      organizationId,
-      agentContext,
-      currentChatId,
-      isGeneratingResponse,
-      setChatSessions,
-      setCurrentChatId,
-      setAiMessages,
-      setAiInput,
-      setAiError,
-      setIsGeneratingResponse,
-      setPendingProposal,
-      focusInput: () => aiInputRef.current?.focus(),
-    });
+  const handleSendPrompt = async (value?: string) => {
+    isStreamingRef.current = true;
+    try {
+      await sendChatPrompt({
+        value,
+        aiInput,
+        canvasId,
+        organizationId,
+        agentContext,
+        currentChatId,
+        isGeneratingResponse,
+        setChatSessions,
+        setCurrentChatId,
+        setAiMessages,
+        setAiInput,
+        setAiError,
+        setIsGeneratingResponse,
+        setPendingProposal,
+        focusInput: () => aiInputRef.current?.focus(),
+      });
+    } finally {
+      isStreamingRef.current = false;
+    }
+  };
 
   const handleStartNewChatSession = () => {
     setCurrentChatId(null);
@@ -80,14 +90,13 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
     setAiError(null);
   };
 
-  // reset state when canvasId changes
+  // reset local state when canvasId changes (currentChatId reset is handled in useAgentState)
   useEffect(() => {
-    setCurrentChatId(null);
     setAiMessages([]);
     setPendingProposal(null);
     setAiError(null);
     setAiInput("");
-  }, [canvasId, setCurrentChatId, setAiMessages, setPendingProposal, setAiError, setAiInput]);
+  }, [canvasId, setAiMessages, setPendingProposal, setAiError, setAiInput]);
 
   // load previous chat sessions
   const isLoadingChatSessions = useLoadChatSessions({
@@ -103,9 +112,24 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
     canvasId,
     organizationId,
     currentChatId,
+    setChatSessions,
     setAiMessages,
     setPendingProposal,
     setAiError,
+    setIsGeneratingResponse,
+  });
+
+  // poll for updates when a run is in progress but no SSE stream is active
+  usePollForMessages({
+    canvasId,
+    organizationId,
+    currentChatId,
+    isGeneratingResponse,
+    isStreamingRef,
+    setChatSessions,
+    setAiMessages,
+    setIsGeneratingResponse,
+    setPendingProposal,
   });
 
   const sidebarTitle = useMemo(() => {
