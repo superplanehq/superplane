@@ -223,11 +223,11 @@ export const IntegrationResourceFieldRenderer = ({
           setCachedFixedValue(val || "");
           setSelectQueryValue(""); // Clear search after selection
         }}
-        // query={selectQueryValue}
-        // onQueryChange={(query) => {
-        //   setSelectQueryValue(query || "");
-        //   setCachedExpressionValue(query || "");
-        // }}
+        query={selectQueryValue}
+        onQueryChange={(query) => {
+          setSelectQueryValue(query || "");
+          setCachedExpressionValue(query || "");
+        }}
         placeholder={field.placeholder ?? `Select ${resourceType}`}
       />
     ) : (
@@ -244,7 +244,6 @@ export const IntegrationResourceFieldRenderer = ({
         value={expressionValue}
         onChange={(nextValue) => {
           onChange(nextValue || undefined);
-          setSelectQueryValue(nextValue || "");
           setCachedExpressionValue(nextValue || "");
         }}
         placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
