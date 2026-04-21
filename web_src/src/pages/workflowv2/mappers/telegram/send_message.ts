@@ -7,10 +7,10 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
@@ -46,7 +46,7 @@ export const sendMessageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? sendMessageEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? sendMessageEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendMessageMetadataList(context.node),
       specs: sendMessageSpecs(context.node),
@@ -105,19 +105,14 @@ function sendMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function sendMessageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function sendMessageEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   if (!execution.rootEvent) {
     return [];
   }
 
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent.id,
     },

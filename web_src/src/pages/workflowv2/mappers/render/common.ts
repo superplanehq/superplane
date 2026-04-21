@@ -1,6 +1,6 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type React from "react";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import renderIcon from "@/assets/icons/integrations/render.svg";
@@ -52,14 +52,8 @@ function formatEventLabel(event?: string): string {
 }
 
 export const renderTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const event = context.event?.data as RenderEventData | undefined;
-    const title = buildTitle(event, context.event?.type as string);
-
-    return {
-      title,
-      subtitle: buildSubtitle(context.event?.createdAt),
-    };
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
+    return buildSubtitle(context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -100,9 +94,7 @@ export const renderTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const event = lastEvent.data as RenderEventData;
       props.lastEventData = {
-        title: buildTitle(event, lastEvent.type as string),
         subtitle: buildSubtitle(lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -134,12 +126,6 @@ function buildMetadata(configuration: OnEventConfiguration | undefined): Trigger
   }
 
   return metadata;
-}
-
-function buildTitle(event: RenderEventData | undefined, type?: string): string {
-  const serviceLabel = event?.serviceName || event?.serviceId || "Service";
-  const eventLabel = formatEventLabel(type);
-  return `${serviceLabel} · ${eventLabel}`;
 }
 
 function buildSubtitle(createdAt?: string): string | React.ReactNode {

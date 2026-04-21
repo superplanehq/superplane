@@ -1,6 +1,6 @@
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
+import { getState, getStateMap } from "..";
 import type React from "react";
 import type {
   ComponentBaseMapper,
@@ -42,7 +42,7 @@ export const getHttpSyntheticCheckMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -156,14 +156,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   if (!execution.createdAt || !execution.rootEvent?.id) {
     return [];
   }
-
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const date = new Date(execution.createdAt);
   const activeChannel = getActiveChannel(execution);
@@ -173,7 +169,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   return [
     {
       receivedAt: new Date(execution.createdAt),
-      eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent.id,

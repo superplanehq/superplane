@@ -1,24 +1,20 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 
 export const onMessageTriggerRenderer: TriggerRenderer = {
   getEventState: (_context: TriggerEventContext) => "triggered",
 
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const data = context.event?.data as Record<string, any> | undefined;
-    const messageId = data?.messageId ? shortID(String(data.messageId)) : "";
-    const title = messageId ? `Received Pub/Sub message · ${messageId}` : "Received Pub/Sub message";
-
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitleParts: (string | React.ReactNode)[] = [];
     if (context.event?.createdAt) {
       subtitleParts.push(renderTimeAgo(new Date(context.event.createdAt)));
     }
 
-    return { title, subtitle: subtitleParts.join(" · ") };
+    return subtitleParts.join(" · ");
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -44,9 +40,7 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
     if (subscription) {
       metadata.push({ icon: "radio", label: subscription });
     }
-    const eventTitleAndSubtitle = lastEvent
-      ? onMessageTriggerRenderer.getTitleAndSubtitle({ event: lastEvent })
-      : undefined;
+    const eventSubtitle = lastEvent ? onMessageTriggerRenderer.subtitle({ event: lastEvent }) : undefined;
     return {
       title: node.name || definition.label || "On Message",
       iconSrc: gcpPubSubIcon,
@@ -56,8 +50,7 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
       metadata,
       ...(lastEvent && {
         lastEventData: {
-          title: eventTitleAndSubtitle?.title ?? "Received Pub/Sub message",
-          subtitle: eventTitleAndSubtitle?.subtitle ?? renderTimeAgo(new Date(lastEvent.createdAt)),
+          subtitle: eventSubtitle || renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,
@@ -66,7 +59,3 @@ export const onMessageTriggerRenderer: TriggerRenderer = {
     };
   },
 };
-
-function shortID(value: string): string {
-  return value.slice(0, 8);
-}

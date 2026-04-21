@@ -79,6 +79,7 @@ export function buildDraftNodeDiffSummary(
     type: node.type || null,
     ref: node.ref || null,
     configuration: node.configuration || null,
+    runTitleTemplate: node.runTitleTemplate || null,
     position: node.position || null,
     isCollapsed: node.isCollapsed || false,
     integrationId: node.integrationId || null,

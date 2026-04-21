@@ -1,7 +1,7 @@
 import type { ComponentBaseMapper, EventStateRegistry, ExecutionInfo, StateFunction, TriggerRenderer } from "../types";
 import { sendEmailMapper } from "./send_email";
-import type { EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { EventState, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { defaultStateFunction } from "../stateRegistry";
 import { onEmailEventTriggerRenderer } from "./on_email_event";
 import { createOrUpdateContactMapper } from "./create_or_update_contact";

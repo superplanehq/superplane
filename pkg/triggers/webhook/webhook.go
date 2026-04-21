@@ -95,6 +95,10 @@ func (w *Webhook) Color() string {
 	return "black"
 }
 
+func (w *Webhook) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.body.run_name, "Webhook event triggered at " + now().Format("1/2/2006, 3:04:05 PM")) }}`
+}
+
 func (w *Webhook) Configuration() []configuration.Field {
 	return []configuration.Field{
 

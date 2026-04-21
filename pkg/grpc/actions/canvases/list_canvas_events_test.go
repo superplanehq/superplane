@@ -53,8 +53,8 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	// First root event
 	//
 	rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-0", "default", nil)
-	customName := "Root Event 1"
-	rootEvent1.CustomName = &customName
+	runTitle := "Root Event 1"
+	rootEvent1.RunTitle = &runTitle
 	require.NoError(t, database.Conn().Save(rootEvent1).Error)
 
 	firstExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID, nil)
@@ -73,8 +73,8 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	// Second root event, no executions
 	//
 	rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-0", "default", nil)
-	customName2 := "Root Event 2"
-	rootEvent2.CustomName = &customName2
+	runTitle2 := "Root Event 2"
+	rootEvent2.RunTitle = &runTitle2
 	require.NoError(t, database.Conn().Save(rootEvent2).Error)
 
 	//
@@ -89,7 +89,7 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	event1 := findCanvasEventWithExecutions(response.Events, rootEvent1.ID.String())
 	require.NotNil(t, event1)
 	require.Len(t, event1.Executions, 2)
-	assert.Equal(t, customName, event1.CustomName)
+	assert.Equal(t, runTitle, event1.RunTitle)
 
 	event2 := findCanvasEventWithExecutions(response.Events, rootEvent2.ID.String())
 	require.NotNil(t, event2)

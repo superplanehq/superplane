@@ -31,6 +31,10 @@ func (p *OnPush) Description() string {
 	return "Listen to Bitbucket push events"
 }
 
+func (p *OnPush) DefaultRunTitle() string {
+	return "{{ root().data.push.changes[0].new.target.message }}"
+}
+
 func (p *OnPush) Documentation() string {
 	return `The On Push trigger starts a workflow execution when code is pushed to a Bitbucket repository.
 

@@ -9,9 +9,8 @@ import type {
   SubtitleContext,
   OutputPayload,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { truncate } from "./safeMappers";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
@@ -153,7 +152,7 @@ export const mergeMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Merge",
-      eventSections: lastExecution ? getMergeEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getMergeEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: MERGE_STATE_MAP,
     };
@@ -179,19 +178,15 @@ export const mergeMapper: ComponentBaseMapper = {
   },
 };
 
-function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getMergeEventSections(execution: ExecutionInfo): EventSection[] {
   const sections: EventSection[] = [];
 
   // Add the main execution section
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const eventSubtitle = getMergeSubtitle(execution);
 
   sections.push({
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: eventTitle,
     eventSubtitle: eventSubtitle,
     eventState: mergeStateFunction(execution),
     eventId: execution.rootEvent!.id!,

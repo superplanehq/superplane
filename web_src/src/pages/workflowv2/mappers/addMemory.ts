@@ -6,9 +6,9 @@ import type {
   NodeInfo,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
-import { getStateMap, getTriggerRenderer } from ".";
+import { getStateMap } from ".";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";
 
@@ -36,7 +36,7 @@ export const addMemoryMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getAddMemoryMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -63,17 +63,13 @@ export const addMemoryMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title: fallbackTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+function getEventSections(execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt),
-      eventTitle: fallbackTitle,
       eventSubtitle,
       eventState: defaultStateFunction(execution),
       eventId: execution.rootEvent?.id || "",

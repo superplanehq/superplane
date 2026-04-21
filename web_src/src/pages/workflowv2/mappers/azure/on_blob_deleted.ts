@@ -1,6 +1,6 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type React from "react";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import type { AzureBlobEvent } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -34,15 +34,10 @@ function extractBlobName(subject?: string): string | undefined {
 }
 
 export const onBlobDeletedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const envelope = context.event?.data as AzureBlobEvent | undefined;
-    const container = extractBlobContainer(envelope?.subject);
-    const blobName = extractBlobName(envelope?.subject);
-
-    const title = container ? `${container}/${blobName ?? ""}` : "Blob deleted";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -80,9 +75,8 @@ export const onBlobDeletedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onBlobDeletedTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onBlobDeletedTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

@@ -8,14 +8,15 @@ import (
 )
 
 type comparableCanvasNode struct {
-	ID            string
-	Name          string
-	Type          string
-	Ref           models.NodeRef
-	Configuration map[string]any
-	Position      models.Position
-	IsCollapsed   bool
-	IntegrationID *string
+	ID               string
+	Name             string
+	Type             string
+	Ref              models.NodeRef
+	Configuration    map[string]any
+	Position         models.Position
+	IsCollapsed      bool
+	RunTitleTemplate *string
+	IntegrationID    *string
 }
 
 type canvasChangeRequestDiff struct {
@@ -212,13 +213,14 @@ func mapEdgesByKey(edges []models.Edge) map[string]models.Edge {
 
 func toComparableCanvasNode(node models.Node) comparableCanvasNode {
 	return comparableCanvasNode{
-		ID:            node.ID,
-		Name:          node.Name,
-		Type:          node.Type,
-		Ref:           node.Ref,
-		Configuration: node.Configuration,
-		Position:      node.Position,
-		IsCollapsed:   node.IsCollapsed,
-		IntegrationID: node.IntegrationID,
+		ID:               node.ID,
+		Name:             node.Name,
+		Type:             node.Type,
+		Ref:              node.Ref,
+		Configuration:    node.Configuration,
+		Position:         node.Position,
+		IsCollapsed:      node.IsCollapsed,
+		RunTitleTemplate: node.RunTitleTemplate,
+		IntegrationID:    node.IntegrationID,
 	}
 }
