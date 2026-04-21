@@ -90,13 +90,13 @@ export function ConversationList({
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   return (
-    <div className={cn("space-y-2", fillAvailable && "flex min-h-0 flex-col", className)}>
+    <div className={cn("space-y-3", fillAvailable && "flex min-h-0 flex-col", className)}>
       {!currentChatId ? (
         <div
           className={cn(
             fillAvailable ? "min-h-0 flex-1 overflow-y-auto" : "max-h-28 overflow-y-auto",
             "bg-transparent",
-            fillAvailable ? "space-y-2" : "space-y-1",
+            fillAvailable ? "space-y-3" : "space-y-2",
             "[scrollbar-width:thin] [scrollbar-color:rgb(203_213_225)_transparent]",
             "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70 [&::-webkit-scrollbar-track]:bg-transparent",
           )}

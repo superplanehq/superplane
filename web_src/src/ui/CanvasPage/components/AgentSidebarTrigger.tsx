@@ -1,6 +1,7 @@
 import type { AgentState } from "@/components/AgentSidebar/useAgentState";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
 
 export type AgentSidebarTriggerProps = {
@@ -12,7 +13,7 @@ export function AgentSidebarTrigger({ agentState }: AgentSidebarTriggerProps) {
 
   return (
     <div className="relative z-10 flex shrink-0 items-center">
-      {showAgentSidebarToggle && !isAgentSidebarOpen ? (
+      {showAgentSidebarToggle ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="relative inline-flex">
@@ -20,16 +21,25 @@ export function AgentSidebarTrigger({ agentState }: AgentSidebarTriggerProps) {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 bg-white border-slate-300"
-                aria-label="Open SuperPlane Agent"
+                aria-pressed={isAgentSidebarOpen}
+                aria-label={isAgentSidebarOpen ? "Close SuperPlane Agent" : "Open SuperPlane Agent"}
                 onClick={handleAgentSidebarToggle}
+                className={cn(
+                  "h-8 w-8 border transition-colors",
+                  isAgentSidebarOpen
+                    ? "border-violet-300 bg-violet-100 text-violet-700 hover:bg-violet-100/90 hover:text-violet-800"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+                )}
               >
-                <Sparkles className="h-3 w-3 text-slate-700" />
+                <Sparkles
+                  className={cn("h-3 w-3", isAgentSidebarOpen ? "text-violet-600" : "text-slate-700")}
+                  aria-hidden
+                />
               </UIButton>
             </span>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
-            Open Agent
+            {isAgentSidebarOpen ? "Close Agent" : "Open Agent"}
           </TooltipContent>
         </Tooltip>
       ) : null}

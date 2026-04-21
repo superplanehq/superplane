@@ -80,7 +80,7 @@ function PageHeader({
   const activeCanvasId = canvasIdParam || workflowId;
 
   return (
-    <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
+    <div className="relative z-40 flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
       </div>
@@ -119,7 +119,7 @@ function SecondaryHeader(props: HeaderProps) {
   const canvasViewMode = props.mode === "version-edit" ? "version-edit" : "version-live";
 
   return (
-    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
+    <div className="relative z-10 flex h-11 items-center border-b border-border bg-slate-100 px-4 gap-3">
       <AgentSidebarTrigger agentState={props.agentState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
