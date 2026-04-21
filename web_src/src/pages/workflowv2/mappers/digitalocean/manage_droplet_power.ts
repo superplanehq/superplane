@@ -1,8 +1,8 @@
-import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/pages/workflowv2/mappers/rendererTypes";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getTriggerRenderer } from "..";
+import { getState } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -142,11 +142,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
-
+function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   // Check if there's a custom power operation event in the outputs
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   const powerEvent = outputs?.default?.find((output) => output.type?.startsWith("digitalocean.droplet.power."));
@@ -158,7 +154,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: eventState,
       eventId: execution.rootEvent!.id!,

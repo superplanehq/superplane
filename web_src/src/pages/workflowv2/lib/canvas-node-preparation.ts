@@ -29,6 +29,7 @@ import {
   buildExecutionInfo,
   buildNodeInfo,
   buildQueueItemInfo,
+  getEventRunTitle,
   buildUserInfo,
   getNextInQueueInfo,
 } from "../utils";
@@ -206,10 +207,10 @@ function appendCompositeLastRunItem(
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const eventInfo = buildEventInfo(execution.rootEvent!);
-  const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: eventInfo });
+  const subtitle = rootTriggerRenderer.subtitle({ event: eventInfo });
 
   (canvasNode.data.composite as CompositeProps).lastRunItem = {
-    title,
+    title: getEventRunTitle(eventInfo),
     subtitle,
     id: execution.rootEvent?.id,
     receivedAt: new Date(execution.createdAt!),

@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { BaseNodeMetadata, GitRef } from "./types";
 import { buildGithubSubtitle, createGithubMetadataItems } from "./utils";
 import type { Predicate } from "../utils";
@@ -15,13 +15,10 @@ interface GithubConfiguration {
  * Renderer for the "github.onTagCreated" trigger
  */
 export const onTagCreatedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as GitRef;
 
-    return {
-      title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
-      subtitle: buildGithubSubtitle(eventData?.ref || "", context.event?.createdAt),
-    };
+    return buildGithubSubtitle(eventData?.ref || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -50,7 +47,6 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as GitRef;
       props.lastEventData = {
-        title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
         subtitle: buildGithubSubtitle(eventData?.ref || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

@@ -1,8 +1,8 @@
-import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/pages/workflowv2/mappers/rendererTypes";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -161,13 +161,9 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
   if (!rootTriggerNode?.componentName) return [];
 
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
       eventId: rootEvent.id,

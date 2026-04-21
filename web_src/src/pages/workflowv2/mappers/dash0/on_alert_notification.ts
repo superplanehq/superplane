@@ -2,7 +2,7 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { stringOrDash } from "../utils";
 
@@ -37,20 +37,16 @@ interface OnAlertNotificationConfiguration {
 }
 
 export const onAlertNotificationTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as AlertNotificationEventData | undefined;
     const issue = eventData?.issue;
-    const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 alert notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
     const subtitle =
       subtitleParts && context.event?.createdAt
         ? renderWithTimeAgo(subtitleParts, new Date(context.event.createdAt))
         : subtitleParts || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -90,9 +86,8 @@ export const onAlertNotificationTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onAlertNotificationTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onAlertNotificationTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

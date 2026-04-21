@@ -95,6 +95,10 @@ func (t *OnAlert) Color() string {
 	return "gray"
 }
 
+func (t *OnAlert) DefaultRunTitle() string {
+	return `Alert {{ root().data.status }} · {{ root().data.labels.alertname }}{{ root().data.labels.instance != "" ? " · " + root().data.labels.instance : "" }}{{ root().data.labels.job != "" ? " · " + root().data.labels.job : "" }}`
+}
+
 func (t *OnAlert) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

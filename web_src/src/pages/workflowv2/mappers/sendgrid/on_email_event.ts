@@ -2,7 +2,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import type React from "react";
 import type { Predicate } from "../utils";
 import { formatPredicate } from "../utils";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
@@ -36,16 +36,10 @@ interface OnEmailEventData {
 }
 
 export const onEmailEventTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as OnEmailEventData;
-    const eventType = eventData?.event ? formatEventLabel(eventData.event) : "Email Event";
-    const title = buildTitle(eventData?.email, eventType);
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = buildSubtitle(context.event?.createdAt);
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -97,13 +91,9 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnEmailEventData;
-      const eventType = eventData?.event ? formatEventLabel(eventData.event) : "Email Event";
-      const title = buildTitle(eventData?.email, eventType);
       const subtitle = buildSubtitle(lastEvent.createdAt);
 
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -114,14 +104,6 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
-function buildTitle(email: string | undefined, eventType: string): string {
-  if (email) {
-    return `${email} · ${eventType}`;
-  }
-
-  return `Email Event · ${eventType}`;
-}
 
 function buildSubtitle(createdAt?: string): string | React.ReactNode {
   const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";

@@ -9,9 +9,14 @@ import type {
   StateFunction,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import type {
+  ComponentBaseProps,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/pages/workflowv2/mappers/rendererTypes";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
+import { getState, getStateMap } from ".";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
@@ -127,14 +132,9 @@ export const ifMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
     eventState: getState(componentName)(execution),
     eventId: execution.rootEvent!.id!,

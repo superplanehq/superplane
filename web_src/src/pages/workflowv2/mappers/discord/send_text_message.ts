@@ -7,10 +7,10 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
@@ -131,18 +131,13 @@ function sendTextMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
 }
 
 function sendTextMessageEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",
     },

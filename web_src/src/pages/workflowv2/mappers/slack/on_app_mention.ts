@@ -2,7 +2,7 @@ import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 
 interface OnAppMentionConfiguration {
@@ -29,18 +29,14 @@ interface AppMentionEventData {
  * Renderer for the "slack.onAppMention" trigger
  */
 export const onAppMentionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as AppMentionEventData | undefined;
-    const title = eventData?.text?.trim() ? eventData.text : "App mention";
     const subtitle = buildSubtitle(
       eventData?.user ? `Mention by ${eventData.user}` : "Mention",
       context.event?.createdAt,
     );
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -81,11 +77,9 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as AppMentionEventData | undefined;
-      const title = eventData?.text?.trim() ? eventData.text : "App mention";
       const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", lastEvent.createdAt);
 
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

@@ -1,6 +1,6 @@
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext, NodeInfo, EventInfo } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
 import logfireIcon from "@/assets/icons/integrations/logfire.svg";
@@ -27,9 +27,8 @@ interface LogfireAlertEventData {
 }
 
 export const onAlertReceivedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as LogfireAlertEventData;
-    const title = buildTitle(eventData);
 
     const subtitleParts: string[] = [];
     if (eventData?.eventType) {
@@ -42,10 +41,7 @@ export const onAlertReceivedTriggerRenderer: TriggerRenderer = {
       subtitleParts.push(formatTimeAgo(new Date(context.event.createdAt)));
     }
 
-    return {
-      title,
-      subtitle: subtitleParts.join(" · "),
-    };
+    return subtitleParts.join(" · ");
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -119,22 +115,11 @@ function buildEventSubtitle(eventData?: LogfireAlertEventData, createdAt?: strin
 function buildLastEventData(lastEvent: NonNullable<EventInfo>) {
   const eventData = lastEvent.data as LogfireAlertEventData;
   return {
-    title: buildTitle(eventData),
     subtitle: buildEventSubtitle(eventData, lastEvent.createdAt),
     receivedAt: new Date(lastEvent.createdAt),
     state: "triggered" as const,
     eventId: lastEvent.id,
   };
-}
-
-function buildTitle(eventData: LogfireAlertEventData | undefined): string {
-  if (eventData?.alertName && eventData?.alertName.trim() !== "") {
-    return eventData.alertName;
-  }
-  if (eventData?.message && eventData?.message.trim() !== "") {
-    return eventData.message;
-  }
-  return "Logfire alert received";
 }
 
 function extractMatchingRows(message?: string): number | undefined {

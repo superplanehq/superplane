@@ -8,11 +8,15 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type {
+  ComponentBaseProps,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/pages/workflowv2/mappers/rendererTypes";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getColorClass } from "@/lib/colors";
 import type React from "react";
-import { getTriggerRenderer } from ".";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 const SSH_STATE_MAP: EventStateMap = {
@@ -237,14 +241,10 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
 }
 
 function getSSHEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   stateFunction: (e: ExecutionInfo) => EventState,
 ): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
     if (state === "running" && execution.createdAt) {
@@ -270,7 +270,6 @@ function getSSHEventSections(
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: generateEventSubtitle(),
       eventState: stateFunction(execution),
       eventId: execution.rootEvent!.id!,

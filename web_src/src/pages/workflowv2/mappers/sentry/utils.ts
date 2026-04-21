@@ -1,38 +1,32 @@
-import type { EventSection } from "@/ui/componentBase";
 import { formatTimeAgo } from "@/lib/date";
 import type {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
   OutputPayload,
+  RendererEventSection,
   StateFunction,
   SubtitleContext,
   TriggerRenderer,
 } from "../types";
 
 export function buildEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
-  getTriggerRenderer: (name: string) => TriggerRenderer,
+  _getTriggerRenderer: (name: string) => TriggerRenderer,
   getState: (componentName: string) => StateFunction,
-): EventSection[] | undefined {
+): RendererEventSection[] | undefined {
   const rootEvent = execution.rootEvent;
   const createdAt = execution.createdAt;
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent?.nodeId);
-  const rootComponentName = rootTriggerNode?.componentName;
 
-  if (!rootEvent || !createdAt || !rootComponentName) {
+  if (!rootEvent || !createdAt) {
     return undefined;
   }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootComponentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
 
   return [
     {
       receivedAt: new Date(createdAt),
-      eventTitle: title,
       eventSubtitle: formatTimeAgo(new Date(createdAt)),
       eventState: getState(componentName)(execution),
       eventId: rootEvent.id || "",
@@ -152,34 +146,6 @@ export function getAlertThresholdMetadataLabel(
   }
 
   return undefined;
-}
-
-export function splitSentryIssueTitle(title?: string): { title?: string; prefix?: string } {
-  if (!title) {
-    return {};
-  }
-
-  const trimmedTitle = title.trim();
-  if (!trimmedTitle) {
-    return {};
-  }
-
-  const separatorIndex = trimmedTitle.indexOf(":");
-  if (separatorIndex <= 0 || separatorIndex >= trimmedTitle.length - 1) {
-    return { title: trimmedTitle };
-  }
-
-  const prefix = trimmedTitle.slice(0, separatorIndex).trim();
-  const suffix = trimmedTitle.slice(separatorIndex + 1).trim();
-
-  if (!prefix || !suffix) {
-    return { title: trimmedTitle };
-  }
-
-  return {
-    title: suffix,
-    prefix,
-  };
 }
 
 export function addDetail(details: Record<string, string>, label: string, value?: string) {

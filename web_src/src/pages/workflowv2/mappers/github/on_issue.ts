@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getDetailsForIssue } from "./base";
 import type { BaseNodeMetadata, Issue } from "./types";
 import { buildGithubSubtitle } from "./utils";
@@ -19,13 +19,10 @@ interface OnIssueEventData {
  * Renderer for the "github.onIssue" trigger
  */
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueEventData;
 
-    return {
-      title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
-    };
+    return buildGithubSubtitle(eventData?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -66,7 +63,6 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnIssueEventData;
 
       props.lastEventData = {
-        title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

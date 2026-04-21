@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -47,20 +47,15 @@ interface OnPipelineDoneEventData {
  * Renderer for the "semaphore.onPipelineDone" trigger type
  */
 export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnPipelineDoneEventData;
     const result = eventData?.pipeline?.result || "";
-    const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`;
-    const title = `${pipelineFile} (${eventData?.pipeline?.name || ""})`;
     const subtitle =
       result && context.event?.createdAt
         ? renderWithTimeAgo(result, new Date(context.event.createdAt))
         : result || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
-    return {
-      title: title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -128,14 +123,12 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as OnPipelineDoneEventData;
       const result = eventData?.pipeline?.result || "";
-      const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`;
       const subtitle =
         result && lastEvent.createdAt
           ? renderWithTimeAgo(result, new Date(lastEvent.createdAt))
           : result || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
 
       props.lastEventData = {
-        title: `${pipelineFile} (${eventData?.pipeline?.name || ""})`,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

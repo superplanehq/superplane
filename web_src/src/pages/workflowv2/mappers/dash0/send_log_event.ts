@@ -1,6 +1,6 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -112,20 +112,14 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   if (!execution.createdAt || !execution.rootEvent?.id) {
     return [];
   }
 
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const triggerComponentName = rootTriggerNode?.componentName ?? "";
-  const rootTriggerRenderer = getTriggerRenderer(triggerComponentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent.id,

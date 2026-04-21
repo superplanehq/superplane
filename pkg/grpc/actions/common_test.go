@@ -7,7 +7,47 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	"google.golang.org/protobuf/proto"
 )
+
+type testTrigger struct {
+	defaultRunTitle string
+}
+
+func (t testTrigger) Name() string { return "test.trigger" }
+
+func (t testTrigger) Label() string { return "Test Trigger" }
+
+func (t testTrigger) Description() string { return "Test trigger" }
+
+func (t testTrigger) Documentation() string { return "" }
+
+func (t testTrigger) Icon() string { return "test" }
+
+func (t testTrigger) Color() string { return "gray" }
+
+func (t testTrigger) ExampleData() map[string]any { return nil }
+
+func (t testTrigger) Configuration() []configuration.Field { return nil }
+
+func (t testTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+
+func (t testTrigger) Setup(ctx core.TriggerContext) error { return nil }
+
+func (t testTrigger) Actions() []core.Action { return nil }
+
+func (t testTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
+}
+
+func (t testTrigger) Cleanup(ctx core.TriggerContext) error { return nil }
+
+func (t testTrigger) DefaultRunTitle() string { return t.defaultRunTitle }
 
 func TestConfigurationFieldToProto(t *testing.T) {
 	t.Run("roundtrip string default value does not introduce extra quotes", func(t *testing.T) {
@@ -95,4 +135,54 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		require.NotNil(t, field2.TypeOptions.List.MaxItems, "expected MaxItems to be set after roundtrip")
 		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
 	})
+}
+
+func TestTriggerDefaultRunTitle(t *testing.T) {
+	assert.Equal(
+		t,
+		"{{ $.data.push.changes[0].new.target.message }}",
+		TriggerDefaultRunTitle(testTrigger{
+			defaultRunTitle: "{{ $.data.push.changes[0].new.target.message }}",
+		}),
+	)
+
+	assert.Equal(t, "", TriggerDefaultRunTitle(testTrigger{}))
+}
+
+func TestNodeRunTitleTemplateProtoRoundTrip(t *testing.T) {
+	runTitleTemplate := "Push {{ $.data.repository.full_name }}"
+
+	nodes := ProtoToNodes([]*componentpb.Node{
+		{
+			Id:               "node-1",
+			Name:             "Node 1",
+			Type:             componentpb.Node_TYPE_TRIGGER,
+			RunTitleTemplate: proto.String(runTitleTemplate),
+			Trigger:          &componentpb.Node_TriggerRef{Name: "bitbucket.onPush"},
+		},
+	})
+
+	require.Len(t, nodes, 1)
+	require.NotNil(t, nodes[0].RunTitleTemplate)
+	assert.Equal(t, runTitleTemplate, *nodes[0].RunTitleTemplate)
+
+	pbNodes := NodesToProto(nodes)
+	require.Len(t, pbNodes, 1)
+	require.NotNil(t, pbNodes[0].RunTitleTemplate)
+	assert.Equal(t, runTitleTemplate, pbNodes[0].GetRunTitleTemplate())
+}
+
+func TestNodeRunTitleTemplateProtoDropsTriggerDefault(t *testing.T) {
+	nodes := ProtoToNodes([]*componentpb.Node{
+		{
+			Id:               "node-1",
+			Name:             "Node 1",
+			Type:             componentpb.Node_TYPE_TRIGGER,
+			RunTitleTemplate: proto.String("{{ $.data.push.changes[0].new.target.message }}"),
+			Trigger:          &componentpb.Node_TriggerRef{Name: "bitbucket.onPush"},
+		},
+	})
+
+	require.Len(t, nodes, 1)
+	assert.Nil(t, nodes[0].RunTitleTemplate)
 }

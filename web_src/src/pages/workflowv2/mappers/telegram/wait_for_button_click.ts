@@ -15,10 +15,9 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getTriggerRenderer } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -188,13 +187,9 @@ function waitForButtonClickEventSections(nodes: NodeInfo[], execution: Execution
     return [];
   }
 
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: waitForButtonClickStateFunction(execution as any),
       eventId: execution.rootEvent!.id!,

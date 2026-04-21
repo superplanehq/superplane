@@ -1,4 +1,4 @@
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/rendererTypes";
 import { defaultStateFunction } from "../stateRegistry";
 import type { EventStateRegistry, ExecutionInfo, OutputPayload } from "../types";
 

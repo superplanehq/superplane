@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { BaseNodeMetadata } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
@@ -52,19 +52,11 @@ interface OnWorkflowRunEventData {
  * Renderer for the "github.onWorkflowRun" trigger
  */
 export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnWorkflowRunEventData;
-    const workflowName =
-      eventData?.workflow_run?.display_title ||
-      eventData?.workflow_run?.name ||
-      eventData?.workflow?.name ||
-      "Workflow";
     const conclusion = eventData?.workflow_run?.conclusion || "";
 
-    return {
-      title: workflowName,
-      subtitle: buildGithubSubtitle(conclusion, context.event?.createdAt),
-    };
+    return buildGithubSubtitle(conclusion, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -125,15 +117,9 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnWorkflowRunEventData;
-      const workflowName =
-        eventData?.workflow_run?.display_title ||
-        eventData?.workflow_run?.name ||
-        eventData?.workflow?.name ||
-        "Workflow";
       const conclusion = eventData?.workflow_run?.conclusion || "";
 
       props.lastEventData = {
-        title: workflowName,
         subtitle: buildGithubSubtitle(conclusion, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { GitLabNodeMetadata } from "./types";
 import { buildGitlabSubtitle } from "./utils";
 import type { WebhookIssue } from "./issue_utils";
@@ -33,14 +33,11 @@ interface OnIssueEventData {
 }
 
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueEventData;
     const issue = eventData?.object_attributes;
 
-    return {
-      title: `#${issue?.iid ?? ""} - ${issue?.title || "Issue"}`,
-      subtitle: buildGitlabSubtitle(issue?.action || "", context.event?.createdAt),
-    };
+    return buildGitlabSubtitle(issue?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -99,7 +96,6 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
       const issue = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: `#${issue?.iid ?? ""} - ${issue?.title || "Issue"}`,
         subtitle: buildGitlabSubtitle(issue?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

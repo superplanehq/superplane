@@ -4,9 +4,26 @@ import type {
   CanvasesCanvasNodeExecutionState,
   OrganizationsIntegration,
 } from "@/api-client";
-import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
-import type { TriggerProps } from "@/ui/trigger";
+import type {
+  ComponentBaseProps as UIComponentBaseProps,
+  EventSection as UIEventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
+import type { TriggerProps as UITriggerProps } from "@/ui/trigger";
 import type { ReactNode } from "react";
+
+export type RendererEventSection = Omit<UIEventSection, "eventTitle">;
+
+export type RendererComponentBaseProps = Omit<UIComponentBaseProps, "eventSections"> & {
+  eventSections?: RendererEventSection[];
+};
+
+export type RendererTriggerLastEventData = Omit<NonNullable<UITriggerProps["lastEventData"]>, "title">;
+
+export type RendererTriggerProps = Omit<UITriggerProps, "lastEventData"> & {
+  lastEventData?: RendererTriggerLastEventData;
+};
 
 /**
  * A trigger renderer converts backend data into UI props for a specific trigger type.
@@ -24,7 +41,7 @@ export interface TriggerRenderer {
    * @param context The context for the trigger renderer
    * @returns the props needed to render the Trigger UI component
    */
-  getTriggerProps: (context: TriggerRendererContext) => TriggerProps;
+  getTriggerProps: (context: TriggerRendererContext) => RendererTriggerProps;
 
   /**
    * Display values for the root event.
@@ -34,11 +51,10 @@ export interface TriggerRenderer {
   getRootEventValues: (context: TriggerEventContext) => Record<string, any>;
 
   /**
-   * Get the title and subtitle for the trigger.
-   * @param context The context for the trigger event
-   * @returns The title and subtitle to display
+   * Get the subtitle for the trigger event.
+   * The event title is resolved centrally from rootEvent.runTitle.
    */
-  getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string | React.ReactNode };
+  subtitle: (context: TriggerEventContext) => string | React.ReactNode;
 
   /**
    * Optional event-state mapper for triggers that have meaningful terminal/running states.
@@ -62,7 +78,7 @@ export type EventInfo =
   | {
       id: string;
       createdAt: string;
-      customName?: string;
+      runTitle?: string;
       data: any;
       nodeId: string;
       type: string;
@@ -109,7 +125,7 @@ export interface ComponentDefinition {
 }
 
 export interface ComponentBaseMapper {
-  props(context: ComponentBaseContext): ComponentBaseProps;
+  props(context: ComponentBaseContext): RendererComponentBaseProps;
   subtitle(context: SubtitleContext): string | React.ReactNode;
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any>;
 }

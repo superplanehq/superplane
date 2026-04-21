@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -66,6 +67,10 @@ func (t *OnIssue) Icon() string {
 
 func (t *OnIssue) Color() string {
 	return "gray"
+}
+
+func (t *OnIssue) DefaultRunTitle() string {
+	return `{{ root().data.displayTitle != "" ? root().data.displayTitle : "Issue" }}`
 }
 
 func (t *OnIssue) Configuration() []configuration.Field {
@@ -198,6 +203,7 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"data":         message.Data,
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
+		"displayTitle": sentryIssueDisplayTitle(message.Data),
 	}
 
 	return ctx.Events.Emit("sentry.issue", payload)
@@ -221,6 +227,36 @@ func decodeWebhookMessage(message any) (*WebhookMessage, error) {
 		}
 		return &decoded, nil
 	}
+}
+
+func sentryIssueDisplayTitle(data any) string {
+	root, ok := data.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	issueData, ok := root["issue"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	title, _ := issueData["title"].(string)
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return ""
+	}
+
+	separatorIndex := strings.Index(title, ":")
+	if separatorIndex <= 0 || separatorIndex >= len(title)-1 {
+		return title
+	}
+
+	suffix := strings.TrimSpace(title[separatorIndex+1:])
+	if suffix == "" {
+		return title
+	}
+
+	return suffix
 }
 
 func eventTimestamp(message *WebhookMessage) string {

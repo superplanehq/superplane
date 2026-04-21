@@ -1,5 +1,5 @@
 import type React from "react";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type {
   OutputPayload,
   ComponentBaseMapper,

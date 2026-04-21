@@ -1,7 +1,7 @@
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -28,16 +28,14 @@ function buildMetadata(configuration?: Configuration): MetadataItem[] {
 }
 
 export const onImageTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as AmiStateChangeEvent;
-    const imageId = eventData?.detail?.ImageId;
     const state = eventData?.detail?.State || "";
-    const title = imageId || "EC2 AMI state change";
     const subtitle =
       state && context.event?.createdAt
         ? renderWithTimeAgo(state, new Date(context.event.createdAt))
         : state || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -69,9 +67,8 @@ export const onImageTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImageTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onImageTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

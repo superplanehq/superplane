@@ -1,5 +1,5 @@
-import type { EventSection } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "..";
+import type { EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
+import { getState } from "..";
 import type { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { IncidentRecord } from "./types";
@@ -13,14 +13,10 @@ export function getIncidentFromExecution(execution: ExecutionInfo): IncidentReco
   return outputs.default[0].data as IncidentRecord;
 }
 
-export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
+export function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

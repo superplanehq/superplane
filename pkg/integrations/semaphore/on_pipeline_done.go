@@ -84,6 +84,10 @@ func (p *OnPipelineDone) Color() string {
 	return "gray"
 }
 
+func (p *OnPipelineDone) DefaultRunTitle() string {
+	return "{{ root().data.pipeline.working_directory }}/{{ root().data.pipeline.yaml_file_name }} ({{ root().data.pipeline.name }})"
+}
+
 func (p *OnPipelineDone) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

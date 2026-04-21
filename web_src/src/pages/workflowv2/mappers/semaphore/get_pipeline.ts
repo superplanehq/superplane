@@ -6,10 +6,10 @@ import type {
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/pages/workflowv2/mappers/rendererTypes";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -97,7 +97,7 @@ function getPipelineSpecs(_node: NodeInfo): ComponentBaseSpec[] {
 }
 
 function getPipelineEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] | undefined {
@@ -105,12 +105,6 @@ function getPipelineEventSections(
   if (!execution.rootEvent || !execution.rootEvent.id) {
     return undefined;
   }
-
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({
-    event: execution.rootEvent,
-  });
 
   // Get state using the component-specific state function
   const executionState = getState(componentName)(execution);
@@ -122,7 +116,6 @@ function getPipelineEventSections(
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "",
       eventState: executionState,
       eventId: execution.rootEvent.id,

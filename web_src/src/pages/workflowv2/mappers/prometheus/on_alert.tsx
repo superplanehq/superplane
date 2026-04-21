@@ -6,7 +6,7 @@ import type {
   TriggerRendererContext,
 } from "../types";
 import React from "react";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
@@ -19,15 +19,11 @@ const statusLabels: Record<string, string> = {
 };
 
 export const onAlertTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as PrometheusAlertPayload;
-    const title = buildEventTitle(eventData);
     const subtitle = buildEventSubtitle(eventData, context.event?.createdAt);
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -83,7 +79,6 @@ export const onAlertTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as PrometheusAlertPayload;
       props.lastEventData = {
-        title: buildEventTitle(eventData),
         subtitle: buildEventSubtitle(eventData, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -148,17 +143,6 @@ export const onAlertCustomFieldRenderer: CustomFieldRenderer = {
     );
   },
 };
-
-function buildEventTitle(eventData: PrometheusAlertPayload): string {
-  const alertName = eventData?.labels?.alertname || "Alert";
-  const sourceParts = [eventData?.labels?.instance, eventData?.labels?.job].filter(Boolean);
-
-  if (sourceParts.length > 0) {
-    return `Alert ${eventData?.status} · ${alertName} · ${sourceParts.join(" · ")}`;
-  }
-
-  return `Alert ${eventData?.status} · ${alertName}`;
-}
 
 function buildEventSubtitle(eventData: PrometheusAlertPayload, createdAt?: string): string | React.ReactNode {
   const parts: (string | React.ReactNode)[] = [];

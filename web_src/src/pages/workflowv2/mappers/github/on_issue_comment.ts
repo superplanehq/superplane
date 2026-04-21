@@ -2,7 +2,7 @@ import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import { truncate } from "../safeMappers";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { BaseNodeMetadata, Issue, Comment } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
@@ -20,13 +20,10 @@ interface OnIssueCommentEventData {
  * Renderer for the "github.onIssueComment" trigger
  */
 export const onIssueCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueCommentEventData;
 
-    return {
-      title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt),
-    };
+    return buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -73,7 +70,6 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnIssueCommentEventData;
 
       props.lastEventData = {
-        title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
         subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

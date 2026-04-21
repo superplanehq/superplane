@@ -2,7 +2,7 @@ package actions
 
 import (
 	"encoding/json"
-	"slices"
+	"strings"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,8 +13,10 @@ import (
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -656,6 +658,8 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
+		nodeRef := ProtoToNodeRef(node)
+
 		var integrationID *string
 		if node.Integration != nil && node.Integration.Id != "" {
 			integrationID = &node.Integration.Id
@@ -676,17 +680,29 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		// to avoid allowing requests to override node metadata.
 		// Metadata is something only triggers/components implementations can set.
 		//
+		var runTitleTemplate *string
+		if node.RunTitleTemplate != nil {
+			template := strings.TrimSpace(node.GetRunTitleTemplate())
+			if nodeRef.Trigger != nil {
+				template = registry.NormalizeRunTitleTemplateForTrigger(nodeRef.Trigger.Name, template)
+			}
+			if template != "" {
+				runTitleTemplate = &template
+			}
+		}
+
 		result[i] = models.Node{
-			ID:             node.Id,
-			Name:           node.Name,
-			Type:           ProtoToNodeType(node.Type),
-			Ref:            ProtoToNodeRef(node),
-			Configuration:  node.Configuration.AsMap(),
-			Position:       ProtoToPosition(node.Position),
-			IsCollapsed:    node.IsCollapsed,
-			IntegrationID:  integrationID,
-			ErrorMessage:   errorMessage,
-			WarningMessage: warningMessage,
+			ID:               node.Id,
+			Name:             node.Name,
+			Type:             ProtoToNodeType(node.Type),
+			Ref:              nodeRef,
+			Configuration:    node.Configuration.AsMap(),
+			Position:         ProtoToPosition(node.Position),
+			IsCollapsed:      node.IsCollapsed,
+			RunTitleTemplate: runTitleTemplate,
+			IntegrationID:    integrationID,
+			ErrorMessage:     errorMessage,
+			WarningMessage:   warningMessage,
 		}
 	}
 	return result
@@ -739,6 +755,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			result[i].Integration = &componentpb.IntegrationRef{
 				Id: *node.IntegrationID,
 			}
+		}
+
+		if node.RunTitleTemplate != nil && strings.TrimSpace(*node.RunTitleTemplate) != "" {
+			result[i].RunTitleTemplate = proto.String(strings.TrimSpace(*node.RunTitleTemplate))
 		}
 
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
@@ -1068,7 +1088,6 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()
-		configFields = AppendGlobalTriggerFields(configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1076,35 +1095,25 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 		exampleData, _ := structpb.NewStruct(trigger.ExampleData())
 
 		out[i] = &triggerpb.Trigger{
-			Name:          trigger.Name(),
-			Label:         trigger.Label(),
-			Description:   trigger.Description(),
-			Icon:          trigger.Icon(),
-			Color:         trigger.Color(),
-			Configuration: configuration,
-			ExampleData:   exampleData,
+			Name:            trigger.Name(),
+			Label:           trigger.Label(),
+			Description:     trigger.Description(),
+			Icon:            trigger.Icon(),
+			Color:           trigger.Color(),
+			Configuration:   configuration,
+			ExampleData:     exampleData,
+			DefaultRunTitle: TriggerDefaultRunTitle(trigger),
 		}
 	}
 	return out
 }
 
-func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Field {
-	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
-		return field.Name == "customName"
-	}) {
-		return fields
+func TriggerDefaultRunTitle(trigger core.Trigger) string {
+	if title := strings.TrimSpace(trigger.DefaultRunTitle()); title != "" {
+		return title
 	}
 
-	fields = append(fields, configuration.Field{
-		Name:        "customName",
-		Label:       "Run title (optional)",
-		Type:        configuration.FieldTypeString,
-		Togglable:   true,
-		Description: "Optional run title template. Supports expressions like {{ $.data }}.",
-		Placeholder: "Deploy {{ $.repository.name }} @ {{ $.head_commit.id }}",
-	})
-
-	return fields
+	return ""
 }
 
 func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {

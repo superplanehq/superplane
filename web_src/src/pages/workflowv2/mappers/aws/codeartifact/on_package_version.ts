@@ -1,10 +1,10 @@
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import type { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
-import { formatPackageLabel, formatPackageName } from "./utils";
+import { formatPackageName } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { Predicate } from "../../utils";
 import { formatPredicate, numberOrZero, stringOrDash } from "../../utils";
@@ -27,14 +27,10 @@ export interface Metadata {
  * Renderer for the "aws.codeArtifact.onPackageVersion" trigger
  */
 export const onPackageVersionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as PackageVersionEvent;
-    const detail = eventData?.detail;
-    const packageLabel = formatPackageLabel(detail);
-    const title = packageLabel || "CodeArtifact package version";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = renderTimeAgo(new Date(context.event?.createdAt || ""));
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -79,9 +75,8 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onPackageVersionTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onPackageVersionTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

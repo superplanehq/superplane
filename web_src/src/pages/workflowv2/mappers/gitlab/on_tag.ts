@@ -1,6 +1,6 @@
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { Predicate } from "../utils";
 import { formatPredicate, stringOrDash } from "../utils";
@@ -27,13 +27,10 @@ interface OnTagEventData {
 }
 
 export const onTagTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnTagEventData;
 
-    return {
-      title: eventData?.ref ? eventData.ref : "Tag Push",
-      subtitle: buildGitlabSubtitle(eventData?.event_name || "", context.event?.createdAt),
-    };
+    return buildGitlabSubtitle(eventData?.event_name || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -87,7 +84,6 @@ export const onTagTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnTagEventData;
 
       props.lastEventData = {
-        title: eventData?.ref ? eventData.ref : "Tag Push",
         subtitle: buildGitlabSubtitle(eventData?.event_name || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

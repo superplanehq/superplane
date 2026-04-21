@@ -73,6 +73,10 @@ func (p *OnImageScan) Color() string {
 	return "gray"
 }
 
+func (p *OnImageScan) DefaultRunTitle() string {
+	return `{{ root().data.detail["repository-name"] != "" ? root().data.detail["repository-name"] : "ECR image scan" }}{{ len(root().data.detail["image-tags"]) > 0 ? ":" + root().data.detail["image-tags"][0] : "" }}`
+}
+
 func (p *OnImageScan) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

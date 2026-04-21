@@ -80,6 +80,10 @@ func (t *OnFeatureFlagChange) Color() string {
 	return "gray"
 }
 
+func (t *OnFeatureFlagChange) DefaultRunTitle() string {
+	return `{{ root().data.name != "" ? root().data.name : (root().data.flagKey != "" ? root().data.flagKey : "Feature Flag") }}`
+}
+
 func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

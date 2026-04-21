@@ -1,7 +1,7 @@
 import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
@@ -33,12 +33,10 @@ interface TopicMessageEvent {
 }
 
 export const onTopicMessageTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as TopicMessageEvent;
-    const title = eventData?.MessageId ? eventData.MessageId : "SNS topic message";
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -68,9 +66,8 @@ export const onTopicMessageTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onTopicMessageTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onTopicMessageTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

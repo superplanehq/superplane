@@ -1,9 +1,9 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/rendererTypes";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import { addDetail, addFormattedTimestamp, getProjectLabel, splitSentryIssueTitle } from "./utils";
+import { addDetail, addFormattedTimestamp, getProjectLabel } from "./utils";
 
 interface OnIssueConfiguration {
   project?: string;
@@ -40,11 +40,9 @@ interface SentryIssueEventData {
 }
 
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  subtitle: (context: TriggerEventContext): string => {
     const eventData = context.event?.data as SentryIssueEventData;
     const issue = eventData?.data?.issue;
-    const parsedTitle = splitSentryIssueTitle(issue?.title);
-    const title = parsedTitle.title || "Issue";
     const action = eventData?.action?.trim();
     const status = issue?.status?.trim();
 
@@ -56,10 +54,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
       .filter(Boolean)
       .map((value) => String(value));
 
-    return {
-      title,
-      subtitle: subtitleParts.join(" · "),
-    };
+    return subtitleParts.join(" · ");
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -103,9 +98,8 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onIssueTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onIssueTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
