@@ -160,6 +160,12 @@ def _record_usage(
         )
     except Exception as error:
         print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
+        # update_run_usage sets latest_run_status = "completed"; if it fails the
+        # chat stays stuck at "running". Mark it failed so the UI doesn't spin forever.
+        try:
+            store.mark_run_failed(chat_id)
+        except Exception as mark_error:
+            print(f"[web] failed to mark run as failed after usage error {run_id}: {mark_error}", flush=True)
 
     # DB write and RabbitMQ publish are independent
     # a DB failure won't prevent publishing, and each has its own error logging
@@ -532,8 +538,8 @@ async def _stream_agent_run(
                 list(result.new_messages()),
                 persisted_tool_display_labels,
             )
-            recorder.save_authoritative_messages(messages)
             resolved_output = result.output
+            coerced_proposal_json: str | None = None
             if isinstance(resolved_output, CanvasAnswer):
                 cache_key = f"{deps.canvas_id}:{deps.canvas_version_id or 'inspect'}"
                 canvas_summary = deps.canvas_cache.get(cache_key)
@@ -542,6 +548,9 @@ async def _stream_agent_run(
                     resolved_output,
                     canvas_summary,
                 )
+                if resolved_output.proposal is not None:
+                    coerced_proposal_json = json.dumps(_to_jsonable(resolved_output.proposal))
+            recorder.save_authoritative_messages(messages, coerced_proposal_json=coerced_proposal_json)
             output = _to_jsonable(resolved_output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
@@ -584,6 +593,36 @@ async def _stream_agent_run(
     yield {"type": "done"}
 
 
+async def _run_agent_to_queue(
+    chat_id: str,
+    payload: AgentStreamRequest,
+    request: Request,
+    queue: "asyncio.Queue[dict[str, Any] | None]",
+) -> None:
+    """Run the agent to completion, placing every SSE event into queue.
+
+    Runs as an independent asyncio.Task so the agent is never interrupted when
+    the SSE client disconnects.  The sentinel value None is always placed last
+    (even after errors) so the consumer knows the task is done.
+    """
+    try:
+        async for event in _stream_agent_run(chat_id, payload, request):
+            await queue.put(event)
+    except Exception as error:
+        print(f"[web] agent task failed chat_id={chat_id} error={error}", flush=True)
+        import sentry_sdk
+
+        sentry_sdk.capture_exception(error)
+        try:
+            store: SessionStore = request.app.state.session_store
+            store.mark_run_failed(chat_id)
+        except Exception as mark_error:
+            print(f"[web] failed to mark run as failed in agent task chat_id={chat_id}: {mark_error}", flush=True)
+        await queue.put({"type": "_agent_error", "error": error})
+    finally:
+        await queue.put(None)  # sentinel — always sent so the consumer can exit
+
+
 def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -603,6 +642,13 @@ def _create_app() -> FastAPI:
         app.state.stream_tracker = tracker
         app.state.publisher = publisher
         app.state.limit_checker = limit_checker
+
+        # Reset any chats that were left in 'running' by a previous crash/OOM
+        # kill so they don't permanently show a spinner in the UI.
+        stale_count = store.reset_stale_running_chats()
+        if stale_count:
+            print(f"[web] startup: reset {stale_count} stale running chat(s) to failed", flush=True)
+
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
@@ -661,26 +707,53 @@ def _create_app() -> FastAPI:
         try:
 
             async def event_generator() -> AsyncIterator[str]:
-                try:
-                    async for event in _stream_agent_run(chat_id, payload, request):
-                        if await request.is_disconnected():
-                            _debug_log("client disconnected", chat_id=chat_id)
-                            break
-                        yield _encode_sse_event(event)
-                except Exception as error:
-                    import sentry_sdk
+                # The agent runs in an independent task so it is never interrupted
+                # by the SSE connection closing.  The SSE generator just reads from
+                # the shared queue; when the client disconnects we return early and
+                # the task keeps running until _record_usage persists the final state.
+                queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+                agent_task = asyncio.create_task(
+                    _run_agent_to_queue(chat_id, payload, request, queue)
+                )
+                register_background_task(agent_task)
 
-                    sentry_sdk.capture_exception(error)
-                    print(f"[web] stream failed chat_id={chat_id} error={error}", flush=True)
-                    yield _encode_sse_event(
-                        {
-                            "type": "run_failed",
-                            "error": _friendly_error_message(error),
-                        }
-                    )
-                    yield _encode_sse_event({"type": "done"})
+                try:
+                    while True:
+                        try:
+                            event = await asyncio.wait_for(queue.get(), timeout=0.1)
+                        except TimeoutError:
+                            if await request.is_disconnected():
+                                _debug_log("client disconnected, agent continues in background", chat_id=chat_id)
+                                return
+                            continue
+
+                        if event is None:  # sentinel — agent task finished
+                            break
+
+                        if event.get("type") == "_agent_error":
+                            error = event["error"]
+                            yield _encode_sse_event(
+                                {
+                                    "type": "run_failed",
+                                    "error": _friendly_error_message(error),
+                                }
+                            )
+                            yield _encode_sse_event({"type": "done"})
+                            return
+
+                        yield _encode_sse_event(event)
                 finally:
-                    await tracker.release()
+                    if agent_task.done():
+                        # Agent finished before/alongside the SSE connection — release immediately.
+                        await tracker.release()
+                    else:
+                        # SSE closed but agent is still running in the background.
+                        # Transfer tracker ownership so graceful shutdown waits for
+                        # the agent task to actually finish before draining.
+                        loop = asyncio.get_running_loop()
+                        agent_task.add_done_callback(
+                            lambda _: loop.create_task(tracker.release())
+                        )
 
             return StreamingResponse(
                 event_generator(),

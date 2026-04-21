@@ -45,7 +45,8 @@ CREATE TABLE public.agent_chat_messages (
     message jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    run_id uuid
+    run_id uuid,
+    proposal text
 );
 
 
@@ -80,7 +81,8 @@ CREATE TABLE public.agent_chats (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     total_input_tokens bigint DEFAULT 0 NOT NULL,
     total_output_tokens bigint DEFAULT 0 NOT NULL,
-    total_tokens bigint DEFAULT 0 NOT NULL
+    total_tokens bigint DEFAULT 0 NOT NULL,
+    latest_run_status text DEFAULT ''::text NOT NULL
 );
 
 
@@ -211,7 +213,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260412145739	f
+20260421120636	f
 \.
 
 

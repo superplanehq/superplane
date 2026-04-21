@@ -46,8 +46,9 @@ func serializeAgentChats(in []*internalpb.ChatInfo) []*pb.AgentChatInfo {
 		}
 
 		chat := &pb.AgentChatInfo{
-			Id:             c.Id,
-			InitialMessage: c.InitialMessage,
+			Id:              c.Id,
+			InitialMessage:  c.InitialMessage,
+			LatestRunStatus: c.LatestRunStatus,
 		}
 
 		if c.CreatedAt != nil {
