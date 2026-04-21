@@ -111,7 +111,7 @@ export function buildTriggerSidebarEvent(
       channel: event.channel,
       data: event.data,
       createdAt: event.createdAt,
-      runTitle: event.runTitle,
+      customName: event.customName,
     },
     triggerNode,
   );
