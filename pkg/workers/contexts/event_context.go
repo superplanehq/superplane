@@ -57,7 +57,7 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		s.tx,
 		s.node,
 		rootPayload,
-		rootPayload,
+		BuildRootEventRunTitleInput(payload, payloadType, now, "default"),
 	)
 	if err == nil && runTitle != nil {
 		event.RunTitle = runTitle
@@ -81,6 +81,28 @@ func BuildRootEventPayload(payload any, payloadType string, createdAt time.Time)
 		"timestamp": createdAt.UTC().Format(time.RFC3339Nano),
 		"data":      payload,
 	}
+}
+
+func BuildRootEventRunTitleInput(payload any, payloadType string, createdAt time.Time, channel string) map[string]any {
+	input := map[string]any{
+		"data": payload,
+		"event": map[string]any{
+			"createdAt": createdAt.UTC().Format(time.RFC3339Nano),
+			"type":      payloadType,
+			"channel":   channel,
+		},
+	}
+
+	payloadMap, ok := payload.(map[string]any)
+	if !ok {
+		return input
+	}
+
+	for key, value := range payloadMap {
+		input[key] = value
+	}
+
+	return input
 }
 
 func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, rootPayload any, input any) (*string, error) {

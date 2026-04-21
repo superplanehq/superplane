@@ -70,11 +70,45 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "test.payload", data["type"])
 		assert.NotNil(t, data["timestamp"])
-		assert.Equal(t, map[string]any{"n": 1}, data["data"])
+		assert.Equal(t, map[string]any{"n": float64(1)}, data["data"])
 		_, hasID := data["id"]
 		_, hasChannel := data["channel"]
 		assert.False(t, hasID)
 		assert.False(t, hasChannel)
+	})
+
+	t.Run("legacy run title input exposes payload fields and event metadata", func(t *testing.T) {
+		componentCanvas, componentNodes := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: "node-1",
+					Name:   "node-1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			nil,
+		)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), componentCanvas.ID)
+		require.NoError(t, err)
+		runTitleTemplate := `{{ $["node-1"].message }} @ {{ $["node-1"].event.channel }}`
+		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
+		require.NoError(t, database.Conn().Save(liveVersion).Error)
+
+		ctx := NewEventContext(database.Conn(), &componentNodes[0], nil)
+		require.NoError(t, ctx.Emit("test.payload", map[string]any{"message": "hello"}))
+
+		events, err := models.ListCanvasEvents(componentCanvas.ID, "node-1", 10, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, events)
+		require.NotNil(t, events[len(events)-1].RunTitle)
+		assert.Equal(t, "hello @ default", *events[len(events)-1].RunTitle)
 	})
 
 	t.Run("uses default run title from trigger definition", func(t *testing.T) {
