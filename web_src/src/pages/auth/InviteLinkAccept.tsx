@@ -65,7 +65,7 @@ export default function InviteLinkAccept() {
           throw new Error("Invite link response was missing organization details.");
         }
 
-        analytics.organizationJoined(data.organization_id);
+        analytics.memberAccept(data.organization_id);
         navigate(`/${data.organization_id}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unable to accept invite link.";
