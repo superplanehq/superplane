@@ -3,7 +3,6 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../../types";
@@ -47,7 +46,7 @@ export const copyImageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? copyImageEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? copyImageEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: copyImageMetadata(configuration),
       eventStateMap: getStateMap(componentName),
@@ -114,7 +113,7 @@ function copyImageMetadata(configuration?: Configuration): MetadataItem[] {
   return items;
 }
 
-function copyImageEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function copyImageEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

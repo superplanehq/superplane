@@ -1,13 +1,9 @@
 import { getState } from "..";
-import type { ExecutionInfo, NodeInfo, OutputPayload, RendererEventSection } from "../types";
+import type { ExecutionInfo, OutputPayload, RendererEventSection } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { Incident } from "./types";
 
-export function baseEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): RendererEventSection[] {
+export function baseEventSections(execution: ExecutionInfo, componentName: string): RendererEventSection[] {
   const rootEvent = execution.rootEvent;
   const createdAt = execution.createdAt;
 

@@ -68,7 +68,7 @@ export const deleteMemoryMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getDeleteMemoryMetadataList(context.node),
       eventStateMap: DELETE_MEMORY_STATE_MAP,
@@ -95,7 +95,7 @@ export const deleteMemoryMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getEventSections(execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

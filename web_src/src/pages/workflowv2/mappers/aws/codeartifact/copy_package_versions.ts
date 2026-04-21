@@ -42,9 +42,7 @@ export const copyPackageVersionsMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? copyPackageVersionsEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? copyPackageVersionsEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: copyPackageVersionsMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -96,11 +94,7 @@ function copyPackageVersionsMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function copyPackageVersionsEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function copyPackageVersionsEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

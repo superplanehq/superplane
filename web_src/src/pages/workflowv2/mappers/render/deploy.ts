@@ -105,7 +105,7 @@ export const deployMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? deployEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? deployEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deployMetadataList(context.node),
       eventStateMap: DEPLOY_STATE_MAP,
@@ -147,7 +147,7 @@ function deployMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function deployEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function deployEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

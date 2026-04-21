@@ -77,7 +77,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getMetadataList(context.node),
       eventStateMap: RUN_PIPELINE_STATE_MAP,
@@ -132,7 +132,7 @@ function getMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getEventSections(execution: ExecutionInfo): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

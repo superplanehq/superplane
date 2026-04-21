@@ -6,7 +6,6 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
@@ -47,7 +46,7 @@ export const launchAgentMapper: ComponentBaseMapper = {
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
         "Launch Cloud Agent",
-      eventSections: lastExecution ? launchAgentEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? launchAgentEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -86,7 +85,7 @@ export const launchAgentMapper: ComponentBaseMapper = {
   },
 };
 
-function launchAgentEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function launchAgentEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

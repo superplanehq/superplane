@@ -1,4 +1,4 @@
-import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
+import type { ComponentBaseContext, ExecutionInfo, SubtitleContext } from "../../types";
 import type React from "react";
 import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
@@ -37,20 +37,14 @@ export function buildEcsComponentProps(
     iconColor: getColorClass(context.componentDefinition.color),
     collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
     collapsed: context.node.isCollapsed,
-    eventSections: lastExecution
-      ? eventSections || buildEcsEventSections(context.nodes, lastExecution, componentName)
-      : undefined,
+    eventSections: lastExecution ? eventSections || buildEcsEventSections(lastExecution, componentName) : undefined,
     includeEmptyState: !lastExecution,
     metadata,
     eventStateMap: getStateMap(componentName),
   };
 }
 
-export function buildEcsEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+export function buildEcsEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

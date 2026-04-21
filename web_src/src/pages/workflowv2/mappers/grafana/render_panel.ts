@@ -25,7 +25,7 @@ export const renderPanelMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? buildGrafanaEventSections(lastExecution, componentName) : undefined,
       metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),

@@ -4,7 +4,6 @@ import type {
   EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   StateFunction,
   SubtitleContext,
@@ -102,7 +101,7 @@ export const ifMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs: specs,
       runDisabled: false,
@@ -127,7 +126,7 @@ export const ifMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
     eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),

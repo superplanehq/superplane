@@ -3,7 +3,6 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../../types";
@@ -42,9 +41,7 @@ export const deregisterImageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? deregisterImageEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? deregisterImageEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deregisterImageMetadata(configuration),
       eventStateMap: getStateMap(componentName),
@@ -98,11 +95,7 @@ function deregisterImageMetadata(configuration?: Configuration): MetadataItem[] 
   return items;
 }
 
-function deregisterImageEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function deregisterImageEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

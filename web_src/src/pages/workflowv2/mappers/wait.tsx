@@ -72,12 +72,7 @@ export const waitMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: lastExecution
-        ? getWaitEventSections(
-            context.nodes,
-            lastExecution,
-            context.node.configuration as WaitConfiguration,
-            componentName,
-          )
+        ? getWaitEventSections(lastExecution, context.node.configuration as WaitConfiguration, componentName)
         : undefined,
       includeEmptyState: !lastExecution,
       hideMetadataList: false,
@@ -274,7 +269,6 @@ function getWaitMetadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function getWaitEventSections(
-  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   configuration: WaitConfiguration,
   componentName: string,

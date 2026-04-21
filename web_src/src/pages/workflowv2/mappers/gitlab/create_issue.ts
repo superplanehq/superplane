@@ -14,7 +14,7 @@ import { getDetailsForApiIssue } from "./issue_utils";
 
 export const createIssueMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    return baseProps(context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {

@@ -44,7 +44,7 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
       eventSections: lastExecution
-        ? getPackageVersionEventSections(context.nodes, lastExecution, context.componentDefinition.name)
+        ? getPackageVersionEventSections(lastExecution, context.componentDefinition.name)
         : undefined,
       includeEmptyState: !lastExecution,
       metadata: getPackageVersionMetadataList(context.node),
@@ -126,11 +126,7 @@ function getPackageVersionMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function getPackageVersionEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function getPackageVersionEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

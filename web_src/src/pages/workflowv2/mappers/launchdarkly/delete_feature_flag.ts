@@ -27,7 +27,7 @@ interface DeleteFeatureFlagOutput {
   deleted?: boolean;
 }
 
-function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
   return [
@@ -70,7 +70,7 @@ export const deleteFeatureFlagMapper: ComponentBaseMapper = {
       metadata: deleteFeatureFlagMetadata(node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution, componentName) : undefined,
     };
   },
 

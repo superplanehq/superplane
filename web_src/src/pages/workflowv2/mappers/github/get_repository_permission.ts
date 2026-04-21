@@ -43,7 +43,7 @@ function getRepositoryPermissionMetadataList(node: NodeInfo): MetadataItem[] {
 
 export const getRepositoryPermissionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const base = baseProps(context.node, context.componentDefinition, context.lastExecutions);
 
     return {
       ...base,

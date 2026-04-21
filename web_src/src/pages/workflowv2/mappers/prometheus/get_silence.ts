@@ -18,7 +18,7 @@ import type { GetSilenceConfiguration, GetSilenceNodeMetadata, PrometheusSilence
 
 export const getSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return buildGetSilenceProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    return buildGetSilenceProps(context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -82,7 +82,6 @@ export const getSilenceMapper: ComponentBaseMapper = {
 };
 
 function buildGetSilenceProps(
-  nodes: NodeInfo[],
   node: NodeInfo,
   componentDefinition: { name: string; label: string; color: string },
   lastExecutions: ExecutionInfo[],
@@ -96,7 +95,7 @@ function buildGetSilenceProps(
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,
     title: node.name || componentDefinition.label || "Unnamed component",
-    eventSections: lastExecution ? buildEventSections(nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? buildEventSections(lastExecution, componentName) : undefined,
     metadata: getMetadata(node),
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
@@ -116,7 +115,7 @@ function getMetadata(node: NodeInfo): MetadataItem[] {
   return metadata.slice(0, 3);
 }
 
-function buildEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function buildEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

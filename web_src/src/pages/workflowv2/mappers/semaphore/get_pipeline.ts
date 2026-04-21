@@ -37,7 +37,7 @@ export const getPipelineMapper: ComponentBaseMapper = {
       includeEmptyState: !lastExecution,
       metadata: getPipelineMetadataList(context.node),
       specs: getPipelineSpecs(context.node),
-      eventSections: lastExecution ? getPipelineEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getPipelineEventSections(lastExecution, componentName) : undefined,
       eventStateMap: getStateMap(componentName),
     };
   },
@@ -96,11 +96,7 @@ function getPipelineSpecs(_node: NodeInfo): ComponentBaseSpec[] {
   return [];
 }
 
-function getPipelineEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] | undefined {
+function getPipelineEventSections(execution: ExecutionInfo, componentName: string): EventSection[] | undefined {
   // Return undefined if no root event
   if (!execution.rootEvent || !execution.rootEvent.id) {
     return undefined;

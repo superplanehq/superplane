@@ -7,7 +7,6 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
@@ -45,9 +44,7 @@ export const getLastMessageMapper: ComponentBaseMapper = {
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
         "Get Last Message",
-      eventSections: lastExecution
-        ? getLastMessageEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? getLastMessageEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -91,11 +88,7 @@ export const getLastMessageMapper: ComponentBaseMapper = {
   },
 };
 
-function getLastMessageEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function getLastMessageEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

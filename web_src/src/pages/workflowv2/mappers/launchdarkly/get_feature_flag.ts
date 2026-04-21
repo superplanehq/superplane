@@ -32,7 +32,7 @@ interface FeatureFlagOutput {
   creationDate?: number;
 }
 
-function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
   return [
@@ -75,7 +75,7 @@ export const getFeatureFlagMapper: ComponentBaseMapper = {
       metadata: getFeatureFlagMetadata(node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution, componentName) : undefined,
     };
   },
 

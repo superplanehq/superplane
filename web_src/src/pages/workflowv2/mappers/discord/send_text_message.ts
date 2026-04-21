@@ -50,9 +50,7 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? sendTextMessageEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? sendTextMessageEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendTextMessageMetadataList(context.node),
       specs: sendTextMessageSpecs(context.node),
@@ -130,11 +128,7 @@ function sendTextMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function sendTextMessageEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function sendTextMessageEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

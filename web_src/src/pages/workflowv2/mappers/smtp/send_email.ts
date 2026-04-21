@@ -43,7 +43,7 @@ export const sendEmailMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? sendEmailEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? sendEmailEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendEmailMetadataList(context.node),
       specs: sendEmailSpecs(context.node),
@@ -101,7 +101,7 @@ function sendEmailSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function sendEmailEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function sendEmailEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

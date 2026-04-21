@@ -29,7 +29,7 @@ export const escalateIncidentMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -62,7 +62,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

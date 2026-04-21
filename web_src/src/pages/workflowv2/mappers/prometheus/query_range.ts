@@ -18,7 +18,7 @@ import type { PrometheusQueryPayload, QueryRangeConfiguration, QueryRangeNodeMet
 
 export const queryRangeMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return buildQueryRangeProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    return buildQueryRangeProps(context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -73,7 +73,6 @@ export const queryRangeMapper: ComponentBaseMapper = {
 };
 
 function buildQueryRangeProps(
-  nodes: NodeInfo[],
   node: NodeInfo,
   componentDefinition: { name: string; label: string; color: string },
   lastExecutions: ExecutionInfo[],
@@ -87,7 +86,7 @@ function buildQueryRangeProps(
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,
     title: node.name || componentDefinition.label || "Unnamed component",
-    eventSections: lastExecution ? buildEventSections(nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? buildEventSections(lastExecution, componentName) : undefined,
     metadata: getMetadata(node),
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
@@ -115,7 +114,7 @@ function getMetadata(node: NodeInfo): MetadataItem[] {
   return metadata.slice(0, 3);
 }
 
-function buildEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function buildEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

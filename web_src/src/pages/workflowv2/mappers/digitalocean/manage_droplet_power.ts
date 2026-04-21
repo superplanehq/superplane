@@ -84,7 +84,7 @@ export const manageDropletPowerMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: powerStateMap,
@@ -142,7 +142,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   // Check if there's a custom power operation event in the outputs
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   const powerEvent = outputs?.default?.find((output) => output.type?.startsWith("digitalocean.droplet.power."));

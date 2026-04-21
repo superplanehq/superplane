@@ -46,7 +46,7 @@ export const sendMessageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? sendMessageEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? sendMessageEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendMessageMetadataList(context.node),
       specs: sendMessageSpecs(context.node),
@@ -105,7 +105,7 @@ function sendMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function sendMessageEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function sendMessageEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   if (!execution.rootEvent) {
     return [];
   }

@@ -58,7 +58,7 @@ export const baseMapper: ComponentBaseMapper = {
       title:
         context.node.name || context.componentDefinition?.label || context.componentDefinition?.name || "Perplexity",
       metadata: metadataList(context.node),
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -98,7 +98,7 @@ export const baseMapper: ComponentBaseMapper = {
   },
 };
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

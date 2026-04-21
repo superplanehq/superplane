@@ -1,6 +1,6 @@
 import type { EventSection } from "@/pages/workflowv2/mappers/types";
 import { getState } from "..";
-import type { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
+import type { ExecutionInfo, OutputPayload } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { IncidentRecord } from "./types";
 import { STATE_LABELS, URGENCY_LABELS, IMPACT_LABELS } from "./types";
@@ -13,7 +13,7 @@ export function getIncidentFromExecution(execution: ExecutionInfo): IncidentReco
   return outputs.default[0].data as IncidentRecord;
 }
 
-export function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+export function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

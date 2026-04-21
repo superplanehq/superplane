@@ -18,7 +18,7 @@ export const createAlertRuleMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution
-        ? buildGrafanaEventSections(context.nodes, lastExecution, componentName, { strict: true })
+        ? buildGrafanaEventSections(lastExecution, componentName, { strict: true })
         : undefined,
       metadata: buildAlertRuleMetadata(context.node, { includeGroup: true, includePausedState: true }),
       includeEmptyState: !lastExecution,

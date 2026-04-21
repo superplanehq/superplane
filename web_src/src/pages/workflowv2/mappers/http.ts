@@ -178,7 +178,7 @@ export const httpMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: context.lastExecutions[0]
-        ? getHTTPEventSections(context.nodes, context.lastExecutions[0], httpStateFunction)
+        ? getHTTPEventSections(context.lastExecutions[0], httpStateFunction)
         : undefined,
       includeEmptyState: !context.lastExecutions[0],
       metadata: getHTTPMetadataList(context.node),
@@ -453,7 +453,6 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
 }
 
 function getHTTPEventSections(
-  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   stateFunction: (execution: ExecutionInfo) => EventState,
 ): EventSection[] {

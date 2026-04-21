@@ -129,7 +129,7 @@ export const sshMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: context.lastExecutions[0]
-        ? getSSHEventSections(context.nodes, context.lastExecutions[0], sshStateFunction)
+        ? getSSHEventSections(context.lastExecutions[0], sshStateFunction)
         : undefined,
       includeEmptyState: !context.lastExecutions[0],
       metadata: getSSHMetadataList(context.node),
@@ -236,7 +236,6 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
 }
 
 function getSSHEventSections(
-  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   stateFunction: (e: ExecutionInfo) => EventState,
 ): EventSection[] {

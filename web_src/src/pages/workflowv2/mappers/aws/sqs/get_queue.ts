@@ -42,7 +42,7 @@ export const getQueueMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? getQueueEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getQueueEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getQueueMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -106,7 +106,7 @@ function getQueueMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getQueueEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getQueueEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

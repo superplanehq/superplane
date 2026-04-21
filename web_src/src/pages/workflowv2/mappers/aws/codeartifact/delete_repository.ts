@@ -49,9 +49,7 @@ export const deleteRepositoryMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? deleteRepositoryEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? deleteRepositoryEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deleteRepositoryMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -98,11 +96,7 @@ function deleteRepositoryMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function deleteRepositoryEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function deleteRepositoryEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

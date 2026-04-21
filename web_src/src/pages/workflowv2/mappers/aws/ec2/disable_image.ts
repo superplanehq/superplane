@@ -3,7 +3,6 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../../types";
@@ -40,7 +39,7 @@ export const disableImageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? disableImageEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? disableImageEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: disableImageMetadata(configuration),
       eventStateMap: getStateMap(componentName),
@@ -86,11 +85,7 @@ function disableImageMetadata(configuration?: Configuration): MetadataItem[] {
   return items;
 }
 
-function disableImageEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function disableImageEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

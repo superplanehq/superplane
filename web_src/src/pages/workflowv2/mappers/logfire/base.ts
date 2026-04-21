@@ -25,7 +25,7 @@ export const baseMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || context.componentDefinition?.name || "logfire",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
       metadata: metadataList(context.node),
@@ -166,7 +166,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata.slice(0, 3);
 }
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   if (!execution.rootEvent) return [];
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";

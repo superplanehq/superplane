@@ -1,10 +1,10 @@
 import type { EventSection } from "@/pages/workflowv2/mappers/types";
 import { getState } from "..";
-import type { ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionInfo } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { Incident, IncidentEvent } from "./types";
 
-export function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+export function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

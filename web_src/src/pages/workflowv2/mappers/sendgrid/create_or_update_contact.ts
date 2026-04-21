@@ -39,7 +39,7 @@ export const createOrUpdateContactMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? eventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? eventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs: contactSpecs(context.node),
       metadata: metadataList(context.node),
@@ -112,7 +112,7 @@ function contactSpecs(node: NodeInfo): ComponentBaseSpec[] | undefined {
   ];
 }
 
-function eventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function eventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

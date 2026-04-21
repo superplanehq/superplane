@@ -119,7 +119,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition?.color!),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: runWorkflowEventSections(context.nodes, context.lastExecutions[0]),
+      eventSections: runWorkflowEventSections(context.lastExecutions[0]),
       includeEmptyState: !context.lastExecutions[0],
       metadata: runWorkflowMetadataList(context.node),
       specs: runWorkflowSpecs(context.node),
@@ -214,7 +214,7 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runWorkflowEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+function runWorkflowEventSections(execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }

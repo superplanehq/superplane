@@ -4,7 +4,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { getState, getStateMap } from "..";
-import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../types";
+import type { ComponentBaseContext, ExecutionInfo, SubtitleContext } from "../types";
 
 export type BuildGrafanaEventSectionsOptions = {
   /** When true, return [] if root trigger event or timestamp is missing (alert rule mappers). */
@@ -12,7 +12,6 @@ export type BuildGrafanaEventSectionsOptions = {
 };
 
 export function buildGrafanaEventSections(
-  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
   options?: BuildGrafanaEventSectionsOptions,
@@ -76,7 +75,7 @@ export function grafanaComponentBaseProps(context: ComponentBaseContext, metadat
     collapsedBackground: "bg-white",
     collapsed: context.node.isCollapsed,
     title: context.node.name || context.componentDefinition.label || "Unnamed component",
-    eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
     metadata,
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
@@ -88,6 +87,6 @@ export function grafanaCreatedAtSubtitle(context: SubtitleContext): string | Rea
   return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
-export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  return buildGrafanaEventSections(nodes, execution, componentName);
+export function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
+  return buildGrafanaEventSections(execution, componentName);
 }

@@ -1,4 +1,4 @@
-import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
+import type { ComponentBaseContext, ExecutionInfo, SubtitleContext } from "../../types";
 import type React from "react";
 import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
@@ -17,7 +17,7 @@ export function buildSnsProps(context: ComponentBaseContext, metadata: MetadataI
     iconColor: getColorClass(context.componentDefinition.color),
     collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
     collapsed: context.node.isCollapsed,
-    eventSections: lastExecution ? buildEventSections(context.nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? buildEventSections(lastExecution, componentName) : undefined,
     includeEmptyState: !lastExecution,
     metadata,
     eventStateMap: getStateMap(componentName),
@@ -32,11 +32,7 @@ export function buildSubtitle(context: SubtitleContext): string | React.ReactNod
   return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
-export function buildEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+export function buildEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   if (!execution.createdAt || !execution.rootEvent?.id) {
     return [];
   }

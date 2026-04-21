@@ -42,7 +42,7 @@ export const deleteQueueMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? deleteQueueEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? deleteQueueEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deleteQueueMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -83,7 +83,7 @@ function deleteQueueMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function deleteQueueEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function deleteQueueEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

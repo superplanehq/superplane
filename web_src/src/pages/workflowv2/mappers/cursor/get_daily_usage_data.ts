@@ -6,7 +6,6 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
@@ -43,9 +42,7 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
         "Get Daily Usage Data",
-      eventSections: lastExecution
-        ? getDailyUsageDataEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? getDailyUsageDataEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -81,11 +78,7 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
   },
 };
 
-function getDailyUsageDataEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function getDailyUsageDataEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

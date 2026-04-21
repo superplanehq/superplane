@@ -42,7 +42,7 @@ export const createEventMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? createEventEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? createEventEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: createEventMetadataList(context.node),
       specs: createEventSpecs(context.node),
@@ -99,7 +99,7 @@ function createEventSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function createEventEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function createEventEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

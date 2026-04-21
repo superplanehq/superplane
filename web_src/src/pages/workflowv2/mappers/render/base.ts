@@ -6,7 +6,6 @@ import { getState, getStateMap } from "..";
 import type { ComponentDefinition, ExecutionInfo, NodeInfo } from "../types";
 
 export function baseProps(
-  nodes: NodeInfo[],
   node: NodeInfo,
   componentDefinition: ComponentDefinition,
   lastExecutions: ExecutionInfo[],
@@ -20,13 +19,13 @@ export function baseProps(
     iconColor: getColorClass(componentDefinition.color),
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,
-    eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
   };
 }
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

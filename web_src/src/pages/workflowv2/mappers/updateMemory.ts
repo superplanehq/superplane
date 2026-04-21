@@ -71,7 +71,7 @@ export const updateMemoryMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getUpdateMemoryMetadataList(context.node),
       eventStateMap: UPDATE_MEMORY_STATE_MAP,
@@ -110,7 +110,7 @@ export const updateMemoryMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getEventSections(execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

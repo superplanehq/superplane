@@ -16,7 +16,6 @@ import type {
   ComponentBaseContext,
   SubtitleContext,
   ExecutionDetailsContext,
-  NodeInfo,
   ExecutionInfo,
 } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
@@ -93,7 +92,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       metadata: [],
       specs,
       includeEmptyState: !lastExecution,
@@ -337,7 +336,7 @@ function getIssueCounts(execution: ExecutionInfo): { critical: number; degraded:
   return { critical, degraded };
 }
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const { critical, degraded } = getIssueCounts(execution);
   const date = new Date(execution.createdAt!);
 

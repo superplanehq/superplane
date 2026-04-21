@@ -8,7 +8,6 @@ import type { GitLabNodeMetadata } from "./types";
 import { buildGitlabExecutionSubtitle } from "./utils";
 
 export function baseProps(
-  nodes: NodeInfo[],
   node: NodeInfo,
   componentDefinition: ComponentDefinition,
   lastExecutions: ExecutionInfo[],
@@ -22,7 +21,7 @@ export function baseProps(
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,
     title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-    eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
     metadata: metadataList(node),
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
@@ -40,7 +39,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

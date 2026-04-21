@@ -40,9 +40,7 @@ export const deletePackageVersionsMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? deletePackageVersionsEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? deletePackageVersionsEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deletePackageVersionsMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -74,11 +72,7 @@ function deletePackageVersionsMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function deletePackageVersionsEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function deletePackageVersionsEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

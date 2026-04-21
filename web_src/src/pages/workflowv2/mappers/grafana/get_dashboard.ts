@@ -25,7 +25,7 @@ export const getDashboardMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? buildGrafanaEventSections(lastExecution, componentName) : undefined,
       metadata: buildDashboardMetadata(
         context.node,
         typeof context.node.configuration === "object" && context.node.configuration !== null

@@ -95,7 +95,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: lastExecution ? runPipelineEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? runPipelineEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: runPipelineMetadataList(context.node),
       specs: runPipelineSpecs(context.node),
@@ -193,7 +193,7 @@ function runPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runPipelineEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+function runPipelineEventSections(execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }

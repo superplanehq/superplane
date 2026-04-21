@@ -68,7 +68,7 @@ export const PURGE_CACHE_STATE_REGISTRY: EventStateRegistry = {
 
 export const purgeCacheMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const base = baseProps(context.node, context.componentDefinition, context.lastExecutions);
     return { ...base, metadata: metadataList(context.node) };
   },
 

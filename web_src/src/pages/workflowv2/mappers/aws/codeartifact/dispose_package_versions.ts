@@ -41,9 +41,7 @@ export const disposePackageVersionsMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? disposePackageVersionsEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? disposePackageVersionsEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: disposePackageVersionsMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -89,11 +87,7 @@ function disposePackageVersionsMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function disposePackageVersionsEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function disposePackageVersionsEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

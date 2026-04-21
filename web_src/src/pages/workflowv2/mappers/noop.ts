@@ -3,7 +3,6 @@ import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "./types";
@@ -27,7 +26,7 @@ export const noopMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getNoopEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getNoopEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -53,7 +52,7 @@ export const noopMapper: ComponentBaseMapper = {
   },
 };
 
-function getNoopEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, _componentName: string): EventSection[] {
+function getNoopEventSections(execution: ExecutionInfo, _componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

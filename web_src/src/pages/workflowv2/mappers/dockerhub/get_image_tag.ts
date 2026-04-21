@@ -34,7 +34,7 @@ export const getImageTagMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? getImageTagEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getImageTagEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getImageTagMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -90,7 +90,7 @@ function getImageTagMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getImageTagEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getImageTagEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

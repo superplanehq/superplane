@@ -49,7 +49,7 @@ export const runFunctionMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? runFunctionEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? runFunctionEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: runFunctionMetadataList(context.node),
       specs: runFunctionSpecs(context.node),
@@ -119,7 +119,7 @@ function runFunctionSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runFunctionEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function runFunctionEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

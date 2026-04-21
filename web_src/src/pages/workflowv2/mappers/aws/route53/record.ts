@@ -53,7 +53,7 @@ function recordMetadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
-function recordEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function recordEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),
@@ -79,7 +79,7 @@ export const recordMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? recordEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? recordEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: recordMetadataList(context.node),
       eventStateMap: getStateMap(componentName),

@@ -61,7 +61,7 @@ export const updateIssueMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: lastExecution
-        ? buildEventSections(context.nodes, lastExecution, componentName, getTriggerRenderer, getState)
+        ? buildEventSections(lastExecution, componentName, getTriggerRenderer, getState)
         : undefined,
       metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,

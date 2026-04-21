@@ -5,7 +5,6 @@ import type {
   ExecutionDetailsContext,
   ExecutionInfo,
   GroupRef,
-  NodeInfo,
   RoleRef,
   StateFunction,
   SubtitleContext,
@@ -155,7 +154,7 @@ export const approvalMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("orange"),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Approval",
-      eventSections: lastExecution ? getApprovalEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getApprovalEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       specs: getApprovalSpecs(items),
       eventStateMap: APPROVAL_STATE_MAP,
@@ -377,7 +376,7 @@ function getApprovalSpecs(items: ApprovalRecord[]): ComponentBaseSpec[] {
   ];
 }
 
-function getApprovalEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getApprovalEventSections(execution: ExecutionInfo): EventSection[] {
   const eventSubtitle = getComponentSubtitle(execution);
 
   const eventSection: EventSection = {

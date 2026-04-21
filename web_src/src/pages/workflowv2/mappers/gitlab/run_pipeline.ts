@@ -109,7 +109,7 @@ export const RUN_PIPELINE_STATE_REGISTRY: EventStateRegistry = {
 
 export const runPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const base = baseProps(context.node, context.componentDefinition, context.lastExecutions);
     const config = context.node.configuration as RunPipelineConfiguration;
     const metadata = base.metadata as MetadataItem[];
     if (config.ref) {

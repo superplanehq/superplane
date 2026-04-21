@@ -2,7 +2,6 @@ import { formatTimeAgo } from "@/lib/date";
 import type {
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   RendererEventSection,
   StateFunction,
@@ -11,7 +10,6 @@ import type {
 } from "../types";
 
 export function buildEventSections(
-  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
   _getTriggerRenderer: (name: string) => TriggerRenderer,

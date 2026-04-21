@@ -115,7 +115,7 @@ export const sendEmailMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Send Email Notification",
-      eventSections: lastExecution ? getSendEmailEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getSendEmailEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getSendEmailMetadata(context.node),
       eventStateMap: SEND_EMAIL_EVENT_STATE_MAP,
@@ -224,7 +224,7 @@ function getSendEmailMetadata(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getSendEmailEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getSendEmailEventSections(execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

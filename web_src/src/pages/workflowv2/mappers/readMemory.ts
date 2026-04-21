@@ -41,7 +41,7 @@ export const readMemoryMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getReadMemoryMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -76,7 +76,7 @@ export const readMemoryMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getEventSections(execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 

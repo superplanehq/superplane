@@ -106,7 +106,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       specs,
       includeEmptyState: !lastExecution,
@@ -270,7 +270,7 @@ export const LIST_INCIDENTS_STATE_REGISTRY: EventStateRegistry = {
   getState: listIncidentsStateFunction,
 };
 
-function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const incidents = getIncidents(execution);
   const date = new Date(execution.createdAt!);
 

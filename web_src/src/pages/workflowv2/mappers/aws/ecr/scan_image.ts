@@ -30,7 +30,7 @@ export const scanImageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? getScanEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getScanEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getScanMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -86,7 +86,7 @@ function getScanMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getScanEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getScanEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

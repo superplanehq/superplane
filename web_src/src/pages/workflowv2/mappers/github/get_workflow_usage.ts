@@ -96,7 +96,7 @@ function formatBreakdownSummary(breakdown?: Record<string, number>): string | un
 
 export const getWorkflowUsageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const base = baseProps(context.node, context.componentDefinition, context.lastExecutions);
 
     // Override metadata to show repositories
     const metadata = getWorkflowUsageMetadataList(context.node);

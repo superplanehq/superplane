@@ -13,7 +13,7 @@ import type { Comment } from "./types";
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    return baseProps(context.node, context.componentDefinition, context.lastExecutions);
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);

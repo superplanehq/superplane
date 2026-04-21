@@ -152,7 +152,7 @@ export const mergeMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Merge",
-      eventSections: lastExecution ? getMergeEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getMergeEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: MERGE_STATE_MAP,
     };
@@ -178,7 +178,7 @@ export const mergeMapper: ComponentBaseMapper = {
   },
 };
 
-function getMergeEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
+function getMergeEventSections(execution: ExecutionInfo): EventSection[] {
   const sections: EventSection[] = [];
 
   // Add the main execution section

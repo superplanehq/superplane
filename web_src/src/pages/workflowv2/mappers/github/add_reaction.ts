@@ -49,7 +49,7 @@ function getReactionDisplay(content?: string): string {
 
 export const addReactionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const props = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const props = baseProps(context.node, context.componentDefinition, context.lastExecutions);
     const configuration = (context.node.configuration as AddReactionConfiguration | undefined) ?? {};
     const metadata = (context.node.metadata as BaseNodeMetadata | undefined) ?? ({} as BaseNodeMetadata);
 

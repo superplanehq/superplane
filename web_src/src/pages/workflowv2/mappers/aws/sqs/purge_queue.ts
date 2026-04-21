@@ -42,7 +42,7 @@ export const purgeQueueMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? purgeQueueEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? purgeQueueEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: purgeQueueMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -83,7 +83,7 @@ function purgeQueueMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function purgeQueueEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function purgeQueueEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),

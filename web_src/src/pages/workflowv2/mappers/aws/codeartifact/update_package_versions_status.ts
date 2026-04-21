@@ -43,9 +43,7 @@ export const updatePackageVersionsStatusMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? updatePackageVersionsStatusEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? updatePackageVersionsStatusEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: updatePackageVersionsStatusMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -98,11 +96,7 @@ function updatePackageVersionsStatusMetadataList(node: NodeInfo): MetadataItem[]
   return items;
 }
 
-function updatePackageVersionsStatusEventSections(
-  _nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function updatePackageVersionsStatusEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),

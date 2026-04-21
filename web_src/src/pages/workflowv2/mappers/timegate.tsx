@@ -49,7 +49,7 @@ export const timeGateMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: context.lastExecutions[0]
-        ? getTimeGateEventSections(context.nodes, context.lastExecutions[0], componentName)
+        ? getTimeGateEventSections(context.lastExecutions[0], componentName)
         : undefined,
       includeEmptyState: !context.lastExecutions[0],
       specs: getTimeGateSpecs(context.node),
@@ -253,7 +253,7 @@ function getTimeGateSpecs(node: NodeInfo): ComponentBaseSpec[] {
   ];
 }
 
-function getTimeGateEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getTimeGateEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const executionState = getState(componentName)(execution);
 
   const subtitle = getTimeGateEventSubtitle(execution, componentName);
