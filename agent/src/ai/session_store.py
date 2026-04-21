@@ -19,7 +19,7 @@ from pydantic_ai.messages import (
 )
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import CursorResult, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from ai.config import config
@@ -671,8 +671,8 @@ class SessionStore:
         )
         with self._session() as session:
             with session.begin():
-                result = session.execute(stmt)
-                return result.rowcount
+                result: CursorResult[Any] = session.execute(stmt)  # type: ignore[assignment]
+                return int(result.rowcount)
 
     # ---- org usage ----
 
@@ -768,7 +768,7 @@ class SessionStore:
             # Prefer the explicitly saved proposal (already coerced) over the
             # value extracted from raw tool-call args (which is pre-coercion).
             if record.proposal is not None:
-                proposal_json = record.proposal
+                proposal_json: str | None = record.proposal
             else:
                 proposal_dict = _extract_output_proposal(record.message)
                 proposal_json = json.dumps(proposal_dict) if proposal_dict is not None else None

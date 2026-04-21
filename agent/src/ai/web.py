@@ -165,7 +165,10 @@ def _record_usage(
         try:
             store.mark_run_failed(chat_id)
         except Exception as mark_error:
-            print(f"[web] failed to mark run as failed after usage error {run_id}: {mark_error}", flush=True)
+            print(
+                f"[web] failed to mark run as failed after usage error {run_id}: {mark_error}",
+                flush=True,
+            )
 
     # DB write and RabbitMQ publish are independent
     # a DB failure won't prevent publishing, and each has its own error logging
@@ -550,7 +553,9 @@ async def _stream_agent_run(
                 )
                 if resolved_output.proposal is not None:
                     coerced_proposal_json = json.dumps(_to_jsonable(resolved_output.proposal))
-            recorder.save_authoritative_messages(messages, coerced_proposal_json=coerced_proposal_json)
+            recorder.save_authoritative_messages(
+                messages, coerced_proposal_json=coerced_proposal_json
+            )
             output = _to_jsonable(resolved_output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
@@ -617,7 +622,10 @@ async def _run_agent_to_queue(
             store: SessionStore = request.app.state.session_store
             store.mark_run_failed(chat_id)
         except Exception as mark_error:
-            print(f"[web] failed to mark run as failed in agent task chat_id={chat_id}: {mark_error}", flush=True)
+            print(
+                f"[web] failed to mark run as failed in agent task chat_id={chat_id}: {mark_error}",
+                flush=True,
+            )
         await queue.put({"type": "_agent_error", "error": error})
     finally:
         await queue.put(None)  # sentinel — always sent so the consumer can exit
@@ -723,7 +731,10 @@ def _create_app() -> FastAPI:
                             event = await asyncio.wait_for(queue.get(), timeout=0.1)
                         except TimeoutError:
                             if await request.is_disconnected():
-                                _debug_log("client disconnected, agent continues in background", chat_id=chat_id)
+                                _debug_log(
+                                    "client disconnected, agent continues in background",
+                                    chat_id=chat_id,
+                                )
                                 return
                             continue
 
@@ -751,9 +762,7 @@ def _create_app() -> FastAPI:
                         # Transfer tracker ownership so graceful shutdown waits for
                         # the agent task to actually finish before draining.
                         loop = asyncio.get_running_loop()
-                        agent_task.add_done_callback(
-                            lambda _: loop.create_task(tracker.release())
-                        )
+                        agent_task.add_done_callback(lambda _: loop.create_task(tracker.release()))
 
             return StreamingResponse(
                 event_generator(),
