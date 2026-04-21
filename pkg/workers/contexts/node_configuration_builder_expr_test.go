@@ -16,3 +16,11 @@ func TestNodeConfigurationBuilder_ResolveExpression_DateWithTimezoneOption(t *te
 	require.NoError(t, err)
 	require.Equal(t, "2026-03-17T01:02:03.000000001Z", out)
 }
+
+func TestNodeConfigurationBuilder_ResolveExpression_FirstNonEmpty(t *testing.T) {
+	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
+
+	out, err := b.ResolveTemplateExpressions(`{{ firstNonEmpty("", "  ", nil, "value", "ignored") }}`)
+	require.NoError(t, err)
+	require.Equal(t, "value", out)
+}

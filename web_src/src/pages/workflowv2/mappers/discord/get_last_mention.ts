@@ -9,10 +9,10 @@ import type {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
@@ -109,9 +109,7 @@ export const getLastMentionMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? getLastMentionEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? getLastMentionEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getLastMentionMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -159,19 +157,10 @@ function getLastMentionMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getLastMentionEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function getLastMentionEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",
     },

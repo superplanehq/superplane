@@ -70,6 +70,10 @@ func (t *OnIncident) Color() string {
 	return "gray"
 }
 
+func (t *OnIncident) DefaultRunTitle() string {
+	return "{{ root().data.data.incident.id }} - {{ root().data.data.incident.title }}"
+}
+
 func (t *OnIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

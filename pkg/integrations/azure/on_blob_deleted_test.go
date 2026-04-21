@@ -179,6 +179,9 @@ func TestOnBlobDeleted_HandleWebhook_BlobDeleted(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "blob-del-event-1", payload["id"])
 		assert.Equal(t, EventTypeBlobDeleted, payload["eventType"])
+		assert.Equal(t, "/blobServices/default/containers/mycontainer/blobs/data/myfile.csv", payload["subject"])
+		assert.NotContains(t, payload, "container")
+		assert.NotContains(t, payload, "blobName")
 	})
 
 	t.Run("skips event with non-matching container filter", func(t *testing.T) {

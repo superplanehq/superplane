@@ -24,6 +24,7 @@ func (p *panickingTrigger) Icon() string                         { return "icon"
 func (p *panickingTrigger) Color() string                        { return "blue" }
 func (p *panickingTrigger) ExampleData() map[string]any          { return nil }
 func (p *panickingTrigger) Configuration() []configuration.Field { return nil }
+func (p *panickingTrigger) DefaultRunTitle() string              { return "" }
 func (p *panickingTrigger) Actions() []core.Action               { return nil }
 func (p *panickingTrigger) Setup(ctx core.TriggerContext) error  { panic("setup panic") }
 func (p *panickingTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
