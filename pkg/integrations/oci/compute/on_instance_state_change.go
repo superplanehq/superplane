@@ -1,59 +1,54 @@
 package compute
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type OnInstanceStateChange struct{}
 
-type OnInstanceStateChangeMetadata struct {
-	RuleID string `json:"ruleId" mapstructure:"ruleId"`
-}
-
 func (t *OnInstanceStateChange) Name() string {
-	return "oci.compute.onInstanceStateChange"
+	return "onInstanceStateChange"
 }
 
 func (t *OnInstanceStateChange) Label() string {
-	return "Compute • On Instance State Change"
+	return "On Instance State Change"
 }
 
 func (t *OnInstanceStateChange) Description() string {
-	return "Triggered when an OCI Compute instance state changes"
-}
-
-func (t *OnInstanceStateChange) Icon() string {
-	return "oci"
+	return "Emits when an OCI Compute instance changes its lifecycle state"
 }
 
 func (t *OnInstanceStateChange) Configuration() []configuration.Field {
-	return nil
+	return []configuration.Field{}
 }
 
 func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
-	return nil
+	return ctx.Integration.Subscribe(t.Name(), nil)
 }
 
-func (t *OnInstanceStateChange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	var payload map[string]any
-	if err := json.NewDecoder(ctx.Request.Body).Decode(&payload); err != nil {
-		return 400, nil, err
+func (t *OnInstanceStateChange) OnIntegrationMessage(ctx core.TriggerContext, message []byte) error {
+	var event struct {
+		EventType string `json:"eventType"`
+		Data      struct {
+			ResourceID string `json:"resourceId"`
+			State      string `json:"state"`
+		} `json:"data"`
 	}
 
-	eventType, _ := payload["eventType"].(string)
-	if eventType == "" {
-		return 400, nil, fmt.Errorf("missing eventType in OCI payload")
+	if err := json.Unmarshal(message, &event); err != nil {
+		return nil
 	}
 
-	err := ctx.Events.Emit("oci.compute.instanceEvent", payload)
-	if err != nil {
-		return 500, nil, err
+	if event.EventType != "com.oraclecloud.computeapi.instance.statechange" {
+		return nil
 	}
 
-	return 200, &core.WebhookResponseBody{Data: map[string]any{"status": "accepted"}}, nil
+	return ctx.Emit("changed", "oci.instance.state", []any{event.Data})
+}
+
+func (t *OnInstanceStateChange) Cleanup(ctx core.TriggerContext) error {
+	return nil
 }

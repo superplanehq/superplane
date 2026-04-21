@@ -3,21 +3,15 @@ package compute
 import (
 	"context"
 	"fmt"
+
 	ocicore "github.com/oracle/oci-go-sdk/v65/core"
+	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type CreateInstance struct{}
-
-type CreateInstanceSpec struct {
-	CompartmentID      string `mapstructure:"compartmentId"`
-	AvailabilityDomain string `mapstructure:"availabilityDomain"`
-	DisplayName        string `mapstructure:"displayName"`
-	Shape              string `mapstructure:"shape"`
-	ImageID            string `mapstructure:"imageId"`
-	SubnetID           string `mapstructure:"subnetId"`
-}
 
 func (c *CreateInstance) Name() string {
 	return "createInstance"
@@ -28,10 +22,10 @@ func (c *CreateInstance) Label() string {
 }
 
 func (c *CreateInstance) Description() string {
-	return "Provision a new Compute instance in OCI"
+	return "Provision a new OCI Compute instance"
 }
 
-func (c *CreateInstance) Setup() []configuration.Field {
+func (c *CreateInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "compartmentId",
@@ -41,17 +35,10 @@ func (c *CreateInstance) Setup() []configuration.Field {
 			Description: "The OCID of the compartment to create the instance in",
 		},
 		{
-			Name:        "availabilityDomain",
-			Label:       "Availability Domain",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The availability domain to create the instance in (e.g. Uocm:US-ASHBURN-AD-1)",
-		},
-		{
 			Name:        "displayName",
 			Label:       "Display Name",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
+			Required:    true,
 			Description: "A user-friendly name for the instance",
 		},
 		{
@@ -78,36 +65,58 @@ func (c *CreateInstance) Setup() []configuration.Field {
 	}
 }
 
-func (c *CreateInstance) Run(ctx core.ExecutionContext) (any, error) {
-	var spec CreateInstanceSpec
-	if err := ctx.GetSpec(&spec); err != nil {
-		return nil, err
+func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
+	var input struct {
+		CompartmentID string `mapstructure:"compartmentId"`
+		DisplayName   string `mapstructure:"displayName"`
+		Shape         string `mapstructure:"shape"`
+		ImageID       string `mapstructure:"imageId"`
+		SubnetID      string `mapstructure:"subnetId"`
+	}
+
+	if err := mapstructure.Decode(ctx.Configuration, &input); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
 	client, err := getClient(ctx)
 	if err != nil {
-		return nil, err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get OCI client: %v", err))
 	}
 
-	req := ocicore.LaunchInstanceRequest{
+	resp, err := client.LaunchInstance(ctx.Context, ocicore.LaunchInstanceRequest{
 		LaunchInstanceDetails: ocicore.LaunchInstanceDetails{
-			CompartmentId:      &spec.CompartmentID,
-			AvailabilityDomain: &spec.AvailabilityDomain,
-			DisplayName:        &spec.DisplayName,
-			Shape:              &spec.Shape,
+			CompartmentId: common.String(input.CompartmentID),
+			DisplayName:   common.String(input.DisplayName),
+			Shape:         common.String(input.Shape),
 			SourceDetails: ocicore.InstanceSourceViaImageDetails{
-				ImageId: &spec.ImageID,
+				ImageId: common.String(input.ImageID),
 			},
 			CreateVnicDetails: &ocicore.CreateVnicDetails{
-				SubnetId: &spec.SubnetID,
+				SubnetId: common.String(input.SubnetID),
 			},
 		},
-	}
-
-	resp, err := client.CreateInstance(context.Background(), req)
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to launch OCI instance: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to launch OCI instance: %v", err))
 	}
 
-	return resp.Instance, nil
+	payload := map[string]interface{}{
+		"id":           *resp.Instance.Id,
+		"displayName":  *resp.Instance.DisplayName,
+		"state":        string(resp.Instance.LifecycleState),
+		"shape":        *resp.Instance.Shape,
+		"region":       *resp.Instance.Region,
+		"timeCreated":  resp.Instance.TimeCreated.String(),
+	}
+
+	return ctx.ExecutionState.Emit("success", "oci.instance", []any{payload})
 }
+
+func (c *CreateInstance) Setup(ctx core.SetupContext) error { return nil }
+func (c *CreateInstance) Cleanup(ctx core.SetupContext) error { return nil }
+func (c *CreateInstance) Actions() []core.Action { return nil }
+func (c *CreateInstance) HandleAction(ctx core.ActionContext) error { return nil }
+func (c *CreateInstance) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (c *CreateInstance) Cancel(ctx core.ExecutionContext) error { return nil }

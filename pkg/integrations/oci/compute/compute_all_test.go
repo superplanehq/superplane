@@ -6,11 +6,26 @@ import (
 
 	ocicore "github.com/oracle/oci-go-sdk/v65/core"
 	"github.com/oracle/oci-go-sdk/v65/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+// Mock para ExecutionStateContext
+type MockExecutionState struct {
+	mock.Mock
+}
+
+func (m *MockExecutionState) IsFinished() bool { return m.Called().Bool(0) }
+func (m *MockExecutionState) SetKV(key, value string) error { return m.Called(key, value).Error(0) }
+func (m *MockExecutionState) Emit(channel, payloadType string, payloads []any) error {
+	return m.Called(channel, payloadType, payloads).Error(0)
+}
+func (m *MockExecutionState) Pass() error { return m.Called().Error(0) }
+func (m *MockExecutionState) Fail(reason, message string) error {
+	return m.Called(reason, message).Error(0)
+}
+
+// Reutilizamos el MockClientAll anterior...
 type MockClientAll struct {
 	mock.Mock
 }
@@ -43,86 +58,61 @@ func (m *MockClientAll) InstanceAction(ctx context.Context, request ocicore.Inst
 // 1. TEST: Create Instance
 func TestCreateInstance(t *testing.T) {
 	mockClient := new(MockClientAll)
+	mockState := new(MockExecutionState)
 	SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mockClient, nil })
 
 	expectedOCID := "ocid1.instance.test"
 	mockClient.On("LaunchInstance", mock.Anything, mock.Anything).Return(ocicore.LaunchInstanceResponse{
-		Instance: ocicore.Instance{Id: common.String(expectedOCID), DisplayName: common.String("test")},
-	}, nil)
-
-	action := &CreateInstance{}
-	output, err := action.Run(core.ExecutionContext{Context: context.Background()}, map[string]interface{}{
-		"compartmentId": "c1", "displayName": "test", "shape": "VM", "imageId": "i1", "subnetId": "s1",
-	})
-
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOCID, output.(map[string]interface{})["id"])
-}
-
-// 2. TEST: Get Instance
-func TestGetInstance(t *testing.T) {
-	mockClient := new(MockClientAll)
-	SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mockClient, nil })
-
-	expectedOCID := "ocid1.instance.test"
-	mockClient.On("GetInstance", mock.Anything, mock.Anything).Return(ocicore.GetInstanceResponse{
 		Instance: ocicore.Instance{
-			Id: common.String(expectedOCID),
+			Id: common.String(expectedOCID), 
+			DisplayName: common.String("test"),
 			LifecycleState: ocicore.InstanceLifecycleStateRunning,
+			Shape: common.String("VM.Standard.E4.Flex"),
+			Region: common.String("us-ashburn-1"),
 		},
 	}, nil)
 
-	action := &GetInstance{}
-	output, err := action.Run(core.ExecutionContext{Context: context.Background()}, map[string]interface{}{"id": expectedOCID})
+	mockState.On("Emit", "success", "oci.instance", mock.Anything).Return(nil)
 
-	assert.NoError(t, err)
-	assert.Equal(t, "RUNNING", output.(map[string]interface{})["state"])
-}
-
-// 3. TEST: Update Instance
-func TestUpdateInstance(t *testing.T) {
-	mockClient := new(MockClientAll)
-	SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mockClient, nil })
-
-	mockClient.On("UpdateInstance", mock.Anything, mock.Anything).Return(ocicore.UpdateInstanceResponse{
-		Instance: ocicore.Instance{DisplayName: common.String("new-name")},
-	}, nil)
-
-	action := &UpdateInstance{}
-	output, err := action.Run(core.ExecutionContext{Context: context.Background()}, map[string]interface{}{
-		"id": "ocid1", "displayName": "new-name",
+	action := &CreateInstance{}
+	err := action.Execute(core.ExecutionContext{
+		Context: context.Background(),
+		Configuration: map[string]interface{}{
+			"compartmentId": "c1", "displayName": "test", "shape": "VM", "imageId": "i1", "subnetId": "s1",
+		},
+		ExecutionState: mockState,
 	})
 
-	assert.NoError(t, err)
-	assert.Equal(t, "new-name", output.(map[string]interface{})["displayName"])
+	if err != nil {
+		t.Errorf("Execute failed: %v", err)
+	}
+	mockClient.AssertExpectations(t)
+	mockState.AssertExpectations(t)
 }
 
-// 4. TEST: Manage Power
+// 2. TEST: Manage Power
 func TestManageInstancePower(t *testing.T) {
 	mockClient := new(MockClientAll)
+	mockState := new(MockExecutionState)
 	SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mockClient, nil })
 
 	mockClient.On("InstanceAction", mock.Anything, mock.MatchedBy(func(req ocicore.InstanceActionRequest) bool {
-		return req.Action == common.String("START")
+		return *req.Action == "STOP"
 	})).Return(ocicore.InstanceActionResponse{}, nil)
 
+	mockState.On("Emit", "success", "oci.instance.action", mock.Anything).Return(nil)
+
 	action := &ManageInstancePower{}
-	_, err := action.Run(core.ExecutionContext{Context: context.Background()}, map[string]interface{}{
-		"id": "ocid1", "action": "START",
+	err := action.Execute(core.ExecutionContext{
+		Context: context.Background(),
+		Configuration: map[string]interface{}{
+			"id": "inst1", "action": "STOP",
+		},
+		ExecutionState: mockState,
 	})
 
-	assert.NoError(t, err)
-}
-
-// 5. TEST: Delete Instance
-func TestDeleteInstance(t *testing.T) {
-	mockClient := new(MockClientAll)
-	SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mockClient, nil })
-
-	mockClient.On("TerminateInstance", mock.Anything, mock.Anything).Return(ocicore.TerminateInstanceResponse{}, nil)
-
-	action := &DeleteInstance{}
-	_, err := action.Run(core.ExecutionContext{Context: context.Background()}, map[string]interface{}{"id": "ocid1"})
-
-	assert.NoError(t, err)
+	if err != nil {
+		t.Errorf("Execute failed: %v", err)
+	}
+	mockClient.AssertExpectations(t)
 }

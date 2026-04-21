@@ -1,65 +1,64 @@
 package compute
 
 import (
-	"context"
 	"testing"
-	"encoding/json"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type mockSubscription struct {
-	core.Subscription
-	sentBody []byte
+// Mock para TriggerContext
+type MockTriggerContext struct {
+	mock.Mock
 }
 
-func (m *mockSubscription) SendMessage(body interface{}) error {
-	b, _ := json.Marshal(body)
-	m.sentBody = b
-	return nil
+func (m *MockTriggerContext) Emit(event, payloadType string, payloads []any) error {
+	return m.Called(event, payloadType, payloads).Error(0)
 }
 
-func TestOnInstanceCreated_WebhookHandler(t *testing.T) {
+func (m *MockTriggerContext) Integration() core.IntegrationContext {
+	return m.Called().Get(0).(core.IntegrationContext)
+}
+
+// Mock para IntegrationContext
+type MockIntegrationContext struct {
+	mock.Mock
+}
+
+func (m *MockIntegrationContext) Subscribe(name string, filter any) error {
+	return m.Called(name, filter).Error(0)
+}
+func (m *MockIntegrationContext) Ready() {}
+func (m *MockIntegrationContext) ListSubscriptions() ([]core.Subscription, error) {
+	args := m.Called()
+	return args.Get(0).([]core.Subscription), args.Error(1)
+}
+
+func TestOnInstanceCreated_OnIntegrationMessage(t *testing.T) {
 	trigger := &OnInstanceCreated{}
+	mockCtx := new(MockTriggerContext)
 	
-	ociEvent := map[string]interface{}{
-		"eventType": "com.oraclecloud.computeapi.launchinstance.end",
-		"data": map[string]interface{}{
-			"resourceName": "test-vm",
-			"resourceId": "ocid1.instance.123",
-		},
+	payload := `{"eventType": "com.oraclecloud.computeapi.launchinstance.end", "data": {"resourceId": "inst1"}}`
+	
+	mockCtx.On("Emit", "created", "oci.instance", mock.Anything).Return(nil)
+	
+	err := trigger.OnIntegrationMessage(mockCtx, []byte(payload))
+	if err != nil {
+		t.Errorf("OnIntegrationMessage failed: %v", err)
 	}
-	body, _ := json.Marshal(ociEvent)
-
-	sub := &mockSubscription{}
-	ctx := core.TriggerHandlerContext{
-		Event: body,
-		Subscription: sub,
-	}
-
-	err := trigger.Handle(ctx)
-
-	assert.NoError(t, err)
+	mockCtx.AssertExpectations(t)
 }
 
-func TestOnInstanceStateChange_WebhookHandler(t *testing.T) {
-	trigger := &OnInstanceStateChange{}
+func TestOnInstanceCreated_Setup(t *testing.T) {
+	trigger := &OnInstanceCreated{}
+	mockCtx := new(MockTriggerContext)
+	mockIntegration := new(MockIntegrationContext)
 	
-	ociEvent := map[string]interface{}{
-		"eventType": "com.oraclecloud.computeapi.instance.statechange",
-		"data": map[string]interface{}{
-			"state": "RUNNING",
-		},
+	mockCtx.On("Integration").Return(mockIntegration)
+	mockIntegration.On("Subscribe", "onInstanceCreated", mock.Anything).Return(nil)
+	
+	err := trigger.Setup(mockCtx)
+	if err != nil {
+		t.Errorf("Setup failed: %v", err)
 	}
-	body, _ := json.Marshal(ociEvent)
-
-	sub := &mockSubscription{}
-	ctx := core.TriggerHandlerContext{
-		Event: body,
-		Subscription: sub,
-	}
-
-	err := trigger.Handle(ctx)
-	assert.NoError(t, err)
+	mockIntegration.AssertExpectations(t)
 }

@@ -3,17 +3,15 @@ package compute
 import (
 	"context"
 	"fmt"
+
 	ocicore "github.com/oracle/oci-go-sdk/v65/core"
+	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type ManageInstancePower struct{}
-
-type ManageInstancePowerSpec struct {
-	InstanceID string `mapstructure:"instanceId"`
-	Action     string `mapstructure:"action"`
-}
 
 func (c *ManageInstancePower) Name() string {
 	return "manageInstancePower"
@@ -24,13 +22,13 @@ func (c *ManageInstancePower) Label() string {
 }
 
 func (c *ManageInstancePower) Description() string {
-	return "Start, stop, or reset an OCI Compute instance"
+	return "Manage the power state of an OCI Compute instance (Start, Stop, Reset)"
 }
 
-func (c *ManageInstancePower) Setup() []configuration.Field {
+func (c *ManageInstancePower) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "id",
 			Label:       "Instance OCID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
@@ -39,40 +37,55 @@ func (c *ManageInstancePower) Setup() []configuration.Field {
 		{
 			Name:        "action",
 			Label:       "Action",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The power action to perform",
+			Description: "The power action to perform (START, STOP, RESET, SOFTSTOP, SOFTRESET)",
 			Options: []configuration.FieldOption{
 				{Label: "Start", Value: "START"},
-				{Label: "Stop (Force)", Value: "STOP"},
-				{Label: "Stop (Soft)", Value: "SOFTSTOP"},
-				{Label: "Reset (Force)", Value: "RESET"},
-				{Label: "Reset (Soft)", Value: "SOFTRESET"},
+				{Label: "Stop", Value: "STOP"},
+				{Label: "Reset", Value: "RESET"},
+				{Label: "Soft Stop", Value: "SOFTSTOP"},
+				{Label: "Soft Reset", Value: "SOFTRESET"},
 			},
 		},
 	}
 }
 
-func (c *ManageInstancePower) Run(ctx core.ExecutionContext) (any, error) {
-	var spec ManageInstancePowerSpec
-	if err := ctx.GetSpec(&spec); err != nil {
-		return nil, err
+func (c *ManageInstancePower) Execute(ctx core.ExecutionContext) error {
+	var input struct {
+		ID     string `mapstructure:"id"`
+		Action string `mapstructure:"action"`
+	}
+
+	if err := mapstructure.Decode(ctx.Configuration, &input); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
 	client, err := getClient(ctx)
 	if err != nil {
-		return nil, err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get OCI client: %v", err))
 	}
 
-	req := ocicore.InstanceActionRequest{
-		InstanceId: &spec.InstanceID,
-		Action:     &spec.Action,
-	}
-
-	resp, err := client.InstanceAction(context.Background(), req)
+	_, err = client.InstanceAction(ctx.Context, ocicore.InstanceActionRequest{
+		InstanceId: common.String(input.ID),
+		Action:     common.String(input.Action),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform power action on OCI instance: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to perform power action on OCI instance: %v", err))
 	}
 
-	return resp.Instance, nil
+	return ctx.ExecutionState.Emit("success", "oci.instance.action", []any{map[string]interface{}{
+		"id":     input.ID,
+		"action": input.Action,
+		"status": "requested",
+	}})
 }
+
+func (c *ManageInstancePower) Setup(ctx core.SetupContext) error { return nil }
+func (c *ManageInstancePower) Cleanup(ctx core.SetupContext) error { return nil }
+func (c *ManageInstancePower) Actions() []core.Action { return nil }
+func (c *ManageInstancePower) HandleAction(ctx core.ActionContext) error { return nil }
+func (c *ManageInstancePower) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (c *ManageInstancePower) Cancel(ctx core.ExecutionContext) error { return nil }
