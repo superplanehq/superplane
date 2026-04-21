@@ -30,7 +30,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasData";
 import { cn } from "../../lib/utils";
 import { showErrorToast, showSuccessToast } from "../../lib/toast";
-import { formatRelativeTime } from "../../lib/date";
+import { formatRelativeTimeWithTooltip } from "../../lib/date";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
@@ -86,13 +86,13 @@ const HomePage = () => {
       throw new Error("Canvas metadata is required");
     }
     const originalCreatedAt = canvas.metadata.createdAt || "";
-    const createdAtRelative = formatRelativeTime(originalCreatedAt);
+    const createdAtRelative = originalCreatedAt ? formatRelativeTimeWithTooltip(originalCreatedAt) : { relative: "N/A", full: "Unknown" };
 
     return {
       id: canvas.metadata.id!,
       name: canvas.metadata.name!,
       description: canvas.metadata.description,
-      createdAt: formatDate(originalCreatedAt),
+      createdAt: originalCreatedAt ? formatDate(originalCreatedAt) : "Unknown",
       createdAtRelative,
       originalCreatedAt,
       type: "canvases" as const,
@@ -807,80 +807,69 @@ function CanvasActionsMenu({
           event.stopPropagation();
         }}
       >
-        {!canManage ? (
-          <PermissionTooltip
-            allowed={canManage || permissionsLoading}
-            message="You don't have permission to manage this canvas."
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            asChild
+            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
           >
             <button
               className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Canvas actions"
-              disabled
+              disabled={deleteCanvasMutation.isPending}
             >
               <MoreVertical size={16} />
             </button>
-          </PermissionTooltip>
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              asChild
-              onClick={(event: MouseEvent<HTMLButtonElement>) => {
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(event: MouseEvent<HTMLElement>) => {
                 event.preventDefault();
                 event.stopPropagation();
+                navigate(`/${organizationId}/canvases/${canvas.id}/runs`);
               }}
             >
-              <button
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Canvas actions"
-                disabled={deleteCanvasMutation.isPending}
-              >
-                <MoreVertical size={16} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={(event: MouseEvent<HTMLElement>) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  navigate(`/${organizationId}/canvases/${canvas.id}/runs`);
-                }}
-              >
-                <Play size={16} />
-                View Runs
-              </DropdownMenuItem>
-              <PermissionTooltip
-                allowed={canUpdateCanvases || permissionsLoading}
-                message="You don't have permission to update canvases."
-              >
-                <DropdownMenuItem
-                  onClick={(event: MouseEvent<HTMLElement>) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (!canUpdateCanvases) return;
-                    onEdit(canvas);
-                  }}
-                  disabled={!canUpdateCanvases}
+              <Play size={16} />
+              View Runs
+            </DropdownMenuItem>
+            {canManage && (
+              <>
+                <PermissionTooltip
+                  allowed={canUpdateCanvases || permissionsLoading}
+                  message="You don't have permission to update canvases."
                 >
-                  <Pencil size={16} />
-                  Change Name
-                </DropdownMenuItem>
-              </PermissionTooltip>
-              <PermissionTooltip
-                allowed={canDeleteCanvases || permissionsLoading}
-                message="You don't have permission to delete canvases."
-              >
-                <DropdownMenuItem
-                  onClick={openDialog}
-                  className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                  disabled={!canDeleteCanvases}
+                  <DropdownMenuItem
+                    onClick={(event: MouseEvent<HTMLElement>) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (!canUpdateCanvases) return;
+                      onEdit(canvas);
+                    }}
+                    disabled={!canUpdateCanvases}
+                  >
+                    <Pencil size={16} />
+                    Change Name
+                  </DropdownMenuItem>
+                </PermissionTooltip>
+                <PermissionTooltip
+                  allowed={canDeleteCanvases || permissionsLoading}
+                  message="You don't have permission to delete canvases."
                 >
-                  <Trash2 size={16} />
-                  Delete
-                </DropdownMenuItem>
-              </PermissionTooltip>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+                  <DropdownMenuItem
+                    onClick={openDialog}
+                    className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                    disabled={!canDeleteCanvases}
+                  >
+                    <Trash2 size={16} />
+                    Delete
+                  </DropdownMenuItem>
+                </PermissionTooltip>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
