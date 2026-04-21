@@ -17,7 +17,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -166,6 +166,36 @@ def _extract_output_tool_answer(payload: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_output_proposal(payload: dict[str, Any]) -> dict[str, Any] | None:
+    parts = payload.get("parts")
+    if not isinstance(parts, list):
+        return None
+
+    for part in reversed(parts):
+        if not isinstance(part, dict):
+            continue
+        if part.get("part_kind") != "tool-call":
+            continue
+        if not _likely_output_tool_name(part.get("tool_name")):
+            continue
+
+        args = part.get("args")
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                continue
+
+        if not isinstance(args, dict):
+            continue
+
+        proposal = args.get("proposal")
+        if isinstance(proposal, dict):
+            return proposal
+
+    return None
+
+
 @dataclass(frozen=True)
 class StoredAgentChat:
     id: str
@@ -178,6 +208,7 @@ class StoredAgentChat:
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_tokens: int = 0
+    latest_run_status: str = ""
 
 
 @dataclass(frozen=True)
@@ -195,6 +226,7 @@ class StoredAgentChatMessageRecord:
     message: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    proposal: str | None = None
 
 
 @dataclass(frozen=True)
@@ -206,6 +238,7 @@ class StoredAgentChatMessage:
     tool_call_id: str | None
     tool_status: str | None
     created_at: datetime
+    proposal: str | None = None
 
 
 @dataclass(frozen=True)
@@ -500,9 +533,11 @@ class SessionStore:
         preserved_message_count: int,
         messages: list[ModelMessage],
         run_id: str | None = None,
+        coerced_proposal_json: str | None = None,
     ) -> None:
         now = _utcnow()
         cid = uuid.UUID(chat_id)
+        last_index = preserved_message_count + len(messages) - 1
 
         with self._session() as session:
             with session.begin():
@@ -520,13 +555,18 @@ class SessionStore:
                 for offset, msg in enumerate(messages):
                     serialized_message = _serialize_model_message(msg)
                     created_at = _message_timestamp(msg)
+                    index = preserved_message_count + offset
+                    # Set the coerced proposal only on the last message (which
+                    # contains the output tool call whose args have been coerced).
+                    proposal = coerced_proposal_json if index == last_index else None
                     session.add(
                         AgentChatMessage(
                             id=uuid.uuid4(),
                             chat_id=cid,
                             run_id=uuid.UUID(run_id) if run_id else None,
-                            message_index=preserved_message_count + offset,
+                            message_index=index,
                             message=serialized_message,
+                            proposal=proposal,
                             created_at=created_at,
                             updated_at=now,
                         )
@@ -561,6 +601,9 @@ class SessionStore:
                 chat = self._lock_chat(session, cid)
                 if chat is None:
                     raise AgentChatNotFoundError(chat_id)
+
+                chat.latest_run_status = "running"
+                chat.updated_at = now
 
                 session.add(
                     AgentChatRun(
@@ -614,7 +657,43 @@ class SessionStore:
                 chat.total_input_tokens = int(totals[0])
                 chat.total_output_tokens = int(totals[1])
                 chat.total_tokens = int(totals[2])
+                chat.latest_run_status = "completed"
                 chat.updated_at = now
+
+    def mark_run_failed(self, chat_id: str) -> None:
+        cid = uuid.UUID(chat_id)
+        now = _utcnow()
+
+        with self._session() as session:
+            with session.begin():
+                chat = self._lock_chat(session, cid)
+                if chat is None:
+                    return
+
+                # Don't overwrite a successfully-recorded completion.
+                if chat.latest_run_status == "completed":
+                    return
+
+                chat.latest_run_status = "failed"
+                chat.updated_at = now
+
+    def reset_stale_running_chats(self) -> int:
+        """Mark all chats stuck in 'running' as 'failed'.
+
+        Called once on startup to recover from a previous crash or OOM kill
+        that left latest_run_status = 'running' in the DB with no live agent
+        task to complete them.  Returns the number of rows updated.
+        """
+        now = _utcnow()
+        stmt = (
+            update(AgentChat)
+            .where(AgentChat.latest_run_status == "running")
+            .values(latest_run_status="failed", updated_at=now)
+        )
+        with self._session() as session:
+            with session.begin():
+                result = session.execute(stmt)
+                return result.rowcount
 
     # ---- org usage ----
 
@@ -707,6 +786,13 @@ class SessionStore:
             assistant_content = "".join(assistant_parts)
             if not assistant_content:
                 assistant_content = _extract_output_tool_answer(record.message)
+            # Prefer the explicitly saved proposal (already coerced) over the
+            # value extracted from raw tool-call args (which is pre-coercion).
+            if record.proposal is not None:
+                proposal_json = record.proposal
+            else:
+                proposal_dict = _extract_output_proposal(record.message)
+                proposal_json = json.dumps(proposal_dict) if proposal_dict is not None else None
             if assistant_content:
                 flattened.append(
                     StoredAgentChatMessage(
@@ -717,6 +803,7 @@ class SessionStore:
                         tool_call_id=None,
                         tool_status=None,
                         created_at=record.created_at,
+                        proposal=proposal_json,
                     )
                 )
 
@@ -735,6 +822,7 @@ class SessionStore:
             total_input_tokens=int(row.total_input_tokens or 0),
             total_output_tokens=int(row.total_output_tokens or 0),
             total_tokens=int(row.total_tokens or 0),
+            latest_run_status=str(row.latest_run_status or ""),
         )
 
     @staticmethod
@@ -750,6 +838,7 @@ class SessionStore:
             message=payload,
             created_at=_from_db_time(row.created_at),
             updated_at=_from_db_time(row.updated_at),
+            proposal=row.proposal,
         )
 
     @staticmethod

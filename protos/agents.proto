@@ -128,6 +128,7 @@ message AgentChatMessage {
   string tool_call_id = 4;
   string tool_status = 5;
   google.protobuf.Timestamp created_at = 6;
+  string proposal = 7;
 }
 
 message CreateAgentChatRequest {
@@ -160,4 +161,5 @@ message AgentChatInfo {
   string id = 1;
   string initial_message = 2;
   google.protobuf.Timestamp created_at = 3;
+  string latest_run_status = 4;
 }
