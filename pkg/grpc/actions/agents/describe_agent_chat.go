@@ -43,8 +43,9 @@ func DescribeAgentChat(
 	}
 
 	chat := &pb.AgentChatInfo{
-		Id:             response.Chat.Id,
-		InitialMessage: response.Chat.InitialMessage,
+		Id:              response.Chat.Id,
+		InitialMessage:  response.Chat.InitialMessage,
+		LatestRunStatus: response.Chat.LatestRunStatus,
 	}
 
 	if response.Chat.CreatedAt != nil {
