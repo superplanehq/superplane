@@ -51,7 +51,6 @@ func Test__QueryDataSource__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
-
 }
 
 func Test__QueryDataSource__Configuration__UsesIntegrationResourceForDataSource(t *testing.T) {
@@ -195,6 +194,7 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 				"query":      "{}",
 				"timeFrom":   "2026-04-01T10:15",
 				"timeTo":     "2026-04-01T11:45",
+				"timezone":   "5",
 			},
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -210,8 +210,8 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 
 		body := decodeJSONBody(t, httpContext.Requests[0].Body)
-		assert.Equal(t, "1775038500000", body["from"])
-		assert.Equal(t, "1775043900000", body["to"])
+		assert.Equal(t, "1775020500000", body["from"])
+		assert.Equal(t, "1775025900000", body["to"])
 	})
 
 	t.Run("timezone aware timestamps are converted without timezone field", func(t *testing.T) {
@@ -247,6 +247,41 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		body := decodeJSONBody(t, httpContext.Requests[0].Body)
 		assert.Equal(t, "1775020500000", body["from"])
 		assert.Equal(t, "1775025900000", body["to"])
+	})
+
+	t.Run("go style timestamps are converted to unix millis", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"results": {}}`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataSource": "logs",
+				"query":      "{}",
+				"timeFrom":   "2026-04-01 10:15:00 +0000 UTC",
+				"timeTo":     "2026-04-01 11:45:00 +0000 UTC",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://grafana.example.com",
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		body := decodeJSONBody(t, httpContext.Requests[0].Body)
+		assert.Equal(t, "1775038500000", body["from"])
+		assert.Equal(t, "1775043900000", body["to"])
 	})
 
 	t.Run("datetime picker values do not require timezone", func(t *testing.T) {
@@ -352,6 +387,71 @@ func Test__parseGrafanaQueryTime__acceptsGoTimeStringOutput(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, time.Date(2026, time.April, 8, 11, 53, 5, 866556510, time.UTC), parsed.UTC())
+}
+
+func Test__resolveQueryTimeValue(t *testing.T) {
+	t.Run("preserves grafana relative values", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("now-24h", nil)
+		require.NoError(t, err)
+		require.Equal(t, "now-24h", value)
+	})
+
+	t.Run("converts rfc3339 timestamps to unix millis", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("2026-04-09T08:00:00Z", nil)
+		require.NoError(t, err)
+		require.Equal(t, "1775721600000", value)
+	})
+
+	t.Run("strips negative monotonic suffixes from resolved go timestamps", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("2026-04-09 08:00:00 +0000 UTC m=-0.123456789", nil)
+		require.NoError(t, err)
+		require.Equal(t, "1775721600000", value)
+	})
+}
+
+func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
+	for _, offset := range []string{"5.75", "+5.75", "12.75", "-3.5"} {
+		t.Run(offset, func(t *testing.T) {
+			loc, err := parseGrafanaQueryTimezone(&offset)
+			require.NoError(t, err)
+			require.NotNil(t, loc)
+		})
+	}
+}
+
+func Test__parseGrafanaQueryTimezone__rejectsNaNAndInf(t *testing.T) {
+	for _, bad := range []string{"NaN", "+Inf", "-Inf", "inf", "-inf"} {
+		t.Run(bad, func(t *testing.T) {
+			v := bad
+			_, err := parseGrafanaQueryTimezone(&v)
+			require.Error(t, err)
+		})
+	}
+}
+
+func Test__parseGrafanaQueryTimezone__zoneNameMatchesOffset(t *testing.T) {
+	tests := map[string]string{
+		"5.75":  "GMT+05:45",
+		"5.5":   "GMT+05:30",
+		"-5.5":  "GMT-05:30",
+		"0":     "GMT+00:00",
+		"-3.5":  "GMT-03:30",
+		"12.75": "GMT+12:45",
+	}
+	for offset, wantName := range tests {
+		t.Run(offset, func(t *testing.T) {
+			o := offset
+			loc, err := parseGrafanaQueryTimezone(&o)
+			require.NoError(t, err)
+			require.Equal(t, wantName, loc.String())
+		})
+	}
+}
+
+func Test__fixedZoneNameFromOffsetSeconds(t *testing.T) {
+	require.Equal(t, "GMT+00:00", fixedZoneNameFromOffsetSeconds(0))
+	require.Equal(t, "GMT+05:30", fixedZoneNameFromOffsetSeconds(5*3600+30*60))
+	require.Equal(t, "GMT-03:30", fixedZoneNameFromOffsetSeconds(-(3*3600 + 30*60)))
 }
 
 func decodeJSONBody(t *testing.T, body io.ReadCloser) map[string]any {

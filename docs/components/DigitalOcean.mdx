@@ -16,6 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
+  <LinkCard title="Create Database" href="#create-database" description="Create a new managed database instance in DigitalOcean" />
   <LinkCard title="Create Database Cluster" href="#create-database-cluster" description="Create a new database cluster" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
   <LinkCard title="Create Knowledge Base" href="#create-knowledge-base" description="Create a DigitalOcean Gradient AI knowledge base with one or more data sources" />
@@ -25,6 +26,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete App" href="#delete-app" description="Delete a DigitalOcean App Platform application" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Data Source" href="#delete-data-source" description="Remove a data source from a DigitalOcean Gradient AI knowledge base" />
+  <LinkCard title="Delete Database" href="#delete-database" description="Delete an existing database instance from DigitalOcean" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
   <LinkCard title="Delete Knowledge Base" href="#delete-knowledge-base" description="Delete a DigitalOcean Gradient AI knowledge base and optionally its OpenSearch database" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
@@ -33,6 +35,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Detach Knowledge Base" href="#detach-knowledge-base" description="Detach a knowledge base from a DigitalOcean Gradient AI agent" />
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
+  <LinkCard title="Get Cluster Configuration" href="#get-cluster-configuration" description="Retrieve the configuration details for a database cluster" />
+  <LinkCard title="Get Database" href="#get-database" description="Retrieve details of a specific managed database instance" />
   <LinkCard title="Get Database Cluster" href="#get-database-cluster" description="Retrieve details of a specific database cluster" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
@@ -504,6 +508,49 @@ Returns the created DNS record including:
   },
   "timestamp": "2026-03-16T09:50:03.222782653Z",
   "type": "digitalocean.dns.record.created"
+}
+```
+
+<a id="create-database"></a>
+
+## Create Database
+
+The Create Database component adds a new database to an existing DigitalOcean Managed Database cluster.
+
+### Use Cases
+
+- **Application bootstrap**: Create an application-specific database as part of environment setup
+- **Tenant provisioning**: Add a dedicated database for a new customer or workspace
+- **Migration workflows**: Prepare a destination database before importing data
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster that will contain the new database (required)
+- **Database Name**: The name of the database to create (required, supports expressions)
+
+### Output
+
+Returns the created database including:
+- **name**: The created database name
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:create` and `database:read`
+- Database management is not supported for Caching or Valkey clusters
+
+### Example Output
+
+```json
+{
+  "data": {
+    "databaseClusterId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseClusterName": "primary-postgres",
+    "name": "app_db"
+  },
+  "timestamp": "2026-03-27T09:15:00Z",
+  "type": "digitalocean.database.created"
 }
 ```
 
@@ -990,6 +1037,52 @@ Returns the deleted data source details:
   },
   "timestamp": "2026-04-09T10:29:59.190938313Z",
   "type": "digitalocean.data_source.deleted"
+}
+```
+
+<a id="delete-database"></a>
+
+## Delete Database
+
+The Delete Database component permanently removes a database from a DigitalOcean Managed Database cluster.
+
+### Use Cases
+
+- **Cleanup**: Remove databases that are no longer needed after a workflow completes
+- **Environment teardown**: Delete temporary or preview-environment databases
+- **Tenant offboarding**: Remove customer-specific databases during deprovisioning
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster containing the database (required)
+- **Database**: The database to delete (required)
+
+### Output
+
+Returns information about the deleted database:
+- **name**: The deleted database name
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+- **deleted**: Whether the delete request succeeded
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:delete` and `database:read`
+- Database management is not supported for Caching or Valkey clusters
+- Deleting a database that no longer exists is treated as a success
+
+### Example Output
+
+```json
+{
+  "data": {
+    "databaseClusterId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseClusterName": "primary-postgres",
+    "deleted": true,
+    "name": "app_db"
+  },
+  "timestamp": "2026-03-27T09:20:00Z",
+  "type": "digitalocean.database.deleted"
 }
 ```
 
@@ -1487,6 +1580,119 @@ Returns the app object including:
   },
   "timestamp": "2026-03-26T08:21:30.077395918Z",
   "type": "digitalocean.app.fetched"
+}
+```
+
+<a id="get-cluster-configuration"></a>
+
+## Get Cluster Configuration
+
+The Get Cluster Configuration component retrieves the active configuration for a DigitalOcean Managed Database cluster.
+
+### Use Cases
+
+- **Audit workflows**: Inspect the active cluster configuration for reporting or compliance checks
+- **Validation**: Compare the current cluster configuration before updates or maintenance
+- **Operational visibility**: Retrieve engine-specific settings that affect behavior and performance
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster to inspect (required)
+
+### Output
+
+Returns the cluster configuration including:
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+- **config**: The configuration object returned by the DigitalOcean API
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:read`
+- The keys inside `config` vary by database engine
+
+### Example Output
+
+```json
+{
+  "data": {
+    "config": {
+      "autovacuum_naptime": 60,
+      "backtrack_commit_timeout": 30,
+      "default_toast_compression": "pglz",
+      "idle_in_transaction_session_timeout": 0,
+      "jit": true,
+      "max_parallel_workers": 8
+    },
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test"
+  },
+  "timestamp": "2026-03-27T11:10:00.000000000Z",
+  "type": "digitalocean.database.cluster.config.fetched"
+}
+```
+
+<a id="get-database"></a>
+
+## Get Database
+
+The Get Database component retrieves a managed database from a DigitalOcean cluster and enriches it with cluster context.
+
+### Use Cases
+
+- **Routing decisions**: Inspect the database and cluster state before directing traffic or jobs
+- **Operational checks**: Review engine, region, and connection details before maintenance steps
+- **Audit workflows**: Retrieve the current database and cluster context for reporting or validation
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster containing the database (required)
+- **Database**: The database to retrieve (required)
+
+### Output
+
+Returns the requested database enriched with cluster details, including:
+- **name**: The database name
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+- **engine**: The cluster engine
+- **version**: The cluster engine version
+- **region**: The cluster region
+- **status**: The cluster status
+- **connection**: Connection information when available
+- **database**: The raw database object returned by the API
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:read`
+- Database management is not supported for Caching or Valkey clusters
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connection": {
+      "database": "defaultdb",
+      "host": "superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com",
+      "port": 25060,
+      "ssl": true,
+      "uri": "postgresql://doadmin@superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com:25060/defaultdb?sslmode=require",
+      "user": "doadmin"
+    },
+    "database": {
+      "name": "app_db"
+    },
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test",
+    "engine": "pg",
+    "name": "app_db",
+    "region": "nyc1",
+    "status": "online",
+    "version": "17"
+  },
+  "timestamp": "2026-03-27T11:12:00.000000000Z",
+  "type": "digitalocean.database.fetched"
 }
 ```
 

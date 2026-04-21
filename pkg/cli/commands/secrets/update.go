@@ -41,7 +41,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	request := openapi_client.SecretsUpdateSecretBody{}
 	request.SetSecret(secret)
-	request.SetDomainType(organizationDomainType())
+	request.SetDomainType(core.OrganizationDomainType())
 	request.SetDomainId(organizationID)
 
 	response, _, err := ctx.API.SecretAPI.SecretsUpdateSecret(ctx.Context, resource.Metadata.GetId()).Body(request).Execute()

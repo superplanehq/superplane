@@ -49,7 +49,7 @@ func Test__GetDatabaseCluster__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, DatabaseClusterNodeMetadata{
+		assert.Equal(t, DatabaseNodeMetadata{
 			DatabaseClusterID:   "cluster-1",
 			DatabaseClusterName: "superplane-db",
 		}, metadataCtx.Metadata)

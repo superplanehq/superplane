@@ -40,7 +40,7 @@ func (g *Grafana) Icon() string {
 }
 
 func (g *Grafana) Description() string {
-	return "Connect Grafana alerts, alert rules, annotations, silences, and data queries to SuperPlane workflows"
+	return "Connect Grafana alerts, alert rules, dashboards, annotations, silences, and data queries to SuperPlane workflows"
 }
 
 func (g *Grafana) Instructions() string {
@@ -92,8 +92,12 @@ func (g *Grafana) Components() []core.Component {
 		&CreateAlertRule{},
 		&DeleteAlertRule{},
 		&GetAlertRule{},
+		&GetDashboard{},
 		&ListAlertRules{},
 		&QueryDataSource{},
+		&QueryLogs{},
+		&QueryTraces{},
+		&RenderPanel{},
 		&UpdateAlertRule{},
 		&CreateAnnotation{},
 		&ListAnnotations{},
@@ -279,6 +283,16 @@ func formatAnnotationResourceName(a Annotation) string {
 		return fmt.Sprintf("#%d", a.ID)
 	}
 	return fmt.Sprintf("#%d · %s", a.ID, text)
+}
+
+func formatPanelResourceLabel(panel PanelSummary) string {
+	idLabel := fmt.Sprintf("Panel %d", panel.ID)
+	title := strings.TrimSpace(panel.Title)
+	if title == "" {
+		return idLabel
+	}
+
+	return fmt.Sprintf("%s (%s)", title, idLabel)
 }
 
 func grafanaResourcesFromList[T any](resourceType string, items []T, idOf func(T) string, nameOf func(T) string) []core.IntegrationResource {

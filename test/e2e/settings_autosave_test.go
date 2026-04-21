@@ -23,7 +23,7 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.assertExpressionFieldCleared("FilterPartial")
 	})
 
-	t.Run("partial configuration persists after switching to Runs tab", func(t *testing.T) {
+	t.Run("partial configuration persists after switching to Info tab", func(t *testing.T) {
 		steps := &settingsAutoSaveSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Autosave Tab Switch")
@@ -31,7 +31,7 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.assertExpressionFieldEquals("FilterSwitch", "true")
 		steps.clearExpressionField()
 		steps.waitForAutoSave()
-		steps.switchToRunsTab()
+		steps.switchToInfoTab()
 		steps.switchToConfigurationTab()
 		steps.assertExpressionInputEquals("")
 		steps.assertExpressionFieldCleared("FilterSwitch")
@@ -71,8 +71,8 @@ func (s *settingsAutoSaveSteps) waitForAutoSave() {
 	s.session.Sleep(500)
 }
 
-func (s *settingsAutoSaveSteps) switchToRunsTab() {
-	s.session.Click(q.Text("Runs"))
+func (s *settingsAutoSaveSteps) switchToInfoTab() {
+	s.session.Click(q.Text("Info"))
 	s.session.Sleep(500)
 }
 

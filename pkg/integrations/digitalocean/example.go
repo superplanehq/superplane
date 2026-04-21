@@ -177,6 +177,30 @@ func (g *GetDropletMetrics) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDropletMetricsOnce, exampleOutputGetDropletMetricsBytes, &exampleOutputGetDropletMetrics)
 }
 
+//go:embed example_output_get_database.json
+var exampleOutputGetDatabaseBytes []byte
+
+var exampleOutputGetDatabaseOnce sync.Once
+var exampleOutputGetDatabase map[string]any
+
+func (g *GetDatabase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDatabaseOnce, exampleOutputGetDatabaseBytes, &exampleOutputGetDatabase)
+}
+
+//go:embed example_output_get_cluster_configuration.json
+var exampleOutputGetClusterConfigurationBytes []byte
+
+var exampleOutputGetClusterConfigurationOnce sync.Once
+var exampleOutputGetClusterConfiguration map[string]any
+
+func (g *GetClusterConfiguration) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetClusterConfigurationOnce,
+		exampleOutputGetClusterConfigurationBytes,
+		&exampleOutputGetClusterConfiguration,
+	)
+}
+
 //go:embed example_output_get_object.json
 var exampleOutputGetObjectBytes []byte
 
@@ -227,6 +251,16 @@ func (c *CreateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAppOnce, exampleOutputCreateAppBytes, &exampleOutputCreateApp)
 }
 
+//go:embed example_output_create_database.json
+var exampleOutputCreateDatabaseBytes []byte
+
+var exampleOutputCreateDatabaseOnce sync.Once
+var exampleOutputCreateDatabase map[string]any
+
+func (c *CreateDatabase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateDatabaseOnce, exampleOutputCreateDatabaseBytes, &exampleOutputCreateDatabase)
+}
+
 //go:embed example_output_create_database_cluster.json
 var exampleOutputCreateDatabaseClusterBytes []byte
 
@@ -273,6 +307,16 @@ var exampleOutputDeleteApp map[string]any
 
 func (d *DeleteApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAppOnce, exampleOutputDeleteAppBytes, &exampleOutputDeleteApp)
+}
+
+//go:embed example_output_delete_database.json
+var exampleOutputDeleteDatabaseBytes []byte
+
+var exampleOutputDeleteDatabaseOnce sync.Once
+var exampleOutputDeleteDatabase map[string]any
+
+func (d *DeleteDatabase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteDatabaseOnce, exampleOutputDeleteDatabaseBytes, &exampleOutputDeleteDatabase)
 }
 
 //go:embed example_output_update_app.json

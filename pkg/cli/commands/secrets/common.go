@@ -8,7 +8,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -22,10 +21,6 @@ type secretResource struct {
 	Kind       string                                `json:"kind"`
 	Metadata   *openapi_client.SecretsSecretMetadata `json:"metadata,omitempty"`
 	Spec       *openapi_client.SecretsSecretSpec     `json:"spec,omitempty"`
-}
-
-func organizationDomainType() openapi_client.AuthorizationDomainType {
-	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
 }
 
 func parseSecretFile(path string) (*secretResource, error) {
@@ -49,7 +44,7 @@ func parseSecretFile(path string) (*secretResource, error) {
 	}
 
 	resource := secretResource{}
-	if err := yaml.Unmarshal(data, &resource); err != nil {
+	if err := core.NewDecoder(data).DecodeYAML(&resource); err != nil {
 		return nil, fmt.Errorf("failed to parse secret resource: %w", err)
 	}
 

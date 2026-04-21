@@ -1,0 +1,9 @@
+{
+  "data": {
+    "databaseClusterId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseClusterName": "primary-postgres",
+    "name": "app_db"
+  },
+  "timestamp": "2026-03-27T09:15:00Z",
+  "type": "digitalocean.database.created"
+}

@@ -42,8 +42,12 @@ type ContactPoint struct {
 }
 
 type DataSource struct {
-	UID  string `json:"uid"`
-	Name string `json:"name"`
+	ID        int    `json:"id"`
+	UID       string `json:"uid"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	URL       string `json:"url"`
+	IsDefault bool   `json:"isDefault"`
 }
 
 type Silence struct {
@@ -72,6 +76,84 @@ type SilenceMatcher struct {
 type Folder struct {
 	UID   string `json:"uid"`
 	Title string `json:"title"`
+}
+
+type PanelSummary struct {
+	ID    int    `json:"id"`
+	Title string `json:"title"`
+	Type  string `json:"type"`
+}
+
+type DashboardDetails struct {
+	UID         string         `json:"uid"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	URL         string         `json:"url"`
+	FolderTitle string         `json:"folderTitle"`
+	FolderUID   string         `json:"folder"`
+	Tags        []string       `json:"tags"`
+	Panels      []PanelSummary `json:"panels"`
+}
+
+type dashboardGetResponse struct {
+	Dashboard json.RawMessage `json:"dashboard"`
+	Meta      struct {
+		Slug        string `json:"slug"`
+		URL         string `json:"url"`
+		FolderTitle string `json:"folderTitle"`
+		FolderUID   string `json:"folderUid"`
+	} `json:"meta"`
+}
+
+// dashboardURLPathSlug is the path segment after /d/{uid}/ for viewer and image-renderer URLs.
+// When meta.slug is empty, repeating the dashboard UID is a widely accepted Grafana fallback.
+func dashboardURLPathSlug(details *DashboardDetails) string {
+	if details == nil {
+		return "dashboard"
+	}
+	if s := strings.TrimSpace(details.Slug); s != "" {
+		return s
+	}
+	if uid := strings.TrimSpace(details.UID); uid != "" {
+		return uid
+	}
+
+	return "dashboard"
+}
+
+// collectDashboardPanelSummaries walks Grafana dashboard.panel JSON, including panels nested under row panels.
+func collectDashboardPanelSummaries(rawPanels []json.RawMessage) []PanelSummary {
+	out := make([]PanelSummary, 0, len(rawPanels)*2)
+	var walk func([]json.RawMessage)
+	walk = func(list []json.RawMessage) {
+		for _, raw := range list {
+			var node struct {
+				ID     int               `json:"id"`
+				Title  string            `json:"title"`
+				Type   string            `json:"type"`
+				Panels []json.RawMessage `json:"panels"`
+			}
+			if err := json.Unmarshal(raw, &node); err != nil {
+				continue
+			}
+
+			isRow := strings.EqualFold(strings.TrimSpace(node.Type), "row")
+			if node.ID != 0 && !isRow {
+				out = append(out, PanelSummary{
+					ID:    node.ID,
+					Title: node.Title,
+					Type:  node.Type,
+				})
+			}
+
+			if len(node.Panels) > 0 {
+				walk(node.Panels)
+			}
+		}
+	}
+
+	walk(rawPanels)
+	return out
 }
 
 type AlertRuleSummary struct {
@@ -178,6 +260,28 @@ func readAPIToken(ctx core.IntegrationContext) (string, error) {
 	}
 
 	return strings.TrimSpace(string(apiTokenConfig)), nil
+}
+
+func (c *Client) resolveURL(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return trimmed
+	}
+	if parsed.IsAbs() {
+		return trimmed
+	}
+
+	base, err := url.Parse(strings.TrimSuffix(c.BaseURL, "/") + "/")
+	if err != nil {
+		return trimmed
+	}
+
+	return base.ResolveReference(parsed).String()
 }
 
 func (c *Client) buildURL(path string) string {
@@ -756,6 +860,28 @@ func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
 	return c.putNotificationPolicies(root)
 }
 
+func (c *Client) GetDataSource(uid string) (*DataSource, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/datasources/uid/%s", url.PathEscape(uid)),
+		nil, "",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting data source: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana data source get", status, responseBody)
+	}
+
+	var source DataSource
+	if err := json.Unmarshal(responseBody, &source); err != nil {
+		return nil, fmt.Errorf("error parsing data source response: %v", err)
+	}
+
+	return &source, nil
+}
+
 func (c *Client) ListSilences(filter string) ([]Silence, error) {
 	path := "/api/alertmanager/grafana/api/v2/silences"
 	if f := strings.TrimSpace(filter); f != "" {
@@ -1162,6 +1288,86 @@ func (c *Client) ListDashboardPanels(uid string) ([]DashboardPanel, error) {
 	}
 
 	return extractDashboardPanels(response.Dashboard), nil
+}
+
+func (c *Client) getDashboardResponse(uid string) (*dashboardGetResponse, error) {
+	trimmedUID := strings.TrimSpace(uid)
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(trimmedUID)),
+		nil,
+		"",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting dashboard: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response dashboardGetResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	return &response, nil
+}
+
+func (c *Client) buildDashboardDetails(response *dashboardGetResponse) (*DashboardDetails, error) {
+	var dashboard struct {
+		UID    string            `json:"uid"`
+		Title  string            `json:"title"`
+		Tags   []string          `json:"tags"`
+		Panels []json.RawMessage `json:"panels"`
+	}
+	if err := json.Unmarshal(response.Dashboard, &dashboard); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	return &DashboardDetails{
+		UID:         strings.TrimSpace(dashboard.UID),
+		Title:       strings.TrimSpace(dashboard.Title),
+		Slug:        strings.TrimSpace(response.Meta.Slug),
+		URL:         c.resolveURL(response.Meta.URL),
+		FolderTitle: strings.TrimSpace(response.Meta.FolderTitle),
+		FolderUID:   strings.TrimSpace(response.Meta.FolderUID),
+		Tags:        dashboard.Tags,
+		Panels:      collectDashboardPanelSummaries(dashboard.Panels),
+	}, nil
+}
+
+func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
+	response, err := c.getDashboardResponse(uid)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.buildDashboardDetails(response)
+}
+
+func (c *Client) RenderPanelURL(uid, slug string, panelID, width, height int, from, to string) string {
+	escapedUID := url.PathEscape(strings.TrimSpace(uid))
+	escapedSlug := url.PathEscape(strings.TrimSpace(slug))
+	params := url.Values{}
+	params.Set("panelId", fmt.Sprintf("%d", panelID))
+	params.Set("width", fmt.Sprintf("%d", width))
+	params.Set("height", fmt.Sprintf("%d", height))
+	params.Set("tz", "UTC")
+	if from != "" {
+		params.Set("from", from)
+	}
+	if to != "" {
+		params.Set("to", to)
+	}
+
+	return fmt.Sprintf(
+		"%s/render/d-solo/%s/%s?%s",
+		strings.TrimSuffix(c.BaseURL, "/"),
+		escapedUID,
+		escapedSlug,
+		params.Encode(),
+	)
 }
 
 func extractDashboardPanels(dashboard map[string]any) []DashboardPanel {

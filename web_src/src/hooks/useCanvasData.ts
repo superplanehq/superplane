@@ -156,7 +156,23 @@ export const useCanvasTemplates = (organizationId: string) => {
   });
 };
 
-export const useCanvas = (organizationId: string, canvasId: string) => {
+type UseCanvasOptions = {
+  enabled?: boolean;
+  staleTime?: number;
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  refetchOnMount?: boolean;
+};
+
+export const useCanvas = (organizationId: string, canvasId: string, options: UseCanvasOptions = {}) => {
+  const {
+    enabled = true,
+    staleTime = 0,
+    refetchOnWindowFocus = true,
+    refetchOnReconnect = true,
+    refetchOnMount = true,
+  } = options;
+
   return useQuery({
     queryKey: canvasKeys.detail(organizationId, canvasId),
     queryFn: async () => {
@@ -167,9 +183,11 @@ export const useCanvas = (organizationId: string, canvasId: string) => {
       );
       return response.data?.canvas;
     },
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-    enabled: !!organizationId && !!canvasId,
+    staleTime,
+    refetchOnWindowFocus,
+    refetchOnReconnect,
+    refetchOnMount,
+    enabled: enabled && !!organizationId && !!canvasId,
   });
 };
 

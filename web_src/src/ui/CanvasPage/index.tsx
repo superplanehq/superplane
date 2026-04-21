@@ -20,20 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import {
-  ChevronsDownUp,
-  ChevronsUpDown,
-  CircleX,
-  Copy,
-  GitBranch,
-  Group,
-  LayoutDashboard,
-  LayoutGrid,
-  Loader2,
-  Play,
-  Trash2,
-  TriangleAlert,
-} from "lucide-react";
+import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Play, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -60,13 +47,15 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
+import { AgentSidebar } from "@/components/AgentSidebar";
+import { useAgentState, type AgentState } from "@/components/AgentSidebar/useAgentState";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
-import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
-import type { AgentContext, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
+import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import type { EventState, EventStateMap } from "../componentBase";
@@ -74,12 +63,10 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { EmitEventModal } from "../EmitEventModal";
-import { GroupNode } from "../groupNode";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
-import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
 import type { CanvasPageState } from "./useCanvasState";
@@ -178,7 +165,7 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
-  unpublishedDraftChangeCount?: number;
+  hasUnpublishedDraftChanges?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -221,12 +208,6 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  onGroupUpdate?: (nodeId: string, updates: { label?: string; description?: string; color?: string }) => void;
-  onGroupNodes?: (
-    bounds: { x: number; y: number; width: number; height: number },
-    nodePositions: Array<{ id: string; x: number; y: number }>,
-  ) => void;
-  onUngroupNodes?: (groupNodeId: string) => void;
   getCustomField?: (
     nodeId: string,
     onRun?: (initialData?: string) => void,
@@ -271,7 +252,10 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  agentContext: AgentContext;
+  /** When true with a non-empty `activeCanvasVersionId`, the agent may run in build mode. */
+  isEditing: boolean;
+  /** Active canvas version id (draft when editing); drives agent build mode. */
+  activeCanvasVersionId: string;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
@@ -380,12 +364,6 @@ type CanvasAnnotationUpdate = {
   y?: number;
 };
 
-type CanvasGroupUpdate = {
-  label?: string;
-  description?: string;
-  color?: string;
-};
-
 type PendingRunData = {
   nodeId?: string;
   initialData?: string;
@@ -402,12 +380,11 @@ type CanvasNodeRendererCallbacks = {
   onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
-  onGroupUpdate: React.MutableRefObject<CanvasPageProps["onGroupUpdate"] | undefined>;
-  onUngroupNodes: React.MutableRefObject<CanvasPageProps["onUngroupNodes"] | undefined>;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   showHeader: boolean;
   hasMultiSelection: boolean;
+  canvasMode: "live" | "edit";
 };
 
 type CanvasBlockNodeData = CanvasBlockData & {
@@ -430,7 +407,6 @@ function createNodeRenderFallbackData(data: BlockData): BlockData {
     component: undefined,
     composite: undefined,
     annotation: undefined,
-    group: undefined,
     renderFallback: {
       source: "node-render",
       message: CANVAS_NODE_FALLBACK_MESSAGE,
@@ -447,7 +423,6 @@ const NODE_ERROR_LABEL_GETTERS: Record<BlockData["type"], (data: BlockData) => s
   component: (data) => getNonEmptyString(data.component?.title),
   composite: (data) => getNonEmptyString(data.composite?.title),
   annotation: (data) => getNonEmptyString(data.annotation?.title),
-  group: (data) => getNonEmptyString(data.group?.groupLabel),
 };
 
 function getNodeErrorDisplayName(data: BlockData): string {
@@ -476,7 +451,6 @@ function didNodeErrorBoundaryDataChange(previous: BlockData, next: BlockData) {
     previous.component !== next.component ||
     previous.composite !== next.composite ||
     previous.annotation !== next.annotation ||
-    previous.group !== next.group ||
     previous.renderFallback?.source !== next.renderFallback?.source ||
     previous.renderFallback?.message !== next.renderFallback?.message ||
     !areOutputChannelsEqual(previous.outputChannels, next.outputChannels)
@@ -511,6 +485,7 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
+    canvasMode: callbacks.canvasMode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -619,58 +594,16 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
   );
 });
 
-const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
-  data: CanvasBlockNodeData;
-  id: string;
-  selected?: boolean;
-  width?: number;
-  height?: number;
-}) {
-  const { _callbacksRef, ...blockData } = nodeProps.data;
-  const callbacks = _callbacksRef?.current;
-  const groupData = blockData.group || {};
-
-  const handleGroupUpdate = callbacks?.onGroupUpdate?.current
-    ? (updates: CanvasGroupUpdate) => callbacks.onGroupUpdate.current?.(nodeProps.id, updates)
-    : undefined;
-
-  const handleUngroup = callbacks?.onUngroupNodes?.current
-    ? () => callbacks.onUngroupNodes.current?.(nodeProps.id)
-    : undefined;
-
-  const handleDelete = callbacks?.onNodeDelete?.current
-    ? () => callbacks.onNodeDelete.current?.(nodeProps.id)
-    : undefined;
-  const fallback = (
-    <div style={{ width: nodeProps.width, height: nodeProps.height }}>
-      <Block data={createNodeRenderFallbackData(blockData)} nodeId={nodeProps.id} selected={nodeProps.selected} />
-    </div>
-  );
-
-  return (
-    <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
-      <div data-testid="canvas-group-node" style={{ width: nodeProps.width, height: nodeProps.height }}>
-        <GroupNode
-          {...groupData}
-          selected={nodeProps.selected}
-          onGroupUpdate={handleGroupUpdate}
-          onUngroup={handleUngroup}
-          onDelete={handleDelete}
-        />
-      </div>
-    </CanvasNodeErrorBoundary>
-  );
-});
-
 const nodeTypes = {
   default: DefaultNodeRenderer,
-  group: GroupNodeRenderer,
 };
 
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
+    props.canvasStateMode === "editing" ? "settings" : "latest",
+  );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -705,6 +638,16 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
+  const agentState = useAgentState({
+    isEditing: props.isEditing,
+    canvasVersion: props.activeCanvasVersionId,
+    hideAddControls: props.hideAddControls,
+    readOnly,
+    canvasId: props.canvasId,
+    organizationId: props.organizationId,
+    onApplyAiOperations: props.onApplyAiOperations,
+  });
+
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
@@ -713,17 +656,6 @@ function CanvasPage(props: CanvasPageProps) {
     channels: string[];
     initialData?: string;
   } | null>(null);
-  const canvasNodesForAiContext = useMemo(
-    () =>
-      (props.workflowNodes || []).map((node) => ({
-        id: node.id || "",
-        name: node.name || "",
-        label: node.name || "",
-        type: node.type || "",
-      })),
-    [props.workflowNodes],
-  );
-
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
       return;
@@ -1118,7 +1050,7 @@ function CanvasPage(props: CanvasPageProps) {
 
     state.componentSidebar.close();
     // Reset to latest tab when sidebar closes
-    setCurrentTab("latest");
+    setCurrentTab(props.canvasStateMode === "editing" ? "settings" : "latest");
 
     // Only remove the node if it's a pending connection node (not yet configured)
     if (isPendingConnection && state.componentSidebar.selectedNodeId) {
@@ -1139,7 +1071,7 @@ function CanvasPage(props: CanvasPageProps) {
         selected: false,
       })),
     );
-  }, [state, templateNodeId]);
+  }, [props.canvasStateMode, state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar =
@@ -1147,7 +1079,13 @@ function CanvasPage(props: CanvasPageProps) {
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
-    <div ref={canvasWrapperRef} className="h-full w-full overflow-hidden sp-canvas relative flex flex-col">
+    <div
+      ref={canvasWrapperRef}
+      className={cn(
+        "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
+        props.headerMode === "version-live" && "sp-canvas-live",
+      )}
+    >
       {/* Header at the top spanning full width */}
       <div className="relative z-30">
         <CanvasContentHeader
@@ -1173,8 +1111,13 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           publishVersionLabel={props.publishVersionLabel}
-          unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
+          hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+          isVersionControlOpen={props.isVersionControlOpen}
+          onOpenVersionControl={props.onOpenVersionControl}
+          versionControlButtonTooltip={props.versionControlButtonTooltip}
+          versionControlNotificationCount={props.versionControlNotificationCount}
+          agentState={agentState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1182,6 +1125,8 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
         {props.versionControlSidebar}
+
+        <AgentSidebar agentState={agentState} />
 
         <RightSideControls
           mode={readOnly ? "live" : "edit"}
@@ -1193,14 +1138,9 @@ function CanvasPage(props: CanvasPageProps) {
 
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen
+            isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live"}
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
-            agentContext={props.agentContext}
-            canvasId={props.canvasId}
-            organizationId={props.organizationId}
-            canvasNodes={canvasNodesForAiContext}
-            onApplyAiOperations={props.onApplyAiOperations}
             integrations={props.integrations}
             canvasZoom={canvasZoom}
             disabled={readOnly}
@@ -1268,9 +1208,6 @@ function CanvasPage(props: CanvasPageProps) {
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
               onAnnotationBlur={props.onAnnotationBlur}
-              onGroupUpdate={props.onGroupUpdate}
-              onGroupNodes={props.onGroupNodes}
-              onUngroupNodes={props.onUngroupNodes}
               onTogglePause={props.onTogglePause}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
@@ -1284,11 +1221,8 @@ function CanvasPage(props: CanvasPageProps) {
               highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
               setCurrentTab={setCurrentTab}
-              isVersionControlOpen={props.isVersionControlOpen}
-              onOpenVersionControl={props.onOpenVersionControl}
-              versionControlButtonTooltip={props.versionControlButtonTooltip}
-              versionControlNotificationCount={props.versionControlNotificationCount}
               showBottomStatusControls={props.showBottomStatusControls}
+              headerMode={props.headerMode}
               isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
               onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
               autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1339,6 +1273,7 @@ function CanvasPage(props: CanvasPageProps) {
             configurationSaveMode={props.configurationSaveMode}
             currentTab={currentTab}
             onTabChange={setCurrentTab}
+            canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
             integrations={props.integrations}
@@ -1402,6 +1337,7 @@ function Sidebar({
   configurationSaveMode = "manual",
   currentTab,
   onTabChange,
+  canvasMode,
   organizationId,
   getCustomField,
   integrations,
@@ -1448,6 +1384,7 @@ function Sidebar({
   configurationSaveMode?: "manual" | "auto";
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  canvasMode: "live" | "edit";
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
@@ -1484,6 +1421,7 @@ function Sidebar({
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
+  const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode;
 
   // Trigger data loading when sidebar opens for a node
   useEffect(() => {
@@ -1547,7 +1485,7 @@ function Sidebar({
   }
 
   // Show loading state when data is being fetched (skip for annotation nodes)
-  if (sidebarData.isLoading && currentTab === "latest" && !isAnnotationNode) {
+  if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     const sidebarWidth = saved ? parseInt(saved, 10) : 450;
 
@@ -1570,6 +1508,7 @@ function Sidebar({
     <ComponentSidebar
       key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
+      canvasMode={canvasMode}
       onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}
@@ -1670,8 +1609,13 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   publishVersionLabel,
-  unpublishedDraftChangeCount,
+  hasUnpublishedDraftChanges,
   showCanvasSettingsMenu,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  versionControlNotificationCount,
+  agentState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1695,8 +1639,13 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   publishVersionLabel?: string;
-  unpublishedDraftChangeCount?: number;
+  hasUnpublishedDraftChanges?: boolean;
   showCanvasSettingsMenu?: boolean;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
+  agentState: AgentState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1737,8 +1686,13 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       publishVersionLabel={publishVersionLabel}
-      unpublishedDraftChangeCount={unpublishedDraftChangeCount}
+      hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
+      isVersionControlOpen={isVersionControlOpen}
+      onOpenVersionControl={onOpenVersionControl}
+      versionControlButtonTooltip={versionControlButtonTooltip}
+      versionControlNotificationCount={versionControlNotificationCount}
+      agentState={agentState}
     />
   );
 }
@@ -1792,9 +1746,6 @@ function CanvasContent({
   onToggleView,
   onAnnotationUpdate,
   onAnnotationBlur,
-  onGroupUpdate,
-  onGroupNodes,
-  onUngroupNodes,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1807,11 +1758,8 @@ function CanvasContent({
   highlightedNodeIds,
   workflowNodes,
   setCurrentTab,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount = 0,
   showBottomStatusControls = true,
+  headerMode,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -1852,12 +1800,6 @@ function CanvasContent({
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  onGroupUpdate?: (nodeId: string, updates: { label?: string; description?: string; color?: string }) => void;
-  onGroupNodes?: (
-    bounds: { x: number; y: number; width: number; height: number },
-    nodePositions: Array<{ id: string; x: number; y: number }>,
-  ) => void;
-  onUngroupNodes?: (groupNodeId: string) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1873,11 +1815,8 @@ function CanvasContent({
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
+  headerMode?: CanvasPageProps["headerMode"];
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1916,28 +1855,6 @@ function CanvasContent({
     const isMac = navigator.platform.toLowerCase().includes("mac");
     return isMac ? "Meta" : "Control";
   }, []);
-
-  const computeSelectionBounds = useCallback(
-    (nodes: CanvasNode[]) => {
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-      const nodePositions = nodes.map((n) => {
-        const rect = resolveAbsoluteNodeRect(n, getInternalNode);
-        if (rect.x < minX) minX = rect.x;
-        if (rect.y < minY) minY = rect.y;
-        if (rect.x + rect.w > maxX) maxX = rect.x + rect.w;
-        if (rect.y + rect.h > maxY) maxY = rect.y + rect.h;
-        return { id: n.id, x: rect.x, y: rect.y };
-      });
-      return {
-        bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
-        nodePositions,
-      };
-    },
-    [getInternalNode],
-  );
 
   // Use refs to avoid recreating callbacks when state changes
   const stateRef = useRef(state);
@@ -1983,6 +1900,17 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
+  const isLiveMode = headerMode === "version-live";
+  const isEditMode = !isLiveMode;
+
+  useEffect(() => {
+    if (isEditMode) {
+      return;
+    }
+
+    setHoveredEdgeId(null);
+  }, [isEditMode]);
+
   useEffect(() => {
     if (showBottomStatusControls) {
       localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
@@ -2012,6 +1940,14 @@ function CanvasContent({
       setIsLogSidebarOpen(false);
     }
   }, [showBottomStatusControls]);
+
+  useEffect(() => {
+    if (isLiveMode || consoleTab !== "runs") {
+      return;
+    }
+
+    setConsoleTab("errors");
+  }, [consoleTab, isLiveMode]);
 
   const [multiSelectedNodes, setMultiSelectedNodes] = useState<ReactFlowNode[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -2062,12 +1998,11 @@ function CanvasContent({
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
       const isAnnotationNode = clickedNode?.data?.type === "annotation";
-      const isGroupNode = clickedNode?.data?.type === "group";
 
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
       const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
-      if (isAnnotationNode || isGroupNode) {
+      if (isAnnotationNode) {
         return;
       }
 
@@ -2088,7 +2023,7 @@ function CanvasContent({
         );
 
         if (setCurrentTab) {
-          setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
+          setCurrentTab(hasConfigurationWarning || isEditMode ? "settings" : "latest");
         }
 
         if (onBuildingBlocksSidebarToggle) {
@@ -2103,7 +2038,7 @@ function CanvasContent({
         })),
       );
     },
-    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab],
+    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab, isEditMode],
   );
 
   const onRunRef = useRef(onRun);
@@ -2131,10 +2066,6 @@ function CanvasContent({
   onAnnotationUpdateRef.current = onAnnotationUpdate;
   const onAnnotationBlurRef = useRef(onAnnotationBlur);
   onAnnotationBlurRef.current = onAnnotationBlur;
-  const onGroupUpdateRef = useRef(onGroupUpdate);
-  onGroupUpdateRef.current = onGroupUpdate;
-  const onUngroupNodesRef = useRef(onUngroupNodes);
-  onUngroupNodesRef.current = onUngroupNodes;
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -2200,10 +2131,6 @@ function CanvasContent({
     [reportZoom, viewportRef],
   );
 
-  const handleToggleCollapse = useCallback(() => {
-    state.toggleCollapse();
-  }, [state.toggleCollapse]);
-
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
       return;
@@ -2236,20 +2163,6 @@ function CanvasContent({
     );
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
   }, [focusRequest, fitView]);
-
-  // Add keyboard shortcut for toggling collapse/expand
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Toggle collapse: Ctrl/Cmd + E
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "e") {
-        e.preventDefault();
-        handleToggleCollapse();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleToggleCollapse]);
 
   const handlePaneClick = useCallback(() => {
     previouslySelectedRef.current = new Set();
@@ -2328,12 +2241,11 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
-    onGroupUpdate: onGroupUpdateRef,
-    onUngroupNodes: onUngroupNodesRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? ("edit" as const) : ("live" as const),
   });
   callbacksRef.current = {
     handleNodeClick,
@@ -2346,12 +2258,11 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
-    onGroupUpdate: onGroupUpdateRef,
-    onUngroupNodes: onUngroupNodesRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,
     hasMultiSelection,
+    canvasMode: isEditMode ? "edit" : "live",
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -2463,17 +2374,19 @@ function CanvasContent({
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
-          onDelete: isReadOnly ? undefined : stableEdgeDelete,
+          canDelete: isEditMode && !isReadOnly,
+          onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId, stableEdgeDelete, isReadOnly],
+    [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly],
   );
+
+  const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const prev = previouslySelectedRef.current;
-      const nodes = stateRef.current.nodes ?? [];
 
       if (prev.size > 0) {
         changes = changes.map((c) => {
@@ -2485,8 +2398,7 @@ function CanvasContent({
       }
 
       if (!isReadOnly) {
-        state.onNodesChange(clampGroupChildNodePositionChanges(changes, nodes));
-        resizeGroupsAfterChildChanges(changes, nodes, state.setNodes);
+        state.onNodesChange(changes);
         return;
       }
 
@@ -2494,10 +2406,8 @@ function CanvasContent({
       if (filteredChanges.length > 0) {
         state.onNodesChange(filteredChanges);
       }
-
-      resizeGroupsAfterChildChanges(changes, stateRef.current.nodes ?? [], state.setNodes);
     },
-    [isReadOnly, state.onNodesChange, state.setNodes],
+    [isReadOnly, state.onNodesChange],
   );
 
   const handleEdgesChange = useCallback(
@@ -2551,8 +2461,6 @@ function CanvasContent({
     setIsLogSidebarOpen(true);
   }, []);
 
-  const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
-
   return (
     <div className="h-full w-full relative">
       <div className="h-full">
@@ -2576,13 +2484,13 @@ function CanvasContent({
             snapGrid={[48, 48]}
             panOnScrollSpeed={0.8}
             nodesDraggable={!isReadOnly}
-            nodesConnectable={!isReadOnly && !!onEdgeCreate}
+            nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
-            onConnect={isReadOnly ? undefined : handleConnect}
-            onConnectStart={isReadOnly ? undefined : handleConnectStart}
-            onConnectEnd={isReadOnly ? undefined : handleConnectEnd}
+            onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
+            onConnectStart={isConnectionEditingEnabled ? handleConnectStart : undefined}
+            onConnectEnd={isConnectionEditingEnabled ? handleConnectEnd : undefined}
             onDragOver={isReadOnly ? undefined : handleDragOver}
             onDrop={isReadOnly ? undefined : handleDrop}
             onMove={handleMove}
@@ -2598,8 +2506,8 @@ function CanvasContent({
               setIsSelecting(false);
               previouslySelectedRef.current = new Set();
             }}
-            onEdgeMouseEnter={handleEdgeMouseEnter}
-            onEdgeMouseLeave={handleEdgeMouseLeave}
+            onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
+            onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
@@ -2621,74 +2529,35 @@ function CanvasContent({
                 </div>
               )}
               <div className="flex items-center gap-3">
-                {showVersionControlTrigger ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center rounded-md p-0.5 h-8">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="relative inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 items-center text-xs font-medium gap-1.5"
-                            onClick={onOpenVersionControl}
-                            aria-label="Open version control"
-                          >
-                            <GitBranch className="h-3 w-3" />
-                          </Button>
-                          {versionControlNotificationCount > 0 ? (
-                            <span className="absolute left-6 -top-2 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
-                              {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
-                            </span>
-                          ) : null}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                ) : null}
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
-                  isSnapToGridEnabled={isSnapToGridEnabled}
-                  onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
+                  isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
+                  onSnapToGridToggle={isEditMode ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined}
                 >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                        {state.isCollapsed ? (
-                          <ChevronsUpDown className="h-3 w-3" />
-                        ) : (
-                          <ChevronsDownUp className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {state.isCollapsed
-                        ? "Switch components to Detailed view (Ctrl/Cmd + E)"
-                        : "Switch components to Compact view (Ctrl/Cmd + E)"}
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
-                          onClick={handleToggleAutoLayoutOnUpdate}
-                          disabled={isAutoLayoutToggleDisabled}
-                          aria-pressed={isAutoLayoutOnUpdateEnabled}
-                        >
-                          {isAutoLayoutOnUpdateEnabled ? (
-                            <LayoutGrid className="h-3 w-3" />
-                          ) : (
-                            <LayoutDashboard className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-                  </Tooltip>
+                  {isEditMode ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
+                            onClick={handleToggleAutoLayoutOnUpdate}
+                            disabled={isAutoLayoutToggleDisabled}
+                            aria-pressed={isAutoLayoutOnUpdateEnabled}
+                          >
+                            {isAutoLayoutOnUpdateEnabled ? (
+                              <LayoutGrid className="h-3 w-3" />
+                            ) : (
+                              <LayoutDashboard className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+                    </Tooltip>
+                  ) : null}
                   <NodeSearch
                     onSearch={(searchString) => {
                       const query = searchString.toLowerCase();
@@ -2712,36 +2581,41 @@ function CanvasContent({
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={cn(
-                            "h-8 items-center text-xs font-medium",
-                            runsCountInfo.running > 0 && "text-blue-600",
-                          )}
-                          onClick={() => handleLogButtonClick("runs")}
-                        >
-                          {runsCountInfo.running > 0 ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Play className="h-3 w-3" />
-                          )}
-                          <span className={cn(runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800")}>
-                            Runs ·{" "}
-                            <span className="tabular-nums">
-                              {(runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total).toLocaleString(
-                                "en-US",
-                              )}
+                    {isLiveMode ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 items-center text-xs font-medium",
+                              runsCountInfo.running > 0 && "text-blue-600",
+                            )}
+                            onClick={() => handleLogButtonClick("runs")}
+                          >
+                            {runsCountInfo.running > 0 ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Play className="h-3 w-3" />
+                            )}
+                            <span className={cn(runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800")}>
+                              Runs ·{" "}
+                              <span className="tabular-nums">
+                                {(runsCountInfo.running > 0
+                                  ? runsCountInfo.running
+                                  : runsCountInfo.total
+                                ).toLocaleString("en-US")}
+                              </span>
                             </span>
-                          </span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {runsCountInfo.running > 0 ? `${runsCountInfo.running} running` : `${runsCountInfo.total} runs`}
-                      </TooltipContent>
-                    </Tooltip>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {runsCountInfo.running > 0
+                            ? `${runsCountInfo.running} running`
+                            : `${runsCountInfo.total} runs`}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -2796,7 +2670,7 @@ function CanvasContent({
             {selectionToolbarFlowPos &&
               !isSelecting &&
               !isReadOnly &&
-              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes || onGroupNodes) && (
+              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
                 <ViewportPortal>
                   <div
                     style={{
@@ -2816,34 +2690,6 @@ function CanvasContent({
                         pointerEvents: "all",
                       }}
                     >
-                      {onGroupNodes &&
-                        multiSelectedNodes.filter((n) => n.data?.type !== "group" && !n.parentId).length >= 2 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                data-testid="multi-select-group"
-                                aria-label="Group"
-                                onPointerDown={stopCanvasPointerEvent}
-                                onMouseDown={stopCanvasPointerEvent}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  const groupable = multiSelectedNodes.filter(
-                                    (n) => n.data?.type !== "group" && !n.parentId,
-                                  );
-                                  const { bounds, nodePositions } = computeSelectionBounds(groupable);
-                                  onGroupNodes(bounds, nodePositions);
-                                  setMultiSelectedNodes([]);
-                                }}
-                                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                              >
-                                <Group className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Group</TooltipContent>
-                          </Tooltip>
-                        )}
                       {onAutoLayoutNodes && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -2939,6 +2785,7 @@ function CanvasContent({
         <CanvasLogSidebar
           isOpen={isLogSidebarOpen}
           onClose={() => setIsLogSidebarOpen(false)}
+          showRunsTab={isLiveMode}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
           searchValue={logSearch}

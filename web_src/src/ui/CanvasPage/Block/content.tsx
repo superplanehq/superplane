@@ -44,16 +44,20 @@ function getActionProps(data: BlockProps["data"], compactView: boolean, props: P
   };
 }
 
-function renderFallbackBlock(
-  data: BlockProps["data"],
-  fallbackTitle: string,
-  selected: boolean,
-  showHeader: boolean | undefined,
-  actionProps: ReturnType<typeof getActionProps>,
-) {
+function renderFallbackBlock(args: {
+  data: BlockProps["data"];
+  fallbackTitle: string;
+  selected: boolean;
+  showHeader: boolean | undefined;
+  canvasMode: BlockProps["canvasMode"];
+  actionProps: ReturnType<typeof getActionProps>;
+}) {
+  const { data, fallbackTitle, selected, showHeader, canvasMode, actionProps } = args;
+
   return (
     <ComponentBase
       {...buildFallbackComponentProps(data, fallbackTitle)}
+      canvasMode={canvasMode}
       selected={selected}
       showHeader={showHeader}
       {...actionProps}
@@ -66,6 +70,7 @@ function AnnotationBlockContent({
   nodeId,
   selected,
   showHeader,
+  canvasMode,
   onAnnotationUpdate,
   onAnnotationBlur,
   actionProps,
@@ -74,6 +79,7 @@ function AnnotationBlockContent({
   nodeId?: string;
   selected: boolean;
   showHeader?: boolean;
+  canvasMode?: BlockProps["canvasMode"];
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
@@ -93,7 +99,14 @@ function AnnotationBlockContent({
   };
 
   if (!safeAnnotationProps) {
-    return renderFallbackBlock(data, "Annotation", selected, showHeader, actionProps);
+    return renderFallbackBlock({
+      data,
+      fallbackTitle: "Annotation",
+      selected,
+      showHeader,
+      canvasMode,
+      actionProps,
+    });
   }
 
   return (
@@ -113,23 +126,40 @@ function renderBlockByType(args: {
   nodeId?: string;
   selected: boolean;
   showHeader?: boolean;
+  canvasMode?: BlockProps["canvasMode"];
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
 }) {
-  const { data, nodeId, selected, showHeader, onAnnotationUpdate, onAnnotationBlur, actionProps } = args;
+  const { data, nodeId, selected, showHeader, canvasMode, onAnnotationUpdate, onAnnotationBlur, actionProps } = args;
 
   switch (data.type) {
     case "trigger":
       if (!isRecord(data.trigger)) {
-        return renderFallbackBlock(data, "Trigger", selected, showHeader, actionProps);
+        return renderFallbackBlock({
+          data,
+          fallbackTitle: "Trigger",
+          selected,
+          showHeader,
+          canvasMode,
+          actionProps,
+        });
       }
-      return <Trigger {...getSafeTriggerProps(data)} selected={selected} showHeader={showHeader} {...actionProps} />;
+      return (
+        <Trigger
+          {...getSafeTriggerProps(data)}
+          canvasMode={canvasMode}
+          selected={selected}
+          showHeader={showHeader}
+          {...actionProps}
+        />
+      );
     case "component": {
       const safeComponentProps = getSafeComponentProps(data);
       return (
         <ComponentBase
           {...safeComponentProps}
+          canvasMode={canvasMode}
           paused={safeComponentProps.paused}
           selected={selected}
           showHeader={showHeader}
@@ -139,7 +169,13 @@ function renderBlockByType(args: {
     }
     case "composite":
       return (
-        <Composite {...getSafeCompositeProps(data)} selected={selected} showHeader={showHeader} {...actionProps} />
+        <Composite
+          {...getSafeCompositeProps(data)}
+          canvasMode={canvasMode}
+          selected={selected}
+          showHeader={showHeader}
+          {...actionProps}
+        />
       );
     case "annotation":
       return (
@@ -148,15 +184,21 @@ function renderBlockByType(args: {
           nodeId={nodeId}
           selected={selected}
           showHeader={showHeader}
+          canvasMode={canvasMode}
           onAnnotationUpdate={onAnnotationUpdate}
           onAnnotationBlur={onAnnotationBlur}
           actionProps={actionProps}
         />
       );
-    case "group":
-      return renderFallbackBlock(data, "Group", selected, showHeader, actionProps);
     default:
-      return renderFallbackBlock(data, "Component", selected, showHeader, actionProps);
+      return renderFallbackBlock({
+        data,
+        fallbackTitle: "Component",
+        selected,
+        showHeader,
+        canvasMode,
+        actionProps,
+      });
   }
 }
 
@@ -174,6 +216,7 @@ export function BlockContent({
   onToggleView,
   onDelete,
   showHeader,
+  canvasMode,
   isCompactView,
   onAnnotationUpdate,
   onAnnotationBlur,
@@ -196,6 +239,7 @@ export function BlockContent({
     nodeId,
     selected,
     showHeader,
+    canvasMode,
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,
