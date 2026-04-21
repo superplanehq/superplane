@@ -130,6 +130,7 @@ import {
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
+  getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
 function getNodeAnalyticsProps(
@@ -171,19 +172,6 @@ type QueuedCanvasSaveRequest = {
 };
 
 type CanvasEchoRelease = () => void;
-
-function getWorkflowSaveSignature(workflow: CanvasesCanvas | null | undefined): string {
-  if (!workflow) {
-    return "";
-  }
-
-  return JSON.stringify({
-    name: workflow.metadata?.name ?? "",
-    description: workflow.metadata?.description ?? "",
-    nodes: workflow.spec?.nodes ?? [],
-    edges: workflow.spec?.edges ?? [],
-  });
-}
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
