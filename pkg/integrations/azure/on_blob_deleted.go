@@ -78,7 +78,7 @@ func (t *OnBlobDeleted) Color() string {
 }
 
 func (t *OnBlobDeleted) DefaultRunTitle() string {
-	return `{{ firstNonEmpty(root().data.container != "" ? root().data.container + "/" + root().data.blobName : "", "Blob deleted") }}`
+	return `{{ firstNonEmpty(root().data.subject, "Blob deleted") }}`
 }
 
 func (t *OnBlobDeleted) Configuration() []configuration.Field {
@@ -256,9 +256,6 @@ func (t *OnBlobDeleted) handleBlobDeletedEvent(
 	}
 
 	ctx.Logger.Infof("Blob deleted: %s/%s", container, blobName)
-
-	rawEvent["container"] = container
-	rawEvent["blobName"] = blobName
 
 	if err := ctx.Events.Emit("azure.blob.deleted", rawEvent); err != nil {
 		return fmt.Errorf("failed to emit event: %w", err)
