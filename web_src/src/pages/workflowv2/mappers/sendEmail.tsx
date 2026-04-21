@@ -8,12 +8,11 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/pages/workflowv2/mappers/types";
 import React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from ".";
 
 const SEND_EMAIL_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
@@ -116,7 +115,7 @@ export const sendEmailMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Send Email Notification",
-      eventSections: lastExecution ? getSendEmailEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getSendEmailEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: getSendEmailMetadata(context.node),
       eventStateMap: SEND_EMAIL_EVENT_STATE_MAP,
@@ -225,17 +224,13 @@ function getSendEmailMetadata(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getSendEmailEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+function getSendEmailEventSections(execution: ExecutionInfo): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle,
       eventState: sendEmailStateFunction(execution),
       eventId: execution.rootEvent!.id!,

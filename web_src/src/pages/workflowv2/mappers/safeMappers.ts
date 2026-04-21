@@ -1,10 +1,13 @@
 import React from "react";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
+  RendererComponentBaseProps,
+  RendererEventSection,
+  RendererTriggerProps,
   TriggerRenderer,
   TriggerRendererContext,
 } from "./types";
@@ -97,6 +100,18 @@ function sanitizeCustomField(
   return sanitizeReactNodeValue(customField);
 }
 
+function normalizeRendererEventSections(eventSections: unknown): EventSection[] | undefined {
+  const sections = sanitizeArray<RendererEventSection>(eventSections);
+  if (!sections) {
+    return undefined;
+  }
+
+  return sections.map((section) => ({
+    ...section,
+    eventTitle: undefined,
+  }));
+}
+
 function normalizeEmptyStateProps(
   emptyStateProps: unknown,
 ): NonNullable<ComponentBaseProps["emptyStateProps"]> | undefined {
@@ -126,6 +141,8 @@ function buildNormalizedComponentBaseProps(
   fallbackTitle: string,
   fallbackIconSlug: string,
 ): ComponentBaseProps {
+  const defaultEventTitle = context.lastExecutions[0]?.rootEvent?.runTitle?.trim() || "";
+
   return {
     ...record,
     iconSrc: asString(record.iconSrc),
@@ -139,7 +156,8 @@ function buildNormalizedComponentBaseProps(
     hideMetadataList: asBoolean(record.hideMetadataList),
     collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
     collapsedBackground: asString(record.collapsedBackground),
-    eventSections: sanitizeArray(record.eventSections),
+    defaultEventTitle: sanitizeNonEmptyString(record.defaultEventTitle, defaultEventTitle),
+    eventSections: normalizeRendererEventSections(record.eventSections),
     selected: asBoolean(record.selected),
     metadata: sanitizeArray(record.metadata),
     customField: sanitizeCustomField(record.customField as ComponentBaseProps["customField"], fallbackTitle),
@@ -157,7 +175,7 @@ function buildNormalizedComponentBaseProps(
 
 function applyComponentBaseFallbacks(
   normalized: ComponentBaseProps,
-  props: ComponentBaseProps | unknown,
+  props: RendererComponentBaseProps | unknown,
   record: UnknownRecord,
   fallbackTitle: string,
   fallbackIconSlug: string,
@@ -185,7 +203,7 @@ function applyComponentBaseFallbacks(
 }
 
 export function normalizeComponentBaseProps(
-  props: ComponentBaseProps | unknown,
+  props: RendererComponentBaseProps | unknown,
   context: ComponentBaseContext,
 ): ComponentBaseProps {
   const fallbackTitle = getComponentTitle(context);
@@ -204,7 +222,7 @@ function buildFallbackTriggerProps(context: TriggerRendererContext): TriggerProp
   };
 }
 
-function buildLastEventData(lastEventData: unknown, fallbackTitle: string): TriggerProps["lastEventData"] {
+function buildLastEventData(lastEventData: unknown): TriggerProps["lastEventData"] {
   if (!isRecord(lastEventData)) {
     return undefined;
   }
@@ -212,7 +230,6 @@ function buildLastEventData(lastEventData: unknown, fallbackTitle: string): Trig
   const subtitle = lastEventData.subtitle;
 
   return {
-    title: sanitizeNonEmptyString(lastEventData.title, fallbackTitle),
     subtitle:
       typeof subtitle === "string" || React.isValidElement(subtitle)
         ? (subtitle as NonNullable<TriggerProps["lastEventData"]>["subtitle"])
@@ -247,6 +264,7 @@ function buildNormalizedTriggerProps(
   const metadata = sanitizeArray<TriggerProps["metadata"][number]>(record.metadata) || [];
   const normalizedTitle = sanitizeNonEmptyString(record.title, fallbackProps.title);
   const normalizedIconSlug = sanitizeNonEmptyString(record.iconSlug, fallbackProps.iconSlug);
+  const defaultEventTitle = context.lastEvent?.runTitle?.trim() || "";
 
   return {
     ...record,
@@ -261,6 +279,7 @@ function buildNormalizedTriggerProps(
     hideMetadataList: asBoolean(record.hideMetadataList),
     collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
     collapsedBackground: asString(record.collapsedBackground),
+    defaultEventTitle: sanitizeNonEmptyString(record.defaultEventTitle, defaultEventTitle),
     selected: asBoolean(record.selected),
     metadata,
     customField: normalizeTriggerCustomField(record.customField),
@@ -273,13 +292,13 @@ function buildNormalizedTriggerProps(
     emptyStateProps: normalizeEmptyStateProps(record.emptyStateProps),
     error: sanitizeString(record.error),
     warning: sanitizeString(record.warning),
-    lastEventData: buildLastEventData(record.lastEventData, normalizedTitle),
+    lastEventData: buildLastEventData(record.lastEventData),
   };
 }
 
 function applyTriggerFallbacks(
   normalized: TriggerProps,
-  props: TriggerProps | unknown,
+  props: RendererTriggerProps | unknown,
   record: UnknownRecord,
 ): TriggerProps {
   if (isRecord(props) && typeof record.title === "string") {
@@ -298,7 +317,10 @@ function applyTriggerFallbacks(
   };
 }
 
-export function normalizeTriggerProps(props: TriggerProps | unknown, context: TriggerRendererContext): TriggerProps {
+export function normalizeTriggerProps(
+  props: RendererTriggerProps | unknown,
+  context: TriggerRendererContext,
+): TriggerProps {
   const fallbackProps = buildFallbackTriggerProps(context);
   const record = isRecord(props) ? props : {};
   const normalizedTriggerProps = buildNormalizedTriggerProps(record, context, fallbackProps);
@@ -399,12 +421,12 @@ export function createSafeTriggerRenderer(renderer: TriggerRenderer, rendererNam
       }
     },
 
-    getTitleAndSubtitle(context) {
+    subtitle(context) {
       try {
-        return renderer.getTitleAndSubtitle(context);
+        return renderer.subtitle(context);
       } catch (error) {
-        console.error(`[SafeMapper] Trigger renderer "${rendererName}" threw in getTitleAndSubtitle():`, error);
-        return { title: "Event", subtitle: "" };
+        console.error(`[SafeMapper] Trigger renderer "${rendererName}" threw in subtitle():`, error);
+        return "";
       }
     },
 

@@ -64,6 +64,10 @@ func (i *OnIssue) Color() string {
 	return "orange"
 }
 
+func (i *OnIssue) DefaultRunTitle() string {
+	return "#{{ root().data.object_attributes.iid }} - {{ root().data.object_attributes.title }}"
+}
+
 func (i *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
