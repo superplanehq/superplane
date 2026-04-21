@@ -77,7 +77,7 @@ func Test__EventContext__Emit(t *testing.T) {
 		assert.False(t, hasChannel)
 	})
 
-	t.Run("legacy run title input exposes payload fields and event metadata", func(t *testing.T) {
+	t.Run("custom run title template resolves against root payload", func(t *testing.T) {
 		componentCanvas, componentNodes := support.CreateCanvas(
 			t,
 			r.Organization.ID,
@@ -97,7 +97,7 @@ func Test__EventContext__Emit(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), componentCanvas.ID)
 		require.NoError(t, err)
-		runTitleTemplate := `{{ $["node-1"].message }} @ {{ $["node-1"].event.channel }}`
+		runTitleTemplate := `{{ root().data.message }}`
 		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
 		require.NoError(t, database.Conn().Save(liveVersion).Error)
 
@@ -108,7 +108,7 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, events)
 		require.NotNil(t, events[len(events)-1].RunTitle)
-		assert.Equal(t, "hello @ default", *events[len(events)-1].RunTitle)
+		assert.Equal(t, "hello", *events[len(events)-1].RunTitle)
 	})
 
 	t.Run("uses default run title from trigger definition", func(t *testing.T) {

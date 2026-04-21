@@ -49,7 +49,7 @@ func EmitNodeEvent(
 		database.Conn(),
 		node,
 		rootPayload,
-		contexts.BuildRootEventRunTitleInput(data, "", now, channel),
+		rootPayload,
 	)
 	if err == nil && runTitle != nil {
 		event.RunTitle = runTitle

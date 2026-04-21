@@ -161,7 +161,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		assert.Equal(t, "Run: hello", *event.RunTitle)
 	})
 
-	t.Run("legacy run title input exposes payload fields and event metadata", func(t *testing.T) {
+	t.Run("custom run title template resolves against root payload", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
@@ -181,7 +181,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		runTitleTemplate := `{{ $["node-1"].message }} @ {{ $["node-1"].event.channel }}`
+		runTitleTemplate := `{{ root().data.message }}`
 		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
 		require.NoError(t, database.Conn().Save(liveVersion).Error)
 
@@ -201,7 +201,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
 		require.NotNil(t, event.RunTitle)
-		assert.Equal(t, "hello @ default", *event.RunTitle)
+		assert.Equal(t, "hello", *event.RunTitle)
 	})
 
 	t.Run("trigger default run title resolves against root event payload envelope", func(t *testing.T) {
