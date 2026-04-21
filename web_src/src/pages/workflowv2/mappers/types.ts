@@ -50,7 +50,7 @@ export interface TriggerRenderer {
    * @param context The context for the trigger event
    * @returns The values to display
    */
-  getRootEventValues: (context: TriggerEventContext) => Record<string, any>;
+  getRootEventValues: (context: TriggerEventContext) => Record<string, unknown>;
 
   /**
    * Get the subtitle for the trigger event.

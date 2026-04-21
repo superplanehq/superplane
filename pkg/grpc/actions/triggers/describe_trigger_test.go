@@ -43,7 +43,7 @@ func Test__DescribeTrigger(t *testing.T) {
 		require.NotNil(t, response.Trigger)
 		require.Equal(
 			t,
-			"{{ $.data.push.changes[0].new.target.message }}",
+			"{{ root().data.push.changes[0].new.target.message }}",
 			response.Trigger.DefaultRunTitle,
 		)
 	})

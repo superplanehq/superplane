@@ -80,7 +80,7 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
   const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
   const eventInfo = buildEventInfo(event);
   const subtitle = triggerRenderer.subtitle({ event: eventInfo });
-  const values = triggerRenderer.getRootEventValues({ event: eventInfo });
+  const values = normalizeSidebarValues(triggerRenderer.getRootEventValues({ event: eventInfo }));
   const state = triggerRenderer.getEventState?.({ event: eventInfo }) || "triggered";
 
   return {
@@ -145,7 +145,9 @@ export function mapExecutionsToSidebarEvents(
         ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "")
         : "";
 
-    const values = eventInfo ? rootTriggerRenderer.getRootEventValues({ event: eventInfo }) : {};
+    const values = eventInfo
+      ? normalizeSidebarValues(rootTriggerRenderer.getRootEventValues({ event: eventInfo }))
+      : {};
 
     return {
       id: execution.id!,
@@ -216,7 +218,9 @@ export function mapQueueItemsToSidebarEvents(
         ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "")
         : "";
 
-    const values = eventInfo ? rootTriggerRenderer.getRootEventValues({ event: eventInfo }) : {};
+    const values = eventInfo
+      ? normalizeSidebarValues(rootTriggerRenderer.getRootEventValues({ event: eventInfo }))
+      : {};
 
     return {
       id: item.id!,
@@ -399,6 +403,18 @@ export function buildRunEntryFromEvent(options: {
       .filter(Boolean)
       .join(" "),
   };
+}
+
+export function normalizeSidebarValues(values: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(values).flatMap(([key, value]) => {
+      if (value === undefined || value === null || value === "") {
+        return [];
+      }
+
+      return [[key, String(value)]];
+    }),
+  );
 }
 
 export function mapWorkflowEventsToRunLogEntries(options: {

@@ -32,6 +32,7 @@ import {
   getEventRunTitle,
   buildUserInfo,
   getNextInQueueInfo,
+  normalizeSidebarValues,
 } from "../utils";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -215,7 +216,7 @@ function appendCompositeLastRunItem(
     id: execution.rootEvent?.id,
     receivedAt: new Date(execution.createdAt!),
     state: getRunItemState(execution),
-    values: rootTriggerRenderer.getRootEventValues({ event: eventInfo }),
+    values: normalizeSidebarValues(rootTriggerRenderer.getRootEventValues({ event: eventInfo })),
   };
 }
 
