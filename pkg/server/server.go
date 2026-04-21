@@ -55,6 +55,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/elastic"
 	_ "github.com/superplanehq/superplane/pkg/integrations/firehydrant"
 	_ "github.com/superplanehq/superplane/pkg/integrations/gcp"
+	_ "github.com/superplanehq/superplane/pkg/integrations/oci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
 	_ "github.com/superplanehq/superplane/pkg/integrations/grafana"
