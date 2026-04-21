@@ -18,9 +18,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rewrite commits with sign-off
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rebase origin/${{ github.base_ref }} \
+          git rebase "origin/${BASE_REF}" \
             --exec "git commit --amend --no-edit -s"
-          git push --force-with-lease origin HEAD:${{ github.head_ref }}
+          git push --force-with-lease origin "HEAD:${HEAD_REF}"
