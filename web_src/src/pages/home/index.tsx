@@ -1,6 +1,20 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Grid3x3, MoreVertical, Pencil, Plus, Palette, Rainbow, Rows3, Search, Trash2 } from "lucide-react";
+import {
+  Grid3x3,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Palette,
+  Rainbow,
+  Rows3,
+  Search,
+  Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Play,
+} from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -16,6 +30,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasData";
 import { cn } from "../../lib/utils";
 import { showErrorToast, showSuccessToast } from "../../lib/toast";
+import { formatRelativeTime } from "../../lib/date";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
@@ -29,6 +44,8 @@ interface CanvasCardData {
   name: string;
   description?: string;
   createdAt: string;
+  createdAtRelative: { relative: string; full: string };
+  originalCreatedAt: string;
   type: "canvases";
   createdBy?: { id?: string; name?: string };
   nodes?: SuperplaneComponentsNode[];
@@ -40,6 +57,8 @@ const HomePage = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>("grid");
+  const [sortBy, setSortBy] = useState<"name" | "createdAt">("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const canvasModalState = useCreateCanvasModalState();
 
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -62,22 +81,44 @@ const HomePage = () => {
     return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: CanvasesCanvas) => ({
-    id: canvas.metadata?.id!,
-    name: canvas.metadata?.name!,
-    description: canvas.metadata?.description,
-    createdAt: formatDate(canvas.metadata?.createdAt),
-    type: "canvases" as const,
-    createdBy: canvas.metadata?.createdBy,
-    nodes: canvas.spec?.nodes || [],
-    edges: canvas.spec?.edges || [],
-  }));
+  const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: CanvasesCanvas) => {
+    if (!canvas.metadata) {
+      throw new Error("Canvas metadata is required");
+    }
+    const originalCreatedAt = canvas.metadata.createdAt || "";
+    const createdAtRelative = formatRelativeTime(originalCreatedAt);
+
+    return {
+      id: canvas.metadata.id!,
+      name: canvas.metadata.name!,
+      description: canvas.metadata.description,
+      createdAt: formatDate(originalCreatedAt),
+      createdAtRelative,
+      originalCreatedAt,
+      type: "canvases" as const,
+      createdBy: canvas.metadata.createdBy,
+      nodes: canvas.spec?.nodes || [],
+      edges: canvas.spec?.edges || [],
+    };
+  });
 
   const filteredCanvases = canvases.filter((canvas) => {
     const matchesSearch =
       canvas.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       canvas.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
+  });
+
+  const sortedCanvases = [...filteredCanvases].sort((a, b) => {
+    let comparison = 0;
+
+    if (sortBy === "name") {
+      comparison = a.name.localeCompare(b.name);
+    } else if (sortBy === "createdAt") {
+      comparison = Date.parse(a.originalCreatedAt) - Date.parse(b.originalCreatedAt);
+    }
+
+    return sortOrder === "asc" ? comparison : -comparison;
   });
 
   const isLoading = canvasesLoading;
@@ -129,6 +170,12 @@ const HomePage = () => {
                   setSearchQuery={setSearchQuery}
                   canvasViewMode={canvasViewMode}
                   onCanvasViewModeChange={setCanvasViewMode}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSortChange={(newSortBy, newSortOrder) => {
+                    setSortBy(newSortBy);
+                    setSortOrder(newSortOrder);
+                  }}
                 />
               </div>
             )}
@@ -143,7 +190,7 @@ const HomePage = () => {
               </div>
             ) : (
               <Content
-                filteredCanvases={filteredCanvases}
+                filteredCanvases={sortedCanvases}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
                 canvasViewMode={canvasViewMode}
@@ -168,9 +215,28 @@ interface SearchBarProps {
   setSearchQuery: (query: string) => void;
   canvasViewMode: CanvasViewMode;
   onCanvasViewModeChange: (mode: CanvasViewMode) => void;
+  sortBy: "name" | "createdAt";
+  sortOrder: "asc" | "desc";
+  onSortChange: (sortBy: "name" | "createdAt", sortOrder: "asc" | "desc") => void;
 }
 
-function SearchBar({ searchQuery, setSearchQuery, canvasViewMode, onCanvasViewModeChange }: SearchBarProps) {
+function SearchBar({
+  searchQuery,
+  setSearchQuery,
+  canvasViewMode,
+  onCanvasViewModeChange,
+  sortBy,
+  sortOrder,
+  onSortChange,
+}: SearchBarProps) {
+  const getSortLabel = () => {
+    if (sortBy === "name") {
+      return sortOrder === "asc" ? "Name A-Z" : "Name Z-A";
+    } else {
+      return sortOrder === "desc" ? "Newest" : "Oldest";
+    }
+  };
+
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-4">
       <div className="min-w-0 w-full shrink-0 md:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]">
@@ -184,7 +250,62 @@ function SearchBar({ searchQuery, setSearchQuery, canvasViewMode, onCanvasViewMo
           />
         </div>
       </div>
-      <div className="ml-auto flex shrink-0 items-center">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
+              {getSortLabel()}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => onSortChange("createdAt", "desc")}
+              className={cn(
+                "flex items-center gap-2",
+                sortBy === "createdAt" && sortOrder === "desc" && "bg-gray-100 dark:bg-gray-800",
+              )}
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+              Newest
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onSortChange("createdAt", "asc")}
+              className={cn(
+                "flex items-center gap-2",
+                sortBy === "createdAt" && sortOrder === "asc" && "bg-gray-100 dark:bg-gray-800",
+              )}
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+              Oldest
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onSortChange("name", "asc")}
+              className={cn(
+                "flex items-center gap-2",
+                sortBy === "name" && sortOrder === "asc" && "bg-gray-100 dark:bg-gray-800",
+              )}
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+              Name A-Z
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onSortChange("name", "desc")}
+              className={cn(
+                "flex items-center gap-2",
+                sortBy === "name" && sortOrder === "desc" && "bg-gray-100 dark:bg-gray-800",
+              )}
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+              Name Z-A
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           type="button"
           variant="ghost"
@@ -488,10 +609,24 @@ function CanvasCard({
             <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
               {canvas.createdBy?.name ? (
                 <>
-                  Created by {canvas.createdBy.name}, on {canvas.createdAt}
+                  Created by {canvas.createdBy.name}{" "}
+                  <span
+                    title={canvas.createdAtRelative.full}
+                    className="pointer-events-auto underline decoration-dotted decoration-gray-400 underline-offset-2 cursor-help"
+                  >
+                    {canvas.createdAtRelative.relative}
+                  </span>
                 </>
               ) : (
-                <>Created on {canvas.createdAt}</>
+                <>
+                  Created{" "}
+                  <span
+                    title={canvas.createdAtRelative.full}
+                    className="pointer-events-auto underline decoration-dotted decoration-gray-400 underline-offset-2 cursor-help"
+                  >
+                    {canvas.createdAtRelative.relative}
+                  </span>
+                </>
               )}
             </p>
           </div>
@@ -703,6 +838,16 @@ function CanvasActionsMenu({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(event: MouseEvent<HTMLElement>) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  navigate(`/${organizationId}/canvases/${canvas.id}/runs`);
+                }}
+              >
+                <Play size={16} />
+                View Runs
+              </DropdownMenuItem>
               <PermissionTooltip
                 allowed={canUpdateCanvases || permissionsLoading}
                 message="You don't have permission to update canvases."
@@ -815,10 +960,24 @@ function CanvasListRow({
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           {canvas.createdBy?.name ? (
             <>
-              Created by {canvas.createdBy.name}, on {canvas.createdAt}
+              Created by {canvas.createdBy.name}{" "}
+              <span
+                title={canvas.createdAtRelative.full}
+                className="pointer-events-auto underline decoration-dotted decoration-gray-400 underline-offset-2 cursor-help"
+              >
+                {canvas.createdAtRelative.relative}
+              </span>
             </>
           ) : (
-            <>Created on {canvas.createdAt}</>
+            <>
+              Created{" "}
+              <span
+                title={canvas.createdAtRelative.full}
+                className="pointer-events-auto underline decoration-dotted decoration-gray-400 underline-offset-2 cursor-help"
+              >
+                {canvas.createdAtRelative.relative}
+              </span>
+            </>
           )}
         </p>
       </div>
