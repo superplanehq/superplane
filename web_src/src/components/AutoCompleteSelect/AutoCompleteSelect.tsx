@@ -18,6 +18,8 @@ export interface AutoCompleteSelectProps {
   className?: string;
   error?: boolean;
   disabled?: boolean;
+  query?: string;
+  onQueryChange?: (query: string) => void;
 }
 
 export function AutoCompleteSelect({
@@ -28,9 +30,11 @@ export function AutoCompleteSelect({
   className,
   error = false,
   disabled = false,
+  query: externalQuery,
+  onQueryChange,
 }: AutoCompleteSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [internalQuery, setInternalQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -51,6 +55,9 @@ export function AutoCompleteSelect({
     ],
     whileElementsMounted: autoUpdate,
   });
+
+  // Use external query if provided (controlled), otherwise use internal state (uncontrolled)
+  const query = externalQuery !== undefined ? externalQuery : internalQuery;
 
   // Find the selected option
   const selectedOption = options.find((option) => option.value === value);
@@ -77,7 +84,7 @@ export function AutoCompleteSelect({
 
   const handleInputFocus = () => {
     setIsOpen(true);
-    setQuery("");
+    setInternalQuery("");
   };
 
   const handleInputBlur = (e: React.FocusEvent) => {
@@ -85,7 +92,7 @@ export function AutoCompleteSelect({
       return;
     }
     setTimeout(() => {
-      setQuery("");
+      setInternalQuery("");
       setIsOpen(false);
     }, 150);
   };
@@ -94,20 +101,24 @@ export function AutoCompleteSelect({
     onChange(optionValue);
     setTimeout(() => {
       inputRef.current?.blur();
-      setQuery("");
+      setInternalQuery("");
+      onQueryChange?.("");
       setIsOpen(false);
     }, 150);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(e.target.value);
+    const newQuery = e.target.value;
+    setInternalQuery(newQuery);
+    onQueryChange?.(newQuery);
     if (!isOpen) setIsOpen(true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       setIsOpen(false);
-      setQuery("");
+      onQueryChange?.("");
+      setInternalQuery("");
       inputRef.current?.blur();
     }
   };
@@ -127,7 +138,7 @@ export function AutoCompleteSelect({
         !floatingEl.contains(event.target as Node)
       ) {
         setIsOpen(false);
-        setQuery("");
+        setInternalQuery("");
       }
     };
 
@@ -151,7 +162,7 @@ export function AutoCompleteSelect({
         onClick={() => {
           if (!isOpen) {
             setIsOpen(true);
-            setQuery("");
+            setInternalQuery("");
           }
           inputRef.current?.focus();
         }}
