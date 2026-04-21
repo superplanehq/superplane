@@ -53,7 +53,7 @@ func (r *OnRelease) Color() string {
 }
 
 func (r *OnRelease) DefaultRunTitle() string {
-	return `{{ root().data.name != "" ? root().data.name : (root().data.tag != "" ? root().data.tag : "Release") }}{{ root().data.tag != "" ? " (" + root().data.tag + ")" : "" }}`
+	return `{{ firstNonEmpty(root().data.name, root().data.tag, "Release") }}{{ root().data.tag != "" ? " (" + root().data.tag + ")" : "" }}`
 }
 
 func (r *OnRelease) Configuration() []configuration.Field {

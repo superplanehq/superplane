@@ -97,7 +97,7 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
 }
 
 func (t *OnAlertFires) DefaultRunTitle() string {
-	return `{{ (root().data.ruleName != "" ? root().data.ruleName : (root().data.alertName != "" ? root().data.alertName : (root().data.name != "" ? root().data.name : (root().data.title != "" ? root().data.title : "Elastic alert received")))) + (root().data.spaceId != "" ? " · " + root().data.spaceId : "") }}`
+	return `{{ firstNonEmpty(root().data.ruleName, root().data.alertName, root().data.name, root().data.title, "Elastic alert received") }}{{ root().data.spaceId != "" ? " · " + root().data.spaceId : "" }}`
 }
 
 func (t *OnAlertFires) Configuration() []configuration.Field {

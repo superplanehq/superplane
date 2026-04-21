@@ -68,7 +68,7 @@ func (t *OnBuild) Color() string {
 }
 
 func (t *OnBuild) DefaultRunTitle() string {
-	return `{{ (root().data.serviceName != "" ? root().data.serviceName : (root().data.serviceId != "" ? root().data.serviceId : "Service")) + " · " + (root().type == "render.build.ended" ? "Build Ended" : (root().type == "render.build.started" ? "Build Started" : "Render Event")) }}`
+	return `{{ firstNonEmpty(root().data.serviceName, root().data.serviceId, "Service") + " · " + ({"render.build.ended": "Build Ended", "render.build.started": "Build Started"}[root().type] ?? "Render Event") }}`
 }
 
 func (t *OnBuild) Configuration() []configuration.Field {

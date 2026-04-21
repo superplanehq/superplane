@@ -59,7 +59,7 @@ When the trigger fires, SuperPlane receives the webhook and starts a workflow ex
 }
 
 func (t *OnAlertFired) DefaultRunTitle() string {
-	return `{{ root().data.name != "" ? root().data.name : "Alert Fired" }}{{ root().data.alert_type != "" ? " · " + root().data.alert_type : "" }}`
+	return `{{ firstNonEmpty(root().data.name, "Alert Fired") }}{{ root().data.alert_type != "" ? " · " + root().data.alert_type : "" }}`
 }
 
 func (t *OnAlertFired) Configuration() []configuration.Field {

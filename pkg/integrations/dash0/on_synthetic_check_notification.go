@@ -64,7 +64,7 @@ func (t *OnSyntheticCheckNotification) ExampleData() map[string]any {
 }
 
 func (t *OnSyntheticCheckNotification) DefaultRunTitle() string {
-	return `{{ root().data.issue.summary != "" ? root().data.issue.summary : (root().data.issue.issueIdentifier != "" ? root().data.issue.issueIdentifier : (root().data.issue.id != "" ? root().data.issue.id : "Dash0 synthetic check notification")) }}`
+	return `{{ firstNonEmpty(root().data.issue.summary, root().data.issue.issueIdentifier, root().data.issue.id, "Dash0 synthetic check notification") }}`
 }
 
 func (t *OnSyntheticCheckNotification) Configuration() []configuration.Field {

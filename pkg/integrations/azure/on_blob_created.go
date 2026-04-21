@@ -81,7 +81,7 @@ func (t *OnBlobCreated) Color() string {
 }
 
 func (t *OnBlobCreated) DefaultRunTitle() string {
-	return `{{ root().data.container != "" ? root().data.container + "/" + root().data.blobName : "Blob created" }}`
+	return `{{ firstNonEmpty(root().data.container != "" ? root().data.container + "/" + root().data.blobName : "", "Blob created") }}`
 }
 
 func (t *OnBlobCreated) Configuration() []configuration.Field {

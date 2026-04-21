@@ -96,7 +96,7 @@ func (w *Webhook) Color() string {
 }
 
 func (w *Webhook) DefaultRunTitle() string {
-	return `{{ root().data.body.run_name != "" ? root().data.body.run_name : "Webhook " + root().id + " at " + date(root().timestamp).Format("1/2/2006, 3:04:05 PM") }}`
+	return `{{ firstNonEmpty(root().data.body.run_name, "Webhook " + root().id + " at " + date(root().timestamp).Format("1/2/2006, 3:04:05 PM")) }}`
 }
 
 func (w *Webhook) Configuration() []configuration.Field {

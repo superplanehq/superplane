@@ -81,7 +81,7 @@ func (t *OnFeatureFlagChange) Color() string {
 }
 
 func (t *OnFeatureFlagChange) DefaultRunTitle() string {
-	return `{{ root().data.name != "" ? root().data.name : (root().data.flagKey != "" ? root().data.flagKey : "Feature Flag") }}`
+	return `{{ firstNonEmpty(root().data.name, root().data.flagKey, "Feature Flag") }}`
 }
 
 func (t *OnFeatureFlagChange) Configuration() []configuration.Field {
