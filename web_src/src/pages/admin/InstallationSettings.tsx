@@ -310,6 +310,7 @@ const SMTPFields = ({ form, passwordConfigured, onFieldChange }: SMTPFieldsProps
             value={form.password}
             onChange={(event) => onFieldChange("password", event.target.value)}
             placeholder={passwordConfigured ? "Leave blank to keep current password" : "SMTP password"}
+            className="ph-no-capture"
           />
         </InputGroup>
         {passwordConfigured ? (
