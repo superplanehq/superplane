@@ -12,25 +12,30 @@ export type BuildGrafanaEventSectionsOptions = {
 };
 
 export function buildGrafanaEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
   options?: BuildGrafanaEventSectionsOptions,
 ): EventSection[] {
-  const strict = options?.strict === true;
-
   if (!execution.rootEvent?.id) {
     return [];
   }
 
-  if (strict) {
-    if (!execution.createdAt) {
-      return [];
-    }
-    const strictTrigger = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-    if (!strictTrigger?.componentName) {
-      return [];
-    }
+  const strict = options?.strict === true;
+
+  if (strict && !execution.createdAt) {
+    return [];
+  }
+
+  if (!strict) {
+    return [
+      {
+        receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
+        eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
+        eventState: getState(componentName)(execution),
+        eventId: execution.rootEvent?.id || "",
+      },
+    ];
   }
 
   return [
@@ -43,7 +48,7 @@ export function buildGrafanaEventSections(
   ];
 }
 
-/** Single source for Grafana event display time so subtitle and receivedAt stay aligned. */
+/** Single source for Grafana event display time so subtitle and receivedAt stay aligned (strict / alert flows). */
 function resolveGrafanaEventDisplayTimestamp(execution: ExecutionInfo): string | undefined {
   return execution.createdAt || execution.updatedAt;
 }
@@ -83,13 +88,6 @@ export function grafanaCreatedAtSubtitle(context: SubtitleContext): string | Rea
   return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
-export function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  return [
-    {
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id || "",
-    },
-  ];
+export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  return buildGrafanaEventSections(nodes, execution, componentName);
 }
