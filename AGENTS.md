@@ -40,6 +40,7 @@
   - `make openapi.spec.gen` to generate OpenAPI spec for the API
   - `make openapi.client.gen` to generate GoLang SDK for the API
   - `make openapi.web.client.gen` to generate TypeScript SDK for the UI
+- The generated spec lives at `api/swagger/superplane.swagger.json` and is served (no auth) at `/api/v1/docs/superplane.swagger.json` (UI at `/api/v1/docs`).
 
 ## Coding Style & Naming Conventions
 
