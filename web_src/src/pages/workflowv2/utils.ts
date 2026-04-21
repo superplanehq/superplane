@@ -19,6 +19,7 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
+import { formatTimestamp } from "./mappers/utils";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
@@ -1321,8 +1322,12 @@ export function buildEventInfo(event: CanvasesCanvasEvent): EventInfo | undefine
   };
 }
 
-export function getEventRunTitle(event: EventInfo, fallback = ""): string {
-  return event?.runTitle?.trim() || fallback;
+export function getEventTitleFallback(createdAt?: string): string {
+  return "Event received at " + formatTimestamp(createdAt || "");
+}
+
+export function getEventRunTitle(event: EventInfo, fallback?: string): string {
+  return event?.runTitle?.trim() || fallback || getEventTitleFallback(event?.createdAt);
 }
 
 export function buildQueueItemInfo(queueItem: CanvasesCanvasNodeQueueItem): QueueItemInfo {
