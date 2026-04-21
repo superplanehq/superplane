@@ -11,14 +11,6 @@ if (key) {
     api_host: "https://us.i.posthog.com",
     autocapture: false,
     capture_pageview: false,
-    session_recording: {
-      // Record the React Flow canvas at low FPS
-      captureCanvas: {
-        recordCanvas: true,
-        canvasFps: 1,
-        canvasQuality: "0.1",
-      },
-    },
   });
 }
 
