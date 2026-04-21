@@ -18,6 +18,7 @@ export interface AutoCompleteSelectProps {
   className?: string;
   error?: boolean;
   disabled?: boolean;
+  onQueryChange?: (query: string) => void;
 }
 
 export function AutoCompleteSelect({
@@ -28,6 +29,7 @@ export function AutoCompleteSelect({
   className,
   error = false,
   disabled = false,
+  onQueryChange,
 }: AutoCompleteSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -100,7 +102,9 @@ export function AutoCompleteSelect({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(e.target.value);
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    onQueryChange?.(newQuery);
     if (!isOpen) setIsOpen(true);
   };
 
