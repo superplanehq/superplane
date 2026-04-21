@@ -2,7 +2,7 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import type { Incident } from "./types";
 import { getDetailsForIncident } from "./base";
@@ -33,16 +33,13 @@ interface OnIncidentEventData {
  * Renderer for the "rootly.onIncident" trigger type
  */
 export const onIncidentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnIncidentEventData;
     const incident = eventData?.incident;
     const contentParts = [incident?.severity, incident?.status].filter(Boolean).join(" · ");
     const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
-    return {
-      title: incident?.title || "Incident",
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -77,7 +74,6 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
 
       props.lastEventData = {
-        title: incident?.title || "Incident",
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

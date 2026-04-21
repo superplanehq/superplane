@@ -41,18 +41,6 @@ export function formatTags(tags?: string[]): string {
   return tags.join(", ");
 }
 
-export function formatTagLabel(tags?: string[]): string | undefined {
-  if (!tags || tags.length === 0) {
-    return undefined;
-  }
-
-  if (tags.length === 1) {
-    return tags[0];
-  }
-
-  return `${tags[0]} +${tags.length - 1}`;
-}
-
 export function buildRepositoryMetadataItems(
   metadata?: EcrRepositoryMetadata,
   configuration?: EcrRepositoryConfiguration,

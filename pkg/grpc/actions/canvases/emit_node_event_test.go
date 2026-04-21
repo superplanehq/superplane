@@ -118,7 +118,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		assert.Equal(t, float64(42), dataMap["count"])
 	})
 
-	t.Run("custom name is resolved from node configuration", func(t *testing.T) {
+	t.Run("run title is resolved from live node run title template", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
@@ -136,12 +136,10 @@ func Test__EmitNodeEvent(t *testing.T) {
 			[]models.Edge{},
 		)
 
-		node, err := canvas.FindNode("node-1")
-		require.NoError(t, err)
-		node.Configuration = datatypes.NewJSONType(map[string]any{
-			"customName": "Run: {{ $[\"node-1\"].message }}",
-		})
-		require.NoError(t, database.Conn().Save(node).Error)
+		runTitleTemplate := "Run: {{ root().data.message }}"
+		require.NoError(t, database.Conn().Model(&models.CanvasNode{}).
+			Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
+			Update("run_title_template", runTitleTemplate).Error)
 
 		response, err := EmitNodeEvent(
 			ctx,
@@ -158,8 +156,91 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
-		require.NotNil(t, event.CustomName)
-		assert.Equal(t, "Run: hello", *event.CustomName)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
+	})
+
+	t.Run("custom run title template resolves against root payload", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: "node-1",
+					Name:   "node-1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		runTitleTemplate := `{{ root().data.message }}`
+		require.NoError(t, database.Conn().Model(&models.CanvasNode{}).
+			Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
+			Update("run_title_template", runTitleTemplate).Error)
+
+		response, err := EmitNodeEvent(
+			ctx,
+			r.Organization.ID,
+			canvas.ID,
+			"node-1",
+			"default",
+			map[string]any{"message": "hello"},
+		)
+		require.NoError(t, err)
+
+		eventID, err := uuid.Parse(response.EventId)
+		require.NoError(t, err)
+
+		event, err := models.FindCanvasEvent(eventID)
+		require.NoError(t, err)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "hello", *event.RunTitle)
+	})
+
+	t.Run("trigger default run title resolves against root event payload envelope", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: "node-1",
+					Name:   "node-1",
+					Type:   models.NodeTypeTrigger,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Trigger: &models.TriggerRef{Name: "github.onPush"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		response, err := EmitNodeEvent(
+			ctx,
+			r.Organization.ID,
+			canvas.ID,
+			"node-1",
+			"default",
+			map[string]any{
+				"head_commit": map[string]any{
+					"message": "hello",
+				},
+			},
+		)
+		require.NoError(t, err)
+
+		eventID, err := uuid.Parse(response.EventId)
+		require.NoError(t, err)
+
+		event, err := models.FindCanvasEvent(eventID)
+		require.NoError(t, err)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "hello", *event.RunTitle)
 	})
 
 	t.Run("successful event emission publishes RabbitMQ message", func(t *testing.T) {

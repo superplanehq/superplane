@@ -1,10 +1,10 @@
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import type React from "react";
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderWithTimeAgo } from "@/components/TimeAgo";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -57,7 +57,7 @@ export const listNotesMapper: ComponentBaseMapper = {
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
         "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -102,11 +102,7 @@ function metadataList(node: { configuration?: unknown }): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer((rootTriggerNode as any)?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
-
+function baseEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const notes = getNotes(execution);
   const date = new Date(execution.createdAt!);
 
@@ -120,7 +116,6 @@ function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, co
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id,

@@ -202,6 +202,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		Metadata:          datatypes.NewJSONType(node.Metadata),
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
+		RunTitleTemplate:  node.RunTitleTemplate,
 		AppInstallationID: p.getNodeIntegrationID(node),
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
@@ -298,6 +299,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
+	existingNode.RunTitleTemplate = updatedNode.RunTitleTemplate
 	existingNode.AppInstallationID = p.getNodeIntegrationID(updatedNode)
 	existingNode.UpdatedAt = &now
 

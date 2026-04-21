@@ -1,10 +1,10 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -18,7 +18,7 @@ import type { GetSilenceConfiguration, GetSilenceNodeMetadata, PrometheusSilence
 
 export const getSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return buildGetSilenceProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    return buildGetSilenceProps(context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -82,7 +82,6 @@ export const getSilenceMapper: ComponentBaseMapper = {
 };
 
 function buildGetSilenceProps(
-  nodes: NodeInfo[],
   node: NodeInfo,
   componentDefinition: { name: string; label: string; color: string },
   lastExecutions: ExecutionInfo[],
@@ -96,7 +95,7 @@ function buildGetSilenceProps(
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,
     title: node.name || componentDefinition.label || "Unnamed component",
-    eventSections: lastExecution ? buildEventSections(nodes, lastExecution, componentName) : undefined,
+    eventSections: lastExecution ? buildEventSections(lastExecution, componentName) : undefined,
     metadata: getMetadata(node),
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
@@ -116,15 +115,10 @@ function getMetadata(node: NodeInfo): MetadataItem[] {
   return metadata.slice(0, 3);
 }
 
-function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function buildEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "",
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

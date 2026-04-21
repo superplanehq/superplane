@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";

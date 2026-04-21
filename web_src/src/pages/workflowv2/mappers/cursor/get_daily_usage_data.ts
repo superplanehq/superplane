@@ -1,12 +1,11 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
@@ -43,9 +42,7 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
         "Get Daily Usage Data",
-      eventSections: lastExecution
-        ? getDailyUsageDataEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? getDailyUsageDataEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -81,21 +78,13 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
   },
 };
 
-function getDailyUsageDataEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+function getDailyUsageDataEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

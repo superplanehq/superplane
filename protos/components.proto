@@ -145,6 +145,7 @@ message Node {
   string error_message = 13;
   string warning_message = 14;
   bool paused = 15;
+  optional string run_title_template = 16;
 }
 
 message Position {

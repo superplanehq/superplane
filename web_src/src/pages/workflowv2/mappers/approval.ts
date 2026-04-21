@@ -5,7 +5,6 @@ import type {
   ExecutionDetailsContext,
   ExecutionInfo,
   GroupRef,
-  NodeInfo,
   RoleRef,
   StateFunction,
   SubtitleContext,
@@ -17,9 +16,8 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";
@@ -156,7 +154,7 @@ export const approvalMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("orange"),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Approval",
-      eventSections: lastExecution ? getApprovalEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? getApprovalEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       specs: getApprovalSpecs(items),
       eventStateMap: APPROVAL_STATE_MAP,
@@ -378,16 +376,11 @@ function getApprovalSpecs(items: ApprovalRecord[]): ComponentBaseSpec[] {
   ];
 }
 
-function getApprovalEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function getApprovalEventSections(execution: ExecutionInfo): EventSection[] {
   const eventSubtitle = getComponentSubtitle(execution);
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: eventTitle,
     eventSubtitle: eventSubtitle,
     eventState: approvalStateFunction(execution),
     eventId: execution.rootEvent!.id!,

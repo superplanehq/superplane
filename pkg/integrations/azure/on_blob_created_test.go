@@ -182,6 +182,8 @@ func TestOnBlobCreated_HandleWebhook_BlobCreated(t *testing.T) {
 		assert.Equal(t, "blob-event-1", payload["id"])
 		assert.Equal(t, EventTypeBlobCreated, payload["eventType"])
 		assert.Equal(t, "/blobServices/default/containers/mycontainer/blobs/data/myfile.csv", payload["subject"])
+		assert.NotContains(t, payload, "container")
+		assert.NotContains(t, payload, "blobName")
 	})
 
 	t.Run("emits event with matching container filter", func(t *testing.T) {
