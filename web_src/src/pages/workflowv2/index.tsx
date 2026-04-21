@@ -2756,7 +2756,7 @@ export function WorkflowPageV2() {
             ...node,
             configuration: updatedConfiguration,
             name: updatedNodeName,
-            runTitleTemplate,
+            runTitleTemplate: runTitleTemplate !== undefined ? runTitleTemplate : node.runTitleTemplate,
             integration: integrationRef,
           };
         }
