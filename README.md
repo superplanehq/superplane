@@ -181,6 +181,10 @@ You can deploy SuperPlane on a single host or on Kubernetes:
 
 Installation admins can enable private network access during owner setup or later in `/admin/settings` when SuperPlane needs to reach tools inside a VPC, private Kubernetes cluster, or another closed network. Environment variables still take precedence: set `BLOCKED_HTTP_HOSTS` or `BLOCKED_PRIVATE_IP_RANGES` to override the UI-controlled policy, and set either variable to an empty value to disable that specific block list entirely.
 
+## API reference
+
+Every SuperPlane instance serves its OpenAPI spec (Swagger 2.0, no auth) at `/api/v1/docs/superplane.swagger.json` and a Swagger UI at `/api/v1/docs` — e.g. [app.superplane.com](https://app.superplane.com/api/v1/docs/superplane.swagger.json).
+
 ## Contributing
 
 We welcome your bug reports, ideas for improvement, and focused PRs.
