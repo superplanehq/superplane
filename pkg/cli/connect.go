@@ -28,36 +28,38 @@ func (c *ConnectCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("failed to authenticate with the provided token: %w", err)
 	}
 
+	orgID := me.User.GetOrganizationId()
 	organizationResponse, _, err := api.OrganizationAPI.
-		OrganizationsDescribeOrganization(ctx.Context, me.User.GetOrganizationId()).
+		OrganizationsDescribeOrganization(ctx.Context, orgID).
 		Execute()
 
 	if err != nil {
-		return fmt.Errorf("failed to describe organization %s: %w", me.User.GetOrganizationId(), err)
+		return fmt.Errorf("failed to describe organization %s: %w", orgID, err)
 	}
 
 	orgName := *organizationResponse.Organization.Metadata.Name
 
-	_, err = UpsertContext(ConfigContext{
-		URL:          baseURL,
-		Organization: orgName,
-		APIToken:     apiToken,
+	saved, err := UpsertContext(ConfigContext{
+		URL:            baseURL,
+		Organization:   orgName,
+		OrganizationID: orgID,
+		APIToken:       apiToken,
 	})
-
 	if err != nil {
 		return err
 	}
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, err := fmt.Fprintf(stdout, "Connected to %q (%s)\n", orgName, baseURL)
+			_, err := fmt.Fprintf(stdout, "Connected to %q (%s)\n", orgName, saved.URL)
 			return err
 		})
 	}
 
 	return ctx.Renderer.Render(map[string]any{
-		"organization": orgName,
-		"url":          baseURL,
+		"organization":   orgName,
+		"organizationId": orgID,
+		"url":            baseURL,
 	})
 }
 
