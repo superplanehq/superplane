@@ -1,13 +1,16 @@
 import { useCallback, useMemo } from "react";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { analytics } from "@/lib/analytics";
 import type { CanvasNode } from "@/ui/CanvasPage";
 
 interface UseCanvasYamlParams {
+  canvasId: string;
+  organizationId: string;
   nodes: CanvasNode[];
   getYamlExportPayload: (nodes: CanvasNode[]) => { yamlText: string; filename: string } | null;
 }
 
-export function useCanvasYaml({ nodes, getYamlExportPayload }: UseCanvasYamlParams) {
+export function useCanvasYaml({ canvasId, organizationId, nodes, getYamlExportPayload }: UseCanvasYamlParams) {
   const yamlPayload = useMemo(() => getYamlExportPayload(nodes), [getYamlExportPayload, nodes]);
 
   const handleYamlViewCopy = useCallback(async () => {
@@ -32,7 +35,8 @@ export function useCanvasYaml({ nodes, getYamlExportPayload }: UseCanvasYamlPara
     link.remove();
     URL.revokeObjectURL(url);
     showSuccessToast("Canvas exported as YAML");
-  }, [yamlPayload]);
+    analytics.yamlExport(canvasId, organizationId);
+  }, [yamlPayload, canvasId, organizationId]);
 
   return {
     yamlPayload,

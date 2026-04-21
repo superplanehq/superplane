@@ -166,7 +166,7 @@ export function Profile() {
             {token && (
               <div className="space-y-3">
                 <Text className="text-sm font-medium text-gray-700 dark:text-gray-300">New API Token</Text>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ph-no-capture">
                   <Input
                     type={tokenVisible ? "text" : "password"}
                     value={token}

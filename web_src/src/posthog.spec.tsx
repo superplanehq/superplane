@@ -95,6 +95,7 @@ describe("account identification", () => {
         email: "john@example.com",
         name: "John Doe",
         installation_admin: false,
+        is_internal: false,
       });
     });
   });
