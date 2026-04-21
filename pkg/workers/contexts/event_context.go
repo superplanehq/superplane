@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
@@ -26,13 +25,12 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]mo
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
 	now := time.Now()
-	eventID := uuid.New()
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": now.UTC().Format(time.RFC3339Nano),
 		"data":      payload,
 	}
-	rootPayload := BuildRootEventPayload(payload, payloadType, eventID, now, "default")
+	rootPayload := BuildRootEventPayload(payload, payloadType, now)
 
 	data, err := json.Marshal(structuredPayload)
 	if err != nil {
@@ -47,7 +45,6 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
 	//
 	event := models.CanvasEvent{
-		ID:         eventID,
 		WorkflowID: s.node.WorkflowID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
@@ -78,12 +75,10 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func BuildRootEventPayload(payload any, payloadType string, eventID uuid.UUID, createdAt time.Time, channel string) map[string]any {
+func BuildRootEventPayload(payload any, payloadType string, createdAt time.Time) map[string]any {
 	return map[string]any{
-		"id":        eventID.String(),
 		"type":      payloadType,
 		"timestamp": createdAt.UTC().Format(time.RFC3339Nano),
-		"channel":   channel,
 		"data":      payload,
 	}
 }

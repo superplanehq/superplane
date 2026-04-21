@@ -44,7 +44,7 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	rootPayload := contexts.BuildRootEventPayload(data, "", event.ID, now, channel)
+	rootPayload := contexts.BuildRootEventPayload(data, "", now)
 	runTitle, err := contexts.ResolveRootEventRunTitle(
 		database.Conn(),
 		node,
