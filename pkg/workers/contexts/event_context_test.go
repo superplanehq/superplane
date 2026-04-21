@@ -95,11 +95,9 @@ func Test__EventContext__Emit(t *testing.T) {
 			nil,
 		)
 
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), componentCanvas.ID)
-		require.NoError(t, err)
 		runTitleTemplate := `{{ root().data.message }}`
-		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
-		require.NoError(t, database.Conn().Save(liveVersion).Error)
+		require.NoError(t, database.Conn().Model(&componentNodes[0]).Update("run_title_template", runTitleTemplate).Error)
+		componentNodes[0].RunTitleTemplate = &runTitleTemplate
 
 		ctx := NewEventContext(database.Conn(), &componentNodes[0], nil)
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"message": "hello"}))

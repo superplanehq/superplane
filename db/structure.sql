@@ -598,7 +598,8 @@ CREATE TABLE public.workflow_nodes (
     parent_node_id character varying(128),
     deleted_at timestamp with time zone,
     app_installation_id uuid,
-    state_reason text
+    state_reason text,
+    run_title_template text
 );
 
 
@@ -1973,4 +1974,3 @@ COPY public.data_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
-

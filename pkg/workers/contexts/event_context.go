@@ -84,7 +84,7 @@ func BuildRootEventPayload(payload any, payloadType string, createdAt time.Time)
 }
 
 func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, rootPayload any, input any) (*string, error) {
-	template, err := resolveRootEventRunTitleTemplate(tx, node)
+	template, err := resolveRootEventRunTitleTemplate(node)
 	if err != nil {
 		return nil, err
 	}
@@ -110,25 +110,12 @@ func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, rootPayload 
 	return &resolvedName, nil
 }
 
-func resolveRootEventRunTitleTemplate(tx *gorm.DB, node *models.CanvasNode) (string, error) {
-	liveNodes, _, err := models.FindLiveCanvasSpecInTransaction(tx, node.WorkflowID)
-	if err != nil {
-		return "", err
-	}
-
-	for _, liveNode := range liveNodes {
-		if liveNode.ID != node.NodeID {
-			continue
+func resolveRootEventRunTitleTemplate(node *models.CanvasNode) (string, error) {
+	if node.RunTitleTemplate != nil {
+		template := strings.TrimSpace(*node.RunTitleTemplate)
+		if template != "" {
+			return template, nil
 		}
-
-		if liveNode.RunTitleTemplate != nil {
-			template := strings.TrimSpace(*liveNode.RunTitleTemplate)
-			if template != "" {
-				return template, nil
-			}
-		}
-
-		break
 	}
 
 	ref := node.Ref.Data()

@@ -136,11 +136,10 @@ func Test__EmitNodeEvent(t *testing.T) {
 			[]models.Edge{},
 		)
 
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
-		require.NoError(t, err)
 		runTitleTemplate := "Run: {{ root().data.message }}"
-		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
-		require.NoError(t, database.Conn().Save(liveVersion).Error)
+		require.NoError(t, database.Conn().Model(&models.CanvasNode{}).
+			Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
+			Update("run_title_template", runTitleTemplate).Error)
 
 		response, err := EmitNodeEvent(
 			ctx,
@@ -179,11 +178,10 @@ func Test__EmitNodeEvent(t *testing.T) {
 			[]models.Edge{},
 		)
 
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
-		require.NoError(t, err)
 		runTitleTemplate := `{{ root().data.message }}`
-		liveVersion.Nodes[0].RunTitleTemplate = &runTitleTemplate
-		require.NoError(t, database.Conn().Save(liveVersion).Error)
+		require.NoError(t, database.Conn().Model(&models.CanvasNode{}).
+			Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
+			Update("run_title_template", runTitleTemplate).Error)
 
 		response, err := EmitNodeEvent(
 			ctx,
