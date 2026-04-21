@@ -20,6 +20,7 @@ import {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { Dispatch, SetStateAction } from "react";
 import { consumeChatResponseStream } from "./agentChatSupport";
+import { normalizeAiProposal } from "./agentChatProposal";
 import {
   addLocalPromptMessages,
   applyChatPromptFailure,
@@ -47,6 +48,7 @@ export type AiChatSession = {
   title: string;
   initialMessage?: string;
   createdAt?: string;
+  latestRunStatus?: string;
 };
 
 export type AgentMode = { mode: "inspect" } | { mode: "build"; canvasVersion: string };
@@ -156,12 +158,17 @@ function normalizeChatSession(chat: AgentsAgentChatInfo): AiChatSession | null {
 
   const initialMessage = typeof chat.initialMessage === "string" ? chat.initialMessage.trim() : "";
   const createdAt = typeof chat.createdAt === "string" && chat.createdAt.trim().length > 0 ? chat.createdAt : undefined;
+  const latestRunStatus =
+    typeof chat.latestRunStatus === "string" && chat.latestRunStatus.trim().length > 0
+      ? chat.latestRunStatus.trim()
+      : undefined;
 
   return {
     id,
     title: initialMessage || UNTITLED_CHAT_SESSION,
     initialMessage: initialMessage || undefined,
     createdAt,
+    latestRunStatus,
   };
 }
 
@@ -177,6 +184,26 @@ function normalizePersistedMessages(payload: AgentsListAgentChatMessagesResponse
       .map((message) => normalizePersistedMessage(message))
       .filter((message): message is AiBuilderMessage => Boolean(message)),
   );
+}
+
+function extractPendingProposalFromApiMessages(apiMessages: AgentsAgentChatMessage[]): AiBuilderProposal | null {
+  for (let i = apiMessages.length - 1; i >= 0; i--) {
+    const msg = apiMessages[i];
+    if (msg.role !== "assistant") {
+      continue;
+    }
+    const raw = typeof msg.proposal === "string" ? msg.proposal.trim() : "";
+    if (!raw) {
+      // Last assistant message has no proposal — nothing pending.
+      break;
+    }
+    try {
+      return normalizeAiProposal(JSON.parse(raw));
+    } catch {
+      break;
+    }
+  }
+  return null;
 }
 
 function requireChatSessionPayload(payload: AgentsCreateAgentChatResponse | AgentsResumeAgentChatResponse): {
@@ -216,6 +243,11 @@ export async function loadChatSessions({
   return normalizeChatSessions(listResponse.data);
 }
 
+export type ChatConversation = {
+  messages: AiBuilderMessage[];
+  pendingProposal: AiBuilderProposal | null;
+};
+
 export async function loadChatConversation({
   chatId,
   canvasId,
@@ -224,9 +256,9 @@ export async function loadChatConversation({
   chatId?: string | null;
   canvasId?: string;
   organizationId?: string;
-}): Promise<AiBuilderMessage[]> {
+}): Promise<ChatConversation> {
   if (!canvasId || !organizationId || !chatId) {
-    return [];
+    return { messages: [], pendingProposal: null };
   }
 
   const messagesResponse = await agentsListAgentChatMessages(
@@ -241,7 +273,11 @@ export async function loadChatConversation({
     }),
   );
 
-  return normalizePersistedMessages(messagesResponse.data);
+  const apiMessages = messagesResponse.data?.messages ?? [];
+  return {
+    messages: normalizePersistedMessages(messagesResponse.data),
+    pendingProposal: extractPendingProposalFromApiMessages(apiMessages),
+  };
 }
 
 export async function deleteAgentChatSession({

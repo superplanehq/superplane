@@ -39,6 +39,7 @@ class AgentChat(Base):
     total_input_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     total_output_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     total_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    latest_run_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
 
     messages: Mapped[list["AgentChatMessage"]] = relationship(
         back_populates="chat", cascade="all, delete-orphan"
