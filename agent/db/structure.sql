@@ -45,7 +45,8 @@ CREATE TABLE public.agent_chat_messages (
     message jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    run_id uuid
+    run_id uuid,
+    proposal text
 );
 
 

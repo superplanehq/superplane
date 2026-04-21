@@ -73,6 +73,7 @@ class AgentChatMessage(Base):
     )
     message_index: Mapped[int] = mapped_column(nullable=False)
     message: Mapped[dict] = mapped_column(JSONB, nullable=False)  # type: ignore[type-arg]
+    proposal: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TimestampTZ, nullable=False, server_default=func.now()
     )

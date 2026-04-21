@@ -538,8 +538,8 @@ async def _stream_agent_run(
                 list(result.new_messages()),
                 persisted_tool_display_labels,
             )
-            recorder.save_authoritative_messages(messages)
             resolved_output = result.output
+            coerced_proposal_json: str | None = None
             if isinstance(resolved_output, CanvasAnswer):
                 cache_key = f"{deps.canvas_id}:{deps.canvas_version_id or 'inspect'}"
                 canvas_summary = deps.canvas_cache.get(cache_key)
@@ -548,6 +548,9 @@ async def _stream_agent_run(
                     resolved_output,
                     canvas_summary,
                 )
+                if resolved_output.proposal is not None:
+                    coerced_proposal_json = json.dumps(_to_jsonable(resolved_output.proposal))
+            recorder.save_authoritative_messages(messages, coerced_proposal_json=coerced_proposal_json)
             output = _to_jsonable(resolved_output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")

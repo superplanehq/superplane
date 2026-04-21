@@ -33,6 +33,7 @@ export function useLoadChatConversation({
       if (!currentChatId) {
         setAiMessages([]);
         setPendingProposal(null);
+        setIsGeneratingResponse(false);
       }
       setIsLoadingChatMessages(false);
       return () => {
@@ -65,6 +66,7 @@ export function useLoadChatConversation({
         if (session?.latestRunStatus === "running") {
           setIsGeneratingResponse(true);
         } else {
+          setIsGeneratingResponse(false);
           setPendingProposal(loadedProposal);
         }
       } catch (error) {

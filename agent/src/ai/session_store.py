@@ -226,6 +226,7 @@ class StoredAgentChatMessageRecord:
     message: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    proposal: str | None = None
 
 
 @dataclass(frozen=True)
@@ -532,9 +533,11 @@ class SessionStore:
         preserved_message_count: int,
         messages: list[ModelMessage],
         run_id: str | None = None,
+        coerced_proposal_json: str | None = None,
     ) -> None:
         now = _utcnow()
         cid = uuid.UUID(chat_id)
+        last_index = preserved_message_count + len(messages) - 1
 
         with self._session() as session:
             with session.begin():
@@ -552,13 +555,18 @@ class SessionStore:
                 for offset, msg in enumerate(messages):
                     serialized_message = _serialize_model_message(msg)
                     created_at = _message_timestamp(msg)
+                    index = preserved_message_count + offset
+                    # Set the coerced proposal only on the last message (which
+                    # contains the output tool call whose args have been coerced).
+                    proposal = coerced_proposal_json if index == last_index else None
                     session.add(
                         AgentChatMessage(
                             id=uuid.uuid4(),
                             chat_id=cid,
                             run_id=uuid.UUID(run_id) if run_id else None,
-                            message_index=preserved_message_count + offset,
+                            message_index=index,
                             message=serialized_message,
+                            proposal=proposal,
                             created_at=created_at,
                             updated_at=now,
                         )
@@ -778,8 +786,13 @@ class SessionStore:
             assistant_content = "".join(assistant_parts)
             if not assistant_content:
                 assistant_content = _extract_output_tool_answer(record.message)
-            proposal_dict = _extract_output_proposal(record.message)
-            proposal_json = json.dumps(proposal_dict) if proposal_dict is not None else None
+            # Prefer the explicitly saved proposal (already coerced) over the
+            # value extracted from raw tool-call args (which is pre-coercion).
+            if record.proposal is not None:
+                proposal_json = record.proposal
+            else:
+                proposal_dict = _extract_output_proposal(record.message)
+                proposal_json = json.dumps(proposal_dict) if proposal_dict is not None else None
             if assistant_content:
                 flattened.append(
                     StoredAgentChatMessage(
@@ -825,6 +838,7 @@ class SessionStore:
             message=payload,
             created_at=_from_db_time(row.created_at),
             updated_at=_from_db_time(row.updated_at),
+            proposal=row.proposal,
         )
 
     @staticmethod

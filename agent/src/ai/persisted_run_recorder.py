@@ -48,13 +48,18 @@ class PersistedRunRecorder:
             self._current_response_message_id, self._current_response
         )
 
-    def save_authoritative_messages(self, messages: Any) -> None:
+    def save_authoritative_messages(
+        self,
+        messages: Any,
+        coerced_proposal_json: str | None = None,
+    ) -> None:
         validated_messages = ModelMessagesTypeAdapter.validate_python(messages)
         self._store.replace_agent_chat_messages_after(
             self._chat_id,
             self._history_count_before_run,
             list(validated_messages),
             run_id=self._run_id,
+            coerced_proposal_json=coerced_proposal_json,
         )
         self._authoritative_messages_saved = True
         self._current_response_message_id = None
