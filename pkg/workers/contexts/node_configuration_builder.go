@@ -25,6 +25,7 @@ type NodeConfigurationBuilder struct {
 	nodeID              string
 	previousExecutionID *uuid.UUID
 	rootEventID         *uuid.UUID
+	rootPayload         any
 	input               any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
@@ -49,6 +50,11 @@ func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationB
 
 func (b *NodeConfigurationBuilder) WithRootEvent(rootEventID *uuid.UUID) *NodeConfigurationBuilder {
 	b.rootEventID = rootEventID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithRootPayload(rootPayload any) *NodeConfigurationBuilder {
+	b.rootPayload = rootPayload
 	return b
 }
 
@@ -265,6 +271,20 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
 		exprruntime.DateFunctionOption(),
+		expr.Function("firstNonEmpty", func(params ...any) (any, error) {
+			for _, param := range params {
+				if param == nil {
+					continue
+				}
+
+				value := strings.TrimSpace(fmt.Sprintf("%v", param))
+				if value != "" && value != "<nil>" {
+					return value, nil
+				}
+			}
+
+			return "", nil
+		}),
 		expr.Function("root", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")
@@ -487,6 +507,10 @@ func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.CanvasEvent, error)
 }
 
 func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
+	if b.rootPayload != nil {
+		return b.rootPayload, nil
+	}
+
 	rootEvent, err := b.fetchRootEvent()
 	if err != nil {
 		return nil, err

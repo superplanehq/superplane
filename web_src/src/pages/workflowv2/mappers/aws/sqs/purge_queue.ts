@@ -7,10 +7,10 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap } from "../..";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -42,7 +42,7 @@ export const purgeQueueMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? purgeQueueEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? purgeQueueEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: purgeQueueMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
@@ -83,15 +83,10 @@ function purgeQueueMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function purgeQueueEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function purgeQueueEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,

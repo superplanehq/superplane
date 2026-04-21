@@ -15,14 +15,13 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from "..";
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -96,7 +95,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: lastExecution ? runPipelineEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? runPipelineEventSections(lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       metadata: runPipelineMetadataList(context.node),
       specs: runPipelineSpecs(context.node),
@@ -194,14 +193,10 @@ function runPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+function runPipelineEventSections(execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }
-
-  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
@@ -210,7 +205,6 @@ function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   return [
     {
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : new Date(),
-      eventTitle: title,
       eventSubtitle,
       eventState: runPipelineStateFunction(execution),
       eventId: eventID,

@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo } from "../types";
 import { cloudBuildBaseMapper } from "./base";

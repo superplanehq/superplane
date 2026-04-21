@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "./types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
@@ -10,8 +10,8 @@ import { renderTimeAgo } from "@/components/TimeAgo";
  * Uses basic icon/color configuration from the trigger metadata.
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
+  subtitle: (_context: TriggerEventContext): string | React.ReactNode => {
+    return "";
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -30,7 +30,6 @@ export const defaultTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       props.lastEventData = {
-        title: "Event emitted by trigger",
         subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

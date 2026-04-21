@@ -1,5 +1,5 @@
 import type React from "react";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -24,7 +24,7 @@ interface PullRequestReviewOutput {
 
 export const createReviewMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    return baseProps(context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {

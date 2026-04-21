@@ -1,4 +1,4 @@
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
@@ -46,22 +46,9 @@ function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
  * Renderer for the "aws.cloudwatch.onAlarm" trigger
  */
 export const onAlarmTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as CloudWatchAlarmEvent;
-    const detail = eventData?.detail;
-    const alarmName = detail?.alarmName;
-    const state = detail?.state?.value;
-    const previousState = detail?.previousState?.value;
-
-    let title = "CloudWatch alarm";
-    if (alarmName && state && previousState) {
-      title = `${alarmName} - ${previousState} → ${state}`;
-    } else if (alarmName) {
-      title = alarmName;
-    }
-
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
-    return { title, subtitle };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -90,9 +77,8 @@ export const onAlarmTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onAlarmTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
+      const subtitle = onAlarmTriggerRenderer.subtitle({ event: lastEvent });
       props.lastEventData = {
-        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

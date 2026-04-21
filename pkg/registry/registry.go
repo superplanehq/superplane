@@ -31,6 +31,51 @@ func RegisterTrigger(name string, t core.Trigger) {
 	registeredTriggers[name] = t
 }
 
+func DefaultRunTitleForTrigger(name string) string {
+	mu.RLock()
+	trigger, ok := registeredTriggers[name]
+	integrations := make([]core.Integration, 0, len(registeredIntegrations))
+	for _, integration := range registeredIntegrations {
+		integrations = append(integrations, integration)
+	}
+	mu.RUnlock()
+
+	if !ok {
+		for _, integration := range integrations {
+			for _, candidate := range integration.Triggers() {
+				if candidate.Name() == name {
+					trigger = candidate
+					ok = true
+					break
+				}
+			}
+			if ok {
+				break
+			}
+		}
+	}
+
+	if !ok {
+		return ""
+	}
+
+	return strings.TrimSpace(trigger.DefaultRunTitle())
+}
+
+func NormalizeRunTitleTemplateForTrigger(name string, template string) string {
+	trimmed := strings.TrimSpace(template)
+	if trimmed == "" {
+		return ""
+	}
+
+	defaultTemplate := DefaultRunTitleForTrigger(name)
+	if defaultTemplate != "" && trimmed == defaultTemplate {
+		return ""
+	}
+
+	return trimmed
+}
+
 func RegisterIntegration(name string, i core.Integration) {
 	mu.Lock()
 	defer mu.Unlock()

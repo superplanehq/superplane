@@ -76,6 +76,10 @@ func (t *OnDeploy) Color() string {
 	return "gray"
 }
 
+func (t *OnDeploy) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.serviceName, root().data.serviceId, "Service") + " · " + ({"render.deploy.ended": "Deploy Ended", "render.deploy.started": "Deploy Started", "render.image.pull.failed": "Image Pull Failed", "render.pipeline.minutes.exhausted": "Pipeline Minutes Exhausted", "render.pre.deploy.ended": "Pre-Deploy Ended", "render.pre.deploy.started": "Pre-Deploy Started"}[root().type] ?? "Render Event") }}`
+}
+
 func (t *OnDeploy) Configuration() []configuration.Field {
 	return onResourceEventConfigurationFields(deployEventTypeOptions, deployDefaultEventTypes)
 }
