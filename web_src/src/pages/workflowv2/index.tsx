@@ -864,6 +864,7 @@ export function WorkflowPageV2() {
       });
     }
 
+    hasTrackedCanvasView.current = false;
     setHasUnsavedChanges(false);
     setHasNonPositionalUnsavedChanges(false);
     setActiveCanvasVersion(null);
@@ -3586,15 +3587,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      handleSaveWorkflow,
-      isReadOnly,
-      applyLocalWorkflowUpdate,
-      availableIntegrations,
-    ],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
   );
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
