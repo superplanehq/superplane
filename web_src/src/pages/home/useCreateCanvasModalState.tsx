@@ -56,6 +56,8 @@ export function useCreateCanvasModalState() {
       description: data.description,
       nodes: selectedTemplate?.spec?.nodes,
       edges: selectedTemplate?.spec?.edges,
+      method: data.templateId ? "template" : "ui",
+      templateId: data.templateId,
     });
 
     if (result?.data?.canvas?.metadata?.id) {
