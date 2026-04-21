@@ -1,6 +1,6 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type React from "react";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
@@ -57,14 +57,8 @@ function formatEventLabel(event?: string): string {
 }
 
 export const octopusTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const event = context.event?.data as OctopusEventData | undefined;
-    const title = buildTitle(event, context.event?.type as string);
-
-    return {
-      title,
-      subtitle: buildSubtitle(context.event?.createdAt),
-    };
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
+    return buildSubtitle(context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -109,9 +103,7 @@ export const octopusTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const event = lastEvent.data as OctopusEventData;
       props.lastEventData = {
-        title: buildTitle(event, lastEvent.type as string, nodeMetadata),
         subtitle: buildSubtitle(lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -152,17 +144,6 @@ function buildMetadata(
   }
 
   return metadata;
-}
-
-function buildTitle(event: OctopusEventData | undefined, type?: string, nodeMetadata?: OctopusNodeMetadata): string {
-  const eventLabel = formatEventLabel(type || event?.eventType);
-  // Prefer resolved name from event payload, then from node metadata.
-  // Never fall back to raw Octopus IDs (e.g. "Projects-1") in the title.
-  const projectLabel = event?.projectName || nodeMetadata?.projectName;
-  if (projectLabel) {
-    return `${projectLabel} · ${eventLabel}`;
-  }
-  return eventLabel;
 }
 
 function buildSubtitle(createdAt?: string): string | React.ReactNode {

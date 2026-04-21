@@ -15,10 +15,10 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { getColorClass } from "@/lib/colors";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import { getState, getStateMap } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { PushThroughHandler } from "@/pages/workflowv2/components/PushThroughHandler";
@@ -253,17 +253,13 @@ function getTimeGateSpecs(node: NodeInfo): ComponentBaseSpec[] {
   ];
 }
 
-function getTimeGateEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getTimeGateEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const executionState = getState(componentName)(execution);
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const subtitle = getTimeGateEventSubtitle(execution, componentName);
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventState: executionState,
     eventId: execution.rootEvent!.id!,
     eventSubtitle: subtitle,

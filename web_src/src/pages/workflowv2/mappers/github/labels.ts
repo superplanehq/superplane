@@ -6,7 +6,7 @@ import type {
   SubtitleContext,
   ExecutionDetailsContext,
 } from "../types";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import type { Label } from "./types";

@@ -1,6 +1,6 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -104,17 +104,12 @@ function getFirstOutputPayload(outputs: unknown): OutputPayload | undefined {
   return typedOutputs?.default?.[0] ?? typedOutputs?.success?.[0] ?? typedOutputs?.failed?.[0];
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Event";
+function baseEventSections(_nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const eventSubtitle = buildExecuteCommandSubtitle(componentName, execution);
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id ?? "",

@@ -6,7 +6,7 @@ import type {
   TriggerRendererContext,
 } from "../types";
 import React from "react";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
@@ -27,15 +27,11 @@ const priorityLabels: Record<string, string> = {
 };
 
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as NewRelicIssuePayload;
-    const title = buildEventTitle(eventData);
     const subtitle = buildEventSubtitle(eventData, context.event?.createdAt);
 
-    return {
-      title,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -86,7 +82,6 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as NewRelicIssuePayload;
       props.lastEventData = {
-        title: buildEventTitle(eventData),
         subtitle: buildEventSubtitle(eventData, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -115,17 +110,6 @@ export const onIssueCustomFieldRenderer: CustomFieldRenderer = {
     );
   },
 };
-
-function buildEventTitle(eventData: NewRelicIssuePayload): string {
-  const title = eventData?.title || "Issue";
-  const state = eventData?.state ? stateLabels[eventData.state] || eventData.state : "";
-
-  if (state) {
-    return `${title} · ${state}`;
-  }
-
-  return title;
-}
 
 function buildEventSubtitle(eventData: NewRelicIssuePayload, createdAt?: string): string | React.ReactNode {
   const parts: (string | React.ReactNode)[] = [];

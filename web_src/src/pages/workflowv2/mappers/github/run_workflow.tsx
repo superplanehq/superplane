@@ -16,11 +16,10 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { Icon } from "@/components/Icon";
@@ -215,7 +214,7 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+function runWorkflowEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }
@@ -226,13 +225,9 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   // If there is an execution, add section for execution.
   //
   if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
     sections.push({
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
       eventSubtitle: buildGithubExecutionSubtitle(execution),
       eventState: runWorkflowStateFunction(execution),
       eventId: execution.rootEvent!.id!,

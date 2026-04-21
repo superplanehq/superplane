@@ -62,6 +62,10 @@ func (t *DummyTrigger) Configuration() []configuration.Field {
 	return nil
 }
 
+func (t *DummyTrigger) DefaultRunTitle() string {
+	return ""
+}
+
 func (t *DummyTrigger) Actions() []core.Action {
 	return nil
 }
@@ -359,6 +363,10 @@ func (t *DummyIntegrationTrigger) ExampleData() map[string]any {
 
 func (t *DummyIntegrationTrigger) Configuration() []configuration.Field {
 	return []configuration.Field{}
+}
+
+func (t *DummyIntegrationTrigger) DefaultRunTitle() string {
+	return ""
 }
 
 func (t *DummyIntegrationTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

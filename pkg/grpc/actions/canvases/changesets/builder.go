@@ -225,6 +225,10 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 		n.IntegrationId = *proposedNode.IntegrationID
 	}
 
+	if proposedNode.RunTitleTemplate != nil {
+		n.RunTitleTemplate = proto.String(*proposedNode.RunTitleTemplate)
+	}
+
 	if proposedNode.Configuration != nil {
 		configuration, err := structpb.NewStruct(proposedNode.Configuration)
 		if err != nil {
@@ -277,6 +281,14 @@ func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (
 	//
 	if proposedNode.IsCollapsed != currentNode.IsCollapsed {
 		n.IsCollapsed = proto.Bool(proposedNode.IsCollapsed)
+	}
+
+	if !reflect.DeepEqual(currentNode.RunTitleTemplate, proposedNode.RunTitleTemplate) {
+		template := ""
+		if proposedNode.RunTitleTemplate != nil {
+			template = *proposedNode.RunTitleTemplate
+		}
+		n.RunTitleTemplate = proto.String(template)
 	}
 
 	return n, nil

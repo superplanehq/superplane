@@ -129,8 +129,8 @@ func Test__ListNodeExecutions(t *testing.T) {
 		// Create events and executions
 		//
 		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-		customName := "Custom Root Event"
-		rootEvent.CustomName = &customName
+		runTitle := "Custom Root Event"
+		rootEvent.RunTitle = &runTitle
 		require.NoError(t, database.Conn().Save(rootEvent).Error)
 		event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
@@ -158,7 +158,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 		assert.Equal(t, uint32(1), response.TotalCount)
 		assert.Equal(t, "node-1", response.Executions[0].NodeId)
 		require.NotNil(t, response.Executions[0].RootEvent)
-		assert.Equal(t, customName, response.Executions[0].RootEvent.CustomName)
+		assert.Equal(t, runTitle, response.Executions[0].RootEvent.RunTitle)
 	})
 }
 

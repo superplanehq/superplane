@@ -11,9 +11,9 @@ import type {
   StateFunction,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
+import { getState, getStateMap } from ".";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
 import { calcRelativeTimeFromDiff, formatTimestamp } from "@/lib/utils";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -274,21 +274,17 @@ function getWaitMetadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function getWaitEventSections(
-  nodes: NodeInfo[],
+  _nodes: NodeInfo[],
   execution: ExecutionInfo,
   configuration: WaitConfiguration,
   componentName: string,
 ): EventSection[] {
   const executionState = getState(componentName)(execution);
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const eventSubtitle = getWaitEventSubtitle(execution, configuration, componentName);
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventSubtitle,
     eventState: executionState,
     eventId: execution.rootEvent!.id!,

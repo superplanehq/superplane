@@ -9,11 +9,10 @@ import type {
   StateFunction,
   SubtitleContext,
 } from "../../types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
-import { getTriggerRenderer } from "../..";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
@@ -133,15 +132,10 @@ function getMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function getEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   return [
     {
       receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: runPipelineStateFunction(execution),
       eventId: execution.rootEvent?.id ?? "",

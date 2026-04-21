@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";

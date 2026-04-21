@@ -6,12 +6,11 @@ import type {
   EventSection,
   EventState,
   EventStateMap,
-} from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+} from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -217,16 +216,12 @@ function runPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+function runPipelineEventSections(_nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }
 
   const sections: EventSection[] = [];
-
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const executionState = runPipelineStateFunction(execution);
   const subtitleTimestamp =
     executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
@@ -234,7 +229,6 @@ function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
 
   sections.push({
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventSubtitle,
     eventState: executionState,
     eventId: execution.rootEvent!.id!,
