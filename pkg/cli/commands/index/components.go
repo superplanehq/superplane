@@ -41,7 +41,7 @@ func (c *componentsCommand) Execute(ctx core.CommandContext) error {
 	from := strings.TrimSpace(*c.from)
 
 	if name != "" {
-		return c.getComponentByName(ctx, name)
+		return c.getComponentByName(ctx, name, from)
 	}
 
 	components, err := c.listComponents(ctx, from)
@@ -75,8 +75,8 @@ func (c *componentsCommand) Execute(ctx core.CommandContext) error {
 	})
 }
 
-func (c *componentsCommand) getComponentByName(ctx core.CommandContext, name string) error {
-	component, err := c.findComponentByName(ctx, name)
+func (c *componentsCommand) getComponentByName(ctx core.CommandContext, name, from string) error {
+	component, err := c.findComponentByName(ctx, name, from)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func renderConfigurationText(stdout io.Writer, configuration []openapi_client.Co
 	return writer.Flush()
 }
 
-func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]interface{}) error {
+func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]any) error {
 	_, err := fmt.Fprintln(stdout, "Example Payload:")
 	if err != nil {
 		return err
@@ -249,7 +249,15 @@ func (c *componentsCommand) listComponents(ctx core.CommandContext, from string)
 	return response.GetComponents(), nil
 }
 
-func (c *componentsCommand) findComponentByName(ctx core.CommandContext, name string) (openapi_client.ComponentsComponent, error) {
+func (c *componentsCommand) findComponentByName(ctx core.CommandContext, name, from string) (openapi_client.ComponentsComponent, error) {
+	if from != "" {
+		integration, err := core.FindIntegrationDefinition(ctx, from)
+		if err != nil {
+			return openapi_client.ComponentsComponent{}, err
+		}
+		return findIntegrationComponent(integration, name)
+	}
+
 	integrationName, componentName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
