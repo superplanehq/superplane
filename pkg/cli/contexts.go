@@ -19,31 +19,28 @@ func (c *ContextsCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("no contexts configured; run superplane connect [BASE_URL] [API_TOKEN]")
 	}
 
-	if len(ctx.Args) == 1 {
-		selected, err := SaveCurrentContextBySelector(ctx.Args[0])
+	if len(ctx.Args) == 2 {
+		selected, err := SwitchContext(ctx.Args[0], ctx.Args[1])
 		if err != nil {
 			return err
 		}
-
 		return c.renderContext(ctx, *selected)
 	}
 
-	//
-	// If not in text mode or stdin is not a terminal, render the contexts as a list.
-	//
 	if !ctx.Renderer.IsText() || !ctx.IsInteractive() {
 		return c.renderContexts(ctx, contexts)
 	}
 
-	//
-	// Otherwise, select the context interactively.
-	//
 	selected, err := c.selectContextInteractively(ctx, contexts)
 	if err != nil {
 		return err
 	}
 
-	selected, err = SaveCurrentContextBySelector(ContextSelector(*selected))
+	org := selected.OrganizationID
+	if org == "" {
+		org = selected.Organization
+	}
+	selected, err = SwitchContext(selected.URL, org)
 	if err != nil {
 		return err
 	}
@@ -58,10 +55,7 @@ func (c *ContextsCommand) renderContexts(ctx core.CommandContext, contexts []Con
 	if !ctx.Renderer.IsText() {
 		ctxs := make([]map[string]any, 0, len(contexts))
 		for _, context := range contexts {
-			ctxs = append(ctxs, map[string]any{
-				"organization": context.Organization,
-				"url":          context.URL,
-			})
+			ctxs = append(ctxs, contextToMap(context))
 		}
 
 		return ctx.Renderer.Render(map[string]any{
@@ -71,27 +65,32 @@ func (c *ContextsCommand) renderContexts(ctx core.CommandContext, contexts []Con
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		for i, context := range contexts {
-			_, _ = fmt.Fprintf(stdout, "%d. %s (%s)\n", i+1, context.Organization, ContextSelector(context))
+			_, _ = fmt.Fprintf(stdout, "%d. %s (%s)\n", i+1, context.Organization, context.URL)
 		}
 		return nil
 	})
 }
 
-/*
- * Do not render the API token in the output for security reasons.
- */
 func (c *ContextsCommand) renderContext(ctx core.CommandContext, context ConfigContext) error {
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(map[string]any{
-			"organization": context.Organization,
-			"url":          context.URL,
-		})
+		return ctx.Renderer.Render(contextToMap(context))
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "Current context: %q (%s)\n", context.Organization, context.URL)
 		return nil
 	})
+}
+
+func contextToMap(context ConfigContext) map[string]any {
+	m := map[string]any{
+		"organization": context.Organization,
+		"url":          context.URL,
+	}
+	if context.OrganizationID != "" {
+		m["organizationId"] = context.OrganizationID
+	}
+	return m
 }
 
 func (c *ContextsCommand) selectContextInteractively(ctx core.CommandContext, contexts []ConfigContext) (*ConfigContext, error) {
@@ -107,7 +106,7 @@ func (c *ContextsCommand) selectContextInteractively(ctx core.CommandContext, co
 			if hasCurrentContext && ContextSelector(context) == currentSelector {
 				currentPrefix = "*"
 			}
-			_, _ = fmt.Fprintf(stdout, "%s %d. %s (%s)\n", currentPrefix, i+1, context.Organization, ContextSelector(context))
+			_, _ = fmt.Fprintf(stdout, "%s %d. %s (%s)\n", currentPrefix, i+1, context.Organization, context.URL)
 		}
 		_, _ = fmt.Fprint(stdout, "Select a context number: ")
 		return nil
@@ -140,10 +139,19 @@ func (c *ContextsCommand) selectContextInteractively(ctx core.CommandContext, co
 }
 
 var contextsCmd = &cobra.Command{
-	Use:   "contexts [BASE_URL/ORGANIZATION]",
+	Use:   "contexts [BASE_URL] [ORGANIZATION]",
 	Short: "List and switch CLI contexts",
-	Long:  "Without arguments, shows available contexts and prompts for a selection. With a BASE_URL/ORGANIZATION selector, switches directly.",
-	Args:  cobra.MaximumNArgs(1),
+	Long: "Without arguments, lists available contexts and prompts for a selection. " +
+		"With BASE_URL and ORGANIZATION, switches directly. " +
+		"ORGANIZATION can be the organization name or ID.",
+	Args: cobra.MatchAll(
+		func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 || len(args) == 2 {
+				return nil
+			}
+			return fmt.Errorf("accepts 0 or 2 args, received %d", len(args))
+		},
+	),
 }
 
 func init() {
