@@ -27,7 +27,12 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]mo
 func (s *EventContext) Emit(payloadType string, payload any) error {
 	now := time.Now()
 	eventID := uuid.New()
-	structuredPayload := BuildRootEventPayload(payload, payloadType, eventID, now, "default")
+	structuredPayload := map[string]any{
+		"type":      payloadType,
+		"timestamp": now.UTC().Format(time.RFC3339Nano),
+		"data":      payload,
+	}
+	rootPayload := BuildRootEventPayload(payload, payloadType, eventID, now, "default")
 
 	data, err := json.Marshal(structuredPayload)
 	if err != nil {
@@ -54,8 +59,8 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	runTitle, err := ResolveRootEventRunTitle(
 		s.tx,
 		s.node,
-		structuredPayload,
-		structuredPayload,
+		rootPayload,
+		rootPayload,
 	)
 	if err == nil && runTitle != nil {
 		event.RunTitle = runTitle

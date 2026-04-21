@@ -58,6 +58,25 @@ func Test__EventContext__Emit(t *testing.T) {
 		assert.Len(t, newEvents, 2)
 	})
 
+	t.Run("persists legacy root event payload shape", func(t *testing.T) {
+		ctx := NewEventContext(database.Conn(), &nodes[0], nil)
+		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 1}))
+
+		events, err := models.ListCanvasEvents(canvas.ID, triggerNodeID, 10, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, events)
+
+		data, ok := events[len(events)-1].Data.Data().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "test.payload", data["type"])
+		assert.NotNil(t, data["timestamp"])
+		assert.Equal(t, map[string]any{"n": 1}, data["data"])
+		_, hasID := data["id"]
+		_, hasChannel := data["channel"]
+		assert.False(t, hasID)
+		assert.False(t, hasChannel)
+	})
+
 	t.Run("uses default run title from trigger definition", func(t *testing.T) {
 		bitbucketCanvas, bitbucketNodes := support.CreateCanvas(
 			t,
