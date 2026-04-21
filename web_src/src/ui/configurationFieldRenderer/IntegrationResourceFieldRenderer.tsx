@@ -63,6 +63,15 @@ export const IntegrationResourceFieldRenderer = ({
   // Fixed vs Expression mode for single-select when expressions are allowed
   const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
   const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
+  const [selectQueryValue, setSelectQueryValue] = useState("");
+
+  // Cache values for each tab to preserve when switching
+  const [cachedFixedValue, setCachedFixedValue] = useState(
+    initialIsExpression ? "" : typeof value === "string" ? value : "",
+  );
+  const [cachedExpressionValue, setCachedExpressionValue] = useState(
+    initialIsExpression ? (typeof value === "string" ? value : "") : "",
+  );
 
   const additionalQueryParameters = useMemo(() => {
     if (!resourceParameters.length) return undefined;
@@ -209,7 +218,18 @@ export const IntegrationResourceFieldRenderer = ({
       <AutoCompleteSelect
         options={options}
         value={selectedValue}
-        onChange={(val) => onChange(val || undefined)}
+        onChange={(val) => {
+          onChange(val || undefined);
+          setSelectQueryValue("");
+          setCachedExpressionValue("");
+          setCachedFixedValue(val || "");
+        }}
+        query={selectQueryValue}
+        onQueryChange={(query) => {
+              setSelectQueryValue(query || "");
+              setCachedExpressionValue(query || "");
+          }
+        }
         placeholder={field.placeholder ?? `Select ${resourceType}`}
       />
     ) : (
@@ -224,7 +244,11 @@ export const IntegrationResourceFieldRenderer = ({
       <AutoCompleteInput
         exampleObj={autocompleteExampleObj}
         value={expressionValue}
-        onChange={(nextValue) => onChange(nextValue || undefined)}
+        onChange={(nextValue) => {
+          onChange(nextValue || undefined);
+          setSelectQueryValue(nextValue || "");
+          setCachedExpressionValue(nextValue || "");
+        }}
         placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
         startWord="{{"
         prefix="{{ "
@@ -252,9 +276,20 @@ export const IntegrationResourceFieldRenderer = ({
 
       const handleTabChange = (v: string) => {
         const nextExpression = v === "expression";
-        if (nextExpression !== useExpressionMode) {
-          onChange(undefined);
+
+        if (nextExpression === useExpressionMode) return;
+
+        const hasBraces = /[{}]/.test(selectQueryValue);
+  
+        if (nextExpression) {
+          setCachedFixedValue(selectedValue);
+          const newValue = selectQueryValue && !hasBraces ? `{{${selectQueryValue}}}` : cachedExpressionValue;
+          onChange(newValue || undefined);
+        } else {
+          setCachedExpressionValue(expressionValue);
+          onChange(cachedFixedValue || undefined);
         }
+
         setUseExpressionMode(nextExpression);
       };
 
