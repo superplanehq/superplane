@@ -7,6 +7,26 @@ description: Use when working with the SuperPlane CLI to discover available inte
 
 Use this workflow to build or debug canvases from the CLI.
 
+## Select the organization
+
+Every CLI command runs against the current context's organization. Before doing anything else, confirm or switch it:
+
+```bash
+superplane whoami                              # show the active org
+superplane contexts                            # list saved contexts / pick interactively
+superplane contexts <BASE_URL> <ORGANIZATION>  # switch directly
+superplane connect <BASE_URL> <API_TOKEN>      # add a new org (one token = one org)
+```
+
+`ORGANIZATION` is the organization name or ID, for example:
+
+```bash
+superplane contexts https://app.superplane.com "My Org"
+superplane contexts https://app.superplane.com aa291812-efb5-4cd4-9f5f-5bcc77865ad7
+```
+
+An API token is scoped to a single organization, so to see all of your orgs in the CLI run `superplane connect` once per org with that org's token.
+
 ## Discover what exists
 
 Run these first:
