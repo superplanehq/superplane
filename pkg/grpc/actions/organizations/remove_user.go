@@ -34,8 +34,8 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	//
 	roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
 	if err != nil {
-		log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
-		return nil, status.Error(codes.Internal, "error determing user roles")
+		log.Errorf("Error determining user roles for %s: %v", user.ID.String(), err)
+		return nil, status.Error(codes.Internal, "error determining user roles")
 	}
 
 	for _, role := range roles {

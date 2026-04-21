@@ -114,7 +114,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 
 	//
 	// If we are running the application locally,
-	// we provide handlers that auto-autenticate to
+	// we provide handlers that auto-authenticate to
 	// avoid having to authenticate with GitHub every time.
 	//
 	if a.isDev {
