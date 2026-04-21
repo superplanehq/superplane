@@ -1,0 +1,26 @@
+name: Auto-fix DCO for bot PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+jobs:
+  dco-fix:
+    permissions:
+      contents: write
+    if: startsWith(github.head_ref, 'cursor/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rewrite commits with sign-off
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rebase origin/${{ github.base_ref }} \
+            --exec "git commit --amend --no-edit -s"
+          git push --force-with-lease origin HEAD:${{ github.head_ref }}
