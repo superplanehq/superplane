@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -23,11 +24,13 @@ func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]mo
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
+	now := time.Now()
 	structuredPayload := map[string]any{
 		"type":      payloadType,
-		"timestamp": time.Now(),
+		"timestamp": now.UTC().Format(time.RFC3339Nano),
 		"data":      payload,
 	}
+	rootPayload := BuildRootEventPayload(payload, payloadType, now)
 
 	data, err := json.Marshal(structuredPayload)
 	if err != nil {
@@ -37,8 +40,6 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	if len(data) > s.maxPayloadSize {
 		return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
 	}
-
-	now := time.Now()
 
 	//
 	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
@@ -52,10 +53,14 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		CreatedAt:  &now,
 	}
 
-	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload)
-	if err == nil && customName != nil {
-		event.CustomName = customName
+	runTitle, err := ResolveRootEventRunTitle(
+		s.tx,
+		s.node,
+		rootPayload,
+		rootPayload,
+	)
+	if err == nil && runTitle != nil {
+		event.RunTitle = runTitle
 	}
 
 	err = s.tx.Create(&event).Error
@@ -70,30 +75,28 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func (s *EventContext) resolveCustomName(payload any) (*string, error) {
-	config := s.node.Configuration.Data()
-	if config == nil {
-		return nil, nil
+func BuildRootEventPayload(payload any, payloadType string, createdAt time.Time) map[string]any {
+	return map[string]any{
+		"type":      payloadType,
+		"timestamp": createdAt.UTC().Format(time.RFC3339Nano),
+		"data":      payload,
+	}
+}
+
+func ResolveRootEventRunTitle(tx *gorm.DB, node *models.CanvasNode, rootPayload any, input any) (*string, error) {
+	template, err := resolveRootEventRunTitleTemplate(node)
+	if err != nil {
+		return nil, err
 	}
 
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return nil, nil
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return nil, nil
-	}
-
-	template = strings.TrimSpace(template)
 	if template == "" {
 		return nil, nil
 	}
 
-	builder := NewNodeConfigurationBuilder(s.tx, s.node.WorkflowID).
-		WithNodeID(s.node.NodeID).
-		WithInput(map[string]any{s.node.NodeID: payload})
+	builder := NewNodeConfigurationBuilder(tx, node.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithRootPayload(rootPayload).
+		WithInput(map[string]any{node.NodeID: input})
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
@@ -105,4 +108,20 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 	}
 
 	return &resolvedName, nil
+}
+
+func resolveRootEventRunTitleTemplate(node *models.CanvasNode) (string, error) {
+	if node.RunTitleTemplate != nil {
+		template := strings.TrimSpace(*node.RunTitleTemplate)
+		if template != "" {
+			return template, nil
+		}
+	}
+
+	ref := node.Ref.Data()
+	if ref.Trigger == nil || ref.Trigger.Name == "" {
+		return "", nil
+	}
+
+	return registry.DefaultRunTitleForTrigger(ref.Trigger.Name), nil
 }

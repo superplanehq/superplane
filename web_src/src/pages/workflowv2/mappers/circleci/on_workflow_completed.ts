@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
@@ -33,19 +33,15 @@ interface OnWorkflowCompletedEventData {
 }
 
 export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data as OnWorkflowCompletedEventData;
-    const workflowName = eventData?.workflow?.name || "Workflow";
     const status = eventData?.workflow?.status || "";
     const subtitle =
       status && context.event?.createdAt
         ? renderWithTimeAgo(status, new Date(context.event.createdAt))
         : status || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
-    return {
-      title: workflowName,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -86,7 +82,6 @@ export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnWorkflowCompletedEventData;
-      const workflowName = eventData?.workflow?.name || "Workflow";
       const status = eventData?.workflow?.status || "";
       const subtitle =
         status && lastEvent.createdAt
@@ -94,7 +89,6 @@ export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
           : status || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
 
       props.lastEventData = {
-        title: workflowName,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

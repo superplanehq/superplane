@@ -56,6 +56,10 @@ func (p *OnPipeline) Color() string {
 	return "orange"
 }
 
+func (p *OnPipeline) DefaultRunTitle() string {
+	return "Pipeline #{{ root().data.object_attributes.iid }}"
+}
+
 func (p *OnPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

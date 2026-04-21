@@ -2,7 +2,7 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import type { Agent, ResourceRef } from "./types";
 
@@ -42,17 +42,13 @@ interface OnIncidentAnnotatedEventData {
  * Renderer for the "pagerduty.onIncidentAnnotated" trigger type
  */
 export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
     const eventData = context.event?.data?.data as OnIncidentAnnotatedEventData;
-    const incident = eventData?.incident;
     const agent = eventData?.agent;
     const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
     const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
-    return {
-      title: `${incident?.id || ""} - ${incident?.title || ""}`,
-      subtitle,
-    };
+    return subtitle;
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -89,13 +85,11 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent?.data as OnIncidentAnnotatedEventData;
-      const incident = eventData?.incident;
       const agent = eventData?.agent;
       const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
       const subtitle = buildSubtitle(contentParts, lastEvent?.createdAt);
 
       props.lastEventData = {
-        title: `${incident?.id || ""} - ${incident?.title || ""}`,
         subtitle,
         receivedAt: new Date(lastEvent?.createdAt || ""),
         state: "triggered",

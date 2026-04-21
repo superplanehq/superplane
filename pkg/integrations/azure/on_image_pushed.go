@@ -78,6 +78,10 @@ func (t *OnImagePushed) Color() string {
 	return "blue"
 }
 
+func (t *OnImagePushed) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(firstNonEmpty(root().data.data.target.repository, "") != "" ? firstNonEmpty(root().data.data.target.repository, "") + (firstNonEmpty(root().data.data.target.tag, "") != "" ? ":" + firstNonEmpty(root().data.data.target.tag, "") : "") : "", root().data.subject, "Image pushed") }}`
+}
+
 func (t *OnImagePushed) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
