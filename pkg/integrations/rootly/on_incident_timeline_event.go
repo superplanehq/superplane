@@ -97,6 +97,10 @@ func (t *OnIncidentTimelineEvent) Color() string {
 	return "gray"
 }
 
+func (t *OnIncidentTimelineEvent) DefaultRunTitle() string {
+	return "{{ root().data.event }}"
+}
+
 func (t *OnIncidentTimelineEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

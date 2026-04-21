@@ -2,7 +2,7 @@ import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface OnAlertFiredConfiguration {
@@ -22,13 +22,8 @@ interface OnAlertFiredEventData {
 }
 
 export const onAlertFiredTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as OnAlertFiredEventData;
-
-    return {
-      title: buildEventTitle(eventData),
-      subtitle: context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "",
-    };
+  subtitle: (context: TriggerEventContext): string | React.ReactNode => {
+    return context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -74,10 +69,7 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnAlertFiredEventData;
-
       props.lastEventData = {
-        title: buildEventTitle(eventData),
         subtitle: lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "",
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -88,14 +80,3 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
-function buildEventTitle(eventData?: OnAlertFiredEventData): string {
-  const name = eventData?.name?.trim() || "Alert Fired";
-  const alertType = eventData?.alert_type?.trim();
-
-  if (!alertType) {
-    return name;
-  }
-
-  return `${name} · ${alertType}`;
-}

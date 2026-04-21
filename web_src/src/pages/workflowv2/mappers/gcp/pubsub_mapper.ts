@@ -7,7 +7,7 @@ import type {
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { renderTimeAgo } from "@/components/TimeAgo";

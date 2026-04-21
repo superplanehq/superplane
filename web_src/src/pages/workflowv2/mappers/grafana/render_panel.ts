@@ -1,4 +1,4 @@
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/pages/workflowv2/mappers/types";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { getStateMap } from "..";
@@ -25,7 +25,7 @@ export const renderPanelMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? buildGrafanaEventSections(lastExecution, componentName) : undefined,
       metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),

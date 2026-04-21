@@ -9,6 +9,7 @@ import { SimpleTooltip } from "../SimpleTooltip";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import { getSidebarEventTitle } from "../eventTitle";
 
 export interface ExecutionChainItem extends EventStateStyle {
   name: string;
@@ -66,6 +67,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   loadExecutionChain,
   getExecutionState,
 }) => {
+  const eventTitle = getSidebarEventTitle(event);
+
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
     if (!tabData) return "current";
@@ -274,7 +277,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
   return (
     <div
-      key={event.title + index}
+      key={eventTitle + index}
       className={
         `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-4" : "")
@@ -315,7 +318,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           {event.triggerEventId && (
             <span className="text-[13px] text-gray-950/50 font-mono">#{event.triggerEventId.slice(0, 4)}</span>
           )}
-          <span className="text-sm text-gray-800 font-inter truncate text-md min-w-0 font-medium">{event.title}</span>
+          <span className="text-sm text-gray-800 font-inter truncate text-md min-w-0 font-medium">{eventTitle}</span>
         </div>
       </div>
 

@@ -29,10 +29,10 @@ const GithubProps: TriggerProps = createTriggerProps({
     },
   ],
   lastEventData: {
-    title: "refactor: update README.md",
     subtitle: "ef53adfa",
     receivedAt: new Date(),
     state: "triggered",
+    eventId: "ev-1",
   },
 });
 
@@ -62,10 +62,10 @@ const DockerHubProps: TriggerProps = createTriggerProps({
     },
   ],
   lastEventData: {
-    title: "v3.18.217",
     subtitle: "978.3 MB",
     receivedAt: new Date(),
     state: "triggered",
+    eventId: "ev-2",
   },
 });
 

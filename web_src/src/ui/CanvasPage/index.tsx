@@ -113,6 +113,8 @@ export interface NodeEditData {
   displayLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
+  runTitleTemplate?: string;
+  defaultRunTitleTemplate?: string;
   integrationName?: string;
   /** Integration catalog label; used to resolve docs.superplane.com path for integration components. */
   integrationLabel?: string;
@@ -201,6 +203,7 @@ export interface CanvasPageProps {
     nodeId: string,
     configuration: Record<string, unknown>,
     nodeName: string,
+    runTitleTemplate?: string,
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   onAnnotationUpdate?: (
@@ -1010,11 +1013,22 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
+    (
+      configuration: Record<string, unknown>,
+      nodeName: string,
+      runTitleTemplate?: string,
+      integrationRef?: ComponentsIntegrationRef,
+    ) => {
       if (!editingNodeData || !props.onNodeConfigurationSave) {
         return;
       }
-      const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
+      const result = props.onNodeConfigurationSave(
+        editingNodeData.nodeId,
+        configuration,
+        nodeName,
+        runTitleTemplate,
+        integrationRef,
+      );
       if (props.configurationSaveMode !== "auto") {
         state.componentSidebar.close();
       }
@@ -1379,6 +1393,7 @@ function Sidebar({
   onSaveConfiguration?: (
     configuration: Record<string, unknown>,
     nodeName: string,
+    runTitleTemplate?: string,
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
@@ -1541,6 +1556,8 @@ function Sidebar({
       blockName={editingNodeData?.blockName}
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields || []}
+      runTitleTemplate={editingNodeData?.runTitleTemplate}
+      defaultRunTitleTemplate={editingNodeData?.defaultRunTitleTemplate}
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       configurationSaveMode={configurationSaveMode}

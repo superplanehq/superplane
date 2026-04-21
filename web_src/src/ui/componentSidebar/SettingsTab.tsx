@@ -30,9 +30,12 @@ interface SettingsTabProps {
   nodeLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
+  runTitleTemplate?: string;
+  defaultRunTitleTemplate?: string;
   onSave: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
+    runTitleTemplate?: string,
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   onCancel?: () => void;
@@ -57,11 +60,13 @@ interface SettingsTabProps {
 function buildAutosaveSnapshot(
   configuration: Record<string, unknown>,
   nodeName: string,
+  runTitleTemplate?: string,
   integrationRef?: ComponentsIntegrationRef,
 ): string {
   return JSON.stringify({
     configuration,
     nodeName,
+    runTitleTemplate: runTitleTemplate || null,
     integrationRef: integrationRef
       ? {
           id: integrationRef.id || "",
@@ -77,6 +82,8 @@ export function SettingsTab({
   nodeLabel: _nodeLabel,
   configuration,
   configurationFields,
+  runTitleTemplate,
+  defaultRunTitleTemplate,
   onSave,
   onCancel: _onCancel,
   domainId,
@@ -103,13 +110,16 @@ export function SettingsTab({
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
+  const [currentRunTitleTemplate, setCurrentRunTitleTemplate] = useState<string>(runTitleTemplate || "");
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
-  const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
+  const autosaveBaselineSnapshotRef = useRef(
+    buildAutosaveSnapshot(configuration || {}, nodeName, runTitleTemplate, integrationRef),
+  );
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
@@ -164,6 +174,22 @@ export function SettingsTab({
     if (typeof value === "object") return Object.keys(value).length === 0;
     return false;
   };
+
+  const normalizeRunTitleTemplate = useCallback(
+    (value: string): string | undefined => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+
+      if (defaultRunTitleTemplate && trimmed === defaultRunTitleTemplate.trim()) {
+        return undefined;
+      }
+
+      return trimmed;
+    },
+    [defaultRunTitleTemplate],
+  );
 
   // Recursively validate nested fields in objects and lists
   const validateNestedFields = useCallback(
@@ -245,20 +271,40 @@ export function SettingsTab({
     }
 
     const filteredConfig = filterVisibleFields(newConfig);
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef);
+    const normalizedRunTitleTemplate = normalizeRunTitleTemplate(runTitleTemplate || "");
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+      filteredConfig,
+      nodeName,
+      normalizedRunTitleTemplate,
+      integrationRef,
+    );
     pendingAutosaveSnapshotRef.current = null;
     setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
+    setCurrentRunTitleTemplate(runTitleTemplate || "");
     setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
+  }, [
+    configuration,
+    nodeName,
+    runTitleTemplate,
+    defaultValuesWithoutToggles,
+    filterVisibleFields,
+    integrationRef,
+    normalizeRunTitleTemplate,
+  ]);
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
-        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
+        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+          nodeConfiguration,
+          currentNodeName,
+          normalizeRunTitleTemplate(currentRunTitleTemplate),
+          undefined,
+        );
         setSelectedIntegration(undefined);
       }
       return;
@@ -277,12 +323,24 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     };
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, nextIntegration);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      normalizeRunTitleTemplate(currentRunTitleTemplate),
+      nextIntegration,
+    );
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [
+    integrationsOfType,
+    selectedIntegration,
+    nodeConfiguration,
+    currentNodeName,
+    currentRunTitleTemplate,
+    normalizeRunTitleTemplate,
+  ]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -341,7 +399,13 @@ export function SettingsTab({
       return;
     }
 
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const normalizedRunTitleTemplate = normalizeRunTitleTemplate(currentRunTitleTemplate);
+    const snapshot = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      normalizedRunTitleTemplate,
+      selectedIntegration,
+    );
     if (configurationSaveMode === "auto" && snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
@@ -358,7 +422,7 @@ export function SettingsTab({
       return;
     }
 
-    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    const result = onSave(nodeConfiguration, currentNodeName, normalizedRunTitleTemplate, selectedIntegration);
     if (!(result instanceof Promise)) {
       updateAutosaveBaseline(snapshot);
       return;
@@ -378,6 +442,8 @@ export function SettingsTab({
     isReadOnly,
     validateNow,
     currentNodeName,
+    currentRunTitleTemplate,
+    normalizeRunTitleTemplate,
     selectedIntegration,
     configurationSaveMode,
     nodeConfiguration,
@@ -430,7 +496,12 @@ export function SettingsTab({
     if (configurationSaveMode !== "auto" || isReadOnly) {
       return;
     }
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const snapshot = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      normalizeRunTitleTemplate(currentRunTitleTemplate),
+      selectedIntegration,
+    );
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       return;
     }
@@ -446,7 +517,15 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [
+    configurationSaveMode,
+    isReadOnly,
+    nodeConfiguration,
+    currentNodeName,
+    currentRunTitleTemplate,
+    selectedIntegration,
+    normalizeRunTitleTemplate,
+  ]);
 
   return (
     <div
@@ -485,6 +564,23 @@ export function SettingsTab({
             disabled={isReadOnly}
           />
         </div>
+
+        {(defaultRunTitleTemplate || runTitleTemplate !== undefined) && (
+          <div className={`flex flex-col gap-2 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}>
+            <Label className="min-w-[100px] text-left">Run title</Label>
+            <Input
+              type="text"
+              value={currentRunTitleTemplate}
+              onChange={(e) => setCurrentRunTitleTemplate(e.target.value)}
+              placeholder={defaultRunTitleTemplate || "Optional run title template"}
+              className="shadow-none"
+              disabled={isReadOnly}
+            />
+            <p className="text-xs text-gray-500">
+              Optional run title template. Supports expressions like {`Event: {{ root().data.exampleField }}`}.{" "}
+            </p>
+          </div>
+        )}
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (

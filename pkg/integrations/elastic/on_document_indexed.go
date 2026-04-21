@@ -78,6 +78,10 @@ SuperPlane generates a random signing secret and configures the Kibana connector
 The webhook acts as a signal. When it fires, SuperPlane queries Elasticsearch for documents newer than the stored checkpoint and emits one event per document containing its ID, index, and full source.`
 }
 
+func (t *OnDocumentIndexed) DefaultRunTitle() string {
+	return "New document in {{ root().data.index }}"
+}
+
 func (t *OnDocumentIndexed) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -52,6 +52,10 @@ func (r *OnRelease) Color() string {
 	return "orange"
 }
 
+func (r *OnRelease) DefaultRunTitle() string {
+	return `{{ firstNonEmpty(root().data.name, root().data.tag, "Release") }}{{ root().data.tag != "" ? " (" + root().data.tag + ")" : "" }}`
+}
+
 func (r *OnRelease) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

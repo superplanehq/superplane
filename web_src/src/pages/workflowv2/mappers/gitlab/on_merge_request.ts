@@ -1,6 +1,6 @@
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/pages/workflowv2/mappers/types";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { buildGitlabSubtitle } from "./utils";
 import type { GitLabNodeMetadata } from "./types";
@@ -37,14 +37,11 @@ interface OnMergeRequestEventData {
 }
 
 export const onMergeRequestTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext) => {
+  subtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnMergeRequestEventData;
     const mr = eventData?.object_attributes;
 
-    return {
-      title: `#${mr?.iid ?? ""} - ${mr?.title || "Merge Request"}`,
-      subtitle: buildGitlabSubtitle(mr?.action || "", context.event?.createdAt),
-    };
+    return buildGitlabSubtitle(mr?.action || "", context.event?.createdAt);
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
@@ -102,7 +99,6 @@ export const onMergeRequestTriggerRenderer: TriggerRenderer = {
       const mr = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: `#${mr?.iid ?? ""} - ${mr?.title || "Merge Request"}`,
         subtitle: buildGitlabSubtitle(mr?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

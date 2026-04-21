@@ -430,14 +430,14 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents m
 	}
 
 	return &pb.CanvasEvent{
-		Id:         rootEvent.ID.String(),
-		CanvasId:   rootEvent.WorkflowID.String(),
-		NodeId:     rootEvent.NodeID,
-		Channel:    rootEvent.Channel,
-		CustomName: valueOrEmpty(rootEvent.CustomName),
-		Data:       s,
-		CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
-		Root:       rootEvent.ExecutionID == nil,
+		Id:        rootEvent.ID.String(),
+		CanvasId:  rootEvent.WorkflowID.String(),
+		NodeId:    rootEvent.NodeID,
+		Channel:   rootEvent.Channel,
+		RunTitle:  valueOrEmpty(rootEvent.RunTitle),
+		Data:      s,
+		CreatedAt: timestamppb.New(*rootEvent.CreatedAt),
+		Root:      rootEvent.ExecutionID == nil,
 	}, nil
 }
 

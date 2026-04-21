@@ -950,7 +950,7 @@ message CanvasEvent {
   string canvas_id = 2;
   string node_id = 3;
   string channel = 4;
-  string custom_name = 5;
+  string run_title = 5;
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
   bool root = 8;
@@ -964,7 +964,7 @@ message CanvasEventWithExecutions {
   google.protobuf.Struct data = 5;
   google.protobuf.Timestamp created_at = 6;
   repeated CanvasNodeExecutionRef executions = 7;
-  string custom_name = 8;
+  string run_title = 8;
 }
 
 message ListEventExecutionsRequest {
@@ -1012,6 +1012,7 @@ message CanvasChangeset {
       string integration_id = 5;
       Components.Position position = 6;
       optional bool is_collapsed = 7;
+      optional string run_title_template = 8;
     }
 
     message Edge {
