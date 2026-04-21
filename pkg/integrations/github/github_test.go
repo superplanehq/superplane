@@ -16,6 +16,10 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+type githubManifest struct {
+	DefaultEvents []string `json:"default_events"`
+}
+
 func Test__GitHub__Setup(t *testing.T) {
 	g := &GitHub{}
 
@@ -30,6 +34,7 @@ func Test__GitHub__Setup(t *testing.T) {
 		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
 		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
 		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/settings/apps/new")
+		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
 
 		//
 		// Metadata is set
@@ -54,6 +59,7 @@ func Test__GitHub__Setup(t *testing.T) {
 		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
 		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
 		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/organizations/testhq/settings/apps/new")
+		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
 
 		//
 		// Metadata is set
@@ -136,4 +142,14 @@ func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
 	require.Equal(t, int64(2), repos[1].ID)
 	require.Equal(t, "repo2", repos[1].Name)
 	require.Equal(t, "https://github.com/test/repo2", repos[1].URL)
+}
+
+func assertManifestContainsDefaultEvents(t *testing.T, manifestJSON string) {
+	t.Helper()
+
+	require.NotEmpty(t, manifestJSON)
+
+	var manifest githubManifest
+	require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
+	require.Equal(t, defaultGitHubAppEvents, manifest.DefaultEvents)
 }
