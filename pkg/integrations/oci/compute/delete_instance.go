@@ -3,16 +3,15 @@ package compute
 import (
 	"context"
 	"fmt"
+
 	ocicore "github.com/oracle/oci-go-sdk/v65/core"
+	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type DeleteInstance struct{}
-
-type DeleteInstanceSpec struct {
-	InstanceID string `mapstructure:"instanceId"`
-}
 
 func (c *DeleteInstance) Name() string {
 	return "deleteInstance"
@@ -26,10 +25,10 @@ func (c *DeleteInstance) Description() string {
 	return "Terminate an OCI Compute instance"
 }
 
-func (c *DeleteInstance) Setup() []configuration.Field {
+func (c *DeleteInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "id",
 			Label:       "Instance OCID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
@@ -38,25 +37,38 @@ func (c *DeleteInstance) Setup() []configuration.Field {
 	}
 }
 
-func (c *DeleteInstance) Run(ctx core.ExecutionContext) (any, error) {
-	var spec DeleteInstanceSpec
-	if err := ctx.GetSpec(&spec); err != nil {
-		return nil, err
+func (c *DeleteInstance) Execute(ctx core.ExecutionContext) error {
+	var input struct {
+		ID string `mapstructure:"id"`
+	}
+
+	if err := mapstructure.Decode(ctx.Configuration, &input); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
 	client, err := getClient(ctx)
 	if err != nil {
-		return nil, err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get OCI client: %v", err))
 	}
 
-	req := ocicore.TerminateInstanceRequest{
-		InstanceId: &spec.InstanceID,
-	}
-
-	_, err = client.TerminateInstance(context.Background(), req)
+	_, err = client.TerminateInstance(ctx.Context, ocicore.TerminateInstanceRequest{
+		InstanceId: common.String(input.ID),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to terminate OCI instance: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to terminate OCI instance: %v", err))
 	}
 
-	return map[string]string{"status": "terminating"}, nil
+	return ctx.ExecutionState.Emit("success", "oci.instance.deleted", []any{map[string]interface{}{
+		"id":     input.ID,
+		"status": "termination_requested",
+	}})
 }
+
+func (c *DeleteInstance) Setup(ctx core.SetupContext) error { return nil }
+func (c *DeleteInstance) Cleanup(ctx core.SetupContext) error { return nil }
+func (c *DeleteInstance) Actions() []core.Action { return nil }
+func (c *DeleteInstance) HandleAction(ctx core.ActionContext) error { return nil }
+func (c *DeleteInstance) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (c *DeleteInstance) Cancel(ctx core.ExecutionContext) error { return nil }

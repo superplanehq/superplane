@@ -3,16 +3,15 @@ package compute
 import (
 	"context"
 	"fmt"
+
 	ocicore "github.com/oracle/oci-go-sdk/v65/core"
+	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type GetInstance struct{}
-
-type GetInstanceSpec struct {
-	InstanceID string `mapstructure:"instanceId"`
-}
 
 func (c *GetInstance) Name() string {
 	return "getInstance"
@@ -26,10 +25,10 @@ func (c *GetInstance) Description() string {
 	return "Retrieve details of an OCI Compute instance"
 }
 
-func (c *GetInstance) Setup() []configuration.Field {
+func (c *GetInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "id",
 			Label:       "Instance OCID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
@@ -38,25 +37,44 @@ func (c *GetInstance) Setup() []configuration.Field {
 	}
 }
 
-func (c *GetInstance) Run(ctx core.ExecutionContext) (any, error) {
-	var spec GetInstanceSpec
-	if err := ctx.GetSpec(&spec); err != nil {
-		return nil, err
+func (c *GetInstance) Execute(ctx core.ExecutionContext) error {
+	var input struct {
+		ID string `mapstructure:"id"`
+	}
+
+	if err := mapstructure.Decode(ctx.Configuration, &input); err != nil {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
 	client, err := getClient(ctx)
 	if err != nil {
-		return nil, err
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get OCI client: %v", err))
 	}
 
-	req := ocicore.GetInstanceRequest{
-		InstanceId: &spec.InstanceID,
-	}
-
-	resp, err := client.GetInstance(context.Background(), req)
+	resp, err := client.GetInstance(ctx.Context, ocicore.GetInstanceRequest{
+		InstanceId: common.String(input.ID),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get OCI instance: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get OCI instance: %v", err))
 	}
 
-	return resp.Instance, nil
+	payload := map[string]interface{}{
+		"id":           *resp.Instance.Id,
+		"displayName":  *resp.Instance.DisplayName,
+		"state":        string(resp.Instance.LifecycleState),
+		"shape":        *resp.Instance.Shape,
+		"region":       *resp.Instance.Region,
+		"timeCreated":  resp.Instance.TimeCreated.String(),
+	}
+
+	return ctx.ExecutionState.Emit("success", "oci.instance", []any{payload})
 }
+
+func (c *GetInstance) Setup(ctx core.SetupContext) error { return nil }
+func (c *GetInstance) Cleanup(ctx core.SetupContext) error { return nil }
+func (c *GetInstance) Actions() []core.Action { return nil }
+func (c *GetInstance) HandleAction(ctx core.ActionContext) error { return nil }
+func (c *GetInstance) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (c *GetInstance) Cancel(ctx core.ExecutionContext) error { return nil }

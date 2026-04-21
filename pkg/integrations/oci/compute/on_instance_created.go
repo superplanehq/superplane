@@ -10,44 +10,45 @@ import (
 type OnInstanceCreated struct{}
 
 func (t *OnInstanceCreated) Name() string {
-	return "oci.compute.onInstanceCreated"
+	return "onInstanceCreated"
 }
 
 func (t *OnInstanceCreated) Label() string {
-	return "Compute • On Instance Created"
+	return "On Instance Created"
 }
 
 func (t *OnInstanceCreated) Description() string {
-	return "Triggered when a new OCI Compute instance is created"
-}
-
-func (t *OnInstanceCreated) Icon() string {
-	return "oci"
+	return "Emits when a new OCI Compute instance reaches RUNNING state"
 }
 
 func (t *OnInstanceCreated) Configuration() []configuration.Field {
-	return nil
+	return []configuration.Field{}
 }
 
 func (t *OnInstanceCreated) Setup(ctx core.TriggerContext) error {
-	return nil
+	return ctx.Integration.Subscribe(t.Name(), nil)
 }
 
-func (t *OnInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	var payload map[string]any
-	if err := json.NewDecoder(ctx.Request.Body).Decode(&payload); err != nil {
-		return 400, nil, err
+func (t *OnInstanceCreated) OnIntegrationMessage(ctx core.TriggerContext, message []byte) error {
+	var event struct {
+		EventType string `json:"eventType"`
+		Data      struct {
+			ResourceName string `json:"resourceName"`
+			ResourceID   string `json:"resourceId"`
+		} `json:"data"`
 	}
 
-	eventType, _ := payload["eventType"].(string)
-	if eventType != "com.oraclecloud.computeapi.launchinstance.end" {
-		return 200, nil, nil
+	if err := json.Unmarshal(message, &event); err != nil {
+		return nil // Not our event or malformed
 	}
 
-	err := ctx.Events.Emit("oci.compute.instanceCreated", payload)
-	if err != nil {
-		return 500, nil, err
+	if event.EventType != "com.oraclecloud.computeapi.launchinstance.end" {
+		return nil
 	}
 
-	return 200, &core.WebhookResponseBody{Data: map[string]any{"status": "accepted"}}, nil
+	return ctx.Emit("created", "oci.instance", []any{event.Data})
+}
+
+func (t *OnInstanceCreated) Cleanup(ctx core.TriggerContext) error {
+	return nil
 }
