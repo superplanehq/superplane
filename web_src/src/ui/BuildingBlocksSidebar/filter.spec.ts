@@ -84,10 +84,11 @@ describe("findFirstVisibleBlock", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null for an empty query when caller treats empty as no-match", () => {
+  it("returns the top-of-list block for an empty query (callers gate empty-query themselves)", () => {
     // Empty query is not intrinsically a miss — filterBlocksInCategory returns
-    // every block — but callers can choose to treat it as a no-op. Confirm
-    // the non-empty-query behavior here so we don't regress it.
+    // every block. Callers like the Enter handler treat empty as a no-op
+    // before calling in, so this helper itself must still return the
+    // sort-order first block.
     const result = findFirstVisibleBlock([coreCategory], "", "all");
     expect(result?.label).toBe("Manual Run");
   });

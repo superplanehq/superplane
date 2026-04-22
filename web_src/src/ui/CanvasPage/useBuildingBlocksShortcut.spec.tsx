@@ -73,38 +73,26 @@ describe("useBuildingBlocksShortcut", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("does not fire when focus is in an <input>", () => {
+  it.each([
+    ["text-input", "an <input>"],
+    ["textarea", "a <textarea>"],
+    ["editable", "a contenteditable element"],
+    ["monaco-inner", "a Monaco editor"],
+  ])("does not fire when focus is in %s (%s)", (testId) => {
     const onOpen = vi.fn();
     const { getByTestId } = render(<Harness onOpen={onOpen} />);
 
-    fireEvent.keyDown(getByTestId("text-input"), { key: "c" });
+    fireEvent.keyDown(getByTestId(testId), { key: "c" });
 
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("does not fire when focus is in a <textarea>", () => {
+  it("removes the listener on unmount so it cannot leak across canvases", () => {
     const onOpen = vi.fn();
-    const { getByTestId } = render(<Harness onOpen={onOpen} />);
+    const { unmount } = render(<Harness onOpen={onOpen} />);
 
-    fireEvent.keyDown(getByTestId("textarea"), { key: "c" });
-
-    expect(onOpen).not.toHaveBeenCalled();
-  });
-
-  it("does not fire when focus is in a contenteditable element", () => {
-    const onOpen = vi.fn();
-    const { getByTestId } = render(<Harness onOpen={onOpen} />);
-
-    fireEvent.keyDown(getByTestId("editable"), { key: "c" });
-
-    expect(onOpen).not.toHaveBeenCalled();
-  });
-
-  it("does not fire when focus is inside a Monaco editor", () => {
-    const onOpen = vi.fn();
-    const { getByTestId } = render(<Harness onOpen={onOpen} />);
-
-    fireEvent.keyDown(getByTestId("monaco-inner"), { key: "c" });
+    unmount();
+    fireEvent.keyDown(window, { key: "c" });
 
     expect(onOpen).not.toHaveBeenCalled();
   });

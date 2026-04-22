@@ -21,11 +21,13 @@ export interface FindFreePositionInViewportInput {
   nodes: PositionedNodeLike[];
   nodeSize: { width: number; height: number };
   fallbackCanvasSize?: { width: number; height: number };
-  defaultNodeSize?: { width: number; height: number };
-  padding?: number;
-  step?: number;
-  maxRings?: number;
 }
+
+const PADDING = 16;
+const STEP = 40;
+const MAX_RINGS = 8;
+const DEFAULT_NODE_WIDTH = 240;
+const DEFAULT_NODE_HEIGHT = 120;
 
 /**
  * Places a new node inside the currently visible part of the canvas (flow coords),
@@ -37,17 +39,7 @@ export interface FindFreePositionInViewportInput {
  * call from both mouse and keyboard code paths.
  */
 export function findFreePositionInViewport(input: FindFreePositionInViewportInput): { x: number; y: number } {
-  const {
-    viewport,
-    canvasRect,
-    nodes,
-    nodeSize,
-    fallbackCanvasSize = { width: 0, height: 0 },
-    defaultNodeSize = { width: 240, height: 120 },
-    padding = 16,
-    step = 40,
-    maxRings = 8,
-  } = input;
+  const { viewport, canvasRect, nodes, nodeSize, fallbackCanvasSize = { width: 0, height: 0 } } = input;
 
   const visibleWidth = canvasRect?.width ?? fallbackCanvasSize.width;
   const visibleHeight = canvasRect?.height ?? fallbackCanvasSize.height;
@@ -67,14 +59,14 @@ export function findFreePositionInViewport(input: FindFreePositionInViewportInpu
 
   const intersects = (pos: { x: number; y: number }) => {
     const bounds = {
-      minX: pos.x - padding,
-      minY: pos.y - padding,
-      maxX: pos.x + nodeSize.width + padding,
-      maxY: pos.y + nodeSize.height + padding,
+      minX: pos.x - PADDING,
+      minY: pos.y - PADDING,
+      maxX: pos.x + nodeSize.width + PADDING,
+      maxY: pos.y + nodeSize.height + PADDING,
     };
     return nodes.some((node) => {
-      const width = node.width ?? defaultNodeSize.width;
-      const height = node.height ?? defaultNodeSize.height;
+      const width = node.width ?? DEFAULT_NODE_WIDTH;
+      const height = node.height ?? DEFAULT_NODE_HEIGHT;
       const nodeBounds = {
         minX: node.position.x,
         minY: node.position.y,
@@ -91,10 +83,10 @@ export function findFreePositionInViewport(input: FindFreePositionInViewportInpu
   };
 
   const clampToVisible = (pos: { x: number; y: number }) => {
-    const minX = visibleBounds.minX + padding;
-    const minY = visibleBounds.minY + padding;
-    const maxX = visibleBounds.maxX - nodeSize.width - padding;
-    const maxY = visibleBounds.maxY - nodeSize.height - padding;
+    const minX = visibleBounds.minX + PADDING;
+    const minY = visibleBounds.minY + PADDING;
+    const maxX = visibleBounds.maxX - nodeSize.width - PADDING;
+    const maxY = visibleBounds.maxY - nodeSize.height - PADDING;
     return {
       x: Math.min(Math.max(pos.x, minX), maxX),
       y: Math.min(Math.max(pos.y, minY), maxY),
@@ -106,15 +98,15 @@ export function findFreePositionInViewport(input: FindFreePositionInViewportInpu
     return basePositionClamped;
   }
 
-  for (let ring = 1; ring <= maxRings; ring += 1) {
+  for (let ring = 1; ring <= MAX_RINGS; ring += 1) {
     for (let dx = -ring; dx <= ring; dx += 1) {
       for (let dy = -ring; dy <= ring; dy += 1) {
         // Only walk the perimeter of the current ring — interior cells were
         // already tested by smaller rings.
         if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
         const candidate = clampToVisible({
-          x: basePosition.x + dx * step,
-          y: basePosition.y + dy * step,
+          x: basePosition.x + dx * STEP,
+          y: basePosition.y + dy * STEP,
         });
         if (!intersects(candidate)) {
           return candidate;
