@@ -84,10 +84,6 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
-			},
-			{
-				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
 					"incident":{"incidentID":"incident-123","title":"API latency","severity":"minor","status":"active"}
 				}`)),
@@ -118,16 +114,20 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(body, &payload))
 	require.Equal(t, "Initial diagnosis", payload["initialStatusUpdate"])
+
+	require.Len(t, execCtx.Payloads, 1)
+	emitted := execCtx.Payloads[0].(map[string]any)
+	out := emitted["data"].(*Incident)
+	require.Equal(t, "incident-123", out.IncidentID)
+	require.Equal(t, "API latency", out.Title)
+	require.Equal(t, "minor", out.Severity)
+	require.Equal(t, "active", out.Status)
 }
 
 func Test__UpdateIncident__Execute__UpdatesProvidedFields(t *testing.T) {
 	component := &UpdateIncident{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
-			},
 			{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
@@ -161,6 +161,13 @@ func Test__UpdateIncident__Execute__UpdatesProvidedFields(t *testing.T) {
 	require.Len(t, httpCtx.Requests, 2)
 	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.UpdateTitle", httpCtx.Requests[0].URL.Path)
 	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.UpdateSeverity", httpCtx.Requests[1].URL.Path)
+
+	require.Len(t, execCtx.Payloads, 1)
+	emitted := execCtx.Payloads[0].(map[string]any)
+	out := emitted["data"].(*Incident)
+	require.Equal(t, "incident-123", out.IncidentID)
+	require.Equal(t, "New title", out.Title)
+	require.Equal(t, "major", out.Severity)
 }
 
 func Test__UpdateIncident__Execute__CanSetIsDrillFalse(t *testing.T) {
