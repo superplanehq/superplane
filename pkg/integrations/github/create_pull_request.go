@@ -91,15 +91,33 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 		{
 			Name:     "head",
 			Label:    "Head Branch",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "branch",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{Name: "repository", ValueFrom: &configuration.ParameterValueFrom{Field: "repository"}},
+					},
+				},
+			},
 		},
 		{
 			Name:     "base",
 			Label:    "Base Branch",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
 			Default:  "main",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "branch",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{Name: "repository", ValueFrom: &configuration.ParameterValueFrom{Field: "repository"}},
+					},
+				},
+			},
 		},
 		{
 			Name:     "title",
