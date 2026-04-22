@@ -220,8 +220,18 @@ export function NodeDetailPanel({ nodeId, runData, workflowNodes, onClose, onNav
   const createdAt = isTriggerNode ? runData.run?.createdAt : nodeExecution?.createdAt;
 
   return (
-    <div className="absolute inset-x-0 bottom-0 z-30 flex max-h-[45%] flex-col border-t border-slate-200 bg-white shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-1.5">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="flex w-full max-w-3xl max-h-[80vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-1.5">
         <div className="flex items-center gap-3 min-w-0">
           {onNavigateNode ? (
             <div className="flex items-center gap-0.5">
@@ -355,6 +365,7 @@ export function NodeDetailPanel({ nodeId, runData, workflowNodes, onClose, onNav
       ) : (
         <div className="px-4 py-6 text-center text-xs text-gray-400">No execution data for this node in this run.</div>
       )}
+      </div>
     </div>
   );
 }
