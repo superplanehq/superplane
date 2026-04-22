@@ -18,16 +18,54 @@ func Test__CreateHTTPSyntheticCheck__Setup__ValidatesSpec(t *testing.T) {
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"job":       "API health",
-			"target":    "https://api.example.com/health",
-			"method":    "GET",
-			"probes":    []string{},
-			"timeout":   3000,
-			"frequency": 60,
+			"job": "API health",
+			"request": map[string]any{
+				"target": "https://api.example.com/health",
+				"method": "GET",
+			},
+			"schedule": map[string]any{
+				"probes":    []string{},
+				"timeout":   3000,
+				"frequency": 60,
+			},
 		},
 	})
 
 	require.ErrorContains(t, err, "at least one probe is required")
+}
+
+func TestNormalizeSyntheticFrequency_treatsInputAsSeconds(t *testing.T) {
+	assert.Equal(t, int64(1000000), normalizeSyntheticFrequency(1000))
+	assert.Equal(t, int64(2000000), normalizeSyntheticFrequency(2000))
+}
+
+func TestSyntheticCheckToSpecBase_preservesExactGrafanaFrequency(t *testing.T) {
+	base, err := syntheticCheckToSpecBase(&SyntheticCheck{
+		Job:       "API health",
+		Target:    "https://api.example.com/health",
+		Frequency: 1500,
+		Timeout:   3000,
+		Enabled:   true,
+		Probes:    []int64{1},
+		Settings: SyntheticCheckSettings{
+			HTTP: &SyntheticCheckHTTPSettings{Method: "GET"},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, base.FrequencyMilliseconds)
+	assert.Equal(t, int64(2), base.Frequency)
+	assert.Equal(t, int64(1500), *base.FrequencyMilliseconds)
+
+	payload, err := buildSyntheticCheckPayload(base)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1500), payload.Frequency)
+
+	base.Frequency = 1000
+	base.FrequencyMilliseconds = nil
+	payload, err = buildSyntheticCheckPayload(base)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1000000), payload.Frequency)
 }
 
 func grafanaSyntheticDataSourceResponse() *http.Response {
@@ -73,12 +111,16 @@ func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"job":       "API health",
-			"target":    "https://api.example.com/health",
-			"method":    "GET",
-			"probes":    []string{"1"},
-			"timeout":   3000,
-			"frequency": 60,
+			"job": "API health",
+			"request": map[string]any{
+				"target": "https://api.example.com/health",
+				"method": "GET",
+			},
+			"schedule": map[string]any{
+				"probes":    []string{"1"},
+				"timeout":   3000,
+				"frequency": 60,
+			},
 			"failIfHeaderMatchesRegexp": []map[string]any{
 				{
 					"header":       "X-Canary",
@@ -262,11 +304,15 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 		Configuration: map[string]any{
 			"syntheticCheck": "101",
 			"job":            "API health",
-			"target":         "https://api.example.com/health",
-			"method":         "GET",
-			"probes":         []string{"1", "2"},
-			"timeout":        5000,
-			"frequency":      30,
+			"request": map[string]any{
+				"target": "https://api.example.com/health",
+				"method": "GET",
+			},
+			"schedule": map[string]any{
+				"probes":    []string{"1", "2"},
+				"timeout":   5000,
+				"frequency": 30,
+			},
 			"alerts": []map[string]any{
 				{
 					"name":      "ProbeFailedExecutionsTooHigh",

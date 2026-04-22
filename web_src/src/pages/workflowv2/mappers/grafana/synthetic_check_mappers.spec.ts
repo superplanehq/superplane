@@ -82,10 +82,8 @@ describe("grafana synthetic check mappers", () => {
     const props = createHttpSyntheticCheckMapper.props(
       buildComponentContext("grafana.createHttpSyntheticCheck", {
         configuration: {
-          target: "https://api.example.com/health",
-          method: "GET",
-          probes: ["1", "2"],
-          frequency: 60,
+          request: { target: "https://api.example.com/health", method: "GET" },
+          schedule: { frequency: 60, probes: ["1", "2"] },
         },
       }),
     );
@@ -114,6 +112,38 @@ describe("grafana synthetic check mappers", () => {
       expect.objectContaining({ icon: "arrow-right", label: "POST" }),
       expect.objectContaining({ icon: "map-pin", label: "9 · Every 2m" }),
     ]);
+  });
+
+  it("create mapper treats nested frequency as seconds even for large exact values", () => {
+    const props = createHttpSyntheticCheckMapper.props(
+      buildComponentContext("grafana.createHttpSyntheticCheck", {
+        configuration: {
+          request: { target: "https://nested.example.com", method: "GET" },
+          schedule: { frequency: 1000, probes: ["9"] },
+        },
+      }),
+    );
+
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ icon: "map-pin", label: "9 · Every 1000s" })]),
+    );
+  });
+
+  it("create mapper keeps legacy flat millisecond frequency readable", () => {
+    const props = createHttpSyntheticCheckMapper.props(
+      buildComponentContext("grafana.createHttpSyntheticCheck", {
+        configuration: {
+          target: "https://api.example.com/health",
+          method: "GET",
+          probes: ["1"],
+          frequency: 60000,
+        },
+      }),
+    );
+
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ icon: "map-pin", label: "1 · Every 1m" })]),
+    );
   });
 
   it("does not surface legacy or nested TLS configuration in the frontend flat view", () => {
@@ -149,8 +179,7 @@ describe("grafana synthetic check mappers", () => {
         configuration: {
           target: "https://api.example.com/health",
           method: "GET",
-          probes: ["17"],
-          frequency: 60,
+          schedule: { frequency: 60, probes: ["17"] },
         },
         metadata: {
           probeSummary: "Amsterdam (EU)",
@@ -168,10 +197,8 @@ describe("grafana synthetic check mappers", () => {
       buildComponentContext("grafana.updateHttpSyntheticCheck", {
         configuration: {
           syntheticCheck: "42",
-          target: "https://www.elffie.com",
-          method: "GET",
-          frequency: 60,
-          probes: ["17"],
+          request: { target: "https://www.elffie.com", method: "GET" },
+          schedule: { frequency: 60, probes: ["17"] },
         },
         metadata: {
           checkLabel: "Api health check (https://www.elffie.com)",
@@ -196,12 +223,13 @@ describe("grafana synthetic check mappers", () => {
       buildExecutionContext("grafana.createHttpSyntheticCheck", {
         node: {
           configuration: {
-            target: "https://api.example.com/health",
-            method: "GET",
-            frequency: 60,
-            timeout: 3000,
-            probes: ["1", "2"],
-            enabled: true,
+            request: { target: "https://api.example.com/health", method: "GET" },
+            schedule: {
+              frequency: 60,
+              timeout: 3000,
+              probes: ["1", "2"],
+              enabled: true,
+            },
           },
         },
         execution: {
@@ -295,11 +323,12 @@ describe("grafana synthetic check mappers", () => {
       buildExecutionContext("grafana.updateHttpSyntheticCheck", {
         node: {
           configuration: {
-            target: "https://api.example.com/health",
-            method: "GET",
-            frequency: 60,
-            timeout: 3000,
-            probes: ["1"],
+            request: { target: "https://api.example.com/health", method: "GET" },
+            schedule: {
+              frequency: 60,
+              timeout: 3000,
+              probes: ["1"],
+            },
           },
         },
         execution: { outputs: undefined },

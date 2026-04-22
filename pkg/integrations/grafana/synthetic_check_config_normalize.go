@@ -34,9 +34,34 @@ func normalizeSyntheticCheckConfigMap(m map[string]any) {
 	if m == nil {
 		return
 	}
+
+	legacyFrequencyMilliseconds, hasLegacyFrequencyMilliseconds := legacySyntheticFrequencyMilliseconds(m)
 	liftFlatKeysIntoSection(m, "request", syntheticCheckRequestFlatKeys)
 	liftFlatKeysIntoSection(m, "schedule", syntheticCheckScheduleFlatKeys)
 	liftFlatKeysIntoSection(m, "validation", syntheticCheckValidationFlatKeys)
+	if hasLegacyFrequencyMilliseconds {
+		section := toStringMap(m["schedule"])
+		if section == nil {
+			section = map[string]any{}
+		}
+		section["frequency"] = syntheticFrequencySecondsFromMilliseconds(legacyFrequencyMilliseconds)
+		section["frequencyMilliseconds"] = legacyFrequencyMilliseconds
+		m["schedule"] = section
+	}
+}
+
+func legacySyntheticFrequencyMilliseconds(m map[string]any) (int64, bool) {
+	if _, hasSchedule := m["schedule"]; hasSchedule {
+		return 0, false
+	}
+
+	value, ok := m["frequency"]
+	if !ok {
+		return 0, false
+	}
+
+	frequency := castToInt64(value)
+	return frequency, frequency > 0
 }
 
 func liftFlatKeysIntoSection(m map[string]any, sectionKey string, keys []string) {

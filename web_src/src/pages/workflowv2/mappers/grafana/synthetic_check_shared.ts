@@ -62,10 +62,23 @@ function getSyntheticCheckScheduleFlatView(c: CreateHttpSyntheticCheckConfigurat
   const schedule = c.schedule;
   return {
     enabled: schedule?.enabled ?? c.enabled,
-    frequency: schedule?.frequency ?? c.frequency,
+    frequency: normalizeConfiguredScheduleFrequency(schedule?.frequency, c.frequency),
     timeout: schedule?.timeout ?? c.timeout,
     probes: schedule?.probes ?? c.probes,
   };
+}
+
+function normalizeConfiguredScheduleFrequency(
+  scheduleFrequency: number | undefined,
+  legacyFrequency: number | undefined,
+): number | undefined {
+  if (scheduleFrequency != null) {
+    return scheduleFrequency;
+  }
+  if (legacyFrequency == null) {
+    return undefined;
+  }
+  return legacyFrequency / 1000;
 }
 
 function getSyntheticCheckValidationFlatView(c: CreateHttpSyntheticCheckConfiguration): SyntheticCheckFlatView {
@@ -470,10 +483,6 @@ function normalizeMutationFallback(configuration: CreateHttpSyntheticCheckConfig
 }
 
 function formatConfiguredFrequency(value: number): string {
-  if (value >= 1000 && value % 1000 === 0) {
-    return formatMilliseconds(value);
-  }
-
   return formatMilliseconds(value * 1000);
 }
 
