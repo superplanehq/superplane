@@ -9,11 +9,30 @@ import type { AgentState } from "./useAgentState";
 import { useApplyAiProposal } from "./useApplyAiProposal";
 import { useLoadChatConversation } from "./useLoadChatConversation";
 import { useLoadChatSessions } from "./useLoadChatSessions";
+import { usePollForMessages } from "./usePollForMessages";
 import { useSidebarWidth } from "./useSidebarWidth";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
 }
+
+type UseChatHandlersParams = {
+  aiInput: string;
+  aiInputRef: React.RefObject<HTMLTextAreaElement | null>;
+  canvasId?: string;
+  organizationId?: string;
+  agentContext: AgentState["agentContext"];
+  currentChatId: string | null;
+  isGeneratingResponse: boolean;
+  isStreamingRef: React.MutableRefObject<boolean>;
+  setChatSessions: Dispatch<SetStateAction<AiChatSession[]>>;
+  setCurrentChatId: Dispatch<SetStateAction<string | null>>;
+  setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
+  setAiInput: Dispatch<SetStateAction<string>>;
+  setAiError: Dispatch<SetStateAction<string | null>>;
+  setIsGeneratingResponse: Dispatch<SetStateAction<boolean>>;
+  setPendingProposal: Dispatch<SetStateAction<AiBuilderProposal | null>>;
+};
 
 export function AgentSidebar({ agentState }: AgentSidebarProps) {
   if (!agentState.showAgentSidebarToggle) {
@@ -28,15 +47,18 @@ export function AgentSidebar({ agentState }: AgentSidebarProps) {
 }
 
 function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
-  const { canvasId, organizationId, agentContext, onApplyAiOperations } = agentState;
+  const { canvasId, organizationId, agentContext, onApplyAiOperations, currentChatId, setCurrentChatId } = agentState;
 
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Track whether an SSE stream is actively delivering events so the polling
+  // hook knows to stand down.
+  const isStreamingRef = useRef(false);
 
   const { isApplyingProposal, setPendingProposal, pendingProposal, handleDiscardProposal, onApplyProposal } =
     useProposalState({
@@ -45,49 +67,23 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
       onApplyAiOperations,
     });
 
-  const handleSendPrompt = async (value?: string) =>
-    await sendChatPrompt({
-      value,
-      aiInput,
-      canvasId,
-      organizationId,
-      agentContext,
-      currentChatId,
-      isGeneratingResponse,
-      setChatSessions,
-      setCurrentChatId,
-      setAiMessages,
-      setAiInput,
-      setAiError,
-      setIsGeneratingResponse,
-      setPendingProposal,
-      focusInput: () => aiInputRef.current?.focus(),
-    });
-
-  const handleStartNewChatSession = () => {
-    setCurrentChatId(null);
-    setAiMessages([]);
-    setPendingProposal(null);
-    setAiError(null);
-    requestAnimationFrame(() => {
-      aiInputRef.current?.focus();
-    });
-  };
-
-  const handleSelectChatSession = (chatId: string) => {
-    setCurrentChatId(chatId);
-    setPendingProposal(null);
-    setAiError(null);
-  };
-
-  // reset state when canvasId changes
-  useEffect(() => {
-    setCurrentChatId(null);
-    setAiMessages([]);
-    setPendingProposal(null);
-    setAiError(null);
-    setAiInput("");
-  }, [canvasId, setCurrentChatId, setAiMessages, setPendingProposal, setAiError, setAiInput]);
+  const { handleSendPrompt, handleStartNewChatSession, handleSelectChatSession } = useChatHandlers({
+    aiInput,
+    aiInputRef,
+    canvasId,
+    organizationId,
+    agentContext,
+    currentChatId,
+    isGeneratingResponse,
+    isStreamingRef,
+    setChatSessions,
+    setCurrentChatId,
+    setAiMessages,
+    setAiInput,
+    setAiError,
+    setIsGeneratingResponse,
+    setPendingProposal,
+  });
 
   // load previous chat sessions
   const isLoadingChatSessions = useLoadChatSessions({
@@ -103,9 +99,24 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
     canvasId,
     organizationId,
     currentChatId,
+    setChatSessions,
     setAiMessages,
     setPendingProposal,
     setAiError,
+    setIsGeneratingResponse,
+  });
+
+  // poll for updates when a run is in progress but no SSE stream is active
+  usePollForMessages({
+    canvasId,
+    organizationId,
+    currentChatId,
+    isGeneratingResponse,
+    isStreamingRef,
+    setChatSessions,
+    setAiMessages,
+    setIsGeneratingResponse,
+    setPendingProposal,
   });
 
   const sidebarTitle = useMemo(() => {
@@ -242,6 +253,57 @@ function CloseButton({ onClose }: { onClose: () => void }) {
       <X size={16} />
     </button>
   );
+}
+
+function useChatHandlers(p: UseChatHandlersParams) {
+  // reset local state when canvasId changes (currentChatId reset is handled in useAgentState)
+  useEffect(() => {
+    p.setAiMessages([]);
+    p.setPendingProposal(null);
+    p.setAiError(null);
+    p.setAiInput("");
+  }, [p.canvasId, p.setAiMessages, p.setPendingProposal, p.setAiError, p.setAiInput]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSendPrompt = async (value?: string) => {
+    p.isStreamingRef.current = true;
+    try {
+      await sendChatPrompt({
+        value,
+        aiInput: p.aiInput,
+        canvasId: p.canvasId,
+        organizationId: p.organizationId,
+        agentContext: p.agentContext,
+        currentChatId: p.currentChatId,
+        isGeneratingResponse: p.isGeneratingResponse,
+        setChatSessions: p.setChatSessions,
+        setCurrentChatId: p.setCurrentChatId,
+        setAiMessages: p.setAiMessages,
+        setAiInput: p.setAiInput,
+        setAiError: p.setAiError,
+        setIsGeneratingResponse: p.setIsGeneratingResponse,
+        setPendingProposal: p.setPendingProposal,
+        focusInput: () => p.aiInputRef.current?.focus(),
+      });
+    } finally {
+      p.isStreamingRef.current = false;
+    }
+  };
+
+  const handleStartNewChatSession = () => {
+    p.setCurrentChatId(null);
+    p.setAiMessages([]);
+    p.setPendingProposal(null);
+    p.setAiError(null);
+    requestAnimationFrame(() => p.aiInputRef.current?.focus());
+  };
+
+  const handleSelectChatSession = (chatId: string) => {
+    p.setCurrentChatId(chatId);
+    p.setPendingProposal(null);
+    p.setAiError(null);
+  };
+
+  return { handleSendPrompt, handleStartNewChatSession, handleSelectChatSession };
 }
 
 function useProposalState({

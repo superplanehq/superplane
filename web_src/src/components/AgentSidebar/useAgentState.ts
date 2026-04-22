@@ -44,6 +44,12 @@ export function useAgentState({
 }: UseAgentStateOptions) {
   const agentContext = useAgentContext(isEditing, canvasVersion);
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(readInitialAgentSidebarOpen);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+
+  // Reset the active chat when the canvas changes.
+  useEffect(() => {
+    setCurrentChatId(null);
+  }, [canvasId]);
 
   const persistAgentSidebarOpen = useCallback((open: boolean) => {
     if (typeof window !== "undefined") {
@@ -103,6 +109,8 @@ export function useAgentState({
     readOnly,
     onApplyAiOperations: onApplyAiOperations ?? (async () => {}),
     closeSidebar: closeAgentSidebar,
+    currentChatId,
+    setCurrentChatId,
   };
 }
 

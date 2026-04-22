@@ -34,6 +34,7 @@ def _serialize_chat(chat: StoredAgentChat) -> Any:
         id=chat.id,
         initial_message=chat.initial_message or "",
         created_at=_timestamp(chat.created_at),
+        latest_run_status=chat.latest_run_status,
     )
 
 
@@ -45,6 +46,7 @@ def _serialize_message(message: StoredAgentChatMessage) -> Any:
         tool_call_id=message.tool_call_id or "",
         tool_status=message.tool_status or "",
         created_at=_timestamp(message.created_at),
+        proposal=message.proposal or "",
     )
 
 
