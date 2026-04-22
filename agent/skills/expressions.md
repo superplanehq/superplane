@@ -34,6 +34,17 @@ The **data-flow** skill describes how `$` is built during a run.
 | `previous()` | Immediate upstream node’s payload | `previous().data.status` |
 | `previous(n)` | Walk *n* levels upstream | `previous(2).data.version` |
 
+## Canvas memory
+
+`memory` is a namespace for reading records written by the **Add / Upsert / Update Memory** components. Records are scoped to the current canvas.
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `memory.find(ns, matches)` | Every record in namespace `ns` whose stored values contain all fields in `matches`. Newest first. | `memory.find("deploys", {"env": "prod"})` |
+| `memory.findFirst(ns, matches)` | Newest record matching, or `null`. | `memory.findFirst("deploys", {"env": "prod"}).version` |
+
+`matches` is matched with JSONB containment — the record must contain every key/value you pass, but may carry additional fields.
+
 ## Common Expr functions
 
 **String:** `lower()`, `upper()`, `trim()`, `split()`, `replace()`, `indexOf()`, `hasPrefix()`, `hasSuffix()`

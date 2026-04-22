@@ -105,6 +105,50 @@ describe("getSuggestions", () => {
   });
 });
 
+describe("getSuggestions memory namespace", () => {
+  it("suggests the memory namespace among top-level completions", () => {
+    const suggestions = getSuggestions("m", 1, {});
+    const memory = suggestions.find((item) => item.label === "memory");
+    expect(memory).toBeDefined();
+    expect(memory?.kind).toBe("variable");
+    expect(memory?.insertText).toBe("memory.");
+  });
+
+  it("suggests memory.find and memory.findFirst after the dot", () => {
+    const expression = "memory.";
+    const suggestions = getSuggestions(expression, expression.length, {});
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("find");
+    expect(labels).toContain("findFirst");
+    const findFirst = suggestions.find((item) => item.label === "findFirst");
+    expect(findFirst?.kind).toBe("function");
+    expect(findFirst?.insertText).toBe('findFirst("${1:namespace}", {${2}})');
+  });
+
+  it("filters memory methods by the typed member prefix", () => {
+    const expression = "memory.f";
+    const suggestions = getSuggestions(expression, expression.length, {});
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toEqual(expect.arrayContaining(["find", "findFirst"]));
+  });
+
+  it("hides the exact-match memory method from suggestions", () => {
+    const expression = "memory.find";
+    const suggestions = getSuggestions(expression, expression.length, {});
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("findFirst");
+    expect(labels).not.toContain("find");
+  });
+
+  it("does not treat an unrelated identifier as a namespace", () => {
+    const expression = "notAMemory.";
+    const suggestions = getSuggestions(expression, expression.length, {});
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).not.toContain("find");
+    expect(labels).not.toContain("findFirst");
+  });
+});
+
 describe("getSuggestions config fields", () => {
   it("suggests config fields for $['NodeName'].config.", () => {
     const expression = '$["my-component"].config.';
