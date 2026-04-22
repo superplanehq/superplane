@@ -25,7 +25,7 @@ export const updateIncidentMapper: ComponentBaseMapper = {
       "Title",
       "Severity",
       "Status",
-      "Modified At",
+      "Labels",
       "Incident URL",
     ]);
   },
@@ -37,6 +37,8 @@ function buildUpdatedFieldsMetadata(configuration: UpdateIncidentConfiguration |
   const fields: string[] = [];
   if (configuration?.title) fields.push("Title");
   if (configuration?.severity) fields.push("Severity");
+  if (Array.isArray(configuration?.labels) && configuration.labels.length > 0)
+    fields.push(`Labels (${configuration.labels.length})`);
   if (typeof configuration?.isDrill === "boolean") fields.push("Drill");
 
   if (fields.length === 0) {

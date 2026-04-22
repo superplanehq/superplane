@@ -118,6 +118,12 @@ func validateUpdateIncidentSpec(spec UpdateIncidentSpec) error {
 		}
 		hasUpdate = true
 	}
+	if len(spec.Labels) > 0 {
+		if len(incidentLabelsFromStrings(spec.Labels)) == 0 {
+			return errors.New("labels must include at least one non-empty label when provided")
+		}
+		hasUpdate = true
+	}
 	if spec.IsDrill != nil {
 		hasUpdate = true
 	}

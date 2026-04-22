@@ -26,7 +26,7 @@ export const resolveIncidentMapper: ComponentBaseMapper = {
       "Title",
       "Severity",
       "Status",
-      "Closed At",
+      "Labels",
       "Incident URL",
     ]);
   },

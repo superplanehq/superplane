@@ -51,6 +51,8 @@ func Test__IncidentComponents__Configuration__severityIsIntegrationResource(t *t
 	require.NotNil(t, updateFields[2].TypeOptions)
 	require.NotNil(t, updateFields[2].TypeOptions.Resource)
 	require.Equal(t, resourceTypeIncidentSeverity, updateFields[2].TypeOptions.Resource.Type)
+	require.Equal(t, "labels", updateFields[3].Name)
+	require.Equal(t, configuration.FieldTypeList, updateFields[3].Type)
 }
 
 func Test__Grafana__ListResources__IncidentSeverities(t *testing.T) {
@@ -80,6 +82,10 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 	component := &DeclareIncident{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
+			},
 			{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
@@ -118,6 +124,10 @@ func Test__UpdateIncident__Execute__UpdatesProvidedFields(t *testing.T) {
 	component := &UpdateIncident{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
+			},
 			{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
@@ -187,6 +197,60 @@ func Test__UpdateIncident__Execute__CanSetIsDrillFalse(t *testing.T) {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(body, &payload))
 	require.Equal(t, false, payload["isDrill"])
+}
+
+func Test__UpdateIncident__Execute__AddsLabels(t *testing.T) {
+	component := &UpdateIncident{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"incident":{"incidentID":"incident-123","title":"API latency","severity":"minor","status":"active","labels":[{"label":"prod"}]}
+				}`)),
+			},
+		},
+	}
+	execCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"incident": "incident-123",
+			"labels":   []any{"prod"},
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.True(t, execCtx.Passed)
+	require.Equal(t, "grafana.incident.updated", execCtx.Type)
+	require.Len(t, httpCtx.Requests, 2)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/FieldsService.AddLabelValue", httpCtx.Requests[0].URL.Path)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.AddLabel", httpCtx.Requests[1].URL.Path)
+
+	body, err := io.ReadAll(httpCtx.Requests[1].Body)
+	require.NoError(t, err)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, "incident-123", payload["incidentID"])
+	require.Equal(t, map[string]any{"key": "tags", "label": "prod"}, payload["label"])
+}
+
+func Test__UpdateIncident__Setup__RejectsEmptyLabels(t *testing.T) {
+	err := (&UpdateIncident{}).Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"incident": "incident-123",
+			"labels":   []any{"  "},
+		},
+	})
+
+	require.ErrorContains(t, err, "labels must include at least one non-empty label")
 }
 
 func Test__ResolveIncident__Execute__AddsSummaryThenResolves(t *testing.T) {

@@ -21,7 +21,7 @@ export const getIncidentMapper: ComponentBaseMapper = {
       "Title",
       "Severity",
       "Status",
-      "Created At",
+      "Labels",
       "Incident URL",
     ]);
   },
