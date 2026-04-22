@@ -36,14 +36,23 @@ func Test__CreateHTTPSyntheticCheck__Setup__ValidatesSpec(t *testing.T) {
 
 func Test__UpdateHTTPSyntheticCheck__Setup__AllowsExpression(t *testing.T) {
 	component := &UpdateHTTPSyntheticCheck{}
+	httpContext := &contexts.HTTPContext{}
 	metadata := &contexts.MetadataContext{}
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
 			"syntheticCheck": "{{ $['Create HTTP Synthetic Check'].data.check.id }}",
 		},
+		HTTP:     httpContext,
 		Metadata: metadata,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
 	})
 	require.NoError(t, err)
+	require.Empty(t, httpContext.Requests)
 }
 
 func Test__UpdateHTTPSyntheticCheck__Execute__RejectsUnresolvedExpression(t *testing.T) {
@@ -52,7 +61,7 @@ func Test__UpdateHTTPSyntheticCheck__Execute__RejectsUnresolvedExpression(t *tes
 		Configuration: map[string]any{
 			"syntheticCheck": "{{ $['x'].id }}",
 		},
-		Integration:  &contexts.IntegrationContext{},
+		Integration:    &contexts.IntegrationContext{},
 		ExecutionState: &contexts.ExecutionStateContext{},
 	})
 	require.Error(t, err)
