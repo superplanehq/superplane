@@ -1770,7 +1770,88 @@ export function WorkflowPageV2() {
     [preparedNodes, integrations, canvas?.spec?.nodes],
   );
 
-  const nodes = nodesWithIntegrationStatus;
+  //
+  // When the user flips the Run View to Canvas mode, render a subgraph of the
+  // canvas as it looked when this run executed. The snapshot (nodes, edges,
+  // positions, configuration) comes back from DescribeRun on
+  // `runData.snapshotVersion.spec`, and the per-execution status comes from
+  // `runData.executions`. We feed a synthetic CanvasesCanvas through the same
+  // `prepareData` pipeline used for the live canvas so that Block/
+  // ComponentBase/CustomEdge render identically, then trim to the set of
+  // nodes that actually participated in the run (trigger + any node with an
+  // execution). Orphan edges are dropped.
+  //
+  const runViewData = useMemo<{
+    nodes: CanvasNode[];
+    edges: CanvasEdge[];
+  } | null>(() => {
+    if (!isRunsMode) return null;
+    const snapshotSpec = describeRunQuery.data?.snapshotVersion?.spec;
+    if (!snapshotSpec) return null;
+
+    const runExecutions = describeRunQuery.data?.executions || [];
+    const rootEvent = describeRunQuery.data?.run;
+
+    const runExecutionNodeIds = new Set<string>();
+    for (const exec of runExecutions) {
+      if (exec.nodeId) runExecutionNodeIds.add(exec.nodeId);
+    }
+    if (rootEvent?.nodeId) runExecutionNodeIds.add(rootEvent.nodeId);
+
+    const runNodeEventsMap: Record<string, CanvasesCanvasEvent[]> = {};
+    if (rootEvent?.nodeId && rootEvent) {
+      runNodeEventsMap[rootEvent.nodeId] = [rootEvent as CanvasesCanvasEvent];
+    }
+
+    const runNodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
+    for (const exec of runExecutions) {
+      if (!exec.nodeId) continue;
+      if (!runNodeExecutionsMap[exec.nodeId]) runNodeExecutionsMap[exec.nodeId] = [];
+      runNodeExecutionsMap[exec.nodeId].push(exec);
+    }
+
+    const syntheticCanvas: CanvasesCanvas = {
+      metadata: canvas?.metadata,
+      spec: {
+        nodes: snapshotSpec.nodes || [],
+        edges: snapshotSpec.edges || [],
+      },
+    };
+
+    const prepared = prepareData(
+      syntheticCanvas,
+      allTriggers,
+      blueprints,
+      allComponents,
+      runNodeEventsMap,
+      runNodeExecutionsMap,
+      {},
+      canvasId!,
+      queryClient,
+      me,
+      "live",
+    );
+
+    const filteredNodes = prepared.nodes.filter((n) => runExecutionNodeIds.has(n.id));
+    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+    const filteredEdges = prepared.edges.filter((e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target));
+
+    return { nodes: filteredNodes, edges: filteredEdges };
+  }, [
+    isRunsMode,
+    describeRunQuery.data,
+    canvas?.metadata,
+    allTriggers,
+    blueprints,
+    allComponents,
+    canvasId,
+    queryClient,
+    me,
+  ]);
+
+  const showRunCanvas = isRunsMode && runViewMode === "canvas" && runViewData !== null;
+  const nodes = showRunCanvas ? runViewData!.nodes : nodesWithIntegrationStatus;
+  const runViewEdges = showRunCanvas ? runViewData!.edges : edges;
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -5351,7 +5432,7 @@ export function WorkflowPageV2() {
           onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
-          edges={edges}
+          edges={runViewEdges}
           organizationId={organizationId}
           canvasId={canvasId}
           getSidebarData={getSidebarData}
@@ -5392,7 +5473,7 @@ export function WorkflowPageV2() {
           canUpdateIntegrations={canUpdateIntegrations}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
-          readOnly={isReadOnly}
+          readOnly={isReadOnly || showRunCanvas}
           hasFitToViewRef={hasFitToViewRef}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
@@ -5481,13 +5562,20 @@ export function WorkflowPageV2() {
                 {runViewMode === "summary" && selectedRunEventId && describeRunQuery.data ? (
                   <RunSummary
                     runData={describeRunQuery.data}
-                    workflowNodes={canvas?.spec?.nodes}
+                    workflowNodes={describeRunQuery.data?.snapshotVersion?.spec?.nodes ?? canvas?.spec?.nodes}
                     componentIconMap={componentIconMap}
                     onPushThrough={handlePushThrough}
                     onCancelExecution={onCancelExecution}
                     onClose={() => handleSelectRun(null)}
                   />
                 ) : runViewMode === "summary" && selectedRunEventId && describeRunQuery.isLoading ? (
+                  <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">
+                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                  </div>
+                ) : runViewMode === "canvas" &&
+                  selectedRunEventId &&
+                  !describeRunQuery.data &&
+                  describeRunQuery.isLoading ? (
                   <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">
                     <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
                   </div>
@@ -5505,7 +5593,7 @@ export function WorkflowPageV2() {
               <NodeDetailPanel
                 nodeId={runDetailNodeId}
                 runData={describeRunQuery.data}
-                workflowNodes={canvas?.spec?.nodes}
+                workflowNodes={describeRunQuery.data?.snapshotVersion?.spec?.nodes ?? canvas?.spec?.nodes}
                 onClose={() => setRunDetailNodeId(null)}
                 onNavigateNode={setRunDetailNodeId}
               />

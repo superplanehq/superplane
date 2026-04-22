@@ -244,15 +244,30 @@ Current Canvas Page Layout:
 
 ## Known Follow-ups
 
-- **Snapshot canvas rendering**: In Runs mode the canvas currently shows the live
-  canvas graph underneath the `RunSummary` panel rather than the snapshot
-  captured in `describeRunQuery.data.snapshotVersion`. Building a read-only
-  ReactFlow from the snapshot's nodes/edges (and overlaying execution status)
-  was deferred to keep the `Canvas | Summary` toggle ship-able. Track under a
-  future batch when snapshot parity becomes required.
 - **URL sync for run view mode**: `?run=<eventId>` already deep-links the
   selected run; adding `?view=canvas|summary` would round-trip the toggle but
   was not requested.
+
+## Snapshot Canvas Rendering (implemented)
+
+When a run is selected and the `RunViewToggle` is flipped to "Canvas", the
+canvas is rendered from `describeRunQuery.data.snapshotVersion.spec` rather
+than the live canvas. We reuse the same ReactFlow instance as the live canvas
+and swap the `nodes`/`edges` passed to `CanvasPage` via a `runViewData` memo in
+[web_src/src/pages/workflowv2/index.tsx](../web_src/src/pages/workflowv2/index.tsx):
+
+1. Build a synthetic `CanvasesCanvas` from `snapshotVersion.spec`.
+2. Call the existing `prepareData(...)` with that synthetic canvas plus the
+   run's executions keyed by `nodeId` and the root trigger event.
+3. Filter to the set of nodes that actually participated in the run (trigger +
+   any node with an execution) and drop orphan edges.
+4. When `isRunsMode && runViewMode === "canvas"`, pass the filtered
+   nodes/edges into `<CanvasPage>` and force `readOnly` on.
+
+This matches the prototype approach (reuse the same ReactFlow, swap data) and
+also pins `RunSummary`/`NodeDetailPanel` `workflowNodes` to the snapshot's
+nodes so that names/icons/types reflect the canvas as it ran — not today's
+live canvas.
 
 ## Key Design Decisions
 
