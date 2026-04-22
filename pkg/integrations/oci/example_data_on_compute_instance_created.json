@@ -1,0 +1,33 @@
+{
+  "eventType": "com.oraclecloud.computeapi.launchinstance.end",
+  "cloudEventsVersion": "0.1",
+  "eventTypeVersion": "2.0",
+  "source": "ComputeApi",
+  "eventTime": "2026-04-21T12:00:00.000Z",
+  "contentType": "application/json",
+  "data": {
+    "compartmentId": "ocid1.compartment.oc1..aaaaaaaaxyz",
+    "compartmentName": "MyCompartment",
+    "resourceName": "my-instance",
+    "resourceId": "ocid1.instance.oc1.iad.anuwcljtc3adhhqcqzxwspjvqgfpgohspygpxerh6xxvlhkznhqkpzk4wauq",
+    "availabilityDomain": "Uocm:US-ASHBURN-AD-1",
+    "freeformTags": {},
+    "definedTags": {},
+    "request": {
+      "id": "req-abc123",
+      "path": "/20160918/instances",
+      "action": "POST",
+      "parameters": {}
+    },
+    "response": {
+      "status": "200",
+      "payload": {
+        "resourceName": "my-instance",
+        "id": "ocid1.instance.oc1.iad.anuwcljtc3adhhqcqzxwspjvqgfpgohspygpxerh6xxvlhkznhqkpzk4wauq"
+      }
+    }
+  },
+  "extensions": {
+    "compartmentId": "ocid1.compartment.oc1..aaaaaaaaxyz"
+  }
+}
