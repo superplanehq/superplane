@@ -39,6 +39,7 @@ class AgentChat(Base):
     total_input_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     total_output_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     total_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    latest_run_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
 
     messages: Mapped[list["AgentChatMessage"]] = relationship(
         back_populates="chat", cascade="all, delete-orphan"
@@ -72,6 +73,7 @@ class AgentChatMessage(Base):
     )
     message_index: Mapped[int] = mapped_column(nullable=False)
     message: Mapped[dict] = mapped_column(JSONB, nullable=False)  # type: ignore[type-arg]
+    proposal: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TimestampTZ, nullable=False, server_default=func.now()
     )

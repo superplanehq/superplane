@@ -52,6 +52,7 @@ func serializeAgentChatMessages(in []*internalpb.AgentChatMessage) []*pb.AgentCh
 			Content:    message.Content,
 			ToolCallId: message.ToolCallId,
 			ToolStatus: message.ToolStatus,
+			Proposal:   message.Proposal,
 		}
 
 		if message.CreatedAt != nil {
