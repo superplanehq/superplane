@@ -2003,6 +2003,20 @@ export function WorkflowPageV2() {
     [isRunsMode, selectedRunEventId],
   );
 
+  //
+  // In Run View + Canvas mode, a single click on a node should open the
+  // NodeDetailPanel (Details / Payload / Configuration tabs) instead of the
+  // component sidebar. This is wired via CanvasPage's onNodeClick prop which,
+  // when present, replaces the default sidebar-opening behavior.
+  //
+  const handleRunCanvasNodeClick = useCallback(
+    (nodeId: string) => {
+      if (!isRunsMode || !selectedRunEventId) return;
+      setRunDetailNodeId(nodeId);
+    },
+    [isRunsMode, selectedRunEventId],
+  );
+
   useEffect(() => {
     logNodeSelectRef.current = handleLogNodeSelect;
   }, [handleLogNodeSelect]);
@@ -5588,6 +5602,7 @@ export function WorkflowPageV2() {
             ) : null
           }
           onNodeDoubleClick={isRunsMode ? handleNodeDoubleClick : undefined}
+          onNodeClick={showRunCanvas ? handleRunCanvasNodeClick : undefined}
           runDetailPanel={
             isRunsMode && runDetailNodeId && describeRunQuery.data ? (
               <NodeDetailPanel

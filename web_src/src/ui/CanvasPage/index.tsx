@@ -165,6 +165,12 @@ export interface CanvasPageProps {
   runViewOverlay?: React.ReactNode;
   /** Called when a node is double-clicked. Used in runs mode for node drill-down. */
   onNodeDoubleClick?: (nodeId: string) => void;
+  /**
+   * When provided, overrides the default single-click behavior (opening the
+   * component sidebar) with this callback. Used in runs canvas mode to open
+   * the NodeDetailPanel popup instead.
+   */
+  onNodeClick?: (nodeId: string) => void;
   /** Optional bottom detail panel rendered over the canvas (e.g. NodeDetailPanel). */
   runDetailPanel?: React.ReactNode;
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
@@ -1166,9 +1172,7 @@ function CanvasPage(props: CanvasPageProps) {
           {props.headerMode === "runs" && props.runViewOverlay ? (
             <div className="absolute inset-0 z-[15] overflow-hidden pointer-events-none">{props.runViewOverlay}</div>
           ) : null}
-          {props.headerMode === "runs" && props.runDetailPanel ? (
-            <div className="absolute inset-x-0 bottom-0 z-[25]">{props.runDetailPanel}</div>
-          ) : null}
+          {props.headerMode === "runs" && props.runDetailPanel ? props.runDetailPanel : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
@@ -1265,6 +1269,7 @@ function CanvasPage(props: CanvasPageProps) {
               onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
               onNodeDoubleClick={props.onNodeDoubleClick}
+              onNodeClick={props.onNodeClick}
             />
           </ReactFlowProvider>
 
@@ -1809,6 +1814,7 @@ function CanvasContent({
   onConnectIntegration,
   canCreateIntegrations,
   onNodeDoubleClick,
+  onNodeClick,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1872,6 +1878,7 @@ function CanvasContent({
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
   onNodeDoubleClick?: (nodeId: string) => void;
+  onNodeClick?: (nodeId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
@@ -2038,6 +2045,8 @@ function CanvasContent({
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
+      } else if (onNodeClick) {
+        onNodeClick(nodeId);
       } else {
         stateRef.current.componentSidebar.open(nodeId);
 
@@ -2066,7 +2075,14 @@ function CanvasContent({
         })),
       );
     },
-    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab, isEditMode],
+    [
+      workflowNodes,
+      onBuildingBlocksSidebarToggle,
+      onPendingConnectionNodeClick,
+      setCurrentTab,
+      isEditMode,
+      onNodeClick,
+    ],
   );
 
   const onRunRef = useRef(onRun);
