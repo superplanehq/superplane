@@ -7,13 +7,24 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"google.golang.org/grpc/codes"
 )
 
 const (
-	maxErrorBodyBytes       = 2048
-	badRequestDetailType    = "type.googleapis.com/google.rpc.BadRequest"
-	badRequestDetailTypeAlt = "google.rpc.BadRequest"
+	maxErrorBodyBytes      = 2048
+	badRequestDetailSuffix = "BadRequest"
 )
+
+var grpcCodePrefixes = map[codes.Code]string{
+	codes.InvalidArgument:  "invalid request",
+	codes.NotFound:         "not found",
+	codes.AlreadyExists:    "already exists",
+	codes.PermissionDenied: "permission denied",
+	codes.Unimplemented:    "not supported",
+	codes.Internal:         "internal error",
+	codes.Unavailable:      "service unavailable",
+	codes.Unauthenticated:  "authentication required",
+}
 
 func FormatCommandError(err error) error {
 	if err == nil {
@@ -124,37 +135,52 @@ func extractFieldViolations(status *openapi_client.GooglerpcStatus) []string {
 		if !isBadRequestDetail(detail.GetType()) {
 			continue
 		}
-		raw, ok := detail.AdditionalProperties["fieldViolations"]
-		if !ok {
-			raw = detail.AdditionalProperties["field_violations"]
-		}
-		list, ok := raw.([]any)
-		if !ok {
-			continue
-		}
-		for _, item := range list {
-			entry, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
+		for _, entry := range getViolations(detail.AdditionalProperties) {
 			field, _ := entry["field"].(string)
 			desc, _ := entry["description"].(string)
-			switch {
-			case field != "" && desc != "":
-				out = append(out, fmt.Sprintf("%s: %s", field, desc))
-			case field != "":
-				out = append(out, field)
-			case desc != "":
-				out = append(out, desc)
+			if s := formatFieldDesc(field, desc); s != "" {
+				out = append(out, s)
 			}
 		}
 	}
 	return out
 }
 
+func getViolations(props map[string]any) []map[string]any {
+	raw, ok := props["fieldViolations"]
+	if !ok {
+		raw = props["field_violations"]
+	}
+
+	items, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func formatFieldDesc(field, desc string) string {
+	switch {
+	case field != "" && desc != "":
+		return fmt.Sprintf("%s: %s", field, desc)
+	case field != "":
+		return field
+	case desc != "":
+		return desc
+	default:
+		return ""
+	}
+}
+
 func isBadRequestDetail(typeURL string) bool {
-	trimmed := strings.TrimSpace(typeURL)
-	return trimmed == badRequestDetailType || trimmed == badRequestDetailTypeAlt
+	return strings.HasSuffix(strings.TrimSpace(typeURL), badRequestDetailSuffix)
 }
 
 func fallbackAPIError(apiErr *openapi_client.GenericOpenAPIError) error {
@@ -179,26 +205,7 @@ func fallbackAPIError(apiErr *openapi_client.GenericOpenAPIError) error {
 }
 
 func grpcCodePrefix(code int32) string {
-	switch code {
-	case 3:
-		return "invalid request"
-	case 5:
-		return "not found"
-	case 6:
-		return "already exists"
-	case 7:
-		return "permission denied"
-	case 12:
-		return "not supported"
-	case 13:
-		return "internal error"
-	case 14:
-		return "service unavailable"
-	case 16:
-		return "authentication required"
-	default:
-		return ""
-	}
+	return grpcCodePrefixes[codes.Code(code)]
 }
 
 func usageLimitError(message string) error {
