@@ -43,9 +43,8 @@ interface CanvasCardData {
   id: string;
   name: string;
   description?: string;
-  createdAt: string;
   createdAtRelative: { relative: string; full: string };
-  originalCreatedAt: string;
+  createdAtTimestamp: number | null;
   type: "canvases";
   createdBy?: { id?: string; name?: string };
   nodes?: SuperplaneComponentsNode[];
@@ -76,25 +75,23 @@ const HomePage = () => {
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
-  const formatDate = (value?: string) => {
-    if (!value) return "Unknown";
-    return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
-
   const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: CanvasesCanvas) => {
     if (!canvas.metadata) {
       throw new Error("Canvas metadata is required");
     }
     const originalCreatedAt = canvas.metadata.createdAt || "";
-    const createdAtRelative = originalCreatedAt ? formatRelativeTimeWithTooltip(originalCreatedAt) : { relative: "N/A", full: "Unknown" };
+    const parsedCreatedAt = Date.parse(originalCreatedAt);
+    const createdAtTimestamp = Number.isNaN(parsedCreatedAt) ? null : parsedCreatedAt;
+    const createdAtRelative = originalCreatedAt
+      ? formatRelativeTimeWithTooltip(originalCreatedAt)
+      : { relative: "N/A", full: "Unknown" };
 
     return {
       id: canvas.metadata.id!,
       name: canvas.metadata.name!,
       description: canvas.metadata.description,
-      createdAt: originalCreatedAt ? formatDate(originalCreatedAt) : "Unknown",
       createdAtRelative,
-      originalCreatedAt,
+      createdAtTimestamp,
       type: "canvases" as const,
       createdBy: canvas.metadata.createdBy,
       nodes: canvas.spec?.nodes || [],
@@ -110,15 +107,27 @@ const HomePage = () => {
   });
 
   const sortedCanvases = [...filteredCanvases].sort((a, b) => {
-    let comparison = 0;
-
     if (sortBy === "name") {
-      comparison = a.name.localeCompare(b.name);
-    } else if (sortBy === "createdAt") {
-      comparison = Date.parse(a.originalCreatedAt) - Date.parse(b.originalCreatedAt);
+      const comparison = a.name.localeCompare(b.name);
+      return sortOrder === "asc" ? comparison : -comparison;
     }
 
-    return sortOrder === "asc" ? comparison : -comparison;
+    if (a.createdAtTimestamp === null && b.createdAtTimestamp === null) {
+      return a.name.localeCompare(b.name);
+    }
+    if (a.createdAtTimestamp === null) {
+      return 1;
+    }
+    if (b.createdAtTimestamp === null) {
+      return -1;
+    }
+
+    const timeComparison = a.createdAtTimestamp - b.createdAtTimestamp;
+    if (timeComparison === 0) {
+      return a.name.localeCompare(b.name);
+    }
+
+    return sortOrder === "asc" ? timeComparison : -timeComparison;
   });
 
   const isLoading = canvasesLoading;
