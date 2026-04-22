@@ -6,11 +6,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const ResourceTypeCompartment = "compartment"
-const ResourceTypeAvailabilityDomain = "availabilityDomain"
-const ResourceTypeShape = "shape"
-const ResourceTypeImage = "image"
-const ResourceTypeSubnet = "subnet"
+const (
+	ResourceTypeCompartment        = "compartment"
+	ResourceTypeAvailabilityDomain = "availabilityDomain"
+	ResourceTypeShape              = "shape"
+	ResourceTypeImage              = "image"
+	ResourceTypeSubnet             = "subnet"
+	ResourceTypeBlockVolume        = "blockVolume"
+)
 
 func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
@@ -24,6 +27,8 @@ func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return listImages(ctx)
 	case ResourceTypeSubnet:
 		return listSubnets(ctx)
+	case ResourceTypeBlockVolume:
+		return listBlockVolumes(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
@@ -126,18 +131,18 @@ func listImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 		return nil, fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	compartmentID := ctx.Parameters["compartmentId"]
-	if compartmentID == "" {
-		compartmentID = client.tenancyOCID
-	}
-
-	images, err := client.ListImages(compartmentID)
+	// The ListImages API requires a compartment ID, but since images are global resources,
+	// we can use the tenancy OCID as the compartment ID to list all images accessible to the tenancy.
+	images, err := client.ListImages(client.tenancyOCID, ctx.Parameters["imageOs"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to list images: %w", err)
 	}
 
 	resources := make([]core.IntegrationResource, 0, len(images))
 	for _, img := range images {
+		if img.LifecycleState != "AVAILABLE" {
+			continue
+		}
 		resources = append(resources, core.IntegrationResource{
 			Type: ResourceTypeImage,
 			Name: img.DisplayName,
@@ -177,6 +182,37 @@ func listSubnets(ctx core.ListResourcesContext) ([]core.IntegrationResource, err
 			Type: ResourceTypeSubnet,
 			Name: name,
 			ID:   sn.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listBlockVolumes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+
+	volumes, err := client.ListBlockVolumes(compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list block volumes: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(volumes))
+	for _, v := range volumes {
+		if v.LifecycleState != "AVAILABLE" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeBlockVolume,
+			Name: v.DisplayName,
+			ID:   v.ID,
 		})
 	}
 
