@@ -1,0 +1,25 @@
+{
+  "data": {
+    "id": 1234567890,
+    "number": 42,
+    "title": "Add new feature",
+    "state": "open",
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "head": {
+      "ref": "feature-branch",
+      "label": "acme:feature-branch"
+    },
+    "base": {
+      "ref": "main",
+      "label": "acme:main"
+    },
+    "user": {
+      "login": "octocat",
+      "id": 1,
+      "html_url": "https://github.com/octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
+}
