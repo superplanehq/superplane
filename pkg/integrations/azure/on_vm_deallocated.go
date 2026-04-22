@@ -108,6 +108,10 @@ func (t *OnVMDeallocated) Color() string {
 	return "blue"
 }
 
+func (t *OnVMDeallocated) DefaultRunTitle() string {
+	return "{{ root().data.subject }}"
+}
+
 func (t *OnVMDeallocated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

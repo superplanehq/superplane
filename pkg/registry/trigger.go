@@ -56,6 +56,10 @@ func (s *PanicableTrigger) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }
 
+func (s *PanicableTrigger) DefaultRunTitle() string {
+	return s.underlying.DefaultRunTitle()
+}
+
 func (s *PanicableTrigger) Actions() []core.Action {
 	return s.underlying.Actions()
 }

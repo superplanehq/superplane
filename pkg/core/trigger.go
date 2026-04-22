@@ -54,6 +54,12 @@ type Trigger interface {
 	Configuration() []configuration.Field
 
 	/*
+	 * Default run title template for emitted root events.
+	 * This is surfaced through the API and used when no node-specific override is stored.
+	 */
+	DefaultRunTitle() string
+
+	/*
 	 * Handler for webhooks
 	 */
 	HandleWebhook(ctx WebhookRequestContext) (int, *WebhookResponseBody, error)

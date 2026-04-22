@@ -11,11 +11,13 @@ import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
+import { formatTimestamp } from "@/pages/workflowv2/mappers/utils";
 
 interface EventSectionDisplayProps {
   section: EventSection;
   index: number;
   totalSections: number;
+  defaultEventTitle?: string;
   className?: string;
   stateMap?: EventStateMap;
   lastSection?: boolean;
@@ -25,6 +27,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
   section,
   index,
   totalSections,
+  defaultEventTitle,
   className,
   stateMap = DEFAULT_EVENT_STATE_MAP,
   lastSection = false,
@@ -52,6 +55,10 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
 
   const currentState = section.eventState || "neutral";
   const stateStyle = stateMap[currentState] || stateMap["neutral"];
+  const eventTitle =
+    section.eventTitle?.trim() ||
+    defaultEventTitle ||
+    "Event received at " + formatTimestamp(section.receivedAt?.toISOString() || "");
 
   const LastEventBackground = stateStyle.backgroundColor;
   const LastEventStateColor = stateStyle.badgeColor;
@@ -90,7 +97,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
           <span className="text-[13px] text-gray-950/50 font-mono">#{section.eventId?.slice(0, 4)}</span>
         )}
         <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-medium truncate">
-          {section.eventTitle}
+          {eventTitle}
         </span>
       </div>
     </div>
@@ -210,6 +217,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   hideMetadataList?: boolean;
   collapsed?: boolean;
   collapsedBackground?: string;
+  defaultEventTitle?: string;
   eventSections?: EventSection[];
   selected?: boolean;
   metadata?: MetadataItem[];
@@ -242,6 +250,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   specs,
   collapsed: _collapsed = false,
   collapsedBackground: _collapsedBackground,
+  defaultEventTitle,
   eventSections,
   selected = false,
   onRun,
@@ -495,6 +504,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 section={section}
                 index={index}
                 totalSections={safeEventSections.length}
+                defaultEventTitle={defaultEventTitle}
                 stateMap={eventStateMap}
                 lastSection={
                   index === safeEventSections.length - 1 &&

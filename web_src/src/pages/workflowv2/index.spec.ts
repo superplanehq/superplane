@@ -131,7 +131,7 @@ describe("canvas node preparation resilience", () => {
         warning: "renderer warning",
       }),
       getRootEventValues: () => ({}),
-      getTitleAndSubtitle: () => ({ title: "Event", subtitle: "" }),
+      subtitle: () => "",
     });
 
     const result = prepareTriggerNode(

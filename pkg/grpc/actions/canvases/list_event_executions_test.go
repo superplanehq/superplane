@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -192,4 +193,39 @@ func Test__ListEventExecutions__OnlyReturnsExecutionsForSpecificRootEvent(t *tes
 	require.Len(t, response.Executions, 1)
 
 	assert.Equal(t, execution1.ID.String(), response.Executions[0].Id)
+}
+
+func Test__ListEventExecutions__IncludesRootEventRunTitle(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	runTitle := "Root Event Title"
+	rootEvent.RunTitle = &runTitle
+	require.NoError(t, database.Conn().Save(rootEvent).Error)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+
+	response, err := ListEventExecutions(context.Background(), r.Registry, canvas.ID.String(), rootEvent.ID.String())
+	require.NoError(t, err)
+	require.Len(t, response.Executions, 1)
+	require.NotNil(t, response.Executions[0].RootEvent)
+	assert.Equal(t, runTitle, response.Executions[0].RootEvent.RunTitle)
 }

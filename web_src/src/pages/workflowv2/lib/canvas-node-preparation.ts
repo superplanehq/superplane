@@ -29,8 +29,10 @@ import {
   buildExecutionInfo,
   buildNodeInfo,
   buildQueueItemInfo,
+  getEventRunTitle,
   buildUserInfo,
   getNextInQueueInfo,
+  normalizeSidebarValues,
 } from "../utils";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -206,15 +208,15 @@ function appendCompositeLastRunItem(
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const eventInfo = buildEventInfo(execution.rootEvent!);
-  const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: eventInfo });
+  const subtitle = rootTriggerRenderer.subtitle({ event: eventInfo });
 
   (canvasNode.data.composite as CompositeProps).lastRunItem = {
-    title,
+    title: getEventRunTitle(eventInfo),
     subtitle,
     id: execution.rootEvent?.id,
     receivedAt: new Date(execution.createdAt!),
     state: getRunItemState(execution),
-    values: rootTriggerRenderer.getRootEventValues({ event: eventInfo }),
+    values: normalizeSidebarValues(rootTriggerRenderer.getRootEventValues({ event: eventInfo })),
   };
 }
 

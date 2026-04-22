@@ -40,6 +40,23 @@ describe("hasDraftVersusLiveGraphDiff", () => {
     expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(false);
   });
 
+  it("returns true when only runTitleTemplate differs", () => {
+    const live = {
+      spec: {
+        nodes: [node("a")],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+    const draft = {
+      spec: {
+        nodes: [{ ...node("a"), runTitleTemplate: "{{ root().data.message }}" }],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+
+    expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
+  });
+
   it("returns true when only the integration binding changes", () => {
     const live = {
       spec: {

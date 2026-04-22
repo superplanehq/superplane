@@ -4,14 +4,13 @@ import type {
   EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   StateFunction,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer, getState, getStateMap } from ".";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/pages/workflowv2/mappers/types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/pages/workflowv2/mappers/types";
+import { getState, getStateMap } from ".";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -98,7 +97,7 @@ export const filterMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getfilterEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? getfilterEventSections(lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs,
       eventStateMap: getStateMap(componentName),
@@ -121,14 +120,9 @@ export const filterMapper: ComponentBaseMapper = {
   },
 };
 
-function getfilterEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
+function getfilterEventSections(execution: ExecutionInfo, componentName: string): EventSection[] {
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
     eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
     eventState: getState(componentName)(execution),
     eventId: execution.rootEvent!.id!,
