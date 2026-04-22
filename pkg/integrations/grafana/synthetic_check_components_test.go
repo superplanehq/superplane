@@ -34,6 +34,31 @@ func Test__CreateHTTPSyntheticCheck__Setup__ValidatesSpec(t *testing.T) {
 	require.ErrorContains(t, err, "at least one probe is required")
 }
 
+func Test__UpdateHTTPSyntheticCheck__Setup__AllowsExpression(t *testing.T) {
+	component := &UpdateHTTPSyntheticCheck{}
+	metadata := &contexts.MetadataContext{}
+	err := component.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"syntheticCheck": "{{ $['Create HTTP Synthetic Check'].data.check.id }}",
+		},
+		Metadata: metadata,
+	})
+	require.NoError(t, err)
+}
+
+func Test__UpdateHTTPSyntheticCheck__Execute__RejectsUnresolvedExpression(t *testing.T) {
+	component := &UpdateHTTPSyntheticCheck{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"syntheticCheck": "{{ $['x'].id }}",
+		},
+		Integration:  &contexts.IntegrationContext{},
+		ExecutionState: &contexts.ExecutionStateContext{},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "resolve")
+}
+
 func TestNormalizeSyntheticFrequency_treatsInputAsSeconds(t *testing.T) {
 	assert.Equal(t, int64(1000000), normalizeSyntheticFrequency(1000))
 	assert.Equal(t, int64(2000000), normalizeSyntheticFrequency(2000))

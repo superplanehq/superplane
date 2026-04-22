@@ -66,7 +66,7 @@ func (c *UpdateHTTPSyntheticCheck) Configuration() []configuration.Field {
 }
 
 func (c *UpdateHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
-	merged, id, _, existing, client, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration)
+	merged, id, _, existing, client, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration, true)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (c *UpdateHTTPSyntheticCheck) Setup(ctx core.SetupContext) error {
 }
 
 func (c *UpdateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
-	merged, id, raw, existing, client, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration)
+	merged, id, raw, existing, client, err := prepareSyntheticCheckUpdate(ctx.HTTP, ctx.Integration, ctx.Configuration, false)
 	if err != nil {
 		return err
 	}

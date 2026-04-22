@@ -30,10 +30,15 @@ func syntheticCheckUpdateSectionPresent(m map[string]any, key string) bool {
 	return true
 }
 
+// prepareSyntheticCheckUpdate loads the existing check, merges the configuration patch, and validates the result.
+// When forSetup is true and the synthetic check id is still a workflow expression, it skips the remote load so setup
+// can succeed (same pattern as Get/Delete synthetic check components with resolveSyntheticCheckNodeMetadata). Execute
+// must pass forSetup false so unresolved ids return a clear error instead of a failed GetCheck.
 func prepareSyntheticCheckUpdate(
 	httpCtx core.HTTPContext,
 	integration core.IntegrationContext,
 	config any,
+	forSetup bool,
 ) (merged SyntheticCheckSpecBase, syntheticCheckID string, raw map[string]any, existing *SyntheticCheck, client *SyntheticsClient, err error) {
 	raw, err = decodeSyntheticCheckConfigMap(config)
 	if err != nil {
@@ -46,6 +51,13 @@ func prepareSyntheticCheckUpdate(
 	}
 	if err := validateSyntheticCheckSelection(SyntheticCheckSelectionSpec{SyntheticCheck: id}); err != nil {
 		return SyntheticCheckSpecBase{}, "", raw, nil, nil, err
+	}
+
+	if isExpressionValue(id) {
+		if forSetup {
+			return SyntheticCheckSpecBase{}, id, raw, nil, nil, nil
+		}
+		return SyntheticCheckSpecBase{}, "", raw, nil, nil, errors.New("synthetic check id must be resolved before execution")
 	}
 
 	client, err = NewSyntheticsClient(httpCtx, integration)
