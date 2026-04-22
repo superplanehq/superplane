@@ -16,9 +16,9 @@ ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT_DIR"
 
 # Docker Compose config (assumes compose is already up)
-COMPOSE="docker compose -f docker-compose.dev.yml"
+COMPOSE="${CONTAINER_ENGINE:-docker} compose -f docker-compose.dev.yml"
 
-docker_exec() {
+compose_exec() {
   # Pass DB_NAME=superplane_test to match Makefile test environment
   # Also force Go build cache to a writable, persisted path in the repo
   echo "+ ${COMPOSE} exec -e DB_NAME=superplane_test -e GOCACHE=/app/tmp/go-build -e XDG_CACHE_HOME=/app/tmp app bash -lc \"$*\""
@@ -107,7 +107,7 @@ subtest_name_for_line() {
 
 run_all() {
   echo "Running in docker: go test -p 1 -v ./..."
-  docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v ./..."
+  compose_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v ./..."
 }
 
 run_file() {
@@ -118,7 +118,7 @@ run_file() {
     # Not a test file: run the package containing the file
     pkg=$(pkg_for_path "$file")
     echo "Running package tests in docker: go test -p 1 -v $pkg"
-    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
+    compose_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
     return
     ;;
   esac
@@ -128,7 +128,7 @@ run_file() {
   tests_list=$(extract_tests_in_file "$file" || true)
   if [ -z "${tests_list:-}" ]; then
     echo "No tests found in $file; running package in docker: $pkg"
-    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
+    compose_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
     return
   fi
 
@@ -136,7 +136,7 @@ run_file() {
   regex="^($(printf '%s' "$tests_list" | paste -sd '|' -))$"
   echo "Running tests in file: $file"
   echo "docker exec: go test -p 1 -v $pkg -run $regex"
-  docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '$regex'"
+  compose_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '$regex'"
 }
 
 run_line() {
@@ -147,7 +147,7 @@ run_line() {
     *_test.go) : ;;
     *)
     echo "File is not a test file; running package in docker: $pkg"
-    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
+    compose_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg'"
     return
     ;;
   esac
@@ -162,9 +162,9 @@ run_line() {
 
   if [ -n "${subtest_name:-}" ]; then
     echo "Running subtest: $test_name/$subtest_name"
-    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$/^$subtest_name$'"
+    compose_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$/^$subtest_name$'"
   else
-    docker_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$'"
+    compose_exec "cd /app && GOFLAGS= go test -count=1 -p 1 -v '$pkg' -run '^$test_name$'"
   fi
 }
 
