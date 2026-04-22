@@ -36,9 +36,10 @@ export function usePollForMessages({
 
     let cancelled = false;
     let timerId: number | null = null;
+    let isPolling = false;
 
     const poll = async () => {
-      if (cancelled) {
+      if (cancelled || isPolling) {
         return;
       }
 
@@ -54,6 +55,7 @@ export function usePollForMessages({
         return;
       }
 
+      isPolling = true;
       try {
         const [sessions, { messages, pendingProposal: polledProposal }] = await Promise.all([
           loadChatSessions({ canvasId, organizationId }),
@@ -75,6 +77,8 @@ export function usePollForMessages({
         }
       } catch (error) {
         console.warn("Polling for messages failed:", error);
+      } finally {
+        isPolling = false;
       }
 
       schedule();
