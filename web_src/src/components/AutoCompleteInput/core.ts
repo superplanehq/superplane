@@ -610,6 +610,23 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       }
     }
 
+    // Handle namespace method suggestions (e.g., memory.findFirst(...))
+    if (!isFunctionCall) {
+      const namespaceMethods = getNamespaceMethods(baseExpr);
+      if (namespaceMethods.length > 0) {
+        return namespaceMethods
+          .filter((m) => m.name.toLowerCase().startsWith(mp) && mp !== m.name.toLowerCase())
+          .slice(0, limit)
+          .map((m) => ({
+            label: m.name,
+            kind: "function" as const,
+            insertText: m.snippet ?? `${m.name}()`,
+            detail: m.returnType,
+            description: m.description,
+          }));
+      }
+    }
+
     const resolvableBase = isFunctionCall ? baseExpr : extractTailPathExpression(baseExpr);
     const target = resolveExprToValue(resolvableBase, globals);
 
@@ -673,6 +690,18 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
           detail: "function",
           description: fn.description,
           example: fn.example,
+        });
+      }
+    }
+
+    for (const [name, info] of Object.entries(SUPERPLANE_NAMESPACES)) {
+      if (!prefix || name.toLowerCase().startsWith(prefix)) {
+        out.push({
+          label: name,
+          kind: "variable",
+          insertText: `${name}.`,
+          detail: "namespace",
+          description: info.description,
         });
       }
     }
@@ -801,6 +830,44 @@ const FUNCTION_RETURN_METHODS: Record<string, MethodInfo[]> = {
 
 function getFunctionReturnMethods(funcName: string): MethodInfo[] {
   return FUNCTION_RETURN_METHODS[funcName.toLowerCase()] ?? [];
+}
+
+type NamespaceInfo = {
+  /** One-line summary shown as the suggestion description. */
+  description: string;
+  /** Methods reachable via dot-access on the namespace (e.g. memory.findFirst). */
+  methods: MethodInfo[];
+};
+
+/**
+ * Top-level namespaces exposed in the Expr environment — objects whose entries
+ * are reached via dot-access, e.g. `memory.findFirst("deploys", {"env": "prod"})`.
+ */
+const SUPERPLANE_NAMESPACES: Record<string, NamespaceInfo> = {
+  memory: {
+    description:
+      "Canvas-level key/value memory. Read records previously written by the Add / Upsert / Update Memory components.",
+    methods: [
+      {
+        name: "find",
+        snippet: 'find("${1:namespace}", {${2}})',
+        returnType: "array",
+        description:
+          "Returns every canvas-memory record in the namespace whose stored values contain all fields in the second argument. Newest first.",
+      },
+      {
+        name: "findFirst",
+        snippet: 'findFirst("${1:namespace}", {${2}})',
+        returnType: "object | null",
+        description:
+          "Returns the newest canvas-memory record in the namespace whose stored values contain all fields in the second argument, or null if none matches.",
+      },
+    ],
+  },
+};
+
+function getNamespaceMethods(name: string): MethodInfo[] {
+  return SUPERPLANE_NAMESPACES[name]?.methods ?? [];
 }
 
 type EnvKeyTrigger = { quote: "'" | '"' };
