@@ -1,0 +1,16 @@
+{
+  "data": {
+    "instanceId": "ocid1.instance.oc1.iad.anuwcljtc3adhhqcqzxwspjvqgfpgohspygpxerh6xxvlhkznhqkpzk4wauq",
+    "displayName": "my-instance",
+    "lifecycleState": "RUNNING",
+    "shape": "VM.Standard.E4.Flex",
+    "availabilityDomain": "Uocm:US-ASHBURN-AD-1",
+    "compartmentId": "ocid1.compartment.oc1..aaaaaaaaxyz",
+    "region": "us-ashburn-1",
+    "publicIp": "129.146.0.1",
+    "privateIp": "10.0.0.2",
+    "timeCreated": "2026-04-21T12:00:00.000Z"
+  },
+  "timestamp": "2026-04-21T12:01:30.000Z",
+  "type": "oci.compute.instance"
+}
