@@ -105,23 +105,26 @@ describe("Grafana incident execution details", () => {
   it("getIncident does not dump the full incident object", () => {
     const details = getIncidentMapper.getExecutionDetails(buildExecutionContext("getIncident", incident));
 
-    expect(Object.keys(details)).toEqual(["Fetched At", "Title", "Severity", "Status", "Created At", "Incident URL"]);
+    expect(Object.keys(details)).toEqual(["Fetched At", "Title", "Severity", "Status", "Labels", "Incident URL"]);
+    expect(details.Labels).toBe("prod, api, checkout +1");
     expect(Object.keys(details)).toHaveLength(6);
   });
 
   it("updateIncident focuses on updated incident state", () => {
     const details = updateIncidentMapper.getExecutionDetails(buildExecutionContext("updateIncident", incident));
 
-    expect(Object.keys(details)).toEqual(["Updated At", "Title", "Severity", "Status", "Modified At", "Incident URL"]);
+    expect(Object.keys(details)).toEqual(["Updated At", "Title", "Severity", "Status", "Labels", "Incident URL"]);
+    expect(details.Labels).toBe("prod, api, checkout +1");
     expect(Object.keys(details)).toHaveLength(6);
   });
 
-  it("resolveIncident includes closure state only", () => {
+  it("resolveIncident shows labels and resolved status", () => {
     const details = resolveIncidentMapper.getExecutionDetails(
       buildExecutionContext("resolveIncident", { ...incident, status: "resolved" }),
     );
 
-    expect(Object.keys(details)).toEqual(["Resolved At", "Title", "Severity", "Status", "Closed At", "Incident URL"]);
+    expect(Object.keys(details)).toEqual(["Resolved At", "Title", "Severity", "Status", "Labels", "Incident URL"]);
+    expect(details.Labels).toBe("prod, api, checkout +1");
     expect(details.Status).toBe("resolved");
   });
 
@@ -170,5 +173,17 @@ describe("Grafana incident card metadata", () => {
     expect(props.metadata).toEqual([
       expect.objectContaining({ label: "Incident: API latency [active] (incident-123)" }),
     ]);
+  });
+
+  it("shows labels in update incident metadata", () => {
+    const props = updateIncidentMapper.props(
+      buildComponentContext("updateIncident", {
+        configuration: { incident: "incident-123", labels: ["prod", "api"] },
+      }),
+    );
+
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "Updating: Labels (2)" })]),
+    );
   });
 });

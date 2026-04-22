@@ -94,6 +94,120 @@ func Test__Client__ResolveIncident__SetsResolvedStatus(t *testing.T) {
 	require.Equal(t, "resolved", payload["status"])
 }
 
+func Test__Client__UpdateIncident__AddsLabels(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"incident": {
+						"incidentID": "incident-123",
+						"title": "API latency",
+						"severity": "minor",
+						"status": "active",
+						"labels": [{"label": "prod"}]
+					}
+				}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"incident": {
+						"incidentID": "incident-123",
+						"title": "API latency",
+						"severity": "minor",
+						"status": "active",
+						"labels": [{"label": "prod"}, {"label": "api"}]
+					}
+				}`)),
+			},
+		},
+	}
+	client := &Client{BaseURL: "https://grafana.example.com", APIToken: "token", http: httpContext}
+
+	incident, err := client.UpdateIncident("incident-123", nil, nil, []string{" prod ", "", "api"}, nil)
+	require.NoError(t, err)
+	require.Len(t, incident.Labels, 2)
+
+	require.Len(t, httpContext.Requests, 4)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/FieldsService.AddLabelValue", httpContext.Requests[0].URL.Path)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.AddLabel", httpContext.Requests[1].URL.Path)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/FieldsService.AddLabelValue", httpContext.Requests[2].URL.Path)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.AddLabel", httpContext.Requests[3].URL.Path)
+
+	body, err := io.ReadAll(httpContext.Requests[1].Body)
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, "incident-123", payload["incidentID"])
+	require.Equal(t, map[string]any{"key": "tags", "label": "prod"}, payload["label"])
+}
+
+func Test__Client__UpdateIncident__DedupesConfiguredLabels(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"field":{"slug":"tags"}}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"incident": {
+						"incidentID": "incident-123",
+						"title": "API latency",
+						"severity": "minor",
+						"status": "active",
+						"labels": [{"label": "prod"}]
+					}
+				}`)),
+			},
+		},
+	}
+	client := &Client{BaseURL: "https://grafana.example.com", APIToken: "token", http: httpContext}
+
+	incident, err := client.UpdateIncident("incident-123", nil, nil, []string{" prod ", "prod"}, nil)
+	require.NoError(t, err)
+	require.Len(t, incident.Labels, 1)
+
+	require.Len(t, httpContext.Requests, 2)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/FieldsService.AddLabelValue", httpContext.Requests[0].URL.Path)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.AddLabel", httpContext.Requests[1].URL.Path)
+}
+
+func Test__Client__UpdateIncident__IgnoresDuplicateLabelErrors(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"duplicate field option"}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"label already exists"}`)),
+			},
+		},
+	}
+	client := &Client{BaseURL: "https://grafana.example.com", APIToken: "token", http: httpContext}
+
+	incident, err := client.UpdateIncident("incident-123", nil, nil, []string{"prod"}, nil)
+	require.NoError(t, err)
+	require.Equal(t, "incident-123", incident.IncidentID)
+
+	require.Len(t, httpContext.Requests, 2)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/FieldsService.AddLabelValue", httpContext.Requests[0].URL.Path)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.AddLabel", httpContext.Requests[1].URL.Path)
+}
+
 func Test__Client__AddIncidentActivity__UsesUserNote(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{

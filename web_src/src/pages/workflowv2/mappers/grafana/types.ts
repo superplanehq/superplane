@@ -316,6 +316,7 @@ export interface IncidentSelectionConfiguration {
 export interface UpdateIncidentConfiguration extends IncidentSelectionConfiguration {
   title?: string;
   severity?: string;
+  labels?: string[];
   isDrill?: boolean;
 }
 
