@@ -10,8 +10,25 @@ PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 AGENT_TEST_TARGETS ?= tests
 
-COMPOSE=docker compose -f docker-compose.dev.yml
-DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
+CONTAINER_ENGINE ?= docker
+COMPOSE = $(CONTAINER_ENGINE) compose -f docker-compose.dev.yml
+CONTAINER_RUN_AS_CURRENT_USER = $(CONTAINER_ENGINE) run --rm --user $(shell id -u):$(shell id -g)
+INTERNAL_API_PORT ?= 50051
+GRPC_SERVER_ADDR ?= 127.0.0.1:$(INTERNAL_API_PORT)
+PUBLIC_API_PORT ?= 8000
+PORT ?= $(PUBLIC_API_PORT)
+API_PORT ?= $(PUBLIC_API_PORT)
+AGENT_HTTP_PORT ?= 8090
+# Docker BuildKit requires tagged images in cache_from; Podman's --cache-from
+# rejects tags ("repository must contain neither a tag nor digest").
+ifeq ($(CONTAINER_ENGINE),podman)
+APP_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base
+AGENT_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base
+else
+APP_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base:app-latest
+AGENT_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base:agent-latest
+endif
+export GRPC_SERVER_ADDR PORT API_PORT AGENT_HTTP_PORT APP_DEV_BASE_CACHE_IMAGE AGENT_DEV_BASE_CACHE_IMAGE
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger/superplane.swagger.json agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
 #
@@ -368,7 +385,7 @@ openapi.spec.gen:
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
-	$(DOCKER_RUN_AS_CURRENT_USER) \
+	$(CONTAINER_RUN_AS_CURRENT_USER) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
@@ -389,7 +406,7 @@ openapi.web.client.gen:
 
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi
-	$(DOCKER_RUN_AS_CURRENT_USER) \
+	$(CONTAINER_RUN_AS_CURRENT_USER) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g python \
@@ -421,22 +438,22 @@ IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
 image.build:
 	$(MAKE) gen.setup
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+	$(CONTAINER_ENGINE) build --platform linux/amd64 -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 agent.image.build:
 	$(MAKE) gen.setup.agent
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f agent/Dockerfile --target runner --progress plain -t $(AGENT_IMAGE):$(IMAGE_TAG) agent
+	$(CONTAINER_ENGINE) build --platform linux/amd64 -f agent/Dockerfile --target runner --progress plain -t $(AGENT_IMAGE):$(IMAGE_TAG) agent
 
 image.auth:
-	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin
+	@printf "%s" "$(GITHUB_TOKEN)" | $(CONTAINER_ENGINE) login ghcr.io -u superplanehq --password-stdin
 
 image.push:
-	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
-	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+	$(CONTAINER_ENGINE) tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+	$(CONTAINER_ENGINE) push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
 
 agent.image.push:
-	docker tag $(AGENT_IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
-	docker push $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
+	$(CONTAINER_ENGINE) tag $(AGENT_IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
+	$(CONTAINER_ENGINE) push $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
 
 #
 # Tag creation
