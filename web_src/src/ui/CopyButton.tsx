@@ -11,6 +11,8 @@ interface CopyButtonProps {
    *  "button" renders a labeled outline button for primary copy actions. */
   variant?: "icon" | "button";
   children?: React.ReactNode;
+  /** Label briefly shown after a successful copy (button variant). */
+  copiedLabel?: React.ReactNode;
   /** Inverts icon colors on dark backgrounds (icon variant only). */
   dark?: boolean;
   /** Fires when `navigator.clipboard.writeText` rejects. */
@@ -23,6 +25,7 @@ export function CopyButton({
   text,
   variant = "icon",
   children,
+  copiedLabel = "Copied!",
   dark,
   onCopyError,
   className,
@@ -63,7 +66,7 @@ export function CopyButton({
         {copied ? (
           <>
             <Check className="text-green-600 dark:text-green-400" />
-            Copied!
+            {copiedLabel}
           </>
         ) : (
           <>
@@ -87,7 +90,7 @@ export function CopyButton({
         dark ? "hover:bg-gray-700" : "hover:bg-gray-200 dark:hover:bg-gray-700",
         className,
       )}
-      title="Copy to clipboard"
+      title={copied ? "Copied to clipboard" : "Copy to clipboard"}
     >
       {copied ? (
         <Check size={13} className={dark ? "text-green-400" : "text-green-600 dark:text-green-400"} />

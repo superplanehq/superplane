@@ -36,7 +36,7 @@ describe("CopyButton", () => {
       </CopyButton>,
     );
 
-    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^copy$/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button"));
     await flushPromises();
@@ -48,7 +48,22 @@ describe("CopyButton", () => {
       vi.advanceTimersByTime(2000);
     });
 
-    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^copy$/i })).toBeInTheDocument();
+  });
+
+  it("renders a custom copiedLabel in place of the default", async () => {
+    mockClipboard(() => Promise.resolve());
+
+    render(
+      <CopyButton variant="button" text="secret-token" copiedLabel="Token copied">
+        Copy token
+      </CopyButton>,
+    );
+
+    fireEvent.click(screen.getByRole("button"));
+    await flushPromises();
+
+    expect(screen.getByRole("button", { name: /token copied/i })).toBeInTheDocument();
   });
 
   it("icon variant toggles its aria-label to 'Copied to clipboard' after a click", async () => {
