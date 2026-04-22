@@ -132,6 +132,19 @@ func TestComponentsListReturnsFullJSON(t *testing.T) {
 	require.Contains(t, raw, "http")
 }
 
+func TestComponentsDescribeUsesFromIntegration(t *testing.T) {
+	server := newIndexServer(t, http.MethodGet, "/api/v1/integrations", integrationsListResponse)
+	ctx, stdout := newIndexCommandContext(t, server, "json")
+	name := "post-message"
+	from := "slack"
+	full := false
+	cmd := &componentsCommand{name: &name, from: &from, full: &full}
+
+	err := cmd.Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), `"name": "slack.post-message"`)
+}
+
 // Triggers tests
 
 func TestTriggersListReturnsSummaryJSON(t *testing.T) {
@@ -171,6 +184,19 @@ func TestTriggersListReturnsFullJSON(t *testing.T) {
 	raw := stdout.String()
 	require.Contains(t, raw, "schedule")
 	require.Contains(t, raw, "cron")
+}
+
+func TestTriggersDescribeUsesFromIntegration(t *testing.T) {
+	server := newIndexServer(t, http.MethodGet, "/api/v1/integrations", integrationsListResponse)
+	ctx, stdout := newIndexCommandContext(t, server, "json")
+	name := "message-received"
+	from := "slack"
+	full := false
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	err := cmd.Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), `"name": "slack.message-received"`)
 }
 
 // Helpers

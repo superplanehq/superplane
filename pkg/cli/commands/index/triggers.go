@@ -40,7 +40,7 @@ func (c *triggersCommand) Execute(ctx core.CommandContext) error {
 	from := strings.TrimSpace(*c.from)
 
 	if name != "" {
-		return c.getTriggerByName(ctx, name)
+		return c.getTriggerByName(ctx, name, from)
 	}
 
 	triggers, err := c.listTriggers(ctx, from)
@@ -74,8 +74,8 @@ func (c *triggersCommand) Execute(ctx core.CommandContext) error {
 	})
 }
 
-func (c *triggersCommand) getTriggerByName(ctx core.CommandContext, name string) error {
-	trigger, err := c.findTriggerByName(ctx, name)
+func (c *triggersCommand) getTriggerByName(ctx core.CommandContext, name, from string) error {
+	trigger, err := c.findTriggerByName(ctx, name, from)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,15 @@ func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]
 	return response.GetTriggers(), nil
 }
 
-func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string) (openapi_client.TriggersTrigger, error) {
+func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name, from string) (openapi_client.TriggersTrigger, error) {
+	if from != "" {
+		integration, err := core.FindIntegrationDefinition(ctx, from)
+		if err != nil {
+			return openapi_client.TriggersTrigger{}, err
+		}
+		return findIntegrationTrigger(integration, name)
+	}
+
 	integrationName, triggerName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
