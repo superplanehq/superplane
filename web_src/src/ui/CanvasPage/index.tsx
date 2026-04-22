@@ -70,6 +70,7 @@ import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
+import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 
@@ -968,6 +969,16 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
   );
+
+  const handleBuildingBlocksShortcutOpen = useCallback(() => {
+    handleSidebarToggle(true);
+  }, [handleSidebarToggle]);
+
+  useBuildingBlocksShortcut({
+    disabled: readOnly || Boolean(props.hideAddControls) || props.headerMode === "version-live",
+    isSidebarOpen: isBuildingBlocksSidebarOpen,
+    onOpen: handleBuildingBlocksShortcutOpen,
+  });
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
