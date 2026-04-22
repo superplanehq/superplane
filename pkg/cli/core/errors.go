@@ -1,35 +1,81 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"google.golang.org/grpc/codes"
 )
+
+const (
+	maxErrorBodyBytes      = 2048
+	badRequestDetailSuffix = "BadRequest"
+)
+
+var grpcCodePrefixes = map[codes.Code]string{
+	codes.InvalidArgument:  "invalid request",
+	codes.NotFound:         "not found",
+	codes.AlreadyExists:    "already exists",
+	codes.PermissionDenied: "permission denied",
+	codes.Unimplemented:    "not supported",
+	codes.Internal:         "internal error",
+	codes.Unavailable:      "service unavailable",
+	codes.Unauthenticated:  "authentication required",
+}
 
 func FormatCommandError(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	var apiErr openapi_client.GenericOpenAPIError
+	var apiErr *openapi_client.GenericOpenAPIError
 	if !errors.As(err, &apiErr) {
 		return err
 	}
 
+	rpcStatus := extractGoogleRPCStatus(apiErr)
+	if formatted := formatGoogleRPCStatusError(rpcStatus); formatted != nil {
+		return appendFieldViolations(formatted, rpcStatus)
+	}
+
+	return fallbackAPIError(apiErr)
+}
+
+func extractGoogleRPCStatus(apiErr *openapi_client.GenericOpenAPIError) *openapi_client.GooglerpcStatus {
 	switch model := apiErr.Model().(type) {
 	case *openapi_client.GooglerpcStatus:
-		if formatted := formatGoogleRPCStatusError(model); formatted != nil {
-			return formatted
+		if model != nil && !isEmptyRPCStatus(model) {
+			return model
 		}
 	case openapi_client.GooglerpcStatus:
-		if formatted := formatGoogleRPCStatusError(&model); formatted != nil {
-			return formatted
+		if !isEmptyRPCStatus(&model) {
+			return &model
 		}
 	}
 
-	return err
+	body := apiErr.Body()
+	if len(body) == 0 {
+		return nil
+	}
+
+	var decoded openapi_client.GooglerpcStatus
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return nil
+	}
+	if isEmptyRPCStatus(&decoded) {
+		return nil
+	}
+	return &decoded
+}
+
+func isEmptyRPCStatus(status *openapi_client.GooglerpcStatus) bool {
+	if status == nil {
+		return true
+	}
+	return status.Message == nil && status.Code == nil && len(status.Details) == 0
 }
 
 func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
@@ -64,29 +110,102 @@ func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
 	return fmt.Errorf("%s", message)
 }
 
-// grpcCodePrefix returns a user-friendly prefix for known gRPC status codes.
-// See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
-func grpcCodePrefix(code int32) string {
-	switch code {
-	case 3: // InvalidArgument
-		return "invalid request"
-	case 5: // NotFound
-		return "not found"
-	case 6: // AlreadyExists
-		return "already exists"
-	case 7: // PermissionDenied
-		return "permission denied"
-	case 12: // Unimplemented
-		return "not supported"
-	case 13: // Internal
-		return "internal error"
-	case 14: // Unavailable
-		return "service unavailable"
-	case 16: // Unauthenticated
-		return "authentication required"
+func appendFieldViolations(base error, status *openapi_client.GooglerpcStatus) error {
+	violations := extractFieldViolations(status)
+	if len(violations) == 0 {
+		return base
+	}
+
+	var sb strings.Builder
+	sb.WriteString(base.Error())
+	for _, v := range violations {
+		sb.WriteString("\n  - ")
+		sb.WriteString(v)
+	}
+	return errors.New(sb.String())
+}
+
+func extractFieldViolations(status *openapi_client.GooglerpcStatus) []string {
+	if status == nil {
+		return nil
+	}
+
+	var out []string
+	for _, detail := range status.GetDetails() {
+		if !isBadRequestDetail(detail.GetType()) {
+			continue
+		}
+		for _, entry := range getViolations(detail.AdditionalProperties) {
+			field, _ := entry["field"].(string)
+			desc, _ := entry["description"].(string)
+			if s := formatFieldDesc(field, desc); s != "" {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
+func getViolations(props map[string]any) []map[string]any {
+	raw, ok := props["fieldViolations"]
+	if !ok {
+		raw = props["field_violations"]
+	}
+
+	items, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func formatFieldDesc(field, desc string) string {
+	switch {
+	case field != "" && desc != "":
+		return fmt.Sprintf("%s: %s", field, desc)
+	case field != "":
+		return field
+	case desc != "":
+		return desc
 	default:
 		return ""
 	}
+}
+
+func isBadRequestDetail(typeURL string) bool {
+	return strings.HasSuffix(strings.TrimSpace(typeURL), badRequestDetailSuffix)
+}
+
+func fallbackAPIError(apiErr *openapi_client.GenericOpenAPIError) error {
+	status := strings.TrimSpace(apiErr.Error())
+	body := strings.TrimSpace(string(apiErr.Body()))
+
+	if body == "" {
+		if status == "" {
+			return apiErr
+		}
+		return errors.New(status)
+	}
+
+	if len(body) > maxErrorBodyBytes {
+		body = body[:maxErrorBodyBytes] + "... [truncated]"
+	}
+
+	if status == "" {
+		return errors.New(body)
+	}
+	return fmt.Errorf("%s\n%s", status, body)
+}
+
+func grpcCodePrefix(code int32) string {
+	return grpcCodePrefixes[codes.Code(code)]
 }
 
 func usageLimitError(message string) error {
