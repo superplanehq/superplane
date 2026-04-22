@@ -975,7 +975,11 @@ function CanvasPage(props: CanvasPageProps) {
   }, [handleSidebarToggle]);
 
   useBuildingBlocksShortcut({
-    disabled: readOnly || Boolean(props.hideAddControls) || props.headerMode === "version-live",
+    disabled:
+      readOnly ||
+      Boolean(props.hideAddControls) ||
+      props.headerMode === "version-live" ||
+      state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
     onOpen: handleBuildingBlocksShortcutOpen,
   });
