@@ -12,10 +12,11 @@ import (
 type UpdateIncident struct{}
 
 type UpdateIncidentSpec struct {
-	Incident string  `json:"incident" mapstructure:"incident"`
-	Title    *string `json:"title" mapstructure:"title"`
-	Severity *string `json:"severity" mapstructure:"severity"`
-	IsDrill  *bool   `json:"isDrill" mapstructure:"isDrill"`
+	Incident string   `json:"incident" mapstructure:"incident"`
+	Title    *string  `json:"title" mapstructure:"title"`
+	Severity *string  `json:"severity" mapstructure:"severity"`
+	Labels   []string `json:"labels" mapstructure:"labels"`
+	IsDrill  *bool    `json:"isDrill" mapstructure:"isDrill"`
 }
 
 func (u *UpdateIncident) Name() string {
@@ -38,6 +39,7 @@ func (u *UpdateIncident) Documentation() string {
 - **Incident**: The incident to update (required)
 - **Title**: Optional new incident title
 - **Severity**: Optional new severity: Pending, Critical, Major, or Minor
+- **Labels**: Optional labels to add to the incident
 - **Is Drill**: Optional drill flag
 
 ## Output
@@ -85,6 +87,21 @@ func (u *UpdateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "labels",
+			Label:       "Labels",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Labels to add to the incident",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Label",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
+		{
 			Name:        "isDrill",
 			Label:       "Is Drill",
 			Type:        configuration.FieldTypeBool,
@@ -119,7 +136,7 @@ func (u *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	incident, err := client.UpdateIncident(spec.Incident, spec.Title, spec.Severity, spec.IsDrill)
+	incident, err := client.UpdateIncident(spec.Incident, spec.Title, spec.Severity, spec.Labels, spec.IsDrill)
 	if err != nil {
 		return fmt.Errorf("error updating incident: %w", err)
 	}

@@ -12,6 +12,7 @@ import (
 const (
 	grafanaIRMRPCBasePath        = "/api/plugins/grafana-irm-app/resources/api/v1"
 	incidentDefaultRoomPrefix    = "incident"
+	incidentDefaultLabelKey      = "tags"
 	incidentStatusActive         = "active"
 	incidentStatusResolved       = "resolved"
 	incidentActivityKindUserNote = "userNote"
@@ -140,7 +141,7 @@ func (c *Client) GetIncident(id string) (*Incident, error) {
 	return &response.Incident, nil
 }
 
-func (c *Client) UpdateIncident(id string, title, severity *string, isDrill *bool) (*Incident, error) {
+func (c *Client) UpdateIncident(id string, title, severity *string, labels []string, isDrill *bool) (*Incident, error) {
 	var incident *Incident
 	if title != nil {
 		updated, err := c.updateIncidentTitle(id, *title)
@@ -153,6 +154,25 @@ func (c *Client) UpdateIncident(id string, title, severity *string, isDrill *boo
 	if severity != nil {
 		updated, err := c.updateIncidentSeverity(id, *severity)
 		if err != nil {
+			return nil, err
+		}
+		incident = updated
+	}
+
+	for _, label := range incidentLabelsFromStrings(labels) {
+		if err := c.ensureIncidentLabelValue(label); err != nil {
+			return nil, err
+		}
+
+		updated, err := c.addIncidentLabel(id, label)
+		if err != nil {
+			if isDuplicateIncidentLabelError(err) {
+				if incident == nil {
+					incident = &Incident{IncidentID: strings.TrimSpace(id)}
+					c.decorateIncident(incident)
+				}
+				continue
+			}
 			return nil, err
 		}
 		incident = updated
@@ -238,6 +258,40 @@ func (c *Client) updateIncidentSeverity(id, severity string) (*Incident, error) 
 	if err := c.execGrafanaIRMRPC("IncidentsService.UpdateSeverity", map[string]string{
 		"incidentID": strings.TrimSpace(id),
 		"severity":   strings.TrimSpace(severity),
+	}, &response); err != nil {
+		return nil, err
+	}
+
+	c.decorateIncident(&response.Incident)
+	return &response.Incident, nil
+}
+
+func (c *Client) ensureIncidentLabelValue(label IncidentLabel) error {
+	key := strings.TrimSpace(label.Key)
+	value := strings.TrimSpace(label.Label)
+	if key == "" || value == "" {
+		return nil
+	}
+
+	response := map[string]any{}
+	if err := c.execGrafanaIRMRPC("FieldsService.AddLabelValue", map[string]string{
+		"key":   key,
+		"value": value,
+	}, &response); err != nil {
+		if isDuplicateIncidentLabelError(err) {
+			return nil
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) addIncidentLabel(id string, label IncidentLabel) (*Incident, error) {
+	response := incidentResponse{}
+	if err := c.execGrafanaIRMRPC("IncidentsService.AddLabel", map[string]any{
+		"incidentID": strings.TrimSpace(id),
+		"label":      label,
 	}, &response); err != nil {
 		return nil, err
 	}
@@ -333,7 +387,38 @@ func incidentLabelsFromStrings(labels []string) []IncidentLabel {
 		if trimmed == "" {
 			continue
 		}
-		out = append(out, IncidentLabel{Label: trimmed})
+		out = append(out, IncidentLabel{Key: incidentDefaultLabelKey, Label: trimmed})
+	}
+	return dedupeIncidentLabels(out)
+}
+
+func dedupeIncidentLabels(labels []IncidentLabel) []IncidentLabel {
+	seen := map[string]bool{}
+	out := make([]IncidentLabel, 0, len(labels))
+	for _, label := range labels {
+		key := strings.TrimSpace(label.Key)
+		value := strings.TrimSpace(label.Label)
+		if value == "" {
+			continue
+		}
+
+		identity := key + "\x00" + value
+		if seen[identity] {
+			continue
+		}
+		seen[identity] = true
+		out = append(out, IncidentLabel{Key: key, Label: value})
 	}
 	return out
+}
+
+func isDuplicateIncidentLabelError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "already exists") ||
+		strings.Contains(message, "already added") ||
+		strings.Contains(message, "duplicate")
 }
