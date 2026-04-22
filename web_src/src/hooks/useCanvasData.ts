@@ -22,6 +22,7 @@ import {
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
   canvasesListEventExecutions,
+  canvasesDescribeRun,
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
@@ -89,6 +90,8 @@ export const canvasKeys = {
   infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
+  runs: () => [...canvasKeys.all, "runs"] as const,
+  run: (canvasId: string, eventId: string) => [...canvasKeys.runs(), canvasId, eventId] as const,
   childExecutions: () => [...canvasKeys.all, "childExecutions"] as const,
   childExecution: (canvasId: string, executionId: string) =>
     [...canvasKeys.childExecutions(), canvasId, executionId] as const,
@@ -882,6 +885,28 @@ export const useEventExecutions = (canvasId: string, eventId: string | null) => 
     },
     refetchOnWindowFocus: false,
     enabled: !!canvasId && !!eventId,
+  });
+};
+
+// useDescribeRun fetches the full "Run View" payload: the root event,
+// all executions (parents and children), and the canvas version snapshot
+// that was live when the run started. Used by the Runs mode in CanvasPage.
+export const useDescribeRun = (canvasId: string, eventId: string | null, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.run(canvasId, eventId!),
+    queryFn: async () => {
+      const response = await canvasesDescribeRun(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            eventId: eventId!,
+          },
+        }),
+      );
+      return response.data;
+    },
+    refetchOnWindowFocus: false,
+    enabled: enabled && !!canvasId && !!eventId,
   });
 };
 

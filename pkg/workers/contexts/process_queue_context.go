@@ -106,6 +106,13 @@ func BuildProcessQueueContext(
 			UpdatedAt:           &now,
 		}
 
+		// Stamp the live canvas version so the Run View can render the graph
+		// that was active when this execution was created.
+		if liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, node.WorkflowID); err == nil && liveVersion != nil {
+			versionID := liveVersion.ID
+			execution.CanvasVersionID = &versionID
+		}
+
 		// If this queue item originated from an internal (blueprint) execution chain,
 		// propagate the parent execution id from the previous execution so that
 		// child executions are linked to the top-level blueprint execution.
@@ -131,6 +138,15 @@ func BuildProcessQueueContext(
 			canvasName = workflow.Name
 		}
 
+		executionState := NewExecutionStateContext(tx, &execution, onNewEvents)
+		//
+		// The report-template resolver shares the same expression namespace
+		// as the node configuration builder (root(), previous(), $, memory).
+		// Sharing the builder keeps those expressions in sync and avoids
+		// rebuilding the message chain from scratch when the node finishes.
+		//
+		executionState.SetConfigBuilder(builder)
+
 		return &core.ExecutionContext{
 			ID:             execution.ID,
 			WorkflowID:     execution.WorkflowID.String(),
@@ -142,7 +158,7 @@ func BuildProcessQueueContext(
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
-			ExecutionState: NewExecutionStateContext(tx, &execution, onNewEvents),
+			ExecutionState: executionState,
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),

@@ -155,7 +155,18 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs";
+  /** Called when the user clicks the "Runs" tab in the mode toggle. When omitted, the tab is hidden. */
+  onSelectRuns?: () => void;
+  runsNotificationCount?: number;
+  /** Optional left sidebar rendered in runs mode (e.g. RunsSidebar). */
+  runsSidebar?: React.ReactNode;
+  /** Optional overlay panel rendered on top of the canvas area when a run is selected. */
+  runViewOverlay?: React.ReactNode;
+  /** Called when a node is double-clicked. Used in runs mode for node drill-down. */
+  onNodeDoubleClick?: (nodeId: string) => void;
+  /** Optional bottom detail panel rendered over the canvas (e.g. NodeDetailPanel). */
+  runDetailPanel?: React.ReactNode;
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -601,7 +612,7 @@ const nodeTypes = {
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs" | "report">(() =>
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
@@ -1117,6 +1128,8 @@ function CanvasPage(props: CanvasPageProps) {
           onOpenVersionControl={props.onOpenVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
+          onSelectRuns={props.onSelectRuns}
+          runsNotificationCount={props.runsNotificationCount}
           agentState={agentState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
@@ -1124,7 +1137,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
-        {props.versionControlSidebar}
+        {props.headerMode === "runs" ? props.runsSidebar : props.versionControlSidebar}
 
         <AgentSidebar agentState={agentState} />
 
@@ -1136,7 +1149,7 @@ function CanvasPage(props: CanvasPageProps) {
           onYamlOpen={props.onYamlOpen}
         />
 
-        {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
+        {props.hideAddControls || !isBuildingBlocksSidebarOpen || props.headerMode === "runs" ? null : (
           <BuildingBlocksSidebar
             isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live"}
             onToggle={handleSidebarToggle}
@@ -1150,6 +1163,12 @@ function CanvasPage(props: CanvasPageProps) {
         )}
 
         <div className="flex-1 relative">
+          {props.headerMode === "runs" && props.runViewOverlay ? (
+            <div className="absolute inset-0 z-[15] overflow-hidden">{props.runViewOverlay}</div>
+          ) : null}
+          {props.headerMode === "runs" && props.runDetailPanel ? (
+            <div className="absolute inset-x-0 bottom-0 z-[25]">{props.runDetailPanel}</div>
+          ) : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
@@ -1245,6 +1264,7 @@ function CanvasPage(props: CanvasPageProps) {
               missingIntegrations={props.missingIntegrations}
               onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
+              onNodeDoubleClick={props.onNodeDoubleClick}
             />
           </ReactFlowProvider>
 
@@ -1382,8 +1402,8 @@ function Sidebar({
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
-  currentTab?: "latest" | "settings" | "docs";
-  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  currentTab?: "latest" | "settings" | "docs" | "report";
+  onTabChange?: (tab: "latest" | "settings" | "docs" | "report") => void;
   canvasMode: "live" | "edit";
   organizationId?: string;
   getCustomField?: (
@@ -1615,6 +1635,8 @@ function CanvasContentHeader({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
+  onSelectRuns,
+  runsNotificationCount,
   agentState,
 }: {
   state: CanvasPageState;
@@ -1631,7 +1653,7 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1645,6 +1667,8 @@ function CanvasContentHeader({
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
+  onSelectRuns?: () => void;
+  runsNotificationCount?: number;
   agentState: AgentState;
 }) {
   const stateRef = useRef(state);
@@ -1692,6 +1716,8 @@ function CanvasContentHeader({
       onOpenVersionControl={onOpenVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
+      onSelectRuns={onSelectRuns}
+      runsNotificationCount={runsNotificationCount}
       agentState={agentState}
     />
   );
@@ -1782,6 +1808,7 @@ function CanvasContent({
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
+  onNodeDoubleClick,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1844,6 +1871,7 @@ function CanvasContent({
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
+  onNodeDoubleClick?: (nodeId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
@@ -2508,6 +2536,7 @@ function CanvasContent({
             }}
             onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
             onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
+            onNodeDoubleClick={onNodeDoubleClick ? (_e, node) => onNodeDoubleClick(node.id) : undefined}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}

@@ -84,6 +84,19 @@ type CanvasNodeExecution struct {
 	// Only new executions will use the new node configuration.
 	//
 	Configuration datatypes.JSONType[map[string]any]
+
+	//
+	// Snapshot of the canvas version that was live when this execution
+	// was created. Lets the Run View render the exact graph that ran
+	// even if the canvas has been edited since.
+	//
+	CanvasVersionID *uuid.UUID
+
+	//
+	// Resolved markdown text from the node's report template, captured
+	// at execution time. Used to build the run report in the UI.
+	//
+	ReportEntry string
 }
 
 func (e *CanvasNodeExecution) TableName() string {
@@ -472,13 +485,16 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	//
-	// Update execution state
+	// Update execution state. report_entry is included so that report
+	// templates resolved just before this call are persisted alongside the
+	// state transition.
 	//
 	err = tx.Model(e).
 		Updates(map[string]interface{}{
-			"state":      CanvasNodeExecutionStateFinished,
-			"result":     CanvasNodeExecutionResultPassed,
-			"updated_at": &now,
+			"state":        CanvasNodeExecutionStateFinished,
+			"result":       CanvasNodeExecutionResultPassed,
+			"updated_at":   &now,
+			"report_entry": e.ReportEntry,
 		}).Error
 
 	if err != nil {

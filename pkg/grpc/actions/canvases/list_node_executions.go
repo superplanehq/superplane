@@ -189,6 +189,11 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 			return nil, err
 		}
 
+		canvasVersionID := ""
+		if execution.CanvasVersionID != nil {
+			canvasVersionID = execution.CanvasVersionID.String()
+		}
+
 		pbExecution := &pb.CanvasNodeExecution{
 			Id:                  execution.ID.String(),
 			CanvasId:            execution.WorkflowID.String(),
@@ -206,6 +211,8 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
 			CancelledBy:         cancelledByRef(execution.CancelledBy, cancelledByUsersByID),
+			ReportEntry:         execution.ReportEntry,
+			CanvasVersionId:     canvasVersionID,
 		}
 
 		if len(childExecutions) == 0 {
@@ -430,14 +437,15 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents m
 	}
 
 	return &pb.CanvasEvent{
-		Id:         rootEvent.ID.String(),
-		CanvasId:   rootEvent.WorkflowID.String(),
-		NodeId:     rootEvent.NodeID,
-		Channel:    rootEvent.Channel,
-		CustomName: valueOrEmpty(rootEvent.CustomName),
-		Data:       s,
-		CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
-		Root:       rootEvent.ExecutionID == nil,
+		Id:          rootEvent.ID.String(),
+		CanvasId:    rootEvent.WorkflowID.String(),
+		NodeId:      rootEvent.NodeID,
+		Channel:     rootEvent.Channel,
+		CustomName:  valueOrEmpty(rootEvent.CustomName),
+		Data:        s,
+		CreatedAt:   timestamppb.New(*rootEvent.CreatedAt),
+		Root:        rootEvent.ExecutionID == nil,
+		ReportEntry: rootEvent.ReportEntry,
 	}, nil
 }
 

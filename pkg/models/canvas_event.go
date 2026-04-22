@@ -25,6 +25,12 @@ type CanvasEvent struct {
 	ExecutionID *uuid.UUID
 	State       string
 	CreatedAt   *time.Time
+
+	//
+	// Resolved markdown text from the trigger's report template,
+	// captured when the event was emitted.
+	//
+	ReportEntry string
 }
 
 func (e *CanvasEvent) TableName() string {

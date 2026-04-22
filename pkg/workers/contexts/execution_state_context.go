@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,6 +15,7 @@ type ExecutionStateContext struct {
 	tx             *gorm.DB
 	maxPayloadSize int
 	onNewEvents    func([]models.CanvasEvent)
+	configBuilder  *NodeConfigurationBuilder
 }
 
 func NewExecutionStateContext(
@@ -29,11 +31,23 @@ func NewExecutionStateContext(
 	}
 }
 
+//
+// SetConfigBuilder wires a NodeConfigurationBuilder so that report
+// templates can be resolved against the full expression namespace (root,
+// previous, $, memory) when the node finishes. Without this set, the
+// report template will be skipped rather than failing the execution.
+//
+func (s *ExecutionStateContext) SetConfigBuilder(builder *NodeConfigurationBuilder) {
+	s.configBuilder = builder
+}
+
 func (s *ExecutionStateContext) IsFinished() bool {
 	return s.execution.State == models.CanvasNodeExecutionStateFinished
 }
 
 func (s *ExecutionStateContext) Pass() error {
+	s.resolveReportEntry(nil)
+
 	newEvents, err := s.execution.PassInTransaction(s.tx, map[string][]any{})
 	if err != nil {
 		return err
@@ -51,12 +65,15 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		channel: {},
 	}
 
+	outputEvents := make([]any, 0, len(payloads))
 	for _, payload := range payloads {
 		event := map[string]any{
 			"type":      payloadType,
 			"timestamp": time.Now(),
 			"data":      payload,
 		}
+
+		outputEvents = append(outputEvents, event)
 
 		data, err := json.Marshal(event)
 		if err != nil {
@@ -70,6 +87,8 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		outputs[channel] = append(outputs[channel], json.RawMessage(data))
 	}
 
+	s.resolveReportEntry(outputEvents)
+
 	newEvents, err := s.execution.PassInTransaction(s.tx, outputs)
 	if err != nil {
 		return err
@@ -80,6 +99,47 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	}
 
 	return nil
+}
+
+func (s *ExecutionStateContext) resolveReportEntry(outputEvents []any) {
+	config := s.execution.Configuration.Data()
+	if config == nil {
+		return
+	}
+
+	rawTemplate, ok := config["reportTemplate"]
+	if !ok || rawTemplate == nil {
+		return
+	}
+
+	tmpl, ok := rawTemplate.(string)
+	if !ok {
+		return
+	}
+
+	tmpl = strings.TrimSpace(tmpl)
+	if tmpl == "" {
+		return
+	}
+
+	if s.configBuilder == nil {
+		return
+	}
+
+	resolved, errs := s.configBuilder.ResolveReportTemplate(tmpl, outputEvents)
+	resolved = strings.TrimSpace(resolved)
+
+	if len(errs) > 0 {
+		lines := make([]string, 0, len(errs))
+		for _, e := range errs {
+			lines = append(lines, fmt.Sprintf("> `%s`", e.Error()))
+		}
+		resolved += fmt.Sprintf("\n\n> [!CAUTION]\n> Expression errors:\n%s", strings.Join(lines, "\n"))
+	}
+
+	if resolved != "" {
+		s.execution.ReportEntry = resolved
+	}
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {

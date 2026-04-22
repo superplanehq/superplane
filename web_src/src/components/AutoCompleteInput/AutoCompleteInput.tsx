@@ -17,6 +17,7 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   suffix?: string;
   startWord?: string;
   inputSize?: "xs" | "sm" | "md" | "lg";
+  minRows?: number;
   noExampleObjectText?: string;
   showValuePreview?: boolean;
   quickTip?: string;
@@ -44,6 +45,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       suffix = "",
       startWord,
       inputSize = "md",
+      minRows = 1,
       noExampleObjectText = "No suggestions found",
       showValuePreview = false,
       quickTip,
@@ -111,19 +113,25 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
-    // Auto-resize textarea based on content (and backdrop in preview mode)
+    // Auto-resize textarea based on content (and backdrop in preview mode).
+    // When `minRows` is set, ensure the textarea never shrinks below that
+    // number of rendered lines so long-form inputs like report templates
+    // have room to breathe.
     const adjustTextareaHeight = useCallback(() => {
       const textarea = inputRef.current;
       const backdrop = backdropRef.current;
       if (!textarea) return;
       textarea.style.height = "auto";
-      // In preview mode, backdrop content may be longer than textarea content
-      // Use the larger of the two heights
+      const computed = getComputedStyle(textarea);
+      const lineHeight = parseFloat(computed.lineHeight) || 20;
+      const paddingTop = parseFloat(computed.paddingTop) || 0;
+      const paddingBottom = parseFloat(computed.paddingBottom) || 0;
+      const minHeight = lineHeight * minRows + paddingTop + paddingBottom;
       const textareaHeight = textarea.scrollHeight;
       const backdropHeight = backdrop?.scrollHeight ?? 0;
-      const finalHeight = Math.max(textareaHeight, backdropHeight);
+      const finalHeight = Math.max(textareaHeight, backdropHeight, minHeight);
       textarea.style.height = `${finalHeight}px`;
-    }, []);
+    }, [minRows]);
 
     // Tokenize expression content for syntax highlighting
     const tokenizeExpression = (expr: string): React.ReactNode[] => {
@@ -1165,7 +1173,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           {/* Textarea with transparent text */}
           <textarea
             ref={inputRef}
-            rows={1}
+            rows={minRows}
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}

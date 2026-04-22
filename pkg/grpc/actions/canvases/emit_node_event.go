@@ -49,6 +49,10 @@ func EmitNodeEvent(
 		event.CustomName = customName
 	}
 
+	if reportEntry := resolveReportEntry(node, data); reportEntry != "" {
+		event.ReportEntry = reportEntry
+	}
+
 	if err := database.Conn().Create(&event).Error; err != nil {
 		log.Errorf("failed to publish workflow event: %v", err)
 		return nil, fmt.Errorf("failed to create workflow event: %w", err)
@@ -100,4 +104,43 @@ func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string
 	}
 
 	return &resolvedName, nil
+}
+
+func resolveReportEntry(node *models.CanvasNode, payload map[string]any) string {
+	config := node.Configuration.Data()
+	if config == nil {
+		return ""
+	}
+
+	rawTemplate, ok := config["reportTemplate"]
+	if !ok || rawTemplate == nil {
+		return ""
+	}
+
+	template, ok := rawTemplate.(string)
+	if !ok {
+		return ""
+	}
+
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return ""
+	}
+
+	//
+	// Triggers emit events outside of any execution chain, so we resolve
+	// against the raw payload with only root() available.
+	//
+	resolved, errs := contexts.ResolveReportTemplateFromPayload(template, payload)
+	resolved = strings.TrimSpace(resolved)
+
+	if len(errs) > 0 {
+		lines := make([]string, 0, len(errs))
+		for _, e := range errs {
+			lines = append(lines, fmt.Sprintf("> `%s`", e.Error()))
+		}
+		resolved += fmt.Sprintf("\n\n> [!CAUTION]\n> Expression errors:\n%s", strings.Join(lines, "\n"))
+	}
+
+	return resolved
 }

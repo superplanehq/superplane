@@ -26,6 +26,7 @@ import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
+import { ReportTab } from "./ReportTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import type {
   AuthorizationDomainType,
@@ -111,8 +112,8 @@ interface ComponentSidebarProps {
   hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
   hideDocsTab?: boolean; // Hide the "Info" tab (e.g. for annotation nodes)
   hideNodeId?: boolean; // Hide the node ID with copy functionality
-  currentTab?: "latest" | "settings" | "docs";
-  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  currentTab?: "latest" | "settings" | "docs" | "report";
+  onTabChange?: (tab: "latest" | "settings" | "docs" | "report") => void;
 
   // Docs tab props
   componentDescription?: string;
@@ -247,6 +248,15 @@ export const ComponentSidebar = ({
   const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const shouldShowRunsTab = !hideRunsTab && canvasMode === "live";
+  const reportFieldDefinition = useMemo(
+    () => nodeConfigurationFields.find((field) => field.name === "reportTemplate"),
+    [nodeConfigurationFields],
+  );
+  const shouldShowReportTab = !!reportFieldDefinition;
+  const configurationFieldsWithoutReport = useMemo(
+    () => nodeConfigurationFields.filter((field) => field.name !== "reportTemplate"),
+    [nodeConfigurationFields],
+  );
   const activeTab = useMemo(() => {
     if (shouldShowRunsTab || currentTab !== "latest") {
       return currentTab || "latest";
@@ -260,6 +270,20 @@ export const ComponentSidebar = ({
       onTabChange?.("settings");
     }
   }, [currentTab, onTabChange, shouldShowRunsTab]);
+
+  useEffect(() => {
+    if (currentTab === "report" && !shouldShowReportTab) {
+      onTabChange?.("settings");
+    }
+  }, [currentTab, onTabChange, shouldShowReportTab]);
+
+  const handleSaveReportConfiguration = useCallback(
+    async (nextConfiguration: Record<string, unknown>) => {
+      if (!onNodeConfigSave) return;
+      await onNodeConfigSave(nextConfiguration, nodeName, integrationRef);
+    },
+    [onNodeConfigSave, nodeName, integrationRef],
+  );
 
   const [justCopied, setJustCopied] = useState(false);
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
@@ -668,7 +692,7 @@ export const ComponentSidebar = ({
         >
           <Tabs
             value={activeTab}
-            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
+            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs" | "report")}
             className="flex-1"
           >
             {showSettingsTab && (
@@ -699,6 +723,18 @@ export const ComponentSidebar = ({
                       <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                     )}
                   </button>
+                  {shouldShowReportTab && (
+                    <button
+                      onClick={() => onTabChange?.("report")}
+                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                        activeTab === "report"
+                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      }`}
+                    >
+                      Report
+                    </button>
+                  )}
                   {!hideDocsTab && (
                     <button
                       onClick={() => onTabChange?.("docs")}
@@ -752,7 +788,7 @@ export const ComponentSidebar = ({
                   nodeName={nodeName}
                   nodeLabel={nodeLabel}
                   configuration={nodeConfiguration}
-                  configurationFields={nodeConfigurationFields}
+                  configurationFields={configurationFieldsWithoutReport}
                   onSave={onNodeConfigSave || (() => {})}
                   onCancel={onNodeConfigCancel}
                   domainId={domainId}
@@ -770,6 +806,18 @@ export const ComponentSidebar = ({
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
                   configurationSaveMode={configurationSaveMode}
+                />
+              </TabsContent>
+            )}
+
+            {showSettingsTab && shouldShowReportTab && (
+              <TabsContent value="report" className="mt-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
+                <ReportTab
+                  configuration={nodeConfiguration}
+                  onSave={handleSaveReportConfiguration}
+                  configurationSaveMode={configurationSaveMode}
+                  autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  readOnly={readOnly}
                 />
               </TabsContent>
             )}

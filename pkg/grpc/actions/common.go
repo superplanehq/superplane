@@ -1043,6 +1043,7 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 		}
 
 		configFields := component.Configuration()
+		configFields = AppendGlobalComponentFields(configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1089,19 +1090,44 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 }
 
 func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Field {
-	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
+	if !slices.ContainsFunc(fields, func(field configuration.Field) bool {
 		return field.Name == "customName"
+	}) {
+		fields = append(fields, configuration.Field{
+			Name:        "customName",
+			Label:       "Run title (optional)",
+			Type:        configuration.FieldTypeString,
+			Togglable:   true,
+			Description: "Optional run title template. Supports expressions like {{ $.data }}.",
+			Placeholder: "Deploy {{ $.repository.name }} @ {{ $.head_commit.id }}",
+		})
+	}
+
+	fields = appendReportTemplateField(fields)
+	return fields
+}
+
+// AppendGlobalComponentFields appends fields that are available on every
+// component regardless of its implementation. Currently this is just the
+// report template field used to build run reports in the Run View.
+func AppendGlobalComponentFields(fields []configuration.Field) []configuration.Field {
+	return appendReportTemplateField(fields)
+}
+
+func appendReportTemplateField(fields []configuration.Field) []configuration.Field {
+	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
+		return field.Name == "reportTemplate"
 	}) {
 		return fields
 	}
 
 	fields = append(fields, configuration.Field{
-		Name:        "customName",
-		Label:       "Run title (optional)",
-		Type:        configuration.FieldTypeString,
+		Name:        "reportTemplate",
+		Label:       "Report template (optional)",
+		Type:        configuration.FieldTypeText,
 		Togglable:   true,
-		Description: "Optional run title template. Supports expressions like {{ $.data }}.",
-		Placeholder: "Deploy {{ $.repository.name }} @ {{ $.head_commit.id }}",
+		Description: "Markdown template appended to the run report. Use root() for trigger data, or the full expression syntax for component data.",
+		Placeholder: "[View workflow]({{ root().data.workflow.url }})",
 	})
 
 	return fields

@@ -502,7 +502,8 @@ CREATE TABLE public.workflow_events (
     state character varying(32) NOT NULL,
     execution_id uuid,
     created_at timestamp without time zone NOT NULL,
-    custom_name text
+    custom_name text,
+    report_entry text
 );
 
 
@@ -541,7 +542,9 @@ CREATE TABLE public.workflow_node_executions (
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    cancelled_by uuid
+    cancelled_by uuid,
+    canvas_version_id uuid,
+    report_entry text
 );
 
 
@@ -1769,6 +1772,14 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
+-- Name: workflow_node_executions workflow_node_executions_canvas_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_executions
+    ADD CONSTRAINT workflow_node_executions_canvas_version_id_fkey FOREIGN KEY (canvas_version_id) REFERENCES public.workflow_versions(id);
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1928,7 +1939,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260414233443	f
+20260422164838	f
 \.
 
 

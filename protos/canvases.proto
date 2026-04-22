@@ -378,6 +378,17 @@ service Canvases {
     };
   }
 
+  rpc DescribeRun(DescribeRunRequest) returns (DescribeRunResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/runs/{event_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe run";
+      description: "Returns detailed information about a canvas run including parent executions, child executions, and the canvas version snapshot used during the run";
+      tags: "CanvasEvent";
+    };
+  }
+
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/memory"
@@ -836,6 +847,7 @@ message CanvasNodeExecutionRef {
   string result_message = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  string report_entry = 9;
 }
 
 //
@@ -880,6 +892,8 @@ message CanvasNodeExecution {
   repeated CanvasNodeExecution child_executions = 15;
   CanvasEvent root_event = 16;
   UserRef cancelled_by = 17;
+  string report_entry = 18;
+  string canvas_version_id = 19;
 }
 
 message CanvasNodeQueueItem {
@@ -954,6 +968,7 @@ message CanvasEvent {
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
   bool root = 8;
+  string report_entry = 9;
 }
 
 message CanvasEventWithExecutions {
@@ -965,6 +980,7 @@ message CanvasEventWithExecutions {
   google.protobuf.Timestamp created_at = 6;
   repeated CanvasNodeExecutionRef executions = 7;
   string custom_name = 8;
+  string report_entry = 9;
 }
 
 message ListEventExecutionsRequest {
@@ -974,6 +990,18 @@ message ListEventExecutionsRequest {
 
 message ListEventExecutionsResponse {
   repeated CanvasNodeExecution executions = 1;
+}
+
+message DescribeRunRequest {
+  string canvas_id = 1;
+  string event_id = 2;
+}
+
+message DescribeRunResponse {
+  CanvasEventWithExecutions run = 1;
+  repeated CanvasNodeExecution executions = 2;
+  repeated CanvasNodeExecution child_executions = 3;
+  CanvasVersion snapshot_version = 4;
 }
 
 message CancelExecutionRequest {

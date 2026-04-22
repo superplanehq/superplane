@@ -38,6 +38,7 @@ export function useCanvasWebsocket(
   shouldApplyCanvasUpdate?: () => boolean,
   processRuntimeEvents = true,
   enabled = true,
+  selectedRunEventId?: string | null,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -97,6 +98,14 @@ export function useCanvasWebsocket(
                 queryClient.invalidateQueries({
                   queryKey: canvasKeys.eventExecution(canvasId, execution.rootEvent.id),
                 });
+
+                // If the user is viewing a run and this execution belongs to it,
+                // refresh the Run View payload so stats/activity update live.
+                if (selectedRunEventId && execution.rootEvent.id === selectedRunEventId) {
+                  queryClient.invalidateQueries({
+                    queryKey: canvasKeys.run(canvasId, selectedRunEventId),
+                  });
+                }
               }
               onNodeEvent?.(execution.nodeId!, data.event);
               onExecutionEvent?.(execution, data.event);
@@ -175,6 +184,7 @@ export function useCanvasWebsocket(
       onCanvasLifecycleEvent,
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
+      selectedRunEventId,
     ],
   );
 

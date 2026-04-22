@@ -356,6 +356,11 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		UpdatedAt:           &now,
 	}
 
+	if liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, configErr.QueueItem.WorkflowID); err == nil && liveVersion != nil {
+		versionID := liveVersion.ID
+		execution.CanvasVersionID = &versionID
+	}
+
 	err = tx.Create(&execution).Error
 	if err != nil {
 		return nil, err

@@ -1,19 +1,33 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type CanvasMode = "version-live" | "version-edit";
+export type CanvasMode = "version-live" | "version-edit" | "runs";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectEditor: () => void;
   onSelectLive: () => void;
+  onSelectRuns?: () => void;
+  runsNotificationCount?: number;
 }
 
-export function CanvasModeToggle({ mode, onSelectEditor, onSelectLive }: CanvasModeToggleProps) {
+export function CanvasModeToggle({
+  mode,
+  onSelectEditor,
+  onSelectLive,
+  onSelectRuns,
+  runsNotificationCount,
+}: CanvasModeToggleProps) {
   const handleValueChange = (next: string) => {
-    if (next === "version-edit" && mode === "version-live") {
+    if (next === mode) {
+      return;
+    }
+
+    if (next === "version-edit") {
       void onSelectEditor();
-    } else if (next === "version-live" && mode === "version-edit") {
+    } else if (next === "version-live") {
       void onSelectLive();
+    } else if (next === "runs" && onSelectRuns) {
+      void onSelectRuns();
     }
   };
 
@@ -33,10 +47,30 @@ export function CanvasModeToggle({ mode, onSelectEditor, onSelectLive }: CanvasM
           value="version-live"
           data-testid="canvas-view-mode-live"
           aria-label="Live Canvas"
-          className="rounded-sm rounded-bl-none rounded-tl-none border-none px-3 py-1 text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none"
+          className="rounded-none border-none px-3 py-1 text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none"
         >
           Live Canvas
         </TabsTrigger>
+        {onSelectRuns ? (
+          <>
+            <div className="h-full w-px bg-slate-300"></div>
+            <TabsTrigger
+              value="runs"
+              data-testid="canvas-view-mode-runs"
+              aria-label="Runs"
+              className="rounded-sm rounded-bl-none rounded-tl-none border-none px-3 py-1 text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                Runs
+                {runsNotificationCount && runsNotificationCount > 0 ? (
+                  <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-medium leading-none text-white">
+                    {runsNotificationCount > 99 ? "99+" : runsNotificationCount}
+                  </span>
+                ) : null}
+              </span>
+            </TabsTrigger>
+          </>
+        ) : null}
       </TabsList>
     </Tabs>
   );

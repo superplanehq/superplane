@@ -58,6 +58,10 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		event.CustomName = customName
 	}
 
+	if reportEntry := s.resolveReportEntry(wrappedPayload); reportEntry != "" {
+		event.ReportEntry = reportEntry
+	}
+
 	err = s.tx.Create(&event).Error
 	if err != nil {
 		return err
@@ -105,4 +109,39 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 	}
 
 	return &resolvedName, nil
+}
+
+func (s *EventContext) resolveReportEntry(payload any) string {
+	config := s.node.Configuration.Data()
+	if config == nil {
+		return ""
+	}
+
+	rawTemplate, ok := config["reportTemplate"]
+	if !ok || rawTemplate == nil {
+		return ""
+	}
+
+	template, ok := rawTemplate.(string)
+	if !ok {
+		return ""
+	}
+
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return ""
+	}
+
+	resolved, errs := ResolveReportTemplateFromPayload(template, payload)
+	resolved = strings.TrimSpace(resolved)
+
+	if len(errs) > 0 {
+		lines := make([]string, 0, len(errs))
+		for _, e := range errs {
+			lines = append(lines, fmt.Sprintf("> `%s`", e.Error()))
+		}
+		resolved += fmt.Sprintf("\n\n> [!CAUTION]\n> Expression errors:\n%s", strings.Join(lines, "\n"))
+	}
+
+	return resolved
 }
