@@ -84,10 +84,8 @@ func syntheticCheckToSpecBase(check *SyntheticCheck) (SyntheticCheckSpecBase, er
 		return SyntheticCheckSpecBase{}, errors.New("check is missing HTTP settings")
 	}
 
-	freq := check.Frequency
-	if freq >= 1000 && freq%1000 == 0 {
-		freq /= 1000
-	}
+	freq := syntheticFrequencySecondsFromMilliseconds(check.Frequency)
+	freqMilliseconds := check.Frequency
 
 	probes := make([]string, 0, len(check.Probes))
 	for _, p := range check.Probes {
@@ -114,6 +112,7 @@ func syntheticCheckToSpecBase(check *SyntheticCheck) (SyntheticCheckSpecBase, er
 		Target:                     check.Target,
 		Enabled:                    enabledPtr,
 		Frequency:                  freq,
+		FrequencyMilliseconds:      &freqMilliseconds,
 		Timeout:                    check.Timeout,
 		Probes:                     probes,
 		Labels:                     syntheticLabelsToInputs(check.Labels),
@@ -311,6 +310,13 @@ func overlaySyntheticSchedule(base *SyntheticCheckSpecBase, sch map[string]any) 
 	}
 	if _, ok := sch["frequency"]; ok {
 		base.Frequency = castToInt64(sch["frequency"])
+		base.FrequencyMilliseconds = nil
+	}
+	if _, ok := sch["frequencyMilliseconds"]; ok {
+		v := castToInt64(sch["frequencyMilliseconds"])
+		if v > 0 {
+			base.FrequencyMilliseconds = &v
+		}
 	}
 	if _, ok := sch["timeout"]; ok {
 		base.Timeout = castToInt64(sch["timeout"])

@@ -62,6 +62,7 @@ type SyntheticCheckSpecBase struct {
 	Target                     string                           `json:"target" mapstructure:"target"`
 	Enabled                    *bool                            `json:"enabled,omitempty" mapstructure:"enabled"`
 	Frequency                  int64                            `json:"frequency" mapstructure:"frequency"`
+	FrequencyMilliseconds      *int64                           `json:"-" mapstructure:"frequencyMilliseconds"`
 	Timeout                    int64                            `json:"timeout" mapstructure:"timeout"`
 	Probes                     []string                         `json:"probes" mapstructure:"probes"`
 	Labels                     []SyntheticCheckLabelInput       `json:"labels,omitempty" mapstructure:"labels"`
@@ -181,7 +182,7 @@ func buildSyntheticCheckPayload(spec SyntheticCheckSpecBase) (SyntheticCheck, er
 	check := SyntheticCheck{
 		Job:              strings.TrimSpace(spec.Job),
 		Target:           strings.TrimSpace(spec.Target),
-		Frequency:        normalizeSyntheticFrequency(spec.Frequency),
+		Frequency:        syntheticFrequencyMilliseconds(spec),
 		Timeout:          spec.Timeout,
 		Enabled:          enabled,
 		AlertSensitivity: "none",
@@ -295,11 +296,23 @@ func buildSyntheticAlertDrafts(alerts []SyntheticCheckAlertInput) []SyntheticChe
 }
 
 func normalizeSyntheticFrequency(value int64) int64 {
-	if value >= 1000 && value%1000 == 0 {
-		return value
+	return value * 1000
+}
+
+func syntheticFrequencyMilliseconds(spec SyntheticCheckSpecBase) int64 {
+	if spec.FrequencyMilliseconds != nil {
+		return *spec.FrequencyMilliseconds
 	}
 
-	return value * 1000
+	return normalizeSyntheticFrequency(spec.Frequency)
+}
+
+func syntheticFrequencySecondsFromMilliseconds(value int64) int64 {
+	if value <= 0 {
+		return 0
+	}
+
+	return (value + 999) / 1000
 }
 
 func parseSyntheticProbeIDs(probes []string) ([]int64, error) {
