@@ -28,8 +28,10 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 	}
 	var getDraft bool
+	var getURL bool
 	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version instead of the live version")
-	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
+	getCmd.Flags().BoolVar(&getURL, "url", false, "print only the canvas URL")
+	core.Bind(getCmd, &getCommand{draft: &getDraft, url: &getURL}, options)
 
 	activeCmd := &cobra.Command{
 		Use:   "active [canvas-id]",
