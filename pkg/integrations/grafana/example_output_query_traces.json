@@ -1,0 +1,32 @@
+{
+  "type": "grafana.traces.result",
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "data": {
+    "results": {
+      "A": {
+        "frames": [
+          {
+            "schema": {
+              "fields": [
+                { "name": "traceID", "type": "string" },
+                { "name": "spanID", "type": "string" },
+                { "name": "operationName", "type": "string" },
+                { "name": "duration", "type": "number" },
+                { "name": "serviceName", "type": "string" }
+              ]
+            },
+            "data": {
+              "values": [
+                ["abc123def456"],
+                ["0000000000000001"],
+                ["HTTP GET /api/orders"],
+                [1523000],
+                ["order-service"]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

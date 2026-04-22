@@ -18,6 +18,8 @@ import { listAnnotationsMapper } from "./list_annotations";
 import { listSilencesMapper } from "./list_silences";
 import { onAlertFiringTriggerRenderer } from "./on_alert_firing";
 import { queryDataSourceMapper } from "./query_data_source";
+import { queryLogsMapper } from "./query_logs";
+import { queryTracesMapper } from "./query_traces";
 import { renderPanelMapper } from "./render_panel";
 import { updateHttpSyntheticCheckMapper } from "./update_http_synthetic_check";
 import { updateAlertRuleMapper } from "./update_alert_rule";
@@ -31,6 +33,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getHttpSyntheticCheck: getHttpSyntheticCheckMapper,
   listAlertRules: listAlertRulesMapper,
   queryDataSource: queryDataSourceMapper,
+  queryLogs: queryLogsMapper,
+  queryTraces: queryTracesMapper,
   renderPanel: renderPanelMapper,
   updateAlertRule: updateAlertRuleMapper,
   updateHttpSyntheticCheck: updateHttpSyntheticCheckMapper,
@@ -60,6 +64,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getHttpSyntheticCheck: GET_HTTP_SYNTHETIC_CHECK_STATE_REGISTRY,
   listAlertRules: buildActionStateRegistry("listed"),
   queryDataSource: buildActionStateRegistry("queried"),
+  queryLogs: buildActionStateRegistry("queried"),
+  queryTraces: buildActionStateRegistry("queried"),
   renderPanel: buildActionStateRegistry("rendered"),
   updateAlertRule: buildActionStateRegistry("updated"),
   updateHttpSyntheticCheck: buildActionStateRegistry("updated"),

@@ -27,6 +27,41 @@ export function generateNodeId(blockName: string, nodeName: string): string {
   return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
 }
 
+export function getComparableIntegrationId(node: Record<string, unknown>): string | null {
+  const integration = node.integration;
+  if (integration && typeof integration === "object" && "id" in integration) {
+    const integrationId = integration.id;
+    return typeof integrationId === "string" && integrationId ? integrationId : null;
+  }
+
+  const integrationId = node.integrationId;
+  return typeof integrationId === "string" && integrationId ? integrationId : null;
+}
+
+function normalizeNodeForSaveSignature(node: ComponentsNode): ComponentsNode {
+  if (!node.integration) {
+    return node;
+  }
+
+  return {
+    ...node,
+    integration: node.integration.id ? { id: node.integration.id } : undefined,
+  };
+}
+
+export function getWorkflowSaveSignature(workflow: CanvasesCanvas | null | undefined): string {
+  if (!workflow) {
+    return "";
+  }
+
+  return JSON.stringify({
+    name: workflow.metadata?.name ?? "",
+    description: workflow.metadata?.description ?? "",
+    nodes: (workflow.spec?.nodes ?? []).map(normalizeNodeForSaveSignature),
+    edges: workflow.spec?.edges ?? [],
+  });
+}
+
 /**
  * Generates a unique node name based on component name + ordinal number.
  * First instance: "if", second: "if2", third: "if3", etc.
