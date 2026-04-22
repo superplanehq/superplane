@@ -75,10 +75,11 @@ const HomePage = () => {
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
-  const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: CanvasesCanvas) => {
-    if (!canvas.metadata) {
-      throw new Error("Canvas metadata is required");
+  const canvases: CanvasCardData[] = (canvasesData || []).flatMap((canvas: CanvasesCanvas) => {
+    if (!canvas.metadata?.id || !canvas.metadata.name) {
+      return [];
     }
+
     const originalCreatedAt = canvas.metadata.createdAt || "";
     const parsedCreatedAt = Date.parse(originalCreatedAt);
     const createdAtTimestamp = Number.isNaN(parsedCreatedAt) ? null : parsedCreatedAt;
@@ -86,17 +87,19 @@ const HomePage = () => {
       ? formatRelativeTimeWithTooltip(originalCreatedAt)
       : { relative: "N/A", full: "Unknown" };
 
-    return {
-      id: canvas.metadata.id!,
-      name: canvas.metadata.name!,
-      description: canvas.metadata.description,
-      createdAtRelative,
-      createdAtTimestamp,
-      type: "canvases" as const,
-      createdBy: canvas.metadata.createdBy,
-      nodes: canvas.spec?.nodes || [],
-      edges: canvas.spec?.edges || [],
-    };
+    return [
+      {
+        id: canvas.metadata.id,
+        name: canvas.metadata.name,
+        description: canvas.metadata.description,
+        createdAtRelative,
+        createdAtTimestamp,
+        type: "canvases" as const,
+        createdBy: canvas.metadata.createdBy,
+        nodes: canvas.spec?.nodes || [],
+        edges: canvas.spec?.edges || [],
+      },
+    ];
   });
 
   const filteredCanvases = canvases.filter((canvas) => {
