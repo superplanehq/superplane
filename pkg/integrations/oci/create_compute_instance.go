@@ -14,30 +14,40 @@ import (
 )
 
 const (
-	ComputeInstancePayloadType = "oci.compute.instance"
+	ComputeInstancePayloadType = "oci.computeInstanceCreated"
 	instanceStateRunning       = "RUNNING"
 	instanceStateTerminated    = "TERMINATED"
 	instanceStateTerminating   = "TERMINATING"
 	createInstancePollInterval = 10 * time.Second
+	maxPollErrors              = 10
 )
 
 type CreateComputeInstance struct{}
 
 type CreateComputeInstanceSpec struct {
-	CompartmentID      string   `json:"compartmentId" mapstructure:"compartmentId"`
-	AvailabilityDomain string   `json:"availabilityDomain" mapstructure:"availabilityDomain"`
-	DisplayName        string   `json:"displayName" mapstructure:"displayName"`
-	Shape              string   `json:"shape" mapstructure:"shape"`
-	ImageID            string   `json:"imageId" mapstructure:"imageId"`
-	SubnetID           string   `json:"subnetId" mapstructure:"subnetId"`
-	SSHPublicKey       string   `json:"sshPublicKey" mapstructure:"sshPublicKey"`
-	OCPUs              *float64 `json:"ocpus" mapstructure:"ocpus"`
-	MemoryInGBs        *float64 `json:"memoryInGBs" mapstructure:"memoryInGBs"`
+	CompartmentID               string   `json:"compartmentId" mapstructure:"compartmentId"`
+	AvailabilityDomain          string   `json:"availabilityDomain" mapstructure:"availabilityDomain"`
+	DisplayName                 string   `json:"displayName" mapstructure:"displayName"`
+	ImageOs                     string   `json:"imageOs" mapstructure:"imageOs"`
+	Shape                       string   `json:"shape" mapstructure:"shape"`
+	ImageID                     string   `json:"imageId" mapstructure:"imageId"`
+	SubnetID                    string   `json:"subnetId" mapstructure:"subnetId"`
+	SSHPublicKey                string   `json:"sshPublicKey" mapstructure:"sshPublicKey"`
+	OCPUs                       *float64 `json:"ocpus" mapstructure:"ocpus"`
+	MemoryInGBs                 *float64 `json:"memoryInGBs" mapstructure:"memoryInGBs"`
+	EnableShieldedInstance      bool     `json:"enableShieldedInstance" mapstructure:"enableShieldedInstance"`
+	EnableConfidentialComputing bool     `json:"enableConfidentialComputing" mapstructure:"enableConfidentialComputing"`
+	BootVolumeSizeGB            *float64 `json:"bootVolumeSizeGB" mapstructure:"bootVolumeSizeGB"`
+	BootVolumeVpusPerGB         *float64 `json:"bootVolumeVpusPerGB" mapstructure:"bootVolumeVpusPerGB"`
+	AttachBlockVolume           bool     `json:"attachBlockVolume" mapstructure:"attachBlockVolume"`
+	BlockVolumeID               string   `json:"blockVolumeId" mapstructure:"blockVolumeId"`
 }
 
 type CreateInstanceExecutionMetadata struct {
 	InstanceID    string `json:"instanceId" mapstructure:"instanceId"`
 	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
+	BlockVolumeID string `json:"blockVolumeId" mapstructure:"blockVolumeId"`
+	PollErrors    int    `json:"pollErrors" mapstructure:"pollErrors"`
 }
 
 func (c *CreateComputeInstance) Name() string {
@@ -167,6 +177,52 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "ocpus",
+			Label:       "OCPUs",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   true,
+			Description: "Number of OCPUs (required for flex shapes)",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { v := 1; return &v }(),
+				},
+			},
+		},
+		{
+			Name:        "memoryInGBs",
+			Label:       "Memory (GB)",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   true,
+			Description: "Memory in GB (required for flex shapes)",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { v := 1; return &v }(),
+				},
+			},
+		},
+		{
+			Name:        "imageOs",
+			Label:       "Image OS",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Description: "Operating system family for the boot image",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Oracle Linux", Value: "Oracle Linux"},
+						{Label: "Ubuntu", Value: "Canonical Ubuntu"},
+						{Label: "Red Hat", Value: "Red Hat Enterprise Linux"},
+						{Label: "CentOS", Value: "CentOS"},
+						{Label: "AlmaLinux", Value: "AlmaLinux"},
+						{Label: "Rocky Linux", Value: "Rocky Linux"},
+						{Label: "Windows", Value: "Windows"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "imageId",
 			Label:       "Image",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -180,6 +236,12 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
 								Field: "compartmentId",
+							},
+						},
+						{
+							Name: "imageOs",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "imageOs",
 							},
 						},
 					},
@@ -211,32 +273,93 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 			Label:       "SSH Public Key",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
-			Description: "SSH public key content to add to the instance (optional)",
+			Togglable:   true,
+			Description: "SSH public key to add to the instance for remote access",
 			Placeholder: "ssh-rsa AAAA…",
 		},
 		{
-			Name:        "ocpus",
-			Label:       "OCPUs",
+			Name:        "bootVolumeSizeGB",
+			Label:       "Boot Volume Size (GB)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Description: "Number of OCPUs (for flex shapes)",
+			Togglable:   true,
+			Description: "Custom boot volume size in GB. Defaults to the image minimum if not set.",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
-					Min: func() *int { v := 1; return &v }(),
+					Min: func() *int { v := 50; return &v }(),
 				},
 			},
 		},
 		{
-			Name:        "memoryInGBs",
-			Label:       "Memory (GB)",
-			Type:        configuration.FieldTypeNumber,
+			Name:        "bootVolumeVpusPerGB",
+			Label:       "Boot Volume Performance (VPUs/GB)",
+			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Description: "Memory in GB (for flex shapes)",
+			Togglable:   true,
+			Description: "Boot volume performance tier",
 			TypeOptions: &configuration.TypeOptions{
-				Number: &configuration.NumberTypeOptions{
-					Min: func() *int { v := 1; return &v }(),
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Lower Cost (0 VPUs/GB)", Value: "0"},
+						{Label: "Balanced (10 VPUs/GB)", Value: "10"},
+						{Label: "Higher Performance (20 VPUs/GB)", Value: "20"},
+						{Label: "Ultra High Performance (30 VPUs/GB)", Value: "30"},
+					},
 				},
 			},
+		},
+		{
+			Name:        "attachBlockVolume",
+			Label:       "Attach Block Volume",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Togglable:   true,
+			Default:     false,
+			Description: "Attach an existing block volume to the instance after launch",
+		},
+		{
+			Name:        "blockVolumeId",
+			Label:       "Block Volume",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Existing block volume to attach",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "attachBlockVolume", Values: []string{"true"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "attachBlockVolume", Values: []string{"true"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeBlockVolume,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "compartmentId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "compartmentId",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "enableShieldedInstance",
+			Label:       "Enable Shielded Instance",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Togglable:   true,
+			Default:     false,
+			Description: "Enables Secure Boot, vTPM, and Measured Boot for hardware-based instance integrity verification",
+		},
+		{
+			Name:        "enableConfidentialComputing",
+			Label:       "Enable Confidential Computing",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Togglable:   true,
+			Default:     false,
+			Description: "Encrypts data in-use by isolating the instance in a hardware-protected enclave (requires a supported shape)",
 		},
 	}
 }
@@ -262,6 +385,9 @@ func (c *CreateComputeInstance) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(spec.SubnetID) == "" {
 		return errors.New("subnetId is required")
 	}
+	if strings.TrimSpace(spec.ImageOs) == "" {
+		return errors.New("imageOs is required")
+	}
 
 	return nil
 }
@@ -283,8 +409,10 @@ func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 		DisplayName:        spec.DisplayName,
 		Shape:              spec.Shape,
 		SourceDetails: InstanceSourceDetails{
-			SourceType: "image",
-			ImageID:    spec.ImageID,
+			SourceType:          "image",
+			ImageID:             spec.ImageID,
+			BootVolumeSizeInGBs: spec.BootVolumeSizeGB,
+			BootVolumeVpusPerGB: spec.BootVolumeVpusPerGB,
 		},
 		CreateVnicDetails: &CreateVnicDetails{
 			SubnetID: spec.SubnetID,
@@ -304,6 +432,20 @@ func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	if spec.EnableShieldedInstance {
+		req.ShieldedInstanceConfig = &ShieldedInstanceConfig{
+			IsSecureBootEnabled:            true,
+			IsMeasuredBootEnabled:          true,
+			IsTrustedPlatformModuleEnabled: true,
+		}
+	}
+
+	if spec.EnableConfidentialComputing {
+		req.ConfidentialInstanceOptions = &ConfidentialInstanceOptions{
+			IsEnabled: true,
+		}
+	}
+
 	instance, err := client.LaunchInstance(req)
 	if err != nil {
 		return fmt.Errorf("failed to launch instance: %w", err)
@@ -312,6 +454,7 @@ func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 	if err := ctx.Metadata.Set(CreateInstanceExecutionMetadata{
 		InstanceID:    instance.ID,
 		CompartmentID: spec.CompartmentID,
+		BlockVolumeID: spec.BlockVolumeID,
 	}); err != nil {
 		return err
 	}
@@ -352,12 +495,24 @@ func (c *CreateComputeInstance) poll(ctx core.ActionContext) error {
 
 	instance, err := client.GetInstance(metadata.InstanceID)
 	if err != nil {
+		metadata.PollErrors++
+		ctx.Logger.Warnf("failed to get instance %s (attempt %d/%d): %v", metadata.InstanceID, metadata.PollErrors, maxPollErrors, err)
+		if metadata.PollErrors >= maxPollErrors {
+			return fmt.Errorf("giving up polling instance %s after %d consecutive errors: %w", metadata.InstanceID, maxPollErrors, err)
+		}
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return err
+		}
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)
+	}
+	metadata.PollErrors = 0
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return err
 	}
 
 	switch instance.LifecycleState {
 	case instanceStateRunning:
-		return c.emitInstance(ctx, client, instance, metadata.CompartmentID)
+		return c.emitInstance(ctx, client, instance, metadata)
 	case instanceStateTerminated, instanceStateTerminating:
 		return fmt.Errorf("instance %s entered state %s unexpectedly", instance.ID, instance.LifecycleState)
 	default:
@@ -365,10 +520,10 @@ func (c *CreateComputeInstance) poll(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CreateComputeInstance) emitInstance(ctx core.ActionContext, client *Client, instance *Instance, compartmentID string) error {
+func (c *CreateComputeInstance) emitInstance(ctx core.ActionContext, client *Client, instance *Instance, metadata CreateInstanceExecutionMetadata) error {
 	payload := instanceToMap(instance)
 
-	attachments, err := client.ListVNICAttachments(compartmentID, instance.ID)
+	attachments, err := client.ListVNICAttachments(metadata.CompartmentID, instance.ID)
 	if err == nil && len(attachments) > 0 {
 		for _, att := range attachments {
 			if att.LifecycleState == "ATTACHED" && att.VNICID != "" {
@@ -380,6 +535,15 @@ func (c *CreateComputeInstance) emitInstance(ctx core.ActionContext, client *Cli
 				break
 			}
 		}
+	}
+
+	if metadata.BlockVolumeID != "" {
+		attachment, err := client.AttachVolume(instance.ID, metadata.BlockVolumeID)
+		if err != nil {
+			return fmt.Errorf("failed to attach block volume %q to instance %q: %w", metadata.BlockVolumeID, instance.ID, err)
+		}
+		payload["blockVolumeAttachmentId"] = attachment.ID
+		payload["blockVolumeId"] = metadata.BlockVolumeID
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, ComputeInstancePayloadType, []any{payload})

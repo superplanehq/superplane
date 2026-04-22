@@ -53,19 +53,25 @@ export const baseMapper: ComponentBaseMapper = {
 };
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const rootEvent = execution.rootEvent;
+  if (!rootEvent?.nodeId || !rootEvent?.id) {
+    return [];
+  }
+
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
+  const receivedAt = execution.createdAt ? new Date(execution.createdAt) : undefined;
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt,
       eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: rootEvent.id,
     },
   ];
 }

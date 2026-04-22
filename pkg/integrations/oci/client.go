@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -209,9 +210,12 @@ func (c *Client) ListShapes(compartmentID string) ([]Shape, error) {
 	return shapes, nil
 }
 
-func (c *Client) ListImages(compartmentID string) ([]Image, error) {
+func (c *Client) ListImages(compartmentID, operatingSystem string) ([]Image, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/images?compartmentId=%s&limit=100", host, coreServicesAPIVersion, compartmentID)
+	url := fmt.Sprintf("https://%s/%s/images?compartmentId=%s&limit=100&sortBy=DISPLAYNAME&sortOrder=ASC", host, coreServicesAPIVersion, compartmentID)
+	if operatingSystem != "" {
+		url += "&operatingSystem=" + neturl.QueryEscape(operatingSystem)
+	}
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -241,6 +245,23 @@ func (c *Client) ListSubnets(compartmentID string) ([]Subnet, error) {
 	}
 
 	return subnets, nil
+}
+
+func (c *Client) ListBlockVolumes(compartmentID string) ([]BlockVolume, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/volumes?compartmentId=%s&limit=100", host, coreServicesAPIVersion, compartmentID)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var volumes []BlockVolume
+	if err := json.Unmarshal(respBody, &volumes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal block volumes: %w", err)
+	}
+
+	return volumes, nil
 }
 
 // doRequest signs and executes an HTTP request against the OCI API.
@@ -370,19 +391,23 @@ func parsePrivateKey(pemData string) (*rsa.PrivateKey, error) {
 // OCI API types
 
 type LaunchInstanceRequest struct {
-	CompartmentID      string                `json:"compartmentId"`
-	AvailabilityDomain string                `json:"availabilityDomain"`
-	DisplayName        string                `json:"displayName,omitempty"`
-	Shape              string                `json:"shape"`
-	SourceDetails      InstanceSourceDetails `json:"sourceDetails"`
-	CreateVnicDetails  *CreateVnicDetails    `json:"createVnicDetails,omitempty"`
-	Metadata           map[string]string     `json:"metadata,omitempty"`
-	ShapeConfig        *InstanceShapeConfig  `json:"shapeConfig,omitempty"`
+	CompartmentID               string                       `json:"compartmentId"`
+	AvailabilityDomain          string                       `json:"availabilityDomain"`
+	DisplayName                 string                       `json:"displayName,omitempty"`
+	Shape                       string                       `json:"shape"`
+	SourceDetails               InstanceSourceDetails        `json:"sourceDetails"`
+	CreateVnicDetails           *CreateVnicDetails           `json:"createVnicDetails,omitempty"`
+	Metadata                    map[string]string            `json:"metadata,omitempty"`
+	ShapeConfig                 *InstanceShapeConfig         `json:"shapeConfig,omitempty"`
+	ShieldedInstanceConfig      *ShieldedInstanceConfig      `json:"shieldedInstanceConfig,omitempty"`
+	ConfidentialInstanceOptions *ConfidentialInstanceOptions `json:"confidentialInstanceOptions,omitempty"`
 }
 
 type InstanceSourceDetails struct {
-	SourceType string `json:"sourceType"`
-	ImageID    string `json:"imageId"`
+	SourceType          string   `json:"sourceType"`
+	ImageID             string   `json:"imageId"`
+	BootVolumeSizeInGBs *float64 `json:"bootVolumeSizeInGBs,omitempty"`
+	BootVolumeVpusPerGB *float64 `json:"bootVolumeVpusPerGB,omitempty"`
 }
 
 type CreateVnicDetails struct {
@@ -392,6 +417,16 @@ type CreateVnicDetails struct {
 type InstanceShapeConfig struct {
 	OCPUs       *float64 `json:"ocpus,omitempty"`
 	MemoryInGBs *float64 `json:"memoryInGBs,omitempty"`
+}
+
+type ShieldedInstanceConfig struct {
+	IsSecureBootEnabled            bool `json:"isSecureBootEnabled"`
+	IsMeasuredBootEnabled          bool `json:"isMeasuredBootEnabled"`
+	IsTrustedPlatformModuleEnabled bool `json:"isTrustedPlatformModuleEnabled"`
+}
+
+type ConfidentialInstanceOptions struct {
+	IsEnabled bool `json:"isEnabled"`
 }
 
 type Instance struct {
@@ -443,4 +478,219 @@ type Subnet struct {
 	DisplayName    string `json:"displayName"`
 	CIDRBlock      string `json:"cidrBlock"`
 	LifecycleState string `json:"lifecycleState"`
+}
+
+type BlockVolume struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	LifecycleState string `json:"lifecycleState"`
+	SizeInGBs      int    `json:"sizeInGBs"`
+}
+
+type VolumeAttachment struct {
+	ID             string `json:"id"`
+	InstanceID     string `json:"instanceId"`
+	VolumeID       string `json:"volumeId"`
+	LifecycleState string `json:"lifecycleState"`
+	Device         string `json:"device"`
+}
+
+// AttachVolume attaches an existing block volume to a running instance using paravirtualised attachment.
+func (c *Client) AttachVolume(instanceID, volumeID string) (*VolumeAttachment, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/volumeAttachments", host, coreServicesAPIVersion)
+
+	body := map[string]any{
+		"instanceId": instanceID,
+		"volumeId":   volumeID,
+		"type":       "paravirtualized",
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal attach volume request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var attachment VolumeAttachment
+	if err := json.Unmarshal(respBody, &attachment); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal volume attachment response: %w", err)
+	}
+
+	return &attachment, nil
+}
+
+// ONS (Notifications) types
+
+type ONSSubscription struct {
+	ID             string `json:"id"`
+	TopicID        string `json:"topicId"`
+	Protocol       string `json:"protocol"`
+	Endpoint       string `json:"endpoint"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+// CreateONSSubscription creates an HTTPS subscription on an OCI Notifications topic.
+func (c *Client) CreateONSSubscription(compartmentID, topicID, endpoint string) (*ONSSubscription, error) {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/subscriptions", host)
+
+	body := map[string]string{
+		"compartmentId": compartmentID,
+		"topicId":       topicID,
+		"protocol":      "CUSTOM_HTTPS",
+		"endpoint":      endpoint,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var sub ONSSubscription
+	if err := json.Unmarshal(respBody, &sub); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ONS subscription response: %w (body: %s)", err, string(respBody))
+	}
+
+	if sub.ID == "" {
+		return nil, fmt.Errorf("OCI returned an unexpected subscription response with no OCID (body: %s)", string(respBody))
+	}
+
+	return &sub, nil
+}
+
+// DeleteONSSubscription deletes an OCI Notifications subscription by its OCID.
+func (c *Client) DeleteONSSubscription(subscriptionID string) error {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/subscriptions/%s", host, subscriptionID)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// ONS topic types and methods
+
+type ONSTopic struct {
+	TopicID        string `json:"topicId"`
+	Name           string `json:"name"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+// CreateONSTopic creates a new OCI Notifications topic.
+func (c *Client) CreateONSTopic(compartmentID, name string) (*ONSTopic, error) {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/topics", host)
+
+	body := map[string]string{
+		"compartmentId": compartmentID,
+		"name":          name,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal topic request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var topic ONSTopic
+	if err := json.Unmarshal(respBody, &topic); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ONS topic: %w", err)
+	}
+
+	return &topic, nil
+}
+
+// DeleteONSTopic deletes an OCI Notifications topic by its OCID.
+// Deleting the topic also removes all its subscriptions.
+func (c *Client) DeleteONSTopic(topicID string) error {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/topics/%s", host, topicID)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// OCI Events rule types and methods
+
+type EventsRule struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+type eventsRuleAction struct {
+	ActionType string `json:"actionType"`
+	TopicID    string `json:"topicId"`
+	IsEnabled  bool   `json:"isEnabled"`
+}
+
+type eventsRuleActions struct {
+	Actions []eventsRuleAction `json:"actions"`
+}
+
+type createEventsRuleRequest struct {
+	CompartmentID string            `json:"compartmentId"`
+	DisplayName   string            `json:"displayName"`
+	Description   string            `json:"description"`
+	IsEnabled     bool              `json:"isEnabled"`
+	Condition     string            `json:"condition"`
+	Actions       eventsRuleActions `json:"actions"`
+}
+
+// CreateEventsRule creates an OCI Events rule that routes matching events to an ONS topic.
+func (c *Client) CreateEventsRule(compartmentID, displayName, condition, topicID string) (*EventsRule, error) {
+	host := fmt.Sprintf("events.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/rules", host)
+
+	req := createEventsRuleRequest{
+		CompartmentID: compartmentID,
+		DisplayName:   displayName,
+		Description:   "Managed by SuperPlane",
+		IsEnabled:     true,
+		Condition:     condition,
+		Actions: eventsRuleActions{
+			Actions: []eventsRuleAction{
+				{ActionType: "ONS", TopicID: topicID, IsEnabled: true},
+			},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal events rule request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var rule EventsRule
+	if err := json.Unmarshal(respBody, &rule); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal events rule: %w", err)
+	}
+
+	return &rule, nil
+}
+
+// DeleteEventsRule deletes an OCI Events rule by its OCID.
+func (c *Client) DeleteEventsRule(ruleID string) error {
+	host := fmt.Sprintf("events.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/rules/%s", host, ruleID)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
 }

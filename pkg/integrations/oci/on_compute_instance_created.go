@@ -3,7 +3,10 @@ package oci
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -11,19 +14,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// OnComputeInstanceCreated is a trigger that fires when an OCI Compute instance
-// reaches RUNNING state. It receives events via an OCI Events Service webhook
-// (via OCI Notifications HTTPS subscription) and emits when the event type is
-// com.oraclecloud.computeapi.launchinstance.end.
 type OnComputeInstanceCreated struct{}
 
 const (
-	ociEventTypeComputeLaunchEnd = "com.oraclecloud.computeapi.launchinstance.end"
+	ociEventTypeComputeLaunchEnd        = "com.oraclecloud.computeapi.launchinstance.end"
+	OnComputeInstanceCreatedPayloadType = "oci.onComputeInstanceCreated"
 )
 
 type OnComputeInstanceCreatedConfiguration struct {
 	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
-	SecretToken   string `json:"secretToken" mapstructure:"secretToken"`
+}
+
+type OnComputeInstanceCreatedMetadata struct {
+	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
+	EventsRuleID  string `json:"eventsRuleId" mapstructure:"eventsRuleId"`
 }
 
 func (t *OnComputeInstanceCreated) Name() string {
@@ -39,23 +43,15 @@ func (t *OnComputeInstanceCreated) Description() string {
 }
 
 func (t *OnComputeInstanceCreated) Documentation() string {
-	return `The On Compute Instance Created trigger starts a workflow execution whenever an OCI Compute instance launch completes and the instance reaches **RUNNING** state.
+	return `The On Compute Instance Created trigger starts a workflow execution whenever an OCI Compute instance launch completes.
 
 ## How It Works
 
-Events are delivered through the OCI Events Service → OCI Notifications (ONS) → HTTPS subscription chain:
-
-1. SuperPlane generates a unique webhook URL for this trigger.
-2. In OCI, create a **Notifications topic** and add an **HTTPS subscription** pointing to the webhook URL.
-3. Create an **Events rule** in the compartment you want to monitor:
-   - **Conditions**: Event Type = ` + "`com.oraclecloud.computeapi.launchinstance.end`" + `
-   - **Actions**: Send to the ONS topic created above.
-4. Optionally set a **Secret Token** in both SuperPlane and the subscription to validate incoming requests.
+When the OCI integration is set up, SuperPlane automatically creates a shared **OCI Notifications (ONS) topic** and subscribes to it. When this trigger is added to a workflow, SuperPlane automatically creates an **OCI Events rule** in the configured compartment that forwards ` + "`com.oraclecloud.computeapi.launchinstance.end`" + ` events to that topic — no manual OCI configuration is required.
 
 ## Configuration
 
-- **Compartment OCID**: Filter events to a specific compartment. Leave blank to accept events from any compartment.
-- **Secret Token**: Optional shared secret to validate that the webhook came from OCI Notifications.
+- **Compartment**: The compartment to monitor for new Compute instances.
 
 ## Event Data
 
@@ -81,23 +77,15 @@ func (t *OnComputeInstanceCreated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "compartmentId",
-			Label:       "Compartment (Filter)",
+			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "Only emit events from this compartment. Leave blank to accept events from any compartment.",
+			Required:    true,
+			Description: "The compartment to filter instance-created events from. Also used when creating the ONS subscription.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeCompartment,
 				},
 			},
-		},
-		{
-			Name:        "secretToken",
-			Label:       "Secret Token",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "Optional shared secret to validate incoming webhook requests from OCI Notifications.",
 		},
 	}
 }
@@ -107,7 +95,80 @@ func (t *OnComputeInstanceCreated) ExampleData() map[string]any {
 }
 
 func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
-	return nil
+	var config OnComputeInstanceCreatedConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode trigger configuration: %w", err)
+	}
+
+	if config.CompartmentID == "" {
+		return fmt.Errorf("compartmentId is required")
+	}
+
+	// Read the shared topic OCID from the integration metadata set during Sync.
+	var integrationMetadata IntegrationMetadata
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+	if integrationMetadata.TopicID == "" {
+		return fmt.Errorf("integration topic not ready yet; ensure the OCI integration has been fully set up")
+	}
+
+	var metadata OnComputeInstanceCreatedMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode trigger metadata: %w", err)
+	}
+
+	// If the Events rule already exists for this compartment, skip re-creation but
+	// still call RequestWebhook so the subscription is retried if it previously
+	// failed or was never provisioned.
+	if metadata.CompartmentID == config.CompartmentID && metadata.EventsRuleID != "" {
+		return ctx.Integration.RequestWebhook(WebhookConfiguration{
+			CompartmentID: config.CompartmentID,
+			TopicID:       integrationMetadata.TopicID,
+		})
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	// Delete old Events rule if compartment changed.
+	if metadata.EventsRuleID != "" && metadata.CompartmentID != config.CompartmentID {
+		if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
+			ctx.Logger.Warnf("failed to delete old Events rule %q: %v", metadata.EventsRuleID, err)
+		}
+	}
+
+	condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
+
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to set up webhook URL: %w", err)
+	}
+	ruleName := fmt.Sprintf("superplane-compute-instance-created-%s", path.Base(webhookURL))
+	rule, err := client.CreateEventsRule(
+		config.CompartmentID,
+		ruleName,
+		condition,
+		integrationMetadata.TopicID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Events rule: %w", err)
+	}
+
+	if err := ctx.Metadata.Set(OnComputeInstanceCreatedMetadata{
+		CompartmentID: config.CompartmentID,
+		EventsRuleID:  rule.ID,
+	}); err != nil {
+		return fmt.Errorf("failed to persist trigger metadata: %w", err)
+	}
+
+	// Request a per-trigger HTTPS subscription to the shared topic.
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		CompartmentID: config.CompartmentID,
+		TopicID:       integrationMetadata.TopicID,
+	})
 }
 
 func (t *OnComputeInstanceCreated) Actions() []core.Action {
@@ -119,36 +180,61 @@ func (t *OnComputeInstanceCreated) HandleAction(ctx core.TriggerActionContext) (
 }
 
 func (t *OnComputeInstanceCreated) Cleanup(ctx core.TriggerContext) error {
+	var metadata OnComputeInstanceCreatedMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		ctx.Logger.Warnf("failed to decode trigger metadata during cleanup: %v", err)
+		return nil
+	}
+
+	if metadata.EventsRuleID == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create OCI client during cleanup: %w", err)
+	}
+
+	if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
+		ctx.Logger.Warnf("failed to delete Events rule %q during cleanup: %v", metadata.EventsRuleID, err)
+	}
+
 	return nil
 }
 
-// HandleWebhook processes inbound requests from OCI Notifications.
-// OCI Notifications sends a JSON payload with an eventType field.
-// If the payload is an ONS subscription confirmation, it replies with 200 to confirm it.
+// HandleWebhook processes inbound requests forwarded by OCI Notifications.
 func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	cfg := OnComputeInstanceCreatedConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// Validate the optional secret token via the Authorization header.
-	if cfg.SecretToken != "" {
-		authHeader := ctx.Headers.Get("Authorization")
-		if !strings.EqualFold(authHeader, "Bearer "+cfg.SecretToken) {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid secret token")
-		}
-	}
-
-	// OCI Notifications sends a JSON envelope. Parse it to extract the event type.
 	var envelope map[string]any
 	if err := json.Unmarshal(ctx.Body, &envelope); err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse webhook body: %w", err)
 	}
 
-	// Handle ONS subscription confirmation handshake — just acknowledge it.
-	if confirmURL, ok := envelope["confirmationUrl"].(string); ok && confirmURL != "" {
-		confirmBody, _ := json.Marshal(envelope)
-		return http.StatusOK, &core.WebhookResponseBody{Body: confirmBody, ContentType: "application/json"}, nil
+	// Handle ONS subscription confirmation handshake.
+	// For CUSTOM_HTTPS subscriptions, OCI sends the confirmation URL in the
+	// X-OCI-NS-ConfirmationURL HTTP header (not in the JSON body).
+	// The endpoint must GET that URL to activate the subscription.
+	if confirmURL := ctx.Headers.Get("X-OCI-NS-ConfirmationURL"); confirmURL != "" {
+		if err := validateONSConfirmationURL(confirmURL); err != nil {
+			return http.StatusBadRequest, nil, fmt.Errorf("refusing ONS confirmation URL: %w", err)
+		}
+		req, err := http.NewRequest(http.MethodGet, confirmURL, nil)
+		if err != nil {
+			return http.StatusInternalServerError, nil, fmt.Errorf("failed to build ONS confirmation request: %w", err)
+		}
+		resp, err := ctx.HTTP.Do(req)
+		if err != nil {
+			return http.StatusInternalServerError, nil, fmt.Errorf("failed to confirm ONS subscription: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return http.StatusInternalServerError, nil, fmt.Errorf("ONS confirmation returned %d", resp.StatusCode)
+		}
+		return http.StatusOK, nil, nil
 	}
 
 	eventType, _ := envelope["eventType"].(string)
@@ -166,5 +252,31 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 		}
 	}
 
-	return http.StatusOK, &core.WebhookResponseBody{Body: ctx.Body, ContentType: "application/json"}, nil
+	if err := ctx.Events.Emit(OnComputeInstanceCreatedPayloadType, envelope); err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to emit event: %w", err)
+	}
+
+	return http.StatusOK, nil, nil
+}
+
+// validateONSConfirmationURL guards against SSRF by ensuring the URL:
+//   - uses the https scheme
+//   - has a hostname that ends with .oraclecloud.com
+//   - is not a raw IP address
+func validateONSConfirmationURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid confirmation URL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("confirmation URL must use https, got %q", u.Scheme)
+	}
+	hostname := u.Hostname()
+	if net.ParseIP(hostname) != nil {
+		return fmt.Errorf("confirmation URL must not be a raw IP address")
+	}
+	if !strings.HasSuffix(hostname, ".oraclecloud.com") {
+		return fmt.Errorf("confirmation URL hostname %q is not an allowed OCI domain", hostname)
+	}
+	return nil
 }
