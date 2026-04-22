@@ -160,7 +160,9 @@ def _extract_output_tool_arg(payload: dict[str, Any], key: str) -> Any:
         if not isinstance(args, dict):
             continue
 
-        return args.get(key)
+        if key in args:
+            return args[key]
+        # Key absent in this tool call — keep searching earlier parts.
 
     return None
 
