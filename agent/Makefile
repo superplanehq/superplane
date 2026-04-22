@@ -1,8 +1,20 @@
 .PHONY: db.create db.delete db.migration.create db.migrate lint lint.fix format format.check typecheck
 
-COMPOSE=docker compose -f ../docker-compose.dev.yml
+CONTAINER_ENGINE ?= docker
+COMPOSE = $(CONTAINER_ENGINE) compose -f ../docker-compose.dev.yml
 DB_NAME ?= agents_dev
 DB_PASSWORD ?= the-cake-is-a-lie
+
+# Keep in sync with ../Makefile. Docker BuildKit requires tagged cache_from
+# images; Podman's --cache-from rejects tags.
+ifeq ($(CONTAINER_ENGINE),podman)
+APP_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base
+AGENT_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base
+else
+APP_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base:app-latest
+AGENT_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base:agent-latest
+endif
+export APP_DEV_BASE_CACHE_IMAGE AGENT_DEV_BASE_CACHE_IMAGE
 
 lint:
 	$(COMPOSE) run --rm agent uv run --group dev ruff check
