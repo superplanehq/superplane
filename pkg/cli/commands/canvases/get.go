@@ -14,6 +14,7 @@ import (
 
 type getCommand struct {
 	draft *bool
+	url   *bool
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -59,6 +60,18 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	resource := models.CanvasResourceFromCanvas(canvas)
+
+	if c.url != nil && *c.url {
+		orgID, err := core.ResolveOrganizationID(ctx)
+		if err != nil {
+			return err
+		}
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, err := fmt.Fprintf(stdout, "https://app.superplane.com/%s/canvases/%s\n", orgID, resource.Metadata.GetId())
+			return err
+		})
+	}
+
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(resource)
 	}
