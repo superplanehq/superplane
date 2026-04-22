@@ -122,6 +122,29 @@ func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 	return &instance, nil
 }
 
+// ListInstances lists Compute instances in a compartment.
+func (c *Client) ListInstances(compartmentID string) ([]Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances?compartmentId=%s&limit=100",
+		host,
+		coreServicesAPIVersion,
+		neturl.QueryEscape(compartmentID),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instances []Instance
+	if err := json.Unmarshal(respBody, &instances); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instances: %w", err)
+	}
+
+	return instances, nil
+}
+
 // ListVNICAttachments lists VNIC attachments for an instance, used to find IP addresses.
 func (c *Client) ListVNICAttachments(compartmentID, instanceID string) ([]VNICAttachment, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
@@ -420,6 +443,11 @@ type InstanceShapeConfig struct {
 	MemoryInGBs *float64 `json:"memoryInGBs,omitempty"`
 }
 
+type UpdateInstanceRequest struct {
+	DisplayName *string              `json:"displayName,omitempty"`
+	ShapeConfig *InstanceShapeConfig `json:"shapeConfig,omitempty"`
+}
+
 type ShieldedInstanceConfig struct {
 	IsSecureBootEnabled            bool `json:"isSecureBootEnabled"`
 	IsMeasuredBootEnabled          bool `json:"isMeasuredBootEnabled"`
@@ -523,6 +551,62 @@ func (c *Client) AttachVolume(instanceID, volumeID string) (*VolumeAttachment, e
 	}
 
 	return &attachment, nil
+}
+
+// UpdateInstance updates mutable Compute instance attributes.
+func (c *Client) UpdateInstance(instanceID string, req UpdateInstanceRequest) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, instanceID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update instance request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// InstanceAction performs a power lifecycle action on a Compute instance.
+func (c *Client) InstanceAction(instanceID, action string) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s?action=%s", host, coreServicesAPIVersion, instanceID, neturl.QueryEscape(action))
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// TerminateInstance terminates a Compute instance, optionally preserving the boot volume.
+func (c *Client) TerminateInstance(instanceID string, preserveBootVolume bool) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances/%s?preserveBootVolume=%t",
+		host,
+		coreServicesAPIVersion,
+		instanceID,
+		preserveBootVolume,
+	)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
 }
 
 // ONS (Notifications) types
