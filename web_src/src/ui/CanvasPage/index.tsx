@@ -1164,7 +1164,7 @@ function CanvasPage(props: CanvasPageProps) {
 
         <div className="flex-1 relative">
           {props.headerMode === "runs" && props.runViewOverlay ? (
-            <div className="absolute inset-0 z-[15] overflow-hidden">{props.runViewOverlay}</div>
+            <div className="absolute inset-0 z-[15] overflow-hidden pointer-events-none">{props.runViewOverlay}</div>
           ) : null}
           {props.headerMode === "runs" && props.runDetailPanel ? (
             <div className="absolute inset-x-0 bottom-0 z-[25]">{props.runDetailPanel}</div>

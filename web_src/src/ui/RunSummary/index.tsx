@@ -290,7 +290,7 @@ export function RunSummary({
   const { title: runTitle } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "" };
 
   return (
-    <div className="flex h-full w-full flex-col overflow-y-auto bg-slate-50 p-6">
+    <div className="pointer-events-auto flex h-full w-full flex-col overflow-y-auto bg-slate-50 p-6">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="flex items-start justify-between p-5">
@@ -438,32 +438,31 @@ export function RunSummary({
           </div>
         )}
 
-        {(reportSteps.length > 0 || activeSteps.length > 0) && (
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Report</h3>
-            {reportSteps.length > 0 ? (
-              <div className="flex flex-col gap-1">
-                {reportSteps.map((step) => {
-                  const sIconSrc = getHeaderIconSrc(step.componentName);
-                  const sNode = nodeMap.get(step.nodeId);
-                  const sIconSlug = resolveNodeIconSlug(sNode, componentIconMap || {});
-                  return (
-                    <ReportSection
-                      key={step.nodeId + (step.executionId || "")}
-                      step={step}
-                      iconSrc={sIconSrc}
-                      iconSlug={sIconSlug || undefined}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-xs text-gray-400">
-                No report entries yet. Add a report template to triggers and components to populate this section.
-              </div>
-            )}
-          </div>
-        )}
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Report</h3>
+          {reportSteps.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {reportSteps.map((step) => {
+                const sIconSrc = getHeaderIconSrc(step.componentName);
+                const sNode = nodeMap.get(step.nodeId);
+                const sIconSlug = resolveNodeIconSlug(sNode, componentIconMap || {});
+                return (
+                  <ReportSection
+                    key={step.nodeId + (step.executionId || "")}
+                    step={step}
+                    iconSrc={sIconSrc}
+                    iconSlug={sIconSlug || undefined}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">
+              No report entries yet. Add a <code className="rounded bg-gray-100 px-0.5">reportTemplate</code> to your
+              triggers or components to populate this section.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

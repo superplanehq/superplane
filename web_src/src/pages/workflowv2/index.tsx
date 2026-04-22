@@ -78,6 +78,7 @@ import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } f
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { RunSummary } from "@/ui/RunSummary";
+import { RunViewToggle, type RunViewMode } from "@/ui/RunSummary/RunViewToggle";
 import { NodeDetailPanel } from "@/ui/NodeDetailPanel";
 import { usePushThroughHandler } from "@/pages/workflowv2/usePushThroughHandler";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
@@ -598,6 +599,15 @@ export function WorkflowPageV2() {
     return new URLSearchParams(window.location.search).get("run");
   });
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
+  //
+  // Run view mode toggles between the RunSummary panel (default) and the
+  // underlying canvas graph. Selecting a different run resets back to the
+  // summary so users always start with the familiar overview.
+  //
+  const [runViewMode, setRunViewMode] = useState<RunViewMode>("summary");
+  useEffect(() => {
+    setRunViewMode("summary");
+  }, [selectedRunEventId]);
   const describeRunQuery = useDescribeRun(canvasId!, isRunsMode ? selectedRunEventId : null);
   /** After creating a change request, hide draft Discard until the user enters edit mode again. */
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
@@ -5461,23 +5471,32 @@ export function WorkflowPageV2() {
             />
           }
           runViewOverlay={
-            isRunsMode && selectedRunEventId && describeRunQuery.data ? (
-              <RunSummary
-                runData={describeRunQuery.data}
-                workflowNodes={canvas?.spec?.nodes}
-                componentIconMap={componentIconMap}
-                onPushThrough={handlePushThrough}
-                onCancelExecution={onCancelExecution}
-                onClose={() => handleSelectRun(null)}
-              />
-            ) : isRunsMode && selectedRunEventId && describeRunQuery.isLoading ? (
-              <div className="flex h-full items-center justify-center bg-slate-50">
-                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-              </div>
-            ) : isRunsMode && !selectedRunEventId ? (
-              <div className="flex h-full items-center justify-center bg-slate-50 px-6 text-center text-sm text-gray-400">
-                Select a run on the left to see its details.
-              </div>
+            isRunsMode ? (
+              <>
+                {selectedRunEventId ? (
+                  <div className="pointer-events-auto absolute left-3 top-3 z-[20]">
+                    <RunViewToggle value={runViewMode} onChange={setRunViewMode} />
+                  </div>
+                ) : null}
+                {runViewMode === "summary" && selectedRunEventId && describeRunQuery.data ? (
+                  <RunSummary
+                    runData={describeRunQuery.data}
+                    workflowNodes={canvas?.spec?.nodes}
+                    componentIconMap={componentIconMap}
+                    onPushThrough={handlePushThrough}
+                    onCancelExecution={onCancelExecution}
+                    onClose={() => handleSelectRun(null)}
+                  />
+                ) : runViewMode === "summary" && selectedRunEventId && describeRunQuery.isLoading ? (
+                  <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">
+                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                  </div>
+                ) : !selectedRunEventId ? (
+                  <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50 px-6 text-center text-sm text-gray-400">
+                    Select a run on the left to see its details.
+                  </div>
+                ) : null}
+              </>
             ) : null
           }
           onNodeDoubleClick={isRunsMode ? handleNodeDoubleClick : undefined}

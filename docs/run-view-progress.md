@@ -242,6 +242,18 @@ Current Canvas Page Layout:
 +-----------------------------------------------------------+
 ```
 
+## Known Follow-ups
+
+- **Snapshot canvas rendering**: In Runs mode the canvas currently shows the live
+  canvas graph underneath the `RunSummary` panel rather than the snapshot
+  captured in `describeRunQuery.data.snapshotVersion`. Building a read-only
+  ReactFlow from the snapshot's nodes/edges (and overlaying execution status)
+  was deferred to keep the `Canvas | Summary` toggle ship-able. Track under a
+  future batch when snapshot parity becomes required.
+- **URL sync for run view mode**: `?run=<eventId>` already deep-links the
+  selected run; adding `?view=canvas|summary` would round-trip the toggle but
+  was not requested.
+
 ## Key Design Decisions
 
 1. **Entry point**: Third tab "Runs" in `CanvasModeToggle`
