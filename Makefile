@@ -19,8 +19,15 @@ PUBLIC_API_PORT ?= 8000
 PORT ?= $(PUBLIC_API_PORT)
 API_PORT ?= $(PUBLIC_API_PORT)
 AGENT_HTTP_PORT ?= 8090
+# Docker BuildKit requires tagged images in cache_from; Podman's --cache-from
+# rejects tags ("repository must contain neither a tag nor digest").
+ifeq ($(CONTAINER_ENGINE),podman)
 APP_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base
 AGENT_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base
+else
+APP_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base:app-latest
+AGENT_DEV_BASE_CACHE_IMAGE ?= ghcr.io/superplanehq/superplane-dev-base:agent-latest
+endif
 export GRPC_SERVER_ADDR PORT API_PORT AGENT_HTTP_PORT APP_DEV_BASE_CACHE_IMAGE AGENT_DEV_BASE_CACHE_IMAGE
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger/superplane.swagger.json agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
