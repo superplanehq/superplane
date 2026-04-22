@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 
 describe("hasDraftVersusLiveGraphDiff", () => {
-  const node = (id: string) => ({
+  const node = (id: string, integrationId?: string | null) => ({
     id,
     name: "N",
     type: "TYPE_COMPONENT",
@@ -10,7 +10,7 @@ describe("hasDraftVersusLiveGraphDiff", () => {
     configuration: {},
     position: { x: 0, y: 0 },
     isCollapsed: false,
-    integrationId: null,
+    integration: integrationId ? { id: integrationId, name: `integration-${integrationId}` } : undefined,
   });
 
   it("returns true when only edges differ", () => {
@@ -50,6 +50,23 @@ describe("hasDraftVersusLiveGraphDiff", () => {
     const draft = {
       spec: {
         nodes: [{ ...node("a"), runTitleTemplate: "{{ root().data.message }}" }],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+
+    expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
+  });
+
+  it("returns true when only the integration binding changes", () => {
+    const live = {
+      spec: {
+        nodes: [node("a", "github-1")],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+    const draft = {
+      spec: {
+        nodes: [node("a", "github-2")],
         edges: [] as { sourceId: string; targetId: string; channel: string }[],
       },
     };

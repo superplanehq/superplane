@@ -1,5 +1,6 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
 import * as yaml from "js-yaml";
+import { getComparableIntegrationId } from "./utils";
 
 export type DraftDiffLine = {
   prefix: "meta" | "context" | "+" | "-";
@@ -82,7 +83,7 @@ export function buildDraftNodeDiffSummary(
     runTitleTemplate: node.runTitleTemplate || null,
     position: node.position || null,
     isCollapsed: node.isCollapsed || false,
-    integrationId: node.integrationId || null,
+    integrationId: getComparableIntegrationId(node),
   });
 
   const formatDiffValueLines = (value: unknown): string[] => {

@@ -1,12 +1,13 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentsComponent, SuperplaneComponentsNode } from "@/api-client";
-import { makeComponentsNode } from "@/test/factories";
+import { makeCanvas, makeComponentsNode } from "@/test/factories";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
 import { createSafeCustomFieldRenderer } from "./mappers/safeMappers";
 import { prepareComponentBaseNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
+import { getWorkflowSaveSignature } from "./utils";
 
 type FallbackComponentData = {
   renderFallback?: {
@@ -143,5 +144,40 @@ describe("canvas node preparation resilience", () => {
 
     expect(triggerData.trigger.error).toBeUndefined();
     expect(triggerData.trigger.warning).toBeUndefined();
+  });
+});
+
+describe("getWorkflowSaveSignature", () => {
+  it("treats integration refs with the same id as the same saved draft even when only the display name differs", () => {
+    const workflowWithIntegrationName = makeCanvas({
+      spec: {
+        nodes: [
+          makeNode({
+            integration: {
+              id: "integration-1",
+              name: "github-1",
+            },
+          }),
+        ],
+        edges: [],
+      },
+    });
+
+    const workflowWithPersistedIntegrationShape = makeCanvas({
+      spec: {
+        nodes: [
+          makeNode({
+            integration: {
+              id: "integration-1",
+            },
+          }),
+        ],
+        edges: [],
+      },
+    });
+
+    expect(getWorkflowSaveSignature(workflowWithIntegrationName)).toBe(
+      getWorkflowSaveSignature(workflowWithPersistedIntegrationShape),
+    );
   });
 });

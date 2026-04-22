@@ -373,12 +373,12 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   );
                 })}
                 {isError && (
-                  <div className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                  <div className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                     <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600" title="Error">
                       Error:
                     </span>
                     <span
-                      className="text-[13px] flex-1 truncate text-left w-[70%] text-red-600 truncate"
+                      className="text-[13px] flex-1 text-left w-[70%] text-red-600 break-words whitespace-normal"
                       title={item.originalExecution?.resultMessage}
                     >
                       {item.originalExecution?.resultMessage}
