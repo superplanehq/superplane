@@ -940,6 +940,35 @@ function CanvasPage(props: CanvasPageProps) {
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
 
+  /**
+   * Keyboard equivalent of dropping a block onto the canvas via drag-and-drop.
+   * When a placeholder / pending-connection is active we route through the
+   * existing click path so the block fills the placeholder instead of spawning
+   * a free-floating node. Otherwise we place the new node at the viewport
+   * center using the same algorithm as "Add Note".
+   */
+  const handleBuildingBlockEnter = useCallback(
+    (block: BuildingBlock) => {
+      if (readOnly) return;
+
+      if (templateNodeId) {
+        void handleBuildingBlockClick(block);
+        return;
+      }
+
+      const position = findFreePositionInViewport({
+        viewport: props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
+        canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
+        nodes: state.nodes || [],
+        nodeSize: { width: 420, height: 200 },
+        fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
+      });
+
+      void handleBuildingBlockDrop(block, position);
+    },
+    [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
+  );
+
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
       if (!editingNodeData || !props.onNodeConfigurationSave) {
@@ -1077,6 +1106,7 @@ function CanvasPage(props: CanvasPageProps) {
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockClick}
+            onEnterSubmit={handleBuildingBlockEnter}
           />
         )}
 
