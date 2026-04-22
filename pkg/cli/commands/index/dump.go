@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"golang.org/x/sync/errgroup"
 )
 
 func newDumpCommand(options core.BindOptions) *cobra.Command {
