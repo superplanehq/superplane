@@ -294,6 +294,7 @@ function useChatHandlers(p: UseChatHandlersParams) {
     p.setAiMessages([]);
     p.setPendingProposal(null);
     p.setAiError(null);
+    p.setIsGeneratingResponse(false);
     requestAnimationFrame(() => p.aiInputRef.current?.focus());
   };
 
@@ -301,6 +302,7 @@ function useChatHandlers(p: UseChatHandlersParams) {
     p.setCurrentChatId(chatId);
     p.setPendingProposal(null);
     p.setAiError(null);
+    p.setIsGeneratingResponse(false);
   };
 
   return { handleSendPrompt, handleStartNewChatSession, handleSelectChatSession };
