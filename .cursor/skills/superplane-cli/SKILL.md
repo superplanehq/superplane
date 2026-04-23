@@ -1,6 +1,6 @@
 ---
 name: superplane-cli
-description: Use when working with the SuperPlane CLI to discover available integrations, components, and triggers, and to build or troubleshoot canvases that connect trigger->component flows. Covers list/get command usage, interpreting configuration schemas, wiring channels between nodes, and resolving integration binding issues such as "integration is required".
+description: Use when working with the SuperPlane CLI to discover available integrations, components, and triggers, to build or troubleshoot canvases that connect trigger->component flows, and to run canvases programmatically via Manual Run (start) triggers. Covers list/get command usage, interpreting configuration schemas, wiring channels between nodes, resolving integration binding issues such as "integration is required", and the `superplane canvases run` command used by agents to kick off a workflow.
 ---
 
 # SuperPlane CLI Canvas Workflow
@@ -196,6 +196,52 @@ How to resolve:
 4. Reopen the node config and select valid provider resources for required fields.
 5. Use `superplane integrations list-resources --id <integration-id> --type <type> --parameters ...` to inspect valid option IDs/names.
 6. Re-run `superplane canvases get <name>` and confirm node errors are cleared.
+
+## Run a canvas
+
+To run a canvas programmatically (the CLI equivalent of clicking the UI "Run"
+button on a Manual Run node), the canvas must have at least one node with
+`trigger.name: start` and at least one `template` configured on that node.
+
+Discover what is runnable:
+
+```bash
+superplane index triggers --name start
+superplane canvases get <canvas-name>
+```
+
+Look in the canvas YAML for nodes with `trigger.name: start` and read the
+`configuration.templates` list. Each template has a `name` (used as the event
+channel) and a `payload` (used as the default event data).
+
+Trigger a run:
+
+```bash
+superplane canvases run <canvas-name-or-id> \
+  --node <node-id> \
+  --template "Hello World" \
+  --payload-json '{"message":"Hello from agent"}'
+```
+
+- `<node-id>` is the `id` of the Manual Run node in the canvas YAML, not its
+  display `name`.
+- `--template` must match the `name` of one of the templates on that node.
+- `--payload-json` is optional. When omitted, the template's saved payload is
+  used as-is.
+
+Common failure modes and how to read them:
+
+- `node "<id>" is not a trigger` — you passed a component node id; pick a
+  `TYPE_TRIGGER` node backed by `start`.
+- `node "<id>" is a "<name>" trigger, not a Manual Run (start) trigger` — the
+  node uses a different trigger (for example `github.onPush`). Those are not
+  runnable from the CLI; they are invoked by their provider.
+- `template "<name>" not found on node "<id>". Available templates: ...` —
+  use one of the listed names, or add the template to the canvas YAML and
+  re-run `superplane canvases update`.
+- `node "<id>" has no templates configured` — the canvas was saved without a
+  template. Update the canvas YAML to include at least one template under
+  `configuration.templates` and re-run `superplane canvases update`.
 
 ## Troubleshooting checklist
 

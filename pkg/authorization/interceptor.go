@@ -340,13 +340,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_EmitNodeEvent_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-
 		// Service Accounts rules
 		pbServiceAccounts.ServiceAccounts_CreateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbServiceAccounts.ServiceAccounts_ListServiceAccounts_FullMethodName:           {Resource: "service_accounts", Action: "read", DomainType: models.DomainTypeOrganization},

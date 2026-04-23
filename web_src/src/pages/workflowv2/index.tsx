@@ -30,7 +30,11 @@ import type {
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import {
+  canvasesApplyCanvasVersionChangeset,
+  canvasesInvokeNodeTriggerAction,
+  canvasesUpdateNodePause,
+} from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
@@ -3822,22 +3826,24 @@ export function WorkflowPageV2() {
       if (!canvasId) return;
 
       try {
-        await canvasesEmitNodeEvent(
+        await canvasesInvokeNodeTriggerAction(
           withOrganizationHeader({
             path: {
               canvasId: canvasId,
               nodeId: nodeId,
+              actionName: "run",
             },
             body: {
-              channel,
-              data,
+              parameters: {
+                template: channel,
+                payload: data,
+              },
             },
           }),
         );
-        // Note: Success toast is shown by EmitEventModal
       } catch (error) {
         showErrorToast("Failed to emit event");
-        throw error; // Re-throw to let EmitEventModal handle it
+        throw error;
       }
     },
     [canvasId],

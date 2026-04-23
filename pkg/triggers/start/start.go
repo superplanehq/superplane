@@ -1,12 +1,16 @@
 package manual
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+const ActionRun = "run"
 
 func init() {
 	registry.RegisterTrigger("start", &Start{})
@@ -106,11 +110,86 @@ func (s *Start) Setup(ctx core.TriggerContext) error {
 }
 
 func (s *Start) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           ActionRun,
+			Description:    "Start a manual run using a configured template",
+			UserAccessible: true,
+			Parameters: []configuration.Field{
+				{
+					Name:     "template",
+					Label:    "Template",
+					Type:     configuration.FieldTypeString,
+					Required: true,
+				},
+				{
+					Name:  "payload",
+					Label: "Payload Override",
+					Type:  configuration.FieldTypeObject,
+				},
+			},
+		},
+	}
 }
 
 func (s *Start) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+	switch ctx.Name {
+	case ActionRun:
+		return s.run(ctx)
+	default:
+		return nil, fmt.Errorf("action %s not supported", ctx.Name)
+	}
+}
+
+func (s *Start) run(ctx core.TriggerActionContext) (map[string]any, error) {
+	templateName, _ := ctx.Parameters["template"].(string)
+	if templateName == "" {
+		return nil, fmt.Errorf("template parameter is required")
+	}
+
+	config, _ := ctx.Configuration.(map[string]any)
+	rawTemplates, _ := config["templates"].([]any)
+	if len(rawTemplates) == 0 {
+		return nil, fmt.Errorf("no templates configured")
+	}
+
+	var names []string
+	var payload map[string]any
+
+	for _, raw := range rawTemplates {
+		tmpl, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := tmpl["name"].(string)
+		names = append(names, name)
+		if name == templateName {
+			payload, _ = tmpl["payload"].(map[string]any)
+		}
+	}
+
+	if payload == nil && !containsName(names, templateName) {
+		return nil, fmt.Errorf("template %q not found; available: %s", templateName, strings.Join(names, ", "))
+	}
+
+	if override, ok := ctx.Parameters["payload"].(map[string]any); ok {
+		payload = override
+	}
+
+	if err := ctx.Events.Emit("manual.run", payload); err != nil {
+		return nil, fmt.Errorf("failed to emit event: %w", err)
+	}
+
+	return map[string]any{"template": templateName}, nil
+}
+
+func containsName(names []string, target string) bool {
+	for _, n := range names {
+		if n == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Start) Cleanup(ctx core.TriggerContext) error {

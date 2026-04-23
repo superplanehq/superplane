@@ -236,6 +236,27 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
+	var runNode string
+	var runTemplate string
+	var runPayloadJSON string
+	runCmd := &cobra.Command{
+		Use:   "run <name-or-id>",
+		Short: "Run a canvas by emitting an event to a Manual Run trigger node",
+		Long: "Trigger a canvas programmatically by emitting an event to one of its Manual Run (start) trigger nodes. " +
+			"This is the CLI equivalent of pressing the Run button in the UI.\n\n" +
+			"Example:\n" +
+			"  superplane canvases run my-canvas --node start-node --template \"Hello World\"",
+		Args: cobra.ExactArgs(1),
+	}
+	runCmd.Flags().StringVar(&runNode, "node", "", "id of the Manual Run (start) trigger node to run")
+	runCmd.Flags().StringVar(&runTemplate, "template", "", "name of the template to use as the event channel and default payload")
+	runCmd.Flags().StringVar(&runPayloadJSON, "payload-json", "", "optional JSON object to use as the event payload (overrides the template's saved payload)")
+	core.Bind(runCmd, &runCommand{
+		node:        &runNode,
+		template:    &runTemplate,
+		payloadJSON: &runPayloadJSON,
+	}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
@@ -243,6 +264,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(deleteCmd)
+	root.AddCommand(runCmd)
 	root.AddCommand(changeRequestsCmd)
 
 	return root
