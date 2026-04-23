@@ -91,7 +91,6 @@ export function CanvasPageModals({
             },
           ]}
           defaultTemplateId={canvas.metadata?.id || ""}
-          mode="create"
           fromTemplate
         />
       ) : null}

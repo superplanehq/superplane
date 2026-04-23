@@ -39,7 +39,22 @@ import type {
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { analytics } from "../lib/analytics";
-import { isDraftVersion, isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
+import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
+
+type ChangeManagementUpdateInput = {
+  enabled?: boolean;
+  approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
+};
+
+function mapChangeManagementApprovals(
+  approvals?: ChangeManagementUpdateInput["approvals"],
+): ChangeManagementApprover[] | undefined {
+  return approvals?.map((approval) => ({
+    type: approval.type as ChangeManagementApproverType | undefined,
+    userId: approval.userId,
+    roleName: approval.roleName,
+  }));
+}
 
 // Query Keys
 export const canvasKeys = {
@@ -124,100 +139,6 @@ export const widgetKeys = {
 };
 
 export const NODE_EXECUTION_HISTORY_PAGE_SIZE = 10;
-
-type ChangeManagementUpdateInput = {
-  enabled?: boolean;
-  approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
-};
-
-function mapChangeManagementApprovals(
-  approvals?: ChangeManagementUpdateInput["approvals"],
-): ChangeManagementApprover[] | undefined {
-  return approvals?.map((approval) => ({
-    type: approval.type as ChangeManagementApproverType | undefined,
-    userId: approval.userId,
-    roleName: approval.roleName,
-  }));
-}
-
-async function fetchCanvasOrThrow(canvasId: string): Promise<CanvasesCanvas> {
-  const currentCanvasResponse = await canvasesDescribeCanvas(
-    withOrganizationHeader({
-      path: { id: canvasId },
-    }),
-  );
-  const currentCanvas = currentCanvasResponse.data?.canvas;
-  if (!currentCanvas) {
-    throw new Error("Canvas not found");
-  }
-
-  return currentCanvas;
-}
-
-function mergeCanvasUpdate(
-  currentCanvas: CanvasesCanvas,
-  data: {
-    name?: string;
-    description?: string;
-    changeManagement?: ChangeManagementUpdateInput;
-  },
-): CanvasesCanvas {
-  const nextApprovals = mapChangeManagementApprovals(data.changeManagement?.approvals);
-
-  return {
-    ...currentCanvas,
-    metadata: {
-      ...currentCanvas.metadata,
-      name: data.name ?? currentCanvas.metadata?.name ?? "",
-      description: data.description ?? currentCanvas.metadata?.description ?? "",
-    },
-    spec: {
-      ...currentCanvas.spec,
-      changeManagement: data.changeManagement
-        ? {
-            ...currentCanvas.spec?.changeManagement,
-            ...data.changeManagement,
-            approvals: nextApprovals ?? currentCanvas.spec?.changeManagement?.approvals,
-          }
-        : currentCanvas.spec?.changeManagement,
-    },
-  };
-}
-
-async function findDraftVersionId(canvasId: string): Promise<string> {
-  const versionsResponse = await canvasesListCanvasVersions(
-    withOrganizationHeader({
-      path: { canvasId },
-    }),
-  );
-
-  return versionsResponse.data?.versions?.find(isDraftVersion)?.metadata?.id || "";
-}
-
-async function createDraftVersionId(canvasId: string): Promise<string> {
-  const existingDraftVersionId = await findDraftVersionId(canvasId);
-  if (existingDraftVersionId) {
-    throw new Error("this canvas already has a draft; update it in the editor instead");
-  }
-
-  const createVersionResponse = await canvasesCreateCanvasVersion(
-    withOrganizationHeader({
-      path: { canvasId },
-      body: {},
-    }),
-  );
-
-  return createVersionResponse.data?.version?.metadata?.id || "";
-}
-
-async function publishCanvasVersion(canvasId: string, versionId: string) {
-  await canvasesPublishCanvasVersion(
-    withOrganizationHeader({
-      path: { canvasId, versionId },
-      body: {},
-    }),
-  );
-}
 
 function buildCanvasVersionUpdateBody(data: {
   name: string;
@@ -525,53 +446,6 @@ export const useCreateCanvas = (organizationId: string) => {
         );
         analytics.canvasCreated(response.data.canvas.metadata.id, organizationId);
       }
-    },
-  });
-};
-
-export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-  const changeManagementEnabledError =
-    "change management is enabled for this canvas; update the draft in the editor and publish it through a change request";
-
-  return useMutation({
-    mutationFn: async (data: {
-      name?: string;
-      description?: string;
-      changeManagement?: ChangeManagementUpdateInput;
-    }) => {
-      const currentCanvas = await fetchCanvasOrThrow(canvasId);
-
-      if (currentCanvas.spec?.changeManagement?.enabled ?? false) {
-        throw new Error(changeManagementEnabledError);
-      }
-
-      const mergedCanvas = mergeCanvasUpdate(currentCanvas, data);
-      const targetVersionId = await createDraftVersionId(canvasId);
-
-      if (!targetVersionId) {
-        throw new Error("Draft version was not returned by the API");
-      }
-
-      const updateResponse = await canvasesUpdateCanvasVersion2(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            versionId: targetVersionId,
-            canvas: mergedCanvas,
-          },
-        }),
-      );
-
-      await publishCanvasVersion(canvasId, targetVersionId);
-
-      return updateResponse;
-    },
-    onSuccess: (_response) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
     },
   });
 };
