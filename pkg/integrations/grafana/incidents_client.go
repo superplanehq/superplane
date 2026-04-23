@@ -345,9 +345,9 @@ func (c *Client) updateIncidentIsDrill(id string, isDrill bool) (*Incident, erro
 
 func (c *Client) updateIncidentEventTime(id, eventName string, eventTime time.Time) error {
 	return c.execGrafanaIRMRPC("IncidentsService.UpdateIncidentEventTime", map[string]string{
-		"incidentID": strings.TrimSpace(id),
-		"eventName":  strings.TrimSpace(eventName),
-		"eventTime":  eventTime.UTC().Format(time.RFC3339),
+		"incidentID":       strings.TrimSpace(id),
+		"activityItemKind": strings.TrimSpace(eventName),
+		"eventTime":        eventTime.UTC().Format(time.RFC3339),
 	}, &struct{}{})
 }
 

@@ -140,7 +140,7 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 	body, err = io.ReadAll(httpCtx.Requests[1].Body)
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(body, &payload))
-	require.Equal(t, "incidentStart", payload["eventName"])
+	require.Equal(t, "incidentStart", payload["activityItemKind"])
 	require.Equal(t, "2026-04-20T10:00:00Z", payload["eventTime"])
 }
 
