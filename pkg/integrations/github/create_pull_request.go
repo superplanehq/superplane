@@ -131,6 +131,14 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 			Type:     configuration.FieldTypeText,
 			Required: false,
 		},
+		{
+			Name:        "draft",
+			Label:       "Draft",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Create the pull request as a draft",
+		},
 	}
 }
 
