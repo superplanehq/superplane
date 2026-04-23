@@ -1,0 +1,20 @@
+{
+  "data": {
+    "id": 102,
+    "number": 43,
+    "title": "Add PR actions",
+    "state": "open",
+    "html_url": "https://github.com/acme/widgets/pull/43",
+    "user": {
+      "login": "octocat"
+    },
+    "base": {
+      "ref": "main"
+    },
+    "head": {
+      "ref": "feat-pr-actions"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.pull_request"
+}

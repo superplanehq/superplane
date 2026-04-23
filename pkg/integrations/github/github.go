@@ -123,6 +123,8 @@ func (g *GitHub) Components() []core.Component {
 		&UpdateRelease{},
 		&DeleteRelease{},
 		&GetWorkflowUsage{},
+		&CreatePullRequest{},
+		&MergePullRequest{},
 	}
 }
 
