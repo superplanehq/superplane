@@ -10,19 +10,61 @@ import (
 
 type SetupProvider struct{}
 
+const organizationURLInstructions = `You can find the URL in the address bar of your browser when you are on the Semaphore organization page. It follows the format:
+
+~~~text
+https://<organization-name>.semaphoreci.com
+~~~
+
+For example, if your organization name is **superplane**, the URL would be:
+
+~~~text
+https://superplane.semaphoreci.com
+~~~`
+
+const apiTokenInstructions = `
+There are two ways to provide a Semaphore API token:
+1. Use a service account (recommended)
+2. Use a personal API token
+
+## 1. Use a service account (recommended)
+
+If your organization has access to service accounts, you can use one of them to connect to SuperPlane.
+
+1. Go to [%s/people](%s/people)
+2. Create Service Account
+   - Give it a name and a description
+   - Give it an **Admin** role
+3. Copy its API token and paste below
+
+## 2. Use a personal API token
+
+If your organization does not have access to service accounts, you can use a personal API token to connect to SuperPlane.
+
+If you don't have access to your personal access token anymore, you can reset it:
+1. Go to [%s](%s)
+2. On the top right corner, click on your avatar and select **Profile Settings**
+2. Reset API token, copy it and paste below
+
+> **Important:**
+> This will revoke the current token and generate a new one, so any existing workflows that use this token will stop working.
+`
+
 func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	return core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
 		Name:  "selectOrganization",
-		Label: "Select Semaphore organization URL",
+		Label: "What is your Semaphore Organization URL?",
 		Inputs: []configuration.Field{
 			{
 				Name:     "organizationUrl",
-				Label:    "Organization URL",
+				Label:    "Semaphore Organization URL",
 				Type:     configuration.FieldTypeString,
 				Required: true,
+				Default:  "https://hello.semaphoreci.com",
 			},
 		},
+		Instructions: organizationURLInstructions,
 	}
 }
 
@@ -75,12 +117,14 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 		Label: "Enter Semaphore API token",
 		Inputs: []configuration.Field{
 			{
-				Name:     "apiToken",
-				Label:    "API Token",
-				Type:     configuration.FieldTypeString,
-				Required: true,
+				Name:      "apiToken",
+				Label:     "API Token",
+				Type:      configuration.FieldTypeString,
+				Required:  true,
+				Sensitive: true,
 			},
 		},
+		Instructions: fmt.Sprintf(apiTokenInstructions, organizationURL, organizationURL, organizationURL, organizationURL),
 	}, nil
 }
 

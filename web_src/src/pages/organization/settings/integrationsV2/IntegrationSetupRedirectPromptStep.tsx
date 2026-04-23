@@ -1,6 +1,6 @@
 import type { IntegrationSetupStepDefinition } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { IntegrationInstructionsV2 } from "@/ui/IntegrationInstructionsV2";
 
 interface IntegrationSetupRedirectPromptStepProps {
   step: IntegrationSetupStepDefinition;
@@ -21,7 +21,7 @@ export function IntegrationSetupRedirectPromptStep({
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Step: {step.label}</h2>
-        <IntegrationInstructions description={step.instructions} className="mt-3" />
+        <IntegrationInstructionsV2 description={step.instructions} className="mt-3" />
       </div>
 
       <div className="rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
