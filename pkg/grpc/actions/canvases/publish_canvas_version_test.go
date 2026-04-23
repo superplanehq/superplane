@@ -125,6 +125,27 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Contains(t, s.Message(), "version not found")
 	})
 
+	t.Run("draft version with no changes -> failed precondition, not 500", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-no-changes")
+
+		createResp, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+		require.NoError(t, err)
+		draftVersionID := createResp.Version.Metadata.Id
+
+		_, err = PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvasID, draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, s.Code())
+		assert.Contains(t, s.Message(), "no changes to publish")
+	})
+
 	t.Run("draft version -> publishes and deletes draft", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-draft")
