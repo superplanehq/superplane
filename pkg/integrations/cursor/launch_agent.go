@@ -41,7 +41,7 @@ func (c *LaunchAgent) Color() string { return "#8B5CF6" }
 func (c *LaunchAgent) ExampleOutput() map[string]any {
 	return map[string]any{
 		"data": map[string]any{
-			"status":     LaunchAgentStatusDone,
+			"status":     LaunchAgentStatusFinished,
 			"agentId":    "agent_12345",
 			"summary":    "Refactored login logic.",
 			"prUrl":      "https://github.com/org/repo/pull/42",

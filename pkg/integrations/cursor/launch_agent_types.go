@@ -126,10 +126,19 @@ type launchAgentTargetResponse struct {
 }
 
 type launchAgentWebhookPayload struct {
-	ID      string `json:"id"`
-	Status  string `json:"status"`
-	PrURL   string `json:"prUrl,omitempty"`
-	Summary string `json:"summary,omitempty"`
+	Event     string                    `json:"event,omitempty"`
+	Timestamp string                    `json:"timestamp,omitempty"`
+	ID        string                    `json:"id"`
+	Status    string                    `json:"status"`
+	Target    *launchAgentWebhookTarget `json:"target,omitempty"`
+	PrURL     string                    `json:"prUrl,omitempty"`
+	Summary   string                    `json:"summary,omitempty"`
+}
+
+type launchAgentWebhookTarget struct {
+	URL        string `json:"url,omitempty"`
+	BranchName string `json:"branchName,omitempty"`
+	PrURL      string `json:"prUrl,omitempty"`
 }
 
 type LaunchAgentOutputPayload struct {
@@ -164,6 +173,90 @@ func buildOutputPayload(status, agentID, prURL, summary, branchName string) Laun
 		PrURL:      prURL,
 		Summary:    summary,
 		BranchName: branchName,
+	}
+}
+
+func ensureLaunchAgentMetadata(metadata *LaunchAgentExecutionMetadata) {
+	if metadata.Agent == nil {
+		metadata.Agent = &AgentMetadata{}
+	}
+	if metadata.Target == nil {
+		metadata.Target = &TargetMetadata{}
+	}
+	if metadata.Source == nil {
+		metadata.Source = &SourceMetadata{}
+	}
+}
+
+func mergeAgentResponseIntoMetadata(metadata *LaunchAgentExecutionMetadata, response *LaunchAgentResponse) {
+	if response == nil {
+		return
+	}
+
+	ensureLaunchAgentMetadata(metadata)
+
+	if response.ID != "" {
+		metadata.Agent.ID = response.ID
+	}
+	if response.Name != "" {
+		metadata.Agent.Name = response.Name
+	}
+	if response.Status != "" {
+		metadata.Agent.Status = response.Status
+	}
+	if response.Summary != "" {
+		metadata.Agent.Summary = response.Summary
+	}
+
+	if response.Source != nil {
+		if response.Source.Repository != "" {
+			metadata.Source.Repository = response.Source.Repository
+		}
+		if response.Source.Ref != "" {
+			metadata.Source.Ref = response.Source.Ref
+		}
+	}
+
+	if response.Target == nil {
+		return
+	}
+
+	if response.Target.URL != "" {
+		metadata.Agent.URL = response.Target.URL
+	}
+	if response.Target.BranchName != "" {
+		metadata.Target.BranchName = response.Target.BranchName
+	}
+	if response.Target.PrURL != "" {
+		metadata.Target.PrURL = response.Target.PrURL
+	}
+}
+
+func mergeWebhookPayloadIntoMetadata(metadata *LaunchAgentExecutionMetadata, payload launchAgentWebhookPayload) {
+	ensureLaunchAgentMetadata(metadata)
+
+	if payload.ID != "" {
+		metadata.Agent.ID = payload.ID
+	}
+	if payload.Status != "" {
+		metadata.Agent.Status = payload.Status
+	}
+	if payload.Summary != "" {
+		metadata.Agent.Summary = payload.Summary
+	}
+	if payload.Target != nil {
+		if payload.Target.URL != "" {
+			metadata.Agent.URL = payload.Target.URL
+		}
+		if payload.Target.BranchName != "" {
+			metadata.Target.BranchName = payload.Target.BranchName
+		}
+		if payload.Target.PrURL != "" {
+			metadata.Target.PrURL = payload.Target.PrURL
+		}
+	}
+	if payload.PrURL != "" {
+		metadata.Target.PrURL = payload.PrURL
 	}
 }
 
