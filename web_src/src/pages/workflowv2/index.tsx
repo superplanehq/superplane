@@ -18,6 +18,7 @@ import type {
   CanvasesCanvas,
   CanvasesCanvasChangeRequest,
   CanvasesCanvasEvent,
+  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasVersion,
@@ -78,7 +79,7 @@ import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } f
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { RunSummary } from "@/ui/RunSummary";
-import { RunViewToggle, type RunViewMode } from "@/ui/RunSummary/RunViewToggle";
+import { RunContextHeader, type RunViewMode } from "@/ui/RunSummary/RunContextHeader";
 import { NodeDetailPanel } from "@/ui/NodeDetailPanel";
 import { usePushThroughHandler } from "@/pages/workflowv2/usePushThroughHandler";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
@@ -5602,9 +5603,7 @@ export function WorkflowPageV2() {
           fitAllRequest={showRunCanvas ? runsFitAllNonce : null}
           onExecutionChainHandled={handleExecutionChainHandled}
           onSelectRuns={() => setRunsMode(true)}
-          runsNotificationCount={
-            runsEventsData.events.filter((e) => (e.executions || []).some((x) => x.state === "STATE_STARTED")).length
-          }
+          runsNotificationCount={countActiveRuns(runsEventsData.events, visibleNodeQueueItemsMap)}
           runsSidebar={
             <RunsSidebar
               events={runsEventsData.events}
@@ -5617,42 +5616,50 @@ export function WorkflowPageV2() {
               workflowNodes={canvas?.spec?.nodes}
               componentIconMap={componentIconMap}
               totalCount={runsEventsData.totalCount}
+              nodeQueueItemsMap={visibleNodeQueueItemsMap}
             />
           }
           runViewOverlay={
             isRunsMode ? (
-              <>
-                {selectedRunEventId ? (
-                  <div className="pointer-events-auto absolute left-3 top-3 z-[20]">
-                    <RunViewToggle value={runViewMode} onChange={setRunViewMode} />
-                  </div>
-                ) : null}
-                {runViewMode === "summary" && selectedRunEventId && describeRunQuery.data ? (
-                  <RunSummary
-                    runData={describeRunQuery.data}
+              selectedRunEventId ? (
+                <div className="pointer-events-none flex h-full w-full flex-col">
+                  <RunContextHeader
+                    runData={describeRunQuery.data ?? null}
+                    isLoading={describeRunQuery.isLoading}
                     workflowNodes={describeRunQuery.data?.snapshotVersion?.spec?.nodes ?? canvas?.spec?.nodes}
                     componentIconMap={componentIconMap}
-                    onPushThrough={handlePushThrough}
-                    onCancelExecution={onCancelExecution}
+                    viewMode={runViewMode}
+                    onChangeViewMode={setRunViewMode}
                     onClose={() => handleSelectRun(null)}
                   />
-                ) : runViewMode === "summary" && selectedRunEventId && describeRunQuery.isLoading ? (
-                  <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">
-                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                  <div className="min-h-0 flex-1">
+                    {runViewMode === "summary" ? (
+                      describeRunQuery.data ? (
+                        <RunSummary
+                          runData={describeRunQuery.data}
+                          workflowNodes={describeRunQuery.data?.snapshotVersion?.spec?.nodes ?? canvas?.spec?.nodes}
+                          componentIconMap={componentIconMap}
+                          onPushThrough={handlePushThrough}
+                          onCancelExecution={onCancelExecution}
+                          onOpenNodeDetail={setRunDetailNodeId}
+                        />
+                      ) : describeRunQuery.isLoading ? (
+                        <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">
+                          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                        </div>
+                      ) : null
+                    ) : !describeRunQuery.data && describeRunQuery.isLoading ? (
+                      <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                      </div>
+                    ) : null}
                   </div>
-                ) : runViewMode === "canvas" &&
-                  selectedRunEventId &&
-                  !describeRunQuery.data &&
-                  describeRunQuery.isLoading ? (
-                  <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">
-                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                  </div>
-                ) : !selectedRunEventId ? (
-                  <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50 px-6 text-center text-sm text-gray-400">
-                    Select a run on the left to see its details.
-                  </div>
-                ) : null}
-              </>
+                </div>
+              ) : (
+                <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50 px-6 text-center text-sm text-gray-400">
+                  Select a run on the left to see its details.
+                </div>
+              )
             ) : null
           }
           onNodeDoubleClick={isRunsMode ? handleNodeDoubleClick : undefined}
@@ -5815,6 +5822,36 @@ export function WorkflowPageV2() {
       />
     </>
   );
+}
+
+//
+// "Active" runs are those that still have in-flight work: a running/pending
+// execution, or a component still waiting in the canvas queue for this run.
+// Completed-but-queued runs are counted too so the Runs tab notification
+// accurately reflects what still needs attention.
+//
+function countActiveRuns(
+  events: CanvasesCanvasEventWithExecutions[],
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
+): number {
+  const queueCountByEventId: Record<string, number> = {};
+  for (const items of Object.values(nodeQueueItemsMap)) {
+    for (const item of items) {
+      const id = item.rootEvent?.id;
+      if (!id) continue;
+      queueCountByEventId[id] = (queueCountByEventId[id] || 0) + 1;
+    }
+  }
+
+  return events.filter((event) => {
+    const executions = event.executions || [];
+    const hasInFlight = executions.some(
+      (x: { state?: string }) => x.state === "STATE_STARTED" || x.state === "STATE_PENDING",
+    );
+    if (hasInFlight) return true;
+    const pending = event.id ? queueCountByEventId[event.id] || 0 : 0;
+    return pending > 0;
+  }).length;
 }
 
 function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: CanvasesCanvas) {

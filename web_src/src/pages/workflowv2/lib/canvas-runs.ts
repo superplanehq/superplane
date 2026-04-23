@@ -38,6 +38,27 @@ export function getAggregateStatus(executions: CanvasesCanvasNodeExecutionRef[])
   return "queued";
 }
 
+//
+// Like getAggregateStatus but also factors in pending queue items for the
+// run. A run that has every execution finished (thus "completed" by the
+// execution-only logic) but still has components sitting in the queue is
+// really a "queued" run -- it hasn't finished all its work.
+//
+// "running" / "error" / "cancelled" outcomes always take precedence so the
+// user still sees the most severe state, consistent with getAggregateStatus.
+//
+export function getAggregateRunStatus(
+  executions: CanvasesCanvasNodeExecutionRef[],
+  hasPendingQueueItems: boolean,
+): string {
+  if (executions.length === 0) {
+    return hasPendingQueueItems ? "queued" : "queued";
+  }
+  const base = getAggregateStatus(executions);
+  if (hasPendingQueueItems && base === "completed") return "queued";
+  return base;
+}
+
 export function computeDuration(execution: CanvasesCanvasNodeExecutionRef): string | null {
   if (execution.state !== "STATE_FINISHED" || !execution.createdAt || !execution.updatedAt) {
     return null;
