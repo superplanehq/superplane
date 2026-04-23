@@ -1120,8 +1120,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // to prevent position jumping when switching between suggestion types
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
+    const showBottomBar = hasExpressions || (isFocused && !!quickTip);
+
     return (
-      <div ref={containerRef} className={"relative w-full" + (quickTip || hasExpressions ? " mb-6" : "")}>
+      <div ref={containerRef} className="relative w-full">
         {/* Hidden mirror element for measuring cursor position */}
         <span
           ref={mirrorRef}
@@ -1213,61 +1215,60 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             ])}
             {...rest}
           />
-          {/* Bottom bar with preview toggle and quickTip */}
-          {(hasExpressions || quickTip) && (
-            <div className="absolute -bottom-6 left-0 right-0 flex items-center justify-between">
-              {/* Preview toggle - left side */}
-              {hasExpressions ? (
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode(!previewMode)}
-                  className={twMerge([
-                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
-                    previewMode
-                      ? allExpressionsValid
-                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
-                        : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                      : allExpressionsValid
-                        ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-                        : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
-                  ])}
-                >
-                  {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  <span>Preview</span>
-                </button>
-              ) : (
-                <span />
-              )}
-              {/* QuickTip - right side */}
-              {(quickTip || hasExpressions) && (
-                <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                  {quickTip
-                    ? renderQuickTip(quickTip)
-                    : [
-                        "Use ",
-                        <code
-                          key="default-tip"
-                          className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
-                        >
-                          {"{{"}
-                        </code>,
-                        " to write ",
-                        <a
-                          key="expr-link"
-                          href="https://expr-lang.org/docs/language-definition"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                          expr
-                        </a>,
-                        " expressions",
-                      ]}
-                </span>
-              )}
-            </div>
-          )}
         </span>
+        {/* Bottom bar with preview toggle and quickTip — rendered in normal flow so it
+            never overlaps the input regardless of the parent layout (grid, flex, etc.) */}
+        {showBottomBar && (
+          <div className="flex items-center justify-between mt-1 px-0.5">
+            {/* Preview toggle - left side */}
+            {hasExpressions ? (
+              <button
+                type="button"
+                onClick={() => setPreviewMode(!previewMode)}
+                className={twMerge([
+                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
+                  previewMode
+                    ? allExpressionsValid
+                      ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                      : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                    : allExpressionsValid
+                      ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                      : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
+                ])}
+              >
+                {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                <span>Preview</span>
+              </button>
+            ) : (
+              <span />
+            )}
+            {/* QuickTip - right side */}
+            <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+              {quickTip
+                ? renderQuickTip(quickTip)
+                : [
+                    "Use ",
+                    <code
+                      key="default-tip"
+                      className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
+                    >
+                      {"{{"}
+                    </code>,
+                    " to write ",
+                    <a
+                      key="expr-link"
+                      href="https://expr-lang.org/docs/language-definition"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      expr
+                    </a>,
+                    " expressions",
+                  ]}
+            </span>
+          </div>
+        )}
 
         {/* Suggestions Dropdown - rendered in portal to escape overflow:hidden */}
         {isOpen &&

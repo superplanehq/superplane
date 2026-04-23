@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -15,6 +17,7 @@ type OnPush struct{}
 type OnPushConfiguration struct {
 	Repository string                    `json:"repository" mapstructure:"repository"`
 	Refs       []configuration.Predicate `json:"refs" mapstructure:"refs"`
+	Paths      []string                  `json:"paths" mapstructure:"paths"`
 }
 
 func (p *OnPush) Name() string {
@@ -43,13 +46,14 @@ func (p *OnPush) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., ` + "`refs/heads/main`" + `, ` + "`refs/tags/*`" + `)
+- **Paths** *(optional)*: Filter by changed file paths using glob patterns (e.g., ` + "`pkg/**`" + `, ` + "`go.sum`" + `). When set, the trigger only fires if at least one added, modified, or removed file matches any pattern. Use ` + "`**`" + ` to match across directories and ` + "`*`" + ` within a single path segment. Leave empty to fire on all pushes regardless of changed files.
 
 ## Event Data
 
 Each push event includes:
 - **repository**: Repository information
 - **ref**: The branch or tag that was pushed to
-- **commits**: Array of commit information
+- **commits**: Array of commit information (each with ` + "`added`" + `, ` + "`modified`" + `, ` + "`removed`" + ` file arrays)
 - **pusher**: Information about who pushed
 - **before/after**: Commit SHAs before and after the push
 
@@ -94,6 +98,22 @@ func (p *OnPush) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
 					Operators: configuration.AllPredicateOperators,
+				},
+			},
+		},
+		{
+			Name:        "paths",
+			Label:       "Paths",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Placeholder: "e.g. pkg/**",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+					ItemLabel: "Path pattern",
 				},
 			},
 		},
@@ -190,6 +210,18 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusOK, nil, nil
 	}
 
+	if len(config.Paths) > 0 {
+		changedFiles := extractChangedFiles(data)
+		if !matchesAnyGlob(config.Paths, changedFiles) {
+			if len(changedFiles) == 0 {
+				ctx.Logger.Infof("Ignoring event - path filter active but no changed files found in payload")
+			} else {
+				ctx.Logger.Infof("Ignoring event - none of %d changed file(s) matched configured path filters", len(changedFiles))
+			}
+			return http.StatusOK, nil, nil
+		}
+	}
+
 	err = ctx.Events.Emit("github.push", data)
 
 	if err != nil {
@@ -216,4 +248,98 @@ func isBranchDeletionEvent(data map[string]any) bool {
 
 func (p *OnPush) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// extractChangedFiles collects all added, modified, and removed file paths
+// from every commit in the push payload.
+func extractChangedFiles(data map[string]any) []string {
+	commitsRaw, ok := data["commits"]
+	if !ok {
+		return nil
+	}
+
+	commits, ok := commitsRaw.([]any)
+	if !ok {
+		return nil
+	}
+
+	var files []string
+	for _, c := range commits {
+		commit, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		for _, key := range []string{"added", "modified", "removed"} {
+			listRaw, ok := commit[key]
+			if !ok {
+				continue
+			}
+
+			list, ok := listRaw.([]any)
+			if !ok {
+				continue
+			}
+
+			for _, f := range list {
+				if path, ok := f.(string); ok {
+					files = append(files, path)
+				}
+			}
+		}
+	}
+
+	return files
+}
+
+// matchesAnyGlob returns true if any file in files matches any glob pattern.
+func matchesAnyGlob(patterns []string, files []string) bool {
+	for _, pattern := range patterns {
+		re, err := pathGlobToRegex(pattern)
+		if err != nil {
+			continue
+		}
+		for _, file := range files {
+			if re.MatchString(file) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// pathGlobToRegex converts a glob pattern to a compiled regexp.
+//   - ** matches any sequence of path components (including across /)
+//   - *  matches any sequence of characters within a single path segment (no /)
+func pathGlobToRegex(pattern string) (*regexp.Regexp, error) {
+	var buf strings.Builder
+	buf.WriteString("^")
+	i := 0
+	for i < len(pattern) {
+		if pattern[i] == '*' {
+			if i+1 < len(pattern) && pattern[i+1] == '*' {
+				buf.WriteString(".*")
+				i += 2
+			} else {
+				buf.WriteString("[^/]*")
+				i++
+			}
+		} else {
+			if isPathRegexMeta(pattern[i]) {
+				buf.WriteByte('\\')
+			}
+			buf.WriteByte(pattern[i])
+			i++
+		}
+	}
+	buf.WriteString("$")
+	return regexp.Compile(buf.String())
+}
+
+func isPathRegexMeta(b byte) bool {
+	switch b {
+	case '.', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\':
+		return true
+	}
+	return false
 }

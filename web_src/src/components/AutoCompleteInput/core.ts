@@ -156,6 +156,15 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     example: 'hasSuffix("HelloWorld", "World") == true',
   },
 
+  // GitHub helpers
+  {
+    name: "filePathMatches",
+    snippet: "filePathMatches(${1:commits}, ${2:pattern})",
+    description:
+      "Returns true if any file (added, modified, or removed) across the given commits matches the glob pattern. Supports * (single path segment) and ** (any path).",
+    example: 'filePathMatches(root().data.commits, "pkg/**") == true',
+  },
+
   // Date
   {
     name: "now",

@@ -708,6 +708,33 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   hasSuffix: (str: unknown, suffix: unknown) => String(str).endsWith(String(suffix)),
   contains: (str: unknown, sub: unknown) => String(str).includes(String(sub)),
 
+  // GitHub helpers
+  filePathMatches: (commits: unknown, pattern: unknown) => {
+    const pat = String(pattern);
+    // Convert glob pattern to regex: ** matches anything, * matches within a path segment.
+    // Replace ** with a NUL placeholder first so the subsequent single-* pass does not
+    // clobber the .* that ** expands to (e.g. "pkg/**" must become ^pkg/.*$, not ^pkg/.[^/]*$).
+    const reStr =
+      "^" +
+      pat
+        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*\*/g, "\x00")
+        .replace(/\*/g, "[^/]*")
+        .replace(/\x00/g, ".*") +
+      "$";
+    const re = new RegExp(reStr);
+    const commitList = Array.isArray(commits) ? commits : [];
+    return commitList.some((c: unknown) => {
+      const commit = c as Record<string, unknown>;
+      const files = [
+        ...((commit.added as string[]) ?? []),
+        ...((commit.modified as string[]) ?? []),
+        ...((commit.removed as string[]) ?? []),
+      ];
+      return files.some((f) => re.test(f));
+    });
+  },
+
   // Date functions
   now: () => new ExprDate(new Date()),
   date: (str: unknown) => new ExprDate(new Date(String(str))),
