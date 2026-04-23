@@ -122,11 +122,26 @@ func (s *ExecutionStateContext) resolveReportEntry(outputEvents []any) {
 		return
 	}
 
-	if s.configBuilder == nil {
+	//
+	// Most call sites wire a configBuilder when constructing the execution
+	// context (so expressions resolve against the full message chain), but
+	// several completion paths -- node_executor, request worker, integration
+	// subscriptions, approval actions -- construct an ExecutionStateContext
+	// directly without calling SetConfigBuilder. Without a builder we'd
+	// silently drop the report template for every downstream execution, so
+	// we lazily reconstruct a minimal builder from the execution itself.
+	// Expressions still get `previous()` and `root()` because the builder
+	// derives that from the previous execution chain on the execution.
+	//
+	builder := s.configBuilder
+	if builder == nil {
+		builder = s.buildFallbackConfigBuilder()
+	}
+	if builder == nil {
 		return
 	}
 
-	resolved, errs := s.configBuilder.ResolveReportTemplate(tmpl, outputEvents)
+	resolved, errs := builder.ResolveReportTemplate(tmpl, outputEvents)
 	resolved = strings.TrimSpace(resolved)
 
 	if len(errs) > 0 {
@@ -140,6 +155,34 @@ func (s *ExecutionStateContext) resolveReportEntry(outputEvents []any) {
 	if resolved != "" {
 		s.execution.ReportEntry = resolved
 	}
+}
+
+//
+// buildFallbackConfigBuilder produces a NodeConfigurationBuilder wired with
+// enough context to evaluate report template expressions even when the
+// outer execution context didn't call SetConfigBuilder. The builder needs
+// the input event plus the chain references (root event, previous
+// execution) so that root() / previous() / $ resolve the same way they do
+// on the happy path. If the input event can't be loaded we return nil so
+// the caller silently skips template resolution (matching prior behavior
+// for unavailable builders).
+//
+func (s *ExecutionStateContext) buildFallbackConfigBuilder() *NodeConfigurationBuilder {
+	inputEvent, err := models.FindCanvasEventInTransaction(s.tx, s.execution.EventID)
+	if err != nil {
+		return nil
+	}
+
+	builder := NewNodeConfigurationBuilder(s.tx, s.execution.WorkflowID).
+		WithNodeID(s.execution.NodeID).
+		WithRootEvent(&s.execution.RootEventID).
+		WithInput(map[string]any{inputEvent.NodeID: inputEvent.Data.Data()})
+
+	if s.execution.PreviousExecutionID != nil {
+		builder = builder.WithPreviousExecution(s.execution.PreviousExecutionID)
+	}
+
+	return builder
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {
