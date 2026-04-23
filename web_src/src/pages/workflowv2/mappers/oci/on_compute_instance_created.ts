@@ -41,35 +41,25 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const envelope = getEventEnvelope(context.event);
-    const details: Record<string, string> = {};
-
-    if (context.event?.createdAt) {
-      details["Triggered At"] = new Date(context.event.createdAt).toLocaleString();
-    } else if (envelope?.eventTime) {
-      details["Event Time"] = new Date(envelope.eventTime).toLocaleString();
-    }
-
     const data = envelope?.data;
-    if (data?.resourceName) {
-      details["Instance Name"] = data.resourceName;
-    }
-    if (data?.resourceId) {
-      details["Instance ID"] = data.resourceId;
-    }
-    if (data?.additionalDetails?.shape) {
-      details["Shape"] = data.additionalDetails.shape;
-    }
-    if (data?.availabilityDomain) {
-      details["Availability Domain"] = data.availabilityDomain;
-    }
-    if (data?.compartmentId) {
-      details["Compartment ID"] = data.compartmentId;
-    }
-    if (data?.compartmentName) {
-      details["Compartment"] = data.compartmentName;
-    }
 
-    return details;
+    const triggeredAt = context.event?.createdAt
+      ? new Date(context.event.createdAt).toLocaleString()
+      : envelope?.eventTime
+        ? new Date(envelope.eventTime).toLocaleString()
+        : undefined;
+
+    const rawEntries: [string, string | undefined][] = [
+      ["Triggered At", triggeredAt],
+      ["Instance Name", data?.resourceName],
+      ["Instance ID", data?.resourceId],
+      ["Shape", data?.additionalDetails?.shape],
+      ["Availability Domain", data?.availabilityDomain],
+      ["Compartment ID", data?.compartmentId],
+      ["Compartment", data?.compartmentName],
+    ];
+
+    return Object.fromEntries(rawEntries.filter((e): e is [string, string] => e[1] != null));
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
