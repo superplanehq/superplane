@@ -43,6 +43,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(listResourcesCmd)
+	root.AddCommand(newSetupCommand(options))
 
 	return root
 }
