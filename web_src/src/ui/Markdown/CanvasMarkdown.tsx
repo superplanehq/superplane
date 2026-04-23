@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { resolveIcon } from "@/lib/utils";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
 import { MermaidDiagram } from "./MermaidDiagram";
 
@@ -414,18 +415,104 @@ export interface NodeChipIcon {
   iconSlug?: string;
 }
 
+export interface NodeChipConfigField {
+  label: string;
+  value: string;
+}
+
+export type NodeChipKind = "trigger" | "component" | "blueprint" | "widget";
+
+export interface NodeChipDetails {
+  /** Display name (node.name). */
+  name: string;
+  /** Node kind — drives chip + hover-card colors (triggers render purple). */
+  kind?: NodeChipKind;
+  /** Node kind label — "Trigger", "Component", "Blueprint", "Widget". */
+  kindLabel?: string;
+  /** Human-readable type label from the component/trigger definition (e.g. "HTTP probe"). */
+  typeLabel?: string;
+  /** Integration label for bound components/triggers (e.g. "Semaphore"). */
+  integrationLabel?: string;
+  /** Optional icon for the integration (image URL). */
+  integrationIcon?: string;
+  /** Up to a handful of configuration key/value pairs shown as a compact table. */
+  config?: NodeChipConfigField[];
+  /** True when the node is paused. Rendered as a small badge in the hover card. */
+  paused?: boolean;
+  /** True when the node has an error. Rendered as a small badge in the hover card. */
+  hasError?: boolean;
+}
+
 export interface NodeChipContext {
   /** Known node slug -> display name. Slugs not in this map render as "unknown node" chips. */
   nodes?: Record<string, string>;
   /** Known node slug -> icon (image URL or Lucide slug). When present, replaces the leading `@`. */
   icons?: Record<string, NodeChipIcon>;
+  /** Known node slug -> rich details used to render a hover-card preview. */
+  details?: Record<string, NodeChipDetails>;
   /** Link target for known slugs. Called with the slug. Defaults to `?node=<slug>` on the current page. */
   linkFor?: (slug: string) => string;
   /** Optional click handler instead of navigation (e.g. to open a side panel). */
   onNodeClick?: (slug: string) => void;
 }
 
-function NodeChipLeading({ icon }: { icon?: NodeChipIcon }) {
+interface ChipTheme {
+  chip: string;
+  atSign: string;
+  lucide: string;
+  tileBg: string;
+  tileBorder: string;
+  accent: string;
+}
+
+const CHIP_THEMES: Record<NodeChipKind | "default", ChipTheme> = {
+  trigger: {
+    chip: "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100",
+    atSign: "text-purple-400",
+    lucide: "text-purple-500",
+    tileBg: "bg-purple-50",
+    tileBorder: "border-purple-100",
+    accent: "text-purple-700",
+  },
+  component: {
+    chip: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
+    atSign: "text-blue-400",
+    lucide: "text-blue-500",
+    tileBg: "bg-blue-50",
+    tileBorder: "border-blue-100",
+    accent: "text-blue-700",
+  },
+  blueprint: {
+    chip: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
+    atSign: "text-blue-400",
+    lucide: "text-blue-500",
+    tileBg: "bg-blue-50",
+    tileBorder: "border-blue-100",
+    accent: "text-blue-700",
+  },
+  widget: {
+    chip: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
+    atSign: "text-blue-400",
+    lucide: "text-blue-500",
+    tileBg: "bg-blue-50",
+    tileBorder: "border-blue-100",
+    accent: "text-blue-700",
+  },
+  default: {
+    chip: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
+    atSign: "text-blue-400",
+    lucide: "text-blue-500",
+    tileBg: "bg-blue-50",
+    tileBorder: "border-blue-100",
+    accent: "text-blue-700",
+  },
+};
+
+function themeFor(kind?: NodeChipKind): ChipTheme {
+  return CHIP_THEMES[kind ?? "default"];
+}
+
+function NodeChipLeading({ icon, theme }: { icon?: NodeChipIcon; theme: ChipTheme }) {
   if (icon?.iconSrc) {
     return (
       <img
@@ -438,9 +525,9 @@ function NodeChipLeading({ icon }: { icon?: NodeChipIcon }) {
   }
   if (icon?.iconSlug) {
     const Icon = resolveIcon(icon.iconSlug);
-    return <Icon className="h-3 w-3 shrink-0 text-blue-500" aria-hidden="true" />;
+    return <Icon className={`h-3 w-3 shrink-0 ${theme.lucide}`} aria-hidden="true" />;
   }
-  return <span className="text-blue-400">@</span>;
+  return <span className={theme.atSign}>@</span>;
 }
 
 function KnownNodeChip({
@@ -449,32 +536,148 @@ function KnownNodeChip({
   href,
   onClick,
   icon,
+  details,
 }: {
   slug: string;
   name: string;
   href?: string;
   onClick?: () => void;
   icon?: NodeChipIcon;
+  details?: NodeChipDetails;
 }) {
   const label = name || slug;
-  const classes =
-    "sp-node-ref inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-700 hover:bg-blue-100";
+  const theme = themeFor(details?.kind);
+  const classes = `sp-node-ref inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${theme.chip}`;
 
-  if (onClick) {
-    return (
-      <button type="button" className={classes} onClick={onClick} title={`Focus node ${slug}`}>
-        <NodeChipLeading icon={icon} />
-        {label}
-      </button>
-    );
-  }
-
-  return (
+  const chip = onClick ? (
+    <button type="button" className={classes} onClick={onClick} title={`Focus node ${slug}`}>
+      <NodeChipLeading icon={icon} theme={theme} />
+      {label}
+    </button>
+  ) : (
     <a className={classes} href={href} title={`Focus node ${slug}`}>
-      <NodeChipLeading icon={icon} />
+      <NodeChipLeading icon={icon} theme={theme} />
       {label}
     </a>
   );
+
+  if (!details) {
+    return chip;
+  }
+
+  return (
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>{chip}</HoverCardTrigger>
+      <HoverCardContent
+        side="top"
+        align="start"
+        className="w-72 overflow-hidden rounded-lg border border-slate-200 p-0 text-xs shadow-xl"
+        sideOffset={6}
+      >
+        <NodeChipPreview details={details} icon={icon} theme={theme} />
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+function NodeChipPreview({
+  details,
+  icon,
+  theme,
+}: {
+  details: NodeChipDetails;
+  icon?: NodeChipIcon;
+  theme: ChipTheme;
+}) {
+  const subtitleParts = [details.kindLabel, details.typeLabel].filter(Boolean) as string[];
+  const hasConfig = Boolean(details.config && details.config.length > 0);
+  const hasIntegration = Boolean(details.integrationLabel);
+
+  return (
+    <div className="flex flex-col bg-white">
+      <div className="flex items-start gap-3 px-4 pt-3.5 pb-3">
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${theme.tileBorder} ${theme.tileBg}`}
+        >
+          <NodeChipPreviewIcon icon={icon} theme={theme} />
+        </div>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-slate-900">
+              {details.name}
+            </div>
+            {(details.paused || details.hasError) && (
+              <div className="flex shrink-0 items-center gap-1">
+                {details.hasError && (
+                  <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-[1px] text-[10px] font-medium leading-none text-red-700">
+                    Error
+                  </span>
+                )}
+                {details.paused && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-[1px] text-[10px] font-medium leading-none text-amber-700">
+                    Paused
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          {subtitleParts.length > 0 && (
+            <div className="mt-1 truncate text-[11px] font-medium uppercase tracking-wider text-slate-400">
+              {subtitleParts.join(" · ")}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {hasConfig && (
+        <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
+          <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5 text-[11px]">
+            {details.config!.map((field) => (
+              <React.Fragment key={field.label}>
+                <dt className="whitespace-nowrap text-slate-500">{field.label}</dt>
+                <dd
+                  className="truncate text-right font-mono text-[11px] text-slate-800"
+                  title={field.value}
+                >
+                  {field.value}
+                </dd>
+              </React.Fragment>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {hasIntegration && (
+        <div className="flex items-center gap-2 border-t border-slate-100 px-4 py-2">
+          {details.integrationIcon ? (
+            <img
+              src={details.integrationIcon}
+              alt=""
+              aria-hidden="true"
+              className="h-3.5 w-3.5 shrink-0 object-contain"
+            />
+          ) : (
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+          )}
+          <span className="truncate text-[11px] text-slate-600">
+            <span className="text-slate-400">via </span>
+            <span className="font-medium text-slate-700">{details.integrationLabel}</span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NodeChipPreviewIcon({ icon, theme }: { icon?: NodeChipIcon; theme: ChipTheme }) {
+  if (icon?.iconSrc) {
+    return <img src={icon.iconSrc} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />;
+  }
+  if (icon?.iconSlug) {
+    const Icon = resolveIcon(icon.iconSlug);
+    return <Icon className={`h-5 w-5 ${theme.lucide}`} aria-hidden="true" />;
+  }
+  return <span className={`text-base font-semibold ${theme.atSign}`}>@</span>;
 }
 
 function UnknownNodeChip({ slug }: { slug: string }) {
@@ -520,6 +723,7 @@ function buildSpanComponent(context: NodeChipContext) {
 
     const name = known[slug] ?? slug;
     const icon = context.icons?.[slug];
+    const details = context.details?.[slug];
     const linkFor = context.linkFor ?? defaultLinkFor;
 
     if (context.onNodeClick) {
@@ -528,12 +732,15 @@ function buildSpanComponent(context: NodeChipContext) {
           slug={slug}
           name={name}
           icon={icon}
+          details={details}
           onClick={() => context.onNodeClick?.(slug)}
         />
       );
     }
 
-    return <KnownNodeChip slug={slug} name={name} icon={icon} href={linkFor(slug)} />;
+    return (
+      <KnownNodeChip slug={slug} name={name} icon={icon} details={details} href={linkFor(slug)} />
+    );
   };
 }
 

@@ -5,7 +5,12 @@ import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { isUrl } from "@/lib/utils";
-import type { NodeChipIcon } from "@/ui/Markdown/CanvasMarkdown";
+import type {
+  NodeChipConfigField,
+  NodeChipDetails,
+  NodeChipIcon,
+  NodeChipKind,
+} from "@/ui/Markdown/CanvasMarkdown";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
@@ -5297,20 +5302,78 @@ export function WorkflowPageV2() {
     nodesBySlug: readmeNodesBySlug,
     nodeIdBySlug: readmeNodeIdBySlug,
     iconsBySlug: readmeIconsBySlug,
+    detailsBySlug: readmeNodeDetailsBySlug,
   } = useMemo(() => {
     const nodesBySlug: Record<string, string> = {};
     const nodeIdBySlug: Record<string, string> = {};
     const iconsBySlug: Record<string, NodeChipIcon> = {};
+    const detailsBySlug: Record<string, NodeChipDetails> = {};
     const toKebab = (value: string) =>
       value
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
+
+    const KIND_LABEL: Record<string, string> = {
+      TYPE_COMPONENT: "Component",
+      TYPE_TRIGGER: "Trigger",
+      TYPE_BLUEPRINT: "Blueprint",
+      TYPE_WIDGET: "Widget",
+    };
+    const KIND_VALUE: Record<string, NodeChipKind> = {
+      TYPE_COMPONENT: "component",
+      TYPE_TRIGGER: "trigger",
+      TYPE_BLUEPRINT: "blueprint",
+      TYPE_WIDGET: "widget",
+    };
+
+    // Config previews: flatten the top level of `node.configuration`, keep
+    // scalar (or short JSON) values, and cap at four fields so the hover card
+    // stays scannable. We skip fields that are always large blobs of author
+    // content — the report template in particular is a Markdown document that
+    // is the same for every node of the same template and has no business
+    // being crammed into a tooltip.
+    const MAX_CONFIG_FIELDS = 4;
+    const MAX_VALUE_CHARS = 56;
+    const CONFIG_SKIP_KEYS = new Set([
+      "reportTemplate",
+      "report_template",
+      "template",
+      "script",
+      "body",
+      "prompt",
+    ]);
+    const formatConfigValue = (value: unknown): string | undefined => {
+      if (value == null || value === "") return undefined;
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) return undefined;
+        return trimmed.length > MAX_VALUE_CHARS ? `${trimmed.slice(0, MAX_VALUE_CHARS - 1)}…` : trimmed;
+      }
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      if (Array.isArray(value)) {
+        if (value.length === 0) return undefined;
+        return `[${value.length} item${value.length === 1 ? "" : "s"}]`;
+      }
+      if (typeof value === "object") {
+        const keys = Object.keys(value as object);
+        if (keys.length === 0) return undefined;
+        return `{${keys.length} field${keys.length === 1 ? "" : "s"}}`;
+      }
+      return undefined;
+    };
+    const humanizeKey = (key: string) =>
+      key
+        .replace(/[_-]+/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/\b(\w)/g, (m) => m.toUpperCase());
+
     const register = (
       slug: string | undefined,
       displayName: string,
       nodeId: string | undefined,
       icon: NodeChipIcon | undefined,
+      details: NodeChipDetails | undefined,
     ) => {
       if (!slug) return;
       if (!nodesBySlug[slug]) {
@@ -5322,7 +5385,11 @@ export function WorkflowPageV2() {
       if (icon && !iconsBySlug[slug]) {
         iconsBySlug[slug] = icon;
       }
+      if (details && !detailsBySlug[slug]) {
+        detailsBySlug[slug] = details;
+      }
     };
+
     const resolveNodeIcon = (typeName: string | undefined): NodeChipIcon | undefined => {
       if (!typeName) return undefined;
       // Prefer the explicit integration logo (image URL) when available, then
@@ -5336,18 +5403,73 @@ export function WorkflowPageV2() {
       }
       return { iconSlug: mapped };
     };
+
     const sourceNodes = (selectedCanvasVersion ?? liveCanvasVersion)?.spec?.nodes ?? [];
     for (const node of sourceNodes) {
       const displayName = node.name || node.id || "";
       if (!displayName) continue;
       const typeName = node.component?.name || node.trigger?.name;
       const icon = resolveNodeIcon(typeName);
-      register(node.name, displayName, node.id, icon);
-      register(node.id, displayName, node.id, icon);
-      register(toKebab(displayName), displayName, node.id, icon);
+
+      let typeLabel: string | undefined;
+      if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+        const meta = components.find((c) => c.name === node.component?.name);
+        typeLabel = meta?.label || node.component.name;
+      } else if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
+        const meta = triggers.find((t) => t.name === node.trigger?.name);
+        typeLabel = meta?.label || node.trigger.name;
+      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
+        const meta = blueprints.find((b) => b.id === node.blueprint?.id);
+        typeLabel = meta?.name;
+      } else if (node.type === "TYPE_WIDGET" && node.widget?.name) {
+        const meta = widgets.find((w) => w.name === node.widget?.name);
+        typeLabel = meta?.label || node.widget.name;
+      }
+
+      const integrationName = getNodeIntegrationName(node, availableIntegrations);
+      const integrationDef = integrationName
+        ? availableIntegrations.find((i) => i.name === integrationName)
+        : undefined;
+      const integrationLabel = integrationDef?.label;
+      const integrationIcon = integrationName ? getHeaderIconSrc(integrationName) : undefined;
+
+      const configFields: NodeChipConfigField[] = [];
+      const rawConfig = (node.configuration ?? {}) as Record<string, unknown>;
+      for (const key of Object.keys(rawConfig)) {
+        if (configFields.length >= MAX_CONFIG_FIELDS) break;
+        if (CONFIG_SKIP_KEYS.has(key)) continue;
+        const formatted = formatConfigValue(rawConfig[key]);
+        if (formatted == null) continue;
+        configFields.push({ label: humanizeKey(key), value: formatted });
+      }
+
+      const details: NodeChipDetails = {
+        name: displayName,
+        kind: node.type ? KIND_VALUE[node.type] : undefined,
+        kindLabel: node.type ? KIND_LABEL[node.type] : undefined,
+        typeLabel,
+        integrationLabel,
+        integrationIcon,
+        config: configFields.length > 0 ? configFields : undefined,
+        paused: node.paused,
+        hasError: Boolean(node.errorMessage),
+      };
+
+      register(node.name, displayName, node.id, icon, details);
+      register(node.id, displayName, node.id, icon, details);
+      register(toKebab(displayName), displayName, node.id, icon, details);
     }
-    return { nodesBySlug, nodeIdBySlug, iconsBySlug };
-  }, [selectedCanvasVersion, liveCanvasVersion, componentIconMap]);
+    return { nodesBySlug, nodeIdBySlug, iconsBySlug, detailsBySlug };
+  }, [
+    selectedCanvasVersion,
+    liveCanvasVersion,
+    componentIconMap,
+    components,
+    triggers,
+    blueprints,
+    widgets,
+    availableIntegrations,
+  ]);
 
   const linkForReadmeNode = useCallback(
     (slug: string) => {
@@ -5883,6 +6005,7 @@ export function WorkflowPageV2() {
         isCreatingChangeRequest={createCanvasChangeRequestMutation.isPending}
         nodes={readmeNodesBySlug}
         icons={readmeIconsBySlug}
+        details={readmeNodeDetailsBySlug}
         linkFor={linkForReadmeNode}
         onSaveDraft={handleReadmeSaveDraft}
         onCreateChangeRequest={handleReadmeCreateChangeRequest}
