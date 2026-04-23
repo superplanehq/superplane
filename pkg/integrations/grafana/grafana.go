@@ -107,6 +107,7 @@ func (g *Grafana) Components() []core.Component {
 		&CreateSilence{},
 		&DeleteSilence{},
 		&DeclareIncident{},
+		&DeclareDrill{},
 		&GetIncident{},
 		&UpdateIncident{},
 		&ResolveIncident{},

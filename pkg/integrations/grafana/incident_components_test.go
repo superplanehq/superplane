@@ -53,6 +53,12 @@ func Test__IncidentComponents__Configuration__severityIsIntegrationResource(t *t
 	require.Equal(t, resourceTypeIncidentSeverity, updateFields[2].TypeOptions.Resource.Type)
 	require.Equal(t, "labels", updateFields[3].Name)
 	require.Equal(t, configuration.FieldTypeList, updateFields[3].Type)
+
+	drillFields := (&DeclareDrill{}).Configuration()
+	require.Equal(t, "status", drillFields[4].Name)
+	require.Equal(t, configuration.FieldTypeSelect, drillFields[4].Type)
+	require.Equal(t, "startTime", drillFields[5].Name)
+	require.Equal(t, configuration.FieldTypeDateTime, drillFields[5].Type)
 }
 
 func Test__Grafana__ListResources__IncidentSeverities(t *testing.T) {
@@ -88,6 +94,10 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 					"incident":{"incidentID":"incident-123","title":"API latency","severity":"minor","status":"active"}
 				}`)),
 			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			},
 		},
 	}
 	execCtx := &contexts.ExecutionStateContext{}
@@ -98,7 +108,9 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 			"severity":    "minor",
 			"description": "Initial diagnosis",
 			"labels":      []any{"api", "prod"},
-			"isDrill":     true,
+			"status":      "resolved",
+			"startTime":   "2026-04-20T10:00:00Z",
+			"roomPrefix":  "ops",
 		},
 		HTTP:           httpCtx,
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
@@ -114,6 +126,8 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(body, &payload))
 	require.Equal(t, "Initial diagnosis", payload["initialStatusUpdate"])
+	require.Equal(t, "resolved", payload["status"])
+	require.Equal(t, "ops", payload["roomPrefix"])
 
 	require.Len(t, execCtx.Payloads, 1)
 	emitted := execCtx.Payloads[0].(map[string]any)
@@ -122,6 +136,46 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 	require.Equal(t, "API latency", out.Title)
 	require.Equal(t, "minor", out.Severity)
 	require.Equal(t, "active", out.Status)
+
+	body, err = io.ReadAll(httpCtx.Requests[1].Body)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, "incidentStart", payload["eventName"])
+	require.Equal(t, "2026-04-20T10:00:00Z", payload["eventTime"])
+}
+
+func Test__DeclareDrill__Execute(t *testing.T) {
+	component := &DeclareDrill{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"incident":{"incidentID":"incident-456","title":"Game day","severity":"minor","status":"active","isDrill":true}
+				}`)),
+			},
+		},
+	}
+	execCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"title":    "Game day",
+			"severity": "minor",
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.True(t, execCtx.Passed)
+
+	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.NoError(t, err)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, true, payload["isDrill"])
 }
 
 func Test__UpdateIncident__Execute__UpdatesProvidedFields(t *testing.T) {

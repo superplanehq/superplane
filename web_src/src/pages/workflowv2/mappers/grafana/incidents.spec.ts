@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { addIncidentActivityMapper } from "./add_incident_activity";
-import { declareIncidentMapper } from "./declare_incident";
+import { declareDrillMapper, declareIncidentMapper } from "./declare_incident";
 import { getIncidentMapper } from "./get_incident";
 import { resolveIncidentMapper } from "./resolve_incident";
 import { updateIncidentMapper } from "./update_incident";
@@ -149,7 +149,7 @@ describe("Grafana incident card metadata", () => {
   it("uses concise declare incident metadata", () => {
     const props = declareIncidentMapper.props(
       buildComponentContext("declareIncident", {
-        configuration: { title: "API latency", severity: "critical", isDrill: true },
+        configuration: { title: "API latency", severity: "critical", status: "resolved" },
       }),
     );
 
@@ -157,9 +157,19 @@ describe("Grafana incident card metadata", () => {
       expect.arrayContaining([
         expect.objectContaining({ label: "API latency" }),
         expect.objectContaining({ label: "Severity: critical" }),
-        expect.objectContaining({ label: "Drill" }),
+        expect.objectContaining({ label: "Status: resolved" }),
       ]),
     );
+  });
+
+  it("always marks declare drill metadata as drill", () => {
+    const props = declareDrillMapper.props(
+      buildComponentContext("declareDrill", {
+        configuration: { title: "Game day", severity: "major" },
+      }),
+    );
+
+    expect(props.metadata).toEqual(expect.arrayContaining([expect.objectContaining({ label: "Drill" })]));
   });
 
   it("uses resolved incident metadata label for selected incidents", () => {
