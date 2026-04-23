@@ -44,7 +44,7 @@ function ToolMessage({ message, animate }: { message: AiBuilderMessage; animate?
 
 function UserMessage({ content }: { content: string }) {
   return (
-    <div className="w-full py-1">
+    <div className="w-full py-1" data-testid="agent-chat-message" data-role="user">
       <div className="flex w-full items-start gap-2 rounded-sm border border-slate-200/90 bg-slate-100 px-2 py-1.5 text-sm text-slate-800">
         <span className="min-w-0 whitespace-pre-wrap break-words">{content}</span>
       </div>
@@ -54,7 +54,7 @@ function UserMessage({ content }: { content: string }) {
 
 function AssistantMessage({ content }: { content: string }) {
   return (
-    <div className="w-full">
+    <div className="w-full" data-testid="agent-chat-message" data-role="assistant">
       <div className="px-2 text-sm text-gray-800">
         <AiMessageMarkdown content={content} />
       </div>
