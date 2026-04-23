@@ -205,6 +205,54 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertNodePosition("node-b", 780, 95)
 	})
 
+	t.Run("rejects edges that reference an undefined source output channel", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{
+					ID:   "http-1",
+					Name: "HTTP Request",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "http"},
+					},
+					Configuration: map[string]any{
+						"method": "GET",
+						"url":    "https://example.com",
+					},
+				},
+				{
+					ID:   "if-1",
+					Name: "If",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "if"},
+					},
+					Configuration: map[string]any{
+						"expression": "true",
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_EDGE,
+					Edge: &pb.CanvasChangeset_Change_Edge{
+						SourceId: "http-1",
+						TargetId: "if-1",
+						Channel:  "default",
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertHasError()
+		steps.assertErrorContains(`source node http-1 does not have output channel "default"`)
+	})
+
 	t.Run("returns error when change object is misconfigured", func(t *testing.T) {
 		testCases := []struct {
 			name            string
