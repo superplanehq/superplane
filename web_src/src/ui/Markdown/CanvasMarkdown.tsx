@@ -14,6 +14,8 @@ import {
   CircleHelp,
 } from "lucide-react";
 
+import { MermaidDiagram } from "./MermaidDiagram";
+
 import "highlight.js/styles/github.css";
 
 //
@@ -129,7 +131,29 @@ const BADGE_COLORS: Record<string, string> = {
 
 const BADGE_RE = /^(status|success|warning|error|info|duration):(.+)$/;
 
+function extractCodeString(children: React.ReactNode): string {
+  let text = "";
+  Children.forEach(children, (child) => {
+    if (typeof child === "string") {
+      text += child;
+    } else if (typeof child === "number") {
+      text += String(child);
+    } else if (isValidElement<{ children?: React.ReactNode }>(child) && child.props.children != null) {
+      text += extractCodeString(child.props.children);
+    }
+  });
+  return text;
+}
+
 function InlineCode({ children, className }: { children?: React.ReactNode; className?: string }) {
+  const classes = typeof className === "string" ? className : "";
+
+  // Fenced ```mermaid block → render as a live diagram instead of highlighted code.
+  if (/(^|\s)language-mermaid(\s|$)/.test(classes)) {
+    const source = extractCodeString(children).replace(/\n$/, "");
+    return <MermaidDiagram code={source} />;
+  }
+
   const text = String(children ?? "");
   const match = text.match(BADGE_RE);
 
