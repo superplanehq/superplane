@@ -61,6 +61,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -214,10 +215,30 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	return providers
 }
 
+func newGRPCGatewayMarshaler() runtime.Marshaler {
+	// Keep parity with grpc-gateway's default marshaler configuration
+	// (HTTPBodyMarshaler + JSONPb + EmitUnpopulated=true), but reject unknown
+	// request fields by setting DiscardUnknown=false.
+	//
+	// Note: because this is an explicit override, grpc-gateway default option
+	// changes in future upgrades are not picked up automatically.
+	return &runtime.HTTPBodyMarshaler{
+		Marshaler: &runtime.JSONPb{
+			MarshalOptions: protojson.MarshalOptions{
+				EmitUnpopulated: true,
+			},
+			UnmarshalOptions: protojson.UnmarshalOptions{
+				DiscardUnknown: false,
+			},
+		},
+	}
+}
+
 func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	ctx := context.Background()
 
 	grpcGatewayMux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*
