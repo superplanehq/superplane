@@ -82,7 +82,6 @@ The Create Sandbox component creates an isolated environment for executing code 
 Use this pattern when you want to create a sandbox, run one or more commands in it, and delete it when the flow is done.
 
 1. Add a **Create Sandbox** node. Its output includes the sandbox ID that downstream nodes need:
-
 ```json
 {
   "data": {
@@ -94,13 +93,11 @@ Use this pattern when you want to create a sandbox, run one or more commands in 
 ```
 
 2. Connect an **Execute Command** node immediately after **Create Sandbox** and set **Sandbox** to:
-
 ```text
 {{ previous().data.id }}
 ```
 
 3. **Execute Command** returns the command result, not the sandbox ID:
-
 ```json
 {
   "data": {
@@ -113,13 +110,11 @@ Use this pattern when you want to create a sandbox, run one or more commands in 
 ```
 
 4. If you add more command nodes, reference the original create node by name so every command uses the same sandbox:
-
 ```text
 {{ $["Create Sandbox"].data.id }}
 ```
 
 5. Add **Delete Sandbox** at the end of the flow and use the same sandbox reference:
-
 ```text
 {{ $["Create Sandbox"].data.id }}
 ```
@@ -212,7 +207,7 @@ The Execute Code component runs code in an existing Daytona sandbox.
 
 ### Configuration
 
-- **Sandbox**: The sandbox ID to execute code in. If this node runs immediately after **Create Sandbox**, you can use `{{ previous().data.id }}`. If it runs after **Create Repository Sandbox**, use `{{ previous().data.sandboxId }}`. For later nodes, prefer a named reference such as `{{ $["Create Sandbox"].data.id }}`
+- **Sandbox**: The sandbox ID to execute code in (from Create Sandbox or Create Repository Sandbox output). Supports expressions, e.g. `{{ previous().data.id }}` or `{{ $["Create Repository Sandbox"].data.sandboxId }}`
 - **Code**: The code to execute (supports expressions)
 - **Language**: The programming language (python, typescript, javascript)
 - **Timeout**: Optional execution timeout in milliseconds
@@ -257,7 +252,7 @@ The Execute Command component runs shell commands in an existing Daytona sandbox
 
 ### Configuration
 
-- **Sandbox**: The sandbox ID to run commands in (from **Create Sandbox** or **Create Repository Sandbox** output). Supports expressions, e.g. `{{ previous().data.id }}` or `{{ $["Create Sandbox"].data.id }}`
+- **Sandbox**: The sandbox ID to run commands in (from **Create Sandbox** or **Create Repository Sandbox** output). Supports expressions, e.g. `{{ previous().data.id }}` or `{{ $["Create Repository Sandbox"].data.sandboxId }}`
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
 - **Environment Variables**: Optional key-value pairs exported before command execution
