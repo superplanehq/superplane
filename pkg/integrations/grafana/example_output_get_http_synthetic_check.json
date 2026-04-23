@@ -43,10 +43,15 @@
     },
     "metrics": {
       "lastOutcome": "Up",
+      "uptimePercent24h": 99.9,
+      "reachabilityPercent24h": 99.86,
       "successRuns24h": 1438,
       "failureRuns24h": 2,
       "totalRuns24h": 1440,
       "averageLatencySeconds24h": 0.142,
+      "sslEarliestExpiryAt": "2026-05-15T10:25:00Z",
+      "sslEarliestExpiryDays": 30.0,
+      "frequencyMilliseconds": 60000,
       "lastExecutionAt": "2026-04-15T10:25:00Z"
     },
     "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",

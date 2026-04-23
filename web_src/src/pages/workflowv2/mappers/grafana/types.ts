@@ -429,10 +429,15 @@ export interface GrafanaSyntheticCheck {
 
 export interface GrafanaSyntheticCheckMetrics {
   lastOutcome?: string;
+  uptimePercent24h?: number;
+  reachabilityPercent24h?: number;
   successRuns24h?: number;
   failureRuns24h?: number;
   totalRuns24h?: number;
   averageLatencySeconds24h?: number;
+  sslEarliestExpiryAt?: string;
+  sslEarliestExpiryDays?: number;
+  frequencyMilliseconds?: number;
   lastExecutionAt?: string;
 }
 

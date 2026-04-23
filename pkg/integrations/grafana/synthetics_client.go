@@ -109,10 +109,15 @@ type SyntheticCheckMetrics struct {
 	// LastOutcome is the derived probe reachability label: "Up", "Partial", or "Down"
 	// (see probeAvgToOutcome). It matches getHttpSyntheticCheck output channel routing.
 	LastOutcome              *string  `json:"lastOutcome,omitempty"`
+	UptimePercent24h         *float64 `json:"uptimePercent24h,omitempty"`
+	ReachabilityPercent24h   *float64 `json:"reachabilityPercent24h,omitempty"`
 	SuccessRuns24h           *float64 `json:"successRuns24h,omitempty"`
 	FailureRuns24h           *float64 `json:"failureRuns24h,omitempty"`
 	TotalRuns24h             *float64 `json:"totalRuns24h,omitempty"`
 	AverageLatencySeconds24h *float64 `json:"averageLatencySeconds24h,omitempty"`
+	SSLEarliestExpiryAt      *string  `json:"sslEarliestExpiryAt,omitempty"`
+	SSLEarliestExpiryDays    *float64 `json:"sslEarliestExpiryDays,omitempty"`
+	FrequencyMilliseconds    *int64   `json:"frequencyMilliseconds,omitempty"`
 	LastExecutionAt          *string  `json:"lastExecutionAt,omitempty"`
 }
 
@@ -334,6 +339,10 @@ func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck
 		return metrics
 	}
 
+	if check.Frequency > 0 {
+		metrics.FrequencyMilliseconds = &check.Frequency
+	}
+
 	grafanaClient, err := NewClient(ctx.HTTP, ctx.Integration, false)
 	if err != nil {
 		return metrics
@@ -363,11 +372,22 @@ func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck
 			failures = 0
 		}
 		metrics.FailureRuns24h = &failures
+
+		if *metrics.TotalRuns24h > 0 {
+			reachability := (*metrics.SuccessRuns24h / *metrics.TotalRuns24h) * 100
+			metrics.ReachabilityPercent24h = &reachability
+		}
 	}
 
 	avgLatency, err := querySyntheticMetricValue(grafanaClient, metricsDataSourceUID, buildAverageLatencyQuery(check), from, now)
 	if err == nil {
 		metrics.AverageLatencySeconds24h = avgLatency
+	}
+
+	uptime, err := querySyntheticMetricValue(grafanaClient, metricsDataSourceUID, buildUptimeQuery(check), from, now)
+	if err == nil && uptime != nil {
+		uptimePercent := *uptime * 100
+		metrics.UptimePercent24h = &uptimePercent
 	}
 
 	// Use a 2h window matching the last_over_time lookback so that newly-created
@@ -383,6 +403,15 @@ func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck
 	if err == nil && lastExecution != nil && *lastExecution > 0 {
 		executedAt := time.Unix(int64(*lastExecution), 0).UTC().Format(time.RFC3339)
 		metrics.LastExecutionAt = &executedAt
+	}
+
+	sslExpiry, err := querySyntheticMetricValue(grafanaClient, metricsDataSourceUID, buildSSLEarliestExpiryQuery(check), from, now)
+	if err == nil && sslExpiry != nil && *sslExpiry > 0 {
+		expiryAt := time.Unix(int64(*sslExpiry), 0).UTC()
+		expiryAtString := expiryAt.Format(time.RFC3339)
+		expiryDays := expiryAt.Sub(now).Hours() / 24
+		metrics.SSLEarliestExpiryAt = &expiryAtString
+		metrics.SSLEarliestExpiryDays = &expiryDays
 	}
 
 	return metrics
@@ -564,6 +593,18 @@ func buildAverageLatencyQuery(check *SyntheticCheck) string {
 	)
 }
 
+func buildUptimeQuery(check *SyntheticCheck) string {
+	frequencySeconds := syntheticCheckFrequencySeconds(check)
+	return fmt.Sprintf(
+		`avg_over_time((max by () (max_over_time(probe_success{job=%q, instance=%q}[%ds])))[%s:%ds])`,
+		check.Job,
+		check.Target,
+		frequencySeconds,
+		syntheticsMetricsLookback,
+		frequencySeconds,
+	)
+}
+
 // buildCurrentOutcomeQuery returns a PromQL query that computes the fraction of
 // probe locations currently passing, using the same probe_success gauge that
 // Grafana's own UI uses to show per-probe success/failure status.
@@ -583,4 +624,26 @@ func buildCurrentOutcomeQuery(check *SyntheticCheck) string {
 
 func buildLastExecutionQuery(check *SyntheticCheck) string {
 	return fmt.Sprintf(`max(timestamp(probe_success{job=%q, instance=%q}))`, check.Job, check.Target)
+}
+
+func buildSSLEarliestExpiryQuery(check *SyntheticCheck) string {
+	return fmt.Sprintf(
+		`min(last_over_time(probe_ssl_earliest_cert_expiry{job=%q, instance=%q}[%s]))`,
+		check.Job,
+		check.Target,
+		syntheticsMetricsLookback,
+	)
+}
+
+func syntheticCheckFrequencySeconds(check *SyntheticCheck) int64 {
+	if check == nil || check.Frequency <= 0 {
+		return 60
+	}
+
+	frequencySeconds := check.Frequency / 1000
+	if frequencySeconds <= 0 {
+		return 1
+	}
+
+	return frequencySeconds
 }

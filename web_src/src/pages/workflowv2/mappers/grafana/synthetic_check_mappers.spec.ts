@@ -295,10 +295,15 @@ describe("grafana synthetic check mappers", () => {
                 },
                 metrics: {
                   lastOutcome: "Up",
+                  uptimePercent24h: 99.9,
+                  reachabilityPercent24h: 99.86,
                   totalRuns24h: 1440,
                   successRuns24h: 1438,
                   failureRuns24h: 2,
                   averageLatencySeconds24h: 0.142,
+                  sslEarliestExpiryAt: "2026-05-15T10:25:00Z",
+                  sslEarliestExpiryDays: 30,
+                  frequencyMilliseconds: 60000,
                   lastExecutionAt: "2026-04-15T10:25:00Z",
                 },
                 checkUrl: "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",
@@ -309,12 +314,14 @@ describe("grafana synthetic check mappers", () => {
       }),
     );
 
-    expect(Object.keys(details).length).toBeLessThanOrEqual(6);
+    expect(Object.keys(details)[0]).toBe("Fetched At");
     expect(details["Last Outcome"]).toBe("Up");
     expect(details.Job).toBe("API health check");
     expect(details.Target).toBe("GET https://api.example.com/health");
     expect(details.Schedule).toBe("Every 1m · 3s timeout");
+    expect(details["Health (24h)"]).toBe("99.90% uptime · 99.86% reachability");
     expect(details["Runs (24h)"]).toBe("1438 succeeded · 2 failed · 1440 total");
+    expect(details["SSL Expiry"]).toContain("(30d)");
     expect(details["Avg Latency (24h)"]).toBe("0.142s");
   });
 

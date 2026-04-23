@@ -225,9 +225,13 @@ export function buildGetSyntheticCheckDetails(payload: OutputPayload | undefined
   const details: Record<string, string> = {};
   const metrics = output?.metrics;
 
+  if (payload?.timestamp) {
+    details["Fetched At"] = formatTimestamp(payload.timestamp);
+  }
+
   addGetSyntheticCheckSummaryDetails(details, configuration, metrics);
   addGetSyntheticCheckScheduleDetails(details, configuration);
-  addGetSyntheticCheckMetricDetails(details, metrics, payload);
+  addGetSyntheticCheckMetricDetails(details, metrics);
 
   return details;
 }
@@ -274,13 +278,21 @@ function addGetSyntheticCheckScheduleDetails(
 function addGetSyntheticCheckMetricDetails(
   details: Record<string, string>,
   metrics: GetHttpSyntheticCheckOutput["metrics"] | undefined,
-  payload: OutputPayload | undefined,
 ): void {
+  const healthSummary = formatSyntheticCheckHealthSummary(metrics);
+  if (healthSummary) {
+    details["Health (24h)"] = healthSummary;
+  }
+
   if (metrics && syntheticCheckHasRunCounts(metrics)) {
     details["Runs (24h)"] = formatSyntheticCheckRuns24hLine(metrics);
   }
 
-  const probeActivity = formatSyntheticCheckProbeActivity(metrics, payload);
+  if (metrics?.sslEarliestExpiryAt) {
+    details["SSL Expiry"] = formatSyntheticCheckSSLExpiry(metrics);
+  }
+
+  const probeActivity = formatSyntheticCheckProbeActivity(metrics);
   if (probeActivity) {
     details[probeActivity.label] = probeActivity.value;
   }
@@ -288,7 +300,6 @@ function addGetSyntheticCheckMetricDetails(
 
 function formatSyntheticCheckProbeActivity(
   metrics: GetHttpSyntheticCheckOutput["metrics"] | undefined,
-  payload: OutputPayload | undefined,
 ): { label: string; value: string } | undefined {
   if (metrics?.averageLatencySeconds24h != null) {
     return { label: "Avg Latency (24h)", value: `${metrics.averageLatencySeconds24h.toFixed(3)}s` };
@@ -297,12 +308,41 @@ function formatSyntheticCheckProbeActivity(
   if (metrics?.lastExecutionAt) {
     return { label: "Last Probe", value: formatTimestamp(metrics.lastExecutionAt) };
   }
+  return undefined;
+}
 
-  if (!payload?.timestamp) {
-    return undefined;
+function formatSyntheticCheckHealthSummary(
+  metrics: GetHttpSyntheticCheckOutput["metrics"] | undefined,
+): string | undefined {
+  const parts: string[] = [];
+
+  if (metrics?.uptimePercent24h != null) {
+    parts.push(`${formatPercent(metrics.uptimePercent24h)} uptime`);
   }
 
-  return { label: "Fetched At", value: formatTimestamp(payload.timestamp) };
+  if (metrics?.reachabilityPercent24h != null) {
+    parts.push(`${formatPercent(metrics.reachabilityPercent24h)} reachability`);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+function formatSyntheticCheckSSLExpiry(metrics: NonNullable<GetHttpSyntheticCheckOutput["metrics"]>): string {
+  const formattedDate = formatTimestamp(metrics.sslEarliestExpiryAt);
+  if (metrics.sslEarliestExpiryDays == null) {
+    return formattedDate;
+  }
+
+  return `${formattedDate} (${formatDays(metrics.sslEarliestExpiryDays)})`;
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(value % 1 === 0 ? 0 : 2)}%`;
+}
+
+function formatDays(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded.toFixed(rounded % 1 === 0 ? 0 : 1)}d`;
 }
 
 export function buildDeleteHttpSyntheticCheckDetails(payload: OutputPayload | undefined): Record<string, string> {
