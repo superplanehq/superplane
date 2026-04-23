@@ -334,6 +334,13 @@ export interface CanvasPageProps {
 
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
+  /**
+   * Nonce that, when it changes, triggers a fit-to-view over the currently
+   * rendered nodes (same behavior as the "Fit all components" button in the
+   * zoom toolbar). Used by the Runs view to re-focus when the user picks a
+   * different run and the canvas swaps to that run's snapshot.
+   */
+  fitAllRequest?: number | null;
   onExecutionChainHandled?: () => void;
 
   /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
@@ -1272,6 +1279,7 @@ function CanvasPage(props: CanvasPageProps) {
               canCreateIntegrations={props.canCreateIntegrations}
               onNodeDoubleClick={props.onNodeDoubleClick}
               onNodeClick={props.onNodeClick}
+              fitAllRequest={props.fitAllRequest}
             />
           </ReactFlowProvider>
 
@@ -1817,6 +1825,7 @@ function CanvasContent({
   canCreateIntegrations,
   onNodeDoubleClick,
   onNodeClick,
+  fitAllRequest,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1881,6 +1890,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
   onNodeDoubleClick?: (nodeId: string) => void;
   onNodeClick?: (nodeId: string) => void;
+  fitAllRequest?: number | null;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
@@ -2209,6 +2219,23 @@ function CanvasContent({
     );
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
   }, [focusRequest, fitView]);
+
+  //
+  // Fit all currently-rendered nodes into view when the parent bumps
+  // `fitAllRequest`. We wait a microtask so ReactFlow has measured any
+  // just-swapped node set (e.g. when the Runs view switches to a different
+  // run's snapshot) before running the fit.
+  //
+  useEffect(() => {
+    if (fitAllRequest == null) return;
+    if (!hasFitToViewRef.current) return;
+    const nodesCount = stateRef.current.nodes?.length ?? 0;
+    if (nodesCount === 0) return;
+    const id = window.setTimeout(() => {
+      fitView({ duration: 500, maxZoom: 1.0, padding: 0.2 });
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [fitAllRequest, fitView, hasFitToViewRef]);
 
   const handlePaneClick = useCallback(() => {
     previouslySelectedRef.current = new Set();

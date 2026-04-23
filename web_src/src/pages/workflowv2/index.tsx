@@ -139,6 +139,7 @@ import {
 } from "./utils";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
+const RUN_VIEW_MODE_STORAGE_KEY = "run-view-mode";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 
@@ -601,13 +602,28 @@ export function WorkflowPageV2() {
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   //
   // Run view mode toggles between the RunSummary panel (default) and the
-  // underlying canvas graph. Selecting a different run resets back to the
-  // summary so users always start with the familiar overview.
+  // underlying canvas graph. We persist the user's choice to localStorage so
+  // switching between runs (or sessions) keeps the user on the mode they
+  // picked instead of constantly snapping back to Summary.
   //
-  const [runViewMode, setRunViewMode] = useState<RunViewMode>("summary");
-  useEffect(() => {
-    setRunViewMode("summary");
-  }, [selectedRunEventId]);
+  const [runViewMode, setRunViewModeState] = useState<RunViewMode>(() => {
+    if (typeof window === "undefined") return "summary";
+    const saved = window.localStorage.getItem(RUN_VIEW_MODE_STORAGE_KEY);
+    return saved === "canvas" ? "canvas" : "summary";
+  });
+  const setRunViewMode = useCallback((next: RunViewMode) => {
+    setRunViewModeState(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(RUN_VIEW_MODE_STORAGE_KEY, next);
+    }
+  }, []);
+  //
+  // Nonce that, when bumped, asks CanvasPage to re-fit its current nodes into
+  // view (same as clicking "Fit all" in the zoom toolbar). We bump it when the
+  // user switches runs or flips into Canvas mode in Runs view so the viewport
+  // always centers on the executed nodes for the currently selected run.
+  //
+  const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const describeRunQuery = useDescribeRun(canvasId!, isRunsMode ? selectedRunEventId : null);
   /** After creating a change request, hide draft Discard until the user enters edit mode again. */
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
@@ -1853,6 +1869,24 @@ export function WorkflowPageV2() {
   const nodes = showRunCanvas ? runViewData!.nodes : nodesWithIntegrationStatus;
   const runViewEdges = showRunCanvas ? runViewData!.edges : edges;
 
+  //
+  // Ask CanvasPage to re-fit its viewport whenever the Runs canvas is active
+  // and the set of snapshot nodes changes (either because the user picked a
+  // different run, or because they just flipped into Canvas mode). We key on
+  // node ids so unrelated data refreshes (e.g. status polling) don't re-fit.
+  //
+  const runCanvasNodeIdsKey = useMemo(() => {
+    if (!showRunCanvas) return null;
+    const ids = (runViewData?.nodes || []).map((n) => n.id);
+    ids.sort();
+    return ids.join("|");
+  }, [showRunCanvas, runViewData]);
+  useEffect(() => {
+    if (!showRunCanvas) return;
+    if (!runCanvasNodeIdsKey) return;
+    setRunsFitAllNonce((n) => n + 1);
+  }, [showRunCanvas, runCanvasNodeIdsKey]);
+
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
@@ -1994,6 +2028,20 @@ export function WorkflowPageV2() {
     },
     [searchParams, setSearchParams],
   );
+
+  //
+  // When the Runs tab is active and nothing is selected yet, auto-select the
+  // latest run so the user immediately sees details instead of an empty state.
+  // This runs once events load and also when the user toggles into runs mode
+  // after events are already cached.
+  //
+  useEffect(() => {
+    if (!isRunsMode) return;
+    if (selectedRunEventId) return;
+    const firstId = runsEventsData.events[0]?.id;
+    if (!firstId) return;
+    handleSelectRun(firstId);
+  }, [isRunsMode, selectedRunEventId, runsEventsData.events, handleSelectRun]);
 
   const handleNodeDoubleClick = useCallback(
     (nodeId: string) => {
@@ -5551,6 +5599,7 @@ export function WorkflowPageV2() {
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
+          fitAllRequest={showRunCanvas ? runsFitAllNonce : null}
           onExecutionChainHandled={handleExecutionChainHandled}
           onSelectRuns={() => setRunsMode(true)}
           runsNotificationCount={
