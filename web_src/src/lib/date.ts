@@ -1,3 +1,5 @@
+import { formatRelativeTime as formatTimezoneRelativeTime } from "./timezone";
+
 export const formatTimeAgo = (date: Date): string => {
   const seconds = Math.max(0, Math.floor((new Date().getTime() - date.getTime()) / 1000));
 
@@ -9,3 +11,20 @@ export const formatTimeAgo = (date: Date): string => {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 };
+
+export const formatRelativeTimeWithTooltip = (dateString: string): { relative: string; full: string } => {
+  const date = new Date(dateString);
+  const relative = formatTimezoneRelativeTime(dateString, true); // Use existing function with abbreviated format
+
+  const full = date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return { relative, full };
+};
+
