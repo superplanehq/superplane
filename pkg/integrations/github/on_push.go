@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/exprruntime"
 )
 
 type OnPush struct{}
@@ -295,7 +294,7 @@ func extractChangedFiles(data map[string]any) []string {
 // matchesAnyGlob returns true if any file in files matches any glob pattern.
 func matchesAnyGlob(patterns []string, files []string) bool {
 	for _, pattern := range patterns {
-		re, err := pathGlobToRegex(pattern)
+		re, err := exprruntime.GlobToRegex(pattern)
 		if err != nil {
 			continue
 		}
@@ -304,42 +303,6 @@ func matchesAnyGlob(patterns []string, files []string) bool {
 				return true
 			}
 		}
-	}
-	return false
-}
-
-// pathGlobToRegex converts a glob pattern to a compiled regexp.
-//   - ** matches any sequence of path components (including across /)
-//   - *  matches any sequence of characters within a single path segment (no /)
-func pathGlobToRegex(pattern string) (*regexp.Regexp, error) {
-	var buf strings.Builder
-	buf.WriteString("^")
-	i := 0
-	for i < len(pattern) {
-		if pattern[i] == '*' {
-			if i+1 < len(pattern) && pattern[i+1] == '*' {
-				buf.WriteString(".*")
-				i += 2
-			} else {
-				buf.WriteString("[^/]*")
-				i++
-			}
-		} else {
-			if isPathRegexMeta(pattern[i]) {
-				buf.WriteByte('\\')
-			}
-			buf.WriteByte(pattern[i])
-			i++
-		}
-	}
-	buf.WriteString("$")
-	return regexp.Compile(buf.String())
-}
-
-func isPathRegexMeta(b byte) bool {
-	switch b {
-	case '.', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\':
-		return true
 	}
 	return false
 }

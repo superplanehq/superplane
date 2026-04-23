@@ -31,7 +31,7 @@ func FilePathMatchesFunctionOption() expr.Option {
 			return nil, fmt.Errorf("filePathMatches() pattern must be a string, got %T", params[1])
 		}
 
-		re, err := globToRegex(pattern)
+		re, err := GlobToRegex(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("filePathMatches() invalid pattern %q: %w", pattern, err)
 		}
@@ -74,26 +74,48 @@ func FilePathMatchesFunctionOption() expr.Option {
 	})
 }
 
-// globToRegex converts a glob pattern to a compiled regexp.
-// Supported syntax:
-//   - ** matches any sequence of path components (including zero)
-//   - *  matches any sequence of characters within a single path segment (no /)
+// GlobToRegex converts a glob pattern to a compiled regexp.
+// Supported syntax (identical to GitHub Actions path filters):
+//   - **  matches any sequence of path components including zero (crosses /)
+//   - *   matches any sequence of characters within a single path segment (no /)
 //   - All other regexp metacharacters are escaped
-func globToRegex(pattern string) (*regexp.Regexp, error) {
+//
+// Zero-directory semantics:
+//   - /**/  matches either / alone or /anything/ (zero or more intermediate dirs)
+//   - **/   at pattern start matches an optional dir prefix (e.g. **/foo.go matches foo.go)
+func GlobToRegex(pattern string) (*regexp.Regexp, error) {
 	var buf strings.Builder
 	buf.WriteString("^")
 
+	// Replace /**/  with a placeholder so the per-character loop can emit the
+	// correct alternation without having already consumed the surrounding slashes.
+	pattern = strings.ReplaceAll(pattern, "/**/", "\x00")
+
 	i := 0
 	for i < len(pattern) {
-		if pattern[i] == '*' {
-			if i+1 < len(pattern) && pattern[i+1] == '*' {
+		switch {
+		case pattern[i] == '\x00':
+			// Was /**/ — zero or more intermediate path components.
+			// Matches either a single / (zero intermediate dirs) or /…/ (one or more).
+			buf.WriteString("(/|/.+/)")
+			i++
+
+		case pattern[i] == '*' && i+1 < len(pattern) && pattern[i+1] == '*':
+			if i == 0 && i+2 < len(pattern) && pattern[i+2] == '/' {
+				// **/ at the very start — optional dir prefix with trailing slash.
+				buf.WriteString("(.+/)?")
+				i += 3
+			} else {
+				// ** at end or after a non-slash — match anything.
 				buf.WriteString(".*")
 				i += 2
-			} else {
-				buf.WriteString("[^/]*")
-				i++
 			}
-		} else {
+
+		case pattern[i] == '*':
+			buf.WriteString("[^/]*")
+			i++
+
+		default:
 			if isRegexMeta(pattern[i]) {
 				buf.WriteByte('\\')
 			}

@@ -50,5 +50,22 @@ describe("exprEvaluator", () => {
       expect(evaluateExpr("filePathMatches(commits, \"docs/old.md\")", { commits })).toBe(true);
       expect(evaluateExpr("filePathMatches(commits, \"docs/new.md\")", { commits })).toBe(false);
     });
+
+    it("** matches zero intermediate directories", () => {
+      const rootCommits = [{ added: ["pkg/foo.go"], modified: [], removed: [] }];
+      // pkg/**/foo.go must match pkg/foo.go (zero intermediate dirs)
+      expect(evaluateExpr("filePathMatches(commits, \"pkg/**/foo.go\")", { commits: rootCommits })).toBe(true);
+      // pkg/**/foo.go must also match pkg/a/foo.go (one intermediate dir)
+      const nestedCommits = [{ added: ["pkg/a/foo.go"], modified: [], removed: [] }];
+      expect(evaluateExpr("filePathMatches(commits, \"pkg/**/foo.go\")", { commits: nestedCommits })).toBe(true);
+    });
+
+    it("**/ at start matches root-level file", () => {
+      const rootCommits = [{ added: ["foo.go"], modified: [], removed: [] }];
+      expect(evaluateExpr("filePathMatches(commits, \"**/foo.go\")", { commits: rootCommits })).toBe(true);
+      // also matches nested
+      const nestedCommits = [{ added: ["a/b/foo.go"], modified: [], removed: [] }];
+      expect(evaluateExpr("filePathMatches(commits, \"**/foo.go\")", { commits: nestedCommits })).toBe(true);
+    });
   });
 });

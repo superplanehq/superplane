@@ -506,6 +506,50 @@ func Test__OnPush__PathFilter(t *testing.T) {
 		assert.Equal(t, 1, eventContext.Count())
 	})
 
+	t.Run("** matches zero intermediate directories -> event is emitted", func(t *testing.T) {
+		// pkg/**/foo.go should match pkg/foo.go (zero intermediate dirs)
+		body, sig := makeBody(`{"ref":"refs/heads/main","commits":[{"added":["pkg/foo.go"],"modified":[],"removed":[]}]}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: makeHeaders(sig),
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs":       []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"}},
+				"paths":      []string{"pkg/**/foo.go"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("**/ at start matches root-level file -> event is emitted", func(t *testing.T) {
+		// **/foo.go should match foo.go at the repo root
+		body, sig := makeBody(`{"ref":"refs/heads/main","commits":[{"added":["foo.go"],"modified":[],"removed":[]}]}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: makeHeaders(sig),
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs":       []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"}},
+				"paths":      []string{"**/foo.go"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
 	t.Run("path filter configured but payload has no commits -> event is not emitted", func(t *testing.T) {
 		body, sig := makeBody(`{"ref":"refs/heads/main"}`)
 		eventContext := &contexts.EventContext{}

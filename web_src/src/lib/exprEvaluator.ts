@@ -711,16 +711,26 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   // GitHub helpers
   filePathMatches: (commits: unknown, pattern: unknown) => {
     const pat = String(pattern);
-    // Convert glob pattern to regex: ** matches anything, * matches within a path segment.
-    // Replace ** with a NUL placeholder first so the subsequent single-* pass does not
-    // clobber the .* that ** expands to (e.g. "pkg/**" must become ^pkg/.*$, not ^pkg/.[^/]*$).
+    // Convert glob pattern to regex matching GitHub Actions path-filter semantics:
+    //   **/ at start    → optional dir prefix  (.+/)?
+    //   /**/  in middle → / or /anything/      (/|/.+/)
+    //   **  elsewhere   → anything             .*
+    //   *               → within-segment       [^/]*
+    //
+    // All ** variants are replaced with NUL placeholders (\x00–\x02) *before* the
+    // single-* pass runs, so the single-* pass never clobbers the .* expansions.
+    // Placeholders are then swapped back to their final regex fragments last.
     const reStr =
       "^" +
       pat
-        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-        .replace(/\*\*/g, "\x00")
-        .replace(/\*/g, "[^/]*")
-        .replace(/\x00/g, ".*") +
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&") // escape regex metacharacters (incl. ?)
+        .replace(/\/\*\*\//g, "\x00")           // /**/ → placeholder \x00
+        .replace(/^\*\*\//g, "\x01")            // **/ at start → placeholder \x01
+        .replace(/\*\*/g, "\x02")               // remaining ** → placeholder \x02
+        .replace(/\*/g, "[^/]*")                // * → within-segment wildcard
+        .replace(/\x00/g, "(/|/.+/)")           // restore /**/ → zero-or-more dirs
+        .replace(/\x01/g, "(.+/)?")             // restore **/ at start → optional prefix
+        .replace(/\x02/g, ".*") +               // restore remaining ** → .*
       "$";
     const re = new RegExp(reStr);
     const commitList = Array.isArray(commits) ? commits : [];

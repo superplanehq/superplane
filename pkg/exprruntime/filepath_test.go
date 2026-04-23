@@ -90,11 +90,18 @@ func Test__GlobToRegex(t *testing.T) {
 		{"**", "anything/at/all.go", true},
 		// dots in patterns are treated as literals, not regex wildcards
 		{"file.go", "fileXgo", false},
+		// ** matches zero intermediate directories
+		{"pkg/**/foo.go", "pkg/foo.go", true},
+		{"pkg/**/foo.go", "pkg/a/foo.go", true},
+		{"pkg/**/foo.go", "pkg/a/b/foo.go", true},
+		{"**/foo.go", "foo.go", true},
+		{"**/foo.go", "a/foo.go", true},
+		{"**/foo.go", "a/b/foo.go", true},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.pattern+"->"+tc.path, func(t *testing.T) {
-			re, err := globToRegex(tc.pattern)
+			re, err := GlobToRegex(tc.pattern)
 			require.NoError(t, err)
 			assert.Equal(t, tc.matches, re.MatchString(tc.path), "pattern=%q path=%q", tc.pattern, tc.path)
 		})
