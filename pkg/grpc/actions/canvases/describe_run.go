@@ -51,10 +51,21 @@ func DescribeRun(ctx context.Context, organizationID, canvasID, eventID string) 
 		rootEvent.ID.String(): parents,
 	}
 
+	queueItems, err := models.ListQueueItemsForRootEvents([]uuid.UUID{rootEvent.ID})
+	if err != nil {
+		return nil, err
+	}
+
+	serializedQueueItems, err := SerializeNodeQueueItems(queueItems)
+	if err != nil {
+		return nil, err
+	}
+
 	serializedRun, err := SerializeCanvasEventWithExecutions(*rootEvent, executionsByEventID[rootEvent.ID.String()])
 	if err != nil {
 		return nil, err
 	}
+	serializedRun.QueueItems = serializedQueueItems
 
 	serializedExecutions, err := SerializeNodeExecutions(parents, nil)
 	if err != nil {
@@ -72,10 +83,11 @@ func DescribeRun(ctx context.Context, organizationID, canvasID, eventID string) 
 	}
 
 	return &pb.DescribeRunResponse{
-		Run:              serializedRun,
-		Executions:       serializedExecutions,
-		ChildExecutions:  serializedChildren,
-		SnapshotVersion:  snapshotVersion,
+		Run:             serializedRun,
+		Executions:      serializedExecutions,
+		ChildExecutions: serializedChildren,
+		SnapshotVersion: snapshotVersion,
+		QueueItems:      serializedQueueItems,
 	}, nil
 }
 

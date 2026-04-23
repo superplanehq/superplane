@@ -30,7 +30,12 @@ func ListCanvasEvents(ctx context.Context, registry *registry.Registry, canvasID
 		return nil, err
 	}
 
-	serialized, err := SerializeCanvasEventsWithExecutions(events, executionsByEventID)
+	queueItemsByEventID, err := listQueueItemsForCanvasEvents(events)
+	if err != nil {
+		return nil, err
+	}
+
+	serialized, err := SerializeCanvasEventsWithExecutions(events, executionsByEventID, queueItemsByEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +46,39 @@ func ListCanvasEvents(ctx context.Context, registry *registry.Registry, canvasID
 		HasNextPage:   hasNextPage(len(events), int(limit), count),
 		LastTimestamp: getLastEventTimestamp(events),
 	}, nil
+}
+
+func listQueueItemsForCanvasEvents(events []models.CanvasEvent) (map[string][]*pb.CanvasNodeQueueItem, error) {
+	if len(events) == 0 {
+		return map[string][]*pb.CanvasNodeQueueItem{}, nil
+	}
+
+	rootEventIDs := make([]uuid.UUID, len(events))
+	for i, event := range events {
+		rootEventIDs[i] = event.ID
+	}
+
+	queueItems, err := models.ListQueueItemsForRootEvents(rootEventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	byEventID := make(map[string][]models.CanvasNodeQueueItem, len(rootEventIDs))
+	for _, item := range queueItems {
+		rootID := item.RootEventID.String()
+		byEventID[rootID] = append(byEventID[rootID], item)
+	}
+
+	serializedByEventID := make(map[string][]*pb.CanvasNodeQueueItem, len(byEventID))
+	for rootID, items := range byEventID {
+		serialized, err := SerializeNodeQueueItems(items)
+		if err != nil {
+			return nil, err
+		}
+		serializedByEventID[rootID] = serialized
+	}
+
+	return serializedByEventID, nil
 }
 
 func SerializeCanvasEvents(events []models.CanvasEvent) ([]*pb.CanvasEvent, error) {
@@ -57,13 +95,16 @@ func SerializeCanvasEvents(events []models.CanvasEvent) ([]*pb.CanvasEvent, erro
 	return result, nil
 }
 
-func SerializeCanvasEventsWithExecutions(events []models.CanvasEvent, executionsByEventID map[string][]models.CanvasNodeExecution) ([]*pb.CanvasEventWithExecutions, error) {
+func SerializeCanvasEventsWithExecutions(events []models.CanvasEvent, executionsByEventID map[string][]models.CanvasNodeExecution, queueItemsByEventID map[string][]*pb.CanvasNodeQueueItem) ([]*pb.CanvasEventWithExecutions, error) {
 	result := make([]*pb.CanvasEventWithExecutions, 0, len(events))
 
 	for _, event := range events {
 		serializedEvent, err := SerializeCanvasEventWithExecutions(event, executionsByEventID[event.ID.String()])
 		if err != nil {
 			return nil, err
+		}
+		if queueItemsByEventID != nil {
+			serializedEvent.QueueItems = queueItemsByEventID[event.ID.String()]
 		}
 		result = append(result, serializedEvent)
 	}

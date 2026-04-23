@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CanvasesCanvasEventWithExecutions,
-  CanvasesCanvasNodeQueueItem,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
@@ -34,12 +33,6 @@ interface RunsSidebarProps {
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   totalCount?: number;
-  /**
-   * Canvas-wide map of queue items keyed by nodeId. Used to detect runs that
-   * still have components waiting in the queue even when every recorded
-   * execution has finished, so those runs aren't misreported as "completed".
-   */
-  nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
 }
 
 function RunStatusBadge({ status }: { status: string }) {
@@ -118,7 +111,6 @@ export function RunsSidebar({
   workflowNodes,
   componentIconMap,
   totalCount,
-  nodeQueueItemsMap,
 }: RunsSidebarProps) {
   const nodeMap = useMemo(() => {
     const m = new Map<string, ComponentsNode>();
@@ -127,24 +119,6 @@ export function RunsSidebar({
     }
     return m;
   }, [workflowNodes]);
-
-  //
-  // Count queue items per triggering run (rootEvent.id). Used to detect runs
-  // that look completed from executions alone but still have components
-  // waiting in the queue.
-  //
-  const queueCountByEventId = useMemo(() => {
-    const counts: Record<string, number> = {};
-    if (!nodeQueueItemsMap) return counts;
-    for (const items of Object.values(nodeQueueItemsMap)) {
-      for (const item of items) {
-        const eventId = item.rootEvent?.id;
-        if (!eventId) continue;
-        counts[eventId] = (counts[eventId] || 0) + 1;
-      }
-    }
-    return counts;
-  }, [nodeQueueItemsMap]);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -386,7 +360,7 @@ export function RunsSidebar({
           <>
             {filteredEvents.map(({ event, triggerName, title }) => {
               const executions = event.executions || [];
-              const pendingQueueCount = event.id ? queueCountByEventId[event.id] || 0 : 0;
+              const pendingQueueCount = (event.queueItems || []).length;
               const status = getAggregateRunStatus(executions, pendingQueueCount > 0);
               const isSelected = event.id === selectedEventId;
 

@@ -5603,7 +5603,7 @@ export function WorkflowPageV2() {
           fitAllRequest={showRunCanvas ? runsFitAllNonce : null}
           onExecutionChainHandled={handleExecutionChainHandled}
           onSelectRuns={() => setRunsMode(true)}
-          runsNotificationCount={countActiveRuns(runsEventsData.events, visibleNodeQueueItemsMap)}
+          runsNotificationCount={countActiveRuns(runsEventsData.events)}
           runsSidebar={
             <RunsSidebar
               events={runsEventsData.events}
@@ -5616,7 +5616,6 @@ export function WorkflowPageV2() {
               workflowNodes={canvas?.spec?.nodes}
               componentIconMap={componentIconMap}
               totalCount={runsEventsData.totalCount}
-              nodeQueueItemsMap={visibleNodeQueueItemsMap}
             />
           }
           runViewOverlay={
@@ -5830,27 +5829,14 @@ export function WorkflowPageV2() {
 // Completed-but-queued runs are counted too so the Runs tab notification
 // accurately reflects what still needs attention.
 //
-function countActiveRuns(
-  events: CanvasesCanvasEventWithExecutions[],
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-): number {
-  const queueCountByEventId: Record<string, number> = {};
-  for (const items of Object.values(nodeQueueItemsMap)) {
-    for (const item of items) {
-      const id = item.rootEvent?.id;
-      if (!id) continue;
-      queueCountByEventId[id] = (queueCountByEventId[id] || 0) + 1;
-    }
-  }
-
+function countActiveRuns(events: CanvasesCanvasEventWithExecutions[]): number {
   return events.filter((event) => {
     const executions = event.executions || [];
     const hasInFlight = executions.some(
       (x: { state?: string }) => x.state === "STATE_STARTED" || x.state === "STATE_PENDING",
     );
     if (hasInFlight) return true;
-    const pending = event.id ? queueCountByEventId[event.id] || 0 : 0;
-    return pending > 0;
+    return (event.queueItems || []).length > 0;
   }).length;
 }
 

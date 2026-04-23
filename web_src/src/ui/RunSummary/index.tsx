@@ -143,6 +143,44 @@ function buildSteps(
     });
   }
 
+  //
+  // Queue items represent components that are scheduled to run for this
+  // triggering event but don't have an execution record yet (waiting for a
+  // previous stage, paused nodes, approval gates, etc.). Without these the
+  // Activity section would silently miss anything that hasn't produced an
+  // execution yet, and the run would look "idle" when it isn't.
+  //
+  const queueItems = runData.queueItems || [];
+  const executedNodeIds = new Set(
+    sorted.map((exec) => exec.nodeId).filter((id): id is string => !!id),
+  );
+
+  for (const item of queueItems) {
+    if (!item.nodeId) continue;
+    //
+    // A node can have a queue item AND an execution at once (e.g. batching
+    // multiple inputs). If we already have an execution step for that node,
+    // trust the execution -- it carries real state. Otherwise render a
+    // synthetic "queued" step so the user sees there's pending work.
+    //
+    if (executedNodeIds.has(item.nodeId)) continue;
+
+    const node = nodeMap.get(item.nodeId);
+    const startMs = item.createdAt ? new Date(item.createdAt).getTime() : runStartMs;
+    steps.push({
+      key: `queue:${item.id || `${item.nodeId}:${startMs}`}`,
+      nodeId: item.nodeId,
+      name: node?.name || item.nodeId.slice(0, 8),
+      componentName: node?.component?.name || node?.trigger?.name,
+      status: "queued",
+      finished: false,
+      startOffsetMs: Math.max(0, startMs - runStartMs),
+      durationMs: 0,
+      elapsedMs: 0,
+      isTrigger: false,
+    });
+  }
+
   let totalDurationMs = 0;
   for (const s of steps) {
     const end = s.isTrigger ? 0 : s.startOffsetMs + (s.durationMs || s.elapsedMs);

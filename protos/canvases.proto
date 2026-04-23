@@ -1034,6 +1034,10 @@ message CanvasEventWithExecutions {
   repeated CanvasNodeExecutionRef executions = 7;
   string custom_name = 8;
   string report_entry = 9;
+  // Components for this run still sitting in a node queue (no execution yet).
+  // Surfacing these lets the UI detect runs that look "completed" from their
+  // executions alone but still have pending work.
+  repeated CanvasNodeQueueItem queue_items = 10;
 }
 
 message ListEventExecutionsRequest {
@@ -1055,6 +1059,9 @@ message DescribeRunResponse {
   repeated CanvasNodeExecution executions = 2;
   repeated CanvasNodeExecution child_executions = 3;
   CanvasVersion snapshot_version = 4;
+  // Components belonging to this run that are still waiting in a node queue.
+  // The Run View uses these to render waiting steps in the Activity section.
+  repeated CanvasNodeQueueItem queue_items = 5;
 }
 
 message CancelExecutionRequest {
