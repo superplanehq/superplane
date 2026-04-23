@@ -59,7 +59,7 @@ func (e *ExecuteCode) Documentation() string {
 
 ## Configuration
 
-- **Sandbox**: The sandbox ID to execute code in (from createSandbox output). Supports expressions, e.g. ` + "`" + `{{ $["daytona.createSandbox"].data.id }}` + "`" + `
+- **Sandbox**: The sandbox ID to execute code in (from Create Sandbox or Create Repository Sandbox output). Supports expressions, e.g. ` + "`" + `{{ previous().data.id }}` + "`" + ` or ` + "`" + `{{ $["Create Repository Sandbox"].data.sandboxId }}` + "`" + `
 - **Code**: The code to execute (supports expressions)
 - **Language**: The programming language (python, typescript, javascript)
 - **Timeout**: Optional execution timeout in milliseconds
