@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { CanvasesCanvasEventWithExecutions, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { getAggregateStatus, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
@@ -10,6 +10,11 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { Link as LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+
+export const RUNS_SIDEBAR_WIDTH_STORAGE_KEY = "runs-sidebar-width";
+const RUNS_SIDEBAR_MIN_WIDTH = 260;
+const RUNS_SIDEBAR_MAX_WIDTH = 640;
+const RUNS_SIDEBAR_DEFAULT_WIDTH = 320;
 
 interface RunsSidebarProps {
   events: CanvasesCanvasEventWithExecutions[];
@@ -93,8 +98,60 @@ export function RunsSidebar({
     return m;
   }, [workflowNodes]);
 
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem(RUNS_SIDEBAR_WIDTH_STORAGE_KEY) : null;
+    const parsed = saved ? parseInt(saved, 10) : NaN;
+    if (!Number.isFinite(parsed)) return RUNS_SIDEBAR_DEFAULT_WIDTH;
+    return Math.max(RUNS_SIDEBAR_MIN_WIDTH, Math.min(RUNS_SIDEBAR_MAX_WIDTH, parsed));
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const rect = sidebarRef.current?.getBoundingClientRect();
+      const left = rect?.left ?? 0;
+      const newWidth = e.clientX - left;
+      const clampedWidth = Math.max(RUNS_SIDEBAR_MIN_WIDTH, Math.min(RUNS_SIDEBAR_MAX_WIDTH, newWidth));
+      setSidebarWidth(clampedWidth);
+    },
+    [isResizing],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(RUNS_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
   return (
-    <div className="flex w-80 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <div
+      ref={sidebarRef}
+      className="relative flex shrink-0 flex-col border-r border-slate-200 bg-white"
+      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+    >
       <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
         <span className="text-sm font-medium text-gray-700">Runs</span>
         {totalCount != null && totalCount > 0 && <span className="ml-1.5 text-xs text-gray-400">({totalCount})</span>}
@@ -126,12 +183,19 @@ export function RunsSidebar({
               const duration = computeRunDuration(event);
 
               return (
-                <button
+                <div
                   key={event.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => event.id && onSelectRun(event.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      event.id && onSelectRun(event.id);
+                    }
+                  }}
                   className={cn(
-                    "group flex w-full flex-col gap-1 border-b border-slate-100 px-3 py-2.5 text-left transition-colors",
+                    "group flex w-full cursor-pointer flex-col gap-1 border-b border-slate-100 px-3 py-2.5 text-left transition-colors",
                     isSelected ? "bg-sky-50" : "hover:bg-gray-50",
                   )}
                 >
@@ -166,7 +230,7 @@ export function RunsSidebar({
                       <span className="ml-auto shrink-0 font-mono text-[10px] text-gray-400">{duration}</span>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
             {hasNextPage && onLoadMore ? (
@@ -186,6 +250,24 @@ export function RunsSidebar({
             ) : null}
           </>
         )}
+      </div>
+
+      <div
+        onMouseDown={handleMouseDown}
+        className={cn(
+          "absolute right-0 top-0 bottom-0 z-30 flex w-4 cursor-ew-resize items-center justify-center transition-colors hover:bg-gray-100 group",
+          isResizing && "bg-blue-50",
+        )}
+        style={{ marginRight: "-8px" }}
+        aria-label="Resize runs sidebar"
+        role="separator"
+      >
+        <div
+          className={cn(
+            "h-14 w-2 rounded-full bg-gray-300 transition-colors group-hover:bg-gray-800",
+            isResizing && "bg-blue-500",
+          )}
+        />
       </div>
     </div>
   );

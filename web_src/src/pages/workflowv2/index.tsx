@@ -4852,7 +4852,7 @@ export function WorkflowPageV2() {
     await handleToggleEditMode();
   }, [isRunsMode, setRunsMode, handleToggleEditMode]);
 
-  /** Wrapper for the "Live Canvas" mode toggle tab: exits runs mode without toggling edit. */
+  /** Wrapper for the "Live" mode toggle tab: exits runs mode without toggling edit. */
   const handleExitEditMode = useCallback(async () => {
     if (isRunsMode) {
       setRunsMode(false);

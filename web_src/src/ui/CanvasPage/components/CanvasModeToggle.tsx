@@ -46,10 +46,10 @@ export function CanvasModeToggle({
         <TabsTrigger
           value="version-live"
           data-testid="canvas-view-mode-live"
-          aria-label="Live Canvas"
+          aria-label="Live"
           className="rounded-none border-none px-3 py-1 text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none"
         >
-          Live Canvas
+          Live
         </TabsTrigger>
         {onSelectRuns ? (
           <>
