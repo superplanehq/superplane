@@ -4,7 +4,6 @@ import {
   canvasesDescribeCanvas,
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
-  canvasesUpdateCanvas,
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
@@ -33,6 +32,8 @@ import {
 import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
+  ChangeManagementApprover,
+  ChangeManagementApproverType,
   SuperplaneComponentsNode,
   ComponentsPosition,
 } from "../api-client/types.gen";
@@ -403,6 +404,8 @@ export const useCreateCanvas = (organizationId: string) => {
 
 export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
+  const changeManagementEnabledError =
+    "change management is enabled for this canvas; update the draft in the editor and publish it through a change request";
 
   return useMutation({
     mutationFn: async (data: {
@@ -413,48 +416,95 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
         approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
       };
     }) => {
-      return await canvasesUpdateCanvas(
+      const currentCanvasResponse = await canvasesDescribeCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
+        }),
+      );
+      const currentCanvas = currentCanvasResponse.data?.canvas;
+      if (!currentCanvas) {
+        throw new Error("Canvas not found");
+      }
+
+      if (currentCanvas.spec?.changeManagement?.enabled ?? false) {
+        throw new Error(changeManagementEnabledError);
+      }
+
+      const nextApprovals: ChangeManagementApprover[] | undefined = data.changeManagement?.approvals?.map(
+        (approval) => ({
+          type: approval.type as ChangeManagementApproverType | undefined,
+          userId: approval.userId,
+          roleName: approval.roleName,
+        }),
+      );
+
+      const mergedCanvas: CanvasesCanvas = {
+        ...currentCanvas,
+        metadata: {
+          ...currentCanvas.metadata,
+          name: data.name ?? currentCanvas.metadata?.name ?? "",
+          description: data.description ?? currentCanvas.metadata?.description ?? "",
+        },
+        spec: {
+          ...currentCanvas.spec,
+          changeManagement: data.changeManagement
+            ? {
+                ...currentCanvas.spec?.changeManagement,
+                ...data.changeManagement,
+                approvals: nextApprovals ?? currentCanvas.spec?.changeManagement?.approvals,
+              }
+            : currentCanvas.spec?.changeManagement,
+        },
+      };
+
+      const versionsResponse = await canvasesListCanvasVersions(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      let targetVersionId =
+        versionsResponse.data?.versions?.find((version) => !isPublishedVersion(version))?.metadata?.id || "";
+
+      if (!targetVersionId) {
+        const createVersionResponse = await canvasesCreateCanvasVersion(
+          withOrganizationHeader({
+            path: { canvasId },
+            body: {},
+          }),
+        );
+        targetVersionId = createVersionResponse.data?.version?.metadata?.id || "";
+      }
+
+      if (!targetVersionId) {
+        throw new Error("Draft version was not returned by the API");
+      }
+
+      const updateResponse = await canvasesUpdateCanvasVersion2(
+        withOrganizationHeader({
+          path: { canvasId },
           body: {
-            name: data.name,
-            description: data.description,
-            changeManagement: data.changeManagement,
+            versionId: targetVersionId,
+            canvas: mergedCanvas,
           },
         }),
       );
+
+      if (!(currentCanvas.spec?.changeManagement?.enabled ?? false)) {
+        await canvasesPublishCanvasVersion(
+          withOrganizationHeader({
+            path: { canvasId, versionId: targetVersionId },
+            body: {},
+          }),
+        );
+      }
+
+      return updateResponse;
     },
-    onSuccess: (response, variables) => {
+    onSuccess: (_response) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-
-      const updatedCanvas = response?.data?.canvas;
-      if (updatedCanvas) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          const updatedMetadata = updatedCanvas.metadata;
-          const updatedSpec = updatedCanvas.spec;
-
-          return {
-            ...current,
-            metadata: {
-              ...current.metadata,
-              name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
-              description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
-            },
-            spec: {
-              ...current.spec,
-              changeManagement:
-                updatedSpec?.changeManagement ?? variables.changeManagement ?? current.spec?.changeManagement,
-            },
-          };
-        });
-      }
     },
   });
 };

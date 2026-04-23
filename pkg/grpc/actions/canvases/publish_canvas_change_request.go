@@ -142,6 +142,7 @@ func PublishCanvasChangeRequest(
 
 		mergedVersion, createVersionErr := models.CreateCanvasSnapshotVersionInTransaction(
 			tx,
+			version,
 			canvasUUID,
 			publisherOwnerID,
 			mergedNodes,
