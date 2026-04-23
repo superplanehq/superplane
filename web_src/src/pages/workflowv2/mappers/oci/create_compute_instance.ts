@@ -28,7 +28,6 @@ interface CreateComputeInstanceConfiguration {
 }
 
 interface CreateComputeInstanceOutputData {
-  instanceId?: string;
   displayName?: string;
   lifecycleState?: string;
   shape?: string;
@@ -37,12 +36,21 @@ interface CreateComputeInstanceOutputData {
   region?: string;
   timeCreated?: string;
   publicIp?: string;
-  privateIp?: string;
 }
 
 type CreateComputeInstanceOutputPayload = OutputPayload & {
   data?: CreateComputeInstanceOutputData;
 };
+
+interface CreateComputeInstanceExecutionMetadata {
+  startedAt?: string;
+}
+
+function getExecutedAt(context: ExecutionDetailsContext): string | undefined {
+  const metadata = context.execution.metadata as CreateComputeInstanceExecutionMetadata | undefined;
+  const ts = metadata?.startedAt ?? context.execution.createdAt;
+  return ts ? new Date(ts).toLocaleString() : undefined;
+}
 
 function getOutputData(context: ExecutionDetailsContext): CreateComputeInstanceOutputData | undefined {
   const outputs = context.execution.outputs as { default?: CreateComputeInstanceOutputPayload[] } | undefined;
@@ -68,15 +76,12 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
     const data = getOutputData(context);
 
-    if (context.execution.createdAt) {
-      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+    const executedAt = getExecutedAt(context);
+    if (executedAt) {
+      details["Executed At"] = executedAt;
     }
 
     if (!data) return details;
-
-    if (data.instanceId) {
-      details["Instance ID"] = data.instanceId;
-    }
 
     if (data.displayName) {
       details["Display Name"] = data.displayName;
@@ -102,10 +107,6 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
       details["Public IP"] = data.publicIp;
     }
 
-    if (data.privateIp) {
-      details["Private IP"] = data.privateIp;
-    }
-
     return details;
   },
 };
@@ -124,15 +125,6 @@ function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): 
 
   if (config?.availabilityDomain) {
     items.push({ icon: "map-pin", label: config.availabilityDomain });
-  }
-
-  if (config?.imageOs) {
-    items.push({ icon: "layers", label: config.imageOs });
-  }
-
-  if (config?.ocpus) {
-    const memory = config.memoryInGBs ? ` / ${config.memoryInGBs} GB RAM` : "";
-    items.push({ icon: "zap", label: `${config.ocpus} OCPUs${memory}` });
   }
 
   return items;
