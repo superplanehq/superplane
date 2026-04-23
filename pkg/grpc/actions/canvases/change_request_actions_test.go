@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -157,6 +158,56 @@ func TestPublishRequiresApprovals(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, grpcstatus.Code(err))
+}
+
+func TestPublishChangeRequestWithDuplicateNameReturnsAlreadyExists(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	existingCanvasID := createCanvasWithNoopNode(ctx, t, r, "existing-live-canvas")
+	canvasID := createCanvasWithNoopNode(ctx, t, r, "change-request-duplicate-name")
+	draftVersionID := createDraftVersion(ctx, t, r, canvasID, "Draft Name")
+
+	existingCanvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(existingCanvasID))
+	require.NoError(t, err)
+
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasVersion{}).
+		Where("id = ?", *existingCanvas.LiveVersionID).
+		Update("name", "publish-duplicate-live").
+		Error)
+
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasVersion{}).
+		Where("id = ?", uuid.MustParse(draftVersionID)).
+		Update("name", "publish-duplicate-live").
+		Error)
+
+	createResponse, err := CreateCanvasChangeRequest(ctx, r.Organization.ID.String(), canvasID, draftVersionID)
+	require.NoError(t, err)
+
+	_, err = actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		createResponse.ChangeRequest.Metadata.Id,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE,
+	)
+	require.NoError(t, err)
+
+	_, err = actOnCanvasChangeRequestAction(
+		ctx,
+		r,
+		canvasID,
+		createResponse.ChangeRequest.Metadata.Id,
+		pb.ActOnCanvasChangeRequestRequest_ACTION_PUBLISH,
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, grpcstatus.Code(err))
+
+	existingCanvas, err = models.FindCanvas(r.Organization.ID, uuid.MustParse(existingCanvasID))
+	require.NoError(t, err)
+	assert.Equal(t, "publish-duplicate-live", existingCanvas.Name)
 }
 
 func TestUnapproveRequiresReapprovalBeforePublish(t *testing.T) {
