@@ -23,6 +23,7 @@ var AllPredicateOperators = []FieldOption{
 	},
 }
 
+
 type Predicate struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
@@ -56,6 +57,18 @@ type AnyPredicateListTypeOptions struct {
 func MatchesAnyPredicate(predicates []Predicate, value string) bool {
 	for _, predicate := range predicates {
 		if predicate.Matches(value) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// MatchesAnyPredicateInList returns true if any value in values matches any predicate.
+// Used for list-valued fields like file paths across commits.
+func MatchesAnyPredicateInList(predicates []Predicate, values []string) bool {
+	for _, value := range values {
+		if MatchesAnyPredicate(predicates, value) {
 			return true
 		}
 	}
