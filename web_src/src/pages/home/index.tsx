@@ -1,6 +1,6 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Grid3x3, MoreVertical, Pencil, Plus, Palette, Rainbow, Rows3, Search, Trash2 } from "lucide-react";
+import { Grid3x3, MoreVertical, Plus, Palette, Rainbow, Rows3, Search, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -54,7 +54,6 @@ const HomePage = () => {
 
   const canvasError = canvasesApiError ? "Failed to fetch canvases. Please try again later." : null;
   const canCreateCanvases = canAct("canvases", "create");
-  const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
   const formatDate = (value?: string) => {
@@ -147,9 +146,7 @@ const HomePage = () => {
                 organizationId={organizationId}
                 searchQuery={searchQuery}
                 canvasViewMode={canvasViewMode}
-                onEditCanvas={canvasModalState.onOpenEdit}
                 canCreateCanvases={canCreateCanvases}
-                canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
                 permissionsLoading={permissionsLoading}
               />
@@ -223,9 +220,7 @@ function Content({
   organizationId,
   searchQuery,
   canvasViewMode,
-  onEditCanvas,
   canCreateCanvases,
-  canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: {
@@ -233,9 +228,7 @@ function Content({
   organizationId: string;
   searchQuery: string;
   canvasViewMode: CanvasViewMode;
-  onEditCanvas: (canvas: CanvasCardData) => void;
   canCreateCanvases: boolean;
-  canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }) {
@@ -258,9 +251,7 @@ function Content({
       organizationId={organizationId}
       view={canvasViewMode}
       searchQuery={searchQuery}
-      onEditCanvas={onEditCanvas}
       canCreateCanvases={canCreateCanvases}
-      canUpdateCanvases={canUpdateCanvases}
       canDeleteCanvases={canDeleteCanvases}
       permissionsLoading={permissionsLoading}
     />
@@ -286,9 +277,7 @@ interface CanvasGridViewProps {
   organizationId: string;
   view: CanvasViewMode;
   searchQuery: string;
-  onEditCanvas: (canvas: CanvasCardData) => void;
   canCreateCanvases: boolean;
-  canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }
@@ -372,9 +361,7 @@ function CanvasGridView({
   organizationId,
   view,
   searchQuery,
-  onEditCanvas,
   canCreateCanvases,
-  canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: CanvasGridViewProps) {
@@ -395,8 +382,6 @@ function CanvasGridView({
             key={canvas.id}
             canvas={canvas}
             organizationId={organizationId}
-            onEdit={onEditCanvas}
-            canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
           />
@@ -419,8 +404,6 @@ function CanvasGridView({
           key={canvas.id}
           canvas={canvas}
           organizationId={organizationId}
-          onEdit={onEditCanvas}
-          canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
         />
@@ -432,20 +415,11 @@ function CanvasGridView({
 interface CanvasCardProps {
   canvas: CanvasCardData;
   organizationId: string;
-  onEdit: (canvas: CanvasCardData) => void;
-  canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }
 
-function CanvasCard({
-  canvas,
-  organizationId,
-  onEdit,
-  canUpdateCanvases,
-  canDeleteCanvases,
-  permissionsLoading,
-}: CanvasCardProps) {
+function CanvasCard({ canvas, organizationId, canDeleteCanvases, permissionsLoading }: CanvasCardProps) {
   const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
   const previewNodes = canvas.nodes || [];
   const previewEdges = canvas.edges || [];
@@ -468,8 +442,6 @@ function CanvasCard({
               <CanvasActionsMenu
                 canvas={canvas}
                 organizationId={organizationId}
-                onEdit={onEdit}
-                canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
                 permissionsLoading={permissionsLoading}
               />
@@ -598,26 +570,17 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
 interface CanvasActionsMenuProps {
   canvas: CanvasCardData;
   organizationId: string;
-  onEdit: (canvas: CanvasCardData) => void;
-  canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }
 
-function CanvasActionsMenu({
-  canvas,
-  organizationId,
-  onEdit,
-  canUpdateCanvases,
-  canDeleteCanvases,
-  permissionsLoading,
-}: CanvasActionsMenuProps) {
+function CanvasActionsMenu({ canvas, organizationId, canDeleteCanvases, permissionsLoading }: CanvasActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const deleteCanvasMutation = useDeleteCanvas(organizationId);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const canManage = canUpdateCanvases || canDeleteCanvases;
+  const canManage = canDeleteCanvases;
 
   const closeDialog = () => {
     setIsDialogOpen(false);
@@ -704,23 +667,6 @@ function CanvasActionsMenu({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <PermissionTooltip
-                allowed={canUpdateCanvases || permissionsLoading}
-                message="You don't have permission to update canvases."
-              >
-                <DropdownMenuItem
-                  onClick={(event: MouseEvent<HTMLElement>) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (!canUpdateCanvases) return;
-                    onEdit(canvas);
-                  }}
-                  disabled={!canUpdateCanvases}
-                >
-                  <Pencil size={16} />
-                  Change Name
-                </DropdownMenuItem>
-              </PermissionTooltip>
-              <PermissionTooltip
                 allowed={canDeleteCanvases || permissionsLoading}
                 message="You don't have permission to delete canvases."
               >
@@ -773,14 +719,7 @@ function CanvasActionsMenu({
   );
 }
 
-function CanvasListRow({
-  canvas,
-  organizationId,
-  onEdit,
-  canUpdateCanvases,
-  canDeleteCanvases,
-  permissionsLoading,
-}: CanvasCardProps) {
+function CanvasListRow({ canvas, organizationId, canDeleteCanvases, permissionsLoading }: CanvasCardProps) {
   const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
 
   return (
@@ -800,8 +739,6 @@ function CanvasListRow({
             <CanvasActionsMenu
               canvas={canvas}
               organizationId={organizationId}
-              onEdit={onEdit}
-              canUpdateCanvases={canUpdateCanvases}
               canDeleteCanvases={canDeleteCanvases}
               permissionsLoading={permissionsLoading}
             />

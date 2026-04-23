@@ -61,18 +61,6 @@ service Canvases {
     };
   }
 
-  rpc UpdateCanvas(UpdateCanvasRequest) returns (UpdateCanvasResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/canvases/{id}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas";
-      description: "Updates canvas metadata";
-      tags: "Canvas";
-    };
-  }
-
   rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/versions"
@@ -118,7 +106,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update canvas version";
-      description: "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled";
+      description: "Updates a user-owned canvas version, including metadata and flow content";
       tags: "CanvasVersion";
     };
   }
@@ -429,17 +417,6 @@ message DescribeCanvasResponse {
   Canvas canvas = 1;
 }
 
-message UpdateCanvasRequest {
-  string id = 1;
-  optional string name = 2;
-  optional string description = 3;
-  Canvas.ChangeManagement change_management = 4;
-}
-
-message UpdateCanvasResponse {
-  Canvas canvas = 1;
-}
-
 message CreateCanvasRequest {
   Canvas canvas = 1;
   CanvasAutoLayout auto_layout = 2;
@@ -684,6 +661,8 @@ message CanvasVersion {
     google.protobuf.Timestamp published_at = 5;
     google.protobuf.Timestamp created_at = 6;
     google.protobuf.Timestamp updated_at = 7;
+    string name = 8;
+    string description = 9;
   }
 
   Metadata metadata = 1;

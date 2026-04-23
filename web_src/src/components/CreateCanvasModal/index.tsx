@@ -17,10 +17,8 @@ interface CreateCanvasModalProps {
   onSubmit: (data: { name: string; description?: string; templateId?: string }) => Promise<void>;
   isLoading?: boolean;
   organizationId?: string;
-  initialData?: { name: string; description?: string };
   templates?: { id: string; name: string; description?: string }[];
   defaultTemplateId?: string;
-  mode?: "create" | "edit";
   fromTemplate?: boolean;
 }
 
@@ -33,9 +31,7 @@ export function CreateCanvasModal({
   onSubmit,
   isLoading = false,
   organizationId,
-  initialData,
   defaultTemplateId,
-  mode = "create",
   fromTemplate = false,
 }: CreateCanvasModalProps) {
   const [name, setName] = useState("");
@@ -46,18 +42,13 @@ export function CreateCanvasModal({
 
   useEffect(() => {
     if (isOpen) {
-      setName(initialData?.name ?? "");
-      setDescription(initialData?.description ?? "");
+      setName("");
+      setDescription("");
       setNameError("");
       setSubmitError(null);
-    }
-    if (isOpen && mode === "create") {
       setTemplateId(defaultTemplateId || "");
     }
-    if (isOpen && mode !== "create") {
-      setTemplateId("");
-    }
-  }, [isOpen, initialData?.name, initialData?.description, defaultTemplateId, mode]);
+  }, [isOpen, defaultTemplateId]);
 
   const handleClose = () => {
     setName("");
@@ -110,15 +101,11 @@ export function CreateCanvasModal({
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>
-        {fromTemplate ? "New Canvas from template" : mode === "edit" ? "Edit Canvas" : "New Canvas"}
-      </DialogTitle>
+      <DialogTitle>{fromTemplate ? "New Canvas from template" : "New Canvas"}</DialogTitle>
       <DialogDescription className="text-sm !text-[var(--color-gray-800)]">
         {fromTemplate
           ? "Create a canvas from this template. Give it a name and optional description to get started."
-          : mode === "edit"
-            ? "Update the canvas details to keep things clear for your teammates."
-            : "Create a new canvas to orchestrate your DevOps work. You can tweak the details any time."}
+          : "Create a new canvas to orchestrate your DevOps work. You can tweak the details any time."}
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <Icon name="close" size="sm" />
@@ -201,17 +188,13 @@ export function CreateCanvasModal({
           disabled={!name.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"
         >
-          {mode === "edit"
+          {fromTemplate
             ? isLoading
-              ? "Saving..."
-              : "Save changes"
-            : fromTemplate
-              ? isLoading
-                ? "Creating Canvas"
-                : "Create Canvas"
-              : isLoading
-                ? "Creating canvas..."
-                : "Create canvas"}
+              ? "Creating Canvas"
+              : "Create Canvas"
+            : isLoading
+              ? "Creating canvas..."
+              : "Create canvas"}
         </Button>
       </DialogActions>
     </Dialog>

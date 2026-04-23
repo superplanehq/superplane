@@ -4,7 +4,7 @@ import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { GitBranch, MoreVertical, Settings } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
@@ -40,6 +40,7 @@ interface HeaderProps {
   hasUnpublishedDraftChanges?: boolean;
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
+  onOpenCanvasSettings?: () => void;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
@@ -57,6 +58,7 @@ export function Header(props: HeaderProps) {
         onLogoClick={props.onLogoClick}
         headerTitle={headerTitle}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+        onOpenCanvasSettings={props.onOpenCanvasSettings}
       />
 
       <SecondaryHeader {...props} />
@@ -69,13 +71,14 @@ function PageHeader({
   onLogoClick,
   headerTitle,
   showCanvasSettingsMenu = true,
+  onOpenCanvasSettings,
 }: {
   organizationId?: string;
   onLogoClick?: () => void;
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
+  onOpenCanvasSettings?: () => void;
 }) {
-  const navigate = useNavigate();
   const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
   const activeCanvasId = canvasIdParam || workflowId;
 
@@ -88,7 +91,7 @@ function PageHeader({
         <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center">
-        {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
+        {showCanvasSettingsMenu && organizationId && activeCanvasId && onOpenCanvasSettings ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <UIButton
@@ -102,7 +105,7 @@ function PageHeader({
               </UIButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`)}>
+              <DropdownMenuItem onClick={onOpenCanvasSettings}>
                 <Settings className="h-4 w-4" />
                 Settings
               </DropdownMenuItem>
