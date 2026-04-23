@@ -220,45 +220,20 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 	// X-OCI-NS-ConfirmationURL HTTP header (not in the JSON body), and the
 	// confirmation payload may not be a valid JSON object.
 	if confirmURL := ctx.Headers.Get("X-OCI-NS-ConfirmationURL"); confirmURL != "" {
-		if err := validateONSConfirmationURL(confirmURL); err != nil {
-			return http.StatusBadRequest, nil, fmt.Errorf("refusing ONS confirmation URL: %w", err)
-		}
-		req, err := http.NewRequest(http.MethodGet, confirmURL, nil)
-		if err != nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("failed to build ONS confirmation request: %w", err)
-		}
-		resp, err := ctx.HTTP.Do(req)
-		if err != nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("failed to confirm ONS subscription: %w", err)
-		}
-		defer func() {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
-		}()
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return http.StatusInternalServerError, nil, fmt.Errorf("ONS confirmation returned %d", resp.StatusCode)
-		}
+		return t.handleONSConfirmation(ctx, confirmURL)
+	}
+
+	envelope, err := parseEventEnvelope(ctx.Body)
+	if err != nil {
+		return http.StatusBadRequest, nil, err
+	}
+
+	if !isComputeLaunchEvent(envelope) {
 		return http.StatusOK, nil, nil
 	}
 
-	var envelope map[string]any
-	if err := json.Unmarshal(ctx.Body, &envelope); err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse webhook body: %w", err)
-	}
-
-	eventType, _ := envelope["eventType"].(string)
-	if eventType != ociEventTypeComputeLaunchEnd {
-		// Ignore non-launch events silently.
+	if !matchesCompartment(envelope, cfg.CompartmentID) {
 		return http.StatusOK, nil, nil
-	}
-
-	// Filter by compartmentId if configured.
-	if cfg.CompartmentID != "" {
-		data, _ := envelope["data"].(map[string]any)
-		compartmentID, _ := data["compartmentId"].(string)
-		if compartmentID != cfg.CompartmentID {
-			return http.StatusOK, nil, nil
-		}
 	}
 
 	if err := ctx.Events.Emit(OnComputeInstanceCreatedPayloadType, envelope); err != nil {
@@ -266,6 +241,55 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 	}
 
 	return http.StatusOK, nil, nil
+}
+
+func (t *OnComputeInstanceCreated) handleONSConfirmation(ctx core.WebhookRequestContext, confirmURL string) (int, *core.WebhookResponseBody, error) {
+	if err := validateONSConfirmationURL(confirmURL); err != nil {
+		return http.StatusBadRequest, nil, fmt.Errorf("refusing ONS confirmation URL: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, confirmURL, nil)
+	if err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to build ONS confirmation request: %w", err)
+	}
+
+	resp, err := ctx.HTTP.Do(req)
+	if err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to confirm ONS subscription: %w", err)
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return http.StatusInternalServerError, nil, fmt.Errorf("ONS confirmation returned %d", resp.StatusCode)
+	}
+
+	return http.StatusOK, nil, nil
+}
+
+func parseEventEnvelope(body []byte) (map[string]any, error) {
+	var envelope map[string]any
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("failed to parse webhook body: %w", err)
+	}
+	return envelope, nil
+}
+
+func isComputeLaunchEvent(envelope map[string]any) bool {
+	eventType, _ := envelope["eventType"].(string)
+	return eventType == ociEventTypeComputeLaunchEnd
+}
+
+func matchesCompartment(envelope map[string]any, compartmentID string) bool {
+	if compartmentID == "" {
+		return true
+	}
+	data, _ := envelope["data"].(map[string]any)
+	envelopeCompartmentID, _ := data["compartmentId"].(string)
+	return envelopeCompartmentID == compartmentID
 }
 
 // validateONSConfirmationURL guards against SSRF by ensuring the URL:
