@@ -169,7 +169,23 @@ function InlineCode({ children, className }: { children?: React.ReactNode; class
     );
   }
 
-  return <code className={className}>{children}</code>;
+  //
+  // Fenced code blocks arrive with `className="language-xxx"` and are already
+  // wrapped in a <pre> by react-markdown — we pass those through untouched so
+  // rehype-highlight keeps control of their styling. Inline snippets (no
+  // language-* class) get a pill treatment so short commands / paths /
+  // identifiers stand out from the surrounding prose.
+  //
+  const isFencedBlock = /(^|\s)language-/.test(classes);
+  if (isFencedBlock) {
+    return <code className={className}>{children}</code>;
+  }
+
+  return (
+    <code className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800">
+      {children}
+    </code>
+  );
 }
 
 //
@@ -337,16 +353,55 @@ function Details({ children }: { children?: React.ReactNode }) {
 }
 
 function Summary({ children }: { children?: React.ReactNode }) {
+  // The native disclosure marker renders right at the start of the summary's
+  // text content, so `pl-*` on the <summary> pushes the marker too. We wrap
+  // children in a span with a left margin to put some air between the chevron
+  // and the title text.
   return (
-    <summary className="cursor-pointer select-none rounded-md px-3 py-2 text-xs font-medium text-gray-600 hover:bg-slate-50">
-      {children}
+    <summary className="cursor-pointer select-none rounded-md px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+      <span className="ml-1.5">{children}</span>
     </summary>
   );
 }
 
 function DetailsContent({ children }: { children?: React.ReactNode }) {
+  // Details bodies are often raw HTML, not parsed markdown (CommonMark only
+  // reparses HTML-block content when a blank line separates it from the
+  // opening tag). That means a list like `1. Foo\n2. Bar` arrives as a single
+  // text node and we need `whitespace-pre-wrap` to keep each item on its
+  // own visible line.
+  //
+  // The downside of `pre-wrap` is that stray leading/trailing newlines
+  // between `</summary>` and the body render as blank lines (big top gap,
+  // thin bottom gap). We strip those explicitly so the preserved interior
+  // newlines still show but the edges sit flush against the padding.
+  const normalized = Children.toArray(children);
+
+  while (normalized.length && typeof normalized[0] === "string" && normalized[0].trim() === "") {
+    normalized.shift();
+  }
+  while (
+    normalized.length &&
+    typeof normalized[normalized.length - 1] === "string" &&
+    (normalized[normalized.length - 1] as string).trim() === ""
+  ) {
+    normalized.pop();
+  }
+  if (normalized.length) {
+    const first = normalized[0];
+    if (typeof first === "string") {
+      normalized[0] = first.replace(/^\s+/, "");
+    }
+    const last = normalized[normalized.length - 1];
+    if (typeof last === "string") {
+      normalized[normalized.length - 1] = last.replace(/\s+$/, "");
+    }
+  }
+
   return (
-    <div className="whitespace-pre-wrap px-3 py-1.5 text-sm text-gray-700 [&_p]:my-1 [&_pre]:my-2">{children}</div>
+    <div className="whitespace-pre-wrap px-3 py-3 text-sm text-gray-700 [&_p]:my-1 [&_pre]:my-2 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+      {normalized}
+    </div>
   );
 }
 
