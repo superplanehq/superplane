@@ -17,7 +17,6 @@ interface HeaderProps {
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
-  onLogoClick?: () => void;
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
@@ -54,7 +53,6 @@ export function Header(props: HeaderProps) {
     <header>
       <PageHeader
         organizationId={props.organizationId}
-        onLogoClick={props.onLogoClick}
         headerTitle={headerTitle}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
@@ -66,12 +64,10 @@ export function Header(props: HeaderProps) {
 
 function PageHeader({
   organizationId,
-  onLogoClick,
   headerTitle,
   showCanvasSettingsMenu = true,
 }: {
   organizationId?: string;
-  onLogoClick?: () => void;
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
 }) {
@@ -82,7 +78,7 @@ function PageHeader({
   return (
     <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
-        <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
+        <OrganizationMenuButton organizationId={organizationId} />
       </div>
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
         <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
