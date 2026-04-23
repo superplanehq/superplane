@@ -18,9 +18,9 @@ export function IdentityFields({
   canUpdateCanvas,
 }: IdentityFieldsProps) {
   return (
-    <Fieldset className="space-y-5">
+    <Fieldset className="space-y-6 rounded-lg border border-slate-950/15 bg-white p-6">
       <Field className="space-y-3">
-        <Label htmlFor="canvas-settings-name-input" className="block text-sm font-medium text-slate-900">
+        <Label htmlFor="canvas-settings-name-input" className="block text-sm font-medium text-gray-700">
           Canvas Name
         </Label>
         <Input
@@ -33,7 +33,7 @@ export function IdentityFields({
       </Field>
 
       <Field className="space-y-3">
-        <Label htmlFor="canvas-settings-description-input" className="block text-sm font-medium text-slate-900">
+        <Label htmlFor="canvas-settings-description-input" className="block text-sm font-medium text-gray-700">
           Description
         </Label>
         <Textarea

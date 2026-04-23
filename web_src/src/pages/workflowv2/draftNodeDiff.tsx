@@ -57,49 +57,6 @@ export function hasDraftVersusLiveGraphDiff(
   return comparableEdgesSnapshot(liveVersion?.spec?.edges) !== comparableEdgesSnapshot(draftVersion?.spec?.edges);
 }
 
-function comparableChangeManagementSnapshot(version?: CanvasesCanvasVersion) {
-  const approvals = (version?.spec?.changeManagement?.approvals || []).map((approval) => ({
-    type: approval.type || "",
-    userId: approval.userId || "",
-    roleName: approval.roleName || "",
-  }));
-
-  approvals.sort((left, right) => {
-    const byType = left.type.localeCompare(right.type);
-    if (byType !== 0) {
-      return byType;
-    }
-
-    const byUserId = left.userId.localeCompare(right.userId);
-    if (byUserId !== 0) {
-      return byUserId;
-    }
-
-    return left.roleName.localeCompare(right.roleName);
-  });
-
-  return {
-    enabled: version?.spec?.changeManagement?.enabled ?? false,
-    approvals,
-  };
-}
-
-function comparableCanvasMetadataSnapshot(version?: CanvasesCanvasVersion): string {
-  return JSON.stringify({
-    name: version?.metadata?.name || "",
-    description: version?.metadata?.description || "",
-    changeManagement: comparableChangeManagementSnapshot(version),
-  });
-}
-
-export function hasDraftVersusLiveDiff(liveVersion?: CanvasesCanvasVersion, draftVersion?: CanvasesCanvasVersion) {
-  if (comparableCanvasMetadataSnapshot(liveVersion) !== comparableCanvasMetadataSnapshot(draftVersion)) {
-    return true;
-  }
-
-  return hasDraftVersusLiveGraphDiff(liveVersion, draftVersion);
-}
-
 export function buildDraftNodeDiffSummary(
   liveVersion?: CanvasesCanvasVersion,
   draftVersion?: CanvasesCanvasVersion,

@@ -73,7 +73,7 @@ export function ChangeManagementFieldset({
   );
 
   return (
-    <Fieldset className="space-y-6 border-t border-slate-200 pt-6">
+    <Fieldset className="rounded-lg border border-slate-950/15 bg-white p-6">
       {isChangeManagementEnforcedByOrganization ? (
         <Tooltip>
           <TooltipTrigger asChild>

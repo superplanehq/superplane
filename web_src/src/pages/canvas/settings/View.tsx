@@ -92,8 +92,6 @@ export function SettingsView({
           approvals: effectiveChangeManagementEnabled ? normalizeApprovers(approvers) : undefined,
         },
       });
-      setSaveMessage("Canvas updated successfully");
-      setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
       const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to update canvas";

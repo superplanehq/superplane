@@ -19,7 +19,7 @@ type ApproversEditorProps = {
 
 export function ApproversEditor(props: ApproversEditorProps) {
   return (
-    <div className="mt-6 space-y-4 border-t border-slate-200 pt-6">
+    <div className="mt-6 border-t border-slate-950/10 pt-6 space-y-4">
       <SectionHeader />
       <Errors errors={props.approverValidation.formErrors} />
       <ApproverList {...props} />
@@ -73,7 +73,7 @@ function ApproverItem(props: ApproversEditorProps & { index: number; approver: S
   const { approver, approverValidation, onApproverTypeChange, onRemoveApprover, index } = props;
 
   return (
-    <div key={`approver-${index}`} className="py-2">
+    <div key={`approver-${index}`} className="border-b border-slate-950/10 py-3">
       <div className="grid gap-3 md:grid-cols-[auto_1fr_auto] md:items-start">
         <div className="w-full md:w-[12rem] md:justify-self-start">
           <Select

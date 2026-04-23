@@ -54,7 +54,7 @@ function ErrorView({ organizationId, error }: { organizationId?: string; error: 
 
   return (
     <div className="flex h-full flex-col bg-slate-100">
-      {organizationId ? <PageHeader organizationId={organizationId} title="" /> : null}
+      {organizationId && <PageHeader organizationId={organizationId} title="" />}
 
       <div className="flex flex-1 items-center justify-center">
         <p className="text-sm text-slate-600">{error}</p>
@@ -70,15 +70,18 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const resolvedCanvasId = canvas.metadata!.id!;
   const canvasName = canvas.metadata?.name || "Canvas";
   const baseCanvasPath = `/${orgId}/canvases/${resolvedCanvasId}`;
-  const isOrgChangeManagementEnabled = organization.spec?.changeManagementEnabled ?? false;
+  const isOrgChangeManagementEnabled = organization?.spec?.changeManagementEnabled ?? false;
 
   usePageTitle([`${canvasName} · Settings`]);
 
   const { canAct } = usePermissions();
   const canUpdateCanvas = canAct("canvases", "update");
+
   const { data: organizationUsers = [] } = useOrganizationUsers(orgId);
   const { data: organizationRoles = [] } = useOrganizationRoles(orgId);
+
   const updateCanvasMutation = useUpdateCanvas(orgId, resolvedCanvasId);
+
   const initialValues = useMemo(() => buildSettingsInitialValues(canvas), [canvas]);
   const approverUsers = useApproverUsers(organizationUsers);
   const approverRoles = useApproverRoles(organizationRoles);
@@ -113,7 +116,6 @@ function useApproverUsers(organizationUsers: SuperplaneUsersUser[]) {
           if (!id) {
             return null;
           }
-
           return {
             id,
             name: user.spec?.displayName || user.metadata?.email || id,
@@ -133,7 +135,6 @@ function useApproverRoles(organizationRoles: RolesRole[]) {
           if (!name) {
             return null;
           }
-
           return {
             name,
             label: role.spec?.displayName || name,
@@ -145,20 +146,23 @@ function useApproverRoles(organizationRoles: RolesRole[]) {
 }
 
 function useSaveCallback(canvasId: string, organizationId: string): (values: SettingsSavePayload) => Promise<void> {
+  const navigate = useNavigate();
   const updateCanvasMutation = useUpdateCanvas(organizationId, canvasId);
+  const baseCanvasPath = `/${organizationId}/canvases/${canvasId}`;
 
   return useCallback(
     async (values: SettingsSavePayload) => {
       if (!canvasId) {
         return;
       }
-
       await updateCanvasMutation.mutateAsync({
         name: values.name,
         description: values.description,
         changeManagement: values.changeManagement,
       });
+
+      navigate(baseCanvasPath, { replace: true });
     },
-    [canvasId, updateCanvasMutation],
+    [canvasId, updateCanvasMutation, navigate, baseCanvasPath],
   );
 }

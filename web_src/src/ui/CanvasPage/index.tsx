@@ -173,7 +173,6 @@ export interface CanvasPageProps {
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
   showCanvasSettingsMenu?: boolean;
-  onOpenCanvasSettings?: () => void;
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
   versionControlSidebar?: React.ReactNode;
@@ -1114,7 +1113,6 @@ function CanvasPage(props: CanvasPageProps) {
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          onOpenCanvasSettings={props.onOpenCanvasSettings}
           isVersionControlOpen={props.isVersionControlOpen}
           onOpenVersionControl={props.onOpenVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
@@ -1613,7 +1611,6 @@ function CanvasContentHeader({
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   showCanvasSettingsMenu,
-  onOpenCanvasSettings,
   isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
@@ -1644,7 +1641,6 @@ function CanvasContentHeader({
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   showCanvasSettingsMenu?: boolean;
-  onOpenCanvasSettings?: () => void;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
@@ -1692,7 +1688,6 @@ function CanvasContentHeader({
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      onOpenCanvasSettings={onOpenCanvasSettings}
       isVersionControlOpen={isVersionControlOpen}
       onOpenVersionControl={onOpenVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
