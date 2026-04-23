@@ -347,6 +347,7 @@ func (c *Client) updateIncidentEventTime(id, eventName string, eventTime time.Ti
 	return c.execGrafanaIRMRPC("IncidentsService.UpdateIncidentEventTime", map[string]string{
 		"incidentID":       strings.TrimSpace(id),
 		"activityItemKind": strings.TrimSpace(eventName),
+		"eventName":        strings.TrimSpace(eventName),
 		"eventTime":        eventTime.UTC().Format(time.RFC3339),
 	}, &struct{}{})
 }
