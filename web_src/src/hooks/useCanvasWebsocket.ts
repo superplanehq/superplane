@@ -117,6 +117,21 @@ export function useCanvasWebsocket(
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
 
+            //
+            // The Run View payload embeds queue items for its root event, so
+            // when a queue item lands for the currently viewed run we need to
+            // refresh it. Without this the ribbon/Activity stay stale on the
+            // queued -> running transition until the user reselects the run.
+            //
+            if (
+              selectedRunEventId &&
+              queueItem.rootEvent?.id === selectedRunEventId
+            ) {
+              queryClient.invalidateQueries({
+                queryKey: canvasKeys.run(canvasId, selectedRunEventId),
+              });
+            }
+
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
@@ -124,6 +139,15 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId && "id" in payload && payload.id) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+
+            if (
+              selectedRunEventId &&
+              queueItem.rootEvent?.id === selectedRunEventId
+            ) {
+              queryClient.invalidateQueries({
+                queryKey: canvasKeys.run(canvasId, selectedRunEventId),
+              });
+            }
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }

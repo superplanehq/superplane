@@ -12,12 +12,14 @@ import { formatDuration } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import {
   getStatusBadgeProps,
+  resolveEventState,
   resolveExecutionDisplayStatus,
   resolveNodeIconSlug,
 } from "@/pages/workflowv2/lib/canvas-runs";
+import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { ReportMarkdown } from "./ReportMarkdown";
-import { StepRibbon, type RibbonStep, type RibbonStepStatus } from "./StepRibbon";
+import { StepRibbon, type RibbonStep } from "./StepRibbon";
 
 interface RunSummaryProps {
   runData: CanvasesDescribeRunResponse;
@@ -121,8 +123,6 @@ function findActionableApprovalIndex(
   return undefined;
 }
 
-type StepStatus = RibbonStepStatus;
-
 interface Step {
   key: string;
   nodeId: string;
@@ -134,6 +134,8 @@ interface Step {
   startOffsetMs: number;
   durationMs: number;
   elapsedMs: number;
+  startedAt?: string;
+  finishedAt?: string;
   error?: string;
   reportEntry?: string;
   isTrigger: boolean;
@@ -142,24 +144,17 @@ interface Step {
 const DEFAULT_PUSH_THROUGH_COMPONENTS = new Set(["wait", "time_gate", "timegate"]);
 
 //
-// Accent colors match DEFAULT_EVENT_STATE_MAP so Run View stays visually
-// consistent with the canvas/node surfaces. "queued" covers both the raw
-// queued state and "waiting" (e.g. approvals), matching STATUS_TO_EVENT_STATE.
+// Accent color for the Activity row stripe. Derived from the canonical
+// EventState -> DEFAULT_EVENT_STATE_MAP pipeline so Activity, ribbon bars,
+// and badges stay in sync for a given status.
 //
-const STATUS_ACCENT: Record<StepStatus, string> = {
-  success: "bg-emerald-500",
-  error: "bg-red-500",
-  running: "bg-amber-500",
-  queued: "bg-yellow-500",
-  cancelled: "bg-gray-500",
-};
+function accentForStatus(raw: string): string {
+  const state = resolveEventState(raw);
+  return DEFAULT_EVENT_STATE_MAP[state].badgeColor;
+}
 
-function normalizeStatus(raw: string): StepStatus {
-  if (raw === "success" || raw === "completed" || raw === "passed") return "success";
-  if (raw === "error" || raw === "failed") return "error";
-  if (raw === "running" || raw === "pending" || raw === "started") return "running";
-  if (raw === "cancelled") return "cancelled";
-  return "queued";
+function isRunningState(state: EventState): boolean {
+  return state === "running";
 }
 
 function formatMs(ms: number): string {
@@ -191,11 +186,13 @@ function buildSteps(
       nodeId: rootEvent.nodeId,
       name: triggerNode?.name || "Trigger",
       componentName: triggerNode?.trigger?.name,
-      status: "success",
+      status: "triggered",
       finished: true,
       startOffsetMs: 0,
       durationMs: 0,
       elapsedMs: 0,
+      startedAt: rootEvent.createdAt || undefined,
+      finishedAt: rootEvent.createdAt || undefined,
       reportEntry: rootEvent.reportEntry || undefined,
       isTrigger: true,
     });
@@ -215,6 +212,7 @@ function buildSteps(
     const dur = execDurationMs(exec);
     const elapsed = exec.createdAt ? Math.max(0, nowMs - new Date(exec.createdAt).getTime()) : 0;
 
+    const finished = exec.state === "STATE_FINISHED";
     steps.push({
       key: `exec:${exec.id || `${exec.nodeId}:${startMs}`}`,
       nodeId: exec.nodeId,
@@ -222,10 +220,12 @@ function buildSteps(
       name: node?.name || exec.nodeId.slice(0, 8),
       componentName: node?.component?.name || node?.trigger?.name,
       status: resolveExecutionDisplayStatus(exec, nodes),
-      finished: exec.state === "STATE_FINISHED",
+      finished,
       startOffsetMs: Math.max(0, startMs - runStartMs),
       durationMs: dur,
       elapsedMs: elapsed,
+      startedAt: exec.createdAt || undefined,
+      finishedAt: finished ? exec.updatedAt || undefined : undefined,
       error: exec.result === "RESULT_FAILED" && exec.resultMessage ? exec.resultMessage : undefined,
       reportEntry: exec.reportEntry || undefined,
       isTrigger: false,
@@ -266,6 +266,7 @@ function buildSteps(
       startOffsetMs: Math.max(0, startMs - runStartMs),
       durationMs: 0,
       elapsedMs: 0,
+      startedAt: item.createdAt || undefined,
       isTrigger: false,
     });
   }
@@ -334,10 +335,12 @@ function ActivityRow({
     parameters: ApprovalActionParams,
   ) => void | Promise<void>;
 }) {
-  const normalized = normalizeStatus(step.status);
+  const eventState = resolveEventState(step.status);
   const badge = getStatusBadgeProps(step.status);
-  const accent = STATUS_ACCENT[normalized];
-  const isRunning = normalized === "running";
+  const accent = accentForStatus(step.status);
+  const isRunning = isRunningState(eventState);
+  const isError = eventState === "failed" || eventState === "error";
+  const isQueued = eventState === "queued";
   const clickable = !!onOpenDetail;
 
   const handleRowClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -384,13 +387,13 @@ function ActivityRow({
         ) : null}
         <div className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] tabular-nums">
           {isRunning ? (
-            <span className="flex items-center gap-1 text-amber-600">
+            <span className="flex items-center gap-1 text-blue-600">
               <Loader2 className="h-3 w-3 animate-spin" />
               running
             </span>
-          ) : normalized === "error" ? (
+          ) : isError ? (
             <span className="text-red-600">failed</span>
-          ) : normalized === "queued" ? (
+          ) : isQueued ? (
             <span className="text-yellow-700">
               {step.status === "waiting" ? "waiting" : "queued"}
             </span>
@@ -532,15 +535,28 @@ export function RunSummary({
 
   const ribbonSteps: RibbonStep[] = useMemo(
     () =>
-      steps.map((s) => ({
-        key: s.key,
-        name: s.name,
-        status: normalizeStatus(s.status),
-        isTrigger: s.isTrigger,
-        durationMs: s.durationMs,
-        finished: s.finished,
-      })),
-    [steps],
+      steps.map((s) => {
+        const node = nodeMap.get(s.nodeId);
+        const iconSrc = getHeaderIconSrc(s.componentName);
+        const iconSlug = resolveNodeIconSlug(node, componentIconMap || {});
+        return {
+          key: s.key,
+          name: s.name,
+          status: s.status,
+          isTrigger: s.isTrigger,
+          durationMs: s.durationMs,
+          finished: s.finished,
+          componentName: s.componentName,
+          iconSrc: iconSrc || undefined,
+          iconSlug: iconSlug || undefined,
+          startedAt: s.startedAt,
+          finishedAt: s.finishedAt,
+          elapsedMs: s.elapsedMs,
+          executionId: s.executionId,
+          error: s.error,
+        };
+      }),
+    [steps, nodeMap, componentIconMap],
   );
 
   //
@@ -598,7 +614,7 @@ export function RunSummary({
                 const canCancel =
                   !!step.executionId &&
                   !!onCancelExecution &&
-                  normalizeStatus(step.status) === "running";
+                  isRunningState(resolveEventState(step.status));
 
                 const execution = step.executionId ? executionMap.get(step.executionId) : undefined;
                 const approvalIndex =

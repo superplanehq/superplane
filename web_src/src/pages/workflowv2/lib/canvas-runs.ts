@@ -126,8 +126,20 @@ const STATUS_LABELS: Record<string, string> = {
   error: "Error",
 };
 
+//
+// Resolves a raw status string (as emitted by resolveExecutionDisplayStatus,
+// component state functions, or getAggregateStatus) to the canonical
+// EventState that drives colors across the canvas surfaces (badges, node
+// dots, ribbon bars, activity row accents). Unknown strings fall to
+// "neutral" so they get a muted gray rather than being silently bucketed
+// with another state.
+//
+export function resolveEventState(status: string): EventState {
+  return STATUS_TO_EVENT_STATE[status] || "neutral";
+}
+
 export function getStatusBadgeProps(status: string) {
-  const eventState = STATUS_TO_EVENT_STATE[status] || "neutral";
+  const eventState = resolveEventState(status);
   const style = DEFAULT_EVENT_STATE_MAP[eventState];
   const label = STATUS_LABELS[status] || status || "Unknown";
   return { badgeColor: style.badgeColor, label };
