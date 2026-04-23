@@ -61,6 +61,18 @@ func Test__IncidentComponents__Configuration__severityIsIntegrationResource(t *t
 	require.Equal(t, configuration.FieldTypeDateTime, drillFields[5].Type)
 }
 
+func Test__IncidentComponents__ExampleOutput__DeclareDrillMarksIncidentAsDrill(t *testing.T) {
+	declareDrillOutput := (&DeclareDrill{}).ExampleOutput()
+	declareDrillData, ok := declareDrillOutput["data"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, true, declareDrillData["isDrill"])
+
+	declareIncidentOutput := (&DeclareIncident{}).ExampleOutput()
+	declareIncidentData, ok := declareIncidentOutput["data"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, false, declareIncidentData["isDrill"])
+}
+
 func Test__Grafana__ListResources__IncidentSeverities(t *testing.T) {
 	resources, err := (&Grafana{}).ListResources(resourceTypeIncidentSeverity, core.ListResourcesContext{})
 
