@@ -4,7 +4,6 @@ import {
   canvasesDescribeCanvas,
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
-  canvasesUpdateCanvas,
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
@@ -33,12 +32,29 @@ import {
 import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
+  ChangeManagementApprover,
+  ChangeManagementApproverType,
   SuperplaneComponentsNode,
   ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { analytics } from "../lib/analytics";
 import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
+
+type ChangeManagementUpdateInput = {
+  enabled?: boolean;
+  approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
+};
+
+function mapChangeManagementApprovals(
+  approvals?: ChangeManagementUpdateInput["approvals"],
+): ChangeManagementApprover[] | undefined {
+  return approvals?.map((approval) => ({
+    type: approval.type as ChangeManagementApproverType | undefined,
+    userId: approval.userId,
+    roleName: approval.roleName,
+  }));
+}
 
 // Query Keys
 export const canvasKeys = {
@@ -123,6 +139,39 @@ export const widgetKeys = {
 };
 
 export const NODE_EXECUTION_HISTORY_PAGE_SIZE = 10;
+
+function buildCanvasVersionUpdateBody(data: {
+  name: string;
+  description?: string;
+  nodes?: unknown[];
+  edges?: unknown[];
+  changeManagement?: ChangeManagementUpdateInput;
+  autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
+}) {
+  const nextApprovals = mapChangeManagementApprovals(data.changeManagement?.approvals);
+
+  return {
+    canvas: {
+      metadata: {
+        name: data.name,
+        description: data.description || "",
+      },
+      spec: {
+        nodes: data.nodes || [],
+        edges: data.edges || [],
+        ...(data.changeManagement
+          ? {
+              changeManagement: {
+                enabled: data.changeManagement.enabled,
+                approvals: nextApprovals,
+              },
+            }
+          : {}),
+      },
+    },
+    autoLayout: data.autoLayout,
+  };
+}
 
 // Hooks for fetching canvases
 export const useCanvases = (organizationId: string) => {
@@ -401,64 +450,6 @@ export const useCreateCanvas = (organizationId: string) => {
   });
 };
 
-export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      name?: string;
-      description?: string;
-      changeManagement?: {
-        enabled?: boolean;
-        approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
-      };
-    }) => {
-      return await canvasesUpdateCanvas(
-        withOrganizationHeader({
-          path: { id: canvasId },
-          body: {
-            name: data.name,
-            description: data.description,
-            changeManagement: data.changeManagement,
-          },
-        }),
-      );
-    },
-    onSuccess: (response, variables) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-
-      const updatedCanvas = response?.data?.canvas;
-      if (updatedCanvas) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          const updatedMetadata = updatedCanvas.metadata;
-          const updatedSpec = updatedCanvas.spec;
-
-          return {
-            ...current,
-            metadata: {
-              ...current.metadata,
-              name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
-              description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
-            },
-            spec: {
-              ...current.spec,
-              changeManagement:
-                updatedSpec?.changeManagement ?? variables.changeManagement ?? current.spec?.changeManagement,
-            },
-          };
-        });
-      }
-    },
-  });
-};
-
 export const useCreateCanvasVersion = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
@@ -531,23 +522,12 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       description?: string;
       nodes?: unknown[];
       edges?: unknown[];
+      changeManagement?: ChangeManagementUpdateInput;
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
       preserveLocalCanvasState?: boolean;
       invalidateRelatedQueries?: boolean;
     }) => {
-      const body = {
-        canvas: {
-          metadata: {
-            name: data.name,
-            description: data.description || "",
-          },
-          spec: {
-            nodes: data.nodes || [],
-            edges: data.edges || [],
-          },
-        },
-        autoLayout: data.autoLayout,
-      };
+      const body = buildCanvasVersionUpdateBody(data);
 
       if (data.versionId) {
         return await canvasesUpdateCanvasVersion(

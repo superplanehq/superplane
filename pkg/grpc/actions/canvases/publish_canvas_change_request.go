@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -99,6 +98,14 @@ func PublishCanvasChangeRequest(
 			return err
 		}
 
+		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
+		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
+			return status.Error(codes.AlreadyExists, "Canvas with the same name already exists")
+		}
+		if nameErr != nil {
+			return nameErr
+		}
+
 		if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasForUpdate, version, request); err != nil {
 			return err
 		}
@@ -142,6 +149,7 @@ func PublishCanvasChangeRequest(
 
 		mergedVersion, createVersionErr := models.CreateCanvasSnapshotVersionInTransaction(
 			tx,
+			version,
 			canvasUUID,
 			publisherOwnerID,
 			mergedNodes,
@@ -156,18 +164,13 @@ func PublishCanvasChangeRequest(
 			return err
 		}
 
-		publisher, err := changesets.NewCanvasPublisher(tx, mergedVersion, liveVersion, changesets.CanvasPublisherOptions{
-			Registry:       registry,
-			OrgID:          organizationUUID,
-			Encryptor:      encryptor,
-			AuthService:    authService,
-			WebhookBaseURL: webhookBaseURL,
-		})
-		if err != nil {
-			return err
-		}
-
-		if err := publisher.Publish(ctx); err != nil {
+		if err := publishCanvasVersionInTransaction(
+			ctx,
+			tx,
+			liveVersion,
+			mergedVersion,
+			buildCanvasPublisherOptions(registry, organizationUUID, encryptor, authService, webhookBaseURL),
+		); err != nil {
 			return err
 		}
 

@@ -1,4 +1,10 @@
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import type {
+  CanvasesCanvas,
+  CanvasesCanvasVersion,
+  OrganizationsOrganization,
+  RolesRole,
+  SuperplaneUsersUser,
+} from "@/api-client";
 import { CreateCanvasModal } from "@/components/CreateCanvasModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,16 +15,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CanvasSettingsForm } from "@/pages/canvas/settings/CanvasSettingsForm";
 import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
 import type { DraftNodeDiffSummary } from "./draftNodeDiff";
 
 interface CanvasPageModalsProps {
   organizationId: string;
   canvas?: CanvasesCanvas | null;
+  canvasVersionId?: string;
+  organization?: OrganizationsOrganization | null;
+  organizationUsers: SuperplaneUsersUser[];
+  organizationRoles: RolesRole[];
   isUseTemplateOpen: boolean;
   onCloseUseTemplate: () => void;
   onUseTemplateSubmit: (data: { name: string; description?: string; templateId?: string }) => Promise<void>;
   isCreateCanvasPending: boolean;
+  isCanvasSettingsOpen: boolean;
+  onCanvasSettingsOpenChange: (open: boolean) => void;
   isCreateChangeRequestMode: boolean;
   onCreateChangeRequestModeChange: (open: boolean) => void;
   isCreateChangeRequestPending: boolean;
@@ -37,10 +50,16 @@ interface CanvasPageModalsProps {
 export function CanvasPageModals({
   organizationId,
   canvas,
+  canvasVersionId,
+  organization,
+  organizationUsers,
+  organizationRoles,
   isUseTemplateOpen,
   onCloseUseTemplate,
   onUseTemplateSubmit,
   isCreateCanvasPending,
+  isCanvasSettingsOpen,
+  onCanvasSettingsOpenChange,
   isCreateChangeRequestMode,
   onCreateChangeRequestModeChange,
   isCreateChangeRequestPending,
@@ -72,10 +91,31 @@ export function CanvasPageModals({
             },
           ]}
           defaultTemplateId={canvas.metadata?.id || ""}
-          mode="create"
           fromTemplate
         />
       ) : null}
+      <Dialog open={isCanvasSettingsOpen} onOpenChange={onCanvasSettingsOpenChange}>
+        <DialogContent className="flex max-h-[85vh] max-w-4xl flex-col overflow-hidden p-0">
+          <DialogHeader className="border-b border-slate-200 px-6 py-4">
+            <DialogTitle>Canvas settings</DialogTitle>
+            <DialogDescription>Edit draft canvas settings.</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {canvas && canvasVersionId && organization ? (
+              <CanvasSettingsForm
+                organizationId={organizationId}
+                canvasId={canvas.metadata?.id || ""}
+                versionId={canvasVersionId}
+                canvas={canvas}
+                organization={organization}
+                organizationUsers={organizationUsers}
+                organizationRoles={organizationRoles}
+                onClose={() => onCanvasSettingsOpenChange(false)}
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
       <CreateChangeRequestModal
         open={isCreateChangeRequestMode}
         onOpenChange={onCreateChangeRequestModeChange}
