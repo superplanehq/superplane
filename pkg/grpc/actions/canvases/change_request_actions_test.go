@@ -254,7 +254,7 @@ func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.Reso
 			Error,
 	)
 
-	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, testWebhookBaseURL, r.Organization.ID, &pb.Canvas{
+	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Organization.ID, &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{Name: canvasName},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
