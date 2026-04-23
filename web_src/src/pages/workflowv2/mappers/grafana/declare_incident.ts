@@ -4,27 +4,35 @@ import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 import { buildIncidentDetails, getFirstOutputData, truncate, type Details } from "./incident_shared";
 import type { DeclareIncidentConfiguration, GrafanaIncident } from "./types";
 
-export const declareIncidentMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext) {
-    const configuration = context.node.configuration as DeclareIncidentConfiguration | undefined;
-    return grafanaComponentBaseProps(context, buildDeclareIncidentMetadata(configuration));
-  },
+export const declareIncidentMapper = buildDeclareIncidentMapper(false);
+export const declareDrillMapper = buildDeclareIncidentMapper(true);
 
-  getExecutionDetails(context: ExecutionDetailsContext): Details {
-    const incident = getFirstOutputData<GrafanaIncident>(context);
-    return buildIncidentDetails(context, incident, "Declared At", [
-      "Title",
-      "Severity",
-      "Status",
-      "Labels",
-      "Incident URL",
-    ]);
-  },
+function buildDeclareIncidentMapper(isDrillComponent: boolean): ComponentBaseMapper {
+  return {
+    props(context: ComponentBaseContext) {
+      const configuration = context.node.configuration as DeclareIncidentConfiguration | undefined;
+      return grafanaComponentBaseProps(context, buildDeclareIncidentMetadata(configuration, isDrillComponent));
+    },
 
-  subtitle: grafanaCreatedAtSubtitle,
-};
+    getExecutionDetails(context: ExecutionDetailsContext): Details {
+      const incident = getFirstOutputData<GrafanaIncident>(context);
+      return buildIncidentDetails(context, incident, "Declared At", [
+        "Title",
+        "Severity",
+        "Status",
+        "Labels",
+        "Incident URL",
+      ]);
+    },
 
-function buildDeclareIncidentMetadata(configuration: DeclareIncidentConfiguration | undefined): MetadataItem[] {
+    subtitle: grafanaCreatedAtSubtitle,
+  };
+}
+
+function buildDeclareIncidentMetadata(
+  configuration: DeclareIncidentConfiguration | undefined,
+  isDrillComponent: boolean,
+): MetadataItem[] {
   const metadata: MetadataItem[] = [];
 
   if (configuration?.title) {
@@ -33,7 +41,10 @@ function buildDeclareIncidentMetadata(configuration: DeclareIncidentConfiguratio
   if (configuration?.severity) {
     metadata.push({ icon: "funnel", label: `Severity: ${configuration.severity}` });
   }
-  if (configuration?.isDrill) {
+  if (configuration?.status && configuration.status !== "active") {
+    metadata.push({ icon: "check-circle", label: `Status: ${configuration.status}` });
+  }
+  if (isDrillComponent || configuration?.isDrill) {
     metadata.push({ icon: "shield-alert", label: "Drill" });
   }
 

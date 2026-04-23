@@ -19,6 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
   <LinkCard title="Create Annotation" href="#create-annotation" description="Create an annotation in Grafana to mark deploys, incidents, or other operational events on timelines" />
   <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
+  <LinkCard title="Declare Drill" href="#declare-drill" description="Declare a Grafana IRM drill incident" />
   <LinkCard title="Declare Incident" href="#declare-incident" description="Declare a Grafana IRM incident" />
   <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
   <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
@@ -350,6 +351,59 @@ Returns the ID of the newly created silence.
 }
 ```
 
+<a id="declare-drill"></a>
+
+## Declare Drill
+
+The Declare Drill component creates a new drill incident in Grafana IRM.
+
+### Use Cases
+
+- **Operational exercises**: Run incident response drills without affecting production metrics
+- **Process validation**: Test runbooks, roles, and integrations in a safe environment
+
+### Configuration
+
+- **Title**: Drill title (required)
+- **Severity**: Pending, Critical, Major, or Minor (required)
+- **Description**: Optional initial status update added to the drill
+- **Labels**: Optional drill labels
+- **Status**: Start the drill as active or resolved
+- **Start Time**: Optional time when the drill began
+- **Channel Prefix**: Optional Slack channel prefix for the drill room
+
+### Output
+
+Returns the created Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.declared"
+}
+```
+
 <a id="declare-incident"></a>
 
 ## Declare Incident
@@ -359,7 +413,6 @@ The Declare Incident component creates a new incident in Grafana IRM.
 ### Use Cases
 
 - **Automated incident declaration**: Open an incident when a deployment, alert, or workflow detects a production issue
-- **Drill automation**: Create drill incidents for operational exercises
 
 ### Configuration
 
@@ -367,7 +420,9 @@ The Declare Incident component creates a new incident in Grafana IRM.
 - **Severity**: Pending, Critical, Major, or Minor (required)
 - **Description**: Optional initial status update added to the incident
 - **Labels**: Optional incident labels
-- **Is Drill**: Mark the incident as a drill
+- **Status**: Start the incident as active or resolved
+- **Start Time**: Optional time when the incident began
+- **Channel Prefix**: Optional Slack channel prefix for the incident room
 
 ### Output
 

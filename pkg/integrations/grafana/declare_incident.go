@@ -1,9 +1,7 @@
 package grafana
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -11,14 +9,6 @@ import (
 )
 
 type DeclareIncident struct{}
-
-type DeclareIncidentSpec struct {
-	Title       string   `json:"title" mapstructure:"title"`
-	Severity    string   `json:"severity" mapstructure:"severity"`
-	Description string   `json:"description" mapstructure:"description"`
-	Labels      []string `json:"labels" mapstructure:"labels"`
-	IsDrill     bool     `json:"isDrill" mapstructure:"isDrill"`
-}
 
 func (d *DeclareIncident) Name() string {
 	return "grafana.declareIncident"
@@ -38,7 +28,6 @@ func (d *DeclareIncident) Documentation() string {
 ## Use Cases
 
 - **Automated incident declaration**: Open an incident when a deployment, alert, or workflow detects a production issue
-- **Drill automation**: Create drill incidents for operational exercises
 
 ## Configuration
 
@@ -46,7 +35,9 @@ func (d *DeclareIncident) Documentation() string {
 - **Severity**: Pending, Critical, Major, or Minor (required)
 - **Description**: Optional initial status update added to the incident
 - **Labels**: Optional incident labels
-- **Is Drill**: Mark the incident as a drill
+- **Status**: Start the incident as active or resolved
+- **Start Time**: Optional time when the incident began
+- **Channel Prefix**: Optional Slack channel prefix for the incident room
 
 ## Output
 
@@ -70,61 +61,11 @@ func (d *DeclareIncident) ExampleOutput() map[string]any {
 }
 
 func (d *DeclareIncident) Configuration() []configuration.Field {
-	return []configuration.Field{
-		{
-			Name:        "title",
-			Label:       "Title",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Incident title",
-		},
-		{
-			Name:        "severity",
-			Label:       "Severity",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "Grafana IRM severity",
-			Placeholder: "minor",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: resourceTypeIncidentSeverity,
-				},
-			},
-		},
-		{
-			Name:        "description",
-			Label:       "Initial Status Update",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
-			Description: "Initial status update added to the incident",
-		},
-		{
-			Name:        "labels",
-			Label:       "Labels",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: "Labels to attach to the incident",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Label",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
-				},
-			},
-		},
-		{
-			Name:        "isDrill",
-			Label:       "Is Drill",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Description: "Create the incident as a drill",
-		},
-	}
+	return declareIncidentConfiguration(false)
 }
 
 func (d *DeclareIncident) Setup(ctx core.SetupContext) error {
-	spec, err := decodeIncidentSpec[DeclareIncidentSpec](ctx.Configuration)
+	spec, err := decodeIncidentSpec[declareIncidentSpec](ctx.Configuration)
 	if err != nil {
 		return err
 	}
@@ -132,7 +73,7 @@ func (d *DeclareIncident) Setup(ctx core.SetupContext) error {
 }
 
 func (d *DeclareIncident) Execute(ctx core.ExecutionContext) error {
-	spec, err := decodeIncidentSpec[DeclareIncidentSpec](ctx.Configuration)
+	spec, err := decodeIncidentSpec[declareIncidentSpec](ctx.Configuration)
 	if err != nil {
 		return err
 	}
@@ -140,21 +81,8 @@ func (d *DeclareIncident) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
-	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
-	}
-
-	incident, err := client.DeclareIncident(spec.Title, spec.Severity, spec.Description, spec.Labels, spec.IsDrill)
-	if err != nil {
-		return fmt.Errorf("error declaring incident: %w", err)
-	}
-
-	if incident != nil && strings.TrimSpace(incident.IncidentURL) == "" {
-		incident.IncidentURL, _ = buildIncidentWebURL(ctx.Integration, incident.IncidentID)
-	}
-
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "grafana.incident.declared", []any{incident})
+	isDrill := spec.IsDrill != nil && *spec.IsDrill
+	return executeDeclareIncident(ctx, spec, isDrill)
 }
 
 func (d *DeclareIncident) Cancel(ctx core.ExecutionContext) error {

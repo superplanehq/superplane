@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/test/support/contexts"
@@ -26,6 +27,10 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 					}
 				}`)),
 			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			},
 		},
 	}
 	client := &Client{
@@ -34,13 +39,25 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 		http:     httpContext,
 	}
 
-	incident, err := client.DeclareIncident(" API latency ", " minor ", "pool exhaustion", []string{" prod ", "", "api"}, true)
+	startTime := time.Date(2026, time.April, 20, 9, 45, 0, 0, time.UTC)
+
+	incident, err := client.DeclareIncident(DeclareIncidentInput{
+		Title:               " API latency ",
+		Severity:            " minor ",
+		InitialStatusUpdate: "pool exhaustion",
+		Labels:              []string{" prod ", "", "api"},
+		IsDrill:             true,
+		Status:              incidentStatusResolved,
+		RoomPrefix:          "  ops  ",
+		StartTime:           &startTime,
+	})
 	require.NoError(t, err)
 	require.Equal(t, "incident-123", incident.IncidentID)
 	require.Equal(t, "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123", incident.IncidentURL)
 	require.Equal(t, "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123/title", incident.OverviewURL)
+	require.Equal(t, "2026-04-20T09:45:00Z", incident.IncidentStart)
 
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 2)
 	request := httpContext.Requests[0]
 	require.Equal(t, http.MethodPost, request.Method)
 	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.CreateIncident", request.URL.Path)
@@ -53,11 +70,20 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &payload))
 	require.Equal(t, "API latency", payload["title"])
 	require.Equal(t, "minor", payload["severity"])
-	require.Equal(t, "active", payload["status"])
-	require.Equal(t, "incident", payload["roomPrefix"])
+	require.Equal(t, "resolved", payload["status"])
+	require.Equal(t, "ops", payload["roomPrefix"])
 	require.Equal(t, true, payload["isDrill"])
 	require.Equal(t, "pool exhaustion", payload["initialStatusUpdate"])
 	require.Len(t, payload["labels"], 2)
+
+	body, err = io.ReadAll(httpContext.Requests[1].Body)
+	require.NoError(t, err)
+
+	var startPayload map[string]string
+	require.NoError(t, json.Unmarshal(body, &startPayload))
+	require.Equal(t, "incident-123", startPayload["incidentID"])
+	require.Equal(t, "incidentStart", startPayload["eventName"])
+	require.Equal(t, "2026-04-20T09:45:00Z", startPayload["eventTime"])
 }
 
 func Test__Client__ResolveIncident__SetsResolvedStatus(t *testing.T) {

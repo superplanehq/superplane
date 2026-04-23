@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 const (
@@ -80,6 +81,17 @@ type declareIncidentRequest struct {
 	InitialStatusUpdate string          `json:"initialStatusUpdate,omitempty"`
 }
 
+type DeclareIncidentInput struct {
+	Title               string
+	Severity            string
+	Labels              []string
+	RoomPrefix          string
+	IsDrill             bool
+	Status              string
+	InitialStatusUpdate string
+	StartTime           *time.Time
+}
+
 type incidentResponse struct {
 	Incident Incident `json:"incident"`
 	Error    string   `json:"error,omitempty"`
@@ -109,20 +121,38 @@ type addIncidentActivityResponse struct {
 	Error        string               `json:"error,omitempty"`
 }
 
-func (c *Client) DeclareIncident(title, severity, initialStatusUpdate string, labels []string, isDrill bool) (*Incident, error) {
+func (c *Client) DeclareIncident(input DeclareIncidentInput) (*Incident, error) {
+	roomPrefix := strings.TrimSpace(input.RoomPrefix)
+	if roomPrefix == "" {
+		roomPrefix = incidentDefaultRoomPrefix
+	}
+
+	status := strings.TrimSpace(input.Status)
+	if status == "" {
+		status = incidentStatusActive
+	}
+
 	request := declareIncidentRequest{
-		Title:               strings.TrimSpace(title),
-		Severity:            strings.TrimSpace(severity),
-		Labels:              incidentLabelsFromStrings(labels),
-		RoomPrefix:          incidentDefaultRoomPrefix,
-		IsDrill:             isDrill,
-		Status:              incidentStatusActive,
-		InitialStatusUpdate: strings.TrimSpace(initialStatusUpdate),
+		Title:               strings.TrimSpace(input.Title),
+		Severity:            strings.TrimSpace(input.Severity),
+		Labels:              incidentLabelsFromStrings(input.Labels),
+		RoomPrefix:          roomPrefix,
+		IsDrill:             input.IsDrill,
+		Status:              status,
+		InitialStatusUpdate: strings.TrimSpace(input.InitialStatusUpdate),
 	}
 
 	response := incidentResponse{}
 	if err := c.execGrafanaIRMRPC("IncidentsService.CreateIncident", request, &response); err != nil {
 		return nil, err
+	}
+
+	if input.StartTime != nil {
+		if err := c.updateIncidentEventTime(response.Incident.IncidentID, "incidentStart", *input.StartTime); err != nil {
+			return nil, err
+		}
+
+		response.Incident.IncidentStart = input.StartTime.UTC().Format(time.RFC3339)
 	}
 
 	c.decorateIncident(&response.Incident)
@@ -311,6 +341,14 @@ func (c *Client) updateIncidentIsDrill(id string, isDrill bool) (*Incident, erro
 
 	c.decorateIncident(&response.Incident)
 	return &response.Incident, nil
+}
+
+func (c *Client) updateIncidentEventTime(id, eventName string, eventTime time.Time) error {
+	return c.execGrafanaIRMRPC("IncidentsService.UpdateIncidentEventTime", map[string]string{
+		"incidentID": strings.TrimSpace(id),
+		"eventName":  strings.TrimSpace(eventName),
+		"eventTime":  eventTime.UTC().Format(time.RFC3339),
+	}, &struct{}{})
 }
 
 func (c *Client) execGrafanaIRMRPC(operation string, payload any, response any) error {

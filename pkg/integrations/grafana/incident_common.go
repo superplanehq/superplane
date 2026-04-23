@@ -48,13 +48,6 @@ func decodeIncidentSpec[T any](config any) (T, error) {
 	return spec, nil
 }
 
-func validateDeclareIncidentSpec(spec DeclareIncidentSpec) error {
-	if strings.TrimSpace(spec.Title) == "" {
-		return errors.New("title is required")
-	}
-	return validateIncidentSeverity(spec.Severity, true)
-}
-
 func validateIncidentSeverity(severity string, required bool) error {
 	severity = strings.TrimSpace(severity)
 	if severity == "" {
