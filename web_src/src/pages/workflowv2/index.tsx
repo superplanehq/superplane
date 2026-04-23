@@ -82,6 +82,7 @@ import { RunSummary } from "@/ui/RunSummary";
 import { RunContextHeader, type RunViewMode } from "@/ui/RunSummary/RunContextHeader";
 import { NodeDetailPanel } from "@/ui/NodeDetailPanel";
 import { usePushThroughHandler } from "@/pages/workflowv2/usePushThroughHandler";
+import { useApprovalActionHandler } from "@/pages/workflowv2/useApprovalActionHandler";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -5069,6 +5070,7 @@ export function WorkflowPageV2() {
   );
 
   const handlePushThrough = usePushThroughHandler(canvasId);
+  const handleApprovalAction = useApprovalActionHandler(canvasId);
 
   const { onCancelExecution } = useCancelExecutionHandler({
     canvasId: canvasId!,
@@ -5641,6 +5643,8 @@ export function WorkflowPageV2() {
                           onPushThrough={handlePushThrough}
                           onCancelExecution={onCancelExecution}
                           onOpenNodeDetail={setRunDetailNodeId}
+                          onApprovalAction={handleApprovalAction}
+                          currentUser={me}
                         />
                       ) : describeRunQuery.isLoading ? (
                         <div className="pointer-events-auto flex h-full items-center justify-center bg-slate-50">

@@ -2,9 +2,12 @@ import React, { useMemo } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 import type {
+  CanvasesCanvasNodeExecution,
   CanvasesDescribeRunResponse,
   SuperplaneComponentsNode as ComponentsNode,
+  SuperplaneMeUser,
 } from "@/api-client";
+import type { ApprovalActionName, ApprovalActionParams } from "@/pages/workflowv2/useApprovalActionHandler";
 import { formatDuration } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import {
@@ -28,8 +31,94 @@ interface RunSummaryProps {
    * approvals) without switching to Canvas mode.
    */
   onOpenNodeDetail?: (nodeId: string) => void;
+  /**
+   * Invokes approve/reject on an approval execution. When supplied, any
+   * waiting approval in Activity that the current user can act on shows
+   * inline Approve/Reject buttons.
+   */
+  onApprovalAction?: (
+    nodeId: string,
+    executionId: string,
+    actionName: ApprovalActionName,
+    parameters: ApprovalActionParams,
+  ) => void | Promise<void>;
+  /** Current user; used to decide whether inline approve/reject is available. */
+  currentUser?: SuperplaneMeUser | null;
   /** Components (by `component.name` / `trigger.name`) that support the pushThrough action. */
   pushThroughComponentNames?: Set<string>;
+}
+
+//
+// Shape that matches the approval execution metadata emitted by
+// pkg/components/approval. We redeclare the pieces we need here instead of
+// importing from the mapper to keep RunSummary self-contained.
+//
+interface ApprovalRecordLike {
+  index: number;
+  state: string;
+  type: string;
+  user?: { id?: string; email?: string };
+  roleRef?: { name?: string };
+  groupRef?: { name?: string };
+}
+
+//
+// Returns the record index that the given user can currently act on, or
+// undefined if there's nothing for them to do. Mirrors the rules used by
+// the full Approval UI (`canCurrentUserActOnRecord` +
+// `hasUserGivenInputInAnyRecord` from the approval mapper): a user can act
+// on a pending record they match (by user/role/group/"anyone") as long as
+// they haven't already responded anywhere on this execution.
+//
+function findActionableApprovalIndex(
+  execution: CanvasesCanvasNodeExecution | undefined,
+  me: SuperplaneMeUser | null | undefined,
+): number | undefined {
+  if (!execution?.metadata || !me) return undefined;
+  const metadata = execution.metadata as { records?: ApprovalRecordLike[] } | undefined;
+  const records = metadata?.records;
+  if (!Array.isArray(records)) return undefined;
+
+  //
+  // If the user already responded (approved or rejected) anywhere, they
+  // don't get another turn. Matches hasUserGivenInputInAnyRecord.
+  //
+  const hasResponded = records.some(
+    (r) =>
+      r.state !== "pending" &&
+      (r.user?.id === me.id || (!!me.email && r.user?.email === me.email)),
+  );
+  if (hasResponded) return undefined;
+
+  const myRoles = me.roles || [];
+  const myGroups = me.groups || [];
+
+  for (const record of records) {
+    if (record.state !== "pending") continue;
+    switch (record.type) {
+      case "anyone":
+        return record.index;
+      case "user":
+        if (
+          (record.user?.id && record.user.id === me.id) ||
+          (record.user?.email && me.email && record.user.email === me.email)
+        ) {
+          return record.index;
+        }
+        break;
+      case "role":
+        if (record.roleRef?.name && myRoles.includes(record.roleRef.name)) {
+          return record.index;
+        }
+        break;
+      case "group":
+        if (record.groupRef?.name && myGroups.includes(record.groupRef.name)) {
+          return record.index;
+        }
+        break;
+    }
+  }
+  return undefined;
 }
 
 type StepStatus = RibbonStepStatus;
@@ -221,18 +310,29 @@ function ActivityRow({
   iconSlug,
   canPushThrough,
   canCancel,
+  canApprove,
+  approvalIndex,
   onOpenDetail,
   onPushThrough,
   onCancelExecution,
+  onApprovalAction,
 }: {
   step: Step;
   iconSrc: string | undefined;
   iconSlug: string | undefined;
   canPushThrough: boolean;
   canCancel: boolean;
+  canApprove: boolean;
+  approvalIndex?: number;
   onOpenDetail?: (nodeId: string) => void;
   onPushThrough?: (nodeId: string, executionId: string) => void | Promise<void>;
   onCancelExecution?: (nodeId: string, executionId: string) => void | Promise<void>;
+  onApprovalAction?: (
+    nodeId: string,
+    executionId: string,
+    actionName: ApprovalActionName,
+    parameters: ApprovalActionParams,
+  ) => void | Promise<void>;
 }) {
   const normalized = normalizeStatus(step.status);
   const badge = getStatusBadgeProps(step.status);
@@ -296,8 +396,47 @@ function ActivityRow({
             </span>
           ) : null}
         </div>
-        {(canPushThrough || canCancel) && (
+        {(canPushThrough || canCancel || canApprove) && (
           <div className="ml-1 flex shrink-0 items-center gap-1">
+            {canApprove && approvalIndex != null && (
+              <>
+                <button
+                  type="button"
+                  className="rounded px-1.5 py-0.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
+                  onClick={() => {
+                    if (!step.executionId) return;
+                    //
+                    // The backend requires a non-empty reason on reject.
+                    // A lightweight prompt is enough for the Activity row --
+                    // users who want a richer flow can open the node detail
+                    // and use the full approval UI there.
+                    //
+                    const reason = window.prompt("Reason for rejection?");
+                    if (reason == null) return;
+                    const trimmed = reason.trim();
+                    if (!trimmed) return;
+                    onApprovalAction?.(step.nodeId, step.executionId, "reject", {
+                      index: approvalIndex,
+                      reason: trimmed,
+                    });
+                  }}
+                >
+                  Reject
+                </button>
+                <button
+                  type="button"
+                  className="rounded bg-gray-900 px-2 py-0.5 text-[11px] font-medium text-white transition-colors hover:bg-gray-700"
+                  onClick={() => {
+                    if (!step.executionId) return;
+                    onApprovalAction?.(step.nodeId, step.executionId, "approve", {
+                      index: approvalIndex,
+                    });
+                  }}
+                >
+                  Approve
+                </button>
+              </>
+            )}
             {canPushThrough && (
               <button
                 type="button"
@@ -376,6 +515,8 @@ export function RunSummary({
   onPushThrough,
   onCancelExecution,
   onOpenNodeDetail,
+  onApprovalAction,
+  currentUser,
   pushThroughComponentNames = DEFAULT_PUSH_THROUGH_COMPONENTS,
 }: RunSummaryProps) {
   const nodeMap = useMemo(() => {
@@ -416,6 +557,19 @@ export function RunSummary({
   const reportSteps = useMemo(() => steps.filter((s) => !!s.reportEntry || !!s.error), [steps]);
   const hasAnyReport = reportSteps.some((s) => !!s.reportEntry);
 
+  //
+  // Map executions by id so the Activity row can look up an execution's
+  // metadata (needed for approvals) without re-scanning the whole list per
+  // row.
+  //
+  const executionMap = useMemo(() => {
+    const m = new Map<string, CanvasesCanvasNodeExecution>();
+    for (const exec of runData.executions || []) {
+      if (exec.id) m.set(exec.id, exec);
+    }
+    return m;
+  }, [runData.executions]);
+
   return (
     <div className="pointer-events-auto flex h-full w-full flex-col overflow-y-auto bg-slate-50 px-6 py-5">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -445,6 +599,15 @@ export function RunSummary({
                   !!step.executionId &&
                   !!onCancelExecution &&
                   normalizeStatus(step.status) === "running";
+
+                const execution = step.executionId ? executionMap.get(step.executionId) : undefined;
+                const approvalIndex =
+                  step.componentName === "approval"
+                    ? findActionableApprovalIndex(execution, currentUser)
+                    : undefined;
+                const canApprove =
+                  approvalIndex != null && !!step.executionId && !!onApprovalAction;
+
                 return (
                   <ActivityRow
                     key={step.key}
@@ -453,9 +616,12 @@ export function RunSummary({
                     iconSlug={iconSlug || undefined}
                     canPushThrough={canPushThrough}
                     canCancel={canCancel}
+                    canApprove={canApprove}
+                    approvalIndex={approvalIndex}
                     onOpenDetail={onOpenNodeDetail}
                     onPushThrough={onPushThrough}
                     onCancelExecution={onCancelExecution}
+                    onApprovalAction={onApprovalAction}
                   />
                 );
               })}
