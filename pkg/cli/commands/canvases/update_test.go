@@ -178,6 +178,15 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
+		// 7. Resolve org for canvas URL
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
+			},
+		},
 	)
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, true)
@@ -195,6 +204,7 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/me",
 	})
 }
 
@@ -281,6 +291,15 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
 			},
 		},
+		// 8. Resolve org for canvas URL
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
+			},
+		},
 	)
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, false)
@@ -300,6 +319,7 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
+		http.MethodGet + " /api/v1/me",
 	})
 }
 
@@ -351,6 +371,15 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
 			},
 		},
+		// Resolve org for canvas URL
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
+			},
+		},
 	)
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, true)
@@ -366,6 +395,7 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/me",
 	})
 }
 
