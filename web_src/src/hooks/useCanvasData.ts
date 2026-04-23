@@ -125,6 +125,129 @@ export const widgetKeys = {
 
 export const NODE_EXECUTION_HISTORY_PAGE_SIZE = 10;
 
+type ChangeManagementUpdateInput = {
+  enabled?: boolean;
+  approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
+};
+
+function mapChangeManagementApprovals(
+  approvals?: ChangeManagementUpdateInput["approvals"],
+): ChangeManagementApprover[] | undefined {
+  return approvals?.map((approval) => ({
+    type: approval.type as ChangeManagementApproverType | undefined,
+    userId: approval.userId,
+    roleName: approval.roleName,
+  }));
+}
+
+async function fetchCanvasOrThrow(canvasId: string): Promise<CanvasesCanvas> {
+  const currentCanvasResponse = await canvasesDescribeCanvas(
+    withOrganizationHeader({
+      path: { id: canvasId },
+    }),
+  );
+  const currentCanvas = currentCanvasResponse.data?.canvas;
+  if (!currentCanvas) {
+    throw new Error("Canvas not found");
+  }
+
+  return currentCanvas;
+}
+
+function mergeCanvasUpdate(
+  currentCanvas: CanvasesCanvas,
+  data: {
+    name?: string;
+    description?: string;
+    changeManagement?: ChangeManagementUpdateInput;
+  },
+): CanvasesCanvas {
+  const nextApprovals = mapChangeManagementApprovals(data.changeManagement?.approvals);
+
+  return {
+    ...currentCanvas,
+    metadata: {
+      ...currentCanvas.metadata,
+      name: data.name ?? currentCanvas.metadata?.name ?? "",
+      description: data.description ?? currentCanvas.metadata?.description ?? "",
+    },
+    spec: {
+      ...currentCanvas.spec,
+      changeManagement: data.changeManagement
+        ? {
+            ...currentCanvas.spec?.changeManagement,
+            ...data.changeManagement,
+            approvals: nextApprovals ?? currentCanvas.spec?.changeManagement?.approvals,
+          }
+        : currentCanvas.spec?.changeManagement,
+    },
+  };
+}
+
+async function findOrCreateDraftVersionId(canvasId: string): Promise<string> {
+  const versionsResponse = await canvasesListCanvasVersions(
+    withOrganizationHeader({
+      path: { canvasId },
+    }),
+  );
+  const existingDraftVersionId =
+    versionsResponse.data?.versions?.find((version) => !isPublishedVersion(version))?.metadata?.id || "";
+  if (existingDraftVersionId) {
+    return existingDraftVersionId;
+  }
+
+  const createVersionResponse = await canvasesCreateCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId },
+      body: {},
+    }),
+  );
+
+  return createVersionResponse.data?.version?.metadata?.id || "";
+}
+
+async function publishCanvasVersion(canvasId: string, versionId: string) {
+  await canvasesPublishCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId, versionId },
+      body: {},
+    }),
+  );
+}
+
+function buildCanvasVersionUpdateBody(data: {
+  name: string;
+  description?: string;
+  nodes?: unknown[];
+  edges?: unknown[];
+  changeManagement?: ChangeManagementUpdateInput;
+  autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
+}) {
+  const nextApprovals = mapChangeManagementApprovals(data.changeManagement?.approvals);
+
+  return {
+    canvas: {
+      metadata: {
+        name: data.name,
+        description: data.description || "",
+      },
+      spec: {
+        nodes: data.nodes || [],
+        edges: data.edges || [],
+        ...(data.changeManagement
+          ? {
+              changeManagement: {
+                enabled: data.changeManagement.enabled,
+                approvals: nextApprovals,
+              },
+            }
+          : {}),
+      },
+    },
+    autoLayout: data.autoLayout,
+  };
+}
+
 // Hooks for fetching canvases
 export const useCanvases = (organizationId: string) => {
   return useQuery({
@@ -411,69 +534,16 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     mutationFn: async (data: {
       name?: string;
       description?: string;
-      changeManagement?: {
-        enabled?: boolean;
-        approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
-      };
+      changeManagement?: ChangeManagementUpdateInput;
     }) => {
-      const currentCanvasResponse = await canvasesDescribeCanvas(
-        withOrganizationHeader({
-          path: { id: canvasId },
-        }),
-      );
-      const currentCanvas = currentCanvasResponse.data?.canvas;
-      if (!currentCanvas) {
-        throw new Error("Canvas not found");
-      }
+      const currentCanvas = await fetchCanvasOrThrow(canvasId);
 
       if (currentCanvas.spec?.changeManagement?.enabled ?? false) {
         throw new Error(changeManagementEnabledError);
       }
 
-      const nextApprovals: ChangeManagementApprover[] | undefined = data.changeManagement?.approvals?.map(
-        (approval) => ({
-          type: approval.type as ChangeManagementApproverType | undefined,
-          userId: approval.userId,
-          roleName: approval.roleName,
-        }),
-      );
-
-      const mergedCanvas: CanvasesCanvas = {
-        ...currentCanvas,
-        metadata: {
-          ...currentCanvas.metadata,
-          name: data.name ?? currentCanvas.metadata?.name ?? "",
-          description: data.description ?? currentCanvas.metadata?.description ?? "",
-        },
-        spec: {
-          ...currentCanvas.spec,
-          changeManagement: data.changeManagement
-            ? {
-                ...currentCanvas.spec?.changeManagement,
-                ...data.changeManagement,
-                approvals: nextApprovals ?? currentCanvas.spec?.changeManagement?.approvals,
-              }
-            : currentCanvas.spec?.changeManagement,
-        },
-      };
-
-      const versionsResponse = await canvasesListCanvasVersions(
-        withOrganizationHeader({
-          path: { canvasId },
-        }),
-      );
-      let targetVersionId =
-        versionsResponse.data?.versions?.find((version) => !isPublishedVersion(version))?.metadata?.id || "";
-
-      if (!targetVersionId) {
-        const createVersionResponse = await canvasesCreateCanvasVersion(
-          withOrganizationHeader({
-            path: { canvasId },
-            body: {},
-          }),
-        );
-        targetVersionId = createVersionResponse.data?.version?.metadata?.id || "";
-      }
+      const mergedCanvas = mergeCanvasUpdate(currentCanvas, data);
+      const targetVersionId = await findOrCreateDraftVersionId(canvasId);
 
       if (!targetVersionId) {
         throw new Error("Draft version was not returned by the API");
@@ -490,12 +560,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
       );
 
       if (!(currentCanvas.spec?.changeManagement?.enabled ?? false)) {
-        await canvasesPublishCanvasVersion(
-          withOrganizationHeader({
-            path: { canvasId, versionId: targetVersionId },
-            body: {},
-          }),
-        );
+        await publishCanvasVersion(canvasId, targetVersionId);
       }
 
       return updateResponse;
@@ -581,23 +646,12 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       description?: string;
       nodes?: unknown[];
       edges?: unknown[];
+      changeManagement?: ChangeManagementUpdateInput;
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
       preserveLocalCanvasState?: boolean;
       invalidateRelatedQueries?: boolean;
     }) => {
-      const body = {
-        canvas: {
-          metadata: {
-            name: data.name,
-            description: data.description || "",
-          },
-          spec: {
-            nodes: data.nodes || [],
-            edges: data.edges || [],
-          },
-        },
-        autoLayout: data.autoLayout,
-      };
+      const body = buildCanvasVersionUpdateBody(data);
 
       if (data.versionId) {
         return await canvasesUpdateCanvasVersion(
