@@ -21,8 +21,9 @@ const (
 )
 
 type SyntheticsClient struct {
-	DataSourceUID string
-	GrafanaClient *Client
+	DataSourceUID        string
+	MetricsDataSourceUID string
+	GrafanaClient        *Client
 }
 
 type SyntheticCheckLabel struct {
@@ -141,14 +142,15 @@ func NewSyntheticsClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) 
 		return nil, err
 	}
 
-	dataSourceUID, err := findSyntheticMonitoringDataSourceUID(grafanaClient)
+	dataSourceUID, metricsDataSourceUID, err := resolveSyntheticMonitoringDataSources(grafanaClient)
 	if err != nil {
 		return nil, err
 	}
 
 	return &SyntheticsClient{
-		DataSourceUID: dataSourceUID,
-		GrafanaClient: grafanaClient,
+		DataSourceUID:        dataSourceUID,
+		MetricsDataSourceUID: metricsDataSourceUID,
+		GrafanaClient:        grafanaClient,
 	}, nil
 }
 
@@ -182,18 +184,45 @@ func (c *SyntheticsClient) ListChecks() ([]SyntheticCheck, error) {
 }
 
 func (c *SyntheticsClient) GetCheck(id string) (*SyntheticCheck, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("synthetic check id is required")
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/sm/check/%s", url.PathEscape(id)), nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	if status >= 200 && status < 300 {
+		var check SyntheticCheck
+		if err := json.Unmarshal(responseBody, &check); err != nil {
+			return nil, fmt.Errorf("error parsing synthetic check response: %v", err)
+		}
+		return &check, nil
+	}
+
+	// Some proxy setups only expose list; fall back so integrations keep working.
+	if status == http.StatusNotFound || status == http.StatusMethodNotAllowed {
+		return c.getCheckViaList(id)
+	}
+
+	return nil, newAPIStatusError("grafana synthetic check get", status, responseBody)
+}
+
+func (c *SyntheticsClient) getCheckViaList(id string) (*SyntheticCheck, error) {
 	checks, err := c.ListChecks()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, check := range checks {
-		if check.IDString() == strings.TrimSpace(id) {
-			return &check, nil
+	for i := range checks {
+		if checks[i].IDString() == id {
+			return &checks[i], nil
 		}
 	}
 
-	return nil, fmt.Errorf("synthetic check %q not found", strings.TrimSpace(id))
+	return nil, fmt.Errorf("synthetic check %q not found", id)
 }
 
 func (c *SyntheticsClient) CreateCheck(check SyntheticCheck) (*SyntheticCheck, error) {
@@ -333,7 +362,7 @@ func buildSyntheticCheckWebURL(integration core.IntegrationContext, checkID int6
 	return strings.TrimRight(baseURL, "/") + syntheticsPluginPath + "/" + strconv.FormatInt(checkID, 10)
 }
 
-func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck) *SyntheticCheckMetrics {
+func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck, metricsDataSourceUID string) *SyntheticCheckMetrics {
 	metrics := &SyntheticCheckMetrics{}
 	if ctx.HTTP == nil || ctx.Integration == nil || check == nil || strings.TrimSpace(check.Job) == "" || strings.TrimSpace(check.Target) == "" {
 		return metrics
@@ -343,13 +372,13 @@ func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck
 		metrics.FrequencyMilliseconds = &check.Frequency
 	}
 
-	grafanaClient, err := NewClient(ctx.HTTP, ctx.Integration, false)
-	if err != nil {
+	metricsDataSourceUID = strings.TrimSpace(metricsDataSourceUID)
+	if metricsDataSourceUID == "" {
 		return metrics
 	}
 
-	metricsDataSourceUID, err := findSyntheticsMetricsDataSourceUID(grafanaClient)
-	if err != nil || metricsDataSourceUID == "" {
+	grafanaClient, err := NewClient(ctx.HTTP, ctx.Integration, false)
+	if err != nil {
 		return metrics
 	}
 
@@ -417,41 +446,31 @@ func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck
 	return metrics
 }
 
-func findSyntheticMonitoringDataSourceUID(client *Client) (string, error) {
+// resolveSyntheticMonitoringDataSources returns the Synthetic Monitoring plugin
+// datasource UID (for /sm/* proxy calls) and the nested Prometheus metrics UID
+// from jsonData.metrics (for /api/ds/query), using a single ListDataSources call.
+func resolveSyntheticMonitoringDataSources(client *Client) (pluginUID string, metricsUID string, err error) {
 	dataSources, err := client.ListDataSources()
 	if err != nil {
-		return "", err
-	}
-
-	for _, dataSource := range dataSources {
-		if strings.TrimSpace(dataSource.Type) == syntheticMonitoringDataSourceType && strings.TrimSpace(dataSource.UID) != "" {
-			return strings.TrimSpace(dataSource.UID), nil
-		}
-	}
-
-	return "", fmt.Errorf("synthetic monitoring datasource not found")
-}
-
-// findSyntheticsMetricsDataSourceUID returns the UID of the Prometheus datasource
-// that stores Synthetic Monitoring metrics. The SM plugin datasource stores this
-// in jsonData.metrics.uid — it must be used instead of the SM plugin UID itself,
-// which does not support Prometheus queries.
-func findSyntheticsMetricsDataSourceUID(client *Client) (string, error) {
-	dataSources, err := client.ListDataSources()
-	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	for _, dataSource := range dataSources {
 		if strings.TrimSpace(dataSource.Type) != syntheticMonitoringDataSourceType {
 			continue
 		}
+		if pluginUID == "" && strings.TrimSpace(dataSource.UID) != "" {
+			pluginUID = strings.TrimSpace(dataSource.UID)
+		}
 		if dataSource.JSONData.Metrics != nil && strings.TrimSpace(dataSource.JSONData.Metrics.UID) != "" {
-			return strings.TrimSpace(dataSource.JSONData.Metrics.UID), nil
+			metricsUID = strings.TrimSpace(dataSource.JSONData.Metrics.UID)
 		}
 	}
 
-	return "", fmt.Errorf("synthetic monitoring metrics datasource not found")
+	if pluginUID == "" {
+		return "", "", fmt.Errorf("synthetic monitoring datasource not found")
+	}
+	return pluginUID, metricsUID, nil
 }
 
 func querySyntheticMetricValue(client *Client, dataSourceUID, expr string, from, to time.Time) (*float64, error) {

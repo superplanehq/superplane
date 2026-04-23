@@ -116,6 +116,13 @@ func grafanaSyntheticCheckListResponse(checkJSON string) *http.Response {
 	}
 }
 
+func grafanaSyntheticCheckGetResponse(checkJSON string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(checkJSON)),
+	}
+}
+
 func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 	component := &CreateHTTPSyntheticCheck{}
 	httpContext := &contexts.HTTPContext{
@@ -227,12 +234,11 @@ func grafanaGetCheckResponses(reachability string) []*http.Response {
 
 	return []*http.Response{
 		grafanaSyntheticDataSourceResponse(),
-		grafanaSyntheticCheckListResponse(checkJSON),
+		grafanaSyntheticCheckGetResponse(checkJSON),
 		{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(`{"alerts":[{"name":"ProbeFailedExecutionsTooHigh","threshold":1,"period":"5m"}]}`)),
 		},
-		grafanaSyntheticDataSourceResponse(),
 		// success runs
 		{
 			StatusCode: http.StatusOK,
@@ -269,6 +275,35 @@ func grafanaGetCheckResponses(reachability string) []*http.Response {
 			Body:       io.NopCloser(strings.NewReader(`{"results":{"A":{"frames":[{"data":{"values":[[1],[1715768700]]}}]}}}`)),
 		},
 	}
+}
+
+func Test__GetHTTPSyntheticCheck__Execute__UnknownChannelWhenNoOutcome(t *testing.T) {
+	component := &GetHTTPSyntheticCheck{}
+	responses := grafanaGetCheckResponses("1")
+	// Outcome query (probe_success avg); empty result → no LastOutcome → unknown channel
+	responses[7] = &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"results":{}}`)),
+	}
+
+	httpContext := &contexts.HTTPContext{Responses: responses}
+	execCtx := &contexts.ExecutionStateContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"syntheticCheck": "101",
+		},
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "grafana-token",
+			},
+		},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, channelNameUnknown, execCtx.Channel)
 }
 
 func Test__GetHTTPSyntheticCheck__Execute__ReturnsConfigurationAndMetrics(t *testing.T) {
@@ -337,7 +372,7 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			grafanaSyntheticDataSourceResponse(),
-			grafanaSyntheticCheckListResponse(checkJSON),
+			grafanaSyntheticCheckGetResponse(checkJSON),
 			{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(checkJSON)),
@@ -400,7 +435,7 @@ func Test__DeleteHTTPSyntheticCheck__Execute(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			grafanaSyntheticDataSourceResponse(),
-			grafanaSyntheticCheckListResponse(`{
+			grafanaSyntheticCheckGetResponse(`{
 				"id": 101,
 				"job": "API health",
 				"target": "https://api.example.com/health",
