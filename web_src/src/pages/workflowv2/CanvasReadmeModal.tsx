@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CanvasMarkdown } from "@/ui/Markdown/CanvasMarkdown";
+import { CanvasMarkdown, type NodeChipIcon } from "@/ui/Markdown/CanvasMarkdown";
 import { useEffect, useMemo, useState } from "react";
 
 //
@@ -34,12 +34,17 @@ export type CanvasReadmeModalProps = {
   isSavingDraft: boolean;
   isCreatingChangeRequest: boolean;
   nodes: Record<string, string>;
+  icons?: Record<string, NodeChipIcon>;
   linkFor: (slug: string) => string;
   onSaveDraft: (content: string) => Promise<void>;
   onCreateChangeRequest: (args: { title: string; description: string }) => Promise<void>;
 };
 
-type NodeRefs = { nodes: Record<string, string>; linkFor: (slug: string) => string };
+type NodeRefs = {
+  nodes: Record<string, string>;
+  icons?: Record<string, NodeChipIcon>;
+  linkFor: (slug: string) => string;
+};
 
 export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
   const {
@@ -54,12 +59,13 @@ export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
     isSavingDraft,
     isCreatingChangeRequest,
     nodes,
+    icons,
     linkFor,
     onSaveDraft,
     onCreateChangeRequest,
   } = props;
 
-  const nodeRefs = useMemo(() => ({ nodes, linkFor }), [nodes, linkFor]);
+  const nodeRefs = useMemo(() => ({ nodes, icons, linkFor }), [nodes, icons, linkFor]);
   const subtitle = mode === "edit" ? "Draft" : "Published";
 
   const [editorValue, setEditorValue] = useState<string>("");

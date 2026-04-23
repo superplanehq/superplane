@@ -3,7 +3,9 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc, getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { isUrl } from "@/lib/utils";
+import type { NodeChipIcon } from "@/ui/Markdown/CanvasMarkdown";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
@@ -5291,15 +5293,25 @@ export function WorkflowPageV2() {
   // kebab-cased alias of the display name so multi-word node names like
   // "Health check request" can be referenced as `@health-check-request`.
   //
-  const { nodesBySlug: readmeNodesBySlug, nodeIdBySlug: readmeNodeIdBySlug } = useMemo(() => {
+  const {
+    nodesBySlug: readmeNodesBySlug,
+    nodeIdBySlug: readmeNodeIdBySlug,
+    iconsBySlug: readmeIconsBySlug,
+  } = useMemo(() => {
     const nodesBySlug: Record<string, string> = {};
     const nodeIdBySlug: Record<string, string> = {};
+    const iconsBySlug: Record<string, NodeChipIcon> = {};
     const toKebab = (value: string) =>
       value
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
-    const register = (slug: string | undefined, displayName: string, nodeId: string | undefined) => {
+    const register = (
+      slug: string | undefined,
+      displayName: string,
+      nodeId: string | undefined,
+      icon: NodeChipIcon | undefined,
+    ) => {
       if (!slug) return;
       if (!nodesBySlug[slug]) {
         nodesBySlug[slug] = displayName;
@@ -5307,17 +5319,35 @@ export function WorkflowPageV2() {
       if (nodeId && !nodeIdBySlug[slug]) {
         nodeIdBySlug[slug] = nodeId;
       }
+      if (icon && !iconsBySlug[slug]) {
+        iconsBySlug[slug] = icon;
+      }
+    };
+    const resolveNodeIcon = (typeName: string | undefined): NodeChipIcon | undefined => {
+      if (!typeName) return undefined;
+      // Prefer the explicit integration logo (image URL) when available, then
+      // fall back to the component/trigger icon slug registered on the canvas.
+      const headerIconSrc = getHeaderIconSrc(typeName);
+      if (headerIconSrc) return { iconSrc: headerIconSrc };
+      const mapped = componentIconMap[typeName];
+      if (!mapped) return undefined;
+      if (isUrl(mapped) || mapped.startsWith("/") || mapped.startsWith("data:")) {
+        return { iconSrc: mapped };
+      }
+      return { iconSlug: mapped };
     };
     const sourceNodes = (selectedCanvasVersion ?? liveCanvasVersion)?.spec?.nodes ?? [];
     for (const node of sourceNodes) {
       const displayName = node.name || node.id || "";
       if (!displayName) continue;
-      register(node.name, displayName, node.id);
-      register(node.id, displayName, node.id);
-      register(toKebab(displayName), displayName, node.id);
+      const typeName = node.component?.name || node.trigger?.name;
+      const icon = resolveNodeIcon(typeName);
+      register(node.name, displayName, node.id, icon);
+      register(node.id, displayName, node.id, icon);
+      register(toKebab(displayName), displayName, node.id, icon);
     }
-    return { nodesBySlug, nodeIdBySlug };
-  }, [selectedCanvasVersion, liveCanvasVersion]);
+    return { nodesBySlug, nodeIdBySlug, iconsBySlug };
+  }, [selectedCanvasVersion, liveCanvasVersion, componentIconMap]);
 
   const linkForReadmeNode = useCallback(
     (slug: string) => {
@@ -5852,6 +5882,7 @@ export function WorkflowPageV2() {
         isSavingDraft={updateCanvasReadmeMutation.isPending}
         isCreatingChangeRequest={createCanvasChangeRequestMutation.isPending}
         nodes={readmeNodesBySlug}
+        icons={readmeIconsBySlug}
         linkFor={linkForReadmeNode}
         onSaveDraft={handleReadmeSaveDraft}
         onCreateChangeRequest={handleReadmeCreateChangeRequest}

@@ -14,6 +14,8 @@ import {
   CircleHelp,
 } from "lucide-react";
 
+import { resolveIcon } from "@/lib/utils";
+
 import { MermaidDiagram } from "./MermaidDiagram";
 
 import "highlight.js/styles/github.css";
@@ -405,13 +407,40 @@ function DetailsContent({ children }: { children?: React.ReactNode }) {
   );
 }
 
+export interface NodeChipIcon {
+  /** Image URL (e.g. an integration logo). Takes precedence over iconSlug. */
+  iconSrc?: string;
+  /** Lucide icon slug (kebab-case) used when no image URL is available. */
+  iconSlug?: string;
+}
+
 export interface NodeChipContext {
   /** Known node slug -> display name. Slugs not in this map render as "unknown node" chips. */
   nodes?: Record<string, string>;
+  /** Known node slug -> icon (image URL or Lucide slug). When present, replaces the leading `@`. */
+  icons?: Record<string, NodeChipIcon>;
   /** Link target for known slugs. Called with the slug. Defaults to `?node=<slug>` on the current page. */
   linkFor?: (slug: string) => string;
   /** Optional click handler instead of navigation (e.g. to open a side panel). */
   onNodeClick?: (slug: string) => void;
+}
+
+function NodeChipLeading({ icon }: { icon?: NodeChipIcon }) {
+  if (icon?.iconSrc) {
+    return (
+      <img
+        src={icon.iconSrc}
+        alt=""
+        aria-hidden="true"
+        className="h-3 w-3 shrink-0 object-contain"
+      />
+    );
+  }
+  if (icon?.iconSlug) {
+    const Icon = resolveIcon(icon.iconSlug);
+    return <Icon className="h-3 w-3 shrink-0 text-blue-500" aria-hidden="true" />;
+  }
+  return <span className="text-blue-400">@</span>;
 }
 
 function KnownNodeChip({
@@ -419,11 +448,13 @@ function KnownNodeChip({
   name,
   href,
   onClick,
+  icon,
 }: {
   slug: string;
   name: string;
   href?: string;
   onClick?: () => void;
+  icon?: NodeChipIcon;
 }) {
   const label = name || slug;
   const classes =
@@ -432,7 +463,7 @@ function KnownNodeChip({
   if (onClick) {
     return (
       <button type="button" className={classes} onClick={onClick} title={`Focus node ${slug}`}>
-        <span className="text-blue-400">@</span>
+        <NodeChipLeading icon={icon} />
         {label}
       </button>
     );
@@ -440,7 +471,7 @@ function KnownNodeChip({
 
   return (
     <a className={classes} href={href} title={`Focus node ${slug}`}>
-      <span className="text-blue-400">@</span>
+      <NodeChipLeading icon={icon} />
       {label}
     </a>
   );
@@ -488,13 +519,21 @@ function buildSpanComponent(context: NodeChipContext) {
     }
 
     const name = known[slug] ?? slug;
+    const icon = context.icons?.[slug];
     const linkFor = context.linkFor ?? defaultLinkFor;
 
     if (context.onNodeClick) {
-      return <KnownNodeChip slug={slug} name={name} onClick={() => context.onNodeClick?.(slug)} />;
+      return (
+        <KnownNodeChip
+          slug={slug}
+          name={name}
+          icon={icon}
+          onClick={() => context.onNodeClick?.(slug)}
+        />
+      );
     }
 
-    return <KnownNodeChip slug={slug} name={name} href={linkFor(slug)} />;
+    return <KnownNodeChip slug={slug} name={name} icon={icon} href={linkFor(slug)} />;
   };
 }
 
