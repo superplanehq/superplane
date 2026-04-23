@@ -127,7 +127,8 @@ CREATE TABLE public.app_installation_secrets (
     name character varying(64) NOT NULL,
     value bytea NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    editable boolean DEFAULT false NOT NULL
 );
 
 
@@ -162,7 +163,10 @@ CREATE TABLE public.app_installations (
     browser_action jsonb,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    next_setup_step jsonb,
+    parameters jsonb DEFAULT '[]'::jsonb NOT NULL,
+    capabilities jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1928,7 +1932,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260414233443	f
+20260423114543	f
 \.
 
 

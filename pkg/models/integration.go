@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -24,12 +25,26 @@ type Integration struct {
 	InstallationName string
 	State            string
 	StateDescription string
-	Configuration    datatypes.JSONType[map[string]any]
-	Metadata         datatypes.JSONType[map[string]any]
-	BrowserAction    *datatypes.JSONType[BrowserAction]
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
+
+	//
+	// These are fields used by the old integrations.
+	// Should be removed once all integration implementations
+	// are migrated to use core.IntegrationSetupProvider
+	//
+	Configuration datatypes.JSONType[map[string]any]
+	Metadata      datatypes.JSONType[map[string]any]
+	BrowserAction *datatypes.JSONType[BrowserAction]
+
+	//
+	// Fields required for integrations set up using core.IntegrationSetupProvider
+	// All integrations should use this
+	//
+	NextSetupStep *datatypes.JSONType[core.SetupStep]
+	Parameters    datatypes.JSONSlice[core.IntegrationParameterDefinition]
+	Capabilities  datatypes.JSONSlice[core.CapabilityDefinition]
 }
 
 func (a *Integration) TableName() string {

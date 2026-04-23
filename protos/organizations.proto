@@ -221,17 +221,6 @@ service Organizations {
     };
   }
 
-  rpc ListIntegrationsV2(ListIntegrationsV2Request) returns (ListIntegrationsV2Response) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/integrations-v2"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List integrations in an organization (v2)";
-      description: "Returns a list of integrations in an organization (v2)";
-      tags: "Organization";
-    };
-  }
-
   rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/integrations/{integration_id}"
@@ -239,17 +228,6 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe an integration in an organization";
       description: "Returns details of a specific integration in an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc DescribeIntegrationV2(DescribeIntegrationV2Request) returns (DescribeIntegrationV2Response) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/integrations-v2/{integration_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe an integration in an organization (v2)";
-      description: "Returns details of a specific integration in an organization (v2)";
       tags: "Organization";
     };
   }
@@ -277,21 +255,9 @@ service Organizations {
     };
   }
 
-  rpc CreateIntegrationV2(CreateIntegrationV2Request) returns (CreateIntegrationV2Response) {
-    option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/integrations-v2"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create organization integration (v2)";
-      description: "Create an organization integration (v2)";
-      tags: "Organization";
-    };
-  }
-
   rpc SubmitIntegrationSetupStep(SubmitIntegrationSetupStepRequest) returns (SubmitIntegrationSetupStepResponse) {
     option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/integrations-v2/{integration_id}/steps"
+      post: "/api/v1/organizations/{id}/integrations/{integration_id}/steps"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -532,14 +498,6 @@ message ListIntegrationsResponse {
   repeated Integration integrations = 1;
 }
 
-message ListIntegrationsV2Request {
-  string id = 1;
-}
-
-message ListIntegrationsV2Response {
-  repeated IntegrationV2 integrations = 1;
-}
-
 message CreateIntegrationRequest {
   string id = 1;
   string name = 2;
@@ -551,16 +509,6 @@ message CreateIntegrationResponse {
   Integration integration = 1;
 }
 
-message CreateIntegrationV2Request {
-  string id = 1;
-  string name = 2;
-  string integration_name = 3;
-}
-
-message CreateIntegrationV2Response {
-  IntegrationV2 integration = 1;
-}
-
 message DescribeIntegrationRequest {
   string id = 1;
   string integration_id = 2;
@@ -568,15 +516,6 @@ message DescribeIntegrationRequest {
 
 message DescribeIntegrationResponse {
   Integration integration = 1;
-}
-
-message DescribeIntegrationV2Request {
-  string id = 1;
-  string integration_id = 2;
-}
-
-message DescribeIntegrationV2Response {
-  IntegrationV2 integration = 1;
 }
 
 message ListIntegrationResourcesRequest {
@@ -621,51 +560,14 @@ message SubmitIntegrationSetupStepRequest {
 }
 
 message SubmitIntegrationSetupStepResponse {
-  IntegrationV2 integration = 1;
+  Integration integration = 1;
 }
 
 message Integration {
-  message Metadata {
-    string id = 1;
-    string name = 2;
-    google.protobuf.Timestamp created_at = 4;
-    google.protobuf.Timestamp updated_at = 5;
-  }
-
-  message Spec {
-    string integration_name = 1;
-    google.protobuf.Struct configuration = 2;
-  }
-
-  message Status {
-    string state = 1;
-    string state_description = 2;
-    google.protobuf.Struct metadata = 3;
-    BrowserAction browser_action = 4;
-    repeated NodeRef used_in = 5;
-  }
-
-  message NodeRef {
-    string canvas_id = 1;
-    string canvas_name = 2;
-    string node_id = 3;
-    string node_name = 4;
-  }
-
-  Metadata metadata = 1;
-  Spec spec = 2;
-  Status status = 3;
-}
-
-message IntegrationV2 {
-  message Metadata {
-    string id = 1;
-    string name = 2;
-    string integration_name = 3;
-    google.protobuf.Timestamp created_at = 4;
-    google.protobuf.Timestamp updated_at = 5;
-  }
-
+  //
+  // Parameters are how integration implementations expose things to the user
+  // after an integration has been setup. They can be editable or not.
+  //
   message Parameter {
     string name = 1;
     string label = 2;
@@ -675,21 +577,19 @@ message IntegrationV2 {
     bool editable = 6;
   }
 
+  //
+  // Secrets are how integration store sensitive values.
+  // If they are included here, then they should be visible to the user.
+  //
   message Secret {
     string name = 1;
     string label = 2;
     string description = 3;
   }
 
-  message Status {
-    repeated Parameter parameters = 1;
-    repeated Secret secrets = 2;
-    repeated Capability capabilities = 3;
-    string state = 4;
-    string state_description = 5;
-    SetupStepDefinition next_step = 6;
-  }
-
+  //
+  // Capabilities are abilities exposed by the integration.
+  //
   message Capability {
     enum Type {
       UNKNOWN = 0;
@@ -700,6 +600,34 @@ message IntegrationV2 {
     Type type = 1;
     Components.Component component = 2;
     Triggers.Trigger trigger = 3;
+  }
+
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string integration_name = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+  }
+
+  message Spec {
+    google.protobuf.Struct configuration = 2;
+  }
+
+  message Status {
+    string state = 1;
+    string state_description = 2;
+    google.protobuf.Struct metadata = 3;
+    BrowserAction browser_action = 4;
+    repeated NodeRef used_in = 5;
+
+    //
+    // Used by new SetupProvider model.
+    //
+    repeated Parameter parameters = 6;
+    repeated Secret secrets = 7;
+    repeated Capability capabilities = 8;
+    SetupStepDefinition next_step = 9;
   }
 
   message SetupStepDefinition {
@@ -716,14 +644,40 @@ message IntegrationV2 {
     }
 
     Type type = 1;
+
+    //
+    // Unique machine-readable step name
+    //
     string name = 2;
-    string instructions = 3;
-    repeated Configuration.Field inputs = 4;
-    RedirectPrompt redirect_prompt = 5;
+
+    //
+    // Human-readable label for the step
+    //
+    string label = 3;
+
+    //
+    // Markdown-based instructions to display to the user
+    // while going through this step.
+    //
+    string instructions = 4;
+
+    //
+    // Specific fields for each step type
+    //
+    repeated Configuration.Field inputs = 5;
+    RedirectPrompt redirect_prompt = 6;
+  }
+
+  message NodeRef {
+    string canvas_id = 1;
+    string canvas_name = 2;
+    string node_id = 3;
+    string node_name = 4;
   }
 
   Metadata metadata = 1;
-  Status status = 2;
+  Spec spec = 2;
+  Status status = 3;
 }
 
 message BrowserAction {

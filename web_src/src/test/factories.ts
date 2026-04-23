@@ -28,8 +28,8 @@ export function makeEdge(overrides: Partial<ComponentsEdge> = {}): ComponentsEdg
 
 export function makeIntegration(overrides: Partial<OrganizationsIntegration> = {}): OrganizationsIntegration {
   return {
-    metadata: { id: "integration-id", name: "Default Integration" },
-    spec: { integrationName: "github" },
+    metadata: { id: "integration-id", name: "Default Integration", integrationName: "github" },
+    spec: {},
     status: { state: "ready" },
     ...overrides,
   } as OrganizationsIntegration;

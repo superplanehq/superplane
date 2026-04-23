@@ -170,7 +170,7 @@ function OpenBuildingBlocksSidebar({
         const aHasConnectedIntegration = aIntegrationName
           ? integrations.some(
               (integration) =>
-                normalizeIntegrationName(integration.spec?.integrationName) ===
+                normalizeIntegrationName(integration.metadata?.integrationName) ===
                 normalizeIntegrationName(aIntegrationName),
             )
           : false;
@@ -178,7 +178,7 @@ function OpenBuildingBlocksSidebar({
         const bHasConnectedIntegration = bIntegrationName
           ? integrations.some(
               (integration) =>
-                normalizeIntegrationName(integration.spec?.integrationName) ===
+                normalizeIntegrationName(integration.metadata?.integrationName) ===
                 normalizeIntegrationName(bIntegrationName),
             )
           : false;

@@ -85,7 +85,8 @@ func (g *GithubV2) onSelectConnectionModeSubmit(input any, ctx core.SetupStepCon
 	//
 	// Connection mode is not something you can change.
 	//
-	err := ctx.Parameters.Create("connectionMode", core.IntegrationParameterDefinition{
+	err := ctx.Parameters.Create(core.IntegrationParameterDefinition{
+		Name:     "connectionMode",
 		Type:     configuration.FieldTypeString,
 		Value:    connectionMode,
 		Editable: false,

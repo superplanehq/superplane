@@ -5,6 +5,7 @@ import {
   organizationsDescribeIntegration,
   organizationsListIntegrationResources,
   organizationsCreateIntegration,
+  organizationsSubmitIntegrationSetupStep,
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
 } from "@/api-client/sdk.gen";
@@ -141,11 +142,52 @@ export const useCreateIntegration = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
-      analytics.integrationConnected(variables.integrationName, organizationId);
+
+      const hasNextStep = Boolean(response.data?.integration?.status?.nextStep);
+      if (!hasNextStep) {
+        analytics.integrationConnected(variables.integrationName, organizationId);
+      }
+    },
+  });
+};
+
+// Hook to submit setup steps for integrations with setup providers
+export const useSubmitIntegrationSetupStep = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { integrationId: string; stepName: string; inputs?: Record<string, unknown> }) => {
+      return await organizationsSubmitIntegrationSetupStep(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId: data.integrationId },
+          body: {
+            stepName: data.stepName,
+            inputs: data.inputs,
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const integration = response.data?.integration;
+      const integrationId = integration?.metadata?.id;
+      const integrationName = integration?.metadata?.integrationName;
+      const hasNextStep = Boolean(integration?.status?.nextStep);
+
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(organizationId),
+      });
+
+      if (integrationId) {
+        queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
+      }
+
+      if (!hasNextStep && integrationName) {
+        analytics.integrationConnected(integrationName, organizationId);
+      }
     },
   });
 };

@@ -44,12 +44,11 @@ export const STORY_INTEGRATIONS: OrganizationsIntegration[] = [
     metadata: {
       id: STORY_INTEGRATION_ID,
       name: "GitHub Production",
+      integrationName: "github",
       createdAt: "2026-03-30T10:00:00Z",
       updatedAt: "2026-03-30T10:00:00Z",
     },
-    spec: {
-      integrationName: "github",
-    },
+    spec: {},
     status: {
       state: "ready",
       stateDescription: "The connection is ready to list repositories and other resources.",

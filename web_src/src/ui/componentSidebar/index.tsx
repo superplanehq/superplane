@@ -277,10 +277,10 @@ export const ComponentSidebar = ({
   const createIntegrationMutation = useCreateIntegration(domainId ?? "");
   const configureIntegrationDefinition = useMemo(
     () =>
-      configureIntegration?.spec?.integrationName
-        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.spec?.integrationName)
+      configureIntegration?.metadata?.integrationName
+        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.metadata?.integrationName)
         : undefined,
-    [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
+    [availableIntegrationDefinitions, configureIntegration?.metadata?.integrationName],
   );
   const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
   const createIntegrationDefinition = useMemo(
@@ -292,7 +292,7 @@ export const ComponentSidebar = ({
     if (!domainId) return "#";
     const selectedIntegrationId =
       integrationRef?.id ||
-      integrations?.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
+      integrations?.find((integration) => integration.metadata?.integrationName === selectedIntegrationForDialog?.name)
         ?.metadata?.id;
     if (selectedIntegrationId) {
       return `/${domainId}/settings/integrations/${selectedIntegrationId}`;
@@ -384,9 +384,9 @@ export const ComponentSidebar = ({
 
   useEffect(() => {
     setConfigureIntegrationName(
-      configureIntegration?.metadata?.name || configureIntegration?.spec?.integrationName || "",
+      configureIntegration?.metadata?.name || configureIntegration?.metadata?.integrationName || "",
     );
-  }, [configureIntegration?.metadata?.name, configureIntegration?.spec?.integrationName]);
+  }, [configureIntegration?.metadata?.name, configureIntegration?.metadata?.integrationName]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -917,15 +917,15 @@ export const ComponentSidebar = ({
               <DialogHeader>
                 <div className="flex items-center gap-3">
                   <IntegrationIcon
-                    integrationName={configureIntegration.spec?.integrationName}
+                    integrationName={configureIntegration.metadata?.integrationName}
                     iconSlug={configureIntegrationDefinition?.icon}
                     className="h-6 w-6 text-gray-500 dark:text-gray-400"
                   />
                   <div className="flex items-center gap-2">
                     <DialogTitle>
                       Configure{" "}
-                      {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
-                        configureIntegration.spec?.integrationName}
+                      {getIntegrationTypeDisplayName(undefined, configureIntegration.metadata?.integrationName) ||
+                        configureIntegration.metadata?.integrationName}
                     </DialogTitle>
                     <a
                       href={

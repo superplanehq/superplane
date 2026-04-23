@@ -43,7 +43,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
 
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const integrationDef = integration
-    ? availableIntegrations.find((i) => i.name === integration.spec?.integrationName)
+    ? availableIntegrations.find((i) => i.name === integration.metadata?.integrationName)
     : undefined;
 
   const updateMutation = useUpdateIntegration(organizationId, integrationId || "");
@@ -60,8 +60,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   }, [integration]);
 
   useEffect(() => {
-    setIntegrationName(integration?.metadata?.name || integration?.spec?.integrationName || "");
-  }, [integration?.metadata?.name, integration?.spec?.integrationName]);
+    setIntegrationName(integration?.metadata?.name || integration?.metadata?.integrationName || "");
+  }, [integration?.metadata?.name, integration?.metadata?.integrationName]);
 
   // Full instructions (same for all integrations)
   const instructionsContent = useMemo(() => {
@@ -134,7 +134,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   }, [integration?.status?.usedIn]);
 
   const metadataContent = useMemo(
-    () => renderIntegrationMetadata(integration?.spec?.integrationName, integration!),
+    () => renderIntegrationMetadata(integration?.metadata?.integrationName, integration!),
     [integration],
   );
 
@@ -253,15 +253,15 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <IntegrationIcon
-          integrationName={integration?.spec?.integrationName}
+          integrationName={integration?.metadata?.integrationName}
           iconSlug={integrationDef?.icon}
           className="w-6 h-6"
         />
         <div className="flex-1 min-w-[200px]">
           <h4 className="text-2xl font-medium">
             {integration.metadata?.name ||
-              getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
-              integration.spec?.integrationName}
+              getIntegrationTypeDisplayName(undefined, integration.metadata?.integrationName) ||
+              integration.metadata?.integrationName}
           </h4>
         </div>
         <div className="flex items-center gap-2 ml-auto">

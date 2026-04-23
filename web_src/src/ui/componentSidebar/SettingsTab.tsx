@@ -131,7 +131,7 @@ export function SettingsTab({
   // All installations of this integration type (ready, error, pending)
   const integrationsOfType = useMemo(() => {
     if (!integrationName) return [];
-    return integrations.filter((i) => i.spec?.integrationName === integrationName);
+    return integrations.filter((i) => i.metadata?.integrationName === integrationName);
   }, [integrations, integrationName]);
   const selectedIntegrationFull = useMemo(() => {
     const id = selectedIntegration?.id ?? integrationRef?.id;
@@ -555,7 +555,7 @@ export function SettingsTab({
                     <SelectContent>
                       {integrationsOfType.map((integration) => {
                         const instanceName = integration.metadata?.name;
-                        const typeName = integration.spec?.integrationName;
+                        const typeName = integration.metadata?.integrationName;
                         const displayName =
                           instanceName?.toLowerCase() === typeName?.toLowerCase()
                             ? getIntegrationTypeDisplayName(undefined, typeName) || instanceName
@@ -595,7 +595,7 @@ export function SettingsTab({
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <IntegrationIcon
-                              integrationName={selectedIntegrationFull.spec?.integrationName}
+                              integrationName={selectedIntegrationFull.metadata?.integrationName}
                               iconSlug={integrationDefinition?.icon}
                               className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
                             />
@@ -603,7 +603,7 @@ export function SettingsTab({
                               <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
                                 {getIntegrationTypeDisplayName(
                                   undefined,
-                                  selectedIntegrationFull.spec?.integrationName,
+                                  selectedIntegrationFull.metadata?.integrationName,
                                 ) || "Integration"}
                               </h3>
                             </div>

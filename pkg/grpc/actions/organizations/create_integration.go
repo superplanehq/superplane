@@ -7,11 +7,14 @@ import (
 	"maps"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -20,6 +23,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
@@ -86,6 +91,65 @@ func CreateIntegrationWithUsage(
 		return nil, status.Error(codes.Internal, "failed to create integration")
 	}
 
+	//
+	// If the integration implementation does not provide a setup provider,
+	// we fallback to the old sync model. This should be removed once all integrations
+	// are done through setup provider.
+	//
+	setupProvider, err := registry.GetSetupProvider(integrationName)
+	if err != nil {
+		return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
+	}
+
+	return setupIntegration(registry, newIntegration, setupProvider, orgID)
+}
+
+func setupIntegration(registry *registry.Registry, newIntegration *models.Integration, setupProvider core.IntegrationSetupProvider, orgID string) (*pb.CreateIntegrationResponse, error) {
+	logrus.Infof("setting up integration %s", newIntegration.ID)
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		secretStorage, err := contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration)
+		if err != nil {
+			return err
+		}
+
+		firstStep := setupProvider.FirstStep(core.SetupStepContext{
+			IntegrationID:  newIntegration.ID,
+			OrganizationID: orgID,
+			HTTP:           registry.HTTPContext(),
+			Parameters:     contexts.NewIntegrationParameterStorage(newIntegration),
+			Secrets:        secretStorage,
+			Capabilities:   contexts.NewIntegrationCapabilityRegistry(newIntegration),
+		})
+
+		nextSetupStep := datatypes.NewJSONType(firstStep)
+		newIntegration.NextSetupStep = &nextSetupStep
+		return tx.Save(newIntegration).Error
+	})
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to setup integration next setup step: %v", err)
+	}
+
+	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
+	}
+
+	return &pb.CreateIntegrationResponse{Integration: proto}, nil
+}
+
+func syncIntegration(
+	registry *registry.Registry,
+	baseURL string,
+	webhooksBaseURL string,
+	oidcProvider oidc.Provider,
+	orgID string,
+	newIntegration *models.Integration,
+	integrationImpl core.Integration,
+) (*pb.CreateIntegrationResponse, error) {
+	logrus.Infof("syncing integration %s", newIntegration.ID)
+
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
@@ -95,7 +159,7 @@ func CreateIntegrationWithUsage(
 		nil,
 	)
 
-	syncErr := integration.Sync(core.SyncContext{
+	syncErr := integrationImpl.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*newIntegration),
 		HTTP:            registry.HTTPContext(),
 		Integration:     integrationCtx,
@@ -106,7 +170,7 @@ func CreateIntegrationWithUsage(
 		OIDC:            oidcProvider,
 	})
 
-	err = database.Conn().Save(newIntegration).Error
+	err := database.Conn().Save(newIntegration).Error
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save integration after sync: %v", err)
 	}
@@ -155,12 +219,12 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 
 	proto := &pb.Integration{
 		Metadata: &pb.Integration_Metadata{
-			Id:   instance.ID.String(),
-			Name: instance.InstallationName,
+			Id:              instance.ID.String(),
+			Name:            instance.InstallationName,
+			IntegrationName: instance.AppName,
 		},
 		Spec: &pb.Integration_Spec{
-			IntegrationName: instance.AppName,
-			Configuration:   config,
+			Configuration: config,
 		},
 		Status: &pb.Integration_Status{
 			State:            instance.State,
@@ -189,7 +253,62 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		})
 	}
 
+	if instance.NextSetupStep != nil {
+		proto.Status.NextStep = serializeNextStep(instance.NextSetupStep.Data())
+	}
+
+	if instance.Parameters != nil {
+		for _, parameter := range instance.Parameters {
+			proto.Status.Parameters = append(proto.Status.Parameters, &pb.Integration_Parameter{
+				Name:        parameter.Name,
+				Label:       parameter.Label,
+				Description: parameter.Description,
+				Type:        parameter.Type,
+				Editable:    parameter.Editable,
+				// Value:       parameter.Value,
+			})
+		}
+	}
+
+	// TODO: serialize capabilities
+	// TODO: serialize secrets
+
 	return proto, nil
+}
+
+func serializeNextStep(step core.SetupStep) *pb.Integration_SetupStepDefinition {
+	def := &pb.Integration_SetupStepDefinition{
+		Type:         serializeNextStepType(step.Type),
+		Name:         step.Name,
+		Label:        step.Label,
+		Instructions: step.Instructions,
+		Inputs:       []*configpb.Field{},
+	}
+
+	for _, input := range step.Inputs {
+		def.Inputs = append(def.Inputs, actions.ConfigurationFieldToProto(input))
+	}
+
+	if step.RedirectPrompt != nil {
+		def.RedirectPrompt = &pb.Integration_SetupStepDefinition_RedirectPrompt{
+			Url:        step.RedirectPrompt.URL,
+			Method:     step.RedirectPrompt.Method,
+			FormFields: step.RedirectPrompt.FormData,
+		}
+	}
+
+	return def
+}
+
+func serializeNextStepType(stepType core.SetupStepType) pb.Integration_SetupStepDefinition_Type {
+	switch stepType {
+	case core.SetupStepTypeInputs:
+		return pb.Integration_SetupStepDefinition_INPUTS
+	case core.SetupStepTypeRedirectPrompt:
+		return pb.Integration_SetupStepDefinition_REDIRECT_PROMPT
+	default:
+		return pb.Integration_SetupStepDefinition_UNKNOWN
+	}
 }
 
 func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, integration core.Integration, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {

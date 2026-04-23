@@ -67,6 +67,7 @@ import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
+import { getIntegrationV2SetupPath, isIntegrationV2SetupEnabled } from "@/lib/integrationV2";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -2621,7 +2622,9 @@ export function WorkflowPageV2() {
 
   const integrationDialogPendingInstance = useMemo(() => {
     if (!integrationDialogName) return undefined;
-    return integrations.find((i) => i.spec?.integrationName === integrationDialogName && i.status?.state !== "ready");
+    return integrations.find(
+      (i) => i.metadata?.integrationName === integrationDialogName && i.status?.state !== "ready",
+    );
   }, [integrationDialogName, integrations]);
 
   const initialWebhookSetup = useMemo(() => {
@@ -2652,7 +2655,7 @@ export function WorkflowPageV2() {
       if (!integrationName) continue;
 
       const hasReadyInstance = integrations.some(
-        (i) => i.spec?.integrationName === integrationName && i.status?.state === "ready",
+        (i) => i.metadata?.integrationName === integrationName && i.status?.state === "ready",
       );
       if (hasReadyInstance) continue;
 
@@ -2661,7 +2664,7 @@ export function WorkflowPageV2() {
         existing.count++;
       } else {
         const nonReadyInstance = integrations.find(
-          (i) => i.spec?.integrationName === integrationName && i.status?.state !== "ready",
+          (i) => i.metadata?.integrationName === integrationName && i.status?.state !== "ready",
         );
         const rawState = nonReadyInstance?.status?.state;
         missingMap.set(integrationName, {
@@ -2683,9 +2686,17 @@ export function WorkflowPageV2() {
     }));
   }, [canvas?.spec?.nodes, availableIntegrations, integrations, canReadIntegrations, justConnectedIntegrations]);
 
-  const handleConnectIntegration = useCallback((integrationName: string) => {
-    setIntegrationDialogName(integrationName);
-  }, []);
+  const handleConnectIntegration = useCallback(
+    (integrationName: string) => {
+      if (organizationId && isIntegrationV2SetupEnabled(integrationName)) {
+        navigate(getIntegrationV2SetupPath(organizationId, integrationName));
+        return;
+      }
+
+      setIntegrationDialogName(integrationName);
+    },
+    [navigate, organizationId],
+  );
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {

@@ -51,9 +51,8 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		_, _ = fmt.Fprintln(writer, "ID\tNAME\tINTEGRATION\tLABEL\tDESCRIPTION\tSTATE")
 		for _, integration := range connected {
 			metadata := integration.GetMetadata()
-			spec := integration.GetSpec()
 			status := integration.GetStatus()
-			integrationName := spec.GetIntegrationName()
+			integrationName := metadata.GetIntegrationName()
 			definition, found := integrationsByName[integrationName]
 
 			label := ""
