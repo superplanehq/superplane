@@ -338,8 +338,19 @@ func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid
 func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
 
-	err := queryCanvasWithLiveVersion(tx).
+	err := tx.
 		Unscoped().
+		Model(&Canvas{}).
+		Select(
+			"workflows.id",
+			"workflows.organization_id",
+			"workflows.live_version_id",
+			"workflows.is_template",
+			"workflows.created_by",
+			"workflows.created_at",
+			"workflows.updated_at",
+			"workflows.deleted_at",
+		).
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("workflows.id = ?", id).
 		Where("workflows.deleted_at IS NOT NULL").
@@ -348,6 +359,18 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	if canvas.LiveVersionID != nil {
+		liveVersion, err := FindCanvasVersionInTransaction(tx, canvas.ID, *canvas.LiveVersionID)
+		if err != nil {
+			return nil, err
+		}
+
+		canvas.Name = liveVersion.Name
+		canvas.Description = liveVersion.Description
+		canvas.ChangeManagementEnabled = liveVersion.ChangeManagementEnabled
+		canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(liveVersion.EffectiveChangeRequestApprovers())
 	}
 
 	return &canvas, nil

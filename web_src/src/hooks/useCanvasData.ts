@@ -39,7 +39,7 @@ import type {
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { analytics } from "../lib/analytics";
-import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
+import { isDraftVersion, isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
 
 // Query Keys
 export const canvasKeys = {
@@ -184,16 +184,20 @@ function mergeCanvasUpdate(
   };
 }
 
-async function findOrCreateDraftVersionId(canvasId: string): Promise<string> {
+async function findDraftVersionId(canvasId: string): Promise<string> {
   const versionsResponse = await canvasesListCanvasVersions(
     withOrganizationHeader({
       path: { canvasId },
     }),
   );
-  const existingDraftVersionId =
-    versionsResponse.data?.versions?.find((version) => !isPublishedVersion(version))?.metadata?.id || "";
+
+  return versionsResponse.data?.versions?.find(isDraftVersion)?.metadata?.id || "";
+}
+
+async function createDraftVersionId(canvasId: string): Promise<string> {
+  const existingDraftVersionId = await findDraftVersionId(canvasId);
   if (existingDraftVersionId) {
-    return existingDraftVersionId;
+    throw new Error("this canvas already has a draft; update it in the editor instead");
   }
 
   const createVersionResponse = await canvasesCreateCanvasVersion(
@@ -543,7 +547,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
       }
 
       const mergedCanvas = mergeCanvasUpdate(currentCanvas, data);
-      const targetVersionId = await findOrCreateDraftVersionId(canvasId);
+      const targetVersionId = await createDraftVersionId(canvasId);
 
       if (!targetVersionId) {
         throw new Error("Draft version was not returned by the API");
@@ -559,9 +563,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
         }),
       );
 
-      if (!(currentCanvas.spec?.changeManagement?.enabled ?? false)) {
-        await publishCanvasVersion(canvasId, targetVersionId);
-      }
+      await publishCanvasVersion(canvasId, targetVersionId);
 
       return updateResponse;
     },

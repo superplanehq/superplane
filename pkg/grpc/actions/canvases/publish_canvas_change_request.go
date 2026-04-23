@@ -98,6 +98,14 @@ func PublishCanvasChangeRequest(
 			return err
 		}
 
+		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
+		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
+			return status.Error(codes.AlreadyExists, "Canvas with the same name already exists")
+		}
+		if nameErr != nil {
+			return nameErr
+		}
+
 		if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvasForUpdate, version, request); err != nil {
 			return err
 		}
