@@ -176,11 +176,7 @@ func NewServer(
 		registry:              registry,
 		authService:           authorizationService,
 		upgrader: &websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				// Allow all connections - you may want to restrict this in production
-				// TODO: implement origin checking
-				return true
-			},
+			CheckOrigin:     makeOriginChecker(getAllowedOrigins()),
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
@@ -1304,4 +1300,48 @@ func getBaseURL() string {
 		baseURL = fmt.Sprintf("http://localhost:%s", port)
 	}
 	return baseURL
+}
+
+// getAllowedOrigins returns the list of origins permitted to establish
+// WebSocket connections. It reads a comma-separated list from
+// ALLOWED_WS_ORIGINS and falls back to BASE_URL for single-tenant
+// deployments.
+func getAllowedOrigins() []string {
+	if raw := os.Getenv("ALLOWED_WS_ORIGINS"); raw != "" {
+		parts := strings.Split(raw, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	}
+	return []string{getBaseURL()}
+}
+
+// makeOriginChecker returns a CheckOrigin function that validates the
+// WebSocket handshake Origin header against the allowed list per RFC 6454.
+// Requests without an Origin header (non-browser clients such as CLI or
+// server-to-server) are permitted, since those rely on Authorization-header
+// auth which is not susceptible to cross-site WebSocket hijacking.
+func makeOriginChecker(allowed []string) func(*http.Request) bool {
+	set := make(map[string]struct{}, len(allowed))
+	for _, o := range allowed {
+		if u, err := url.Parse(strings.TrimRight(o, "/")); err == nil && u.Host != "" {
+			set[strings.ToLower(u.Scheme+"://"+u.Host)] = struct{}{}
+		}
+	}
+	return func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		u, err := url.Parse(origin)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return false
+		}
+		_, ok := set[strings.ToLower(u.Scheme+"://"+u.Host)]
+		return ok
+	}
 }
