@@ -38,7 +38,6 @@ func (d *DeclareDrill) Documentation() string {
 - **Labels**: Optional drill labels
 - **Status**: Start the drill as active or resolved
 - **Start Time**: Optional time when the drill began
-- **Channel Prefix**: Optional Slack channel prefix for the drill room
 
 ## Output
 
