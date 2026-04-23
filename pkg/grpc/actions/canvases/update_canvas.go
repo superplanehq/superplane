@@ -3,12 +3,12 @@ package canvases
 import (
 	"context"
 	"errors"
-	"log"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -53,7 +53,7 @@ func UpdateCanvas(
 	}
 
 	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); publishErr != nil {
-		log.Printf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
 	}
 
 	refreshedCanvas, err := models.FindCanvas(organizationUUID, canvasID)

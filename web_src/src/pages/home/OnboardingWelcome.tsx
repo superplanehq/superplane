@@ -8,34 +8,19 @@ import {
   canvasesPublishCanvasVersion,
   canvasesUpdateCanvasVersion,
 } from "@/api-client/sdk.gen";
-import type { CanvasesCanvas } from "@/api-client/types.gen";
+import type { CanvasesCanvas, SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client/types.gen";
 import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
 import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
 import { Heading } from "@/components/Heading/heading";
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { Badge } from "@/components/ui/badge";
 import { useAccount } from "@/contexts/AccountContext";
 import { canvasKeys, useCanvasTemplates } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { QuickStartUiPanel } from "@/pages/home/QuickStartUiPanel";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  ChevronRight,
-  Clock,
-  Database,
-  Globe,
-  LayoutTemplate,
-  Loader2,
-  Mail,
-  Monitor,
-  Plug,
-  Plus,
-  Sparkles,
-  Terminal,
-  Timer,
-} from "lucide-react";
+import { Monitor, Sparkles, Terminal } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -68,8 +53,8 @@ async function publishCanvasGraphUpdate(params: {
   canvasId: string;
   name: string;
   description: string;
-  nodes: any[];
-  edges: any[];
+  nodes: SuperplaneComponentsNode[];
+  edges: SuperplaneComponentsEdge[];
 }) {
   const createVersionResponse = await canvasesCreateCanvasVersion(
     withOrganizationHeader({
@@ -131,33 +116,6 @@ const PERSONAS = [
   },
 ];
 
-const FLOW_STEPS = [
-  {
-    icon: Clock,
-    label: "Schedule",
-    bg: "bg-indigo-100 dark:bg-indigo-900/50",
-    iconColor: "text-indigo-600 dark:text-indigo-400",
-  },
-  {
-    icon: Globe,
-    label: "HTTP Check",
-    bg: "bg-sky-100 dark:bg-sky-900/50",
-    iconColor: "text-sky-600 dark:text-sky-400",
-  },
-  {
-    icon: Database,
-    label: "Memory Check",
-    bg: "bg-violet-100 dark:bg-violet-900/50",
-    iconColor: "text-violet-600 dark:text-violet-400",
-  },
-  {
-    icon: Mail,
-    label: "Email Alert",
-    bg: "bg-amber-100 dark:bg-amber-900/50",
-    iconColor: "text-amber-600 dark:text-amber-400",
-  },
-];
-
 interface OnboardingWelcomeProps {
   organizationId: string;
   canCreateCanvases: boolean;
@@ -191,7 +149,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
 
     setIsLaunchingQuickStart(true);
     try {
-      const nodes = (template.spec?.nodes || []).map((node: any) => {
+      const nodes = (template.spec?.nodes || []).map((node) => {
         if (node.component?.name === "sendEmail" && me?.id) {
           return {
             ...node,
@@ -212,7 +170,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         }
         return node;
       });
-      const nodesWithServer2Url = nodes.map((node: any) =>
+      const nodesWithServer2Url = nodes.map((node) =>
         node.component?.name === "http"
           ? {
               ...node,
@@ -248,8 +206,8 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         edges,
       });
 
-      const triggerNode = nodes.find((n: any) => n.trigger?.name === "schedule");
-      const httpNode = nodes.find((n: any) => n.component?.name === "http");
+      const triggerNode = nodes.find((node) => node.trigger?.name === "schedule");
+      const httpNode = nodes.find((node) => node.component?.name === "http");
       let emittedEventId: string | undefined;
 
       if (triggerNode) {
@@ -422,141 +380,18 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
           })}
         </div>
 
-        {/* Content area with crossfade */}
         <div key={mode} className="min-h-[520px] animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
           {mode === "ui" && (
-            <>
-              {/* Quick Start hero card */}
-              <PermissionTooltip allowed={permissionAllowed} message="You don't have permission to create canvases.">
-                <button
-                  type="button"
-                  disabled={!canCreateCanvases || isLaunchingQuickStart || templatesLoading}
-                  onClick={handleQuickStart}
-                  className="group w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 mb-5 hover:shadow-lg hover:outline-primary/30 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Heading level={3} className="!text-[15px]">
-                          Health Check Monitor
-                        </Heading>
-                        <Badge variant="secondary" className="text-[10px] font-medium">
-                          Quick Start
-                        </Badge>
-                      </div>
-                      <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                        Pings your endpoint every ten minutes and alerts only on healthy-to-failing transitions,
-                        including approximately how long it stayed healthy.
-                      </p>
-                    </div>
-                    {isLaunchingQuickStart || templatesLoading ? (
-                      <Loader2 size={18} className="mt-0.5 text-gray-400 shrink-0 animate-spin" />
-                    ) : (
-                      <ArrowRight
-                        size={18}
-                        className="mt-0.5 text-gray-300 dark:text-gray-600 shrink-0 group-hover:text-primary group-hover:translate-x-0.5 transition-all"
-                      />
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 mb-3">
-                    {FLOW_STEPS.map((step, i) => (
-                      <div key={step.label} className="flex items-center gap-1.5">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full ${step.bg} px-2.5 py-1`}>
-                          <step.icon size={12} className={step.iconColor} />
-                          <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">{step.label}</span>
-                        </span>
-                        {i < FLOW_STEPS.length - 1 && (
-                          <ChevronRight size={12} className="text-gray-400 dark:text-gray-500 shrink-0" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
-                        <Timer size={12} />1 min setup
-                      </span>
-                      <span className="text-gray-300 dark:text-gray-600">|</span>
-                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
-                        <Plug size={12} />
-                        No integrations
-                      </span>
-                    </div>
-                    {isLaunchingQuickStart || templatesLoading ? (
-                      <span className="text-[11px] text-gray-400">
-                        {templatesLoading ? "Loading template..." : "Setting up..."}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-primary group-hover:underline">Get started</span>
-                    )}
-                  </div>
-                </button>
-              </PermissionTooltip>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 mb-5">
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                <span className="text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">
-                  or pick your own path
-                </span>
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-              </div>
-
-              {/* Secondary cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <PermissionTooltip allowed={permissionAllowed} message="You don't have permission to create canvases.">
-                  <button
-                    type="button"
-                    disabled={!canCreateCanvases}
-                    onClick={() => navigate(`/${organizationId}/templates`)}
-                    className="w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-2">
-                        <LayoutTemplate size={18} className="text-gray-600 dark:text-gray-300" />
-                      </div>
-                      <div>
-                        <Heading level={3} className="!text-sm mb-1">
-                          Browse Templates
-                        </Heading>
-                        <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                          Incident routing, CI/CD, rollbacks, and more. Ready to go.
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                </PermissionTooltip>
-
-                <PermissionTooltip allowed={permissionAllowed} message="You don't have permission to create canvases.">
-                  <button
-                    type="button"
-                    disabled={!canCreateCanvases || isCreatingBlankCanvas}
-                    onClick={handleCreateBlankCanvas}
-                    className="w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-2">
-                        {isCreatingBlankCanvas ? (
-                          <Loader2 size={18} className="text-gray-600 dark:text-gray-300 animate-spin" />
-                        ) : (
-                          <Plus size={18} className="text-gray-600 dark:text-gray-300" />
-                        )}
-                      </div>
-                      <div>
-                        <Heading level={3} className="!text-sm mb-1">
-                          Blank Canvas
-                        </Heading>
-                        <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                          Start from scratch. You know what you&rsquo;re doing.
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                </PermissionTooltip>
-              </div>
-            </>
+            <QuickStartUiPanel
+              canCreateCanvases={canCreateCanvases}
+              permissionAllowed={permissionAllowed}
+              templatesLoading={templatesLoading}
+              isLaunchingQuickStart={isLaunchingQuickStart}
+              isCreatingBlankCanvas={isCreatingBlankCanvas}
+              onQuickStart={handleQuickStart}
+              onBrowseTemplates={() => navigate(`/${organizationId}/templates`)}
+              onCreateBlankCanvas={handleCreateBlankCanvas}
+            />
           )}
 
           {mode === "cli" && <CLIPanel organizationId={organizationId} />}
