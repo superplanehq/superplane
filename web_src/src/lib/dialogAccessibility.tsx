@@ -12,9 +12,9 @@ function getReactDisplayName(childType: unknown): string | undefined {
   return undefined;
 }
 
-export function hasDialogTitle(children: React.ReactNode, titleComponents: readonly unknown[]): boolean {
-  const titleDisplayNames = new Set(
-    titleComponents.map(getReactDisplayName).filter((value): value is string => !!value),
+export function hasDialogChildOfType(children: React.ReactNode, matchingComponents: readonly unknown[]): boolean {
+  const matchingDisplayNames = new Set(
+    matchingComponents.map(getReactDisplayName).filter((value): value is string => !!value),
   );
 
   return React.Children.toArray(children).some((child) => {
@@ -25,10 +25,10 @@ export function hasDialogTitle(children: React.ReactNode, titleComponents: reado
     const childType = child.type;
     const displayName = getReactDisplayName(childType);
 
-    if (titleComponents.includes(childType) || (!!displayName && titleDisplayNames.has(displayName))) {
+    if (matchingComponents.includes(childType) || (!!displayName && matchingDisplayNames.has(displayName))) {
       return true;
     }
 
-    return hasDialogTitle(child.props.children, titleComponents);
+    return hasDialogChildOfType(child.props.children, matchingComponents);
   });
 }
