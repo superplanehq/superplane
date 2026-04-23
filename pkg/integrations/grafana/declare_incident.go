@@ -37,7 +37,6 @@ func (d *DeclareIncident) Documentation() string {
 - **Labels**: Optional incident labels
 - **Status**: Start the incident as active or resolved
 - **Start Time**: Optional time when the incident began
-- **Channel Prefix**: Optional Slack channel prefix for the incident room
 
 ## Output
 
