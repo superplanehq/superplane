@@ -65,3 +65,15 @@ export function formatDuration(durationMs: number): string {
 
   return formatDurationFallback(duration);
 }
+
+//
+// Formats a duration to second-level granularity (drops milliseconds) for
+// places where millisecond precision is just noise, e.g. human-facing run
+// timings in Run View. Anything under 1s reads as "<1s" rather than "0ms".
+//
+export function formatDurationSeconds(durationMs: number): string {
+  const clamped = Math.max(0, durationMs);
+  if (clamped < 1000) return "<1s";
+  const rounded = Math.floor(clamped / 1000) * 1000;
+  return formatDuration(rounded);
+}

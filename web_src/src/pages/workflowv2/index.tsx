@@ -5631,7 +5631,6 @@ export function WorkflowPageV2() {
                     componentIconMap={componentIconMap}
                     viewMode={runViewMode}
                     onChangeViewMode={setRunViewMode}
-                    onClose={() => handleSelectRun(null)}
                   />
                   <div className="min-h-0 flex-1">
                     {runViewMode === "summary" ? (

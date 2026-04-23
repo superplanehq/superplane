@@ -8,7 +8,7 @@ import type {
   SuperplaneMeUser,
 } from "@/api-client";
 import type { ApprovalActionName, ApprovalActionParams } from "@/pages/workflowv2/useApprovalActionHandler";
-import { formatDuration } from "@/lib/duration";
+import { formatDurationSeconds } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import {
   getStatusBadgeProps,
@@ -159,7 +159,7 @@ function isRunningState(state: EventState): boolean {
 
 function formatMs(ms: number): string {
   if (ms <= 0) return "0s";
-  return formatDuration(ms);
+  return formatDurationSeconds(ms);
 }
 
 function execDurationMs(exec: { createdAt?: string; updatedAt?: string; state?: string }): number {

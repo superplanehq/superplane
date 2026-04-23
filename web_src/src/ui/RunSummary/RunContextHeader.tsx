@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Clock, X } from "lucide-react";
+import { Clock } from "lucide-react";
 import type {
   CanvasesCanvasNodeExecutionRef,
   CanvasesDescribeRunResponse,
@@ -7,7 +7,7 @@ import type {
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDuration } from "@/lib/duration";
+import { formatDurationSeconds } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getAggregateStatus, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
@@ -21,7 +21,6 @@ interface RunContextHeaderProps {
   componentIconMap?: Record<string, string>;
   viewMode: RunViewMode;
   onChangeViewMode: (mode: RunViewMode) => void;
-  onClose?: () => void;
 }
 
 type HeaderStatus = "success" | "error" | "running" | "queued" | "cancelled";
@@ -139,7 +138,6 @@ export function RunContextHeader({
   componentIconMap,
   viewMode,
   onChangeViewMode,
-  onClose,
 }: RunContextHeaderProps) {
   const nodeMap = useMemo(() => {
     const m = new Map<string, ComponentsNode>();
@@ -168,7 +166,7 @@ export function RunContextHeader({
   const shortId = rootEvent?.id ? rootEvent.id.slice(0, 8) : "";
 
   const durationMs = runData ? computeRunDurationMs(runData) : null;
-  const durationLabel = durationMs != null ? formatDuration(durationMs) : null;
+  const durationLabel = durationMs != null ? formatDurationSeconds(durationMs) : null;
 
   // customName surfaces user-labeled events (e.g. re-run markers); keep as a subtle pill
   const customName = rootEvent?.customName;
@@ -176,7 +174,7 @@ export function RunContextHeader({
   const showSkeleton = isLoading && !runData;
 
   return (
-    <div className="pointer-events-auto relative z-20 flex h-11 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3">
+    <div className="pointer-events-auto relative z-20 flex h-10 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3">
       {showSkeleton ? (
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="h-2 w-2 animate-pulse rounded-full bg-slate-300" />
@@ -223,17 +221,6 @@ export function RunContextHeader({
           </span>
         ) : null}
         <ViewTabs value={viewMode} onChange={onChangeViewMode} />
-        {onClose ? (
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-            aria-label="Close run details"
-            title="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        ) : null}
       </div>
     </div>
   );

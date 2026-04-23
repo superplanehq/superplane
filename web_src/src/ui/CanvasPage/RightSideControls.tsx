@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { Code2, Database, FileText, Plus, StickyNote } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -12,11 +13,22 @@ export type RightSideControlsProps = {
   onMemoryOpen: () => void;
   onReadmeOpen?: () => void;
   memoryItemCount?: number;
+  /**
+   * When true, the controls are pushed down to sit below an overlay header
+   * (e.g. the Run View context header). Without this they would be hidden
+   * behind the header bar in runs mode.
+   */
+  belowOverlayHeader?: boolean;
 };
 
 export function RightSideControls(props: RightSideControlsProps) {
   return (
-    <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
+    <div
+      className={cn(
+        "absolute right-4 z-10 flex flex-col gap-1.5",
+        props.belowOverlayHeader ? "top-14" : "top-4",
+      )}
+    >
       {props.mode === "live" ? <LiveCanvasButtons {...props} /> : <EditCanvasButtons {...props} />}
     </div>
   );

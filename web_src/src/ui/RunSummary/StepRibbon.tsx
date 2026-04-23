@@ -1,7 +1,7 @@
 import React from "react";
 
 import { cn, resolveIcon } from "@/lib/utils";
-import { formatDuration } from "@/lib/duration";
+import { formatDurationSeconds } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 import { TimeAgo } from "@/components/TimeAgo";
@@ -56,7 +56,7 @@ function barColorClass(step: RibbonStep): string {
 
 function formatMs(ms: number): string {
   if (ms <= 0) return "0s";
-  return formatDuration(ms);
+  return formatDurationSeconds(ms);
 }
 
 function buildCaption(steps: RibbonStep[], totalDurationMs: number): string {
@@ -78,7 +78,7 @@ function buildCaption(steps: RibbonStep[], totalDurationMs: number): string {
     else if (state === "cancelled") buckets.cancelled += 1;
   }
 
-  const durationPart = totalDurationMs > 0 ? formatDuration(totalDurationMs) : null;
+  const durationPart = totalDurationMs > 0 ? formatDurationSeconds(totalDurationMs) : null;
 
   if (buckets.running > 0) {
     const base = `${buckets.running} of ${execSteps.length} running`;

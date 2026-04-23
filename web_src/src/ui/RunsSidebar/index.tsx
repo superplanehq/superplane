@@ -8,7 +8,7 @@ import { getAggregateRunStatus, getStatusBadgeProps, resolveNodeIconSlug } from 
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
-import { formatDuration } from "@/lib/duration";
+import { formatDurationSeconds } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import { Filter, Link as LinkIcon, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -90,7 +90,7 @@ function computeRunDuration(event: CanvasesCanvasEventWithExecutions): string | 
     }
   }
   if (latestEndMs <= startMs) return null;
-  return formatDuration(latestEndMs - startMs);
+  return formatDurationSeconds(latestEndMs - startMs);
 }
 
 type TriggerOption = {

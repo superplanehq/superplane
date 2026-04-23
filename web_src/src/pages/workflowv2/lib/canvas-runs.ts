@@ -5,7 +5,7 @@ import type {
   CanvasesCanvasNodeQueueItem,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
-import { formatDuration } from "@/lib/duration";
+import { formatDurationSeconds } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "../mappers";
 import { buildEventInfo, buildExecutionInfo } from "../utils";
@@ -64,7 +64,7 @@ export function computeDuration(execution: CanvasesCanvasNodeExecutionRef): stri
     return null;
   }
   const ms = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
-  return formatDuration(ms);
+  return formatDurationSeconds(ms);
 }
 
 export function resolveExecutionDisplayStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]): string {

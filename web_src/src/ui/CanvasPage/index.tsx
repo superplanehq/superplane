@@ -1162,6 +1162,7 @@ function CanvasPage(props: CanvasPageProps) {
           onMemoryOpen={props.onMemoryOpen}
           onReadmeOpen={props.onReadmeOpen}
           onYamlOpen={props.onYamlOpen}
+          belowOverlayHeader={props.headerMode === "runs" && !!props.runViewOverlay}
         />
 
         {props.hideAddControls || !isBuildingBlocksSidebarOpen || props.headerMode === "runs" ? null : (
