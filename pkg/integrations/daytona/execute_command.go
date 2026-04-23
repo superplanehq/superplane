@@ -70,6 +70,22 @@ func (e *ExecuteCommand) Documentation() string {
 - **Environment Variables**: Optional key-value pairs exported before command execution
 - **Timeout**: Optional execution timeout in seconds
 
+## Common Patterns
+
+When **Execute Command** runs immediately after **Create Sandbox**, set **Sandbox** to:
+
+` + "```text" + `
+{{ previous().data.id }}
+` + "```" + `
+
+If you want to run a second or third command in the same sandbox, keep referencing the original create node by name:
+
+` + "```text" + `
+{{ $["Create Sandbox"].data.id }}
+` + "```" + `
+
+This is more reliable than ` + "`" + `previous()` + "`" + ` once the previous node is another **Execute Command** node.
+
 ## Output
 
 Routes to one of two channels:
