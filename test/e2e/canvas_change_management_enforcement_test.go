@@ -11,6 +11,7 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestCanvasChangeManagementEnforcement(t *testing.T) {
@@ -31,7 +32,7 @@ func TestCanvasChangeManagementEnforcement(t *testing.T) {
 		steps.assertCanvasChangeManagementInDB(false)
 	})
 
-	t.Run("organization change management disabled allows per-canvas on and off", func(t *testing.T) {
+	t.Run("organization change management disabled allows enabling per-canvas and blocks direct live edits once enabled", func(t *testing.T) {
 		steps := &canvasChangeManagementEnforcementSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("E2E Canvas Change Mgmt Org Off")
@@ -51,8 +52,8 @@ func TestCanvasChangeManagementEnforcement(t *testing.T) {
 		steps.visitCanvasSettings()
 		steps.assertCanvasChangeManagementToggleEnabled()
 		steps.setCanvasChangeManagementToggle(false)
-		steps.saveCanvasSettings()
-		steps.assertCanvasChangeManagementInDB(false)
+		steps.saveCanvasSettingsExpectError("change management is enabled for this canvas")
+		steps.assertCanvasChangeManagementInDB(true)
 	})
 }
 
@@ -83,12 +84,7 @@ func (s *canvasChangeManagementEnforcementSteps) setOrganizationChangeManagement
 }
 
 func (s *canvasChangeManagementEnforcementSteps) setCanvasChangeManagementInDB(enabled bool) {
-	err := database.Conn().
-		Model(&models.Canvas{}).
-		Where("id = ?", s.canvas.WorkflowID).
-		Update("change_management_enabled", enabled).
-		Error
-	require.NoError(s.t, err)
+	support.SetCanvasChangeManagementEnabled(s.t, s.canvas.WorkflowID, enabled)
 }
 
 func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
@@ -105,6 +101,12 @@ func (s *canvasChangeManagementEnforcementSteps) saveCanvasSettings() {
 	s.session.Click(q.TestID("canvas-settings-save-changes"))
 	canvasPath := "/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String()
 	s.session.WaitForBrowserPath(canvasPath)
+}
+
+func (s *canvasChangeManagementEnforcementSteps) saveCanvasSettingsExpectError(message string) {
+	s.session.Click(q.TestID("canvas-settings-save-changes"))
+	s.session.AssertURLContains("/settings")
+	s.session.AssertText(message)
 }
 
 func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementToggleDisabled() {

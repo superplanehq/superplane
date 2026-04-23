@@ -111,6 +111,14 @@ func publishDraftVersionInTransaction(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
+		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
+		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
+			return status.Error(codes.AlreadyExists, "Canvas with the same name already exists")
+		}
+		if nameErr != nil {
+			return nameErr
+		}
+
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
 		if err != nil {
 			return err
