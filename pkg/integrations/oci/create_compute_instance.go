@@ -20,6 +20,7 @@ const (
 	instanceStateTerminating   = "TERMINATING"
 	createInstancePollInterval = 10 * time.Second
 	maxPollErrors              = 10
+	maxPollAttempts            = 180 // 30 minutes at 10s interval
 )
 
 type CreateComputeInstance struct{}
@@ -48,6 +49,7 @@ type CreateInstanceExecutionMetadata struct {
 	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
 	BlockVolumeID string `json:"blockVolumeId" mapstructure:"blockVolumeId"`
 	PollErrors    int    `json:"pollErrors" mapstructure:"pollErrors"`
+	PollAttempts  int    `json:"pollAttempts" mapstructure:"pollAttempts"`
 }
 
 func (c *CreateComputeInstance) Name() string {
@@ -506,6 +508,7 @@ func (c *CreateComputeInstance) poll(ctx core.ActionContext) error {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)
 	}
 	metadata.PollErrors = 0
+	metadata.PollAttempts++
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
@@ -516,6 +519,9 @@ func (c *CreateComputeInstance) poll(ctx core.ActionContext) error {
 	case instanceStateTerminated, instanceStateTerminating:
 		return fmt.Errorf("instance %s entered state %s unexpectedly", instance.ID, instance.LifecycleState)
 	default:
+		if metadata.PollAttempts >= maxPollAttempts {
+			return fmt.Errorf("timed out waiting for instance %s to reach RUNNING after %d poll attempts (state: %s)", instance.ID, metadata.PollAttempts, instance.LifecycleState)
+		}
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)
 	}
 }
