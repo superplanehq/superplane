@@ -178,11 +178,11 @@ func UpdateCanvasVersionWithUsage(
 			return status.Error(codes.InvalidArgument, "canvas name is required")
 		}
 
-		existingCanvas, findErr := models.FindCanvasByNameInTransaction(tx, nextName, organizationUUID)
-		if findErr == nil && existingCanvas.ID != canvasUUID {
+		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, nextName)
+		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
 			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
 		}
-		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		if findErr != nil {
 			return findErr
 		}
 

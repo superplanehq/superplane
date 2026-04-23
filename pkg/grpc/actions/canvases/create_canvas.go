@@ -124,11 +124,11 @@ func CreateCanvas(
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		existingCanvas, findErr := models.FindCanvasByNameInTransaction(tx, pbCanvas.Metadata.Name, organizationID)
-		if findErr == nil && existingCanvas.ID != canvasID {
+		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationID, canvasID, pbCanvas.Metadata.Name)
+		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
 			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
 		}
-		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		if findErr != nil {
 			return findErr
 		}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -151,6 +152,38 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
 		require.NoError(t, err)
 		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
+	})
+
+	t.Run("draft version with duplicate name -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		existingCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasVersion{}).
+			Where("id = ?", *existingCanvas.LiveVersionID).
+			Update("name", "publish-duplicate-live").
+			Error)
+
+		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		draftVersionID := createVersionResponse.Version.Metadata.Id
+
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasVersion{}).
+			Where("id = ?", uuid.MustParse(draftVersionID)).
+			Update("name", "publish-duplicate-live").
+			Error)
+
+		_, err = PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.AlreadyExists, s.Code())
 	})
 
 }

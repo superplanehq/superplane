@@ -418,6 +418,18 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 	return workflow, createdNodes
 }
 
+func SetCanvasChangeManagementEnabled(t require.TestingT, canvasID uuid.UUID, enabled bool) {
+	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+	require.NoError(t, err)
+	require.NotNil(t, canvas.LiveVersionID)
+
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasVersion{}).
+		Where("id = ?", *canvas.LiveVersionID).
+		Update("change_management_enabled", enabled).
+		Error)
+}
+
 func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
 	now := time.Now()
 

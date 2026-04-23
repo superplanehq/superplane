@@ -404,6 +404,8 @@ export const useCreateCanvas = (organizationId: string) => {
 
 export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
+  const changeManagementEnabledError =
+    "change management is enabled for this canvas; update the draft in the editor and publish it through a change request";
 
   return useMutation({
     mutationFn: async (data: {
@@ -424,11 +426,17 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
         throw new Error("Canvas not found");
       }
 
-      const nextApprovals: ChangeManagementApprover[] | undefined = data.changeManagement?.approvals?.map((approval) => ({
-        type: approval.type as ChangeManagementApproverType | undefined,
-        userId: approval.userId,
-        roleName: approval.roleName,
-      }));
+      if (currentCanvas.spec?.changeManagement?.enabled ?? false) {
+        throw new Error(changeManagementEnabledError);
+      }
+
+      const nextApprovals: ChangeManagementApprover[] | undefined = data.changeManagement?.approvals?.map(
+        (approval) => ({
+          type: approval.type as ChangeManagementApproverType | undefined,
+          userId: approval.userId,
+          roleName: approval.roleName,
+        }),
+      );
 
       const mergedCanvas: CanvasesCanvas = {
         ...currentCanvas,

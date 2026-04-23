@@ -1,11 +1,14 @@
 package canvases
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func validateCanvasChangeRequestApprovers(
@@ -53,6 +56,32 @@ func validateCanvasChangeRequestApprovers(
 		if roleErr != nil {
 			return fmt.Errorf("approver role %s was not found in this organization", roleName)
 		}
+	}
+
+	return nil
+}
+
+func ensureCanvasNameAvailableInTransaction(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	canvasID uuid.UUID,
+	name string,
+) error {
+	if err := tx.
+		Model(&models.Organization{}).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", organizationID).
+		First(&models.Organization{}).
+		Error; err != nil {
+		return err
+	}
+
+	existingCanvas, err := models.FindCanvasByNameInTransaction(tx, name, organizationID)
+	if err == nil && existingCanvas.ID != canvasID {
+		return models.ErrCanvasNameAlreadyExists
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 
 	return nil

@@ -231,46 +231,6 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	return tx.Save(canvas).Error
 }
 
-func CreatePublishedCanvasVersionInTransaction(
-	tx *gorm.DB,
-	workflowID uuid.UUID,
-	ownerID *uuid.UUID,
-	nodes []Node,
-	edges []Edge,
-) (*CanvasVersion, error) {
-	canvas, err := lockCanvasForVersioningInTransaction(tx, workflowID)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	version := CanvasVersion{
-		ID:                     uuid.New(),
-		WorkflowID:             workflowID,
-		OwnerID:                ownerID,
-		State:                  CanvasVersionStatePublished,
-		PublishedAt:            &now,
-		Nodes:                  datatypes.NewJSONSlice(nodes),
-		Edges:                  datatypes.NewJSONSlice(edges),
-		CreatedAt:              &now,
-		UpdatedAt:              &now,
-		ChangeRequestApprovers: datatypes.NewJSONSlice(DefaultCanvasChangeRequestApprovers()),
-	}
-
-	if err := tx.Create(&version).Error; err != nil {
-		return nil, err
-	}
-
-	canvas.LiveVersionID = &version.ID
-	canvas.UpdatedAt = &now
-
-	if err := tx.Save(canvas).Error; err != nil {
-		return nil, err
-	}
-
-	return &version, nil
-}
-
 func SaveCanvasDraftInTransaction(
 	tx *gorm.DB,
 	workflowID uuid.UUID,

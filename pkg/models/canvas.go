@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+var ErrCanvasNameAlreadyExists = errors.New("canvas name already exists")
 
 type Canvas struct {
 	ID                      uuid.UUID
