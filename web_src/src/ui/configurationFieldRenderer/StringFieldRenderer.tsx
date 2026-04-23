@@ -10,6 +10,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   onChange,
   autocompleteExampleObj,
   allowExpressions = false,
+  excludedSuggestions,
 }) => {
   const hasInitialized = useRef(false);
   const shouldPreserveEmpty = field.togglable === true;
@@ -56,8 +57,6 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     );
   }
 
-  const isRunTitle = field.name === "customName";
-
   return (
     <AutoCompleteInput
       exampleObj={autocompleteExampleObj ?? null}
@@ -72,7 +71,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       quickTip="Tip: type `{{` to start an expression."
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}
-      excludedSuggestions={isRunTitle ? ["$", "previous"] : undefined}
+      excludedSuggestions={excludedSuggestions}
     />
   );
 };
