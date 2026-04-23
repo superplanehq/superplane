@@ -2,11 +2,13 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -110,4 +112,34 @@ func TestDownloadAndReplaceBinaryRejectsEmptyDownload(t *testing.T) {
 	contents, readErr := os.ReadFile(executablePath)
 	require.NoError(t, readErr)
 	require.Equal(t, "old-binary", string(contents))
+}
+
+func TestDownloadAndReplaceBinaryReadsStreamedBodyAfterHeaders(t *testing.T) {
+	tmpDir := t.TempDir()
+	executablePath := filepath.Join(tmpDir, "superplane")
+	require.NoError(t, os.WriteFile(executablePath, []byte("old-binary"), 0o755))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+
+		flusher, ok := w.(http.Flusher)
+		require.True(t, ok)
+
+		_, err := fmt.Fprint(w, "chunk-one-")
+		require.NoError(t, err)
+		flusher.Flush()
+
+		time.Sleep(50 * time.Millisecond)
+
+		_, err = fmt.Fprint(w, "chunk-two")
+		require.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+
+	err := downloadAndReplaceBinary(context.Background(), server.URL, executablePath)
+	require.NoError(t, err)
+
+	contents, readErr := os.ReadFile(executablePath)
+	require.NoError(t, readErr)
+	require.Equal(t, "chunk-one-chunk-two", string(contents))
 }

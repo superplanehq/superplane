@@ -191,6 +191,9 @@ func currentExecutableMode(executablePath string) (os.FileMode, error) {
 }
 
 func downloadBinaryToTempFile(ctx context.Context, downloadURL, tempDir string, fileMode os.FileMode) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, releaseDownloadTimeout)
+	defer cancel()
+
 	binaryBody, err := downloadBinary(ctx, downloadURL)
 	if err != nil {
 		return "", err
@@ -202,8 +205,6 @@ func downloadBinaryToTempFile(ctx context.Context, downloadURL, tempDir string, 
 
 func downloadBinary(ctx context.Context, downloadURL string) (io.ReadCloser, error) {
 	client := newReleaseDownloadClient()
-	ctx, cancel := context.WithTimeout(ctx, releaseDownloadTimeout)
-	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
