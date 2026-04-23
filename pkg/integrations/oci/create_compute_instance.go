@@ -489,7 +489,7 @@ func (c *CreateComputeInstance) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 	if metadata.InstanceID == "" {
-		return nil
+		return fmt.Errorf("poll metadata is missing instanceId: execution state may be corrupted")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -532,11 +532,15 @@ func (c *CreateComputeInstance) emitInstance(ctx core.ActionContext, client *Cli
 	payload := instanceToMap(instance)
 
 	attachments, err := client.ListVNICAttachments(metadata.CompartmentID, instance.ID)
-	if err == nil && len(attachments) > 0 {
+	if err != nil {
+		ctx.Logger.Warnf("failed to list VNIC attachments for instance %s: %v", instance.ID, err)
+	} else {
 		for _, att := range attachments {
 			if att.LifecycleState == "ATTACHED" && att.VNICID != "" {
 				vnic, err := client.GetVNIC(att.VNICID)
-				if err == nil {
+				if err != nil {
+					ctx.Logger.Warnf("failed to get VNIC %s for instance %s: %v", att.VNICID, instance.ID, err)
+				} else {
 					payload["publicIp"] = vnic.PublicIP
 					payload["privateIp"] = vnic.PrivateIP
 				}

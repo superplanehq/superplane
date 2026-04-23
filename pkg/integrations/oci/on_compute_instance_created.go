@@ -95,37 +95,16 @@ func (t *OnComputeInstanceCreated) ExampleData() map[string]any {
 }
 
 func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
-	var config OnComputeInstanceCreatedConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode trigger configuration: %w", err)
-	}
-
-	if config.CompartmentID == "" {
-		return fmt.Errorf("compartmentId is required")
-	}
-
-	// Read the shared topic OCID from the integration metadata set during Sync.
-	var integrationMetadata IntegrationMetadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-	if integrationMetadata.TopicID == "" {
-		return fmt.Errorf("integration topic not ready yet; ensure the OCI integration has been fully set up")
-	}
-
-	var metadata OnComputeInstanceCreatedMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode trigger metadata: %w", err)
+	config, integrationMetadata, metadata, err := decodeSetupInputs(ctx)
+	if err != nil {
+		return err
 	}
 
 	// If the Events rule already exists for this compartment, skip re-creation but
 	// still call RequestWebhook so the subscription is retried if it previously
 	// failed or was never provisioned.
 	if metadata.CompartmentID == config.CompartmentID && metadata.EventsRuleID != "" {
-		return ctx.Integration.RequestWebhook(WebhookConfiguration{
-			CompartmentID: config.CompartmentID,
-			TopicID:       integrationMetadata.TopicID,
-		})
+		return requestWebhook(ctx, config.CompartmentID, integrationMetadata.TopicID)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -133,47 +112,93 @@ func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	// Delete old Events rule if compartment changed.
-	if metadata.EventsRuleID != "" && metadata.CompartmentID != config.CompartmentID {
-		if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
-			ctx.Logger.Warnf("failed to delete old Events rule %q: %v", metadata.EventsRuleID, err)
-		}
+	if err := cleanupOldRule(ctx, client, metadata, config.CompartmentID); err != nil {
+		return err
 	}
 
-	condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
-
-	webhookURL, err := ctx.Webhook.Setup()
+	ruleID, err := ensureEventsRule(ctx, client, config.CompartmentID, integrationMetadata.TopicID)
 	if err != nil {
-		return fmt.Errorf("failed to set up webhook URL: %w", err)
-	}
-	parsedWebhookURL, err := url.Parse(webhookURL)
-	if err != nil {
-		return fmt.Errorf("failed to parse webhook URL: %w", err)
-	}
-	urlSegments := strings.Split(strings.TrimRight(parsedWebhookURL.Path, "/"), "/")
-	webhookID := urlSegments[len(urlSegments)-1]
-	ruleName := fmt.Sprintf("superplane-compute-instance-created-%s", webhookID)
-	rule, err := client.CreateEventsRule(
-		config.CompartmentID,
-		ruleName,
-		condition,
-		integrationMetadata.TopicID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create Events rule: %w", err)
+		return err
 	}
 
 	if err := ctx.Metadata.Set(OnComputeInstanceCreatedMetadata{
 		CompartmentID: config.CompartmentID,
-		EventsRuleID:  rule.ID,
+		EventsRuleID:  ruleID,
 	}); err != nil {
 		return fmt.Errorf("failed to persist trigger metadata: %w", err)
 	}
 
-	// Request a per-trigger HTTPS subscription to the shared topic.
+	return requestWebhook(ctx, config.CompartmentID, integrationMetadata.TopicID)
+}
+
+// decodeSetupInputs decodes and validates all inputs needed by Setup.
+func decodeSetupInputs(ctx core.TriggerContext) (OnComputeInstanceCreatedConfiguration, IntegrationMetadata, OnComputeInstanceCreatedMetadata, error) {
+	var config OnComputeInstanceCreatedConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("failed to decode trigger configuration: %w", err)
+	}
+	if config.CompartmentID == "" {
+		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("compartmentId is required")
+	}
+
+	var integrationMetadata IntegrationMetadata
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
+		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+	if integrationMetadata.TopicID == "" {
+		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("integration topic not ready yet; ensure the OCI integration has been fully set up")
+	}
+
+	var metadata OnComputeInstanceCreatedMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("failed to decode trigger metadata: %w", err)
+	}
+
+	return config, integrationMetadata, metadata, nil
+}
+
+// cleanupOldRule deletes the previous Events rule when the compartment changes.
+func cleanupOldRule(ctx core.TriggerContext, client *Client, metadata OnComputeInstanceCreatedMetadata, newCompartmentID string) error {
+	if metadata.EventsRuleID == "" || metadata.CompartmentID == newCompartmentID {
+		return nil
+	}
+	if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
+		ctx.Logger.Warnf("failed to delete old Events rule %q: %v", metadata.EventsRuleID, err)
+	}
+	return nil
+}
+
+// ensureEventsRule creates the OCI Events rule that routes compute-launch events
+// to the shared ONS topic and returns its ID.
+func ensureEventsRule(ctx core.TriggerContext, client *Client, compartmentID, topicID string) (string, error) {
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return "", fmt.Errorf("failed to set up webhook URL: %w", err)
+	}
+
+	parsedURL, err := url.Parse(webhookURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse webhook URL: %w", err)
+	}
+	segments := strings.Split(strings.TrimRight(parsedURL.Path, "/"), "/")
+	webhookID := segments[len(segments)-1]
+	ruleName := fmt.Sprintf("superplane-compute-instance-created-%s", webhookID)
+
+	condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
+	rule, err := client.CreateEventsRule(compartmentID, ruleName, condition, topicID)
+	if err != nil {
+		return "", fmt.Errorf("failed to create Events rule: %w", err)
+	}
+
+	return rule.ID, nil
+}
+
+// requestWebhook asks the integration to provision a per-trigger HTTPS
+// subscription to the shared ONS topic.
+func requestWebhook(ctx core.TriggerContext, compartmentID, topicID string) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		CompartmentID: config.CompartmentID,
-		TopicID:       integrationMetadata.TopicID,
+		CompartmentID: compartmentID,
+		TopicID:       topicID,
 	})
 }
 
