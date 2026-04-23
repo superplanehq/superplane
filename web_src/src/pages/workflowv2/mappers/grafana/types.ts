@@ -275,3 +275,72 @@ export interface AnnotationNodeMetadata {
   dashboardTitle?: string;
   annotationLabel?: string;
 }
+
+export interface GrafanaIncidentLabel {
+  key?: string;
+  label?: string;
+}
+
+export interface GrafanaIncident {
+  incidentID?: string;
+  incidentId?: string;
+  title?: string;
+  summary?: string;
+  severity?: string;
+  status?: string;
+  labels?: GrafanaIncidentLabel[];
+  isDrill?: boolean;
+  createdTime?: string;
+  modifiedTime?: string;
+  closedTime?: string;
+  incidentUrl?: string;
+  overviewURL?: string;
+}
+
+export interface GrafanaIncidentActivity {
+  activityItemID?: string;
+  activityId?: string;
+  incidentID?: string;
+  incidentId?: string;
+  activityKind?: string;
+  body?: string;
+  createdTime?: string;
+  eventTime?: string;
+  url?: string;
+}
+
+export interface GrafanaIncidentNodeMetadata {
+  title?: string;
+  status?: string;
+  severity?: string;
+  label?: string;
+}
+
+export interface DeclareIncidentConfiguration {
+  title?: string;
+  severity?: string;
+  description?: string;
+  labels?: string[];
+  status?: string;
+  startTime?: string;
+  isDrill?: boolean;
+}
+
+export interface IncidentSelectionConfiguration {
+  incident?: string;
+}
+
+export interface UpdateIncidentConfiguration extends IncidentSelectionConfiguration {
+  title?: string;
+  severity?: string;
+  labels?: string[];
+  isDrill?: boolean;
+}
+
+export interface ResolveIncidentConfiguration extends IncidentSelectionConfiguration {
+  summary?: string;
+}
+
+export interface AddIncidentActivityConfiguration extends IncidentSelectionConfiguration {
+  body?: string;
+}
