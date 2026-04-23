@@ -117,12 +117,17 @@ func (o *OCI) Configuration() []configuration.Field {
 func (o *OCI) Components() []core.Component {
 	return []core.Component{
 		&CreateComputeInstance{},
+		&GetInstance{},
+		&UpdateInstance{},
+		&ManageInstancePower{},
+		&DeleteInstance{},
 	}
 }
 
 func (o *OCI) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnComputeInstanceCreated{},
+		&OnInstanceStateChange{},
 	}
 }
 
