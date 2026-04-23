@@ -106,12 +106,13 @@ func CreateCanvasChangeRequestWithMetadata(
 			return status.Error(codes.FailedPrecondition, "published versions cannot create change requests")
 		}
 
-		version, err = models.CreateCanvasSnapshotVersionInTransaction(
+		version, err = models.CreateCanvasSnapshotVersionWithReadmeInTransaction(
 			tx,
 			canvasUUID,
 			userUUID,
 			draftVersion.Nodes,
 			draftVersion.Edges,
+			draftVersion.Readme,
 		)
 		if err != nil {
 			return err

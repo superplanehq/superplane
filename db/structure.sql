@@ -618,7 +618,8 @@ CREATE TABLE public.workflow_versions (
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    state character varying(32) NOT NULL
+    state character varying(32) NOT NULL,
+    readme text DEFAULT ''::text NOT NULL
 );
 
 
@@ -1939,7 +1940,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260422164838	f
+20260423133827	f
 \.
 
 

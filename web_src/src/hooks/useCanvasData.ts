@@ -21,6 +21,8 @@ import {
   canvasesListCanvasEvents,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
+  canvasesGetCanvasReadme,
+  canvasesUpdateCanvasReadme,
   canvasesListEventExecutions,
   canvasesDescribeRun,
   canvasesListChildExecutions,
@@ -107,6 +109,8 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
+  canvasReadme: (canvasId: string, versionId: string) =>
+    [...canvasKeys.all, "readme", canvasId, versionId || "live"] as const,
 };
 
 export const triggerKeys = {
@@ -865,6 +869,72 @@ export const useDeleteCanvasMemoryEntry = (canvasId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
+    },
+  });
+};
+
+export interface CanvasReadme {
+  canvasId: string;
+  versionId: string;
+  versionState: string;
+  content: string;
+  updatedAt?: string;
+}
+
+/**
+ * Fetches the markdown readme for a canvas version.
+ * Pass `versionId=""` for the live version or `"draft"` for the caller's draft.
+ */
+export const useCanvasReadme = (canvasId: string, versionId: string = "", enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.canvasReadme(canvasId, versionId),
+    queryFn: async (): Promise<CanvasReadme> => {
+      const response = await canvasesGetCanvasReadme(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: versionId ? { versionId } : undefined,
+        }),
+      );
+      const d = response.data ?? {};
+      return {
+        canvasId: d.canvasId || canvasId,
+        versionId: d.versionId || "",
+        versionState: d.versionState || "",
+        content: d.content || "",
+        updatedAt: d.updatedAt,
+      };
+    },
+    enabled: !!canvasId && enabled,
+    refetchOnWindowFocus: false,
+  });
+};
+
+/**
+ * Updates the readme on the caller's draft version, creating the draft if
+ * necessary.
+ */
+export const useUpdateCanvasReadme = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ content, versionId }: { content: string; versionId?: string }) => {
+      const response = await canvasesUpdateCanvasReadme(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            versionId: versionId || "",
+            content,
+          },
+        }),
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [...canvasKeys.all, "readme", canvasId],
+      });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail("", canvasId) });
     },
   });
 };

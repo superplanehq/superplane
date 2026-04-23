@@ -99,6 +99,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				Nodes:            serializedNodes,
 				Edges:            actions.EdgesToProto(liveVersion.Edges),
 				ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
+				Readme:           liveVersion.Readme,
 			},
 			Status: nil,
 		}, nil
@@ -151,6 +152,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			Nodes:            serializedNodes,
 			Edges:            actions.EdgesToProto(liveVersion.Edges),
 			ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
+			Readme:           liveVersion.Readme,
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,

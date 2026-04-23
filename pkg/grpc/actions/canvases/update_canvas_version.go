@@ -156,6 +156,9 @@ func UpdateCanvasVersionWithUsage(
 		now := time.Now()
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
+		if pbCanvas.Spec != nil {
+			version.Readme = pbCanvas.Spec.Readme
+		}
 		version.UpdatedAt = &now
 
 		return tx.Save(version).Error

@@ -5444,6 +5444,11 @@ export function WorkflowPageV2() {
           hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
+          onReadmeOpen={() => {
+            const basePath = `/${organizationId}/canvases/${canvasId}/readme`;
+            const versionParam = searchParams.get("version");
+            navigate(versionParam ? `${basePath}?version=${versionParam}` : basePath);
+          }}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
           edges={runViewEdges}

@@ -27,6 +27,7 @@ type CanvasVersion struct {
 	PublishedAt *time.Time
 	Nodes       datatypes.JSONSlice[Node]
 	Edges       datatypes.JSONSlice[Edge]
+	Readme      string
 	CreatedAt   *time.Time
 	UpdatedAt   *time.Time
 }
@@ -238,12 +239,42 @@ func CreatePublishedCanvasVersionInTransaction(
 	return &version, nil
 }
 
+// SaveCanvasDraftInTransaction reuses an existing draft for the user (updating
+// nodes/edges) or creates a new one. Readme is left untouched for existing
+// drafts and defaults to empty for new drafts. Use
+// SaveCanvasDraftWithReadmeInTransaction to also set readme (for example when
+// cloning from the live version).
 func SaveCanvasDraftInTransaction(
 	tx *gorm.DB,
 	workflowID uuid.UUID,
 	userID uuid.UUID,
 	nodes []Node,
 	edges []Edge,
+) (*CanvasVersion, error) {
+	return saveCanvasDraftInTransaction(tx, workflowID, userID, nodes, edges, nil)
+}
+
+// SaveCanvasDraftWithReadmeInTransaction behaves like
+// SaveCanvasDraftInTransaction but also sets the readme on both the
+// newly-created draft and any pre-existing draft for this user+canvas.
+func SaveCanvasDraftWithReadmeInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	userID uuid.UUID,
+	nodes []Node,
+	edges []Edge,
+	readme string,
+) (*CanvasVersion, error) {
+	return saveCanvasDraftInTransaction(tx, workflowID, userID, nodes, edges, &readme)
+}
+
+func saveCanvasDraftInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	userID uuid.UUID,
+	nodes []Node,
+	edges []Edge,
+	readme *string,
 ) (*CanvasVersion, error) {
 	_, err := lockCanvasForVersioningInTransaction(tx, workflowID)
 	if err != nil {
@@ -257,6 +288,9 @@ func SaveCanvasDraftInTransaction(
 	if findErr == nil {
 		existing.Nodes = datatypes.NewJSONSlice(nodes)
 		existing.Edges = datatypes.NewJSONSlice(edges)
+		if readme != nil {
+			existing.Readme = *readme
+		}
 		existing.UpdatedAt = &now
 		if err := tx.Save(existing).Error; err != nil {
 			return nil, err
@@ -277,6 +311,9 @@ func SaveCanvasDraftInTransaction(
 		CreatedAt:  &now,
 		UpdatedAt:  &now,
 	}
+	if readme != nil {
+		version.Readme = *readme
+	}
 
 	if err := tx.Create(&version).Error; err != nil {
 		return nil, err
@@ -292,6 +329,17 @@ func CreateCanvasSnapshotVersionInTransaction(
 	nodes []Node,
 	edges []Edge,
 ) (*CanvasVersion, error) {
+	return CreateCanvasSnapshotVersionWithReadmeInTransaction(tx, workflowID, ownerID, nodes, edges, "")
+}
+
+func CreateCanvasSnapshotVersionWithReadmeInTransaction(
+	tx *gorm.DB,
+	workflowID uuid.UUID,
+	ownerID uuid.UUID,
+	nodes []Node,
+	edges []Edge,
+	readme string,
+) (*CanvasVersion, error) {
 	if _, err := lockCanvasForVersioningInTransaction(tx, workflowID); err != nil {
 		return nil, err
 	}
@@ -304,6 +352,7 @@ func CreateCanvasSnapshotVersionInTransaction(
 		State:      CanvasVersionStateSnapshot,
 		Nodes:      datatypes.NewJSONSlice(nodes),
 		Edges:      datatypes.NewJSONSlice(edges),
+		Readme:     readme,
 		CreatedAt:  &now,
 		UpdatedAt:  &now,
 	}
@@ -313,6 +362,23 @@ func CreateCanvasSnapshotVersionInTransaction(
 	}
 
 	return &version, nil
+}
+
+// UpdateCanvasVersionReadmeInTransaction sets the readme on a version. Intended
+// for callers that update only the readme (e.g. the UpdateCanvasReadme action).
+func UpdateCanvasVersionReadmeInTransaction(
+	tx *gorm.DB,
+	version *CanvasVersion,
+	readme string,
+) error {
+	now := time.Now()
+	version.Readme = readme
+	version.UpdatedAt = &now
+	return tx.Model(version).
+		Updates(map[string]any{
+			"readme":     readme,
+			"updated_at": now,
+		}).Error
 }
 
 func PublishCanvasDraftInTransaction(

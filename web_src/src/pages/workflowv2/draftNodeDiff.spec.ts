@@ -56,4 +56,22 @@ describe("hasDraftVersusLiveGraphDiff", () => {
 
     expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
   });
+
+  it("returns true when only the readme changed", () => {
+    const nodes = [node("a"), node("b")];
+    const edges = [{ sourceId: "a", targetId: "b", channel: "default" }];
+    const live = { spec: { nodes, edges, readme: "# Live" } };
+    const draft = { spec: { nodes, edges, readme: "# Draft" } };
+
+    expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
+  });
+
+  it("treats missing readme the same as an empty readme", () => {
+    const nodes = [node("a")];
+    const edges = [] as { sourceId: string; targetId: string; channel: string }[];
+    const live = { spec: { nodes, edges } };
+    const draft = { spec: { nodes, edges, readme: "" } };
+
+    expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(false);
+  });
 });

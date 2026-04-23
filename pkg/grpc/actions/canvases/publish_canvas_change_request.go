@@ -140,12 +140,13 @@ func PublishCanvasChangeRequest(
 			publisherOwnerID = *request.OwnerID
 		}
 
-		mergedVersion, createVersionErr := models.CreateCanvasSnapshotVersionInTransaction(
+		mergedVersion, createVersionErr := models.CreateCanvasSnapshotVersionWithReadmeInTransaction(
 			tx,
 			canvasUUID,
 			publisherOwnerID,
 			mergedNodes,
 			mergedEdges,
+			version.Readme,
 		)
 		if createVersionErr != nil {
 			return createVersionErr
@@ -188,12 +189,13 @@ func PublishCanvasChangeRequest(
 		}
 
 		if request.OwnerID != nil {
-			renewedDraftVersion, err = models.SaveCanvasDraftInTransaction(
+			renewedDraftVersion, err = models.SaveCanvasDraftWithReadmeInTransaction(
 				tx,
 				canvasUUID,
 				*request.OwnerID,
 				liveVersion.Nodes,
 				liveVersion.Edges,
+				liveVersion.Readme,
 			)
 			if err != nil {
 				return err

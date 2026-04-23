@@ -49,12 +49,13 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 			return liveVersionErr
 		}
 
-		version, err = models.SaveCanvasDraftInTransaction(
+		version, err = models.SaveCanvasDraftWithReadmeInTransaction(
 			tx,
 			canvas.ID,
 			userUUID,
 			liveVersion.Nodes,
 			liveVersion.Edges,
+			liveVersion.Readme,
 		)
 
 		return err

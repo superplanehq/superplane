@@ -236,6 +236,52 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
+	readmeCmd := &cobra.Command{
+		Use:   "readme",
+		Short: "Manage canvas readmes",
+	}
+
+	var readmeGetDraft bool
+	var readmeGetVersion string
+	readmeGetCmd := &cobra.Command{
+		Use:   "get [name-or-id]",
+		Short: "Get the readme for a canvas (live version by default)",
+		Args:  cobra.MaximumNArgs(1),
+	}
+	readmeGetCmd.Flags().BoolVar(&readmeGetDraft, "draft", false, "return your current draft version's readme instead of the live version")
+	readmeGetCmd.Flags().StringVar(&readmeGetVersion, "version", "", "return a specific canvas version's readme")
+	core.Bind(readmeGetCmd, &readmeGetCommand{
+		draft:   &readmeGetDraft,
+		version: &readmeGetVersion,
+	}, options)
+
+	var readmeUpdateFile string
+	var readmeUpdateContent string
+	var readmeUpdateMessage string
+	var readmeUpdateDraftOnly bool
+	readmeUpdateCmd := &cobra.Command{
+		Use:   "update [name-or-id]",
+		Short: "Update the canvas readme",
+		Long: "Update the canvas readme. By default, if change management is enabled a change\n" +
+			"request is created, otherwise the draft is published automatically. Pass\n" +
+			"--draft-only to leave the readme on the draft without publishing or creating\n" +
+			"a change request.",
+		Args: cobra.MaximumNArgs(1),
+	}
+	readmeUpdateCmd.Flags().StringVarP(&readmeUpdateFile, "file", "f", "", "path to a markdown file (use - for stdin)")
+	readmeUpdateCmd.Flags().StringVar(&readmeUpdateContent, "content", "", "inline markdown content")
+	readmeUpdateCmd.Flags().StringVar(&readmeUpdateMessage, "message", "", "change request title when change management is enabled")
+	readmeUpdateCmd.Flags().BoolVar(&readmeUpdateDraftOnly, "draft-only", false, "keep the readme on the draft without publishing or creating a change request")
+	core.Bind(readmeUpdateCmd, &readmeUpdateCommand{
+		file:      &readmeUpdateFile,
+		content:   &readmeUpdateContent,
+		message:   &readmeUpdateMessage,
+		draftOnly: &readmeUpdateDraftOnly,
+	}, options)
+
+	readmeCmd.AddCommand(readmeGetCmd)
+	readmeCmd.AddCommand(readmeUpdateCmd)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
@@ -244,6 +290,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(updateCmd)
 	root.AddCommand(deleteCmd)
 	root.AddCommand(changeRequestsCmd)
+	root.AddCommand(readmeCmd)
 
 	return root
 }

@@ -44,7 +44,7 @@ function comparableEdgesSnapshot(edges: unknown): string {
   return JSON.stringify(normalized);
 }
 
-/** True when draft workflow graph differs from live (nodes and/or edges). */
+/** True when draft workflow differs from live (nodes, edges, and/or readme). */
 export function hasDraftVersusLiveGraphDiff(
   liveVersion?: CanvasesCanvasVersion,
   draftVersion?: CanvasesCanvasVersion,
@@ -54,7 +54,11 @@ export function hasDraftVersusLiveGraphDiff(
     return true;
   }
 
-  return comparableEdgesSnapshot(liveVersion?.spec?.edges) !== comparableEdgesSnapshot(draftVersion?.spec?.edges);
+  if (comparableEdgesSnapshot(liveVersion?.spec?.edges) !== comparableEdgesSnapshot(draftVersion?.spec?.edges)) {
+    return true;
+  }
+
+  return (liveVersion?.spec?.readme ?? "") !== (draftVersion?.spec?.readme ?? "");
 }
 
 export function buildDraftNodeDiffSummary(

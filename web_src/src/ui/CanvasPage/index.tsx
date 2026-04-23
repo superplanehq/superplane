@@ -192,6 +192,7 @@ export interface CanvasPageProps {
   showCanvasSettingsMenu?: boolean;
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
+  onReadmeOpen?: () => void;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -1152,6 +1153,7 @@ function CanvasPage(props: CanvasPageProps) {
           onSidebarOpen={() => handleSidebarToggle(true)}
           onAddNote={handleAddNote}
           onMemoryOpen={props.onMemoryOpen}
+          onReadmeOpen={props.onReadmeOpen}
           onYamlOpen={props.onYamlOpen}
         />
 

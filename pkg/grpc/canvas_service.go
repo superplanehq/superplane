@@ -379,6 +379,16 @@ func (s *CanvasService) DeleteCanvasMemory(ctx context.Context, req *pb.DeleteCa
 	return canvases.DeleteCanvasMemory(ctx, s.registry, organizationID, req.CanvasId, req.MemoryId)
 }
 
+func (s *CanvasService) GetCanvasReadme(ctx context.Context, req *pb.GetCanvasReadmeRequest) (*pb.GetCanvasReadmeResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasReadme(ctx, organizationID, req.CanvasId, req.VersionId)
+}
+
+func (s *CanvasService) UpdateCanvasReadme(ctx context.Context, req *pb.UpdateCanvasReadmeRequest) (*pb.UpdateCanvasReadmeResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasReadme(ctx, organizationID, req.CanvasId, req.VersionId, req.Content)
+}
+
 func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {
 	return canvases.ListEventExecutions(ctx, s.registry, req.CanvasId, req.EventId)
 }

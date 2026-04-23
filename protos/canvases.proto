@@ -411,6 +411,29 @@ service Canvases {
     };
   }
 
+  rpc GetCanvasReadme(GetCanvasReadmeRequest) returns (GetCanvasReadmeResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/readme"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas readme";
+      description: "Returns the markdown readme for a canvas version (live version by default)";
+      tags: "Canvas";
+    };
+  }
+
+  rpc UpdateCanvasReadme(UpdateCanvasReadmeRequest) returns (UpdateCanvasReadmeResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/readme"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas readme";
+      description: "Sets the markdown readme on the caller's draft version";
+      tags: "Canvas";
+    };
+  }
+
   rpc ListEventExecutions(ListEventExecutionsRequest) returns (ListEventExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/events/{event_id}/executions"
@@ -667,6 +690,7 @@ message Canvas {
     repeated Components.Node nodes = 1;
     repeated Components.Edge edges = 2;
     ChangeManagement change_management = 3;
+    string readme = 4;
   }
 
   message Status {
@@ -958,6 +982,35 @@ message DeleteCanvasMemoryRequest {
 }
 
 message DeleteCanvasMemoryResponse {}
+
+message GetCanvasReadmeRequest {
+  string canvas_id = 1;
+  // Optional. When empty, returns the live version's readme.
+  // Use "draft" to return the caller's draft, or a specific version id.
+  string version_id = 2;
+}
+
+message GetCanvasReadmeResponse {
+  string canvas_id = 1;
+  string version_id = 2;
+  string version_state = 3;
+  string content = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message UpdateCanvasReadmeRequest {
+  string canvas_id = 1;
+  // Optional. When empty, updates (or creates) the caller's draft.
+  string version_id = 2;
+  string content = 3;
+}
+
+message UpdateCanvasReadmeResponse {
+  string canvas_id = 1;
+  string version_id = 2;
+  string content = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
 
 message CanvasEvent {
   string id = 1;
