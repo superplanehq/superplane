@@ -48,7 +48,6 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 		Labels:              []string{" prod ", "", "api"},
 		IsDrill:             true,
 		Status:              incidentStatusResolved,
-		RoomPrefix:          "  ops  ",
 		StartTime:           &startTime,
 	})
 	require.NoError(t, err)
@@ -71,7 +70,7 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 	require.Equal(t, "API latency", payload["title"])
 	require.Equal(t, "minor", payload["severity"])
 	require.Equal(t, "resolved", payload["status"])
-	require.Equal(t, "ops", payload["roomPrefix"])
+	require.Equal(t, "incident", payload["roomPrefix"])
 	require.Equal(t, true, payload["isDrill"])
 	require.Equal(t, "pool exhaustion", payload["initialStatusUpdate"])
 	require.Len(t, payload["labels"], 2)

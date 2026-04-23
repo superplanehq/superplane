@@ -26,7 +26,6 @@ type declareIncidentSpec struct {
 	Labels      []string `json:"labels" mapstructure:"labels"`
 	Status      string   `json:"status" mapstructure:"status"`
 	StartTime   string   `json:"startTime" mapstructure:"startTime"`
-	RoomPrefix  string   `json:"roomPrefix" mapstructure:"roomPrefix"`
 	IsDrill     *bool    `json:"isDrill,omitempty" mapstructure:"isDrill"`
 }
 
@@ -94,14 +93,6 @@ func declareIncidentConfiguration(includeLegacyToggle bool) []configuration.Fiel
 			Required:    false,
 			Description: "When the incident began",
 		},
-		{
-			Name:        "roomPrefix",
-			Label:       "Channel Prefix",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Default:     legacyDefaultRoomPrefix,
-			Description: "Slack channel prefix used when Grafana IRM creates an incident room",
-		},
 	}
 
 	if includeLegacyToggle {
@@ -129,9 +120,6 @@ func validateDeclareIncidentSpec(spec declareIncidentSpec) error {
 	}
 	if _, err := parseIncidentStartTime(spec.StartTime); err != nil {
 		return err
-	}
-	if spec.RoomPrefix != "" && strings.TrimSpace(spec.RoomPrefix) == "" {
-		return errors.New("roomPrefix must not be empty when provided")
 	}
 
 	return nil
@@ -201,7 +189,7 @@ func executeDeclareIncident(ctx core.ExecutionContext, spec declareIncidentSpec,
 		Title:               spec.Title,
 		Severity:            spec.Severity,
 		Labels:              spec.Labels,
-		RoomPrefix:          spec.RoomPrefix,
+		RoomPrefix:          legacyDefaultRoomPrefix,
 		IsDrill:             isDrill,
 		Status:              spec.Status,
 		InitialStatusUpdate: spec.Description,

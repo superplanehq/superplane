@@ -110,7 +110,6 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 			"labels":      []any{"api", "prod"},
 			"status":      "resolved",
 			"startTime":   "2026-04-20T10:00:00Z",
-			"roomPrefix":  "ops",
 		},
 		HTTP:           httpCtx,
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
@@ -127,7 +126,7 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &payload))
 	require.Equal(t, "Initial diagnosis", payload["initialStatusUpdate"])
 	require.Equal(t, "resolved", payload["status"])
-	require.Equal(t, "ops", payload["roomPrefix"])
+	require.Equal(t, "incident", payload["roomPrefix"])
 
 	require.Len(t, execCtx.Payloads, 1)
 	emitted := execCtx.Payloads[0].(map[string]any)
