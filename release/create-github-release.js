@@ -124,7 +124,13 @@ async function main() {
     assetPath: sbomPath,
   });
 
-  const cliAssets = loadCLIAssets(cliAssetsDir, cliAssetPrefix);
+  const cliAssets = fs
+    .readdirSync(cliAssetsDir)
+    .filter((name) => name.startsWith(cliAssetPrefix))
+    .map((name) => ({
+      assetName: name,
+      assetPath: path.join(cliAssetsDir, name),
+    }));
 
   for (const cliAsset of cliAssets) {
     await uploadAsset({
@@ -138,32 +144,6 @@ async function main() {
     });
   }
   console.log("Done.");
-}
-
-function loadCLIAssets(cliAssetsDir, cliAssetPrefix) {
-  if (!fs.existsSync(cliAssetsDir)) {
-    console.error(
-      `Error: ${cliAssetsDir} does not exist. Build CLI assets before creating a release.`
-    );
-    process.exit(1);
-  }
-
-  const cliAssets = fs
-    .readdirSync(cliAssetsDir)
-    .filter((name) => name.startsWith(cliAssetPrefix))
-    .sort();
-
-  if (cliAssets.length === 0) {
-    console.error(
-      `Error: no CLI assets found in ${cliAssetsDir}. Expected files like superplane-cli-darwin-arm64.`
-    );
-    process.exit(1);
-  }
-
-  return cliAssets.map((assetName) => ({
-    assetName,
-    assetPath: path.join(cliAssetsDir, assetName),
-  }));
 }
 
 async function uploadAsset({
