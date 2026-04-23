@@ -82,7 +82,7 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 	var startPayload map[string]string
 	require.NoError(t, json.Unmarshal(body, &startPayload))
 	require.Equal(t, "incident-123", startPayload["incidentID"])
-	require.Equal(t, "incidentStart", startPayload["eventName"])
+	require.Equal(t, "incidentStart", startPayload["activityItemKind"])
 	require.Equal(t, "2026-04-20T09:45:00Z", startPayload["eventTime"])
 }
 
