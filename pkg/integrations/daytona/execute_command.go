@@ -64,7 +64,7 @@ func (e *ExecuteCommand) Documentation() string {
 
 ## Configuration
 
-- **Sandbox**: The sandbox ID to run commands in (from createSandbox output). Supports expressions, e.g. ` + "`" + `{{ $["daytona.createSandbox"].data.id }}` + "`" + `
+- **Sandbox**: The sandbox ID to run commands in (from **Create Sandbox** or **Create Repository Sandbox** output). Supports expressions, e.g. ` + "`" + `{{ previous().data.id }}` + "`" + ` or ` + "`" + `{{ $["Create Repository Sandbox"].data.sandboxId }}` + "`" + `
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
 - **Environment Variables**: Optional key-value pairs exported before command execution

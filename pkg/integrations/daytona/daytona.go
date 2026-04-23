@@ -76,7 +76,93 @@ func (d *Daytona) Triggers() []core.Trigger {
 }
 
 func (d *Daytona) Instructions() string {
-	return ""
+	return `### Common Patterns
+
+#### Create a sandbox, run commands, then clean it up
+
+Use this when you need an empty sandbox and want to control each command as a separate node.
+
+1. Add a **Create Sandbox** node. Its output includes the sandbox ID:
+
+```json
+{
+  "data": {
+    "id": "sandbox-abc123def456",
+    "state": "started"
+  },
+  "type": "daytona.sandbox"
+}
+```
+
+2. Connect an **Execute Command** node. If it runs immediately after **Create Sandbox**, set **Sandbox** to:
+
+```text
+{{ previous().data.id }}
+```
+
+3. If you want to run more than one command in the same sandbox, reference the original create node by name in later nodes:
+
+```text
+{{ $["Create Sandbox"].data.id }}
+```
+
+This is more reliable than ` + "`" + `previous()` + "`" + ` once the previous node is no longer **Create Sandbox**.
+
+4. Add **Delete Sandbox** at the end of the flow and use the same sandbox reference:
+
+```text
+{{ $["Create Sandbox"].data.id }}
+```
+
+#### Create a repository sandbox, run commands in the cloned repo, then delete it
+
+Use this when Daytona should clone a repository before your first command runs.
+
+1. Add a **Create Repository Sandbox** node. Its output includes both the sandbox ID and repository directory:
+
+```json
+{
+  "data": {
+    "sandboxId": "sandbox-abc123def456",
+    "directory": "/home/daytona/example-app",
+    "repository": "https://github.com/superplanehq/example-app.git"
+  },
+  "type": "daytona.repository.sandbox"
+}
+```
+
+2. Connect an **Execute Command** node and use:
+
+```text
+Sandbox: {{ previous().data.sandboxId }}
+Working Directory: {{ previous().data.directory }}
+```
+
+3. **Execute Command** returns the command result, not the sandbox ID:
+
+```json
+{
+  "data": {
+    "exitCode": 0,
+    "result": "npm test\nPASS\n",
+    "timeout": false
+  },
+  "type": "daytona.command.response"
+}
+```
+
+4. If you add more command nodes or a final **Delete Sandbox** node, reference the original repository sandbox node by name:
+
+```text
+{{ $["Create Repository Sandbox"].data.sandboxId }}
+```
+
+You can also reuse the cloned directory in later command nodes with:
+
+```text
+{{ $["Create Repository Sandbox"].data.directory }}
+```
+`
 }
 
 func (d *Daytona) Sync(ctx core.SyncContext) error {

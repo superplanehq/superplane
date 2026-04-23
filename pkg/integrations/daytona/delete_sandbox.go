@@ -47,7 +47,7 @@ func (d *DeleteSandbox) Documentation() string {
 
 ## Configuration
 
-- **Sandbox**: The ID or name of the sandbox to delete (from createSandbox output)
+- **Sandbox**: The ID or name of the sandbox to delete. Supports expressions, e.g. ` + "`" + `{{ previous().data.id }}` + "`" + ` or ` + "`" + `{{ $["Create Sandbox"].data.id }}` + "`" + `
 - **Force**: Optional flag to force deletion even if sandbox is running
 
 ## Output
