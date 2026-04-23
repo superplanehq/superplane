@@ -92,6 +92,8 @@ export function SettingsView({
           approvals: effectiveChangeManagementEnabled ? normalizeApprovers(approvers) : undefined,
         },
       });
+      setSaveMessage("Canvas updated successfully");
+      setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
       const errorMessage = responseMessage || (error as { message?: string })?.message || "Failed to update canvas";
@@ -153,8 +155,8 @@ export function SettingsView({
   }, []);
 
   return (
-    <div className="px-6 py-5">
-      <div className="mx-auto w-full max-w-3xl space-y-8">
+    <div className="px-4 py-6">
+      <div className="mx-auto w-full max-w-3xl space-y-6">
         {onBackToCanvas ? (
           <Button
             type="button"
@@ -194,7 +196,7 @@ export function SettingsView({
             onAddApprover={addApprover}
           />
         ) : null}
-        <div className="flex items-center gap-4 border-t border-slate-200 pt-5">
+        <div className="flex items-center gap-4">
           <LoadingButton
             type="button"
             data-testid="canvas-settings-save-changes"
@@ -203,7 +205,7 @@ export function SettingsView({
             loading={isSaving}
             loadingText="Saving..."
           >
-            Save Draft
+            Save Changes
           </LoadingButton>
           {saveMessage ? (
             <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>

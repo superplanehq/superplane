@@ -31,7 +31,7 @@ import type {
   TriggersTrigger,
 } from "@/api-client";
 import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
-import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -227,7 +227,6 @@ export function WorkflowPageV2() {
   const [selectedChangeRequestId, setSelectedChangeRequestId] = useState("");
   const [resolvingConflictChangeRequestId, setResolvingConflictChangeRequestId] = useState("");
   const [isCreateChangeRequestMode, setIsCreateChangeRequestMode] = useState(false);
-  const [isCanvasSettingsOpen, setIsCanvasSettingsOpen] = useState(false);
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
@@ -263,7 +262,6 @@ export function WorkflowPageV2() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
-  const { data: organization } = useOrganization(organizationId!);
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
@@ -627,8 +625,6 @@ export function WorkflowPageV2() {
     return canvasChangeRequests.find((c) => c.metadata?.id === resolvingConflictChangeRequestId);
   }, [canvasChangeRequests, resolvingConflictChangeRequestId]);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
-
-  const { data: organizationRoles = [] } = useOrganizationRoles(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -1722,12 +1718,6 @@ export function WorkflowPageV2() {
     [triggers, components, availableIntegrations],
   );
   const canvasMode = hasEditableVersion ? "edit" : "live";
-  useEffect(() => {
-    if (canvasMode !== "edit" && isCanvasSettingsOpen) {
-      setIsCanvasSettingsOpen(false);
-    }
-  }, [canvasMode, isCanvasSettingsOpen]);
-
   const { nodes: preparedNodes, edges } = useMemo(() => {
     if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
       return { nodes: [], edges: [] };
@@ -5278,8 +5268,10 @@ export function WorkflowPageV2() {
           canvasStateMode={canvasStateMode}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          showCanvasSettingsMenu={canUpdateCanvas && canvasMode === "edit"}
-          onOpenCanvasSettings={canvasMode === "edit" ? () => setIsCanvasSettingsOpen(true) : undefined}
+          showCanvasSettingsMenu={canUpdateCanvas}
+          onOpenCanvasSettings={
+            organizationId && canvasId ? () => navigate(`/${organizationId}/canvases/${canvasId}/settings`) : undefined
+          }
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen((prev) => !prev) : undefined}
           versionControlButtonTooltip={isVersionControlOpen ? "Close versions" : "Open versions"}
@@ -5486,16 +5478,10 @@ export function WorkflowPageV2() {
       <CanvasPageModals
         organizationId={organizationId || ""}
         canvas={canvas}
-        canvasVersionId={activeCanvasVersionId}
-        organization={organization}
-        organizationUsers={organizationUsers}
-        organizationRoles={organizationRoles}
         isUseTemplateOpen={isUseTemplateOpen}
         onCloseUseTemplate={() => setIsUseTemplateOpen(false)}
         onUseTemplateSubmit={handleUseTemplateSubmit}
         isCreateCanvasPending={createWorkflowMutation.isPending}
-        isCanvasSettingsOpen={isCanvasSettingsOpen}
-        onCanvasSettingsOpenChange={setIsCanvasSettingsOpen}
         isCreateChangeRequestMode={isCreateChangeRequestMode}
         onCreateChangeRequestModeChange={(open) => {
           if (!createCanvasChangeRequestMutation.isPending) {

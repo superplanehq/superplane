@@ -4,6 +4,7 @@ import {
   canvasesDescribeCanvas,
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
+  canvasesUpdateCanvas,
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
@@ -445,6 +446,64 @@ export const useCreateCanvas = (organizationId: string) => {
           response.data.canvas,
         );
         analytics.canvasCreated(response.data.canvas.metadata.id, organizationId);
+      }
+    },
+  });
+};
+
+export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      name?: string;
+      description?: string;
+      changeManagement?: ChangeManagementUpdateInput;
+    }) => {
+      return await canvasesUpdateCanvas(
+        withOrganizationHeader({
+          path: { id: canvasId },
+          body: {
+            name: data.name,
+            description: data.description,
+            changeManagement: data.changeManagement
+              ? {
+                  enabled: data.changeManagement.enabled,
+                  approvals: mapChangeManagementApprovals(data.changeManagement.approvals),
+                }
+              : undefined,
+          },
+        }),
+      );
+    },
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+
+      const updatedCanvas = response?.data?.canvas;
+      if (updatedCanvas) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
+          if (!current) {
+            return current;
+          }
+
+          return {
+            ...current,
+            metadata: {
+              ...current.metadata,
+              name: updatedCanvas.metadata?.name ?? variables.name ?? current.metadata?.name,
+              description:
+                updatedCanvas.metadata?.description ?? variables.description ?? current.metadata?.description,
+            },
+            spec: {
+              ...current.spec,
+              changeManagement:
+                updatedCanvas.spec?.changeManagement ?? variables.changeManagement ?? current.spec?.changeManagement,
+            },
+          };
+        });
       }
     },
   });
