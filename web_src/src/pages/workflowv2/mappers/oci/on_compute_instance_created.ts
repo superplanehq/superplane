@@ -43,19 +43,14 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
     const envelope = getEventEnvelope(context.event);
     const data = envelope?.data;
 
-    const triggeredAt = context.event?.createdAt
-      ? new Date(context.event.createdAt).toLocaleString()
-      : envelope?.eventTime
-        ? new Date(envelope.eventTime).toLocaleString()
-        : undefined;
+    const triggeredAtRaw = context.event?.createdAt ?? envelope?.eventTime;
+    const triggeredAt = triggeredAtRaw ? new Date(triggeredAtRaw).toLocaleString() : undefined;
 
     const rawEntries: [string, string | undefined][] = [
       ["Triggered At", triggeredAt],
       ["Instance Name", data?.resourceName],
-      ["Instance ID", data?.resourceId],
       ["Shape", data?.additionalDetails?.shape],
       ["Availability Domain", data?.availabilityDomain],
-      ["Compartment ID", data?.compartmentId],
       ["Compartment", data?.compartmentName],
     ];
 
@@ -75,8 +70,8 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
       metadata: [],
       ...(lastEvent && {
         lastEventData: {
-          title: "Compute instance created",
-          subtitle: instanceName || renderTimeAgo(new Date(lastEvent.createdAt)),
+          title: instanceName || "Compute instance created",
+          subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,

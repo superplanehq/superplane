@@ -59,8 +59,8 @@ SuperPlane authenticates to OCI using API Key authentication.
    - **User OCID** (begins with ` + "`ocid1.user.`" + `)
    - **Fingerprint** (e.g. ` + "`12:34:56:…`" + `)
    - **Tenancy OCID** (begins with ` + "`ocid1.tenancy.`" + `)
-5. Open the downloaded private key file and paste its full contents into the **Private Key** field below.
-6. Select the **Region** that matches your OCI tenancy's home region.
+5. Select the **Region** that matches your OCI tenancy's home region.
+6. Open the downloaded private key file and paste its full contents into the **Private Key** field below.
 7. Click **Connect** to validate the credentials and save the integration.`
 }
 
@@ -76,7 +76,7 @@ func (o *OCI) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "fingerprint",
-			Label:       "Key Fingerprint",
+			Label:       "Fingerprint",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "MD5 fingerprint of the uploaded API public key (e.g. 12:34:56:78:…)",

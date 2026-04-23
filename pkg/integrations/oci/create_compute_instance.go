@@ -50,6 +50,7 @@ type CreateInstanceExecutionMetadata struct {
 	BlockVolumeID string `json:"blockVolumeId" mapstructure:"blockVolumeId"`
 	PollErrors    int    `json:"pollErrors" mapstructure:"pollErrors"`
 	PollAttempts  int    `json:"pollAttempts" mapstructure:"pollAttempts"`
+	StartedAt     string `json:"startedAt" mapstructure:"startedAt"`
 }
 
 func (c *CreateComputeInstance) Name() string {
@@ -457,6 +458,7 @@ func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 		InstanceID:    instance.ID,
 		CompartmentID: spec.CompartmentID,
 		BlockVolumeID: spec.BlockVolumeID,
+		StartedAt:     time.Now().UTC().Format(time.RFC3339),
 	}); err != nil {
 		return err
 	}
