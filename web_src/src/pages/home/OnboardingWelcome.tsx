@@ -1,10 +1,12 @@
 import {
   canvasesCreateCanvas,
+  canvasesCreateCanvasVersion,
   canvasesDescribeCanvas,
   canvasesEmitNodeEvent,
   canvasesListCanvasEvents,
   canvasesListEventExecutions,
-  canvasesUpdateCanvasVersion2,
+  canvasesPublishCanvasVersion,
+  canvasesUpdateCanvasVersion,
 } from "@/api-client/sdk.gen";
 import type { CanvasesCanvas } from "@/api-client/types.gen";
 import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
@@ -60,6 +62,51 @@ function findQuickStartTemplate(templates: CanvasesCanvas[]) {
 
     return normalizeTemplateName(templateName) === normalizedQuickStartName;
   });
+}
+
+async function publishCanvasGraphUpdate(params: {
+  canvasId: string;
+  name: string;
+  description: string;
+  nodes: any[];
+  edges: any[];
+}) {
+  const createVersionResponse = await canvasesCreateCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId: params.canvasId },
+      body: {},
+    }),
+  );
+
+  const versionId = createVersionResponse.data?.version?.metadata?.id;
+  if (!versionId) {
+    throw new Error("Failed to create draft version");
+  }
+
+  await canvasesUpdateCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId: params.canvasId, versionId },
+      body: {
+        canvas: {
+          metadata: {
+            name: params.name,
+            description: params.description,
+          },
+          spec: {
+            nodes: params.nodes,
+            edges: params.edges,
+          },
+        },
+      },
+    }),
+  );
+
+  await canvasesPublishCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId: params.canvasId, versionId },
+      body: {},
+    }),
+  );
 }
 
 const PERSONAS = [
@@ -193,17 +240,13 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       const canvasId = result.data?.canvas?.metadata?.id;
       if (!canvasId) return;
 
-      await canvasesUpdateCanvasVersion2(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            canvas: {
-              metadata: { name: QUICK_START_TEMPLATE_NAME, description },
-              spec: { nodes: nodesWithServer2Url, edges },
-            },
-          },
-        }),
-      );
+      await publishCanvasGraphUpdate({
+        canvasId,
+        name: QUICK_START_TEMPLATE_NAME,
+        description,
+        nodes: nodesWithServer2Url,
+        edges,
+      });
 
       const triggerNode = nodes.find((n: any) => n.trigger?.name === "schedule");
       const httpNode = nodes.find((n: any) => n.component?.name === "http");
@@ -262,17 +305,13 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
-      await canvasesUpdateCanvasVersion2(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            canvas: {
-              metadata: { name: QUICK_START_TEMPLATE_NAME, description },
-              spec: { nodes, edges },
-            },
-          },
-        }),
-      );
+      await publishCanvasGraphUpdate({
+        canvasId,
+        name: QUICK_START_TEMPLATE_NAME,
+        description,
+        nodes,
+        edges,
+      });
 
       const [canvasResponse, eventsResponse] = await Promise.all([
         canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } })),
