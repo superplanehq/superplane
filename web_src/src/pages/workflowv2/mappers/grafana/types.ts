@@ -321,6 +321,9 @@ export interface DeclareIncidentConfiguration {
   severity?: string;
   description?: string;
   labels?: string[];
+  status?: string;
+  startTime?: string;
+  roomPrefix?: string;
   isDrill?: boolean;
 }
 
