@@ -53,8 +53,11 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload)
-	if err == nil && customName != nil {
+	customName, err := s.resolveCustomName(wrappedPayload, structuredPayload)
+	if err != nil {
+		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
+		event.CustomName = &failed
+	} else if customName != nil {
 		event.CustomName = customName
 	}
 
@@ -70,7 +73,7 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func (s *EventContext) resolveCustomName(payload any) (*string, error) {
+func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string, error) {
 	config := s.node.Configuration.Data()
 	if config == nil {
 		return nil, nil
@@ -93,7 +96,8 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 
 	builder := NewNodeConfigurationBuilder(s.tx, s.node.WorkflowID).
 		WithNodeID(s.node.NodeID).
-		WithInput(map[string]any{s.node.NodeID: payload})
+		WithInput(map[string]any{s.node.NodeID: payload}).
+		WithRootPayload(rootPayload)
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
