@@ -1,0 +1,156 @@
+---
+title: "Oracle Cloud Infrastructure"
+---
+
+Manage Oracle Cloud Infrastructure resources in workflows
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Compute Instance Created" href="#on-compute-instance-created" description="Fires when a new OCI Compute instance reaches RUNNING state (via OCI Events Service)" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Compute Instance" href="#create-compute-instance" description="Provision a new OCI Compute instance and wait for it to reach RUNNING state" />
+</CardGrid>
+
+## Instructions
+
+## Connect Oracle Cloud Infrastructure
+
+SuperPlane authenticates to OCI using API Key authentication.
+
+### Steps
+
+1. Open the [OCI Console](https://cloud.oracle.com/) and sign in.
+2. Go to **Profile → User settings → My profile → Tokens and keys → API keys → Add API key**.
+3. Choose **Generate API Key Pair**, download the private key, and click **Add**.
+4. After the key is added, copy the **Configuration File Preview** values:
+   - **User OCID** (begins with `ocid1.user.`)
+   - **Fingerprint** (e.g. `12:34:56:…`)
+   - **Tenancy OCID** (begins with `ocid1.tenancy.`)
+5. Open the downloaded private key file and paste its full contents into the **Private Key** field below.
+6. Select the **Region** that matches your OCI tenancy's home region.
+7. Click **Connect** to validate the credentials and save the integration.
+
+<a id="on-compute-instance-created"></a>
+
+## On Compute Instance Created
+
+The On Compute Instance Created trigger starts a workflow execution whenever an OCI Compute instance launch completes.
+
+### How It Works
+
+When the OCI integration is set up, SuperPlane automatically creates a shared **OCI Notifications (ONS) topic** and subscribes to it. When this trigger is added to a workflow, SuperPlane automatically creates an **OCI Events rule** in the configured compartment that forwards `com.oraclecloud.computeapi.launchinstance.end` events to that topic — no manual OCI configuration is required.
+
+### Configuration
+
+- **Compartment**: The compartment to monitor for new Compute instances.
+
+### Event Data
+
+Each event payload includes:
+- `eventType` — `com.oraclecloud.computeapi.launchinstance.end`
+- `data.resourceId` — the instance OCID
+- `data.resourceName` — the instance display name
+- `data.compartmentId` — the compartment OCID
+- `data.availabilityDomain` — the availability domain
+- `eventTime` — ISO-8601 timestamp of the event
+
+### Example Data
+
+```json
+{
+  "data": {
+    "cloudEventsVersion": "0.1",
+    "contentType": "application/json",
+    "data": {
+      "additionalDetails": {
+        "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890ab",
+        "shape": "VM.Standard.E2.1.Micro",
+        "type": "CustomerVmi"
+      },
+      "availabilityDomain": "EXAMPLE:EU-FRANKFURT-1-AD-1",
+      "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+      "compartmentName": "root",
+      "definedTags": {},
+      "freeformTags": {},
+      "resourceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890cd",
+      "resourceName": "my-instance"
+    },
+    "eventID": "00000000-0000-0000-0000-000000000000",
+    "eventTime": "2026-01-01T00:00:00Z",
+    "eventType": "com.oraclecloud.computeapi.launchinstance.end",
+    "eventTypeVersion": "2.0",
+    "extensions": {
+      "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890"
+    },
+    "source": "ComputeApi"
+  },
+  "timestamp": "2026-01-01T00:00:05Z",
+  "type": "oci.onComputeInstanceCreated"
+}
+```
+
+<a id="create-compute-instance"></a>
+
+## Create Compute Instance
+
+The Create Compute Instance component provisions a new Oracle Cloud Infrastructure Compute instance and waits until it reaches **RUNNING** state before emitting.
+
+### Use Cases
+
+- **Environment provisioning**: Spin up instances as part of deployment or testing workflows
+- **On-demand compute**: Launch instances when triggered by events in other systems
+- **Auto-scaling workflows**: Create additional capacity in response to metrics or alerts
+
+### Configuration
+
+- **Compartment OCID**: The compartment where the instance will be created
+- **Availability Domain**: The OCI availability domain (e.g. `Uocm:PHX-AD-1`)
+- **Display Name**: Human-readable name for the instance
+- **Shape**: Compute shape (e.g. `VM.Standard.E4.Flex`, `VM.Standard2.1`)
+- **Image OCID**: OCID of the platform or custom image to boot from
+- **Subnet OCID**: OCID of the subnet where the primary VNIC will be placed
+- **SSH Public Key**: Optional SSH public key added to `~/.ssh/authorized_keys` on the instance
+- **OCPUs / Memory**: For flex shapes, the number of OCPUs and memory in GB
+
+### Output
+
+Emits the created instance details on the default output channel, including:
+- `instanceId` — instance OCID
+- `displayName` — instance display name
+- `lifecycleState` — should be `RUNNING`
+- `publicIp` — public IP address (if assigned)
+- `privateIp` — primary private IP address
+- `shape` — the instance shape
+- `availabilityDomain` — the availability domain
+- `compartmentId` — the compartment OCID
+- `region` — the region
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+    "displayName": "test-instance-12",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "lifecycleState": "RUNNING",
+    "privateIp": "10.0.0.17",
+    "publicIp": "192.0.2.1",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:31:58.249783188Z",
+  "type": "oci.computeInstanceCreated"
+}
+```
+
