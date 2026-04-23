@@ -42,6 +42,7 @@ type IntegrationSecret struct {
 	InstallationID uuid.UUID
 	Name           string
 	Value          []byte
+	Editable       bool
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
 }

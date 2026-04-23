@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package Superplane.Organizations;
 
+import "configuration.proto";
+import "components.proto";
+import "triggers.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -218,6 +221,17 @@ service Organizations {
     };
   }
 
+  rpc ListIntegrationsV2(ListIntegrationsV2Request) returns (ListIntegrationsV2Response) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/integrations-v2"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integrations in an organization (v2)";
+      description: "Returns a list of integrations in an organization (v2)";
+      tags: "Organization";
+    };
+  }
+
   rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/integrations/{integration_id}"
@@ -225,6 +239,17 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe an integration in an organization";
       description: "Returns details of a specific integration in an organization";
+      tags: "Organization";
+    };
+  }
+
+  rpc DescribeIntegrationV2(DescribeIntegrationV2Request) returns (DescribeIntegrationV2Response) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/integrations-v2/{integration_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe an integration in an organization (v2)";
+      description: "Returns details of a specific integration in an organization (v2)";
       tags: "Organization";
     };
   }
@@ -248,6 +273,30 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create organization integration";
       description: "Create an organization integration";
+      tags: "Organization";
+    };
+  }
+
+  rpc CreateIntegrationV2(CreateIntegrationV2Request) returns (CreateIntegrationV2Response) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/integrations-v2"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create organization integration (v2)";
+      description: "Create an organization integration (v2)";
+      tags: "Organization";
+    };
+  }
+
+  rpc SubmitIntegrationSetupStep(SubmitIntegrationSetupStepRequest) returns (SubmitIntegrationSetupStepResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/integrations-v2/{integration_id}/steps"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Submit an integration setup step";
+      description: "Submit an integration setup step";
       tags: "Organization";
     };
   }
@@ -483,6 +532,14 @@ message ListIntegrationsResponse {
   repeated Integration integrations = 1;
 }
 
+message ListIntegrationsV2Request {
+  string id = 1;
+}
+
+message ListIntegrationsV2Response {
+  repeated IntegrationV2 integrations = 1;
+}
+
 message CreateIntegrationRequest {
   string id = 1;
   string name = 2;
@@ -494,6 +551,16 @@ message CreateIntegrationResponse {
   Integration integration = 1;
 }
 
+message CreateIntegrationV2Request {
+  string id = 1;
+  string name = 2;
+  string integration_name = 3;
+}
+
+message CreateIntegrationV2Response {
+  IntegrationV2 integration = 1;
+}
+
 message DescribeIntegrationRequest {
   string id = 1;
   string integration_id = 2;
@@ -501,6 +568,15 @@ message DescribeIntegrationRequest {
 
 message DescribeIntegrationResponse {
   Integration integration = 1;
+}
+
+message DescribeIntegrationV2Request {
+  string id = 1;
+  string integration_id = 2;
+}
+
+message DescribeIntegrationV2Response {
+  IntegrationV2 integration = 1;
 }
 
 message ListIntegrationResourcesRequest {
@@ -537,6 +613,17 @@ message DeleteIntegrationRequest {
 
 message DeleteIntegrationResponse {}
 
+message SubmitIntegrationSetupStepRequest {
+  string id = 1;
+  string integration_id = 2;
+  string step_name = 3;
+  google.protobuf.Struct inputs = 4;
+}
+
+message SubmitIntegrationSetupStepResponse {
+  IntegrationV2 integration = 1;
+}
+
 message Integration {
   message Metadata {
     string id = 1;
@@ -568,6 +655,75 @@ message Integration {
   Metadata metadata = 1;
   Spec spec = 2;
   Status status = 3;
+}
+
+message IntegrationV2 {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string integration_name = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+  }
+
+  message Parameter {
+    string name = 1;
+    string label = 2;
+    string description = 3;
+    string type = 4;
+    string value = 5;
+    bool editable = 6;
+  }
+
+  message Secret {
+    string name = 1;
+    string label = 2;
+    string description = 3;
+  }
+
+  message Status {
+    repeated Parameter parameters = 1;
+    repeated Secret secrets = 2;
+    repeated Capability capabilities = 3;
+    string state = 4;
+    string state_description = 5;
+    SetupStepDefinition next_step = 6;
+  }
+
+  message Capability {
+    enum Type {
+      UNKNOWN = 0;
+      COMPONENT = 1;
+      TRIGGER = 2;
+    }
+
+    Type type = 1;
+    Components.Component component = 2;
+    Triggers.Trigger trigger = 3;
+  }
+
+  message SetupStepDefinition {
+    enum Type {
+      UNKNOWN = 0;
+      INPUTS = 1;
+      REDIRECT_PROMPT = 2;
+    }
+
+    message RedirectPrompt {
+      string url = 1;
+      string method = 2;
+      map<string, string> form_fields = 3;
+    }
+
+    Type type = 1;
+    string name = 2;
+    string instructions = 3;
+    repeated Configuration.Field inputs = 4;
+    RedirectPrompt redirect_prompt = 5;
+  }
+
+  Metadata metadata = 1;
+  Status status = 2;
 }
 
 message BrowserAction {
