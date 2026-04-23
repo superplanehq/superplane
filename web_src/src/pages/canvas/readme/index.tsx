@@ -97,13 +97,31 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const nodes = canvas.spec?.nodes ?? [];
   const nodesBySlug: Record<string, string> = {};
   const nodeIdBySlug: Record<string, string> = {};
-  for (const node of nodes) {
-    const slug = node.name || node.id;
-    if (!slug) continue;
-    nodesBySlug[slug] = node.name || slug;
-    if (node.id) {
-      nodeIdBySlug[slug] = node.id;
+  // Derive a chip-safe slug from a node name: lower-case, collapse any run of
+  // non [a-z0-9] into a single '-', trim leading/trailing '-'. That lets authors
+  // write `@check-every-10-minutes` and land on the node named "Check every 10
+  // minutes" — the renderer's token regex disallows spaces and punctuation, so
+  // without this alias multi-word names could not be chipped at all.
+  const kebabSlug = (value: string): string =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  const registerSlug = (slug: string | undefined, displayName: string, nodeId: string | undefined) => {
+    if (!slug) return;
+    if (!nodesBySlug[slug]) {
+      nodesBySlug[slug] = displayName;
     }
+    if (nodeId && !nodeIdBySlug[slug]) {
+      nodeIdBySlug[slug] = nodeId;
+    }
+  };
+  for (const node of nodes) {
+    const displayName = node.name || node.id || "";
+    if (!displayName) continue;
+    registerSlug(node.name, displayName, node.id);
+    registerSlug(node.id, displayName, node.id);
+    registerSlug(kebabSlug(displayName), displayName, node.id);
   }
 
   const linkForNode = (slug: string) => {
