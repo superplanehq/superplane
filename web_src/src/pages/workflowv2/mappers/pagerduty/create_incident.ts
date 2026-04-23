@@ -45,14 +45,14 @@ export const createIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as BaseNodeMetadata;
-  const configuration = node.configuration as any;
+  const nodeMetadata = node.metadata as BaseNodeMetadata | undefined;
+  const configuration = node.configuration as { urgency?: string } | undefined;
 
   if (nodeMetadata?.service?.name) {
     metadata.push({ icon: "bell", label: nodeMetadata.service.name });
   }
 
-  if (configuration.urgency) {
+  if (configuration?.urgency) {
     metadata.push({ icon: "funnel", label: "Urgency: " + configuration.urgency });
   }
 
