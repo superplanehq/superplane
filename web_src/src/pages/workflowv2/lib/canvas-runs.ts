@@ -7,7 +7,8 @@ import type {
 } from "@/api-client";
 import { formatDurationSeconds } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "../mappers";
+import { getState, getStateMap, getTriggerRenderer } from "../mappers";
+import { defaultStateFunction } from "../mappers/stateRegistry";
 import { buildEventInfo, buildExecutionInfo } from "../utils";
 
 export function resolveNodeIconSlug(
@@ -82,6 +83,52 @@ export function resolveExecutionDisplayStatus(execution: CanvasesCanvasNodeExecu
   return "unknown";
 }
 
+//
+// Returns the canonical EventState for an execution, bypassing per-component
+// state labels (e.g. "created" / "deleted"). Use this when you need a
+// canvas-consistent color without caring about the custom label. Components
+// without a specific mapper fall through to the default lifecycle logic in
+// `defaultStateFunction`. This is the colors-by-state side of
+// `resolveExecutionDisplayStatus`, which handles labels.
+//
+export function resolveExecutionEventState(execution: CanvasesCanvasNodeExecution): EventState {
+  return defaultStateFunction(buildExecutionInfo(execution));
+}
+
+//
+// Resolves the badge color (tailwind bg class) for an execution using the
+// component's own EventStateMap -- same lookup the canvas node does. This
+// picks up component-specific custom colors (e.g. wait's amber for
+// "pushed through") that aren't expressible via the canonical EventState
+// palette. Falls back to the canonical map via `defaultStateFunction` when
+// the component doesn't define a specific style.
+//
+export function resolveExecutionBadgeColor(
+  execution: CanvasesCanvasNodeExecution,
+  nodes: ComponentsNode[],
+): string {
+  const node = nodes.find((n) => n.id === execution.nodeId);
+  const componentName = node?.component?.name || "";
+  const execInfo = buildExecutionInfo(execution);
+  const stateResolver = getState(componentName);
+  const stateMap = getStateMap(componentName);
+  const customState = stateResolver(execInfo);
+  const customStyle = stateMap[customState];
+  if (customStyle?.badgeColor) return customStyle.badgeColor;
+
+  const canonical = defaultStateFunction(execInfo);
+  return (DEFAULT_EVENT_STATE_MAP[canonical] || DEFAULT_EVENT_STATE_MAP.neutral).badgeColor;
+}
+
+//
+// Tailwind bg class for a canonical EventState, used for non-execution
+// steps (trigger, synthetic queued). Executions should use
+// `resolveExecutionBadgeColor` so they pick up component-specific palettes.
+//
+export function badgeColorForEventState(state: EventState): string {
+  return (DEFAULT_EVENT_STATE_MAP[state] || DEFAULT_EVENT_STATE_MAP.neutral).badgeColor;
+}
+
 const STATUS_TO_EVENT_STATE: Record<string, EventState> = {
   completed: "success",
   success: "success",
@@ -138,10 +185,44 @@ export function resolveEventState(status: string): EventState {
   return STATUS_TO_EVENT_STATE[status] || "neutral";
 }
 
-export function getStatusBadgeProps(status: string) {
-  const eventState = resolveEventState(status);
-  const style = DEFAULT_EVENT_STATE_MAP[eventState];
-  const label = STATUS_LABELS[status] || status || "Unknown";
+//
+// Title-cases an unknown status label so component-specific states
+// (e.g. "created", "deleted", "power on") read nicely in UI pills instead
+// of looking like raw enums. Known labels from STATUS_LABELS already have
+// their own casing and take precedence.
+//
+function formatStatusLabel(status: string): string {
+  if (!status) return "Unknown";
+  const normalized = status.replace(/[_-]+/g, " ").trim();
+  if (!normalized) return "Unknown";
+  return normalized
+    .split(/\s+/)
+    .map((word) => (word.length > 0 ? word[0].toUpperCase() + word.slice(1) : word))
+    .join(" ");
+}
+
+//
+// Returns the visual props (badge color + label) for a raw status. Callers
+// that already know the exact color (e.g. resolved via
+// `resolveExecutionBadgeColor` against the component's own state map) can
+// pass it as `badgeColorOverride` so the pill matches the canvas for
+// component-specific colors like wait's amber "pushed through". If only
+// the canonical `eventState` is known we use the canonical palette. As a
+// last resort we fall back to mapping the raw status string.
+//
+export function getStatusBadgeProps(
+  status: string,
+  eventState?: EventState,
+  badgeColorOverride?: string,
+): { badgeColor: string; label: string } {
+  const label = STATUS_LABELS[status] || formatStatusLabel(status);
+
+  if (badgeColorOverride) {
+    return { badgeColor: badgeColorOverride, label };
+  }
+
+  const resolved = eventState ?? resolveEventState(status);
+  const style = DEFAULT_EVENT_STATE_MAP[resolved] || DEFAULT_EVENT_STATE_MAP.neutral;
   return { badgeColor: style.badgeColor, label };
 }
 

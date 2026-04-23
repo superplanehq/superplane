@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, FileText, Sparkles } from "lucide-react";
 
 import type {
   CanvasesCanvasNodeExecution,
@@ -8,15 +8,18 @@ import type {
   SuperplaneMeUser,
 } from "@/api-client";
 import type { ApprovalActionName, ApprovalActionParams } from "@/pages/workflowv2/useApprovalActionHandler";
+import { TimeAgo } from "@/components/TimeAgo";
 import { formatDurationSeconds } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import {
+  badgeColorForEventState,
   getStatusBadgeProps,
-  resolveEventState,
+  resolveExecutionBadgeColor,
   resolveExecutionDisplayStatus,
+  resolveExecutionEventState,
   resolveNodeIconSlug,
 } from "@/pages/workflowv2/lib/canvas-runs";
-import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
+import { type EventState } from "@/ui/componentBase";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { ReportMarkdown } from "./ReportMarkdown";
 import { StepRibbon, type RibbonStep } from "./StepRibbon";
@@ -129,7 +132,21 @@ interface Step {
   executionId?: string;
   name: string;
   componentName?: string;
+  /** Raw, possibly component-specific status label (e.g. "created", "deleted"). */
   status: string;
+  /**
+   * Canonical event state (success/failed/running/queued/...). Drives
+   * semantics (isRunning?, isQueued?) and is the color fallback.
+   */
+  eventState: EventState;
+  /**
+   * Resolved tailwind bg class for this step, matching the canvas node
+   * color. For executions this runs through the component's own
+   * EventStateMap so component-specific colors (e.g. wait's amber
+   * "pushed through") are honored. Other steps (trigger, queued) use the
+   * canonical palette.
+   */
+  badgeColor: string;
   finished: boolean;
   startOffsetMs: number;
   durationMs: number;
@@ -142,16 +159,6 @@ interface Step {
 }
 
 const DEFAULT_PUSH_THROUGH_COMPONENTS = new Set(["wait", "time_gate", "timegate"]);
-
-//
-// Accent color for the Activity row stripe. Derived from the canonical
-// EventState -> DEFAULT_EVENT_STATE_MAP pipeline so Activity, ribbon bars,
-// and badges stay in sync for a given status.
-//
-function accentForStatus(raw: string): string {
-  const state = resolveEventState(raw);
-  return DEFAULT_EVENT_STATE_MAP[state].badgeColor;
-}
 
 function isRunningState(state: EventState): boolean {
   return state === "running";
@@ -187,6 +194,8 @@ function buildSteps(
       name: triggerNode?.name || "Trigger",
       componentName: triggerNode?.trigger?.name,
       status: "triggered",
+      eventState: "triggered",
+      badgeColor: badgeColorForEventState("triggered"),
       finished: true,
       startOffsetMs: 0,
       durationMs: 0,
@@ -220,6 +229,8 @@ function buildSteps(
       name: node?.name || exec.nodeId.slice(0, 8),
       componentName: node?.component?.name || node?.trigger?.name,
       status: resolveExecutionDisplayStatus(exec, nodes),
+      eventState: resolveExecutionEventState(exec),
+      badgeColor: resolveExecutionBadgeColor(exec, nodes),
       finished,
       startOffsetMs: Math.max(0, startMs - runStartMs),
       durationMs: dur,
@@ -262,6 +273,8 @@ function buildSteps(
       name: node?.name || item.nodeId.slice(0, 8),
       componentName: node?.component?.name || node?.trigger?.name,
       status: "queued",
+      eventState: "queued",
+      badgeColor: badgeColorForEventState("queued"),
       finished: false,
       startOffsetMs: Math.max(0, startMs - runStartMs),
       durationMs: 0,
@@ -335,12 +348,9 @@ function ActivityRow({
     parameters: ApprovalActionParams,
   ) => void | Promise<void>;
 }) {
-  const eventState = resolveEventState(step.status);
-  const badge = getStatusBadgeProps(step.status);
-  const accent = accentForStatus(step.status);
-  const isRunning = isRunningState(eventState);
-  const isError = eventState === "failed" || eventState === "error";
-  const isQueued = eventState === "queued";
+  const eventState = step.eventState;
+  const badge = getStatusBadgeProps(step.status, eventState, step.badgeColor);
+  const accent = step.badgeColor;
   const clickable = !!onOpenDetail;
 
   const handleRowClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -382,25 +392,13 @@ function ActivityRow({
         </span>
         <StepIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={step.name} />
         <span className="min-w-0 truncate text-sm font-medium text-gray-800">{step.name}</span>
-        {step.executionId ? (
-          <span className="shrink-0 font-mono text-[10px] text-gray-400">#{step.executionId.slice(0, 6)}</span>
+        {step.startedAt ? (
+          <span className="shrink-0 text-[11px] tabular-nums text-gray-400">
+            <TimeAgo date={step.startedAt} />
+          </span>
         ) : null}
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] tabular-nums">
-          {isRunning ? (
-            <span className="flex items-center gap-1 text-blue-600">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              running
-            </span>
-          ) : isError ? (
-            <span className="text-red-600">failed</span>
-          ) : isQueued ? (
-            <span className="text-yellow-700">
-              {step.status === "waiting" ? "waiting" : "queued"}
-            </span>
-          ) : null}
-        </div>
         {(canPushThrough || canCancel || canApprove) && (
-          <div className="ml-1 flex shrink-0 items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             {canApprove && approvalIndex != null && (
               <>
                 <button
@@ -460,6 +458,55 @@ function ActivityRow({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+//
+// Empty state for the Report card. Shown when a run produced no
+// reportTemplate output at all (no entries and no errors). Intentionally
+// airy -- the default card layout compresses down to a one-liner and
+// feels like a missing section rather than a feature. This gives the
+// user a clear "here's what this is for + here's how to opt in".
+//
+function ReportEmptyState() {
+  return (
+    <div className="relative flex flex-col items-center gap-3 overflow-hidden rounded-md border border-dashed border-slate-200 bg-gradient-to-b from-slate-50/60 to-white px-6 py-8 text-center">
+      <span
+        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-indigo-100/40 blur-2xl"
+        aria-hidden
+      />
+      <span
+        className="pointer-events-none absolute -bottom-8 -left-6 h-24 w-24 rounded-full bg-emerald-100/40 blur-2xl"
+        aria-hidden
+      />
+
+      <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white text-indigo-500 shadow-sm ring-1 ring-slate-200">
+        <FileText className="h-5 w-5" />
+        <Sparkles className="absolute -right-1 -top-1 h-3 w-3 text-amber-400" aria-hidden />
+      </div>
+
+      <div className="relative flex max-w-md flex-col gap-1">
+        <p className="text-sm font-semibold text-gray-800">No report for this run</p>
+        <p className="text-xs leading-relaxed text-gray-500">
+          Reports surface the most important output of a run at a glance. Add a{" "}
+          <code className="rounded bg-slate-100 px-1 py-[1px] font-mono text-[11px] text-slate-700">reportTemplate</code>{" "}
+          to any trigger or component to populate this section.
+        </p>
+      </div>
+
+      <div className="relative mt-1 w-full max-w-sm rounded-md border border-slate-200 bg-white p-3 text-left shadow-sm">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+          <FileText className="h-3 w-3" />
+          Example
+        </div>
+        <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-slate-700">
+{`reportTemplate: |
+  ### Deploy to production
+  - **Version**: \`{{ outputs.version }}\`
+  - **Region**: {{ inputs.region }}`}
+        </pre>
       </div>
     </div>
   );
@@ -543,6 +590,8 @@ export function RunSummary({
           key: s.key,
           name: s.name,
           status: s.status,
+          eventState: s.eventState,
+          badgeColor: s.badgeColor,
           isTrigger: s.isTrigger,
           durationMs: s.durationMs,
           finished: s.finished,
@@ -552,7 +601,6 @@ export function RunSummary({
           startedAt: s.startedAt,
           finishedAt: s.finishedAt,
           elapsedMs: s.elapsedMs,
-          executionId: s.executionId,
           error: s.error,
         };
       }),
@@ -614,7 +662,7 @@ export function RunSummary({
                 const canCancel =
                   !!step.executionId &&
                   !!onCancelExecution &&
-                  isRunningState(resolveEventState(step.status));
+                  isRunningState(step.eventState);
 
                 const execution = step.executionId ? executionMap.get(step.executionId) : undefined;
                 const approvalIndex =
@@ -666,10 +714,7 @@ export function RunSummary({
               })}
             </div>
           ) : (
-            <div className="text-xs text-gray-500">
-              No report entries yet. Add a <code className="rounded bg-gray-100 px-0.5">reportTemplate</code> to your
-              triggers or components to populate the report.
-            </div>
+            <ReportEmptyState />
           )}
         </div>
       </div>

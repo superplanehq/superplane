@@ -2,7 +2,7 @@ import React from "react";
 
 import { cn, resolveIcon } from "@/lib/utils";
 import { formatDurationSeconds } from "@/lib/duration";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 import { TimeAgo } from "@/components/TimeAgo";
 import {
@@ -12,16 +12,22 @@ import {
 import { AlertTriangle } from "lucide-react";
 
 //
-// One step as seen by the ribbon. Carries the raw status string so the
-// ribbon can apply the same color mapping as badges/nodes via
-// resolveEventState + DEFAULT_EVENT_STATE_MAP. Everything else is hover-card
-// metadata; RibbonStep is intentionally small and the ribbon doesn't need
-// to know about the underlying Step type used inside RunSummary.
+// One step as seen by the ribbon. `status` is the raw label (can be a
+// component-specific string like "created" or "pushed through"),
+// `eventState` is the canonical state used for semantics (counts, running
+// detection), and `badgeColor` is the exact tailwind bg class the canvas
+// node uses for this step. We keep both because some components
+// (e.g. wait) define custom colors that don't exist in the canonical
+// EventState palette -- pushing the color through from the component's
+// own EventStateMap is the only way to stay consistent with the canvas.
+// When `badgeColor` is absent the ribbon falls back to the canonical map.
 //
 export interface RibbonStep {
   key: string;
   name: string;
   status: string;
+  eventState?: EventState;
+  badgeColor?: string;
   isTrigger: boolean;
   durationMs: number;
   finished: boolean;
@@ -31,7 +37,6 @@ export interface RibbonStep {
   startedAt?: string;
   finishedAt?: string;
   elapsedMs?: number;
-  executionId?: string;
   error?: string;
 }
 
@@ -42,16 +47,27 @@ interface StepRibbonProps {
 }
 
 //
-// Resolves the tailwind bg class for a ribbon bar. Triggers are rendered in
-// the "triggered" (violet) palette regardless of the underlying execution
-// status so they stay visually distinct from executions of the same run.
+// Canonical state for the ribbon. Triggers always render as "triggered"
+// (violet) regardless of the underlying execution status so they stay
+// visually distinct. For everything else we prefer the explicit `eventState`
+// the caller passes (which comes from the component's own state resolver,
+// matching the canvas), falling back to the global status -> state map.
+//
+function stateFor(step: RibbonStep): EventState {
+  if (step.isTrigger) return "triggered";
+  return step.eventState ?? resolveEventState(step.status);
+}
+
+//
+// Prefer the caller-provided `badgeColor` (resolved via the component's
+// own EventStateMap) so per-component custom colors land correctly. Fall
+// back to the canonical palette for cases where no explicit color is
+// known (triggers, synthetic queued items, old call sites).
 //
 function barColorClass(step: RibbonStep): string {
-  if (step.isTrigger) {
-    return DEFAULT_EVENT_STATE_MAP.triggered.badgeColor;
-  }
-  const eventState = resolveEventState(step.status);
-  return DEFAULT_EVENT_STATE_MAP[eventState].badgeColor;
+  if (step.badgeColor) return step.badgeColor;
+  const state = stateFor(step);
+  return (DEFAULT_EVENT_STATE_MAP[state] || DEFAULT_EVENT_STATE_MAP.neutral).badgeColor;
 }
 
 function formatMs(ms: number): string {
@@ -70,7 +86,7 @@ function buildCaption(steps: RibbonStep[], totalDurationMs: number): string {
   //
   const buckets = { running: 0, success: 0, failed: 0, error: 0, cancelled: 0 };
   for (const step of execSteps) {
-    const state = resolveEventState(step.status);
+    const state = stateFor(step);
     if (state === "running" || state === "queued") buckets.running += 1;
     else if (state === "success") buckets.success += 1;
     else if (state === "failed") buckets.failed += 1;
@@ -125,8 +141,12 @@ function formatAbsolute(value: string): string {
 }
 
 function StepHoverCardContent({ step }: { step: RibbonStep }) {
-  const eventState = step.isTrigger ? "triggered" : resolveEventState(step.status);
-  const badge = getStatusBadgeProps(step.isTrigger ? "triggered" : step.status);
+  const eventState = stateFor(step);
+  const badge = getStatusBadgeProps(
+    step.isTrigger ? "triggered" : step.status,
+    eventState,
+    step.badgeColor,
+  );
   const isRunning = !step.isTrigger && !step.finished && eventState !== "queued";
   const finishedAt = step.finished ? step.finishedAt : undefined;
   const elapsedDisplay =
@@ -204,14 +224,6 @@ function StepHoverCardContent({ step }: { step: RibbonStep }) {
           </div>
         ) : null}
 
-        {step.executionId && !step.isTrigger ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-gray-500">Execution</span>
-            <span className="font-mono text-[10px] text-gray-500">
-              #{step.executionId.slice(0, 6)}
-            </span>
-          </div>
-        ) : null}
       </div>
 
       {step.error ? (
@@ -233,9 +245,13 @@ export function StepRibbon({ steps, totalDurationMs, onStepClick }: StepRibbonPr
     <div className="flex flex-col gap-1.5">
       <div className="flex h-2 w-full items-stretch gap-[2px]">
         {steps.map((step) => {
-          const eventState = step.isTrigger ? "triggered" : resolveEventState(step.status);
+          const eventState = stateFor(step);
           const isActive = !step.isTrigger && eventState === "running";
-          const badge = getStatusBadgeProps(step.isTrigger ? "triggered" : step.status);
+          const badge = getStatusBadgeProps(
+            step.isTrigger ? "triggered" : step.status,
+            eventState,
+            step.badgeColor,
+          );
           return (
             <HoverCard key={step.key} openDelay={150} closeDelay={80}>
               <HoverCardTrigger asChild>
