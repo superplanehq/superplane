@@ -55,22 +55,25 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("canvas %q not found", ctx.Args[0])
 	}
 
-	node, err := findStartTriggerNode(*describeResp.Canvas, nodeID)
+	_, err = findStartTriggerNode(*describeResp.Canvas, nodeID)
 	if err != nil {
 		return err
 	}
 
-	payload, err := resolveStartTemplatePayload(node, templateName, payloadOverride)
-	if err != nil {
-		return err
+	params := map[string]any{"template": templateName}
+	if payloadOverride != "" {
+		parsed := map[string]any{}
+		if err := json.Unmarshal([]byte(payloadOverride), &parsed); err != nil {
+			return fmt.Errorf("invalid --payload-json: %w", err)
+		}
+		params["payload"] = parsed
 	}
 
-	body := openapi_client.NewCanvasesEmitNodeEventBody()
-	body.SetChannel(templateName)
-	body.SetData(payload)
+	body := openapi_client.NewCanvasesInvokeNodeTriggerActionBody()
+	body.SetParameters(params)
 
-	emitResp, _, err := ctx.API.CanvasNodeAPI.
-		CanvasesEmitNodeEvent(ctx.Context, canvasID, nodeID).
+	resp, _, err := ctx.API.CanvasNodeAPI.
+		CanvasesInvokeNodeTriggerAction(ctx.Context, canvasID, nodeID, "run").
 		Body(*body).
 		Execute()
 	if err != nil {
@@ -78,11 +81,11 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(emitResp)
+		return ctx.Renderer.Render(resp)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, err := fmt.Fprintf(stdout, "Event emitted: %s\n", emitResp.GetEventId())
+		_, err := fmt.Fprintf(stdout, "Run started\n")
 		return err
 	})
 }
@@ -116,59 +119,4 @@ func findStartTriggerNode(
 	}
 
 	return openapi_client.SuperplaneComponentsNode{}, fmt.Errorf("node %q not found on canvas", nodeID)
-}
-
-func resolveStartTemplatePayload(
-	node openapi_client.SuperplaneComponentsNode,
-	templateName string,
-	payloadOverride string,
-) (map[string]any, error) {
-	config := node.GetConfiguration()
-	rawTemplates, ok := config["templates"]
-	if !ok || rawTemplates == nil {
-		return nil, fmt.Errorf(
-			"node %q has no templates configured; add at least one template to the Manual Run trigger",
-			node.GetId(),
-		)
-	}
-
-	templates, ok := rawTemplates.([]any)
-	if !ok {
-		return nil, fmt.Errorf("node %q has invalid templates configuration (expected list)", node.GetId())
-	}
-
-	names := make([]string, 0, len(templates))
-	for _, raw := range templates {
-		item, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		name, _ := item["name"].(string)
-		names = append(names, name)
-
-		if name != templateName {
-			continue
-		}
-
-		if payloadOverride != "" {
-			parsed := map[string]any{}
-			if err := json.Unmarshal([]byte(payloadOverride), &parsed); err != nil {
-				return nil, fmt.Errorf("invalid --payload-json: %w", err)
-			}
-			return parsed, nil
-		}
-
-		payload, ok := item["payload"].(map[string]any)
-		if !ok {
-			return map[string]any{}, nil
-		}
-
-		return payload, nil
-	}
-
-	return nil, fmt.Errorf(
-		"template %q not found on node %q. Available templates: %s",
-		templateName, node.GetId(), strings.Join(names, ", "),
-	)
 }

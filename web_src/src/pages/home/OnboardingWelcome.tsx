@@ -1,7 +1,6 @@
 import {
   canvasesCreateCanvas,
   canvasesDescribeCanvas,
-  canvasesEmitNodeEvent,
   canvasesListCanvasEvents,
   canvasesListEventExecutions,
   canvasesUpdateCanvasVersion2,
@@ -182,50 +181,31 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         }),
       );
 
-      const triggerNode = nodes.find((n: any) => n.trigger?.name === "schedule");
       const httpNode = nodes.find((n: any) => n.component?.name === "http");
-      let emittedEventId: string | undefined;
 
-      if (triggerNode) {
-        const now = new Date();
+      let eventId: string | undefined;
+      for (let i = 0; i < 30; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
         try {
-          const emitResponse = await canvasesEmitNodeEvent(
-            withOrganizationHeader({
-              path: { canvasId, nodeId: triggerNode.id },
-              body: {
-                channel: "default",
-                data: {
-                  type: "scheduler.tick",
-                  timestamp: now.toISOString(),
-                  data: {
-                    calendar: {
-                      year: String(now.getFullYear()),
-                      month: now.toLocaleString("en-US", { month: "long" }),
-                      day: String(now.getDate()),
-                      hour: String(now.getHours()).padStart(2, "0"),
-                      minute: String(now.getMinutes()).padStart(2, "0"),
-                      second: String(now.getSeconds()).padStart(2, "0"),
-                      week_day: now.toLocaleString("en-US", { weekday: "long" }),
-                    },
-                  },
-                },
-              },
-            }),
+          const eventsResp = await canvasesListCanvasEvents(
+            withOrganizationHeader({ path: { canvasId }, query: { limit: 1 } }),
           );
-          emittedEventId = emitResponse.data?.eventId;
+          const firstEvent = eventsResp.data?.events?.[0];
+          if (firstEvent?.id) {
+            eventId = firstEvent.id;
+            break;
+          }
         } catch {
-          // Best-effort; the regular schedule will fire within ten minutes.
+          break;
         }
       }
 
-      if (emittedEventId && httpNode?.id) {
+      if (eventId && httpNode?.id) {
         for (let i = 0; i < 15; i++) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           try {
             const execResp = await canvasesListEventExecutions(
-              withOrganizationHeader({
-                path: { canvasId, eventId: emittedEventId },
-              }),
+              withOrganizationHeader({ path: { canvasId, eventId } }),
             );
             const httpDone = (execResp.data?.executions ?? []).some(
               (e) => e.nodeId === httpNode.id && e.state === "STATE_FINISHED",
@@ -235,8 +215,6 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
             break;
           }
         }
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
       await canvasesUpdateCanvasVersion2(
