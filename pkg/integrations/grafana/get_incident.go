@@ -52,7 +52,7 @@ func (g *GetIncident) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (g *GetIncident) ExampleOutput() map[string]any {
-	return exampleIncidentOutput("grafana.incident")
+	return exampleIncidentOutput("grafana.incident", false)
 }
 
 func (g *GetIncident) Configuration() []configuration.Field {

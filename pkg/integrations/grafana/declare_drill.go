@@ -57,7 +57,7 @@ func (d *DeclareDrill) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (d *DeclareDrill) ExampleOutput() map[string]any {
-	return exampleIncidentOutput("grafana.incident.declared")
+	return exampleIncidentOutput("grafana.incident.declared", true)
 }
 
 func (d *DeclareDrill) Configuration() []configuration.Field {
