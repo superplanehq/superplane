@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
