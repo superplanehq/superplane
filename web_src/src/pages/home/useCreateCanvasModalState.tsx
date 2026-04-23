@@ -1,18 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useCreateCanvas, useUpdateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
+import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import type { SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
-
-type ModalMode = "create" | "edit";
-
-type WorkflowSummary = {
-  id: string;
-  name: string;
-  description?: string;
-  nodes?: SuperplaneComponentsNode[];
-  edges?: SuperplaneComponentsEdge[];
-};
 
 type WorkflowTemplateSummary = {
   id: string;
@@ -26,27 +16,16 @@ export function useCreateCanvasModalState() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
 
-  const [modalState, setModalState] = useState<{ mode: ModalMode; workflow?: WorkflowSummary } | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const onOpen = () => setModalState({ mode: "create" });
-  const onOpenEdit = (workflow: WorkflowSummary) => setModalState({ mode: "edit", workflow });
-  const onClose = () => setModalState(null);
+  const onOpen = () => setIsOpen(true);
+  const onClose = () => setIsOpen(false);
 
   const createMutation = useCreateCanvas(organizationId || "");
-  const updateMutation = useUpdateCanvas(organizationId || "", modalState?.workflow?.id || "");
   const { data: workflowTemplates = [] } = useCanvasTemplates(organizationId || "");
 
   const onSubmit = async (data: { name: string; description?: string; templateId?: string }) => {
     if (!organizationId) {
-      return;
-    }
-
-    if (modalState?.mode === "edit" && modalState.workflow?.id) {
-      await updateMutation.mutateAsync({
-        name: data.name,
-        description: data.description,
-      });
-      onClose();
       return;
     }
 
@@ -65,16 +44,12 @@ export function useCreateCanvasModalState() {
   };
 
   return {
-    isOpen: modalState !== null,
+    isOpen,
     onOpen,
-    onOpenEdit,
     onClose,
     onSubmit,
-    isLoading: modalState?.mode === "edit" ? updateMutation.isPending : createMutation.isPending,
+    isLoading: createMutation.isPending,
     organizationId,
-    initialData: modalState?.workflow
-      ? { name: modalState.workflow.name, description: modalState.workflow.description }
-      : undefined,
     templates: workflowTemplates
       .filter((template) => !!template.metadata?.id)
       .map((template) => ({
@@ -84,6 +59,5 @@ export function useCreateCanvasModalState() {
         nodes: template.spec?.nodes,
         edges: template.spec?.edges,
       })) as WorkflowTemplateSummary[],
-    mode: modalState?.mode ?? "create",
   };
 }

@@ -11,6 +11,7 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestCanvasChangeManagementEnforcement(t *testing.T) {
@@ -22,6 +23,7 @@ func TestCanvasChangeManagementEnforcement(t *testing.T) {
 		steps.setCanvasChangeManagementInDB(false)
 		steps.setOrganizationChangeManagementInDB(true)
 
+		steps.enterEditMode()
 		steps.visitCanvasSettings()
 		steps.assertCanvasChangeManagementToggleChecked(true)
 		steps.assertCanvasChangeManagementToggleDisabled()
@@ -31,7 +33,7 @@ func TestCanvasChangeManagementEnforcement(t *testing.T) {
 		steps.assertCanvasChangeManagementInDB(false)
 	})
 
-	t.Run("organization change management disabled allows per-canvas on and off", func(t *testing.T) {
+	t.Run("organization change management disabled allows enabling per-canvas and blocks direct live edits once enabled", func(t *testing.T) {
 		steps := &canvasChangeManagementEnforcementSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("E2E Canvas Change Mgmt Org Off")
@@ -39,6 +41,8 @@ func TestCanvasChangeManagementEnforcement(t *testing.T) {
 		steps.setOrganizationChangeManagementInDB(false)
 		steps.setCanvasChangeManagementInDB(false)
 
+		steps.enterEditMode()
+		steps.assertHeaderActionVisible("Publish")
 		steps.visitCanvasSettings()
 		steps.assertCanvasChangeManagementToggleEnabled()
 		steps.assertCanvasChangeManagementToggleChecked(false)
@@ -46,13 +50,22 @@ func TestCanvasChangeManagementEnforcement(t *testing.T) {
 
 		steps.setCanvasChangeManagementToggle(true)
 		steps.saveCanvasSettings()
+		steps.assertDraftChangeManagementInDB(true)
+		steps.assertCanvasChangeManagementInDB(false)
+		steps.assertHeaderActionEnabled("Publish")
+		steps.canvas.Publish()
 		steps.assertCanvasChangeManagementInDB(true)
 
+		steps.enterEditMode()
+		steps.assertHeaderActionVisible("Propose Change")
 		steps.visitCanvasSettings()
 		steps.assertCanvasChangeManagementToggleEnabled()
+		steps.assertCanvasChangeManagementToggleChecked(true)
 		steps.setCanvasChangeManagementToggle(false)
 		steps.saveCanvasSettings()
-		steps.assertCanvasChangeManagementInDB(false)
+		steps.assertDraftChangeManagementInDB(false)
+		steps.assertCanvasChangeManagementInDB(true)
+		steps.assertHeaderActionEnabled("Propose Change")
 	})
 }
 
@@ -83,16 +96,15 @@ func (s *canvasChangeManagementEnforcementSteps) setOrganizationChangeManagement
 }
 
 func (s *canvasChangeManagementEnforcementSteps) setCanvasChangeManagementInDB(enabled bool) {
-	err := database.Conn().
-		Model(&models.Canvas{}).
-		Where("id = ?", s.canvas.WorkflowID).
-		Update("change_management_enabled", enabled).
-		Error
-	require.NoError(s.t, err)
+	support.SetCanvasChangeManagementEnabled(s.t, s.canvas.WorkflowID, enabled)
+}
+
+func (s *canvasChangeManagementEnforcementSteps) enterEditMode() {
+	s.canvas.Visit()
+	s.canvas.EnterEditMode()
 }
 
 func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
-	s.canvas.Visit()
 	s.session.AssertVisible(q.Locator(`header button[aria-label="Canvas menu"]`))
 	s.session.Click(q.Locator(`header button[aria-label="Canvas menu"]`))
 	s.session.AssertVisible(q.Locator(`[role="menuitem"]:has-text("Settings")`))
@@ -103,8 +115,7 @@ func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
 
 func (s *canvasChangeManagementEnforcementSteps) saveCanvasSettings() {
 	s.session.Click(q.TestID("canvas-settings-save-changes"))
-	canvasPath := "/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String()
-	s.session.WaitForBrowserPath(canvasPath)
+	s.session.AssertHidden(q.TestID("canvas-settings-save-changes"))
 }
 
 func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementToggleDisabled() {
@@ -156,6 +167,53 @@ func (s *canvasChangeManagementEnforcementSteps) assertCanvasChangeManagementInD
 
 		if time.Now().After(deadline) {
 			s.t.Fatalf("expected change_management_enabled=%t, got %t", expected, canvas.ChangeManagementEnabled)
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func (s *canvasChangeManagementEnforcementSteps) assertDraftChangeManagementInDB(expected bool) {
+	deadline := time.Now().Add(3 * time.Second)
+
+	for {
+		draft := s.canvas.FindCurrentDraft()
+		if draft != nil && draft.ChangeManagementEnabled == expected {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			actual := "<nil>"
+			if draft != nil {
+				actual = "false"
+				if draft.ChangeManagementEnabled {
+					actual = "true"
+				}
+			}
+			s.t.Fatalf("expected draft change_management_enabled=%t, got %s", expected, actual)
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func (s *canvasChangeManagementEnforcementSteps) assertHeaderActionVisible(label string) {
+	s.session.AssertVisible(q.Locator(`header button:has-text("` + label + `")`))
+}
+
+func (s *canvasChangeManagementEnforcementSteps) assertHeaderActionEnabled(label string) {
+	button := q.Locator(`header button:has-text("` + label + `")`).Run(s.session)
+	deadline := time.Now().Add(8 * time.Second)
+
+	for {
+		disabled, err := button.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			s.t.Fatalf("%s button did not become enabled", label)
 		}
 
 		time.Sleep(200 * time.Millisecond)
