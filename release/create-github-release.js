@@ -7,6 +7,12 @@ const fs = require("fs");
 const path = require("path");
 
 const cliAssetPattern = /^superplane-cli-(darwin|linux)-(amd64|arm64)$/;
+const expectedCLIAssets = [
+  "superplane-cli-darwin-amd64",
+  "superplane-cli-darwin-arm64",
+  "superplane-cli-linux-amd64",
+  "superplane-cli-linux-arm64",
+];
 
 async function main() {
   const version = process.argv[2];
@@ -166,6 +172,24 @@ function loadCLIAssets(cliAssetsDir, cliAssetPrefix) {
     if (!cliAssetPattern.test(assetName)) {
       console.error(
         `Error: invalid CLI asset name ${assetName}. Expected superplane-cli-<os>-<arch> raw binaries.`
+      );
+      process.exit(1);
+    }
+  }
+
+  if (cliAssets.length !== expectedCLIAssets.length) {
+    console.error(
+      `Error: expected exactly ${expectedCLIAssets.length} CLI assets (${expectedCLIAssets.join(
+        ", "
+      )}), found ${cliAssets.length}: ${cliAssets.join(", ")}`
+    );
+    process.exit(1);
+  }
+
+  for (const expectedAsset of expectedCLIAssets) {
+    if (!cliAssets.includes(expectedAsset)) {
+      console.error(
+        `Error: missing CLI asset ${expectedAsset}. Release uploads must include the full supported platform matrix.`
       );
       process.exit(1);
     }
