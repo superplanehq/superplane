@@ -1,12 +1,16 @@
 package canvases
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -85,4 +89,49 @@ func ensureCanvasNameAvailableInTransaction(
 	}
 
 	return nil
+}
+
+func publishCanvasVersionInTransaction(
+	ctx context.Context,
+	tx *gorm.DB,
+	liveVersion *models.CanvasVersion,
+	nextVersion *models.CanvasVersion,
+	options changesets.CanvasPublisherOptions,
+) error {
+	changeset, err := changesets.NewChangesetBuilder(
+		liveVersion.Nodes,
+		liveVersion.Edges,
+		nextVersion.Nodes,
+		nextVersion.Edges,
+	).Build()
+	if err != nil {
+		return err
+	}
+
+	if len(changeset.GetChanges()) == 0 {
+		return models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges)
+	}
+
+	publisher, err := changesets.NewCanvasPublisher(tx, nextVersion, liveVersion, options)
+	if err != nil {
+		return err
+	}
+
+	return publisher.Publish(ctx)
+}
+
+func buildCanvasPublisherOptions(
+	reg *registry.Registry,
+	organizationUUID uuid.UUID,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+) changesets.CanvasPublisherOptions {
+	return changesets.CanvasPublisherOptions{
+		Registry:       reg,
+		OrgID:          organizationUUID,
+		Encryptor:      encryptor,
+		AuthService:    authService,
+		WebhookBaseURL: webhookBaseURL,
+	}
 }

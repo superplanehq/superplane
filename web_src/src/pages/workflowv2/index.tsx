@@ -547,13 +547,9 @@ export function WorkflowPageV2() {
       }),
     [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender],
   );
-  // Live change-management state still drives whether publishing goes directly
-  // to live or through a change-request flow, so latch from the live canvas.
-  const changeManagementEnabledRef = useRef(false);
-  if (liveCanvas?.spec?.changeManagement != null) {
-    changeManagementEnabledRef.current = liveCanvas.spec.changeManagement.enabled ?? false;
-  }
-  const isChangeManagementDisabled = !changeManagementEnabledRef.current;
+  const isLiveVersionChangeManagementEnabled =
+    liveCanvasVersion?.spec?.changeManagement?.enabled ?? liveCanvas?.spec?.changeManagement?.enabled ?? false;
+  const isChangeManagementDisabled = !isLiveVersionChangeManagementEnabled;
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);

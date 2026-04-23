@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -124,20 +123,13 @@ func publishDraftVersionInTransaction(
 			return err
 		}
 
-		publisher, err := changesets.NewCanvasPublisher(tx, version, liveVersion, changesets.CanvasPublisherOptions{
-			Registry:       reg,
-			OrgID:          organizationUUID,
-			Encryptor:      encryptor,
-			AuthService:    authService,
-			WebhookBaseURL: webhookBaseURL,
-		})
-
-		if err != nil {
-			log.Errorf("failed to create canvas publisher: %v", err)
-			return err
-		}
-
-		err = publisher.Publish(ctx)
+		err = publishCanvasVersionInTransaction(
+			ctx,
+			tx,
+			liveVersion,
+			version,
+			buildCanvasPublisherOptions(reg, organizationUUID, encryptor, authService, webhookBaseURL),
+		)
 		if err != nil {
 			log.Errorf("failed to publish canvas version: %v", err)
 			return err

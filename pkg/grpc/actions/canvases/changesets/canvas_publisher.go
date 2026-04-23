@@ -19,6 +19,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var errNoChangesToPublish = fmt.Errorf("no changes between live and draft version being applied")
+
 /*
  * CanvasPublisher takes the live version and the proposed version,
  * calculates the changeset to go from the live version to the proposed version,
@@ -88,8 +90,8 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	if err != nil {
 		return nil, err
 	}
-	if changeset == nil {
-		changeset = &pb.CanvasChangeset{}
+	if len(changeset.GetChanges()) == 0 {
+		return nil, errNoChangesToPublish
 	}
 
 	allNodes, err := models.FindCanvasNodesUnscopedInTransaction(tx, liveVersion.WorkflowID)

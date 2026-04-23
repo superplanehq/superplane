@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -157,18 +156,13 @@ func PublishCanvasChangeRequest(
 			return err
 		}
 
-		publisher, err := changesets.NewCanvasPublisher(tx, mergedVersion, liveVersion, changesets.CanvasPublisherOptions{
-			Registry:       registry,
-			OrgID:          organizationUUID,
-			Encryptor:      encryptor,
-			AuthService:    authService,
-			WebhookBaseURL: webhookBaseURL,
-		})
-		if err != nil {
-			return err
-		}
-
-		if err := publisher.Publish(ctx); err != nil {
+		if err := publishCanvasVersionInTransaction(
+			ctx,
+			tx,
+			liveVersion,
+			mergedVersion,
+			buildCanvasPublisherOptions(registry, organizationUUID, encryptor, authService, webhookBaseURL),
+		); err != nil {
 			return err
 		}
 
