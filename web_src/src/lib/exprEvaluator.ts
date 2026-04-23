@@ -708,6 +708,43 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   hasSuffix: (str: unknown, suffix: unknown) => String(str).endsWith(String(suffix)),
   contains: (str: unknown, sub: unknown) => String(str).includes(String(sub)),
 
+  // GitHub helpers
+  filePathMatches: (commits: unknown, pattern: unknown) => {
+    const pat = String(pattern);
+    // Convert glob pattern to regex matching GitHub Actions path-filter semantics:
+    //   **/ at start    → optional dir prefix  (.+/)?
+    //   /**/  in middle → / or /anything/      (/|/.+/)
+    //   **  elsewhere   → anything             .*
+    //   *               → within-segment       [^/]*
+    //
+    // All ** variants are replaced with NUL placeholders (\x00–\x02) *before* the
+    // single-* pass runs, so the single-* pass never clobbers the .* expansions.
+    // Placeholders are then swapped back to their final regex fragments last.
+    const reStr =
+      "^" +
+      pat
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&") // escape regex metacharacters (incl. ?)
+        .replace(/\/\*\*\//g, "\x00")           // /**/ → placeholder \x00
+        .replace(/^\*\*\//g, "\x01")            // **/ at start → placeholder \x01
+        .replace(/\*\*/g, "\x02")               // remaining ** → placeholder \x02
+        .replace(/\*/g, "[^/]*")                // * → within-segment wildcard
+        .replace(/\x00/g, "(/|/.+/)")           // restore /**/ → zero-or-more dirs
+        .replace(/\x01/g, "(.+/)?")             // restore **/ at start → optional prefix
+        .replace(/\x02/g, ".*") +               // restore remaining ** → .*
+      "$";
+    const re = new RegExp(reStr);
+    const commitList = Array.isArray(commits) ? commits : [];
+    return commitList.some((c: unknown) => {
+      const commit = c as Record<string, unknown>;
+      const files = [
+        ...((commit.added as string[]) ?? []),
+        ...((commit.modified as string[]) ?? []),
+        ...((commit.removed as string[]) ?? []),
+      ];
+      return files.some((f) => re.test(f));
+    });
+  },
+
   // Date functions
   now: () => new ExprDate(new Date()),
   date: (str: unknown) => new ExprDate(new Date(String(str))),
