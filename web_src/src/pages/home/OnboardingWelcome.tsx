@@ -6,6 +6,7 @@ import {
   canvasesListEventExecutions,
   canvasesUpdateCanvasVersion2,
 } from "@/api-client/sdk.gen";
+import type { CanvasesCanvas } from "@/api-client/types.gen";
 import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
 import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
 import { Heading } from "@/components/Heading/heading";
@@ -43,6 +44,23 @@ const QUICK_START_HTTP_URL_SERVER1 = "https://httpbin.org/status/200";
 const QUICK_START_HTTP_URL_SERVER2 = "https://httpbin.org/status/500";
 
 type Mode = "ui" | "cli" | "agent";
+
+function normalizeTemplateName(name: string) {
+  return name.trim().toLowerCase().replace(/ /g, "-");
+}
+
+function findQuickStartTemplate(templates: CanvasesCanvas[]) {
+  const normalizedQuickStartName = normalizeTemplateName(QUICK_START_TEMPLATE_NAME);
+
+  return templates.find((template) => {
+    const templateName = template.metadata?.name;
+    if (!templateName) {
+      return false;
+    }
+
+    return normalizeTemplateName(templateName) === normalizedQuickStartName;
+  });
+}
 
 const PERSONAS = [
   {
@@ -105,7 +123,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
   const { account } = useAccount();
   const { data: me } = useMe();
   const permissionAllowed = canCreateCanvases || permissionsLoading;
-  const { data: templates = [] } = useCanvasTemplates(organizationId);
+  const { data: templates = [], isLoading: templatesLoading } = useCanvasTemplates(organizationId);
   const [mode, setMode] = useState<Mode>("ui");
   const [isLaunchingQuickStart, setIsLaunchingQuickStart] = useState(false);
   const [isCreatingBlankCanvas, setIsCreatingBlankCanvas] = useState(false);
@@ -113,7 +131,12 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
   const firstName = account?.name?.split(" ")[0] || "";
 
   const handleQuickStart = async () => {
-    const template = templates.find((t: any) => t.metadata?.name === QUICK_START_TEMPLATE_NAME);
+    if (templatesLoading) {
+      showErrorToast("Templates are still loading. Please try again in a moment.");
+      return;
+    }
+
+    const template = findQuickStartTemplate(templates);
     if (!template) {
       showErrorToast("Quick start template not found. Please try again later.");
       return;
@@ -368,7 +391,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
               <PermissionTooltip allowed={permissionAllowed} message="You don't have permission to create canvases.">
                 <button
                   type="button"
-                  disabled={!canCreateCanvases || isLaunchingQuickStart}
+                  disabled={!canCreateCanvases || isLaunchingQuickStart || templatesLoading}
                   onClick={handleQuickStart}
                   className="group w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 mb-5 hover:shadow-lg hover:outline-primary/30 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -387,7 +410,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                         including approximately how long it stayed healthy.
                       </p>
                     </div>
-                    {isLaunchingQuickStart ? (
+                    {isLaunchingQuickStart || templatesLoading ? (
                       <Loader2 size={18} className="mt-0.5 text-gray-400 shrink-0 animate-spin" />
                     ) : (
                       <ArrowRight
@@ -422,8 +445,10 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                         No integrations
                       </span>
                     </div>
-                    {isLaunchingQuickStart ? (
-                      <span className="text-[11px] text-gray-400">Setting up...</span>
+                    {isLaunchingQuickStart || templatesLoading ? (
+                      <span className="text-[11px] text-gray-400">
+                        {templatesLoading ? "Loading template..." : "Setting up..."}
+                      </span>
                     ) : (
                       <span className="text-[11px] text-primary group-hover:underline">Get started</span>
                     )}

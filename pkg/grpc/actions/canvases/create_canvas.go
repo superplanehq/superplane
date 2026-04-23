@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -26,8 +27,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const ErrDuplicateCanvasName = "duplicate key value violates unique constraint"
-
 func CreateCanvas(
 	ctx context.Context,
 	registry *registry.Registry,
@@ -51,6 +50,12 @@ func CreateCanvas(
 		return nil, status.Error(codes.InvalidArgument, "templates cannot be created")
 	}
 
+	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
+	}
+	pbCanvas.Metadata.Name = name
+
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -67,9 +72,31 @@ func CreateCanvas(
 	}
 
 	createdBy := uuid.MustParse(userID)
-	changeManagementEnabled, err := models.IsChangeManagementEnabled(organizationID)
+	organizationChangeManagementEnabled, err := models.IsChangeManagementEnabled(organizationID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to load organization change management setting: %v", err)
+	}
+
+	changeManagementEnabled := organizationChangeManagementEnabled
+	changeRequestApprovers := models.DefaultCanvasChangeRequestApprovers()
+	if pbCanvas.Spec != nil && pbCanvas.Spec.ChangeManagement != nil {
+		changeManagementEnabled = pbCanvas.Spec.ChangeManagement.Enabled
+
+		approvers, parseErr := parseCanvasChangeRequestApprovalConfig(pbCanvas.Spec.ChangeManagement)
+		if parseErr != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", parseErr)
+		}
+
+		if approvers != nil {
+			if validateErr := validateCanvasChangeRequestApprovers(
+				authService,
+				organizationID.String(),
+				approvers,
+			); validateErr != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", validateErr)
+			}
+			changeRequestApprovers = approvers
+		}
 	}
 
 	canvasCount, err := models.CountCanvasesByOrganization(organizationID.String())
@@ -94,28 +121,29 @@ func CreateCanvas(
 
 	now := time.Now()
 	canvas := models.Canvas{
-		ID:                      canvasID,
-		OrganizationID:          organizationID,
-		LiveVersionID:           &versionID,
-		IsTemplate:              false,
-		ChangeManagementEnabled: changeManagementEnabled,
-		Name:                    pbCanvas.Metadata.Name,
-		Description:             pbCanvas.Metadata.Description,
-		CreatedBy:               &createdBy,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:             canvasID,
+		OrganizationID: organizationID,
+		LiveVersionID:  &versionID,
+		IsTemplate:     false,
+		CreatedBy:      &createdBy,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationID, canvasID, name)
+		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
+			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+		}
+		if findErr != nil {
+			return findErr
+		}
 
 		//
 		// Create the workflow record
 		//
 		err := tx.Clauses(clause.Returning{}).Create(&canvas).Error
 		if err != nil {
-			if strings.Contains(err.Error(), ErrDuplicateCanvasName) {
-				return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
-			}
 			return err
 		}
 
@@ -123,15 +151,19 @@ func CreateCanvas(
 		// Create new empty canvas version record
 		//
 		emptyVersion := models.CanvasVersion{
-			ID:          versionID,
-			WorkflowID:  canvasID,
-			OwnerID:     &createdBy,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:                      versionID,
+			WorkflowID:              canvasID,
+			OwnerID:                 &createdBy,
+			State:                   models.CanvasVersionStatePublished,
+			Name:                    name,
+			Description:             pbCanvas.Metadata.Description,
+			ChangeManagementEnabled: changeManagementEnabled,
+			ChangeRequestApprovers:  datatypes.NewJSONSlice(changeRequestApprovers),
+			PublishedAt:             &now,
+			Nodes:                   datatypes.NewJSONSlice([]models.Node{}),
+			Edges:                   datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:               &now,
+			UpdatedAt:               &now,
 		}
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {
@@ -189,6 +221,8 @@ func CreateCanvas(
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
+
+	canvas.ChangeManagementEnabled = changeManagementEnabled
 
 	var user *models.User
 	if canvas.CreatedBy != nil {

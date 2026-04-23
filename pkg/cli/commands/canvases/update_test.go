@@ -150,7 +150,15 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 		requestExpectation{
 			method: http.MethodPut,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				rawBody, _ := io.ReadAll(r.Body)
+				var payload map[string]any
+				_ = json.Unmarshal(rawBody, &payload)
+				canvasPayload := payload["canvas"].(map[string]any)
+				specPayload := canvasPayload["spec"].(map[string]any)
+				cm := specPayload["changeManagement"].(map[string]any)
+				require.Equal(t, true, cm["enabled"])
+
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
 			},
@@ -162,20 +170,6 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
-			},
-		},
-		// 6. Enable change management after spec update
-		requestExpectation{
-			method: http.MethodPut,
-			path:   "/api/v1/canvases/" + canvasID,
-			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-				rawBody, _ := io.ReadAll(r.Body)
-				var payload map[string]any
-				_ = json.Unmarshal(rawBody, &payload)
-				cm := payload["changeManagement"].(map[string]any)
-				require.Equal(t, true, cm["enabled"])
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
 	)
@@ -194,11 +188,10 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
-		http.MethodPut + " /api/v1/canvases/" + canvasID,
 	})
 }
 
-func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
+func TestUpdateFromFileRequiresDraftWhenLiveChangeManagementIsEnabled(t *testing.T) {
 	t.Helper()
 
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
@@ -214,73 +207,6 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
-		// 2. Resolve org to check if disable is allowed
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/me",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/organizations/org-1",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1"},"spec":{"changeManagementEnabled":false}}}`))
-			},
-		},
-		// 3. Disable change management
-		requestExpectation{
-			method: http.MethodPut,
-			path:   "/api/v1/canvases/" + canvasID,
-			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-				rawBody, _ := io.ReadAll(r.Body)
-				var payload map[string]any
-				_ = json.Unmarshal(rawBody, &payload)
-				cm := payload["changeManagement"].(map[string]any)
-				require.Equal(t, false, cm["enabled"])
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
-			},
-		},
-		// 4. List versions (no existing draft)
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[]}`))
-			},
-		},
-		// 5. Create draft version
-		requestExpectation{
-			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
-			},
-		},
-		// 6. Update draft version
-		requestExpectation{
-			method: http.MethodPut,
-			path:   "/api/v1/canvases/" + canvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
-			},
-		},
-		// 7. Auto-publish
-		requestExpectation{
-			method: http.MethodPatch,
-			path:   "/api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
-			},
-		},
 	)
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, false)
@@ -289,17 +215,15 @@ func TestUpdateFromFileDisablesChangeManagementBeforeSpecUpdate(t *testing.T) {
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.Contains(
+		t,
+		err.Error(),
+		"change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`",
+	)
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/me",
-		http.MethodGet + " /api/v1/organizations/org-1",
-		http.MethodPut + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
-		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
-		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
-		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
 	})
 }
 
@@ -319,24 +243,11 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 			},
 		},
 		requestExpectation{
-			method: http.MethodPut,
-			path:   "/api/v1/canvases/" + canvasID,
-			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-				rawBody, _ := io.ReadAll(r.Body)
-				var payload map[string]any
-				_ = json.Unmarshal(rawBody, &payload)
-				cm := payload["changeManagement"].(map[string]any)
-				require.Equal(t, true, cm["enabled"])
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
-			},
-		},
-		requestExpectation{
 			method: http.MethodGet,
 			path:   "/api/v1/canvases/" + canvasID + "/versions",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","isPublished":false}}]}`))
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
 			},
 		},
 		requestExpectation{
@@ -347,6 +258,10 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 				var payload map[string]any
 				_ = json.Unmarshal(rawBody, &payload)
 				require.Equal(t, "draft-1", payload["versionId"])
+				canvasPayload := payload["canvas"].(map[string]any)
+				specPayload := canvasPayload["spec"].(map[string]any)
+				cm := specPayload["changeManagement"].(map[string]any)
+				require.Equal(t, true, cm["enabled"])
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
 			},
@@ -363,13 +278,12 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodPut + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 	})
 }
 
-func TestUpdateFromFileDisableChangeManagementFailsWhenOrganizationEnforcesIt(t *testing.T) {
+func TestUpdateFromFileDisableChangeManagementRequiresDraftWhenLiveChangeManagementIsEnabled(t *testing.T) {
 	t.Helper()
 
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
@@ -384,22 +298,6 @@ func TestUpdateFromFileDisableChangeManagementFailsWhenOrganizationEnforcesIt(t 
 				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":true}}}}`))
 			},
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/me",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/organizations/org-1",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1"},"spec":{"changeManagementEnabled":true}}}`))
-			},
-		},
 	)
 
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, false)
@@ -409,12 +307,10 @@ func TestUpdateFromFileDisableChangeManagementFailsWhenOrganizationEnforcesIt(t 
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot disable change management")
+	require.Contains(t, err.Error(), "change management is enabled for this canvas")
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
-		http.MethodGet + " /api/v1/me",
-		http.MethodGet + " /api/v1/organizations/org-1",
 	})
 }
 

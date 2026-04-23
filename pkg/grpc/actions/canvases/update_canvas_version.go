@@ -90,6 +90,26 @@ func UpdateCanvasVersionWithUsage(
 		return nil, err
 	}
 
+	changeManagementEnabled := false
+	var changeRequestApprovers []models.CanvasChangeRequestApprover
+	if pbCanvas.Spec != nil && pbCanvas.Spec.ChangeManagement != nil {
+		changeManagementEnabled = pbCanvas.Spec.ChangeManagement.Enabled
+
+		changeRequestApprovers, err = parseCanvasChangeRequestApprovalConfig(pbCanvas.Spec.ChangeManagement)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", err)
+		}
+		if changeRequestApprovers != nil {
+			if validateErr := validateCanvasChangeRequestApprovers(
+				authService,
+				organizationID,
+				changeRequestApprovers,
+			); validateErr != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", validateErr)
+			}
+		}
+	}
+
 	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
@@ -153,7 +173,28 @@ func UpdateCanvasVersionWithUsage(
 			return draftErr
 		}
 
+		nextName := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
+		if nextName == "" {
+			return status.Error(codes.InvalidArgument, "canvas name is required")
+		}
+
+		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, nextName)
+		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
+			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+		}
+		if findErr != nil {
+			return findErr
+		}
+
 		now := time.Now()
+		version.Name = nextName
+		version.Description = pbCanvas.GetMetadata().GetDescription()
+		if pbCanvas.Spec != nil && pbCanvas.Spec.ChangeManagement != nil {
+			version.ChangeManagementEnabled = changeManagementEnabled
+			if changeRequestApprovers != nil {
+				version.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
+			}
+		}
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
