@@ -209,15 +209,10 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	var envelope map[string]any
-	if err := json.Unmarshal(ctx.Body, &envelope); err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse webhook body: %w", err)
-	}
-
-	// Handle ONS subscription confirmation handshake.
+	// Handle ONS subscription confirmation handshake before parsing the body.
 	// For CUSTOM_HTTPS subscriptions, OCI sends the confirmation URL in the
-	// X-OCI-NS-ConfirmationURL HTTP header (not in the JSON body).
-	// The endpoint must GET that URL to activate the subscription.
+	// X-OCI-NS-ConfirmationURL HTTP header (not in the JSON body), and the
+	// confirmation payload may not be a valid JSON object.
 	if confirmURL := ctx.Headers.Get("X-OCI-NS-ConfirmationURL"); confirmURL != "" {
 		if err := validateONSConfirmationURL(confirmURL); err != nil {
 			return http.StatusBadRequest, nil, fmt.Errorf("refusing ONS confirmation URL: %w", err)
@@ -235,6 +230,11 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 			return http.StatusInternalServerError, nil, fmt.Errorf("ONS confirmation returned %d", resp.StatusCode)
 		}
 		return http.StatusOK, nil, nil
+	}
+
+	var envelope map[string]any
+	if err := json.Unmarshal(ctx.Body, &envelope); err != nil {
+		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse webhook body: %w", err)
 	}
 
 	eventType, _ := envelope["eventType"].(string)

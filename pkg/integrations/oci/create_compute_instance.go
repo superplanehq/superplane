@@ -366,7 +366,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 
 func (c *CreateComputeInstance) Setup(ctx core.SetupContext) error {
 	spec := CreateComputeInstanceSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
@@ -394,7 +394,7 @@ func (c *CreateComputeInstance) Setup(ctx core.SetupContext) error {
 
 func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 	spec := CreateComputeInstanceSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
