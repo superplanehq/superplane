@@ -41,6 +41,12 @@ export type CanvasReadmeModalProps = {
   icons?: Record<string, NodeChipIcon>;
   details?: Record<string, NodeChipDetails>;
   linkFor: (slug: string) => string;
+  /**
+   * Optional click handler for node reference chips. When provided it
+   * suppresses in-modal navigation so callers can e.g. close the modal and
+   * focus the clicked node on the canvas instead of triggering a page load.
+   */
+  onNodeClick?: (slug: string) => void;
   onSaveDraft: (content: string) => Promise<void>;
   onCreateChangeRequest: (args: { title: string; description: string }) => Promise<void>;
 };
@@ -50,6 +56,7 @@ type NodeRefs = {
   icons?: Record<string, NodeChipIcon>;
   details?: Record<string, NodeChipDetails>;
   linkFor: (slug: string) => string;
+  onNodeClick?: (slug: string) => void;
 };
 
 export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
@@ -68,13 +75,14 @@ export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
     icons,
     details,
     linkFor,
+    onNodeClick,
     onSaveDraft,
     onCreateChangeRequest,
   } = props;
 
   const nodeRefs = useMemo(
-    () => ({ nodes, icons, details, linkFor }),
-    [nodes, icons, details, linkFor],
+    () => ({ nodes, icons, details, linkFor, onNodeClick }),
+    [nodes, icons, details, linkFor, onNodeClick],
   );
   const subtitle = mode === "edit" ? "Draft" : "Published";
 

@@ -5481,6 +5481,24 @@ export function WorkflowPageV2() {
     [readmeNodeIdBySlug, searchParams, organizationId, canvasId],
   );
 
+  //
+  // Clicking a node reference chip inside the readme modal should feel like an
+  // in-app action, not a navigation: close the modal, select + open the
+  // component sidebar for that node, and fire a focus request so the canvas
+  // zooms in. We still fall back to `linkForReadmeNode` if the slug hasn't
+  // been resolved to a known node id yet.
+  //
+  const handleReadmeNodeChipClick = useCallback(
+    (slug: string) => {
+      const nodeId = readmeNodeIdBySlug[slug];
+      if (!nodeId) return;
+      setIsReadmeModalOpen(false);
+      handleSidebarChange(true, nodeId);
+      setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
+    },
+    [readmeNodeIdBySlug, handleSidebarChange, setFocusRequest],
+  );
+
   const handleReadmeSaveDraft = useCallback(
     async (content: string) => {
       await updateCanvasReadmeMutation.mutateAsync({ content });
@@ -6007,6 +6025,7 @@ export function WorkflowPageV2() {
         icons={readmeIconsBySlug}
         details={readmeNodeDetailsBySlug}
         linkFor={linkForReadmeNode}
+        onNodeClick={handleReadmeNodeChipClick}
         onSaveDraft={handleReadmeSaveDraft}
         onCreateChangeRequest={handleReadmeCreateChangeRequest}
       />
