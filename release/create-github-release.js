@@ -6,8 +6,6 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
-const cliAssetPattern = /^superplane-cli-(darwin|linux)-(amd64|arm64)$/;
-
 async function main() {
   const version = process.argv[2];
 
@@ -160,15 +158,6 @@ function loadCLIAssets(cliAssetsDir, cliAssetPrefix) {
       `Error: no CLI assets found in ${cliAssetsDir}. Expected files like superplane-cli-darwin-arm64.`
     );
     process.exit(1);
-  }
-
-  for (const assetName of cliAssets) {
-    if (!cliAssetPattern.test(assetName)) {
-      console.error(
-        `Error: invalid CLI asset name ${assetName}. Expected superplane-cli-<os>-<arch> raw binaries.`
-      );
-      process.exit(1);
-    }
   }
 
   return cliAssets.map((assetName) => ({
