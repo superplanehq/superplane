@@ -566,6 +566,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
+	accountRoute.HandleFunc("/signup-survey", s.submitSignupSurvey).Methods("POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
@@ -887,12 +888,12 @@ type AccountImpersonation struct {
 }
 
 type AccountResponse struct {
-	ID                string                `json:"id"`
-	Name              string                `json:"name"`
-	Email             string                `json:"email"`
-	AvatarURL         string                `json:"avatar_url"`
-	InstallationAdmin bool                  `json:"installation_admin"`
-	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
+	ID                   string                `json:"id"`
+	Name                 string                `json:"name"`
+	Email                string                `json:"email"`
+	AvatarURL            string                `json:"avatar_url"`
+	InstallationAdmin    bool                  `json:"installation_admin"`
+	Impersonation        *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
