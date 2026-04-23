@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const releasesDownloadBaseURL = "https://github.com/superplanehq/superplane/releases/download"
+const (
+	releasesDownloadBaseURL      = "https://github.com/superplanehq/superplane/releases/download"
+	releaseDownloadHeaderTimeout = 30 * time.Second
+	releaseDownloadTimeout       = 15 * time.Minute
+)
 
 var latestReleaseURL = "https://api.github.com/repos/superplanehq/superplane/releases/latest"
 
@@ -57,7 +62,7 @@ var upgradeCmd = &cobra.Command{
 			return fmt.Errorf("resolve current executable: %w", err)
 		}
 
-		if err := downloadAndReplaceBinary(asset.BrowserDownloadURL, executablePath); err != nil {
+		if err := downloadAndReplaceBinary(cmd.Context(), asset.BrowserDownloadURL, executablePath); err != nil {
 			return fmt.Errorf("upgrade CLI: %w", err)
 		}
 
@@ -101,10 +106,6 @@ func fetchLatestRelease() (*releaseInfo, error) {
 	}
 
 	return &release, nil
-}
-
-func currentCLIAssetName() string {
-	return cliAssetName(runtime.GOOS, runtime.GOARCH)
 }
 
 func cliAssetName(goos, goarch string) string {
@@ -151,14 +152,16 @@ func currentExecutablePath() (string, error) {
 	return path, nil
 }
 
-func downloadAndReplaceBinary(downloadURL, executablePath string) error {
+func downloadAndReplaceBinary(ctx context.Context, downloadURL, executablePath string) error {
 	if runtime.GOOS == "windows" {
 		return fmt.Errorf("self-update is not yet supported on Windows; download the binary directly from %s", downloadURL)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := newReleaseDownloadClient()
+	ctx, cancel := context.WithTimeout(ctx, releaseDownloadTimeout)
+	defer cancel()
 
-	req, err := http.NewRequest(http.MethodGet, downloadURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return fmt.Errorf("create download request: %w", err)
 	}
@@ -190,9 +193,15 @@ func downloadAndReplaceBinary(downloadURL, executablePath string) error {
 		_ = os.Remove(tempPath)
 	}()
 
-	if _, err := io.Copy(tempFile, resp.Body); err != nil {
+	written, err := io.Copy(tempFile, resp.Body)
+	if err != nil {
 		_ = tempFile.Close()
 		return fmt.Errorf("write downloaded binary: %w", err)
+	}
+
+	if written == 0 {
+		_ = tempFile.Close()
+		return fmt.Errorf("downloaded binary is empty")
 	}
 
 	if err := tempFile.Chmod(currentInfo.Mode().Perm()); err != nil {
@@ -214,4 +223,16 @@ func downloadAndReplaceBinary(downloadURL, executablePath string) error {
 	}
 
 	return nil
+}
+
+func newReleaseDownloadClient() *http.Client {
+	transport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return &http.Client{}
+	}
+
+	cloned := transport.Clone()
+	cloned.ResponseHeaderTimeout = releaseDownloadHeaderTimeout
+
+	return &http.Client{Transport: cloned}
 }

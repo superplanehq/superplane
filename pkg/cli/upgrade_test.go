@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -79,7 +80,7 @@ func TestDownloadAndReplaceBinary(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	err := downloadAndReplaceBinary(server.URL, executablePath)
+	err := downloadAndReplaceBinary(context.Background(), server.URL, executablePath)
 	require.NoError(t, err)
 
 	contents, readErr := os.ReadFile(executablePath)
@@ -89,4 +90,24 @@ func TestDownloadAndReplaceBinary(t *testing.T) {
 	info, statErr := os.Stat(executablePath)
 	require.NoError(t, statErr)
 	require.Equal(t, os.FileMode(0o755), info.Mode().Perm())
+}
+
+func TestDownloadAndReplaceBinaryRejectsEmptyDownload(t *testing.T) {
+	tmpDir := t.TempDir()
+	executablePath := filepath.Join(tmpDir, "superplane")
+	require.NoError(t, os.WriteFile(executablePath, []byte("old-binary"), 0o755))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	err := downloadAndReplaceBinary(context.Background(), server.URL, executablePath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "downloaded binary is empty")
+
+	contents, readErr := os.ReadFile(executablePath)
+	require.NoError(t, readErr)
+	require.Equal(t, "old-binary", string(contents))
 }
