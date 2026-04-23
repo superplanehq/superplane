@@ -40,6 +40,14 @@ export function useOnCancelQueueItemHandler({ canvasId, organizationId, canvas, 
         // Refresh queue items and sidebar data for this node
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeQueueItem(canvasId, nodeId) });
 
+        //
+        // Run View reads queue items off the canvas-events / describe-run
+        // responses (not the per-node queue query), so the Activity row
+        // would stay visible after cancel until the next websocket tick
+        // unless we invalidate the runs prefix here too.
+        //
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.runs() });
+
         const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
         if (node) {
           await refetchNodeDataMethod(canvasId, nodeId, node.type!, queryClient);

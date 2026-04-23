@@ -31,6 +31,13 @@ interface RunSummaryProps {
   onPushThrough?: (nodeId: string, executionId: string) => void | Promise<void>;
   onCancelExecution?: (nodeId: string, executionId: string) => void | Promise<void>;
   /**
+   * Cancels a queued item for a node before it turns into an execution.
+   * Queue items live on a separate backend endpoint from executions
+   * (DeleteNodeQueueItem vs CancelExecution), so the two cancel actions
+   * must be wired separately even though they share a UI button.
+   */
+  onCancelQueueItem?: (nodeId: string, queueItemId: string) => void | Promise<void>;
+  /**
    * Opens the per-node detail modal (Details / Payload / Config tabs). Used
    * from Activity rows so the user can reach richer interactions (like
    * approvals) without switching to Canvas mode.
@@ -130,6 +137,13 @@ interface Step {
   key: string;
   nodeId: string;
   executionId?: string;
+  /**
+   * Backend ID of the queue item backing this step, when the step is a
+   * synthetic "queued" entry (no execution yet). Drives the cancel action
+   * in Activity for queued items, which goes through DeleteNodeQueueItem
+   * rather than CancelExecution.
+   */
+  queueItemId?: string;
   name: string;
   componentName?: string;
   /** Raw, possibly component-specific status label (e.g. "created", "deleted"). */
@@ -270,6 +284,7 @@ function buildSteps(
     steps.push({
       key: `queue:${item.id || `${item.nodeId}:${startMs}`}`,
       nodeId: item.nodeId,
+      queueItemId: item.id || undefined,
       name: node?.name || item.nodeId.slice(0, 8),
       componentName: node?.component?.name || node?.trigger?.name,
       status: "queued",
@@ -329,18 +344,24 @@ function ActivityRow({
   onOpenDetail,
   onPushThrough,
   onCancelExecution,
+  onCancelQueueItem,
   onApprovalAction,
 }: {
   step: Step;
   iconSrc: string | undefined;
   iconSlug: string | undefined;
   canPushThrough: boolean;
+  /**
+   * When true, a Cancel button is shown. The row picks the right handler
+   * (execution vs queue item) based on what the step carries.
+   */
   canCancel: boolean;
   canApprove: boolean;
   approvalIndex?: number;
   onOpenDetail?: (nodeId: string) => void;
   onPushThrough?: (nodeId: string, executionId: string) => void | Promise<void>;
   onCancelExecution?: (nodeId: string, executionId: string) => void | Promise<void>;
+  onCancelQueueItem?: (nodeId: string, queueItemId: string) => void | Promise<void>;
   onApprovalAction?: (
     nodeId: string,
     executionId: string,
@@ -451,7 +472,13 @@ function ActivityRow({
               <button
                 type="button"
                 className="rounded px-1.5 py-0.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                onClick={() => onCancelExecution?.(step.nodeId, step.executionId!)}
+                onClick={() => {
+                  if (step.executionId) {
+                    onCancelExecution?.(step.nodeId, step.executionId);
+                  } else if (step.queueItemId) {
+                    onCancelQueueItem?.(step.nodeId, step.queueItemId);
+                  }
+                }}
               >
                 Cancel
               </button>
@@ -564,6 +591,7 @@ export function RunSummary({
   componentIconMap,
   onPushThrough,
   onCancelExecution,
+  onCancelQueueItem,
   onOpenNodeDetail,
   onApprovalAction,
   currentUser,
@@ -659,10 +687,23 @@ export function RunSummary({
                   !!onPushThrough &&
                   !!step.componentName &&
                   pushThroughComponentNames.has(step.componentName);
-                const canCancel =
+                //
+                // A step is cancellable either as an in-flight execution
+                // (CancelExecution endpoint) or as a pending queue item
+                // before it produces an execution (DeleteNodeQueueItem
+                // endpoint). The two live on different backend paths so
+                // the row needs a different handler depending on which.
+                //
+                const canCancelExec =
                   !!step.executionId &&
                   !!onCancelExecution &&
                   isRunningState(step.eventState);
+                const canCancelQueue =
+                  !step.executionId &&
+                  !!step.queueItemId &&
+                  !!onCancelQueueItem &&
+                  step.eventState === "queued";
+                const canCancel = canCancelExec || canCancelQueue;
 
                 const execution = step.executionId ? executionMap.get(step.executionId) : undefined;
                 const approvalIndex =
@@ -685,6 +726,7 @@ export function RunSummary({
                     onOpenDetail={onOpenNodeDetail}
                     onPushThrough={onPushThrough}
                     onCancelExecution={onCancelExecution}
+                    onCancelQueueItem={onCancelQueueItem}
                     onApprovalAction={onApprovalAction}
                   />
                 );

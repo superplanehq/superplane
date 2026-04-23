@@ -5745,6 +5745,7 @@ export function WorkflowPageV2() {
                           componentIconMap={componentIconMap}
                           onPushThrough={handlePushThrough}
                           onCancelExecution={onCancelExecution}
+                          onCancelQueueItem={onCancelQueueItem}
                           onOpenNodeDetail={setRunDetailNodeId}
                           onApprovalAction={handleApprovalAction}
                           currentUser={me}
