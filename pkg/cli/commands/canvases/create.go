@@ -136,6 +136,12 @@ func validateAndPrintCreateResponse(
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId())
+		if err != nil {
+			return err
+		}
+		if url := core.CanvasURL(ctx, canvas.Metadata.GetId()); url != "" {
+			_, err = fmt.Fprintf(stdout, "Canvas URL: %s\n", url)
+		}
 		return err
 	})
 }

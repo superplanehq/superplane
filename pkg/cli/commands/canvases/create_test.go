@@ -18,10 +18,15 @@ import (
 func newCanvasCreateServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/canvases", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/canvases":
+			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/me":
+			_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
+		default:
+			require.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
+		}
 	}))
 	t.Cleanup(server.Close)
 	return server

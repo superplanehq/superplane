@@ -232,6 +232,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
+		if url := core.CanvasURL(ctx, metadata.GetCanvasId()); url != "" {
+			_, _ = fmt.Fprintf(stdout, "Canvas URL: %s\n", url)
+		}
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
 		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
 
