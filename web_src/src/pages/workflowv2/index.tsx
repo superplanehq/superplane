@@ -44,6 +44,7 @@ import {
   useCanvas,
   useCanvasChangeRequests,
   useCanvasMemoryEntries,
+  useCanvasReadme,
   useCanvasVersion,
   useCanvasVersions,
   useCreateCanvas,
@@ -57,6 +58,7 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
+  useUpdateCanvasReadme,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -89,6 +91,7 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
+import { CanvasReadmeModal } from "./CanvasReadmeModal";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
@@ -572,6 +575,7 @@ export function WorkflowPageV2() {
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
   const [isMemoryViewModalOpen, setIsMemoryViewModalOpen] = useState(false);
+  const [isReadmeModalOpen, setIsReadmeModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
       return true;
@@ -5239,6 +5243,110 @@ export function WorkflowPageV2() {
     !draftSpecToRender &&
     (loadedCanvasVersionLoading || loadedCanvasVersionFetching || !loadedCanvasVersion?.spec);
 
+  //
+  // Readme modal wiring. All readme-related hooks live above the early
+  // returns below so hook order stays stable across the initial-loading and
+  // fully-loaded renders.
+  //
+  // ?readme=1 is a one-shot URL flag used by the legacy /readme route to
+  // auto-open the modal after it redirects to the canvas. We strip it on the
+  // first read so refreshing the page doesn't keep re-opening the modal. Any
+  // ?version= the user arrived with is preserved for the canvas version
+  // machinery elsewhere.
+  //
+  useEffect(() => {
+    if (searchParams.get("readme") !== "1") return;
+    setIsReadmeModalOpen(true);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("readme");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
+  //
+  // Readme mode mirrors the canvas mode: editor tab opens the editable
+  // draft view; live tab opens the read-only published view. We skip the
+  // draft fetch entirely in live mode so read-only users don't trigger an
+  // unauthorized draft lookup.
+  //
+  const readmeMode: "live" | "edit" = canvasMode === "edit" && canUpdateCanvas ? "edit" : "live";
+  const readmeChangeManagementEnabled = liveCanvas?.spec?.changeManagement?.enabled ?? false;
+  const liveReadmeQuery = useCanvasReadme(canvasId!, "", isReadmeModalOpen);
+  const draftReadmeQuery = useCanvasReadme(
+    canvasId!,
+    "draft",
+    isReadmeModalOpen && readmeMode === "edit",
+  );
+  const updateCanvasReadmeMutation = useUpdateCanvasReadme(canvasId!);
+
+  //
+  // Build slug -> display-name + slug -> node-id maps used by the Readme
+  // renderer to turn `@node` / `[[node:name]]` tokens into chips. We source
+  // from whichever version the user is currently viewing so chip behavior
+  // tracks the active canvas state. We register the raw name, the id, and a
+  // kebab-cased alias of the display name so multi-word node names like
+  // "Health check request" can be referenced as `@health-check-request`.
+  //
+  const { nodesBySlug: readmeNodesBySlug, nodeIdBySlug: readmeNodeIdBySlug } = useMemo(() => {
+    const nodesBySlug: Record<string, string> = {};
+    const nodeIdBySlug: Record<string, string> = {};
+    const toKebab = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const register = (slug: string | undefined, displayName: string, nodeId: string | undefined) => {
+      if (!slug) return;
+      if (!nodesBySlug[slug]) {
+        nodesBySlug[slug] = displayName;
+      }
+      if (nodeId && !nodeIdBySlug[slug]) {
+        nodeIdBySlug[slug] = nodeId;
+      }
+    };
+    const sourceNodes = (selectedCanvasVersion ?? liveCanvasVersion)?.spec?.nodes ?? [];
+    for (const node of sourceNodes) {
+      const displayName = node.name || node.id || "";
+      if (!displayName) continue;
+      register(node.name, displayName, node.id);
+      register(node.id, displayName, node.id);
+      register(toKebab(displayName), displayName, node.id);
+    }
+    return { nodesBySlug, nodeIdBySlug };
+  }, [selectedCanvasVersion, liveCanvasVersion]);
+
+  const linkForReadmeNode = useCallback(
+    (slug: string) => {
+      const id = readmeNodeIdBySlug[slug] ?? slug;
+      const version = searchParams.get("version");
+      const suffix = version ? `&version=${encodeURIComponent(version)}` : "";
+      return `/${organizationId}/canvases/${canvasId}?node=${encodeURIComponent(id)}${suffix}`;
+    },
+    [readmeNodeIdBySlug, searchParams, organizationId, canvasId],
+  );
+
+  const handleReadmeSaveDraft = useCallback(
+    async (content: string) => {
+      await updateCanvasReadmeMutation.mutateAsync({ content });
+    },
+    [updateCanvasReadmeMutation],
+  );
+
+  const handleReadmeCreateChangeRequest = useCallback(
+    async ({ title, description }: { title: string; description: string }) => {
+      const versionId = draftReadmeQuery.data?.versionId;
+      if (!versionId) {
+        return;
+      }
+      await createCanvasChangeRequestMutation.mutateAsync({ versionId, title, description });
+    },
+    [createCanvasChangeRequestMutation, draftReadmeQuery.data?.versionId],
+  );
+
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
   if (isInitialCanvasBootstrapLoading) {
@@ -5495,11 +5603,7 @@ export function WorkflowPageV2() {
           hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
-          onReadmeOpen={() => {
-            const basePath = `/${organizationId}/canvases/${canvasId}/readme`;
-            const versionParam = searchParams.get("version");
-            navigate(versionParam ? `${basePath}?version=${versionParam}` : basePath);
-          }}
+          onReadmeOpen={() => setIsReadmeModalOpen(true)}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
           edges={runViewEdges}
@@ -5734,6 +5838,22 @@ export function WorkflowPageV2() {
           canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+      />
+      <CanvasReadmeModal
+        open={isReadmeModalOpen}
+        onOpenChange={setIsReadmeModalOpen}
+        mode={readmeMode}
+        changeManagementEnabled={readmeChangeManagementEnabled}
+        liveContent={liveReadmeQuery.data?.content ?? ""}
+        draftContent={draftReadmeQuery.data?.content ?? ""}
+        isLoadingLive={liveReadmeQuery.isLoading}
+        isLoadingDraft={readmeMode === "edit" && draftReadmeQuery.isLoading}
+        isSavingDraft={updateCanvasReadmeMutation.isPending}
+        isCreatingChangeRequest={createCanvasChangeRequestMutation.isPending}
+        nodes={readmeNodesBySlug}
+        linkFor={linkForReadmeNode}
+        onSaveDraft={handleReadmeSaveDraft}
+        onCreateChangeRequest={handleReadmeCreateChangeRequest}
       />
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">

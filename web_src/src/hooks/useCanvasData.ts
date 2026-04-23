@@ -524,6 +524,10 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      // Publishing flips a new version to live, which can change what the
+      // live readme resolves to; the draft query key keeps pointing at the
+      // same draft id so it's worth refreshing that too.
+      queryClient.invalidateQueries({ queryKey: [...canvasKeys.all, "readme", canvasId] });
     },
   });
 };
@@ -707,6 +711,10 @@ export const useActOnCanvasChangeRequest = (organizationId: string, canvasId: st
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+      // ACTION_PUBLISH flips a new version to live, which can change what the
+      // live readme resolves to. Cheap to invalidate for the other actions
+      // too since the hook isn't running unless the modal is open.
+      queryClient.invalidateQueries({ queryKey: [...canvasKeys.all, "readme", canvasId] });
       queryClient.removeQueries({ queryKey: canvasKeys.changeRequestDetail(canvasId, variables.changeRequestId) });
     },
   });
@@ -749,6 +757,9 @@ export const useResolveCanvasChangeRequest = (organizationId: string, canvasId: 
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
       queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+      // Resolving a CR updates the underlying version (and can publish),
+      // which can change what the live readme resolves to.
+      queryClient.invalidateQueries({ queryKey: [...canvasKeys.all, "readme", canvasId] });
 
       const version = response?.data?.version;
       if (version?.metadata?.id) {
