@@ -126,7 +126,7 @@ func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 func (c *Client) ListVNICAttachments(compartmentID, instanceID string) ([]VNICAttachment, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
 	url := fmt.Sprintf("https://%s/%s/vnicAttachments?compartmentId=%s&instanceId=%s",
-		host, coreServicesAPIVersion, compartmentID, instanceID)
+		host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID), neturl.QueryEscape(instanceID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -161,7 +161,7 @@ func (c *Client) GetVNIC(vnicID string) (*VNIC, error) {
 
 func (c *Client) ListCompartments() ([]Compartment, error) {
 	host := fmt.Sprintf(identityHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/compartments?compartmentId=%s&limit=1000", host, coreServicesAPIVersion, c.tenancyOCID)
+	url := fmt.Sprintf("https://%s/%s/compartments?compartmentId=%s&limit=1000", host, coreServicesAPIVersion, neturl.QueryEscape(c.tenancyOCID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -178,7 +178,7 @@ func (c *Client) ListCompartments() ([]Compartment, error) {
 
 func (c *Client) ListAvailabilityDomains(compartmentID string) ([]AvailabilityDomain, error) {
 	host := fmt.Sprintf(identityHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/availabilityDomains?compartmentId=%s", host, coreServicesAPIVersion, compartmentID)
+	url := fmt.Sprintf("https://%s/%s/availabilityDomains?compartmentId=%s", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -195,7 +195,7 @@ func (c *Client) ListAvailabilityDomains(compartmentID string) ([]AvailabilityDo
 
 func (c *Client) ListShapes(compartmentID string) ([]Shape, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/shapes?compartmentId=%s&limit=100", host, coreServicesAPIVersion, compartmentID)
+	url := fmt.Sprintf("https://%s/%s/shapes?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -212,7 +212,8 @@ func (c *Client) ListShapes(compartmentID string) ([]Shape, error) {
 
 func (c *Client) ListImages(compartmentID, operatingSystem string) ([]Image, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/images?compartmentId=%s&limit=100&sortBy=DISPLAYNAME&sortOrder=ASC", host, coreServicesAPIVersion, compartmentID)
+	url := fmt.Sprintf("https://%s/%s/images?compartmentId=%s&limit=100&sortBy=DISPLAYNAME&sortOrder=ASC",
+		host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
 	if operatingSystem != "" {
 		url += "&operatingSystem=" + neturl.QueryEscape(operatingSystem)
 	}
@@ -232,7 +233,7 @@ func (c *Client) ListImages(compartmentID, operatingSystem string) ([]Image, err
 
 func (c *Client) ListSubnets(compartmentID string) ([]Subnet, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/subnets?compartmentId=%s&limit=100", host, coreServicesAPIVersion, compartmentID)
+	url := fmt.Sprintf("https://%s/%s/subnets?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -249,7 +250,7 @@ func (c *Client) ListSubnets(compartmentID string) ([]Subnet, error) {
 
 func (c *Client) ListBlockVolumes(compartmentID string) ([]BlockVolume, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/volumes?compartmentId=%s&limit=100", host, coreServicesAPIVersion, compartmentID)
+	url := fmt.Sprintf("https://%s/%s/volumes?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -146,7 +145,13 @@ func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to set up webhook URL: %w", err)
 	}
-	ruleName := fmt.Sprintf("superplane-compute-instance-created-%s", path.Base(webhookURL))
+	parsedWebhookURL, err := url.Parse(webhookURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse webhook URL: %w", err)
+	}
+	urlSegments := strings.Split(strings.TrimRight(parsedWebhookURL.Path, "/"), "/")
+	webhookID := urlSegments[len(urlSegments)-1]
+	ruleName := fmt.Sprintf("superplane-compute-instance-created-%s", webhookID)
 	rule, err := client.CreateEventsRule(
 		config.CompartmentID,
 		ruleName,
