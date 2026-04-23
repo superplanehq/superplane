@@ -248,6 +248,11 @@ func grafanaGetCheckResponses(reachability string) []*http.Response {
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(`{"results":{"A":{"frames":[{"data":{"values":[[1],[0.142]]}}]}}}`)),
 		},
+		// uptime
+		{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"results":{"A":{"frames":[{"data":{"values":[[1],[0.999]]}}]}}}`)),
+		},
 		// reachability
 		{
 			StatusCode: http.StatusOK,
@@ -257,6 +262,11 @@ func grafanaGetCheckResponses(reachability string) []*http.Response {
 		{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(`{"results":{"A":{"frames":[{"data":{"values":[[1],[1713176700]]}}]}}}`)),
+		},
+		// ssl earliest expiry
+		{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"results":{"A":{"frames":[{"data":{"values":[[1],[1715768700]]}}]}}}`)),
 		},
 	}
 }
@@ -300,6 +310,12 @@ func Test__GetHTTPSyntheticCheck__Execute__ReturnsConfigurationAndMetrics(t *tes
 			data := payload["data"].(map[string]any)
 			assert.Contains(t, data, "configuration")
 			assert.Contains(t, data, "metrics")
+			metrics := data["metrics"].(*SyntheticCheckMetrics)
+			require.NotNil(t, metrics.ReachabilityPercent24h)
+			require.NotNil(t, metrics.UptimePercent24h)
+			require.NotNil(t, metrics.SSLEarliestExpiryAt)
+			require.NotNil(t, metrics.FrequencyMilliseconds)
+			assert.Equal(t, float64(60000), float64(*metrics.FrequencyMilliseconds))
 		})
 	}
 }
