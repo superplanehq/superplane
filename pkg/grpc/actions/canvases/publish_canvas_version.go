@@ -125,6 +125,9 @@ func publishDraftVersionInTransaction(
 		})
 
 		if err != nil {
+			if errors.Is(err, changesets.ErrNoChangesToPublish) {
+				return status.Error(codes.FailedPrecondition, "draft version has no changes to publish")
+			}
 			log.Errorf("failed to create canvas publisher: %v", err)
 			return err
 		}

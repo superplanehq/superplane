@@ -99,7 +99,7 @@ func Test__NewCanvasPublisher(t *testing.T) {
 	publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
 
 	require.Nil(t, publisher)
-	require.ErrorContains(t, err, "no changes between live and draft version being applied")
+	require.ErrorIs(t, err, ErrNoChangesToPublish)
 }
 
 func Test__CanvasPublisher_Publish(t *testing.T) {
