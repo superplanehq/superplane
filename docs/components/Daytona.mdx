@@ -77,6 +77,53 @@ The Create Sandbox component creates an isolated environment for executing code 
 - **Code testing**: Test untrusted code without affecting your infrastructure
 - **Development environments**: Create ephemeral development environments
 
+### Common Pattern
+
+Use this pattern when you want to create a sandbox, run one or more commands in it, and delete it when the flow is done.
+
+1. Add a **Create Sandbox** node. Its output includes the sandbox ID that downstream nodes need:
+
+```json
+{
+  "data": {
+    "id": "sandbox-abc123def456",
+    "state": "started"
+  },
+  "type": "daytona.sandbox"
+}
+```
+
+2. Connect an **Execute Command** node immediately after **Create Sandbox** and set **Sandbox** to:
+
+```text
+{{ previous().data.id }}
+```
+
+3. **Execute Command** returns the command result, not the sandbox ID:
+
+```json
+{
+  "data": {
+    "exitCode": 0,
+    "result": "npm test\nPASS\n",
+    "timeout": false
+  },
+  "type": "daytona.command.response"
+}
+```
+
+4. If you add more command nodes, reference the original create node by name so every command uses the same sandbox:
+
+```text
+{{ $["Create Sandbox"].data.id }}
+```
+
+5. Add **Delete Sandbox** at the end of the flow and use the same sandbox reference:
+
+```text
+{{ $["Create Sandbox"].data.id }}
+```
+
 ### Configuration
 
 - **Snapshot**: Base environment snapshot (optional, uses default if not specified)
@@ -123,7 +170,7 @@ The Delete Sandbox component removes an existing Daytona sandbox.
 
 ### Configuration
 
-- **Sandbox**: The ID or name of the sandbox to delete (from createSandbox output)
+- **Sandbox**: The ID or name of the sandbox to delete. If this node runs immediately after **Create Sandbox**, use `{{ previous().data.id }}`. If it runs after one or more command nodes, use `{{ $["Create Sandbox"].data.id }}` so the cleanup step still points to the original sandbox.
 - **Force**: Optional flag to force deletion even if sandbox is running
 
 ### Output
@@ -165,7 +212,7 @@ The Execute Code component runs code in an existing Daytona sandbox.
 
 ### Configuration
 
-- **Sandbox**: The sandbox ID to execute code in (from createSandbox output). Supports expressions, e.g. `{{ $["daytona.createSandbox"].data.id }}`
+- **Sandbox**: The sandbox ID to execute code in. If this node runs immediately after **Create Sandbox**, you can use `{{ previous().data.id }}`. If it runs after **Create Repository Sandbox**, use `{{ previous().data.sandboxId }}`. For later nodes, prefer a named reference such as `{{ $["Create Sandbox"].data.id }}`
 - **Code**: The code to execute (supports expressions)
 - **Language**: The programming language (python, typescript, javascript)
 - **Timeout**: Optional execution timeout in milliseconds
@@ -210,11 +257,27 @@ The Execute Command component runs shell commands in an existing Daytona sandbox
 
 ### Configuration
 
-- **Sandbox**: The sandbox ID to run commands in (from createSandbox output). Supports expressions, e.g. `{{ $["daytona.createSandbox"].data.id }}`
+- **Sandbox**: The sandbox ID to run commands in (from **Create Sandbox** or **Create Repository Sandbox** output). Supports expressions, e.g. `{{ previous().data.id }}` or `{{ $["Create Sandbox"].data.id }}`
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
 - **Environment Variables**: Optional key-value pairs exported before command execution
 - **Timeout**: Optional execution timeout in seconds
+
+### Common Patterns
+
+When **Execute Command** runs immediately after **Create Sandbox**, set **Sandbox** to:
+
+```text
+{{ previous().data.id }}
+```
+
+If you want to run a second or third command in the same sandbox, keep referencing the original create node by name:
+
+```text
+{{ $["Create Sandbox"].data.id }}
+```
+
+This is more reliable than `previous()` once the previous node is another **Execute Command** node.
 
 ### Output
 
