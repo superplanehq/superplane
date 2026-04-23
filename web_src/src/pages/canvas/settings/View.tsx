@@ -153,8 +153,8 @@ export function SettingsView({
   }, []);
 
   return (
-    <div className="px-4 py-6">
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="px-6 py-5">
+      <div className="mx-auto w-full max-w-3xl space-y-8">
         {onBackToCanvas ? (
           <Button
             type="button"
@@ -194,7 +194,7 @@ export function SettingsView({
             onAddApprover={addApprover}
           />
         ) : null}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 border-t border-slate-200 pt-5">
           <LoadingButton
             type="button"
             data-testid="canvas-settings-save-changes"
@@ -203,7 +203,7 @@ export function SettingsView({
             loading={isSaving}
             loadingText="Saving..."
           >
-            Save Changes
+            Save Draft
           </LoadingButton>
           {saveMessage ? (
             <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>

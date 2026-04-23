@@ -31,7 +31,7 @@ import type {
   TriggersTrigger,
 } from "@/api-client";
 import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
-import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -86,7 +86,7 @@ import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
-import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
+import { buildDraftNodeDiffSummary, hasDraftVersusLiveDiff } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import {
@@ -160,6 +160,57 @@ type QueuedCanvasSaveRequest = {
 
 type CanvasEchoRelease = () => void;
 
+function mergeCanvasMetadata(
+  liveCanvas: CanvasesCanvas,
+  versionMetadata?: CanvasesCanvasVersion["metadata"],
+): CanvasesCanvas["metadata"] {
+  return {
+    ...liveCanvas.metadata,
+    name: versionMetadata?.name ?? liveCanvas.metadata?.name,
+    description: versionMetadata?.description ?? liveCanvas.metadata?.description,
+  };
+}
+
+function buildCanvasForView({
+  liveCanvas,
+  selectedCanvasVersion,
+  isViewingDraftVersion,
+  draftSpecToRender,
+}: {
+  liveCanvas?: CanvasesCanvas;
+  selectedCanvasVersion: CanvasesCanvasVersion | null;
+  isViewingDraftVersion: boolean;
+  draftSpecToRender: CanvasesCanvas["spec"] | null;
+}): CanvasesCanvas | null | undefined {
+  if (!liveCanvas) {
+    return liveCanvas;
+  }
+
+  if (isViewingDraftVersion) {
+    if (!draftSpecToRender) {
+      return null;
+    }
+
+    return {
+      ...liveCanvas,
+      metadata: mergeCanvasMetadata(liveCanvas, selectedCanvasVersion?.metadata),
+      spec: draftSpecToRender,
+    };
+  }
+
+  const versionSpec = selectedCanvasVersion?.spec;
+  const versionMetadata = selectedCanvasVersion?.metadata;
+  if (!versionSpec && !versionMetadata) {
+    return liveCanvas;
+  }
+
+  return {
+    ...liveCanvas,
+    metadata: mergeCanvasMetadata(liveCanvas, versionMetadata),
+    spec: versionSpec ?? liveCanvas.spec,
+  };
+}
+
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
     organizationId: string;
@@ -176,6 +227,7 @@ export function WorkflowPageV2() {
   const [selectedChangeRequestId, setSelectedChangeRequestId] = useState("");
   const [resolvingConflictChangeRequestId, setResolvingConflictChangeRequestId] = useState("");
   const [isCreateChangeRequestMode, setIsCreateChangeRequestMode] = useState(false);
+  const [isCanvasSettingsOpen, setIsCanvasSettingsOpen] = useState(false);
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
@@ -211,6 +263,7 @@ export function WorkflowPageV2() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
+  const { data: organization } = useOrganization(organizationId!);
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
@@ -414,8 +467,8 @@ export function WorkflowPageV2() {
     }
     return liveCreatedAt > draftCreatedAt;
   }, [liveCanvasVersion?.metadata?.createdAt, createChangeRequestVersion?.metadata?.createdAt]);
-  const hasDraftGraphDiffVersusLive = useMemo(
-    () => hasDraftVersusLiveGraphDiff(liveCanvasVersion, latestDraftVersion),
+  const hasDraftDiffVersusLive = useMemo(
+    () => hasDraftVersusLiveDiff(liveCanvasVersion, latestDraftVersion),
     [liveCanvasVersion, latestDraftVersion],
   );
   const selectedCanvasVersionID = selectedCanvasVersion?.metadata?.id || "";
@@ -484,42 +537,19 @@ export function WorkflowPageV2() {
     draftCanvasSpec,
   ]);
 
-  const canvas = useMemo(() => {
-    if (!liveCanvas) {
-      return liveCanvas;
-    }
-
-    // Draft editing uses the local query cache as source of truth so
-    // optimistic/local edits are not overwritten by slower version fetches.
-    if (isViewingDraftVersion) {
-      if (draftSpecToRender) {
-        return {
-          ...liveCanvas,
-          spec: draftSpecToRender,
-        };
-      }
-
-      return null;
-    }
-
-    const versionSpec = selectedCanvasVersion?.spec;
-    if (!versionSpec) {
-      return liveCanvas;
-    }
-
-    return {
-      ...liveCanvas,
-      spec: versionSpec,
-    };
-  }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
-  // changeManagement lives on Canvas.Spec but is NOT part of CanvasVersion.Spec.
-  // Optimistic cache updates that spread version.spec into canvas.spec can
-  // temporarily wipe the field, so we latch to the last truthy API value.
-  const changeManagementEnabledRef = useRef(false);
-  if (liveCanvas?.spec?.changeManagement != null) {
-    changeManagementEnabledRef.current = liveCanvas.spec.changeManagement.enabled ?? false;
-  }
-  const isChangeManagementDisabled = !changeManagementEnabledRef.current;
+  const canvas = useMemo(
+    () =>
+      buildCanvasForView({
+        liveCanvas,
+        selectedCanvasVersion,
+        isViewingDraftVersion,
+        draftSpecToRender,
+      }),
+    [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender],
+  );
+  const isLiveVersionChangeManagementEnabled =
+    liveCanvasVersion?.spec?.changeManagement?.enabled ?? liveCanvas?.spec?.changeManagement?.enabled ?? false;
+  const isChangeManagementDisabled = !isLiveVersionChangeManagementEnabled;
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
@@ -598,11 +628,7 @@ export function WorkflowPageV2() {
   }, [canvasChangeRequests, resolvingConflictChangeRequestId]);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
 
-  // Warm up org users and roles cache so approval specs can pretty-print
-  // user IDs as emails and role names as display names.
-  // We don't use the values directly here; loading them populates the
-  // react-query cache which prepareApprovalNode reads from.
-  useOrganizationRoles(organizationId!);
+  const { data: organizationRoles = [] } = useOrganizationRoles(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -1696,6 +1722,11 @@ export function WorkflowPageV2() {
     [triggers, components, availableIntegrations],
   );
   const canvasMode = hasEditableVersion ? "edit" : "live";
+  useEffect(() => {
+    if (canvasMode !== "edit" && isCanvasSettingsOpen) {
+      setIsCanvasSettingsOpen(false);
+    }
+  }, [canvasMode, isCanvasSettingsOpen]);
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
     if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
@@ -5190,11 +5221,10 @@ export function WorkflowPageV2() {
     publishPending: publishCanvasVersionMutation.isPending,
     canvasDeletedRemotely,
     isPreparingVersionAction,
-    hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
+    hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftDiffVersusLive,
   });
   const headerMode = canvasMode === "edit" ? "version-edit" : "version-live";
-  const hasUnpublishedDraftChanges =
-    !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
+  const hasUnpublishedDraftChanges = !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftDiffVersusLive;
   const canvasStateMode = hasEditableVersion
     ? "editing"
     : isViewingPendingApprovalVersion
@@ -5248,7 +5278,8 @@ export function WorkflowPageV2() {
           canvasStateMode={canvasStateMode}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          showCanvasSettingsMenu={canUpdateCanvas}
+          showCanvasSettingsMenu={canUpdateCanvas && canvasMode === "edit"}
+          onOpenCanvasSettings={canvasMode === "edit" ? () => setIsCanvasSettingsOpen(true) : undefined}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen((prev) => !prev) : undefined}
           versionControlButtonTooltip={isVersionControlOpen ? "Close versions" : "Open versions"}
@@ -5455,10 +5486,16 @@ export function WorkflowPageV2() {
       <CanvasPageModals
         organizationId={organizationId || ""}
         canvas={canvas}
+        canvasVersionId={activeCanvasVersionId}
+        organization={organization}
+        organizationUsers={organizationUsers}
+        organizationRoles={organizationRoles}
         isUseTemplateOpen={isUseTemplateOpen}
         onCloseUseTemplate={() => setIsUseTemplateOpen(false)}
         onUseTemplateSubmit={handleUseTemplateSubmit}
         isCreateCanvasPending={createWorkflowMutation.isPending}
+        isCanvasSettingsOpen={isCanvasSettingsOpen}
+        onCanvasSettingsOpenChange={setIsCanvasSettingsOpen}
         isCreateChangeRequestMode={isCreateChangeRequestMode}
         onCreateChangeRequestModeChange={(open) => {
           if (!createCanvasChangeRequestMutation.isPending) {
