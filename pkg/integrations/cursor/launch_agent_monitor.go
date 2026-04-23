@@ -55,18 +55,21 @@ func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 
 	// 5. Update State
 	executionCtx.Logger.Infof("Received webhook for Agent %s: %s", payload.ID, payload.Status)
-	if metadata.Agent == nil {
-		metadata.Agent = &AgentMetadata{}
-	}
-	metadata.Agent.ID = payload.ID
-	metadata.Agent.Status = payload.Status
-	metadata.Agent.Summary = payload.Summary
+	mergeWebhookPayloadIntoMetadata(&metadata, payload)
 
-	if metadata.Target == nil {
-		metadata.Target = &TargetMetadata{}
-	}
-	if payload.PrURL != "" {
-		metadata.Target.PrURL = payload.PrURL
+	if isTerminalStatus(payload.Status) &&
+		(metadata.Agent.Summary == "" || metadata.Target == nil || metadata.Target.PrURL == "") &&
+		executionCtx.HTTP != nil &&
+		executionCtx.Integration != nil {
+		client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
+		if err == nil && client.LaunchAgentKey != "" {
+			agentStatus, err := client.GetAgentStatus(payload.ID)
+			if err == nil {
+				mergeAgentResponseIntoMetadata(&metadata, agentStatus)
+			} else {
+				executionCtx.Logger.WithError(err).Warnf("Failed to refresh terminal Cursor Agent %s after webhook", payload.ID)
+			}
+		}
 	}
 
 	if err := executionCtx.Metadata.Set(metadata); err != nil {
@@ -75,11 +78,13 @@ func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 
 	// 6. Complete Workflow if finished
 	if isTerminalStatus(payload.Status) {
+		prURL := ""
 		branchName := ""
 		if metadata.Target != nil {
+			prURL = metadata.Target.PrURL
 			branchName = metadata.Target.BranchName
 		}
-		outputPayload := buildOutputPayload(payload.Status, payload.ID, payload.PrURL, payload.Summary, branchName)
+		outputPayload := buildOutputPayload(metadata.Agent.Status, metadata.Agent.ID, prURL, metadata.Agent.Summary, branchName)
 		if err := executionCtx.ExecutionState.Emit(LaunchAgentDefaultChannel, LaunchAgentPayloadType, []any{outputPayload}); err != nil {
 			return http.StatusInternalServerError, nil, err
 		}
@@ -158,33 +163,18 @@ func (c *LaunchAgent) poll(ctx core.ActionContext) error {
 
 	// Update Metadata
 	pollErrors = 0
-	metadata.Agent.Status = agentStatus.Status
-	metadata.Agent.Summary = agentStatus.Summary
-	if agentStatus.Target != nil {
-		if metadata.Target == nil {
-			metadata.Target = &TargetMetadata{}
-		}
-		if agentStatus.Target.URL != "" {
-			metadata.Agent.URL = agentStatus.Target.URL
-		}
-		if agentStatus.Target.PrURL != "" {
-			metadata.Target.PrURL = agentStatus.Target.PrURL
-		}
-		if agentStatus.Target.BranchName != "" {
-			metadata.Target.BranchName = agentStatus.Target.BranchName
-		}
-	}
+	mergeAgentResponseIntoMetadata(&metadata, agentStatus)
 	_ = ctx.Metadata.Set(metadata) // Best effort save
 
 	// Check for Completion
-	if isTerminalStatus(agentStatus.Status) {
+	if isTerminalStatus(metadata.Agent.Status) {
 		prURL := ""
 		branchName := ""
 		if metadata.Target != nil {
 			prURL = metadata.Target.PrURL
 			branchName = metadata.Target.BranchName
 		}
-		outputPayload := buildOutputPayload(agentStatus.Status, metadata.Agent.ID, prURL, agentStatus.Summary, branchName)
+		outputPayload := buildOutputPayload(metadata.Agent.Status, metadata.Agent.ID, prURL, metadata.Agent.Summary, branchName)
 		return ctx.ExecutionState.Emit(LaunchAgentDefaultChannel, LaunchAgentPayloadType, []any{outputPayload})
 	}
 
