@@ -57,7 +57,7 @@ export function hasDraftVersusLiveGraphDiff(
   return comparableEdgesSnapshot(liveVersion?.spec?.edges) !== comparableEdgesSnapshot(draftVersion?.spec?.edges);
 }
 
-function comparableChangeManagementSnapshot(version?: CanvasesCanvasVersion): string {
+function comparableChangeManagementSnapshot(version?: CanvasesCanvasVersion) {
   const approvals = (version?.spec?.changeManagement?.approvals || []).map((approval) => ({
     type: approval.type || "",
     userId: approval.userId || "",
@@ -78,10 +78,10 @@ function comparableChangeManagementSnapshot(version?: CanvasesCanvasVersion): st
     return left.roleName.localeCompare(right.roleName);
   });
 
-  return JSON.stringify({
+  return {
     enabled: version?.spec?.changeManagement?.enabled ?? false,
     approvals,
-  });
+  };
 }
 
 function comparableCanvasMetadataSnapshot(version?: CanvasesCanvasVersion): string {
