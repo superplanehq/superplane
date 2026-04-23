@@ -65,8 +65,7 @@ func (c *CreateSandbox) Documentation() string {
 Use this pattern when you want to create a sandbox, run one or more commands in it, and delete it when the flow is done.
 
 1. Add a **Create Sandbox** node. Its output includes the sandbox ID that downstream nodes need:
-
-```json
+` + "```json" + `
 {
   "data": {
     "id": "sandbox-abc123def456",
@@ -74,17 +73,15 @@ Use this pattern when you want to create a sandbox, run one or more commands in 
   },
   "type": "daytona.sandbox"
 }
-```
+` + "```" + `
 
 2. Connect an **Execute Command** node immediately after **Create Sandbox** and set **Sandbox** to:
-
-```text
+` + "```text" + `
 {{ previous().data.id }}
-```
+` + "```" + `
 
 3. **Execute Command** returns the command result, not the sandbox ID:
-
-```json
+` + "```json" + `
 {
   "data": {
     "exitCode": 0,
@@ -93,19 +90,17 @@ Use this pattern when you want to create a sandbox, run one or more commands in 
   },
   "type": "daytona.command.response"
 }
-```
+` + "```" + `
 
 4. If you add more command nodes, reference the original create node by name so every command uses the same sandbox:
-
-```text
+` + "```text" + `
 {{ $["Create Sandbox"].data.id }}
-```
+` + "```" + `
 
 5. Add **Delete Sandbox** at the end of the flow and use the same sandbox reference:
-
-```text
+` + "```text" + `
 {{ $["Create Sandbox"].data.id }}
-```
+` + "```" + `
 
 ## Configuration
 
