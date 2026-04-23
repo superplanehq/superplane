@@ -56,6 +56,8 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     );
   }
 
+  const isRunTitle = field.name === "customName";
+
   return (
     <AutoCompleteInput
       exampleObj={autocompleteExampleObj ?? null}
@@ -70,6 +72,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       quickTip="Tip: type `{{` to start an expression."
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}
+      excludedSuggestions={isRunTitle ? ["$", "previous"] : undefined}
     />
   );
 };
