@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,6 +49,12 @@ func CreateCanvas(
 	if pbCanvas.Metadata.GetIsTemplate() {
 		return nil, status.Error(codes.InvalidArgument, "templates cannot be created")
 	}
+
+	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
+	if name == "" {
+		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
+	}
+	pbCanvas.Metadata.Name = name
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -124,7 +131,7 @@ func CreateCanvas(
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationID, canvasID, pbCanvas.Metadata.Name)
+		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationID, canvasID, name)
 		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
 			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
 		}
@@ -148,7 +155,7 @@ func CreateCanvas(
 			WorkflowID:              canvasID,
 			OwnerID:                 &createdBy,
 			State:                   models.CanvasVersionStatePublished,
-			Name:                    pbCanvas.Metadata.Name,
+			Name:                    name,
 			Description:             pbCanvas.Metadata.Description,
 			ChangeManagementEnabled: changeManagementEnabled,
 			ChangeRequestApprovers:  datatypes.NewJSONSlice(changeRequestApprovers),
@@ -214,6 +221,8 @@ func CreateCanvas(
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
+
+	canvas.ChangeManagementEnabled = changeManagementEnabled
 
 	var user *models.User
 	if canvas.CreatedBy != nil {
