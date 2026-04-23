@@ -1097,11 +1097,11 @@ func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Fie
 
 	fields = append(fields, configuration.Field{
 		Name:        "customName",
-		Label:       "Run title (optional)",
+		Label:       "Run title",
 		Type:        configuration.FieldTypeString,
 		Togglable:   true,
-		Description: "Optional run title template. Supports expressions like {{ $.data }}.",
-		Placeholder: "Deploy {{ $.repository.name }} @ {{ $.head_commit.id }}",
+		Description: "Give each run a dynamic title using expressions. Use root().data to access the trigger payload.",
+		Placeholder: "{{ root().data.foo }}",
 	})
 
 	return fields
