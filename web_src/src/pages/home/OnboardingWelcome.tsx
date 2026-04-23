@@ -1,14 +1,11 @@
 import {
   canvasesCreateCanvas,
-  canvasesCreateCanvasVersion,
   canvasesDescribeCanvas,
   canvasesEmitNodeEvent,
   canvasesListCanvasEvents,
   canvasesListEventExecutions,
-  canvasesPublishCanvasVersion,
-  canvasesUpdateCanvasVersion,
 } from "@/api-client/sdk.gen";
-import type { CanvasesCanvas, SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client/types.gen";
+import type { CanvasesCanvas } from "@/api-client/types.gen";
 import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
 import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
 import { Heading } from "@/components/Heading/heading";
@@ -26,9 +23,8 @@ import { useNavigate } from "react-router-dom";
 
 const QUICK_START_TEMPLATE_NAME = "Health Check Monitor";
 
-/** Quick start runs one tick against status/200, then saves status/500 before opening the canvas. */
+/** Quick start creates the canvas and triggers one run against status/200 before opening it. */
 const QUICK_START_HTTP_URL_SERVER1 = "https://httpbin.org/status/200";
-const QUICK_START_HTTP_URL_SERVER2 = "https://httpbin.org/status/500";
 
 type Mode = "ui" | "cli" | "agent";
 
@@ -47,51 +43,6 @@ function findQuickStartTemplate(templates: CanvasesCanvas[]) {
 
     return normalizeTemplateName(templateName) === normalizedQuickStartName;
   });
-}
-
-async function publishCanvasGraphUpdate(params: {
-  canvasId: string;
-  name: string;
-  description: string;
-  nodes: SuperplaneComponentsNode[];
-  edges: SuperplaneComponentsEdge[];
-}) {
-  const createVersionResponse = await canvasesCreateCanvasVersion(
-    withOrganizationHeader({
-      path: { canvasId: params.canvasId },
-      body: {},
-    }),
-  );
-
-  const versionId = createVersionResponse.data?.version?.metadata?.id;
-  if (!versionId) {
-    throw new Error("Failed to create draft version");
-  }
-
-  await canvasesUpdateCanvasVersion(
-    withOrganizationHeader({
-      path: { canvasId: params.canvasId, versionId },
-      body: {
-        canvas: {
-          metadata: {
-            name: params.name,
-            description: params.description,
-          },
-          spec: {
-            nodes: params.nodes,
-            edges: params.edges,
-          },
-        },
-      },
-    }),
-  );
-
-  await canvasesPublishCanvasVersion(
-    withOrganizationHeader({
-      path: { canvasId: params.canvasId, versionId },
-      body: {},
-    }),
-  );
 }
 
 const PERSONAS = [
@@ -170,17 +121,6 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         }
         return node;
       });
-      const nodesWithServer2Url = nodes.map((node) =>
-        node.component?.name === "http"
-          ? {
-              ...node,
-              configuration: {
-                ...node.configuration,
-                url: QUICK_START_HTTP_URL_SERVER2,
-              },
-            }
-          : node,
-      );
       const edges = template.spec?.edges || [];
       const description = template.metadata?.description || "";
 
@@ -197,14 +137,6 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
 
       const canvasId = result.data?.canvas?.metadata?.id;
       if (!canvasId) return;
-
-      await publishCanvasGraphUpdate({
-        canvasId,
-        name: QUICK_START_TEMPLATE_NAME,
-        description,
-        nodes: nodesWithServer2Url,
-        edges,
-      });
 
       const triggerNode = nodes.find((node) => node.trigger?.name === "schedule");
       const httpNode = nodes.find((node) => node.component?.name === "http");
@@ -262,14 +194,6 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       } else {
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
-
-      await publishCanvasGraphUpdate({
-        canvasId,
-        name: QUICK_START_TEMPLATE_NAME,
-        description,
-        nodes,
-        edges,
-      });
 
       const [canvasResponse, eventsResponse] = await Promise.all([
         canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } })),
