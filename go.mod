@@ -100,6 +100,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
+	github.com/marijaaleksic/taguchi v0.0.0-20260224012509-ff613389417b
 	github.com/mattn/go-isatty v0.0.17
 	github.com/mattn/go-sqlite3 v1.14.28 // indirect
 	github.com/microsoft/go-mssqldb v1.7.2 // indirect
@@ -132,3 +133,5 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.20.3 // indirect
 )
+
+replace github.com/marijaaleksic/taguchi => github.com/aleksicmarija/taguchi v0.0.0-20260224012509-ff613389417b

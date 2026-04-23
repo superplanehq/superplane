@@ -1,0 +1,21 @@
+{
+  "type": "taguchi.plan",
+  "data": {
+    "data": {
+      "experimentId": "icon-redesign-q2",
+      "arrayName": "L9",
+      "arms": [
+        {"arm_id": "arm-0", "params": {"icons": "classic",  "board_size": "7x6",  "time_limit": "none"}},
+        {"arm_id": "arm-1", "params": {"icons": "classic",  "board_size": "9x7",  "time_limit": "blitz_30s"}},
+        {"arm_id": "arm-2", "params": {"icons": "classic",  "board_size": "11x8", "time_limit": "classical_5min"}},
+        {"arm_id": "arm-3", "params": {"icons": "themed_a", "board_size": "7x6",  "time_limit": "blitz_30s"}},
+        {"arm_id": "arm-4", "params": {"icons": "themed_a", "board_size": "9x7",  "time_limit": "classical_5min"}},
+        {"arm_id": "arm-5", "params": {"icons": "themed_a", "board_size": "11x8", "time_limit": "none"}},
+        {"arm_id": "arm-6", "params": {"icons": "themed_b", "board_size": "7x6",  "time_limit": "classical_5min"}},
+        {"arm_id": "arm-7", "params": {"icons": "themed_b", "board_size": "9x7",  "time_limit": "none"}},
+        {"arm_id": "arm-8", "params": {"icons": "themed_b", "board_size": "11x8", "time_limit": "blitz_30s"}}
+      ]
+    }
+  },
+  "timestamp": "2026-04-18T00:00:00Z"
+}
