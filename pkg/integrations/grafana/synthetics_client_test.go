@@ -58,7 +58,36 @@ func Test__NewSyntheticsClient__UsesGrafanaDatasourceProxy(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "sm-ds", client.DataSourceUID)
+	assert.Equal(t, "prom-ds", client.MetricsDataSourceUID)
 	require.NotNil(t, client.GrafanaClient)
+}
+
+func Test__SyntheticsClient__GetCheck__UsesSingleCheckPath(t *testing.T) {
+	checkJSON := `{"id":101,"job":"API health","target":"https://api.example.com/health","frequency":60000,"timeout":3000,"enabled":true,"basicMetricsOnly":true,"settings":{"http":{"method":"GET"}},"probes":[1]}`
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(checkJSON)),
+			},
+		},
+	}
+
+	client := &SyntheticsClient{
+		DataSourceUID: "sm-ds",
+		GrafanaClient: &Client{
+			BaseURL:  "https://grafana.example.com",
+			APIToken: "grafana-token",
+			http:     httpContext,
+		},
+	}
+
+	check, err := client.GetCheck("101")
+	require.NoError(t, err)
+	require.NotNil(t, check)
+	assert.Equal(t, int64(101), check.ID)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, "/api/datasources/proxy/uid/sm-ds/sm/check/101", httpContext.Requests[0].URL.Path)
 }
 
 func Test__SyntheticsClient__ListProbes__UsesGrafanaDatasourceProxy(t *testing.T) {
