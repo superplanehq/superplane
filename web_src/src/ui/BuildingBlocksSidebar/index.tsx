@@ -217,6 +217,14 @@ function OpenBuildingBlocksSidebar({
     return map;
   }, [integrations]);
 
+  const configuredIntegrationNames = useMemo(() => {
+    const configured = new Set<string>();
+    integrations.forEach((integration) => {
+      configured.add(normalizeIntegrationName(integration.spec?.integrationName));
+    });
+    return configured;
+  }, [integrations]);
+
   const sortedCategories = useMemo(() => {
     const categoryOrder: Record<string, number> = {
       Core: 0,
@@ -229,7 +237,7 @@ function OpenBuildingBlocksSidebar({
       }
 
       return category.blocks.some((block) =>
-        connectedIntegrationNames.has(normalizeIntegrationName(block.integrationName)),
+        configuredIntegrationNames.has(normalizeIntegrationName(block.integrationName)),
       );
     });
 
@@ -243,7 +251,7 @@ function OpenBuildingBlocksSidebar({
 
       return a.name.localeCompare(b.name);
     });
-  }, [blocks, connectedIntegrationNames]);
+  }, [blocks, configuredIntegrationNames]);
 
   const integrationsModalItems = useMemo(() => {
     return [...availableIntegrations].sort((a, b) => (a.label || a.name || "").localeCompare(b.label || b.name || ""));
