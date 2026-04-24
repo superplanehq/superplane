@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/metric"
 
@@ -34,6 +35,11 @@ var (
 
 	dbLocksCountHistogram       metric.Int64Histogram
 	dbLongQueriesCountHistogram metric.Int64Histogram
+
+	dbRowsAffectedCounter metric.Int64Counter
+
+	pendingEventsGauge     metric.Int64Gauge
+	pendingExecutionsGauge metric.Int64Gauge
 )
 
 func InitMetrics(ctx context.Context) error {
@@ -168,6 +174,38 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	dbRowsAffectedCounter, err = meter.Int64Counter(
+		"db.rows.affected.count",
+		metric.WithDescription("Number of database rows affected by operation"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	pendingEventsGauge, err = meter.Int64Gauge(
+		"workflow_events.pending.count",
+		metric.WithDescription("Current number of pending workflow events"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	pendingExecutionsGauge, err = meter.Int64Gauge(
+		"workflow_node_executions.pending.count",
+		metric.WithDescription("Current number of pending workflow node executions"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	err = registerDBOperationMetricsCallbacks()
+	if err != nil {
+		return err
+	}
+
 	StartPeriodicMetricsReporter()
 
 	metricsReady.Store(true)
@@ -282,4 +320,35 @@ func RecordDBLongQueriesCount(ctx context.Context, count int64) {
 	}
 
 	dbLongQueriesCountHistogram.Record(ctx, count)
+}
+
+func RecordDBRowsAffected(ctx context.Context, count int64, tableName, operation string) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	dbRowsAffectedCounter.Add(
+		ctx,
+		count,
+		metric.WithAttributes(
+			attribute.String("table", tableName),
+			attribute.String("operation", operation),
+		),
+	)
+}
+
+func RecordPendingEventsCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	pendingEventsGauge.Record(ctx, count)
+}
+
+func RecordPendingExecutionsCount(ctx context.Context, count int64) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	pendingExecutionsGauge.Record(ctx, count)
 }
