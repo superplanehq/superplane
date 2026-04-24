@@ -627,6 +627,7 @@ export function WorkflowPageV2() {
    */
   const hasFitToViewRef = useRef(false);
   const hasSyncedVersionFromURLRef = useRef(false);
+  const hasHandledAutoEnterEditRef = useRef(false);
 
   /**
    * Capture the initial node focus from the URL so we only zoom once.
@@ -838,6 +839,7 @@ export function WorkflowPageV2() {
 
   useEffect(() => {
     canvasSaveSessionRef.current += 1;
+    hasHandledAutoEnterEditRef.current = false;
 
     const queuedRequest = queuedCanvasSaveRef.current;
     if (queuedRequest) {
@@ -3286,8 +3288,8 @@ export function WorkflowPageV2() {
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
-      sourceNodeId: string;
-      sourceHandleId: string | null;
+      sourceNodeId?: string;
+      sourceHandleId?: string | null;
     }): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
@@ -3312,18 +3314,20 @@ export function WorkflowPageV2() {
         },
       };
 
-      const newEdge: ComponentsEdge = {
-        sourceId: data.sourceNodeId,
-        targetId: newNodeId,
-        channel: data.sourceHandleId || "default",
-      };
+      const newEdge: ComponentsEdge | null = data.sourceNodeId
+        ? {
+            sourceId: data.sourceNodeId,
+            targetId: newNodeId,
+            channel: data.sourceHandleId || "default",
+          }
+        : null;
 
       const updatedWorkflow = {
         ...latestWorkflow,
         spec: {
           ...latestWorkflow.spec,
           nodes: [...(latestWorkflow.spec?.nodes || []), newNode],
-          edges: [...(latestWorkflow.spec?.edges || []), newEdge],
+          edges: newEdge ? [...(latestWorkflow.spec?.edges || []), newEdge] : [...(latestWorkflow.spec?.edges || [])],
         },
       };
 
@@ -4677,6 +4681,36 @@ export function WorkflowPageV2() {
     handleCreateVersion,
   ]);
 
+  useEffect(() => {
+    const shouldAutoEnterEdit = searchParams.get("edit") === "1";
+    if (!shouldAutoEnterEdit || hasHandledAutoEnterEditRef.current) {
+      return;
+    }
+
+    const clearEditParam = () => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("edit");
+        return next;
+      });
+    };
+
+    // Already in edit mode: only clear the one-shot flag.
+    if (hasEditableVersion) {
+      hasHandledAutoEnterEditRef.current = true;
+      clearEditParam();
+      return;
+    }
+
+    // Wait for canvas/version creation to settle before auto-entering edit mode.
+    if (createCanvasVersionMutation.isPending) {
+      return;
+    }
+
+    hasHandledAutoEnterEditRef.current = true;
+    void handleToggleEditMode().finally(clearEditParam);
+  }, [searchParams, hasEditableVersion, createCanvasVersionMutation.isPending, handleToggleEditMode, setSearchParams]);
+
   /** After leaving version history, land on the draft editing canvas — not the live monitoring view. */
   const handleCloseVersionControl = useCallback(() => {
     setIsVersionControlOpen(false);
@@ -4684,6 +4718,14 @@ export function WorkflowPageV2() {
       void handleToggleEditMode();
     }
   }, [hasEditableVersion, canUpdateCanvas, isTemplate, handleToggleEditMode]);
+
+  const handleStarterPlaceholderHandled = useCallback(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("starter");
+      return next;
+    });
+  }, [setSearchParams]);
 
   const handleResetDraftChanges = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -5367,6 +5409,8 @@ export function WorkflowPageV2() {
           onAcknowledgeErrors={canUpdateCanvas && isLiveExecutionSurface ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
+          autoOpenStarterPlaceholder={searchParams.get("starter") === "1"}
+          onStarterPlaceholderHandled={handleStarterPlaceholderHandled}
           versionControlSidebar={
             !isTemplate ? (
               <CanvasVersionControlSidebar

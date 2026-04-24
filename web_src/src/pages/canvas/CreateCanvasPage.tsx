@@ -93,7 +93,7 @@ export function CreateCanvasPage() {
       });
 
       if (result?.data?.canvas?.metadata?.id) {
-        navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
+        navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}?edit=1&starter=1`);
       }
     } catch (error) {
       const errorMessage = getApiErrorMessage(error, "Failed to create canvas");
@@ -330,7 +330,7 @@ export function CreateCanvasPage() {
                     open={isImportYamlOpen}
                     onOpenChange={setIsImportYamlOpen}
                     organizationId={organizationId}
-                    onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
+                    onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}?edit=1`)}
                   />
                 )}
               </>

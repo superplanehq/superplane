@@ -11,6 +11,78 @@ const HANDLE_STYLE = {
   background: "transparent",
 };
 
+const APPEND_HANDLE_CLASS =
+  "after:relative after:-top-[1px] after:content-['+'] after:text-lg after:font-semibold after:text-slate-300 hover:after:text-slate-400";
+const APPEND_HANDLE_HOVER_CLASS = "sp-append-source-handle";
+const APPEND_PREVIEW_CLASS = "sp-append-source-preview";
+
+const APPEND_HANDLE_STYLE = {
+  ...HANDLE_STYLE,
+  width: 24,
+  height: 24,
+  border: "3px solid #C9D5E1",
+  background: "white",
+  pointerEvents: "auto" as const,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center" as const,
+  justifyContent: "center" as const,
+};
+
+function AppendHandlePreview({
+  style,
+  connectorTop = "50%",
+  containerOffsetY = 0,
+}: {
+  style: React.CSSProperties;
+  connectorTop?: number | string;
+  containerOffsetY?: number;
+}) {
+  const previewStemLength = 44;
+  const previewConnectorSize = 12;
+  const previewContainerGap = 12;
+  const previewContainerLeft = previewStemLength + previewConnectorSize / 2 + previewContainerGap;
+
+  return (
+    <div className={APPEND_PREVIEW_CLASS} style={style}>
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: connectorTop,
+          width: previewStemLength,
+          height: 3,
+          transform: "translateY(-50%)",
+          backgroundColor: "#C9D5E1",
+          borderRadius: 999,
+        }}
+      />
+      <div
+        style={{
+          ...HANDLE_STYLE,
+          position: "absolute",
+          left: previewStemLength + 6,
+          top: connectorTop,
+          transform: "translate(-50%, -50%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          marginLeft: previewContainerLeft,
+          marginTop: containerOffsetY,
+          width: "23rem",
+          height: 96,
+          borderRadius: 8,
+          background: "white",
+          outline: "1px solid rgb(15 23 42 / 0.15)",
+          opacity: 0.6,
+        }}
+      />
+    </div>
+  );
+}
+
 function isAlreadyConnectedToNode(
   edges: BlockEdgeState[],
   connection: BlockConnectionState | undefined,
@@ -32,6 +104,15 @@ function isAlreadyConnectedToNode(
 
 function getBlockEdges(data: CanvasBlockData): BlockEdgeState[] {
   return data._allEdges || [];
+}
+
+function getNodeConnectionStats(edges: BlockEdgeState[], nodeId?: string) {
+  if (!nodeId) {
+    return { hasIncoming: false, hasOutgoing: false };
+  }
+  const hasIncoming = edges.some((edge) => edge.target === nodeId);
+  const hasOutgoing = edges.some((edge) => edge.source === nodeId);
+  return { hasIncoming, hasOutgoing };
 }
 
 function shouldHideLeftHandle(data: CanvasBlockData) {
@@ -144,6 +225,7 @@ function MultiRightHandle({
   nodeId,
   allEdges,
   isConnectionInteractive,
+  onAppendFromNode,
 }: {
   channels: string[];
   hoveredEdge?: BlockEdgeState;
@@ -151,6 +233,7 @@ function MultiRightHandle({
   nodeId?: string;
   allEdges: BlockEdgeState[];
   isConnectionInteractive: boolean;
+  onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
 }) {
   const getChannelHighlight = getChannelHighlightResolver({
     hoveredEdge,
@@ -159,7 +242,7 @@ function MultiRightHandle({
     allEdges,
   });
 
-  const channelSpacing = 24;
+  const channelSpacing = 34;
   const handleSize = 12;
   const edgeColor = "#C9D5E1";
   const trunkLength = 16;
@@ -175,6 +258,9 @@ function MultiRightHandle({
     channel,
     offsetY: (index - (channels.length - 1) / 2) * channelSpacing,
     isHighlighted: isConnectionInteractive && getChannelHighlight(channel),
+    hasOutgoingForChannel: allEdges.some(
+      (edge) => edge.source === nodeId && (edge.sourceHandle ?? "default") === channel,
+    ),
   }));
 
   return (
@@ -210,39 +296,134 @@ function MultiRightHandle({
         })}
       </svg>
 
-      {channelPositions.map(({ channel, offsetY, isHighlighted }) => (
-        <React.Fragment key={channel}>
-          <span
-            className="text-xs font-medium whitespace-nowrap absolute bg-slate-100"
-            style={{
-              left: labelStartX,
-              top: `calc(50% + ${offsetY}px)`,
-              transform: "translateY(-50%)",
-              color: "#8B9AAC",
-              lineHeight: `${handleSize}px`,
-              paddingLeft: 4,
-              paddingRight: 4,
-            }}
-          >
-            {channel}
-          </span>
+      {channelPositions.map(({ channel, offsetY, isHighlighted, hasOutgoingForChannel }) => {
+        const isAppendHandle = isConnectionInteractive && !!nodeId && !!onAppendFromNode && !hasOutgoingForChannel;
 
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={channel}
-            style={{
-              ...HANDLE_STYLE,
-              left: handleLeftX,
-              top: `calc(50% + ${offsetY}px)`,
-              transform: "translateY(-50%)",
-              pointerEvents: isConnectionInteractive ? "auto" : "none",
-            }}
-            className={isHighlighted ? "highlighted" : undefined}
-          />
-        </React.Fragment>
-      ))}
+        return (
+          <React.Fragment key={channel}>
+            <span
+              className="text-xs font-medium whitespace-nowrap absolute bg-slate-100"
+              style={{
+                left: labelStartX,
+                top: `calc(50% + ${offsetY}px)`,
+                transform: "translateY(-50%)",
+                color: "#8B9AAC",
+                lineHeight: `${handleSize}px`,
+                paddingLeft: 4,
+                paddingRight: 4,
+              }}
+            >
+              {channel}
+            </span>
+
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={channel}
+              aria-label={isAppendHandle ? `Add next component (${channel})` : undefined}
+              onClick={
+                isAppendHandle
+                  ? (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void onAppendFromNode(nodeId, channel);
+                    }
+                  : undefined
+              }
+              className={
+                isAppendHandle
+                  ? `${APPEND_HANDLE_CLASS} ${APPEND_HANDLE_HOVER_CLASS}`
+                  : isHighlighted
+                    ? "highlighted"
+                    : undefined
+              }
+              style={{
+                ...(isAppendHandle ? APPEND_HANDLE_STYLE : HANDLE_STYLE),
+                left: isAppendHandle ? handleLeftX - 6 : handleLeftX,
+                top: `calc(50% + ${offsetY}px)`,
+                transform: "translateY(-50%)",
+                pointerEvents: isConnectionInteractive ? "auto" : "none",
+              }}
+            />
+            {isAppendHandle ? (
+              <AppendHandlePreview
+                style={{
+                  position: "absolute",
+                  left: handleLeftX + 6,
+                  top: `calc(50% + ${offsetY}px)`,
+                  transform: "translateY(-50%)",
+                }}
+                containerOffsetY={54}
+              />
+            ) : null}
+          </React.Fragment>
+        );
+      })}
     </div>
+  );
+}
+
+function EndNodeAppendConnector({
+  nodeId,
+  channel,
+  onAppendFromNode,
+}: {
+  nodeId?: string;
+  channel: string;
+  onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
+}) {
+  if (!nodeId || !onAppendFromNode) {
+    return null;
+  }
+
+  return (
+    <>
+      <div
+        style={{
+          ...HANDLE_STYLE,
+          position: "absolute",
+          right: -21,
+          top: 13,
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          right: -63,
+          top: 17,
+          width: 42,
+          height: 3,
+          backgroundColor: "#C9D5E1",
+          pointerEvents: "none",
+        }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={channel}
+        aria-label="Add next component"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void onAppendFromNode(nodeId, channel);
+        }}
+        className={`${APPEND_HANDLE_CLASS} ${APPEND_HANDLE_HOVER_CLASS}`}
+        style={{
+          ...APPEND_HANDLE_STYLE,
+          right: -75,
+          top: 18,
+        }}
+      />
+      <AppendHandlePreview
+        style={{
+          position: "absolute",
+          left: "calc(100% + 81px)",
+          top: 0,
+        }}
+        connectorTop={18}
+      />
+    </>
   );
 }
 
@@ -251,12 +432,21 @@ export function LeftHandle({
   nodeId,
   isConnectionInteractive = true,
 }: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
+  const allEdges = getBlockEdges(data);
+  const { hasIncoming, hasOutgoing } = getNodeConnectionStats(allEdges, nodeId);
+  const isDisconnected = !hasIncoming && !hasOutgoing;
+
+  // In live mode, hide all handles for disconnected components.
+  if (!isConnectionInteractive && isDisconnected) {
+    return null;
+  }
+
   if (shouldHideLeftHandle(data)) return null;
 
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
   const isAlreadyConnected = isAlreadyConnectedToNode(
-    getBlockEdges(data),
+    allEdges,
     connectingFrom,
     connectingFrom?.nodeId,
     nodeId,
@@ -290,12 +480,25 @@ export function RightHandle({
   nodeId,
   isConnectionInteractive = true,
 }: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
+  const allEdges = getBlockEdges(data);
+  const { hasIncoming, hasOutgoing } = getNodeConnectionStats(allEdges, nodeId);
+  const isDisconnected = !hasIncoming && !hasOutgoing;
+
+  // In live mode, hide end connectors and all connectors for disconnected nodes.
+  if (!isConnectionInteractive && (!hasOutgoing || isDisconnected)) {
+    return null;
+  }
+
   if (shouldHideRightHandle(data)) return null;
 
   const channels = getOutputChannels(data);
+  const onAppendFromNode = data._callbacksRef?.current?.onAppendFromNode;
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
-  const allEdges = getBlockEdges(data);
+
+  if (isConnectionInteractive && !hasOutgoing && channels.length === 1 && nodeId && onAppendFromNode) {
+    return <EndNodeAppendConnector nodeId={nodeId} channel={channels[0]} onAppendFromNode={onAppendFromNode} />;
+  }
 
   if (channels.length === 1) {
     return (
@@ -318,6 +521,7 @@ export function RightHandle({
       nodeId={nodeId}
       allEdges={allEdges}
       isConnectionInteractive={isConnectionInteractive}
+      onAppendFromNode={onAppendFromNode}
     />
   );
 }

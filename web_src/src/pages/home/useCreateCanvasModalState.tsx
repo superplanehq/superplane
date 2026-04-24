@@ -51,6 +51,7 @@ export function useCreateCanvasModalState() {
     }
 
     const selectedTemplate = workflowTemplates.find((template) => template.metadata?.id === data.templateId);
+    const shouldUseStarterPlaceholder = !selectedTemplate;
     const result = await createMutation.mutateAsync({
       name: data.name,
       description: data.description,
@@ -60,7 +61,9 @@ export function useCreateCanvasModalState() {
 
     if (result?.data?.canvas?.metadata?.id) {
       onClose();
-      navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
+      navigate(
+        `/${organizationId}/canvases/${result.data.canvas.metadata.id}?edit=1${shouldUseStarterPlaceholder ? "&starter=1" : ""}`,
+      );
     }
   };
 

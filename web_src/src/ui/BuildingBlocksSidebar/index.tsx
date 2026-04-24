@@ -12,6 +12,10 @@ import { ComponentBase } from "../componentBase";
 import { CategorySection } from "./CategorySection";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
+const DEFAULT_COMPONENT_SIDEBAR_WIDTH = 380;
+const MIN_COMPONENT_SIDEBAR_WIDTH = 300;
+const MAX_COMPONENT_SIDEBAR_WIDTH = 800;
+
 export type { AgentContext, AgentMode } from "@/components/AgentSidebar/agentChat";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
@@ -77,15 +81,20 @@ function OpenBuildingBlocksSidebar({
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "component">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const activeResizePointerIdRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") {
-      return 450;
+      return DEFAULT_COMPONENT_SIDEBAR_WIDTH;
     }
 
     const saved = window.localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    return saved ? parseInt(saved, 10) : 450;
+    const parsed = saved ? Number.parseInt(saved, 10) : NaN;
+    if (!Number.isFinite(parsed)) {
+      return DEFAULT_COMPONENT_SIDEBAR_WIDTH;
+    }
+    return Math.max(MIN_COMPONENT_SIDEBAR_WIDTH, Math.min(MAX_COMPONENT_SIDEBAR_WIDTH, parsed));
   });
   const [isResizing, setIsResizing] = useState(false);
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
@@ -111,41 +120,56 @@ function OpenBuildingBlocksSidebar({
     };
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isResizing) return;
-
-      const newWidth = window.innerWidth - e.clientX;
-      const clampedWidth = Math.max(320, Math.min(600, newWidth));
-      setSidebarWidth(clampedWidth);
-    },
-    [isResizing],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
+  const updateSidebarWidthFromPointer = useCallback((clientX: number) => {
+    const newWidth = window.innerWidth - clientX;
+    const clampedWidth = Math.max(MIN_COMPONENT_SIDEBAR_WIDTH, Math.min(MAX_COMPONENT_SIDEBAR_WIDTH, newWidth));
+    setSidebarWidth(clampedWidth);
   }, []);
 
   useEffect(() => {
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "ew-resize";
-      document.body.style.userSelect = "none";
-
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
+    if (!isResizing) {
+      return;
     }
-  }, [isResizing, handleMouseMove, handleMouseUp]);
+
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (activeResizePointerIdRef.current !== null && event.pointerId !== activeResizePointerIdRef.current) {
+        return;
+      }
+      updateSidebarWidthFromPointer(event.clientX);
+    };
+
+    const finishResize = (event: PointerEvent) => {
+      if (activeResizePointerIdRef.current !== null && event.pointerId !== activeResizePointerIdRef.current) {
+        return;
+      }
+      activeResizePointerIdRef.current = null;
+      setIsResizing(false);
+    };
+
+    window.addEventListener("pointermove", handleWindowPointerMove);
+    window.addEventListener("pointerup", finishResize);
+    window.addEventListener("pointercancel", finishResize);
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", finishResize);
+      window.removeEventListener("pointercancel", finishResize);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, updateSidebarWidthFromPointer]);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      activeResizePointerIdRef.current = e.pointerId;
+      updateSidebarWidthFromPointer(e.clientX);
+      setIsResizing(true);
+    },
+    [updateSidebarWidthFromPointer],
+  );
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -200,11 +224,11 @@ function OpenBuildingBlocksSidebar({
       data-testid="building-blocks-sidebar"
     >
       <div
-        onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
+        onPointerDown={handlePointerDown}
+        className={`absolute left-0 top-0 bottom-0 w-5 cursor-ew-resize touch-none hover:bg-gray-100 transition-colors flex items-center justify-center group z-40 ${
           isResizing ? "bg-blue-50" : ""
         }`}
-        style={{ marginLeft: "-8px" }}
+        style={{ marginLeft: "-10px" }}
       >
         <div
           className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
