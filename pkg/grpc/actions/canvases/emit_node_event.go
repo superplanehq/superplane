@@ -45,7 +45,10 @@ func EmitNodeEvent(
 	}
 
 	customName, err := resolveCustomName(node, data)
-	if err == nil && customName != nil {
+	if err != nil {
+		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
+		event.CustomName = &failed
+	} else if customName != nil {
 		event.CustomName = customName
 	}
 
@@ -88,7 +91,8 @@ func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string
 
 	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
 		WithNodeID(node.NodeID).
-		WithInput(map[string]any{node.NodeID: payload})
+		WithInput(map[string]any{node.NodeID: payload}).
+		WithRootPayload(payload)
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
