@@ -119,9 +119,12 @@ function resolveEndTimestamp(
     }
   }
 
-  const finishedAt = (context.execution as { finishedAt?: string }).finishedAt;
-  if (finishedAt) {
-    const ms = Date.parse(finishedAt);
+  // For non-bootstrap stage finishes (e.g. preparingSandbox timeout),
+  // freeze the elapsed counter at the execution's last update once it
+  // has reached the finished state. Without this, the timer keeps
+  // ticking forward on every sidebar refetch.
+  if (context.execution.state === "STATE_FINISHED") {
+    const ms = Date.parse(context.execution.updatedAt);
     if (!Number.isNaN(ms)) {
       return ms;
     }

@@ -99,6 +99,33 @@ describe("createRepositorySandboxMapper.getExecutionDetails", () => {
     expect(details.Elapsed).toContain("30s");
   });
 
+  it("freezes elapsed at execution.updatedAt for non-bootstrap finishes", () => {
+    // For a preparingSandbox-stage timeout there is no bootstrap.finishedAt,
+    // but the execution still reaches STATE_FINISHED. The elapsed counter
+    // must freeze at execution.updatedAt instead of ticking forward forever.
+    const node = buildNode();
+    const started = new Date("2026-04-23T10:00:00Z").toISOString();
+    const finished = new Date("2026-04-23T10:00:45Z").toISOString();
+
+    const ctx: ExecutionDetailsContext = {
+      nodes: [node],
+      node,
+      execution: {
+        ...buildExecution({
+          stage: "preparingSandbox",
+          sandboxStartedAt: started,
+          timeout: 60,
+        }),
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        updatedAt: finished,
+      },
+    };
+
+    const details = createRepositorySandboxMapper.getExecutionDetails(ctx);
+    expect(details.Elapsed).toContain("45s");
+  });
+
   it("omits elapsed when sandboxStartedAt is missing", () => {
     const node = buildNode();
     const ctx: ExecutionDetailsContext = {

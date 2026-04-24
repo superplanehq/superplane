@@ -802,7 +802,7 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
 		require.NotNil(t, updated.Bootstrap)
 		assert.Contains(t, updated.Bootstrap.Log, "[truncated")
-		assert.LessOrEqual(t, len(updated.Bootstrap.Log), CreateRepositorySandboxBootstrapLogMaxBytes+64, "tail-trimmed log must fit the cap plus the truncation marker")
+		assert.LessOrEqual(t, len(updated.Bootstrap.Log), CreateRepositorySandboxBootstrapLogMaxBytes, "tail-trimmed log must respect the cap as a hard upper bound (marker included)")
 	})
 
 	t.Run("re-fetches logs after command exits so trailing output is captured", func(t *testing.T) {

@@ -644,7 +644,12 @@ func (c *CreateRepositorySandbox) prepareInlineBootstrapScript(client *Client, m
 func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return err
+		// Treat as transient — the previous getCommandResult-based
+		// implementation also retried on client-creation failures via
+		// the caller's error-to-reschedule path. Keep that behavior so
+		// a flaky integration context doesn't fail an in-flight bootstrap.
+		ctx.Logger.Errorf("failed to create client: %v", err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxBootstrapPollInterval)
 	}
 
 	//
@@ -736,15 +741,22 @@ func resolveTimeoutSeconds(bootstrap *CreateRepositorySandboxBootstrapSpec) int 
 	return int(CreateRepositorySandboxDefaultTimeout.Seconds())
 }
 
-// tailBytes keeps the last max bytes of s, prefixing a truncation marker
-// when clipping occurs so the UI can indicate missing output.
+// tailBytes returns the tail of s capped at max bytes total, including
+// a truncation marker when clipping occurs. The returned string length
+// never exceeds max, so callers can rely on the cap as a hard upper
+// bound when storing the result (e.g. in execution metadata).
 func tailBytes(s string, max int) string {
 	if max <= 0 || len(s) <= max {
 		return s
 	}
 
-	truncated := len(s) - max
-	return fmt.Sprintf("…[truncated %d bytes]\n%s", truncated, s[truncated:])
+	marker := fmt.Sprintf("…[truncated %d bytes]\n", len(s)-max)
+	if len(marker) >= max {
+		return marker[:max]
+	}
+
+	tail := s[len(s)-(max-len(marker)):]
+	return marker + tail
 }
 
 func (c *CreateRepositorySandbox) finish(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
