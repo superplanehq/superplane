@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -414,7 +415,7 @@ func (e *CanvasNodeExecution) StartInTransaction(tx *gorm.DB) error {
 
 func (e *CanvasNodeExecution) Pass(outputs map[string][]any) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultEventProcessingTimeout, "CanvasNodeExecution.Pass", func(tx *gorm.DB) error {
 		var err error
 		events, err = e.PassInTransaction(tx, outputs)
 		if err != nil {
@@ -489,7 +490,7 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 }
 
 func (e *CanvasNodeExecution) Fail(reason, message string) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultEventProcessingTimeout, "CanvasNodeExecution.Fail", func(tx *gorm.DB) error {
 		return e.FailInTransaction(tx, reason, message)
 	})
 }

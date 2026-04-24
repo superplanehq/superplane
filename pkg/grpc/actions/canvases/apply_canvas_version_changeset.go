@@ -44,7 +44,7 @@ func ApplyCanvasVersionChangeset(
 
 	var newVersion *models.CanvasVersion
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "ApplyCanvasVersionChangeset", func(tx *gorm.DB) error {
 		version, err := models.FindCanvasVersionForUpdateInTransaction(tx, canvasID, versionID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {

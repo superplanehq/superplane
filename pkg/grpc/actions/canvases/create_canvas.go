@@ -106,7 +106,7 @@ func CreateCanvas(
 		UpdatedAt:               &now,
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "CreateCanvas", func(tx *gorm.DB) error {
 
 		//
 		// Create the workflow record

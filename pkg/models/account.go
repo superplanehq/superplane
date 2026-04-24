@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -194,7 +195,7 @@ func (a *Account) UpdateEmail(newEmail string) error {
 	normalizedEmail := utils.NormalizeEmail(newEmail)
 	originalEmail := a.Email
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultAccountOperationTimeout, "Account.UpdateEmail", func(tx *gorm.DB) error {
 		err := tx.Model(a).Update("email", normalizedEmail).Error
 		if err != nil {
 			return err
@@ -222,7 +223,7 @@ func (a *Account) UpdateEmail(newEmail string) error {
 func (a *Account) UpdateEmailForProvider(newEmail, provider, providerID string) error {
 	normalizedEmail := utils.NormalizeEmail(newEmail)
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultAccountOperationTimeout, "Account.UpdateEmailForProvider", func(tx *gorm.DB) error {
 
 		err := tx.Model(a).Update("email", normalizedEmail).Error
 		if err != nil {

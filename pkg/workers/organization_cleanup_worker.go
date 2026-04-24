@@ -69,7 +69,7 @@ func (w *OrganizationCleanupWorker) LockAndProcessOrganization(organization mode
 		return nil
 	}
 
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultCleanupTransactionTimeout, "OrganizationCleanupWorker.LockAndProcessOrganization", func(tx *gorm.DB) error {
 		lockedOrganization, err := models.LockDeletedOrganization(tx, organization.ID)
 		if err != nil {
 			w.logger.Infof("Organization %s already being processed - skipping", organization.ID)

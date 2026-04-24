@@ -76,7 +76,7 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 		return nil
 	}
 
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultCleanupTransactionTimeout, "CanvasCleanupWorker.LockAndProcessCanvas", func(tx *gorm.DB) error {
 		lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
 		if err != nil {
 			w.logger.Infof("Canvas %s already being processed - skipping", canvas.ID)

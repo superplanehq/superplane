@@ -140,7 +140,7 @@ func (w *EventRouter) Consume(delivery tackle.Delivery) error {
 func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var execution *models.CanvasNodeExecution
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultEventProcessingTimeout, "EventRouter.LockAndProcessEvent", func(tx *gorm.DB) error {
 		event, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
 			logger.Info("Event already being processed - skipping")

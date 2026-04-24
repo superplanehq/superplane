@@ -79,7 +79,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	var account *models.Account
 	var user *models.User
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(r.Context(), database.DefaultOrganizationMutationTimeout, "setupOwner", func(tx *gorm.DB) error {
 		var err error
 
 		account, err = models.CreateAccountInTransaction(tx, fullName, req.Email)

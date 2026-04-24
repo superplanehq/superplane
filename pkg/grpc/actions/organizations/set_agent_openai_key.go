@@ -60,7 +60,7 @@ func SetAgentOpenAIKey(
 	var settings *models.OrganizationAgentSettings
 	encryptionKeyID := agentCredentialEncryptionKeyID
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultOrganizationMutationTimeout, "SetAgentOpenAIKey", func(tx *gorm.DB) error {
 		var txErr error
 
 		settings, txErr = findOrCreateOrganizationAgentSettingsInTransaction(tx, orgID)

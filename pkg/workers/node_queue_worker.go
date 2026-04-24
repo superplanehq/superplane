@@ -169,7 +169,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		newEvents = append(newEvents, events...)
 	}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultEventProcessingTimeout, "NodeQueueWorker.LockAndProcessNode", func(tx *gorm.DB) error {
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
 			logger.Info("Node already being processed - skipping")

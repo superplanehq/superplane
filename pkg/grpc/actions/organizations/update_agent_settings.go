@@ -1,6 +1,7 @@
 package organizations
 
 import (
+	"context"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -18,7 +19,7 @@ func UpdateAgentSettings(
 ) (*pb.UpdateAgentSettingsResponse, error) {
 	var settings *models.OrganizationAgentSettings
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultOrganizationMutationTimeout, "UpdateAgentSettings", func(tx *gorm.DB) error {
 		var txErr error
 		settings, txErr = findOrCreateOrganizationAgentSettingsInTransaction(tx, orgID)
 		if txErr != nil {

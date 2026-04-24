@@ -27,7 +27,7 @@ func UpdateNodePause(ctx context.Context, registry *registry.Registry, canvasID,
 	}
 
 	var canvasNode *models.CanvasNode
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "UpdateNodePause", func(tx *gorm.DB) error {
 		lockedNode, err := models.LockCanvasNodeForUpdate(tx, canvasUUID, nodeID)
 		if err != nil {
 			return err

@@ -71,7 +71,7 @@ func ListCanvasChangeRequests(
 
 	var requests []models.CanvasChangeRequest
 	var totalCount int64
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultReadOnlyTransactionTimeout, "ListCanvasChangeRequests", func(tx *gorm.DB) error {
 		items, listErr := models.ListCanvasChangeRequestsFilteredInTransaction(tx, canvas.ID, listOptions)
 		if listErr != nil {
 			return listErr

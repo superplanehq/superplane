@@ -66,7 +66,7 @@ func (w *IntegrationCleanupWorker) Start(ctx context.Context) {
 }
 
 func (w *IntegrationCleanupWorker) LockAndProcessIntegration(integration models.Integration) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultCleanupTransactionTimeout, "IntegrationCleanupWorker.LockAndProcessIntegration", func(tx *gorm.DB) error {
 		r, err := models.LockIntegration(tx, integration.ID)
 		if err != nil {
 			w.log("Integration %s already being processed - skipping", integration.ID)

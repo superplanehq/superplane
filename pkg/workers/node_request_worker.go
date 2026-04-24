@@ -90,7 +90,7 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 		newEvents = append(newEvents, events...)
 	}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultWorkerTransactionTimeout, "NodeRequestWorker.LockAndProcessRequest", func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err != nil {
 			w.log("Request %s already being processed - skipping", request.ID)

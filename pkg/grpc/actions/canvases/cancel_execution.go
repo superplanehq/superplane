@@ -41,7 +41,7 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 		return nil, status.Error(codes.InvalidArgument, "cannot cancel child execution directly, cancel the parent execution instead")
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "CancelExecution", func(tx *gorm.DB) error {
 		node, err := models.FindCanvasNode(tx, workflowID, execution.NodeID)
 
 		if err != nil {

@@ -69,7 +69,7 @@ func handleExistingUser(
 	}
 
 	var invitation *models.OrganizationInvitation
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(ctx, database.DefaultOrganizationMutationTimeout, "CreateInvitation", func(tx *gorm.DB) error {
 		userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, orgID.String())
 		if countErr != nil {
 			return countErr

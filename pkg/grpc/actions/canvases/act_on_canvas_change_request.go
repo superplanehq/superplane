@@ -159,7 +159,7 @@ func runActOnCanvasChangeRequestTransaction(
 	var request *models.CanvasChangeRequest
 	var version *models.CanvasVersion
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "ActOnCanvasChangeRequest", func(tx *gorm.DB) error {
 		canvasInTx, err := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
 		if err != nil {
 			return err

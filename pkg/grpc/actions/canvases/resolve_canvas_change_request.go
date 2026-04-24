@@ -73,7 +73,7 @@ func ResolveCanvasChangeRequest(
 	var version *models.CanvasVersion
 	var request *models.CanvasChangeRequest
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "ResolveCanvasChangeRequest", func(tx *gorm.DB) error {
 		canvasInTx, findCanvasErr := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
 		if findCanvasErr != nil {
 			return findCanvasErr
