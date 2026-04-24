@@ -1632,17 +1632,10 @@ function CanvasContentHeader({
     }
   }, [onSave]);
 
-  const handleLogoClick = useCallback(() => {
-    if (organizationId) {
-      window.location.href = `/${organizationId}`;
-    }
-  }, [organizationId]);
-
   return (
     <Header
       canvasName={canvasName}
       onSave={onSave ? handleSave : undefined}
-      onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
       saveIsPrimary={saveIsPrimary}
       saveButtonHidden={saveButtonHidden}
