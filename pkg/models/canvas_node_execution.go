@@ -493,7 +493,6 @@ func (e *CanvasNodeExecution) markNodeReady(tx *gorm.DB) error {
 	return nil
 }
 
-//
 // FailWithOutputsInTransaction finishes the execution with RESULT_FAILED while
 // still emitting payloads to the given channels. This is used when a component
 // routes a failure payload on one of its output channels (e.g. the HTTP node's
@@ -503,7 +502,6 @@ func (e *CanvasNodeExecution) markNodeReady(tx *gorm.DB) error {
 // Unlike FailInTransaction, this does NOT bubble up to the parent execution:
 // the emitted event will drive parent aggregation via the normal completion
 // path, so propagating failure up would double-count.
-//
 func (e *CanvasNodeExecution) FailWithOutputsInTransaction(tx *gorm.DB, channelOutputs map[string][]any, reason, message string) ([]CanvasEvent, error) {
 	now := time.Now()
 
