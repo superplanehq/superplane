@@ -146,8 +146,10 @@ func countPendingExecutions() (int64, error) {
 	var count int64
 
 	err := database.Conn().
-		Table("workflow_node_executions").
-		Where("state = ?", "pending").
+		Table("workflow_node_executions AS wne").
+		Joins("JOIN workflows AS w ON wne.workflow_id = w.id").
+		Where("wne.state = ?", "pending").
+		Where("w.deleted_at IS NULL").
 		Count(&count).
 		Error
 	if err != nil {

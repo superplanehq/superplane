@@ -180,6 +180,44 @@ func TestCountPendingExecutions(t *testing.T) {
 	require.Equal(t, int64(1), count)
 }
 
+func TestCountPendingExecutions_DeletedWorkflowIsNotCounted(t *testing.T) {
+	database.TruncateTables()
+
+	activeSteps := stuckQueueItemsTestSteps{t: t}
+	activeSteps.CreateWorkflow()
+	activeSteps.CreateWorkflowNode()
+	activeSteps.CreateRootEvent()
+
+	deletedSteps := stuckQueueItemsTestSteps{t: t}
+	deletedSteps.CreateWorkflow()
+	deletedSteps.CreateWorkflowNode()
+	deletedSteps.CreateRootEvent()
+
+	activeExecution := &models.CanvasNodeExecution{
+		WorkflowID:  activeSteps.workflow.ID,
+		NodeID:      activeSteps.node.NodeID,
+		RootEventID: activeSteps.rootEvent.ID,
+		EventID:     activeSteps.rootEvent.ID,
+		State:       models.CanvasNodeExecutionStatePending,
+	}
+	require.NoError(t, database.Conn().Create(activeExecution).Error)
+
+	deletedExecution := &models.CanvasNodeExecution{
+		WorkflowID:  deletedSteps.workflow.ID,
+		NodeID:      deletedSteps.node.NodeID,
+		RootEventID: deletedSteps.rootEvent.ID,
+		EventID:     deletedSteps.rootEvent.ID,
+		State:       models.CanvasNodeExecutionStatePending,
+	}
+	require.NoError(t, database.Conn().Create(deletedExecution).Error)
+
+	require.NoError(t, deletedSteps.workflow.SoftDelete())
+
+	count, err := countPendingExecutions()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
 type stuckQueueItemsTestSteps struct {
 	t         *testing.T
 	workflow  *models.Canvas
