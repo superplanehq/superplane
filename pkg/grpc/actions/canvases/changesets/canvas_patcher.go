@@ -409,9 +409,7 @@ func (p *CanvasPatcher) addEdge(change *pb.CanvasChangeset_Change) error {
 	}
 
 	if err := ValidateSourceNodeOutputChannel(
-		p.tx,
 		p.registry,
-		p.orgID,
 		p.nodes[edge.GetSourceId()],
 		edge.GetChannel(),
 	); err != nil {

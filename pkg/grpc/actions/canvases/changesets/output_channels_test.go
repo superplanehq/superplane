@@ -62,9 +62,7 @@ func TestValidateSourceNodeOutputChannel(t *testing.T) {
 
 	t.Run("unresolvable source component stays soft", func(t *testing.T) {
 		err := ValidateSourceNodeOutputChannel(
-			nil,
 			reg,
-			uuid.New(),
 			models.Node{
 				ID:   "node-a",
 				Type: models.NodeTypeComponent,
@@ -87,9 +85,7 @@ func TestValidateSourceNodeOutputChannel(t *testing.T) {
 		}
 
 		err := ValidateSourceNodeOutputChannel(
-			nil,
 			reg,
-			uuid.New(),
 			models.Node{
 				ID:   "node-a",
 				Type: models.NodeTypeComponent,

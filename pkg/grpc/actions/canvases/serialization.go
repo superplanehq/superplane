@@ -290,9 +290,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 
 		if err := changesets.ValidateSourceNodeOutputChannel(
-			database.Conn(),
 			registry,
-			uuid.MustParse(orgID),
 			nodesByID[edge.SourceId],
 			edge.Channel,
 		); err != nil {
