@@ -250,7 +250,7 @@ func (a *Handler) acceptPendingInvitations(account *models.Account) error {
 }
 
 func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, account *models.Account) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultAuthTransactionTimeout, "acceptInvitation", func(tx *gorm.DB) error {
 		user, err := models.CreateUserInTransaction(tx, invitation.OrganizationID, account.ID, account.Email, account.Name)
 		if err != nil {
 			return err

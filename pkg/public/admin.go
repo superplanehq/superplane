@@ -126,7 +126,7 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 var errInvalidInstallationSettingsRequest = errors.New("invalid installation settings request")
 
 func (s *Server) updateInstallationSettings(ctx context.Context, req installationSettingsRequest) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(ctx, database.DefaultOrganizationMutationTimeout, "updateInstallationSettings", func(tx *gorm.DB) error {
 		if req.AllowPrivateNetworkAccess != nil {
 			metadata, err := models.GetInstallationMetadataInTransaction(tx)
 			if err != nil {

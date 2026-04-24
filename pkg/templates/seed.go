@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -34,7 +35,7 @@ func Setup(registry *registry.Registry) error {
 }
 
 func SeedTemplates(registry *registry.Registry) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultWorkerTransactionTimeout, "SeedTemplates", func(tx *gorm.DB) error {
 		locked, err := lockTemplateSeed(tx)
 		if err != nil {
 			return err
