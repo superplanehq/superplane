@@ -46,14 +46,14 @@ export const createIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as BaseNodeMetadata;
-  const configuration = node.configuration as CreateIncidentConfiguration;
+  const nodeMetadata = node.metadata as BaseNodeMetadata | undefined;
+  const configuration = node.configuration as CreateIncidentConfiguration | undefined;
 
   if (nodeMetadata?.instanceUrl) {
     metadata.push({ icon: "globe", label: instanceUrlToLabel(nodeMetadata.instanceUrl) });
   }
 
-  if (configuration.urgency) {
+  if (configuration?.urgency) {
     const urgencyLabel = URGENCY_LABELS[configuration.urgency] || configuration.urgency;
     metadata.push({ icon: "funnel", label: `Urgency: ${urgencyLabel}` });
   }
