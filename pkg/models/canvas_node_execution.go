@@ -429,9 +429,31 @@ func (e *CanvasNodeExecution) Pass(outputs map[string][]any) ([]CanvasEvent, err
 func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]CanvasEvent, error) {
 	now := time.Now()
 
-	//
-	// Create events for outputs
-	//
+	events, err := e.createOutputEvents(tx, channelOutputs, now)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := e.markNodeReady(tx); err != nil {
+		return nil, err
+	}
+
+	err = tx.Model(e).
+		Updates(map[string]interface{}{
+			"state":      CanvasNodeExecutionStateFinished,
+			"result":     CanvasNodeExecutionResultPassed,
+			"updated_at": &now,
+		}).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+// createOutputEvents persists channel events for an execution and returns them.
+// Shared between PassInTransaction and FailWithOutputsInTransaction.
+func (e *CanvasNodeExecution) createOutputEvents(tx *gorm.DB, channelOutputs map[string][]any, now time.Time) ([]CanvasEvent, error) {
 	events := []CanvasEvent{}
 	for channel, outputs := range channelOutputs {
 		for _, event := range outputs {
@@ -448,39 +470,60 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	if len(events) > 0 {
-		err := tx.Create(&events).Error
-		if err != nil {
+		if err := tx.Create(&events).Error; err != nil {
 			return nil, fmt.Errorf("failed to create events: %w", err)
 		}
 	}
 
-	//
-	// Update the workflow node state to ready.
-	//
+	return events, nil
+}
+
+// markNodeReady transitions the owning node back to Ready unless it is paused.
+func (e *CanvasNodeExecution) markNodeReady(tx *gorm.DB) error {
 	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	if node != nil && node.State != CanvasNodeStatePaused {
+		if err := node.UpdateState(tx, CanvasNodeStateReady); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//
+// FailWithOutputsInTransaction finishes the execution with RESULT_FAILED while
+// still emitting payloads to the given channels. This is used when a component
+// routes a failure payload on one of its output channels (e.g. the HTTP node's
+// "failure" channel) — the channel event must fire so downstream nodes run,
+// but the execution itself must record a failed result for operators/tooling.
+//
+// Unlike FailInTransaction, this does NOT bubble up to the parent execution:
+// the emitted event will drive parent aggregation via the normal completion
+// path, so propagating failure up would double-count.
+//
+func (e *CanvasNodeExecution) FailWithOutputsInTransaction(tx *gorm.DB, channelOutputs map[string][]any, reason, message string) ([]CanvasEvent, error) {
+	now := time.Now()
+
+	events, err := e.createOutputEvents(tx, channelOutputs, now)
+	if err != nil {
 		return nil, err
 	}
 
-	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err = node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return nil, err
-			}
-		}
+	if err := e.markNodeReady(tx); err != nil {
+		return nil, err
 	}
 
-	//
-	// Update execution state
-	//
 	err = tx.Model(e).
 		Updates(map[string]interface{}{
-			"state":      CanvasNodeExecutionStateFinished,
-			"result":     CanvasNodeExecutionResultPassed,
-			"updated_at": &now,
+			"state":          CanvasNodeExecutionStateFinished,
+			"result":         CanvasNodeExecutionResultFailed,
+			"result_reason":  reason,
+			"result_message": message,
+			"updated_at":     &now,
 		}).Error
-
 	if err != nil {
 		return nil, err
 	}
