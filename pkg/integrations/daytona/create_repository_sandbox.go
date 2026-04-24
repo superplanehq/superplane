@@ -658,10 +658,8 @@ func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, meta
 	// logged but never fail the execution; the top-of-poll timeout check is
 	// the single authoritative exit for long hangs.
 	//
-	logs, logsErr := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, metadata.Bootstrap.CmdID)
-	if logsErr != nil {
-		ctx.Logger.Errorf("failed to get bootstrap command logs for %s: %v", metadata.Bootstrap.CmdID, logsErr)
-	} else {
+	logs, logsFetched := fetchBootstrapLogs(ctx, client, metadata)
+	if logsFetched {
 		metadata.Bootstrap.Log = tailBytes(logs, CreateRepositorySandboxBootstrapLogMaxBytes)
 		if err := ctx.Metadata.Set(*metadata); err != nil {
 			return err
@@ -685,21 +683,28 @@ func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, meta
 	// produced between the two calls (commonly the final "done" echo) would
 	// otherwise be dropped from the captured result.
 	//
-	if finalLogs, err := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, metadata.Bootstrap.CmdID); err == nil {
+	if finalLogs, finalFetched := fetchBootstrapLogs(ctx, client, metadata); finalFetched {
 		logs = finalLogs
-	} else {
-		ctx.Logger.Errorf("failed to fetch final bootstrap logs for %s: %v", metadata.Bootstrap.CmdID, err)
+		logsFetched = true
 	}
+
+	//
+	// Only overwrite the persisted log/result when we actually captured
+	// fresh content this poll. Otherwise keep whatever a prior successful
+	// poll persisted — back-to-back fetch failures must not erase the log
+	// snapshot the user can already see in the UI.
+	//
+	if logsFetched {
+		metadata.Bootstrap.Result = logs
+		metadata.Bootstrap.Log = tailBytes(logs, CreateRepositorySandboxBootstrapLogMaxBytes)
+	}
+	metadata.Bootstrap.FinishedAt = time.Now().Format(time.RFC3339)
+	metadata.Bootstrap.ExitCode = *command.ExitCode
 
 	result := &ExecuteCommandResponse{
 		ExitCode: *command.ExitCode,
-		Result:   logs,
+		Result:   metadata.Bootstrap.Result,
 	}
-
-	metadata.Bootstrap.Result = result.Result
-	metadata.Bootstrap.Log = tailBytes(result.Result, CreateRepositorySandboxBootstrapLogMaxBytes)
-	metadata.Bootstrap.FinishedAt = time.Now().Format(time.RFC3339)
-	metadata.Bootstrap.ExitCode = result.ExitCode
 
 	if result.ExitCode != 0 {
 		if err := ctx.Metadata.Set(*metadata); err != nil {
@@ -739,6 +744,19 @@ func resolveTimeoutSeconds(bootstrap *CreateRepositorySandboxBootstrapSpec) int 
 		return bootstrap.Timeout * 60
 	}
 	return int(CreateRepositorySandboxDefaultTimeout.Seconds())
+}
+
+// fetchBootstrapLogs retrieves the current bootstrap command logs.
+// Returns the log content and whether the fetch succeeded; on failure
+// the error is logged and the caller is expected to keep any previously
+// persisted log content intact rather than overwriting it with empty.
+func fetchBootstrapLogs(ctx core.ActionContext, client *Client, metadata *CreateRepositorySandboxMetadata) (string, bool) {
+	logs, err := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, metadata.Bootstrap.CmdID)
+	if err != nil {
+		ctx.Logger.Errorf("failed to get bootstrap command logs for %s: %v", metadata.Bootstrap.CmdID, err)
+		return "", false
+	}
+	return logs, true
 }
 
 // tailBytes returns the tail of s capped at max bytes total, including

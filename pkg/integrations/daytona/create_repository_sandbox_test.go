@@ -860,6 +860,71 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		assert.Contains(t, updated.Bootstrap.Log, "done", "final log must include output produced between the in-flight fetch and the exit-code check")
 	})
 
+	t.Run("terminal poll preserves prior logs when both log fetches fail", func(t *testing.T) {
+		// A previous poll captured "earlier output" into Bootstrap.Log /
+		// Bootstrap.Result. The terminal poll (where ExitCode appears)
+		// must not erase that snapshot if its own log fetches both fail.
+		priorLog := "earlier output captured by a previous poll\n"
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: CreateRepositorySandboxMetadata{
+				Stage:            repositorySandboxStageBootstrapping,
+				SandboxID:        "sandbox-123",
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
+				SessionID:        "session-1",
+				Repository:       "https://github.com/superplanehq/superplane.git",
+				Directory:        "/home/daytona/superplane",
+				Clone: &CloneMetadata{
+					StartedAt:  time.Now().Format(time.RFC3339),
+					FinishedAt: time.Now().Format(time.RFC3339),
+				},
+				Bootstrap: &BootstrapMetadata{
+					CmdID:  "cmd-bootstrap",
+					From:   SandboxBootstrapFromInline,
+					Log:    priorLog,
+					Result: priorLog,
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// First log fetch fails (5xx).
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"unavailable"}`))},
+				// GetSession succeeds and reports the command as exited.
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-bootstrap","exitCode":0}]}`))},
+				// Final post-exit log re-fetch also fails.
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"unavailable"}`))},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Metadata:       metadataCtx,
+			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+			Logger:         newTestLogger(),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-api-key"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+
+		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
+		require.NotNil(t, updated.Bootstrap)
+		assert.Equal(t, priorLog, updated.Bootstrap.Log, "prior log snapshot must be preserved when both terminal log fetches fail")
+		assert.Equal(t, priorLog, updated.Bootstrap.Result, "prior Result must be preserved when both terminal log fetches fail")
+		assert.Equal(t, 0, updated.Bootstrap.ExitCode)
+	})
+
 	t.Run("transient log fetch failure does not fail execution", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
