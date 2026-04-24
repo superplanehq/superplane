@@ -123,8 +123,9 @@ func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.S
 	}
 	for i, opt := range opts.Options {
 		pbOpts.Options[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -136,12 +137,14 @@ func multiSelectTypeOptionsToProto(opts *configuration.MultiSelectTypeOptions) *
 	}
 
 	pbOpts := &configpb.MultiSelectTypeOptions{
-		Options: make([]*configpb.SelectOption, len(opts.Options)),
+		Options:       make([]*configpb.SelectOption, len(opts.Options)),
+		UseCheckboxes: opts.UseCheckboxes,
 	}
 	for i, opt := range opts.Options {
 		pbOpts.Options[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -248,8 +251,9 @@ func anyPredicateListTypeOptionsToProto(opts *configuration.AnyPredicateListType
 	}
 	for i, opt := range opts.Operators {
 		pbOpts.Operators[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -400,8 +404,9 @@ func protoToSelectTypeOptions(pbOpts *configpb.SelectTypeOptions) *configuration
 	}
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -413,12 +418,14 @@ func protoToMultiSelectTypeOptions(pbOpts *configpb.MultiSelectTypeOptions) *con
 	}
 
 	opts := &configuration.MultiSelectTypeOptions{
-		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
+		Options:       make([]configuration.FieldOption, len(pbOpts.Options)),
+		UseCheckboxes: pbOpts.UseCheckboxes,
 	}
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -575,8 +582,9 @@ func protoToAnyPredicateListTypeOptions(pbOpts *configpb.AnyPredicateListTypeOpt
 	}
 	for i, pbOpt := range pbOpts.Operators {
 		opts.Operators[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
