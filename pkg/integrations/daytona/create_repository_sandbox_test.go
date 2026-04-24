@@ -136,6 +136,38 @@ func Test__CreateRepositorySandbox__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "invalid secret type")
 	})
 
+	t.Run("negative bootstrap timeout is rejected", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Metadata: &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository": "https://github.com/superplanehq/superplane.git",
+				"bootstrap": map[string]any{
+					"from":    SandboxBootstrapFromInline,
+					"script":  "npm ci",
+					"timeout": -1,
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "bootstrap.timeout cannot be negative")
+	})
+
+	t.Run("bootstrap timeout above the ceiling is rejected", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Metadata: &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository": "https://github.com/superplanehq/superplane.git",
+				"bootstrap": map[string]any{
+					"from":    SandboxBootstrapFromInline,
+					"script":  "npm ci",
+					"timeout": int(CreateRepositorySandboxMaxTimeout.Minutes()) + 1,
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "bootstrap.timeout cannot exceed")
+	})
+
 	t.Run("valid inline bootstrap setup", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Metadata: &contexts.MetadataContext{},
@@ -221,6 +253,41 @@ func Test__CreateRepositorySandbox__Execute(t *testing.T) {
 	assert.Equal(t, SandboxBootstrapFromInline, metadata.Bootstrap.From)
 	require.NotNil(t, metadata.Bootstrap.Script)
 	assert.Equal(t, "npm ci", *metadata.Bootstrap.Script)
+}
+
+func Test__CreateRepositorySandbox__Execute_WithConfiguredBootstrapTimeout(t *testing.T) {
+	component := CreateRepositorySandbox{}
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"creating"}`)),
+			},
+		},
+	}
+
+	metadataCtx := &contexts.MetadataContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"repository": "https://github.com/superplanehq/superplane.git",
+			"bootstrap": map[string]any{
+				"from":    SandboxBootstrapFromInline,
+				"script":  "npm ci",
+				"timeout": 2,
+			},
+		},
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-api-key"}},
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Metadata:       metadataCtx,
+		Requests:       &contexts.RequestContext{},
+		Logger:         newTestLogger(),
+	})
+
+	require.NoError(t, err)
+	metadata := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
+	assert.Equal(t, 2*60, metadata.Timeout, "bootstrap timeout in minutes should be converted to seconds")
 }
 
 func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
@@ -349,6 +416,64 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		assert.Contains(t, req.Command, "cd '/home/daytona/superplane' && sh '/home/daytona/.superplane/bootstrap.sh'")
 	})
 
+	t.Run("inline script with CRLF line endings is normalized to LF before upload", func(t *testing.T) {
+		// The configuration form sometimes produces CRLF line endings; dash
+		// interprets the trailing \r literally, which breaks `sleep 2` and
+		// keywords like `done`. The component must strip them before upload.
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: CreateRepositorySandboxMetadata{
+				Stage:            repositorySandboxStagePreparingSandbox,
+				SandboxID:        "sandbox-123",
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
+				Repository:       "https://github.com/superplanehq/superplane.git",
+				Directory:        "/home/daytona/superplane",
+				Bootstrap: &BootstrapMetadata{
+					From:   SandboxBootstrapFromInline,
+					Script: ptr("echo line1\r\nsleep 2\r\necho line2\r\n"),
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sandbox-123","state":"started"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"cmdId":"cmd-bootstrap"}`))},
+			},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Metadata:       metadataCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       &contexts.RequestContext{},
+			Logger:         newTestLogger(),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-api-key"},
+			},
+		})
+
+		require.NoError(t, err)
+
+		uploadedScriptBody, err := io.ReadAll(httpContext.Requests[6].Body)
+		require.NoError(t, err)
+		// The multipart envelope itself uses CRLF; we only care that the
+		// script content is LF-only. Asserting the exact LF substring is
+		// sufficient because the original input had \r\n line endings.
+		assert.Contains(t, string(uploadedScriptBody), "echo line1\nsleep 2\necho line2\n")
+		assert.NotContains(t, string(uploadedScriptBody), "echo line1\r", "carriage returns inside the script must be stripped before upload")
+	})
+
 	t.Run("clone failure marks execution as failed", func(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: CreateRepositorySandboxMetadata{
@@ -422,10 +547,15 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				// FetchConfig for GetSessionCommandLogs (logs fetched first so UI gets early output)
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`bootstrap logs partial`))},
+				// FetchConfig for GetSession
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-bootstrap","exitCode":0}]}`))},
+				// FetchConfig for the final log re-fetch (after ExitCode is known)
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`bootstrap logs`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`bootstrap logs complete`))},
 			},
 		}
 
@@ -456,7 +586,8 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 		assert.Equal(t, "/home/daytona/superplane", payload.Directory)
 		require.NotNil(t, payload.Clone)
 		assert.Nil(t, payload.Clone.Error)
-		assert.Equal(t, "bootstrap logs", payload.Bootstrap.Result)
+		assert.Equal(t, "bootstrap logs complete", payload.Bootstrap.Result, "final Result should reflect the post-exit log re-fetch, not the earlier partial snapshot")
+		assert.Equal(t, "bootstrap logs complete", payload.Bootstrap.Log)
 		assert.Equal(t, 0, payload.Bootstrap.ExitCode)
 	})
 
@@ -477,8 +608,13 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				// FetchConfig for GetSessionCommandLogs
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`npm ERR!`))},
+				// FetchConfig for GetSession
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-bootstrap","exitCode":2}]}`))},
+				// FetchConfig for the final log re-fetch (after ExitCode is known)
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`npm ERR!`))},
 			},
@@ -534,21 +670,22 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 
 	t.Run("times out during bootstrap stage and marks execution as failed", func(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
-
-		err := component.HandleAction(core.ActionContext{
-			Name: "poll",
-			Metadata: &contexts.MetadataContext{
-				Metadata: CreateRepositorySandboxMetadata{
-					Stage:            repositorySandboxStageBootstrapping,
-					SandboxID:        "sandbox-123",
-					SandboxStartedAt: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
-					Timeout:          int(time.Minute.Seconds()),
-					SessionID:        "session-1",
-					Bootstrap: &BootstrapMetadata{
-						CmdID: "cmd-bootstrap",
-					},
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: CreateRepositorySandboxMetadata{
+				Stage:            repositorySandboxStageBootstrapping,
+				SandboxID:        "sandbox-123",
+				SandboxStartedAt: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
+				Timeout:          int(time.Minute.Seconds()),
+				SessionID:        "session-1",
+				Bootstrap: &BootstrapMetadata{
+					CmdID: "cmd-bootstrap",
 				},
 			},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			Metadata:       metadataCtx,
 			ExecutionState: execCtx,
 			Requests:       &contexts.RequestContext{},
 			Logger:         newTestLogger(),
@@ -566,6 +703,207 @@ func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
 			execCtx.FailureMessage,
 			"sandbox creation failed on stage "+repositorySandboxStageBootstrapping+" after 1m0s",
 		)
+
+		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
+		require.NotNil(t, updated.Bootstrap)
+		assert.NotEmpty(t, updated.Bootstrap.FinishedAt, "bootstrap FinishedAt should be set on timeout so the UI has a terminal timestamp")
+	})
+
+	t.Run("captures logs while bootstrap is still running", func(t *testing.T) {
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: CreateRepositorySandboxMetadata{
+				Stage:            repositorySandboxStageBootstrapping,
+				SandboxID:        "sandbox-123",
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
+				SessionID:        "session-1",
+				Bootstrap: &BootstrapMetadata{
+					CmdID: "cmd-bootstrap",
+					From:  SandboxBootstrapFromInline,
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// FetchConfig for GetSessionCommandLogs
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("installing deps...\nrunning tests..."))},
+				// FetchConfig for GetSession (ExitCode still nil => still running)
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-bootstrap","exitCode":null}]}`))},
+			},
+		}
+
+		requestCtx := &contexts.RequestContext{}
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Metadata:       metadataCtx,
+			ExecutionState: execCtx,
+			Requests:       requestCtx,
+			Logger:         newTestLogger(),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-api-key"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.False(t, execCtx.Finished, "execution should still be running while bootstrap command is in flight")
+		assert.Equal(t, "poll", requestCtx.Action)
+		assert.Equal(t, CreateRepositorySandboxBootstrapPollInterval, requestCtx.Duration)
+
+		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
+		require.NotNil(t, updated.Bootstrap)
+		assert.Equal(t, "installing deps...\nrunning tests...", updated.Bootstrap.Log)
+		assert.Empty(t, updated.Bootstrap.FinishedAt, "FinishedAt should not be set while the command is still running")
+	})
+
+	t.Run("bootstrap logs are tail-trimmed when exceeding the cap", func(t *testing.T) {
+		big := strings.Repeat("x", CreateRepositorySandboxBootstrapLogMaxBytes+1024)
+
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: CreateRepositorySandboxMetadata{
+				Stage:            repositorySandboxStageBootstrapping,
+				SandboxID:        "sandbox-123",
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
+				SessionID:        "session-1",
+				Bootstrap: &BootstrapMetadata{
+					CmdID: "cmd-bootstrap",
+					From:  SandboxBootstrapFromInline,
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(big))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-bootstrap","exitCode":null}]}`))},
+			},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Metadata:       metadataCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       &contexts.RequestContext{},
+			Logger:         newTestLogger(),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-api-key"},
+			},
+		})
+
+		require.NoError(t, err)
+		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
+		require.NotNil(t, updated.Bootstrap)
+		assert.Contains(t, updated.Bootstrap.Log, "[truncated")
+		assert.LessOrEqual(t, len(updated.Bootstrap.Log), CreateRepositorySandboxBootstrapLogMaxBytes+64, "tail-trimmed log must fit the cap plus the truncation marker")
+	})
+
+	t.Run("re-fetches logs after command exits so trailing output is captured", func(t *testing.T) {
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: CreateRepositorySandboxMetadata{
+				Stage:            repositorySandboxStageBootstrapping,
+				SandboxID:        "sandbox-123",
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
+				SessionID:        "session-1",
+				Repository:       "https://github.com/superplanehq/superplane.git",
+				Directory:        "/home/daytona/superplane",
+				Clone: &CloneMetadata{
+					StartedAt:  time.Now().Format(time.RFC3339),
+					FinishedAt: time.Now().Format(time.RFC3339),
+				},
+				Bootstrap: &BootstrapMetadata{
+					CmdID: "cmd-bootstrap",
+					From:  SandboxBootstrapFromInline,
+				},
+			},
+		}
+
+		// First log fetch happens before the command has produced its final line;
+		// between that fetch and the session-status check, the command exits and
+		// emits "done". Without a post-exit re-fetch, "done" would be dropped.
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("step 10\n"))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-bootstrap","exitCode":0}]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("step 10\ndone\n"))},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Metadata:       metadataCtx,
+			ExecutionState: execCtx,
+			Requests:       &contexts.RequestContext{},
+			Logger:         newTestLogger(),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-api-key"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Passed)
+		updated := metadataCtx.Metadata.(CreateRepositorySandboxMetadata)
+		require.NotNil(t, updated.Bootstrap)
+		assert.Contains(t, updated.Bootstrap.Log, "done", "final log must include output produced between the in-flight fetch and the exit-code check")
+	})
+
+	t.Run("transient log fetch failure does not fail execution", func(t *testing.T) {
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: CreateRepositorySandboxMetadata{
+				Stage:            repositorySandboxStageBootstrapping,
+				SandboxID:        "sandbox-123",
+				SandboxStartedAt: time.Now().Format(time.RFC3339),
+				Timeout:          int(5 * time.Minute.Seconds()),
+				SessionID:        "session-1",
+				Bootstrap: &BootstrapMetadata{
+					CmdID: "cmd-bootstrap",
+					From:  SandboxBootstrapFromInline,
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// FetchConfig for GetSessionCommandLogs
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				// Transient 5xx on log fetch
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"upstream unavailable"}`))},
+				// FetchConfig for GetSession
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"sessionId":"session-1","commands":[{"id":"cmd-bootstrap","exitCode":null}]}`))},
+			},
+		}
+
+		requestCtx := &contexts.RequestContext{}
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Metadata:       metadataCtx,
+			ExecutionState: execCtx,
+			Requests:       requestCtx,
+			Logger:         newTestLogger(),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-api-key"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.False(t, execCtx.Finished)
+		assert.Equal(t, "poll", requestCtx.Action, "a transient log-fetch failure must not abort the bootstrap poll")
 	})
 
 	t.Run("unknown action returns error", func(t *testing.T) {

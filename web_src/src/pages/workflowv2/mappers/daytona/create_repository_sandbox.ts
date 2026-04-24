@@ -2,6 +2,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
 import { baseMapper } from "./base";
 import type { ComponentBaseSpec } from "@/ui/componentBase";
+import { formatDuration } from "@/lib/duration";
 
 interface CreateRepositorySandboxConfiguration {
   snapshot?: string;
@@ -11,6 +12,7 @@ interface CreateRepositorySandboxConfiguration {
     from?: string;
     script?: string;
     path?: string;
+    timeout?: number;
   };
 }
 
@@ -31,6 +33,7 @@ interface CreateRepositorySandboxMetadata {
     finishedAt?: string;
     exitCode?: number;
     result?: string;
+    log?: string;
   };
 }
 
@@ -66,9 +69,66 @@ export const createRepositorySandboxMapper: ComponentBaseMapper = {
       details["Directory"] = metadata.directory;
     }
 
+    const elapsedLabel = buildElapsedLabel(context, metadata);
+    if (elapsedLabel) {
+      details["Elapsed"] = elapsedLabel;
+    }
+
+    if (metadata?.bootstrap?.log) {
+      details["Bootstrap log"] = metadata.bootstrap.log;
+    }
+
     return details;
   },
 };
+
+function buildElapsedLabel(
+  context: ExecutionDetailsContext,
+  metadata: CreateRepositorySandboxMetadata | undefined,
+): string | undefined {
+  if (!metadata?.sandboxStartedAt) {
+    return undefined;
+  }
+
+  const timeoutMs = metadata.timeout ? metadata.timeout * 1000 : undefined;
+  const startedAtMs = Date.parse(metadata.sandboxStartedAt);
+  if (Number.isNaN(startedAtMs)) {
+    return undefined;
+  }
+
+  // For finished runs, show elapsed frozen at execution end when available;
+  // for in-flight runs, elapsed ticks forward naturally on each sidebar refresh
+  // (the sidebar already polls every 1.5s).
+  const endAtMs = resolveEndTimestamp(context, metadata) ?? Date.now();
+  const elapsedMs = Math.max(0, endAtMs - startedAtMs);
+
+  if (timeoutMs) {
+    return `${formatDuration(elapsedMs)} / ${formatDuration(timeoutMs)}`;
+  }
+  return formatDuration(elapsedMs);
+}
+
+function resolveEndTimestamp(
+  context: ExecutionDetailsContext,
+  metadata: CreateRepositorySandboxMetadata | undefined,
+): number | undefined {
+  if (metadata?.bootstrap?.finishedAt) {
+    const ms = Date.parse(metadata.bootstrap.finishedAt);
+    if (!Number.isNaN(ms)) {
+      return ms;
+    }
+  }
+
+  const finishedAt = (context.execution as { finishedAt?: string }).finishedAt;
+  if (finishedAt) {
+    const ms = Date.parse(finishedAt);
+    if (!Number.isNaN(ms)) {
+      return ms;
+    }
+  }
+
+  return undefined;
+}
 
 function createRepositorySandboxMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateRepositorySandboxConfiguration | undefined;
