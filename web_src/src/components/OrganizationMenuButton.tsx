@@ -19,19 +19,17 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { posthog } from "@/posthog";
 
 interface OrganizationMenuButtonProps {
   organizationId?: string;
-  onLogoClick?: () => void;
   className?: string;
 }
 
-export function OrganizationMenuButton({ organizationId, onLogoClick, className }: OrganizationMenuButtonProps) {
-  const navigate = useNavigate();
+export function OrganizationMenuButton({ organizationId, className }: OrganizationMenuButtonProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -45,16 +43,6 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
 
   const handleMenuButtonClick = () => {
     setIsMenuOpen((prev) => !prev);
-  };
-
-  const handleLogoNavigate = () => {
-    if (onLogoClick) {
-      onLogoClick();
-      return;
-    }
-    if (organizationId) {
-      navigate(`/${organizationId}`);
-    }
   };
 
   useEffect(() => {
@@ -289,14 +277,13 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={handleLogoNavigate}
-        className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
+      <Link
+        to={`/${organizationId}`}
         aria-label="Go to canvases"
+        className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
       >
         <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
-      </button>
+      </Link>
     </div>
   );
 }
