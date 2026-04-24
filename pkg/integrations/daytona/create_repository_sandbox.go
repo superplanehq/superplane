@@ -15,9 +15,12 @@ import (
 )
 
 const (
-	CreateRepositorySandboxPayloadType    = "daytona.repository.sandbox"
-	CreateRepositorySandboxPollInterval   = 5 * time.Second
-	CreateRepositorySandboxDefaultTimeout = 5 * time.Minute
+	CreateRepositorySandboxPayloadType           = "daytona.repository.sandbox"
+	CreateRepositorySandboxPollInterval          = 5 * time.Second
+	CreateRepositorySandboxBootstrapPollInterval = 2 * time.Second
+	CreateRepositorySandboxDefaultTimeout        = 5 * time.Minute
+	CreateRepositorySandboxMaxTimeout            = time.Hour
+	CreateRepositorySandboxBootstrapLogMaxBytes  = 64 * 1024
 
 	SandboxBootstrapFromInline = "inline"
 	SandboxBootstrapFromFile   = "file"
@@ -42,10 +45,11 @@ type CreateRepositorySandboxSpec struct {
 }
 
 type CreateRepositorySandboxBootstrapSpec struct {
-	From   string `json:"from,omitempty"`
-	Script string `json:"script,omitempty"`
-	Path   string `json:"path,omitempty"`
-	URL    string `json:"url,omitempty"`
+	From    string `json:"from,omitempty"`
+	Script  string `json:"script,omitempty"`
+	Path    string `json:"path,omitempty"`
+	URL     string `json:"url,omitempty"`
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 type CreateRepositorySandboxMetadata struct {
@@ -73,6 +77,7 @@ type BootstrapMetadata struct {
 	FinishedAt string  `json:"finishedAt" mapstructure:"finishedAt"`
 	ExitCode   int     `json:"exitCode" mapstructure:"exitCode"`
 	Result     string  `json:"result" mapstructure:"result"`
+	Log        string  `json:"log,omitempty" mapstructure:"log,omitempty"`
 	From       string  `json:"from" mapstructure:"from"`
 	Script     *string `json:"script,omitempty" mapstructure:"script,omitempty"`
 	Path       *string `json:"path,omitempty" mapstructure:"path,omitempty"`
@@ -235,6 +240,14 @@ func (c *CreateRepositorySandbox) Configuration() []configuration.Field {
 								{Field: "from", Values: []string{SandboxBootstrapFromFile}},
 							},
 						},
+						{
+							Name:        "timeout",
+							Label:       "Timeout",
+							Type:        configuration.FieldTypeNumber,
+							Required:    false,
+							Description: "Time in minutes before the bootstrap fails",
+							Default:     int(CreateRepositorySandboxDefaultTimeout.Minutes()),
+						},
 					},
 				},
 			},
@@ -254,6 +267,15 @@ func (c *CreateRepositorySandbox) Setup(ctx core.SetupContext) error {
 
 	if spec.AutoStopInterval < 0 {
 		return fmt.Errorf("autoStopInterval cannot be negative")
+	}
+
+	if spec.Bootstrap != nil {
+		if spec.Bootstrap.Timeout < 0 {
+			return fmt.Errorf("bootstrap.timeout cannot be negative")
+		}
+		if spec.Bootstrap.Timeout > int(CreateRepositorySandboxMaxTimeout.Minutes()) {
+			return fmt.Errorf("bootstrap.timeout cannot exceed %d minutes", int(CreateRepositorySandboxMaxTimeout.Minutes()))
+		}
 	}
 
 	if spec.Repository == "" {
@@ -368,7 +390,7 @@ func (c *CreateRepositorySandbox) Execute(ctx core.ExecutionContext) error {
 		Stage:            repositorySandboxStagePreparingSandbox,
 		SandboxID:        sandbox.ID,
 		SandboxStartedAt: time.Now().Format(time.RFC3339),
-		Timeout:          int(CreateRepositorySandboxDefaultTimeout.Seconds()),
+		Timeout:          resolveTimeoutSeconds(spec.Bootstrap),
 		Repository:       strings.TrimSpace(spec.Repository),
 		Directory:        path.Join(SandboxHomeDir, repositoryDirectory),
 		Secrets:          spec.Secrets,
@@ -422,6 +444,7 @@ func (c *CreateRepositorySandbox) poll(ctx core.ActionContext) error {
 
 	timeout := time.Duration(metadata.Timeout) * time.Second
 	if time.Since(startedAt) > timeout {
+		c.markBootstrapTimedOut(ctx, &metadata)
 		ctx.Logger.Errorf("sandbox creation failed on stage %s after %v", metadata.Stage, timeout)
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("sandbox creation failed on stage %s after %v", metadata.Stage, timeout))
 	}
@@ -525,7 +548,7 @@ func (c *CreateRepositorySandbox) startClone(ctx core.ActionContext, client *Cli
 		return err
 	}
 
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxPollInterval)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxBootstrapPollInterval)
 }
 
 func (c *CreateRepositorySandbox) cloneRepositoryRequest(secretsContext core.SecretsContext, metadata *CreateRepositorySandboxMetadata) (*CloneRepositoryRequest, error) {
@@ -597,7 +620,15 @@ func (c *CreateRepositorySandbox) prepareInlineBootstrapScript(client *Client, m
 	}
 
 	inlineScriptPath := repositorySandboxInlineBootstrapPath
-	script := *metadata.Bootstrap.Script
+	//
+	// Normalize line endings to LF before upload. The configuration form may
+	// produce CRLF (Windows-style) line endings, which dash interprets
+	// literally — turning `sleep 2` into `sleep "2\r"` and breaking shell
+	// keywords like `done\r`. Strip carriage returns so the script the user
+	// sees is the script the sandbox runs.
+	//
+	script := strings.ReplaceAll(*metadata.Bootstrap.Script, "\r\n", "\n")
+	script = strings.ReplaceAll(script, "\r", "\n")
 	if !strings.HasSuffix(script, "\n") {
 		script += "\n"
 	}
@@ -611,15 +642,69 @@ func (c *CreateRepositorySandbox) prepareInlineBootstrapScript(client *Client, m
 }
 
 func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
-	result, err := c.getCommandResult(ctx, metadata, metadata.Bootstrap.CmdID)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		ctx.Logger.Errorf("failed to get bootstrap command result for %s: %v", metadata.Bootstrap.CmdID, err)
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxPollInterval)
+		// Treat as transient — the previous getCommandResult-based
+		// implementation also retried on client-creation failures via
+		// the caller's error-to-reschedule path. Keep that behavior so
+		// a flaky integration context doesn't fail an in-flight bootstrap.
+		ctx.Logger.Errorf("failed to create client: %v", err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxBootstrapPollInterval)
 	}
 
-	metadata.Bootstrap.Result = result.Result
+	//
+	// Fetch the latest bootstrap logs on every poll so the UI has a live view
+	// even while the command is still running. Transient log-fetch errors are
+	// logged but never fail the execution; the top-of-poll timeout check is
+	// the single authoritative exit for long hangs.
+	//
+	logs, logsFetched := fetchBootstrapLogs(ctx, client, metadata)
+	if logsFetched {
+		metadata.Bootstrap.Log = tailBytes(logs, CreateRepositorySandboxBootstrapLogMaxBytes)
+		if err := ctx.Metadata.Set(*metadata); err != nil {
+			return err
+		}
+	}
+
+	session, err := client.GetSession(metadata.SandboxID, metadata.SessionID)
+	if err != nil {
+		ctx.Logger.Errorf("failed to get session %s: %v", metadata.SessionID, err)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxBootstrapPollInterval)
+	}
+
+	command := session.FindCommand(metadata.Bootstrap.CmdID)
+	if command == nil || command.ExitCode == nil {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateRepositorySandboxBootstrapPollInterval)
+	}
+
+	//
+	// Re-fetch logs once more now that the command has exited. The earlier
+	// fetch happened before we confirmed the command was done, so any output
+	// produced between the two calls (commonly the final "done" echo) would
+	// otherwise be dropped from the captured result.
+	//
+	if finalLogs, finalFetched := fetchBootstrapLogs(ctx, client, metadata); finalFetched {
+		logs = finalLogs
+		logsFetched = true
+	}
+
+	//
+	// Only overwrite the persisted log/result when we actually captured
+	// fresh content this poll. Otherwise keep whatever a prior successful
+	// poll persisted — back-to-back fetch failures must not erase the log
+	// snapshot the user can already see in the UI.
+	//
+	if logsFetched {
+		metadata.Bootstrap.Result = logs
+		metadata.Bootstrap.Log = tailBytes(logs, CreateRepositorySandboxBootstrapLogMaxBytes)
+	}
 	metadata.Bootstrap.FinishedAt = time.Now().Format(time.RFC3339)
-	metadata.Bootstrap.ExitCode = result.ExitCode
+	metadata.Bootstrap.ExitCode = *command.ExitCode
+
+	result := &ExecuteCommandResponse{
+		ExitCode: *command.ExitCode,
+		Result:   metadata.Bootstrap.Result,
+	}
 
 	if result.ExitCode != 0 {
 		if err := ctx.Metadata.Set(*metadata); err != nil {
@@ -634,6 +719,64 @@ func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, meta
 	return c.finish(ctx, metadata)
 }
 
+// markBootstrapTimedOut records the best-effort terminal state for the
+// bootstrap phase when the deadline fires, so the UI has a definite
+// FinishedAt timestamp and the last captured log.
+func (c *CreateRepositorySandbox) markBootstrapTimedOut(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) {
+	if metadata.Bootstrap == nil || metadata.Stage != repositorySandboxStageBootstrapping {
+		return
+	}
+
+	if metadata.Bootstrap.FinishedAt == "" {
+		metadata.Bootstrap.FinishedAt = time.Now().Format(time.RFC3339)
+	}
+
+	if err := ctx.Metadata.Set(*metadata); err != nil {
+		ctx.Logger.Errorf("failed to persist bootstrap metadata on timeout: %v", err)
+	}
+}
+
+// resolveTimeoutSeconds returns the effective timeout in seconds. The user
+// configures it in minutes under the bootstrap block; when bootstrap is not
+// configured or the value is unset, the default applies.
+func resolveTimeoutSeconds(bootstrap *CreateRepositorySandboxBootstrapSpec) int {
+	if bootstrap != nil && bootstrap.Timeout > 0 {
+		return bootstrap.Timeout * 60
+	}
+	return int(CreateRepositorySandboxDefaultTimeout.Seconds())
+}
+
+// fetchBootstrapLogs retrieves the current bootstrap command logs.
+// Returns the log content and whether the fetch succeeded; on failure
+// the error is logged and the caller is expected to keep any previously
+// persisted log content intact rather than overwriting it with empty.
+func fetchBootstrapLogs(ctx core.ActionContext, client *Client, metadata *CreateRepositorySandboxMetadata) (string, bool) {
+	logs, err := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, metadata.Bootstrap.CmdID)
+	if err != nil {
+		ctx.Logger.Errorf("failed to get bootstrap command logs for %s: %v", metadata.Bootstrap.CmdID, err)
+		return "", false
+	}
+	return logs, true
+}
+
+// tailBytes returns the tail of s capped at max bytes total, including
+// a truncation marker when clipping occurs. The returned string length
+// never exceeds max, so callers can rely on the cap as a hard upper
+// bound when storing the result (e.g. in execution metadata).
+func tailBytes(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+
+	marker := fmt.Sprintf("…[truncated %d bytes]\n", len(s)-max)
+	if len(marker) >= max {
+		return marker[:max]
+	}
+
+	tail := s[len(s)-(max-len(marker)):]
+	return marker + tail
+}
+
 func (c *CreateRepositorySandbox) finish(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
 	metadata.Stage = repositorySandboxStageDone
 	err := ctx.Metadata.Set(*metadata)
@@ -646,33 +789,6 @@ func (c *CreateRepositorySandbox) finish(ctx core.ActionContext, metadata *Creat
 		CreateRepositorySandboxPayloadType,
 		[]any{*metadata},
 	)
-}
-
-func (c *CreateRepositorySandbox) getCommandResult(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata, cmdID string) (*ExecuteCommandResponse, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	session, err := client.GetSession(metadata.SandboxID, metadata.SessionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session %s: %v", metadata.SessionID, err)
-	}
-
-	command := session.FindCommand(cmdID)
-	if command == nil || command.ExitCode == nil {
-		return nil, fmt.Errorf("command %s not found in session %s", cmdID, metadata.SessionID)
-	}
-
-	logs, err := client.GetSessionCommandLogs(metadata.SandboxID, metadata.SessionID, cmdID)
-	if err != nil {
-		ctx.Logger.Errorf("failed to get command logs for %s: %v", cmdID, err)
-	}
-
-	return &ExecuteCommandResponse{
-		ExitCode: *command.ExitCode,
-		Result:   logs,
-	}, nil
 }
 
 /*

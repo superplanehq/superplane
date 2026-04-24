@@ -10,6 +10,7 @@ import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
+import { MultilineDetail } from "./MultilineDetail";
 
 export interface ChildExecution {
   name: string;
@@ -343,6 +344,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 {Object.entries(item.tabData.current).map(([key, value]) => {
                   const stringValue = String(value);
                   const isUrlValue = isUrl(stringValue);
+
+                  if (stringValue.includes("\n")) {
+                    return <MultilineDetail key={key} label={key} value={stringValue} />;
+                  }
 
                   return (
                     <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
