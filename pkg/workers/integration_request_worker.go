@@ -72,7 +72,7 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 }
 
 func (w *IntegrationRequestWorker) LockAndProcessRequest(request models.IntegrationRequest) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultIntegrationOperationTimeout, "IntegrationRequestWorker.LockAndProcessRequest", func(tx *gorm.DB) error {
 		r, err := models.LockIntegrationRequest(tx, request.ID)
 		if err != nil {
 			w.log("Request %s already being processed - skipping", request.ID)

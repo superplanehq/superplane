@@ -85,7 +85,7 @@ func (w *EventRetentionWorker) tick(ctx context.Context) {
 }
 
 func (w *EventRetentionWorker) LockAndProcessRootEvent(rootEvent models.CanvasEvent, referenceTime time.Time) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultCleanupTransactionTimeout, "EventRetentionWorker.LockAndProcessRootEvent", func(tx *gorm.DB) error {
 		lockedEvent, err := models.LockExpiredRoutedRootCanvasEvent(tx, rootEvent.ID, referenceTime)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {

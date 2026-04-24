@@ -66,7 +66,7 @@ func (w *WebhookCleanupWorker) Start(ctx context.Context) {
 }
 
 func (w *WebhookCleanupWorker) LockAndProcessWebhook(webhook models.Webhook) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultCleanupTransactionTimeout, "WebhookCleanupWorker.LockAndProcessWebhook", func(tx *gorm.DB) error {
 		r, err := models.LockDeletedWebhook(tx, webhook.ID)
 		if err != nil {
 			w.log("Webhook %s already being processed - skipping", webhook.ID)

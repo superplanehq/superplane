@@ -108,13 +108,12 @@ func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) error
 func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*models.Webhook, error) {
 	var locked *models.Webhook
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultTransactionTimeout, "WebhookProvisioner.lockAndMarkProvisioning", func(tx *gorm.DB) error {
 		r, err := models.LockWebhook(tx, webhook.ID)
 		if err != nil {
 			return err
 		}
 
-		// Non-integration webhooks don't need external calls — mark ready directly.
 		if r.AppInstallationID == nil {
 			return r.Ready(tx)
 		}
@@ -160,7 +159,7 @@ func (w *WebhookProvisioner) runIntegrationSetup(webhook *models.Webhook) (any, 
 
 // markReady transitions the webhook to "ready" state.
 func (w *WebhookProvisioner) markReady(webhook *models.Webhook, metadata any) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultTransactionTimeout, "WebhookProvisioner.markReady", func(tx *gorm.DB) error {
 		if metadata != nil {
 			return webhook.ReadyWithMetadata(tx, metadata)
 		}
@@ -171,7 +170,7 @@ func (w *WebhookProvisioner) markReady(webhook *models.Webhook, metadata any) er
 // handleProvisioningError handles a failed Setup() by either incrementing
 // the retry count or marking the webhook as failed.
 func (w *WebhookProvisioner) handleProvisioningError(webhook *models.Webhook, originalErr error) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.TransactionWithContext(context.Background(), database.DefaultTransactionTimeout, "WebhookProvisioner.handleProvisioningError", func(tx *gorm.DB) error {
 		if webhook.HasExceededRetries() {
 			w.log("Webhook %s has exceeded max retries (%d), marking as failed", webhook.ID, webhook.MaxRetries)
 			if err := webhook.MarkFailed(tx); err != nil {
