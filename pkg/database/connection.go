@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -84,7 +85,66 @@ func connect() *gorm.DB {
 	sqlDB.SetMaxIdleConns(dbPoolSize())
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
 
+	configureTimeouts(db)
+
 	return db
+}
+
+const (
+	DefaultStatementTimeout               = "60s"
+	DefaultIdleInTransactionTimeout       = "5min"
+	DefaultTransactionTimeout             = 30 * time.Second
+	DefaultWorkerTransactionTimeout       = 2 * time.Minute
+	DefaultReadOnlyTransactionTimeout     = 15 * time.Second
+	DefaultCanvasMutationTimeout          = 45 * time.Second
+	DefaultEventProcessingTimeout         = 60 * time.Second
+	DefaultCleanupTransactionTimeout      = 2 * time.Minute
+	DefaultAuthTransactionTimeout         = 15 * time.Second
+	DefaultOrganizationMutationTimeout    = 30 * time.Second
+	DefaultIntegrationOperationTimeout    = 30 * time.Second
+	DefaultAccountOperationTimeout        = 15 * time.Second
+	DefaultServiceAccountOperationTimeout = 15 * time.Second
+)
+
+func configureTimeouts(db *gorm.DB) {
+	statementTimeout := envOrDefault("DB_STATEMENT_TIMEOUT", DefaultStatementTimeout)
+	idleInTxTimeout := envOrDefault("DB_IDLE_IN_TRANSACTION_TIMEOUT", DefaultIdleInTransactionTimeout)
+
+	if err := db.Exec(fmt.Sprintf("SET statement_timeout = '%s'", statementTimeout)).Error; err != nil {
+		log.Printf("[database] Warning: failed to set statement_timeout: %v", err)
+	}
+
+	if err := db.Exec(fmt.Sprintf("SET idle_in_transaction_session_timeout = '%s'", idleInTxTimeout)).Error; err != nil {
+		log.Printf("[database] Warning: failed to set idle_in_transaction_session_timeout: %v", err)
+	}
+}
+
+func envOrDefault(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+
+	return defaultValue
+}
+
+func TransactionWithContext(ctx context.Context, timeout time.Duration, operationName string, fn func(tx *gorm.DB) error) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	start := time.Now()
+	err := Conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(tx)
+	})
+
+	elapsed := time.Since(start)
+	if err != nil && ctx.Err() != nil {
+		log.Printf(
+			"[database] Transaction timed out or cancelled: operation=%s elapsed=%s timeout=%s error=%v",
+			operationName, elapsed, timeout, err,
+		)
+	}
+
+	return err
 }
 
 func TruncateTables() error {
