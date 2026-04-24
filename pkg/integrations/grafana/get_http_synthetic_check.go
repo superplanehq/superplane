@@ -41,7 +41,6 @@ func (g *GetHTTPSyntheticCheck) Documentation() string {
 - **Up**: All probe locations are passing
 - **Partial**: Some probe locations are passing and some are failing
 - **Down**: All probe locations are failing
-- **Unknown**: Metrics are unavailable, the check has no probe data yet, or outcome could not be derived (workflows should wire this channel to avoid silently dropping events)
 
 ## Output
 
@@ -64,7 +63,6 @@ const (
 	channelNameUp      = "up"
 	channelNamePartial = "partial"
 	channelNameDown    = "down"
-	channelNameUnknown = "unknown"
 )
 
 func (g *GetHTTPSyntheticCheck) OutputChannels(configuration any) []core.OutputChannel {
@@ -72,7 +70,6 @@ func (g *GetHTTPSyntheticCheck) OutputChannels(configuration any) []core.OutputC
 		{Name: channelNameUp, Label: "Up", Description: "All probe locations are passing"},
 		{Name: channelNamePartial, Label: "Partial", Description: "Some probe locations are passing and some are failing"},
 		{Name: channelNameDown, Label: "Down", Description: "All probe locations are failing"},
-		{Name: channelNameUnknown, Label: "Unknown", Description: "No outcome yet (missing metrics, new check, or unreachable metrics datasource)"},
 	}
 }
 
@@ -137,7 +134,7 @@ func (g *GetHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 		"alerts":        check.Alerts,
 	}
 
-	channel := channelNameUnknown
+	channel := ""
 	if metrics != nil && metrics.LastOutcome != nil {
 		if routed := syntheticCheckOutcomeToChannel(*metrics.LastOutcome); routed != "" {
 			channel = routed

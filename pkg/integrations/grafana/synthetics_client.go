@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -384,26 +385,30 @@ func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck
 
 	now := time.Now().UTC()
 	from := now.Add(-24 * time.Hour)
+	var rawSuccessRuns *float64
+	var rawTotalRuns *float64
 
 	successRuns, err := querySyntheticMetricValue(grafanaClient, metricsDataSourceUID, buildSuccessRunsQuery(check), from, now)
 	if err == nil {
-		metrics.SuccessRuns24h = successRuns
+		rawSuccessRuns = successRuns
+		metrics.SuccessRuns24h = normalizeSyntheticRunCount(successRuns)
 	}
 
 	totalRuns, err := querySyntheticMetricValue(grafanaClient, metricsDataSourceUID, buildTotalRunsQuery(check), from, now)
 	if err == nil {
-		metrics.TotalRuns24h = totalRuns
+		rawTotalRuns = totalRuns
+		metrics.TotalRuns24h = normalizeSyntheticRunCount(totalRuns)
 	}
 
-	if metrics.SuccessRuns24h != nil && metrics.TotalRuns24h != nil {
-		failures := *metrics.TotalRuns24h - *metrics.SuccessRuns24h
+	if rawSuccessRuns != nil && rawTotalRuns != nil {
+		failures := *rawTotalRuns - *rawSuccessRuns
 		if failures < 0 {
 			failures = 0
 		}
-		metrics.FailureRuns24h = &failures
+		metrics.FailureRuns24h = normalizeSyntheticRunCount(&failures)
 
-		if *metrics.TotalRuns24h > 0 {
-			reachability := (*metrics.SuccessRuns24h / *metrics.TotalRuns24h) * 100
+		if *rawTotalRuns > 0 {
+			reachability := (*rawSuccessRuns / *rawTotalRuns) * 100
 			metrics.ReachabilityPercent24h = &reachability
 		}
 	}
@@ -444,6 +449,19 @@ func fetchSyntheticCheckMetrics(ctx core.ExecutionContext, check *SyntheticCheck
 	}
 
 	return metrics
+}
+
+func normalizeSyntheticRunCount(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+
+	rounded := math.Round(*value)
+	if rounded < 0 {
+		rounded = 0
+	}
+
+	return &rounded
 }
 
 // resolveSyntheticMonitoringDataSources returns the Synthetic Monitoring plugin

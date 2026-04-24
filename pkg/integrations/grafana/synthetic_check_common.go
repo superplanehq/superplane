@@ -364,7 +364,7 @@ func validateSyntheticCheckAlerts(alerts []SyntheticCheckAlertInput) error {
 // resolveSyntheticCheckNodeMetadata resolves workflow node metadata for a synthetic check.
 // When loadedCheck is non-nil (e.g. after prepareSyntheticCheckUpdate), it is used and no extra HTTP calls are made.
 func resolveSyntheticCheckNodeMetadata(ctx core.SetupContext, syntheticCheck string, loadedCheck *SyntheticCheck) error {
-	if strings.Contains(syntheticCheck, "{{") || ctx.Metadata == nil || ctx.HTTP == nil {
+	if isExpressionValue(syntheticCheck) || ctx.Metadata == nil || ctx.HTTP == nil {
 		return nil
 	}
 
@@ -403,7 +403,7 @@ func resolveSyntheticProbeSummaryMetadata(ctx core.SetupContext, probeIDStrings 
 	}
 
 	for _, probeID := range probeIDStrings {
-		if strings.Contains(probeID, "{{") {
+		if isExpressionValue(probeID) {
 			return nil
 		}
 	}

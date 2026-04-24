@@ -478,15 +478,19 @@ function syntheticCheckHasRunCounts(metrics: NonNullable<GetHttpSyntheticCheckOu
 function formatSyntheticCheckRuns24hLine(metrics: NonNullable<GetHttpSyntheticCheckOutput["metrics"]>): string {
   const parts: string[] = [];
   if (metrics.successRuns24h != null) {
-    parts.push(`${metrics.successRuns24h} succeeded`);
+    parts.push(`${formatRunCount(metrics.successRuns24h)} succeeded`);
   }
   if (metrics.failureRuns24h != null) {
-    parts.push(`${metrics.failureRuns24h} failed`);
+    parts.push(`${formatRunCount(metrics.failureRuns24h)} failed`);
   }
   if (metrics.totalRuns24h != null) {
-    parts.push(`${metrics.totalRuns24h} total`);
+    parts.push(`${formatRunCount(metrics.totalRuns24h)} total`);
   }
   return parts.join(" · ");
+}
+
+function formatRunCount(value: number): string {
+  return String(Math.max(0, Math.round(value)));
 }
 
 type MutationFallback = {

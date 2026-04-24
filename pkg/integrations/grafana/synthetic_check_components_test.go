@@ -277,10 +277,10 @@ func grafanaGetCheckResponses(reachability string) []*http.Response {
 	}
 }
 
-func Test__GetHTTPSyntheticCheck__Execute__UnknownChannelWhenNoOutcome(t *testing.T) {
+func Test__GetHTTPSyntheticCheck__Execute__EmptyChannelWhenNoOutcome(t *testing.T) {
 	component := &GetHTTPSyntheticCheck{}
 	responses := grafanaGetCheckResponses("1")
-	// Outcome query (probe_success avg); empty result → no LastOutcome → unknown channel
+	// Outcome query (probe_success avg); empty result → no LastOutcome → empty channel
 	responses[7] = &http.Response{
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(strings.NewReader(`{"results":{}}`)),
@@ -303,7 +303,7 @@ func Test__GetHTTPSyntheticCheck__Execute__UnknownChannelWhenNoOutcome(t *testin
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, channelNameUnknown, execCtx.Channel)
+	assert.Equal(t, "", execCtx.Channel)
 }
 
 func Test__GetHTTPSyntheticCheck__Execute__ReturnsConfigurationAndMetrics(t *testing.T) {
@@ -353,6 +353,49 @@ func Test__GetHTTPSyntheticCheck__Execute__ReturnsConfigurationAndMetrics(t *tes
 			assert.Equal(t, float64(60000), float64(*metrics.FrequencyMilliseconds))
 		})
 	}
+}
+
+func Test__GetHTTPSyntheticCheck__Execute__RoundsFractionalRunCounts(t *testing.T) {
+	component := &GetHTTPSyntheticCheck{}
+	responses := grafanaGetCheckResponses("1")
+	responses[3] = &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"results":{"A":{"frames":[{"data":{"values":[[1],[144.20027816411684]]}}]}}}`)),
+	}
+	responses[4] = &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"results":{"A":{"frames":[{"data":{"values":[[1],[144.20027816411684]]}}]}}}`)),
+	}
+
+	httpContext := &contexts.HTTPContext{Responses: responses}
+	execCtx := &contexts.ExecutionStateContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"syntheticCheck": "101",
+		},
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "grafana-token",
+			},
+		},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, execCtx.Payloads, 1)
+
+	payload := execCtx.Payloads[0].(map[string]any)
+	data := payload["data"].(map[string]any)
+	metrics := data["metrics"].(*SyntheticCheckMetrics)
+
+	require.NotNil(t, metrics.SuccessRuns24h)
+	require.NotNil(t, metrics.FailureRuns24h)
+	require.NotNil(t, metrics.TotalRuns24h)
+	assert.Equal(t, 144.0, *metrics.SuccessRuns24h)
+	assert.Equal(t, 0.0, *metrics.FailureRuns24h)
+	assert.Equal(t, 144.0, *metrics.TotalRuns24h)
 }
 
 func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
