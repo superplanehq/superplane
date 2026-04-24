@@ -361,8 +361,8 @@ describe("eventStateRegistry", () => {
   it("maps in-progress executions to running", () => {
     const execution = buildExecution({
       state: "STATE_STARTED",
-      result: "RESULT_UNSPECIFIED",
-      resultReason: "RESULT_REASON_UNSPECIFIED",
+      result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
+      resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
     });
 
     expect(eventStateRegistry.getInstance.getState(execution)).toBe("running");
