@@ -24,7 +24,9 @@ func createExecutionContext(config map[string]any) (core.ExecutionContext, *cont
 		config["timeoutSeconds"] = 1
 	}
 
-	stateCtx := &contexts.ExecutionStateContext{}
+	stateCtx := &contexts.ExecutionStateContext{
+		Channels: (&HTTP{}).OutputChannels(config),
+	}
 	metadataCtx := &contexts.MetadataContext{}
 	return core.ExecutionContext{
 		Logger:         log.NewEntry(log.StandardLogger()),
@@ -561,6 +563,39 @@ func TestHTTP__Execute__EmptyResponse(t *testing.T) {
 	response := responsePayload(t, stateCtx)
 	assert.Equal(t, http.StatusNoContent, response["status"])
 	assert.Nil(t, response["body"])
+}
+
+func TestHTTP__Execute__Non2xxRoutesToFailureChannelAndRecordsFailed(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		err := json.NewEncoder(w).Encode(map[string]string{"error": "boom"})
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+	})
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+
+	// The failure-channel event MUST still fire so downstream nodes run.
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	assert.Equal(t, "http.request.failed", stateCtx.Type)
+
+	// But the execution result must be "failed" — this is the bug fix for #4284.
+	assert.False(t, stateCtx.Passed)
+	assert.NotEmpty(t, stateCtx.FailureReason)
+	assert.NotEmpty(t, stateCtx.FailureMessage)
+
+	response := responsePayload(t, stateCtx)
+	assert.Equal(t, http.StatusInternalServerError, response["status"])
 }
 
 func TestHTTP__Execute__SuccessCodesTreat404AsSuccess(t *testing.T) {
