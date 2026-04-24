@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn, flattenObject, resolveIcon } from "@/lib/utils";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
+import {
+  badgeColorForEventState,
+  getStatusBadgeProps,
+  resolveExecutionBadgeColor,
+  resolveExecutionDisplayStatus,
+  resolveExecutionEventState,
+} from "@/pages/workflowv2/lib/canvas-runs";
 
 interface NodeDetailPanelProps {
   nodeId: string;
@@ -22,51 +29,43 @@ interface NodeDetailPanelProps {
 
 type TabKey = "current" | "payload" | "configuration";
 
-function ExecutionStatusBadge({ execution }: { execution: CanvasesCanvasNodeExecution }) {
-  const state = execution.state;
-  const result = execution.result;
-
-  let label: string;
-  let color: string;
-
-  if (state === "STATE_PENDING") {
-    label = "Pending";
-    color = "bg-slate-200 text-slate-700";
-  } else if (state === "STATE_STARTED") {
-    label = "Running";
-    color = "bg-blue-100 text-blue-700";
-  } else if (result === "RESULT_PASSED") {
-    label = "Passed";
-    color = "bg-emerald-100 text-emerald-700";
-  } else if (result === "RESULT_FAILED") {
-    label = "Failed";
-    color = "bg-red-100 text-red-700";
-  } else if (result === "RESULT_CANCELLED") {
-    label = "Cancelled";
-    color = "bg-gray-200 text-gray-600";
-  } else {
-    label = "Unknown";
-    color = "bg-gray-100 text-gray-500";
-  }
-
+//
+// Unified status badge styling used in the node detail header. Colors are
+// resolved the same way as the StepRibbon and Activity rows so component-
+// specific labels (e.g. "False" for an IF evaluating falsey, "Pushed Through"
+// for a wait) show the right palette instead of defaulting to a generic
+// "Passed" pill.
+//
+function StatusPill({ badgeColor, label }: { badgeColor: string; label: string }) {
   return (
-    <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase", color)}>
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide text-white",
+        badgeColor,
+      )}
+    >
       {label}
     </span>
   );
 }
 
+function ExecutionStatusBadge({
+  execution,
+  workflowNodes,
+}: {
+  execution: CanvasesCanvasNodeExecution;
+  workflowNodes: ComponentsNode[];
+}) {
+  const rawStatus = resolveExecutionDisplayStatus(execution, workflowNodes);
+  const eventState = resolveExecutionEventState(execution);
+  const badgeColor = resolveExecutionBadgeColor(execution, workflowNodes);
+  const { label, badgeColor: resolvedColor } = getStatusBadgeProps(rawStatus, eventState, badgeColor);
+  return <StatusPill badgeColor={resolvedColor} label={label} />;
+}
+
 function TriggerStatusBadge() {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase",
-        "bg-indigo-100 text-indigo-700",
-      )}
-    >
-      Triggered
-    </span>
-  );
+  const { label, badgeColor } = getStatusBadgeProps("triggered", "triggered", badgeColorForEventState("triggered"));
+  return <StatusPill badgeColor={badgeColor} label={label} />;
 }
 
 type TabData = {
@@ -262,7 +261,7 @@ export function NodeDetailPanel({ nodeId, runData, workflowNodes, onClose, onNav
           {isTriggerNode ? (
             <TriggerStatusBadge />
           ) : nodeExecution ? (
-            <ExecutionStatusBadge execution={nodeExecution} />
+            <ExecutionStatusBadge execution={nodeExecution} workflowNodes={workflowNodes || []} />
           ) : null}
           {createdAt ? (
             <span className="text-xs text-gray-400">

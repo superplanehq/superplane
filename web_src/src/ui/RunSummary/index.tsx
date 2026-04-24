@@ -9,7 +9,6 @@ import type {
 } from "@/api-client";
 import type { ApprovalActionName, ApprovalActionParams } from "@/pages/workflowv2/useApprovalActionHandler";
 import { TimeAgo } from "@/components/TimeAgo";
-import { formatDurationSeconds } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import {
   badgeColorForEventState,
@@ -176,11 +175,6 @@ const DEFAULT_PUSH_THROUGH_COMPONENTS = new Set(["wait", "time_gate", "timegate"
 
 function isRunningState(state: EventState): boolean {
   return state === "running";
-}
-
-function formatMs(ms: number): string {
-  if (ms <= 0) return "0s";
-  return formatDurationSeconds(ms);
 }
 
 function execDurationMs(exec: { createdAt?: string; updatedAt?: string; state?: string }): number {
@@ -540,47 +534,78 @@ function ReportEmptyState() {
 }
 
 //
-// A single step's slice inside the consolidated Report. Shows a compact
-// byline (icon, name, optional duration) above the markdown so the reader
-// knows which step a given report chunk came from without needing a full
-// row header.
+// A single step's slice inside the consolidated Report. The markdown is the
+// hero; the "which step this came from" metadata lives in a chip that only
+// fades in when the block is hovered or focused, keeping the report reading
+// like a document. Clicking the chip opens the NodeDetailPanel so the user
+// can jump from a report snippet into the full per-step view.
 //
 function ReportEntry({
   step,
   iconSrc,
   iconSlug,
   hasError,
+  onOpenNodeDetail,
 }: {
   step: Step;
   iconSrc: string | undefined;
   iconSlug: string | undefined;
   hasError: boolean;
+  onOpenNodeDetail?: (nodeId: string) => void;
 }) {
+  const clickable = !!onOpenNodeDetail;
+  const chipClassName = cn(
+    "pointer-events-auto absolute right-0 top-0 z-10 flex max-w-[60%] items-center gap-1.5 rounded px-1.5 py-0.5 text-[11px] text-gray-400 opacity-0 transition-opacity duration-150",
+    "bg-white/70 backdrop-blur-[2px]",
+    "group-hover:opacity-100 focus-within:opacity-100 focus-visible:opacity-100",
+    clickable ? "hover:text-gray-600 cursor-pointer" : "",
+  );
+
+  const chipInner = (
+    <>
+      <StepIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={step.name} />
+      <span className="truncate">{step.name}</span>
+      {step.isTrigger ? (
+        <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400">
+          trigger
+        </span>
+      ) : (
+        <span
+          aria-hidden
+          className={cn("inline-block h-1.5 w-1.5 shrink-0 rounded-full", step.badgeColor)}
+        />
+      )}
+    </>
+  );
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 text-[11px] text-gray-500">
-        <StepIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={step.name} />
-        <span className="truncate font-medium text-gray-700">{step.name}</span>
-        {step.isTrigger ? (
-          <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
-            Trigger
-          </span>
+    <div className="group relative">
+      {clickable ? (
+        <button
+          type="button"
+          onClick={() => onOpenNodeDetail?.(step.nodeId)}
+          className={chipClassName}
+          aria-label={`Open ${step.name} details`}
+        >
+          {chipInner}
+        </button>
+      ) : (
+        <div className={chipClassName}>{chipInner}</div>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        {hasError && step.error ? (
+          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 break-words">{step.error}</span>
+          </div>
         ) : null}
-        {!step.isTrigger && step.durationMs > 0 ? (
-          <span className="shrink-0 tabular-nums text-gray-400">{formatMs(step.durationMs)}</span>
+        {step.reportEntry ? (
+          <ReportMarkdown className="prose prose-sm prose-gray max-w-none text-sm text-gray-700 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mb-1">
+            {step.reportEntry}
+          </ReportMarkdown>
         ) : null}
       </div>
-      {hasError && step.error ? (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 break-words">{step.error}</span>
-        </div>
-      ) : null}
-      {step.reportEntry ? (
-        <ReportMarkdown className="prose prose-sm prose-gray max-w-none text-sm text-gray-700 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mb-1">
-          {step.reportEntry}
-        </ReportMarkdown>
-      ) : null}
     </div>
   );
 }
@@ -750,6 +775,7 @@ export function RunSummary({
                       iconSrc={iconSrc}
                       iconSlug={iconSlug || undefined}
                       hasError={!!step.error}
+                      onOpenNodeDetail={onOpenNodeDetail}
                     />
                   </div>
                 );
