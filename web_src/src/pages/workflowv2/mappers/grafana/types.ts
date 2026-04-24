@@ -322,6 +322,7 @@ export interface DeclareIncidentConfiguration {
   description?: string;
   labels?: string[];
   status?: string;
+  debriefStatus?: string;
   startTime?: string;
   isDrill?: boolean;
 }

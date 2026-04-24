@@ -31,6 +31,26 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{}`)),
 			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"fields": [
+						{
+							"uuid": "field-1",
+							"slug": "debrief_status",
+							"type": "single-select",
+							"selectoptions": [
+								{"uuid": "option-1", "value": "not_started", "label": "Not started"},
+								{"uuid": "option-2", "value": "in_progress", "label": "In progress"}
+							]
+						}
+					]
+				}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			},
 		},
 	}
 	client := &Client{
@@ -48,6 +68,7 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 		Labels:              []string{" prod ", "", "api"},
 		IsDrill:             true,
 		Status:              incidentStatusResolved,
+		DebriefStatus:       "In progress",
 		StartTime:           &startTime,
 	})
 	require.NoError(t, err)
@@ -56,7 +77,7 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 	require.Equal(t, "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123/title", incident.OverviewURL)
 	require.Equal(t, "2026-04-20T09:45:00Z", incident.IncidentStart)
 
-	require.Len(t, httpContext.Requests, 2)
+	require.Len(t, httpContext.Requests, 4)
 	request := httpContext.Requests[0]
 	require.Equal(t, http.MethodPost, request.Method)
 	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.CreateIncident", request.URL.Path)
@@ -84,6 +105,14 @@ func Test__Client__DeclareIncident__UsesGrafanaIRMRPC(t *testing.T) {
 	require.Equal(t, "incidentStart", startPayload["activityItemKind"])
 	require.Equal(t, "incidentStart", startPayload["eventName"])
 	require.Equal(t, "2026-04-20T09:45:00Z", startPayload["eventTime"])
+
+	body, err = io.ReadAll(httpContext.Requests[3].Body)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, "field-1", payload["fieldUUID"])
+	require.Equal(t, "incident", payload["targetKind"])
+	require.Equal(t, "incident-123", payload["targetID"])
+	require.Equal(t, "option-2", payload["value"])
 }
 
 func Test__Client__ResolveIncident__SetsResolvedStatus(t *testing.T) {

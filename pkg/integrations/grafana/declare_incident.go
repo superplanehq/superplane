@@ -36,6 +36,7 @@ func (d *DeclareIncident) Documentation() string {
 - **Description**: Optional initial status update added to the incident
 - **Labels**: Optional incident labels
 - **Status**: Start the incident as active or resolved
+- **Debrief Status**: Optional dropdown with completed, in_progress, not_needed, or not_started, recorded to the incident custom field with slug debrief_status
 - **Start Time**: Optional time when the incident began
 
 ## Output

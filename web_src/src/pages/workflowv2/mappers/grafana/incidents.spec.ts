@@ -162,6 +162,18 @@ describe("Grafana incident card metadata", () => {
     );
   });
 
+  it("shows debrief status in declare incident metadata", () => {
+    const props = declareIncidentMapper.props(
+      buildComponentContext("declareIncident", {
+        configuration: { title: "API latency", severity: "critical", debriefStatus: "in_progress" },
+      }),
+    );
+
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "Debrief: in_progress" })]),
+    );
+  });
+
   it("always marks declare drill metadata as drill", () => {
     const props = declareDrillMapper.props(
       buildComponentContext("declareDrill", {

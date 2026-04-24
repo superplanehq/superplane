@@ -57,8 +57,13 @@ func Test__IncidentComponents__Configuration__severityIsIntegrationResource(t *t
 	drillFields := (&DeclareDrill{}).Configuration()
 	require.Equal(t, "status", drillFields[4].Name)
 	require.Equal(t, configuration.FieldTypeSelect, drillFields[4].Type)
-	require.Equal(t, "startTime", drillFields[5].Name)
-	require.Equal(t, configuration.FieldTypeDateTime, drillFields[5].Type)
+	require.Equal(t, "debriefStatus", drillFields[5].Name)
+	require.Equal(t, configuration.FieldTypeSelect, drillFields[5].Type)
+	require.NotNil(t, drillFields[5].TypeOptions)
+	require.NotNil(t, drillFields[5].TypeOptions.Select)
+	require.Equal(t, grafanaIncidentDebriefStatusOptions, drillFields[5].TypeOptions.Select.Options)
+	require.Equal(t, "startTime", drillFields[6].Name)
+	require.Equal(t, configuration.FieldTypeDateTime, drillFields[6].Type)
 }
 
 func Test__IncidentComponents__ExampleOutput__DeclareDrillMarksIncidentAsDrill(t *testing.T) {
@@ -96,6 +101,18 @@ func Test__DeclareIncident__Setup__RejectsUnknownSeverity(t *testing.T) {
 	require.ErrorContains(t, err, "severity must be one of")
 }
 
+func Test__DeclareIncident__Setup__RejectsUnknownDebriefStatus(t *testing.T) {
+	err := (&DeclareIncident{}).Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"title":         "API latency",
+			"severity":      "major",
+			"debriefStatus": "haha",
+		},
+	})
+
+	require.ErrorContains(t, err, "debriefStatus must be one of")
+}
+
 func Test__DeclareIncident__Execute(t *testing.T) {
 	component := &DeclareIncident{}
 	httpCtx := &contexts.HTTPContext{
@@ -110,18 +127,29 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{}`)),
 			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"fields":[{"uuid":"field-1","slug":"debrief_status","type":"single-select","selectoptions":[{"uuid":"option-1","value":"not_started","label":"Not started"},{"uuid":"option-2","value":"in_progress","label":"In progress"}]}]
+				}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			},
 		},
 	}
 	execCtx := &contexts.ExecutionStateContext{}
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"title":       "API latency",
-			"severity":    "minor",
-			"description": "Initial diagnosis",
-			"labels":      []any{"api", "prod"},
-			"status":      "resolved",
-			"startTime":   "2026-04-20T10:00:00Z",
+			"title":         "API latency",
+			"severity":      "minor",
+			"description":   "Initial diagnosis",
+			"labels":        []any{"api", "prod"},
+			"status":        "resolved",
+			"debriefStatus": "in_progress",
+			"startTime":     "2026-04-20T10:00:00Z",
 		},
 		HTTP:           httpCtx,
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
@@ -154,6 +182,14 @@ func Test__DeclareIncident__Execute(t *testing.T) {
 	require.Equal(t, "incidentStart", payload["activityItemKind"])
 	require.Equal(t, "incidentStart", payload["eventName"])
 	require.Equal(t, "2026-04-20T10:00:00Z", payload["eventTime"])
+
+	body, err = io.ReadAll(httpCtx.Requests[3].Body)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, "field-1", payload["fieldUUID"])
+	require.Equal(t, "incident", payload["targetKind"])
+	require.Equal(t, "incident-123", payload["targetID"])
+	require.Equal(t, "option-2", payload["value"])
 }
 
 func Test__DeclareDrill__Execute(t *testing.T) {

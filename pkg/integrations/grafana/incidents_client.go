@@ -11,12 +11,17 @@ import (
 )
 
 const (
-	grafanaIRMRPCBasePath        = "/api/plugins/grafana-irm-app/resources/api/v1"
-	incidentDefaultRoomPrefix    = "incident"
-	incidentDefaultLabelKey      = "tags"
-	incidentStatusActive         = "active"
-	incidentStatusResolved       = "resolved"
-	incidentActivityKindUserNote = "userNote"
+	grafanaIRMRPCBasePath         = "/api/plugins/grafana-irm-app/resources/api/v1"
+	incidentDefaultRoomPrefix     = "incident"
+	incidentDefaultLabelKey       = "tags"
+	incidentStatusActive          = "active"
+	incidentStatusResolved        = "resolved"
+	incidentActivityKindUserNote  = "userNote"
+	incidentFieldDomainIncident   = "incident"
+	incidentFieldSlugDebrief      = "debrief_status"
+	incidentFieldTypeString       = "string"
+	incidentFieldTypeSingleSelect = "single-select"
+	incidentTargetKind            = "incident"
 )
 
 type IncidentLabel struct {
@@ -88,8 +93,40 @@ type DeclareIncidentInput struct {
 	RoomPrefix          string
 	IsDrill             bool
 	Status              string
+	DebriefStatus       string
 	InitialStatusUpdate string
 	StartTime           *time.Time
+}
+
+type IncidentCustomField struct {
+	UUID          string                            `json:"uuid"`
+	Name          string                            `json:"name,omitempty"`
+	Slug          string                            `json:"slug"`
+	Type          string                            `json:"type,omitempty"`
+	Archived      bool                              `json:"archived,omitempty"`
+	SelectOptions []IncidentCustomFieldSelectOption `json:"selectoptions,omitempty"`
+}
+
+type IncidentCustomFieldSelectOption struct {
+	UUID  string `json:"uuid,omitempty"`
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+type getIncidentCustomFieldsRequest struct {
+	DomainName string `json:"domainName,omitempty"`
+}
+
+type getIncidentCustomFieldsResponse struct {
+	Fields []IncidentCustomField `json:"fields"`
+	Error  string                `json:"error,omitempty"`
+}
+
+type recordIncidentFieldValueRequest struct {
+	FieldUUID  string `json:"fieldUUID"`
+	Value      string `json:"value,omitempty"`
+	TargetKind string `json:"targetKind"`
+	TargetID   string `json:"targetID"`
 }
 
 type incidentResponse struct {
@@ -153,6 +190,10 @@ func (c *Client) DeclareIncident(input DeclareIncidentInput) (*Incident, error) 
 		}
 
 		response.Incident.IncidentStart = input.StartTime.UTC().Format(time.RFC3339)
+	}
+
+	if err := c.setIncidentDebriefStatus(response.Incident.IncidentID, input.DebriefStatus); err != nil {
+		return nil, err
 	}
 
 	c.decorateIncident(&response.Incident)
@@ -350,6 +391,107 @@ func (c *Client) updateIncidentEventTime(id, eventName string, eventTime time.Ti
 		"eventName":        strings.TrimSpace(eventName),
 		"eventTime":        eventTime.UTC().Format(time.RFC3339),
 	}, &struct{}{})
+}
+
+func (c *Client) setIncidentDebriefStatus(id, value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+
+	field, err := c.getIncidentCustomFieldBySlug(incidentFieldSlugDebrief)
+	if err != nil {
+		return err
+	}
+
+	normalizedValue, err := normalizeIncidentCustomFieldValue(field, value)
+	if err != nil {
+		return err
+	}
+
+	return c.execGrafanaIRMRPC("FieldsService.RecordFieldValue", recordIncidentFieldValueRequest{
+		FieldUUID:  strings.TrimSpace(field.UUID),
+		Value:      normalizedValue,
+		TargetKind: incidentTargetKind,
+		TargetID:   strings.TrimSpace(id),
+	}, &struct{}{})
+}
+
+func (c *Client) getIncidentCustomFieldBySlug(slug string) (IncidentCustomField, error) {
+	response := getIncidentCustomFieldsResponse{}
+	if err := c.execGrafanaIRMRPC("FieldsService.GetFields", getIncidentCustomFieldsRequest{
+		DomainName: incidentFieldDomainIncident,
+	}, &response); err != nil {
+		return IncidentCustomField{}, err
+	}
+
+	slug = strings.TrimSpace(slug)
+	for _, field := range response.Fields {
+		if field.Archived {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(field.Slug), slug) {
+			return field, nil
+		}
+	}
+
+	return IncidentCustomField{}, fmt.Errorf("grafana incident custom field %q was not found", slug)
+}
+
+func normalizeIncidentCustomFieldValue(field IncidentCustomField, value string) (string, error) {
+	value = strings.TrimSpace(value)
+	switch strings.TrimSpace(field.Type) {
+	case "", incidentFieldTypeString:
+		return value, nil
+	case incidentFieldTypeSingleSelect:
+		for _, option := range field.SelectOptions {
+			optionUUID := strings.TrimSpace(option.UUID)
+			optionValue := strings.TrimSpace(option.Value)
+			optionLabel := strings.TrimSpace(option.Label)
+			if strings.EqualFold(value, optionValue) || strings.EqualFold(value, optionLabel) {
+				if optionUUID == "" {
+					return "", fmt.Errorf(
+						"grafana incident custom field %q option %q is missing a UUID",
+						strings.TrimSpace(field.Slug),
+						optionValue,
+					)
+				}
+				return optionUUID, nil
+			}
+		}
+
+		options := make([]string, 0, len(field.SelectOptions))
+		for _, option := range field.SelectOptions {
+			optionValue := strings.TrimSpace(option.Value)
+			optionLabel := strings.TrimSpace(option.Label)
+			if optionLabel != "" && !strings.EqualFold(optionLabel, optionValue) {
+				options = append(options, fmt.Sprintf("%s (%s)", optionLabel, optionValue))
+				continue
+			}
+			if optionValue != "" {
+				options = append(options, optionValue)
+			}
+		}
+
+		if len(options) == 0 {
+			return "", fmt.Errorf("grafana incident custom field %q does not define any selectable options", strings.TrimSpace(field.Slug))
+		}
+
+		return "", fmt.Errorf(
+			"invalid value %q for grafana incident custom field %q; expected one of: %s",
+			value,
+			strings.TrimSpace(field.Slug),
+			strings.Join(options, ", "),
+		)
+	default:
+		return "", fmt.Errorf(
+			"grafana incident custom field %q must be type %q or %q, got %q",
+			strings.TrimSpace(field.Slug),
+			incidentFieldTypeString,
+			incidentFieldTypeSingleSelect,
+			strings.TrimSpace(field.Type),
+		)
+	}
 }
 
 func (c *Client) execGrafanaIRMRPC(operation string, payload any, response any) error {

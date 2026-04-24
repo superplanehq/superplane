@@ -44,6 +44,9 @@ function buildDeclareIncidentMetadata(
   if (configuration?.status && configuration.status !== "active") {
     metadata.push({ icon: "check-circle", label: `Status: ${configuration.status}` });
   }
+  if (configuration?.debriefStatus) {
+    metadata.push({ icon: "hash", label: `Debrief: ${truncate(configuration.debriefStatus, 40)}` });
+  }
   if (isDrillComponent || configuration?.isDrill) {
     metadata.push({ icon: "shield-alert", label: "Drill" });
   }

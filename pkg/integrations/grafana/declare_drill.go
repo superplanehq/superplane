@@ -37,6 +37,7 @@ func (d *DeclareDrill) Documentation() string {
 - **Description**: Optional initial status update added to the drill
 - **Labels**: Optional drill labels
 - **Status**: Start the drill as active or resolved
+- **Debrief Status**: Optional dropdown with completed, in_progress, not_needed, or not_started, recorded to the incident custom field with slug debrief_status
 - **Start Time**: Optional time when the drill began
 
 ## Output

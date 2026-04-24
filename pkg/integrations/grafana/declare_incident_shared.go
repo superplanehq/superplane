@@ -19,14 +19,22 @@ var grafanaIncidentStatusOptions = []configuration.FieldOption{
 	{Label: "Resolved", Value: incidentStatusResolved},
 }
 
+var grafanaIncidentDebriefStatusOptions = []configuration.FieldOption{
+	{Label: "Report completed", Value: "completed"},
+	{Label: "Report in progress", Value: "in_progress"},
+	{Label: "Report not needed", Value: "not_needed"},
+	{Label: "Report not started", Value: "not_started"},
+}
+
 type declareIncidentSpec struct {
-	Title       string   `json:"title" mapstructure:"title"`
-	Severity    string   `json:"severity" mapstructure:"severity"`
-	Description string   `json:"description" mapstructure:"description"`
-	Labels      []string `json:"labels" mapstructure:"labels"`
-	Status      string   `json:"status" mapstructure:"status"`
-	StartTime   string   `json:"startTime" mapstructure:"startTime"`
-	IsDrill     *bool    `json:"isDrill,omitempty" mapstructure:"isDrill"`
+	Title         string   `json:"title" mapstructure:"title"`
+	Severity      string   `json:"severity" mapstructure:"severity"`
+	Description   string   `json:"description" mapstructure:"description"`
+	Labels        []string `json:"labels" mapstructure:"labels"`
+	Status        string   `json:"status" mapstructure:"status"`
+	DebriefStatus string   `json:"debriefStatus" mapstructure:"debriefStatus"`
+	StartTime     string   `json:"startTime" mapstructure:"startTime"`
+	IsDrill       *bool    `json:"isDrill,omitempty" mapstructure:"isDrill"`
 }
 
 func declareIncidentConfiguration(includeLegacyToggle bool) []configuration.Field {
@@ -87,6 +95,18 @@ func declareIncidentConfiguration(includeLegacyToggle bool) []configuration.Fiel
 			},
 		},
 		{
+			Name:        "debriefStatus",
+			Label:       "Debrief Status",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "Optional debrief status to record to the Grafana IRM incident custom field with slug debrief_status",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: grafanaIncidentDebriefStatusOptions,
+				},
+			},
+		},
+		{
 			Name:        "startTime",
 			Label:       "Start Time",
 			Type:        configuration.FieldTypeDateTime,
@@ -118,6 +138,9 @@ func validateDeclareIncidentSpec(spec declareIncidentSpec) error {
 	if err := validateIncidentStatus(spec.Status); err != nil {
 		return err
 	}
+	if err := validateIncidentDebriefStatus(spec.DebriefStatus); err != nil {
+		return err
+	}
 	if _, err := parseIncidentStartTime(spec.StartTime); err != nil {
 		return err
 	}
@@ -137,6 +160,21 @@ func validateIncidentStatus(status string) error {
 	default:
 		return fmt.Errorf("status must be one of: %s, %s", incidentStatusActive, incidentStatusResolved)
 	}
+}
+
+func validateIncidentDebriefStatus(status string) error {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return nil
+	}
+
+	for _, option := range grafanaIncidentDebriefStatusOptions {
+		if status == option.Value {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("debriefStatus must be one of: completed, in_progress, not_needed, not_started")
 }
 
 func parseIncidentStartTime(value string) (*time.Time, error) {
@@ -192,6 +230,7 @@ func executeDeclareIncident(ctx core.ExecutionContext, spec declareIncidentSpec,
 		RoomPrefix:          legacyDefaultRoomPrefix,
 		IsDrill:             isDrill,
 		Status:              spec.Status,
+		DebriefStatus:       spec.DebriefStatus,
 		InitialStatusUpdate: spec.Description,
 		StartTime:           startTime,
 	})
