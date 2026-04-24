@@ -42,13 +42,18 @@ type Integration struct {
 	// Fields required for integrations set up using core.IntegrationSetupProvider
 	// All integrations should use this
 	//
-	NextSetupStep *datatypes.JSONType[core.SetupStep]
-	Parameters    datatypes.JSONSlice[core.IntegrationParameterDefinition]
-	Capabilities  datatypes.JSONSlice[core.CapabilityDefinition]
+	SetupState   *datatypes.JSONType[SetupState]
+	Parameters   datatypes.JSONSlice[core.IntegrationParameterDefinition]
+	Capabilities datatypes.JSONSlice[core.CapabilityDefinition]
 }
 
 func (a *Integration) TableName() string {
 	return "app_installations"
+}
+
+type SetupState struct {
+	CurrentStep   *core.SetupStep  `json:"current_step,omitempty"`
+	PreviousSteps []core.SetupStep `json:"previous_steps,omitempty"`
 }
 
 type IntegrationSecret struct {

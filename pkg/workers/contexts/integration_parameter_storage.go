@@ -25,6 +25,16 @@ func (s *IntegrationParameterStorage) Get(name string) (any, error) {
 	return nil, fmt.Errorf("parameter %s not found", name)
 }
 
+func (s *IntegrationParameterStorage) Delete(name string) error {
+	for i, param := range s.integration.Parameters {
+		if param.Name == name {
+			s.integration.Parameters = append(s.integration.Parameters[:i], s.integration.Parameters[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("parameter %s not found", name)
+}
+
 func (s *IntegrationParameterStorage) Create(def core.IntegrationParameterDefinition) error {
 	_, err := s.Get(def.Name)
 	if err == nil {

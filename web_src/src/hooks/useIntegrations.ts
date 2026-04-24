@@ -5,11 +5,12 @@ import {
   organizationsDescribeIntegration,
   organizationsListIntegrationResources,
   organizationsCreateIntegration,
-  organizationsSubmitIntegrationSetupStep,
+  organizationsNextIntegrationSetupStep,
+  organizationsPreviousIntegrationSetupStep,
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
 } from "@/api-client/sdk.gen";
-import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
+import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { analytics } from "@/lib/analytics";
@@ -35,6 +36,10 @@ export const integrationKeys = {
         .join("&"),
     ] as const,
 };
+
+function hasCurrentSetupStep(integration?: OrganizationsIntegration | null): boolean {
+  return Boolean(integration?.status?.setupState?.currentStep);
+}
 
 // Hook to fetch available integrations (catalog).
 // Normalizes each integration's label (e.g. "github" -> "GitHub") so consumers get correct display names.
@@ -147,7 +152,7 @@ export const useCreateIntegration = (organizationId: string) => {
         queryKey: integrationKeys.connected(organizationId),
       });
 
-      const hasNextStep = Boolean(response.data?.integration?.status?.nextStep);
+      const hasNextStep = hasCurrentSetupStep(response.data?.integration);
       if (!hasNextStep) {
         analytics.integrationConnected(variables.integrationName, organizationId);
       }
@@ -155,17 +160,16 @@ export const useCreateIntegration = (organizationId: string) => {
   });
 };
 
-// Hook to submit setup steps for integrations with setup providers
-export const useSubmitIntegrationSetupStep = (organizationId: string) => {
+// Hook to advance setup steps for integrations with setup providers
+export const useNextIntegrationSetupStep = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { integrationId: string; stepName: string; inputs?: Record<string, unknown> }) => {
-      return await organizationsSubmitIntegrationSetupStep(
+    mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown> }) => {
+      return await organizationsNextIntegrationSetupStep(
         withOrganizationHeader({
           path: { id: organizationId, integrationId: data.integrationId },
           body: {
-            stepName: data.stepName,
             inputs: data.inputs,
           },
         }),
@@ -175,7 +179,7 @@ export const useSubmitIntegrationSetupStep = (organizationId: string) => {
       const integration = response.data?.integration;
       const integrationId = integration?.metadata?.id;
       const integrationName = integration?.metadata?.integrationName;
-      const hasNextStep = Boolean(integration?.status?.nextStep);
+      const hasNextStep = hasCurrentSetupStep(integration);
 
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
@@ -187,6 +191,34 @@ export const useSubmitIntegrationSetupStep = (organizationId: string) => {
 
       if (!hasNextStep && integrationName) {
         analytics.integrationConnected(integrationName, organizationId);
+      }
+    },
+  });
+};
+
+// Hook to move back setup steps for integrations with setup providers
+export const usePreviousIntegrationSetupStep = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { integrationId: string }) => {
+      return await organizationsPreviousIntegrationSetupStep(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId: data.integrationId },
+          body: {},
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const integration = response.data?.integration;
+      const integrationId = integration?.metadata?.id;
+
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(organizationId),
+      });
+
+      if (integrationId) {
+        queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
       }
     },
   });

@@ -178,16 +178,20 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	}
 }
 
-func (g *SetupProvider) OnStepSubmit(stepName string, inputs any, ctx core.SetupStepContext) (*core.SetupStep, error) {
-	switch stepName {
+func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
+	return fmt.Errorf("TODO: not implemented")
+}
+
+func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	switch ctx.CurrentStep {
 	case SetupStepSelectOwner:
-		return g.onSelectOwnerSubmit(inputs, ctx)
+		return g.onSelectOwnerSubmit(ctx.Inputs, ctx)
 	case SetupStepSelectResources:
-		return g.onSelectResourcesSubmit(inputs, ctx)
+		return g.onSelectResourcesSubmit(ctx.Inputs, ctx)
 	case SetupStepSelectAuthMethod:
-		return g.onSelectAuthMethodSubmit(inputs, ctx)
+		return g.onSelectAuthMethodSubmit(ctx.Inputs, ctx)
 	case SetupStepEnterPAT:
-		return g.onEnterPATSubmit(inputs, ctx)
+		return g.onEnterPATSubmit(ctx.Inputs, ctx)
 	case SetupStepSetupApp:
 		return nil, fmt.Errorf("not implemented")
 	}

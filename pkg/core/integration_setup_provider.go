@@ -7,7 +7,8 @@ import (
 
 type IntegrationSetupProvider interface {
 	FirstStep(ctx SetupStepContext) SetupStep
-	OnStepSubmit(stepName string, inputs any, ctx SetupStepContext) (*SetupStep, error)
+	OnStepSubmit(ctx SetupStepContext) (*SetupStep, error)
+	OnStepRevert(ctx SetupStepContext) error
 }
 
 type SetupStepType string
@@ -33,6 +34,8 @@ type RedirectPrompt struct {
 }
 
 type SetupStepContext struct {
+	CurrentStep    string
+	Inputs         any
 	IntegrationID  uuid.UUID
 	OrganizationID string
 	HTTP           HTTPContext
@@ -43,6 +46,7 @@ type SetupStepContext struct {
 
 type IntegrationSecretStorage interface {
 	Get(name string) (string, error)
+	Delete(name string) error
 	Create(name string, def IntegrationSecretDefinition) error
 }
 
@@ -53,6 +57,7 @@ type IntegrationSecretDefinition struct {
 
 type IntegrationParameterStorage interface {
 	Get(name string) (any, error)
+	Delete(name string) error
 	Create(def IntegrationParameterDefinition) error
 }
 

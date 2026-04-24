@@ -17,10 +17,9 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func SubmitIntegrationSetupStep(ctx context.Context, registry *registry.Registry, orgID, id, stepName string, inputs *structpb.Struct) (*pb.SubmitIntegrationSetupStepResponse, error) {
+func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Registry, orgID, id string) (*pb.PreviousIntegrationSetupStepResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -42,6 +41,21 @@ func SubmitIntegrationSetupStep(ctx context.Context, registry *registry.Registry
 		return nil, status.Error(codes.Internal, "failed to find integration")
 	}
 
+	//
+	// Verify that we are in a revertable state
+	//
+	setupState := integration.SetupState.Data()
+	if setupState.CurrentStep == nil {
+		return nil, status.Error(codes.InvalidArgument, "current step is not set, cannot revert")
+	}
+
+	if setupState.PreviousSteps == nil || len(setupState.PreviousSteps) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no previous steps, cannot revert")
+	}
+
+	//
+	// Find setup provider and revert integration to the previous step
+	//
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get setup provider")
@@ -53,33 +67,31 @@ func SubmitIntegrationSetupStep(ctx context.Context, registry *registry.Registry
 			return err
 		}
 
-		nextStep, err := setupProvider.OnStepSubmit(stepName, getStepInputs(inputs), core.SetupStepContext{
+		ctx := core.SetupStepContext{
+			CurrentStep:    setupState.CurrentStep.Name,
 			IntegrationID:  integration.ID,
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),
 			Parameters:     contexts.NewIntegrationParameterStorage(integration),
 			Capabilities:   contexts.NewIntegrationCapabilityRegistry(integration),
 			Secrets:        secretStorage,
-		})
+		}
 
+		err = setupProvider.OnStepRevert(ctx)
 		if err != nil {
 			return err
 		}
 
 		//
-		// If no next step, make integration ready
+		// Current step becomes the last previous step,
+		// and the previous steps are all the previous steps except the current one
 		//
-		if nextStep == nil {
-			integration.NextSetupStep = nil
-			integration.State = models.IntegrationStateReady
-			return tx.Save(integration).Error
-		}
-
-		//
-		// Otherwise, set the next step
-		//
-		nextSetupStep := datatypes.NewJSONType(*nextStep)
-		integration.NextSetupStep = &nextSetupStep
+		newState := models.SetupState{}
+		lastStep := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
+		newState.CurrentStep = &lastStep
+		newState.PreviousSteps = setupState.PreviousSteps[:len(setupState.PreviousSteps)-1]
+		newStateWrapper := datatypes.NewJSONType(newState)
+		integration.SetupState = &newStateWrapper
 		return tx.Save(integration).Error
 	})
 
@@ -94,15 +106,7 @@ func SubmitIntegrationSetupStep(ctx context.Context, registry *registry.Registry
 		return nil, err
 	}
 
-	return &pb.SubmitIntegrationSetupStepResponse{
+	return &pb.PreviousIntegrationSetupStepResponse{
 		Integration: proto,
 	}, nil
-}
-
-func getStepInputs(inputs *structpb.Struct) map[string]any {
-	if inputs == nil {
-		return map[string]any{}
-	}
-
-	return inputs.AsMap()
 }

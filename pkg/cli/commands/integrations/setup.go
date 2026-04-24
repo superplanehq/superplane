@@ -379,12 +379,11 @@ func submitSetupStep(
 		stepInputs = map[string]interface{}{}
 	}
 
-	body := openapi_client.OrganizationsSubmitIntegrationSetupStepBody{}
-	body.SetStepName(stepName)
+	body := openapi_client.OrganizationsNextIntegrationSetupStepBody{}
 	body.SetInputs(stepInputs)
 
 	response, _, err := ctx.API.OrganizationAPI.
-		OrganizationsSubmitIntegrationSetupStep(ctx.Context, organizationID, integrationID).
+		OrganizationsNextIntegrationSetupStep(ctx.Context, organizationID, integrationID).
 		Body(body).
 		Execute()
 	if err != nil {
@@ -482,14 +481,11 @@ func renderSetupStateText(stdout io.Writer, integration openapi_client.Organizat
 
 func currentSetupStep(integration openapi_client.OrganizationsIntegration) (openapi_client.IntegrationSetupStepDefinition, bool) {
 	status := integration.GetStatus()
-	step, hasNextStep := status.GetNextStepOk()
-	if !hasNextStep || step == nil {
+	setupState, hasSetupState := status.GetSetupStateOk()
+	if !hasSetupState || setupState == nil {
 		return openapi_client.IntegrationSetupStepDefinition{}, false
 	}
-	if strings.TrimSpace(step.GetName()) == "" {
-		return openapi_client.IntegrationSetupStepDefinition{}, false
-	}
-	return *step, true
+	return *setupState.CurrentStep, true
 }
 
 func promptSetupStepInputs(

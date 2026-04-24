@@ -162,9 +162,14 @@ func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.List
 	return organizations.ListIntegrations(ctx, s.registry, orgID)
 }
 
-func (s *OrganizationService) SubmitIntegrationSetupStep(ctx context.Context, req *pb.SubmitIntegrationSetupStepRequest) (*pb.SubmitIntegrationSetupStepResponse, error) {
+func (s *OrganizationService) NextIntegrationSetupStep(ctx context.Context, req *pb.NextIntegrationSetupStepRequest) (*pb.NextIntegrationSetupStepResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.SubmitIntegrationSetupStep(ctx, s.registry, orgID, req.IntegrationId, req.StepName, req.Inputs)
+	return organizations.NextIntegrationSetupStep(ctx, s.registry, orgID, req.IntegrationId, req.Inputs)
+}
+
+func (s *OrganizationService) PreviousIntegrationSetupStep(ctx context.Context, req *pb.PreviousIntegrationSetupStepRequest) (*pb.PreviousIntegrationSetupStepResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.PreviousIntegrationSetupStep(ctx, s.registry, orgID, req.IntegrationId)
 }
 
 func (s *OrganizationService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {

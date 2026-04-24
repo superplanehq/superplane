@@ -4,15 +4,19 @@ import { IntegrationInstructionsV2 } from "@/ui/IntegrationInstructionsV2";
 
 interface IntegrationSetupRedirectPromptStepProps {
   step: IntegrationSetupStepDefinition;
+  onBack?: () => void;
   onOpenRedirect: () => void;
   onSubmit: () => void;
+  isReverting?: boolean;
   isSubmitting?: boolean;
 }
 
 export function IntegrationSetupRedirectPromptStep({
   step,
+  onBack,
   onOpenRedirect,
   onSubmit,
+  isReverting,
   isSubmitting,
 }: IntegrationSetupRedirectPromptStepProps) {
   const redirectPrompt = step.redirectPrompt;
@@ -30,10 +34,18 @@ export function IntegrationSetupRedirectPromptStep({
       </div>
 
       <div className="flex items-center gap-3 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBack}
+          disabled={Boolean(isSubmitting || isReverting || !onBack)}
+        >
+          {isReverting ? "Going back..." : "Previous"}
+        </Button>
         <Button type="button" variant="outline" onClick={onOpenRedirect} disabled={!redirectPrompt?.url}>
           Open Redirect
         </Button>
-        <Button type="button" onClick={onSubmit} disabled={Boolean(isSubmitting)}>
+        <Button type="button" onClick={onSubmit} disabled={Boolean(isSubmitting || isReverting)}>
           {isSubmitting ? "Saving..." : "Next"}
         </Button>
       </div>

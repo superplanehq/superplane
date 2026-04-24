@@ -122,8 +122,12 @@ func setupIntegration(registry *registry.Registry, newIntegration *models.Integr
 			Capabilities:   contexts.NewIntegrationCapabilityRegistry(newIntegration),
 		})
 
-		nextSetupStep := datatypes.NewJSONType(firstStep)
-		newIntegration.NextSetupStep = &nextSetupStep
+		setupState := datatypes.NewJSONType(models.SetupState{
+			CurrentStep:   &firstStep,
+			PreviousSteps: []core.SetupStep{},
+		})
+
+		newIntegration.SetupState = &setupState
 		return tx.Save(newIntegration).Error
 	})
 
@@ -253,8 +257,19 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		})
 	}
 
-	if instance.NextSetupStep != nil {
-		proto.Status.NextStep = serializeNextStep(instance.NextSetupStep.Data())
+	if instance.SetupState != nil {
+		state := instance.SetupState.Data()
+		proto.Status.SetupState = &pb.Integration_SetupState{
+			PreviousSteps: []*pb.Integration_SetupStepDefinition{},
+		}
+
+		if state.CurrentStep != nil {
+			proto.Status.SetupState.CurrentStep = serializeNextStep(*state.CurrentStep)
+		}
+
+		for _, step := range state.PreviousSteps {
+			proto.Status.SetupState.PreviousSteps = append(proto.Status.SetupState.PreviousSteps, serializeNextStep(step))
+		}
 	}
 
 	if instance.Parameters != nil {

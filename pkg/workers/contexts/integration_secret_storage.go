@@ -53,6 +53,26 @@ func (s *IntegrationSecretStorage) Get(name string) (string, error) {
 	return "", fmt.Errorf("secret %s not found", name)
 }
 
+func (s *IntegrationSecretStorage) Delete(name string) error {
+	err := s.tx.
+		Where("installation_id = ? AND name = ?", s.integration.ID, name).
+		Delete(&models.IntegrationSecret{}).
+		Error
+
+	if err != nil {
+		return err
+	}
+
+	for i, secret := range s.secrets {
+		if secret.Name == name {
+			s.secrets = append(s.secrets[:i], s.secrets[i+1:]...)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("secret %s not found", name)
+}
+
 func (s *IntegrationSecretStorage) Create(name string, def core.IntegrationSecretDefinition) error {
 	_, err := s.Get(name)
 	if err == nil {

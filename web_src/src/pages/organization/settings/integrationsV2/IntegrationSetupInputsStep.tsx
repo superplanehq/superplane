@@ -8,8 +8,10 @@ interface IntegrationSetupInputsStepProps {
   step: IntegrationSetupStepDefinition;
   values: Record<string, unknown>;
   validationErrors?: Set<string>;
+  onBack?: () => void;
   onChange: (fieldName: string, value: unknown) => void;
   onSubmit: () => void;
+  isReverting?: boolean;
   isSubmitting?: boolean;
 }
 
@@ -18,8 +20,10 @@ export function IntegrationSetupInputsStep({
   step,
   values,
   validationErrors,
+  onBack,
   onChange,
   onSubmit,
+  isReverting,
   isSubmitting,
 }: IntegrationSetupInputsStepProps) {
   const fields = (step.inputs || []).filter((field) => Boolean(field.name));
@@ -54,7 +58,15 @@ export function IntegrationSetupInputsStep({
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <Button onClick={onSubmit} disabled={Boolean(isSubmitting)}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBack}
+          disabled={Boolean(isSubmitting || isReverting || !onBack)}
+        >
+          {isReverting ? "Going back..." : "Previous"}
+        </Button>
+        <Button onClick={onSubmit} disabled={Boolean(isSubmitting || isReverting)}>
           {isSubmitting ? "Saving..." : "Next"}
         </Button>
       </div>

@@ -68,15 +68,34 @@ func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	}
 }
 
-func (s *SetupProvider) OnStepSubmit(stepName string, inputs any, ctx core.SetupStepContext) (*core.SetupStep, error) {
-	switch stepName {
+func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	switch ctx.CurrentStep {
 	case "selectOrganization":
-		return s.onSelectOrganizationSubmit(inputs, ctx)
+		return s.onSelectOrganizationSubmit(ctx.Inputs, ctx)
 	case "enterAPIToken":
-		return s.onEnterAPITokenSubmit(inputs, ctx)
+		return s.onEnterAPITokenSubmit(ctx.Inputs, ctx)
 	}
 
 	return nil, errors.New("unknown step")
+}
+
+func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
+	switch ctx.CurrentStep {
+	case "selectOrganization":
+		return s.onSelectOrganizationRevert(ctx)
+	case "enterAPIToken":
+		return s.onEnterAPITokenRevert(ctx)
+	}
+
+	return errors.New("unknown step")
+}
+
+func (s *SetupProvider) onSelectOrganizationRevert(ctx core.SetupStepContext) error {
+	return ctx.Parameters.Delete("organizationUrl")
+}
+
+func (s *SetupProvider) onEnterAPITokenRevert(ctx core.SetupStepContext) error {
+	return ctx.Secrets.Delete("apiToken")
 }
 
 func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupStepContext) (*core.SetupStep, error) {

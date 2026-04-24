@@ -255,14 +255,26 @@ service Organizations {
     };
   }
 
-  rpc SubmitIntegrationSetupStep(SubmitIntegrationSetupStepRequest) returns (SubmitIntegrationSetupStepResponse) {
+  rpc NextIntegrationSetupStep(NextIntegrationSetupStepRequest) returns (NextIntegrationSetupStepResponse) {
     option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/integrations/{integration_id}/steps"
+      patch: "/api/v1/organizations/{id}/integrations/{integration_id}/next"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Submit an integration setup step";
-      description: "Submit an integration setup step";
+      summary: "Submit an integration setup step and go to the next";
+      description: "Submit an integration setup step and go to the next";
+      tags: "Organization";
+    };
+  }
+
+  rpc PreviousIntegrationSetupStep(PreviousIntegrationSetupStepRequest) returns (PreviousIntegrationSetupStepResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/integrations/{integration_id}/previous"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revert the current integration setup step and go to the previous";
+      description: "Revert the current integration setup step and go to the previous";
       tags: "Organization";
     };
   }
@@ -552,14 +564,22 @@ message DeleteIntegrationRequest {
 
 message DeleteIntegrationResponse {}
 
-message SubmitIntegrationSetupStepRequest {
+message NextIntegrationSetupStepRequest {
   string id = 1;
   string integration_id = 2;
-  string step_name = 3;
-  google.protobuf.Struct inputs = 4;
+  google.protobuf.Struct inputs = 3;
 }
 
-message SubmitIntegrationSetupStepResponse {
+message NextIntegrationSetupStepResponse {
+  Integration integration = 1;
+}
+
+message PreviousIntegrationSetupStepRequest {
+  string id = 1;
+  string integration_id = 2;
+}
+
+message PreviousIntegrationSetupStepResponse {
   Integration integration = 1;
 }
 
@@ -627,7 +647,12 @@ message Integration {
     repeated Parameter parameters = 6;
     repeated Secret secrets = 7;
     repeated Capability capabilities = 8;
-    SetupStepDefinition next_step = 9;
+    SetupState setup_state = 9;
+  }
+
+  message SetupState {
+    SetupStepDefinition current_step = 1;
+    repeated SetupStepDefinition previous_steps = 2;
   }
 
   message SetupStepDefinition {

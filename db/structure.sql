@@ -164,7 +164,7 @@ CREATE TABLE public.app_installations (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     deleted_at timestamp with time zone,
-    next_setup_step jsonb,
+    setup_state jsonb,
     parameters jsonb DEFAULT '[]'::jsonb NOT NULL,
     capabilities jsonb DEFAULT '[]'::jsonb NOT NULL
 );

@@ -9,7 +9,8 @@ import {
   useAvailableIntegrations,
   useConnectedIntegrations,
   useCreateIntegration,
-  useSubmitIntegrationSetupStep,
+  useNextIntegrationSetupStep,
+  usePreviousIntegrationSetupStep,
 } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
@@ -109,6 +110,15 @@ function getNextIntegrationName(baseName: string, existingNames: Set<string>): s
   return candidate;
 }
 
+function getCurrentSetupStep(integration: OrganizationsIntegration | null): IntegrationSetupStepDefinition | null {
+  return integration?.status?.setupState?.currentStep ?? null;
+}
+
+function canRevertSetupStep(integration: OrganizationsIntegration | null): boolean {
+  const previousSteps = integration?.status?.setupState?.previousSteps ?? [];
+  return previousSteps.length > 0;
+}
+
 export function IntegrationSetupPage({ organizationId }: IntegrationSetupPageProps) {
   const navigate = useNavigate();
   const { integrationName: routeIntegrationName } = useParams<{ integrationName: string }>();
@@ -119,7 +129,8 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId);
 
   const createMutation = useCreateIntegration(organizationId);
-  const submitStepMutation = useSubmitIntegrationSetupStep(organizationId);
+  const submitStepMutation = useNextIntegrationSetupStep(organizationId);
+  const revertStepMutation = usePreviousIntegrationSetupStep(organizationId);
 
   const [instanceName, setInstanceName] = useState("");
   const [createdIntegration, setCreatedIntegration] = useState<OrganizationsIntegration | null>(null);
@@ -133,7 +144,8 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
 
   const integrationLabel =
     integrationDefinition?.label || getIntegrationTypeDisplayName(undefined, integrationName) || integrationName;
-  const currentStep = createdIntegration?.status?.nextStep ?? null;
+  const currentStep = getCurrentSetupStep(createdIntegration);
+  const canRevertCurrentStep = canRevertSetupStep(createdIntegration);
 
   usePageTitle(["Integrations", integrationLabel, "Setup"]);
 
@@ -183,8 +195,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
 
   const handleSubmitCurrentStep = async () => {
     const integrationId = createdIntegration?.metadata?.id;
-    const stepName = currentStep?.name;
-    if (!integrationId || !stepName) {
+    if (!integrationId || !currentStep?.name) {
       return;
     }
 
@@ -199,8 +210,26 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     try {
       const response = await submitStepMutation.mutateAsync({
         integrationId,
-        stepName,
         inputs: currentStep.type === "INPUTS" ? stepInputs : undefined,
+      });
+      const updatedIntegration = response.data?.integration || null;
+      setCreatedIntegration(updatedIntegration);
+      setStepInputs({});
+      setValidationErrors(new Set());
+    } catch {
+      // Error is shown by inline alert.
+    }
+  };
+
+  const handleRevertCurrentStep = async () => {
+    const integrationId = createdIntegration?.metadata?.id;
+    if (!integrationId || !currentStep?.name) {
+      return;
+    }
+
+    try {
+      const response = await revertStepMutation.mutateAsync({
+        integrationId,
       });
       const updatedIntegration = response.data?.integration || null;
       setCreatedIntegration(updatedIntegration);
@@ -235,7 +264,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     );
   }
 
-  const activeError = createMutation.error || submitStepMutation.error;
+  const activeError = createMutation.error || submitStepMutation.error || revertStepMutation.error;
 
   return (
     <div className="pt-6">
@@ -309,14 +338,18 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
               setStepInputs((currentValues) => ({ ...currentValues, [fieldName]: value }));
             }}
             onSubmit={handleSubmitCurrentStep}
+            onBack={canRevertCurrentStep ? handleRevertCurrentStep : undefined}
             isSubmitting={submitStepMutation.isPending}
+            isReverting={revertStepMutation.isPending}
           />
         ) : currentStep?.type === "REDIRECT_PROMPT" ? (
           <IntegrationSetupRedirectPromptStep
             step={currentStep}
+            onBack={canRevertCurrentStep ? handleRevertCurrentStep : undefined}
             onOpenRedirect={() => openRedirectPrompt(currentStep)}
             onSubmit={handleSubmitCurrentStep}
             isSubmitting={submitStepMutation.isPending}
+            isReverting={revertStepMutation.isPending}
           />
         ) : (
           <div className="space-y-4">
