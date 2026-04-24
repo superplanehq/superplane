@@ -104,6 +104,62 @@ func TestCountStuckQueueNodes_NodeWithNonFinishedExecutionIsNotCounted(t *testin
 	require.Equal(t, int64(0), count)
 }
 
+func TestCountPendingEvents(t *testing.T) {
+	database.TruncateTables()
+
+	steps := stuckQueueItemsTestSteps{t: t}
+	steps.CreateWorkflow()
+	steps.CreateWorkflowNode()
+	steps.CreateRootEvent()
+
+	routedEvent := &models.CanvasEvent{
+		WorkflowID: steps.workflow.ID,
+		NodeID:     steps.node.NodeID,
+		Channel:    "default",
+		Data:       datatypes.JSONType[any]{},
+		State:      models.CanvasEventStateRouted,
+	}
+
+	require.NoError(t, database.Conn().Create(routedEvent).Error)
+
+	count, err := countPendingEvents()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
+func TestCountPendingExecutions(t *testing.T) {
+	database.TruncateTables()
+
+	steps := stuckQueueItemsTestSteps{t: t}
+	steps.CreateWorkflow()
+	steps.CreateWorkflowNode()
+	steps.CreateRootEvent()
+
+	pendingExecution := &models.CanvasNodeExecution{
+		WorkflowID:  steps.workflow.ID,
+		NodeID:      steps.node.NodeID,
+		RootEventID: steps.rootEvent.ID,
+		EventID:     steps.rootEvent.ID,
+		State:       models.CanvasNodeExecutionStatePending,
+	}
+
+	require.NoError(t, database.Conn().Create(pendingExecution).Error)
+
+	startedExecution := &models.CanvasNodeExecution{
+		WorkflowID:  steps.workflow.ID,
+		NodeID:      steps.node.NodeID,
+		RootEventID: steps.rootEvent.ID,
+		EventID:     steps.rootEvent.ID,
+		State:       models.CanvasNodeExecutionStateStarted,
+	}
+
+	require.NoError(t, database.Conn().Create(startedExecution).Error)
+
+	count, err := countPendingExecutions()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
 type stuckQueueItemsTestSteps struct {
 	t         *testing.T
 	workflow  *models.Canvas
