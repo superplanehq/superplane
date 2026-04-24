@@ -262,6 +262,11 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 	// Find shadowed names within connected components
 	nodeWarnings := actions.FindShadowedNameWarnings(canvas.Spec.Nodes, canvas.Spec.Edges)
+	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
+	nodesByID := make(map[string]models.Node, len(nodes))
+	for _, node := range nodes {
+		nodesByID[node.ID] = node
+	}
 
 	for i, edge := range canvas.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -283,10 +288,19 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
+
+		if err := changesets.ValidateSourceNodeOutputChannel(
+			database.Conn(),
+			registry,
+			uuid.MustParse(orgID),
+			nodesByID[edge.SourceId],
+			edge.Channel,
+		); err != nil {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: %v", i, err)
+		}
 	}
 
 	// Convert proto nodes to models, adding validation errors and warnings where applicable
-	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
 	edges := actions.ProtoToEdges(canvas.Spec.Edges)
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
