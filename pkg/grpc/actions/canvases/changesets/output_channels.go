@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -11,6 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var errUnresolvableSourceNodeOutputChannels = errors.New("source node output channels are not resolvable")
+
 func ValidateSourceNodeOutputChannel(
 	tx *gorm.DB,
 	registry *registry.Registry,
@@ -20,6 +23,10 @@ func ValidateSourceNodeOutputChannel(
 ) error {
 	outputChannels, err := listSourceNodeOutputChannels(tx, registry, organizationID, sourceNode)
 	if err != nil {
+		if errors.Is(err, errUnresolvableSourceNodeOutputChannels) {
+			return nil
+		}
+
 		return fmt.Errorf("failed to resolve output channels for source node %s: %w", sourceNode.ID, err)
 	}
 
@@ -65,12 +72,12 @@ func listSourceNodeOutputChannels(
 
 func listComponentOutputChannels(registry *registry.Registry, sourceNode models.Node) ([]core.OutputChannel, error) {
 	if sourceNode.Ref.Component == nil || sourceNode.Ref.Component.Name == "" {
-		return nil, fmt.Errorf("component reference is required")
+		return nil, fmt.Errorf("%w: component reference is required", errUnresolvableSourceNodeOutputChannels)
 	}
 
 	component, err := registry.GetComponent(sourceNode.Ref.Component.Name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", errUnresolvableSourceNodeOutputChannels, err)
 	}
 
 	outputChannels := component.OutputChannels(sourceNode.Configuration)
@@ -87,12 +94,12 @@ func listBlueprintOutputChannels(
 	sourceNode models.Node,
 ) ([]core.OutputChannel, error) {
 	if sourceNode.Ref.Blueprint == nil || sourceNode.Ref.Blueprint.ID == "" {
-		return nil, fmt.Errorf("blueprint reference is required")
+		return nil, fmt.Errorf("%w: blueprint reference is required", errUnresolvableSourceNodeOutputChannels)
 	}
 
 	blueprint, err := models.FindBlueprintInTransaction(tx, organizationID.String(), sourceNode.Ref.Blueprint.ID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", errUnresolvableSourceNodeOutputChannels, err)
 	}
 
 	outputChannels := make([]core.OutputChannel, 0, len(blueprint.OutputChannels))
