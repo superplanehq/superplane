@@ -6,7 +6,6 @@ const defaultProps = {
   isOpen: true,
   onToggle: vi.fn(),
   blocks: [],
-  canvasZoom: 1,
 };
 
 describe("BuildingBlocksSidebar", () => {

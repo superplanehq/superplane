@@ -5344,6 +5344,8 @@ export function WorkflowPageV2() {
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
+          availableIntegrationDefinitions={availableIntegrations}
+          integrationDialogOpen={!!integrationDialogName}
           canReadIntegrations={canReadIntegrations}
           canCreateIntegrations={canCreateIntegrations}
           canUpdateIntegrations={canUpdateIntegrations}

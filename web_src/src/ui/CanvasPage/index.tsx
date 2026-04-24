@@ -41,6 +41,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   ComponentsComponent,
+  IntegrationsIntegrationDefinition,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
@@ -187,6 +188,7 @@ export interface CanvasPageProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  integrationDialogOpen?: boolean;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   // Disable running nodes when there are unsaved changes (with tooltip)
@@ -216,6 +218,7 @@ export interface CanvasPageProps {
   ) => (() => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   integrations?: OrganizationsIntegration[];
+  availableIntegrationDefinitions?: IntegrationsIntegrationDefinition[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
@@ -623,6 +626,7 @@ function CanvasPage(props: CanvasPageProps) {
   );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const hasHandledStarterPlaceholderRef = useRef(false);
+  const pendingSelectionNodeIdRef = useRef<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
@@ -668,7 +672,6 @@ function CanvasPage(props: CanvasPageProps) {
 
   // New/empty canvases should start at 100% unless a later fit-to-view is needed.
   const initialCanvasZoom = 1;
-  const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
     nodeId: string;
     nodeName: string;
@@ -859,24 +862,98 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
+  const findAvailablePlaceholderPosition = useCallback(
+    (preferredPosition: { x: number; y: number }) => {
+      const PLACEHOLDER_WIDTH = 368;
+      const PLACEHOLDER_HEIGHT = 96;
+      const COLLISION_PADDING = 24;
+      const STEP_X = 140;
+      const STEP_Y = 110;
+      const MAX_RING = 8;
+      const nodes = state.nodes || [];
+
+      const intersectsExistingNode = (candidate: { x: number; y: number }) => {
+        const candidateLeft = candidate.x - COLLISION_PADDING;
+        const candidateTop = candidate.y - COLLISION_PADDING;
+        const candidateRight = candidate.x + PLACEHOLDER_WIDTH + COLLISION_PADDING;
+        const candidateBottom = candidate.y + PLACEHOLDER_HEIGHT + COLLISION_PADDING;
+
+        return nodes.some((node) => {
+          const nodeWidth = node.width ?? PLACEHOLDER_WIDTH;
+          const nodeHeight = node.height ?? PLACEHOLDER_HEIGHT;
+          const nodeLeft = node.position.x;
+          const nodeTop = node.position.y;
+          const nodeRight = nodeLeft + nodeWidth;
+          const nodeBottom = nodeTop + nodeHeight;
+
+          return !(
+            candidateRight <= nodeLeft ||
+            candidateLeft >= nodeRight ||
+            candidateBottom <= nodeTop ||
+            candidateTop >= nodeBottom
+          );
+        });
+      };
+
+      if (!intersectsExistingNode(preferredPosition)) {
+        return preferredPosition;
+      }
+
+      for (let ring = 1; ring <= MAX_RING; ring += 1) {
+        const candidates: Array<{ x: number; y: number; distance: number }> = [];
+
+        for (let dx = -ring; dx <= ring; dx += 1) {
+          for (let dy = -ring; dy <= ring; dy += 1) {
+            if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) {
+              continue;
+            }
+
+            const x = preferredPosition.x + dx * STEP_X;
+            const y = preferredPosition.y + dy * STEP_Y;
+            candidates.push({ x, y, distance: dx * dx + dy * dy });
+          }
+        }
+
+        candidates.sort((a, b) => a.distance - b.distance);
+        const available = candidates.find((candidate) => !intersectsExistingNode(candidate));
+        if (available) {
+          return { x: available.x, y: available.y };
+        }
+      }
+
+      return preferredPosition;
+    },
+    [state.nodes],
+  );
+
   const handleConnectionDropInEmptySpace = useCallback(
     async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
       if (readOnly) return;
       if (!sourceConnection || !props.onPlaceholderAdd) return;
 
+      const requestedPosition = { x: position.x, y: position.y - 30 };
+      const resolvedPosition = findAvailablePlaceholderPosition(requestedPosition);
+
       // Save placeholder immediately to backend
       const placeholderId = await props.onPlaceholderAdd({
-        position: { x: position.x, y: position.y - 30 },
+        position: resolvedPosition,
         sourceNodeId: sourceConnection.nodeId,
         sourceHandleId: sourceConnection.handleId,
       });
 
       // Set as template node and open building blocks sidebar
       setTemplateNodeId(placeholderId);
+      state.setNodes((nodes) =>
+        nodes.map((node) => ({
+          ...node,
+          selected: node.id === placeholderId,
+        })),
+      );
+      pendingSelectionNodeIdRef.current = placeholderId;
       setIsBuildingBlocksSidebarOpen(true);
       state.componentSidebar.close();
     },
-    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, readOnly],
+    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, readOnly, findAvailablePlaceholderPosition],
   );
 
   const handlePendingConnectionNodeClick = useCallback(
@@ -888,6 +965,12 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Open the BuildingBlocksSidebar so user can select a component
       setIsBuildingBlocksSidebarOpen(true);
+      state.setNodes((nodes) =>
+        nodes.map((node) => ({
+          ...node,
+          selected: node.id === nodeId,
+        })),
+      );
 
       // Close ComponentSidebar since we're selecting a building block first
       state.componentSidebar.close();
@@ -929,6 +1012,12 @@ function CanvasPage(props: CanvasPageProps) {
 
         setTemplateNodeId(null);
         setIsBuildingBlocksSidebarOpen(false);
+        state.setNodes((nodes) =>
+          nodes.map((node) => ({
+            ...node,
+            selected: node.id === templateNodeId,
+          })),
+        );
         state.componentSidebar.open(templateNodeId);
         setCurrentTab("settings");
         return;
@@ -961,6 +1050,12 @@ function CanvasPage(props: CanvasPageProps) {
           setIsBuildingBlocksSidebarOpen(false);
 
           // Open component sidebar for the new node
+          state.setNodes((nodes) =>
+            nodes.map((node) => ({
+              ...node,
+              selected: node.id === newNodeId,
+            })),
+          );
           state.componentSidebar.open(newNodeId);
           setCurrentTab("settings");
         }
@@ -1112,6 +1207,62 @@ function CanvasPage(props: CanvasPageProps) {
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
 
+  const handleAddComponentButtonClick = useCallback(async () => {
+    if (readOnly) {
+      return;
+    }
+
+    if (!props.onPlaceholderAdd) {
+      handleSidebarToggle(true);
+      return;
+    }
+
+    const viewport = props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+    const canvasRect = canvasWrapperRef.current?.getBoundingClientRect();
+    const zoom = viewport.zoom || DEFAULT_CANVAS_ZOOM;
+    const visibleWidth = canvasRect?.width ?? window.innerWidth;
+    const visibleHeight = canvasRect?.height ?? window.innerHeight;
+    const savedSidebarWidth = getPersistedSidebarWidth();
+    const preferredPlaceholderPosition = {
+      x: ((visibleWidth - savedSidebarWidth) / 2 - viewport.x) / zoom - 120,
+      y: (visibleHeight / 2 - viewport.y) / zoom - 45,
+    };
+    const placeholderPosition = findAvailablePlaceholderPosition(preferredPlaceholderPosition);
+
+    const placeholderId = await props.onPlaceholderAdd({
+      position: placeholderPosition,
+    });
+    setTemplateNodeId(placeholderId);
+    state.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: node.id === placeholderId,
+      })),
+    );
+    pendingSelectionNodeIdRef.current = placeholderId;
+    handleSidebarToggle(true);
+    state.componentSidebar.close();
+  }, [readOnly, props, handleSidebarToggle, state.componentSidebar, findAvailablePlaceholderPosition]);
+
+  useEffect(() => {
+    const pendingNodeId = pendingSelectionNodeIdRef.current;
+    if (!pendingNodeId) {
+      return;
+    }
+
+    if (!state.nodes.some((node) => node.id === pendingNodeId)) {
+      return;
+    }
+
+    pendingSelectionNodeIdRef.current = null;
+    state.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: node.id === pendingNodeId,
+      })),
+    );
+  }, [state.nodes, state.setNodes]);
+
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
       if (!editingNodeData || !props.onNodeConfigurationSave) {
@@ -1176,6 +1327,20 @@ function CanvasPage(props: CanvasPageProps) {
     );
   }, [props.canvasStateMode, state, templateNodeId]);
 
+  useEffect(() => {
+    if (!templateNodeId || !isBuildingBlocksSidebarOpen) {
+      return;
+    }
+
+    const templateNodeStillExists = state.nodes.some((node) => node.id === templateNodeId);
+    if (templateNodeStillExists) {
+      return;
+    }
+
+    setTemplateNodeId(null);
+    setIsBuildingBlocksSidebarOpen(false);
+  }, [isBuildingBlocksSidebarOpen, state.nodes, templateNodeId]);
+
   const canvasStateMode = props.canvasStateMode || "default";
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
@@ -1233,7 +1398,9 @@ function CanvasPage(props: CanvasPageProps) {
         {props.isVersionControlOpen ? null : (
           <RightSideControls
             mode={readOnly ? "live" : "edit"}
-            onSidebarOpen={() => handleSidebarToggle(true)}
+            onSidebarOpen={() => {
+              void handleAddComponentButtonClick();
+            }}
             onAddNote={handleAddNote}
             onMemoryOpen={props.onMemoryOpen}
             onYamlOpen={props.onYamlOpen}
@@ -1246,10 +1413,12 @@ function CanvasPage(props: CanvasPageProps) {
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
-            canvasZoom={canvasZoom}
+            availableIntegrations={props.availableIntegrationDefinitions || []}
+            integrationDialogOpen={props.integrationDialogOpen ?? false}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockClick}
+            onConnectIntegration={props.onConnectIntegration}
           />
         )}
 
@@ -1302,7 +1471,6 @@ function CanvasPage(props: CanvasPageProps) {
               onBuildingBlocksSidebarToggle={handleSidebarToggle}
               onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
               onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
               initialCanvasZoom={initialCanvasZoom}

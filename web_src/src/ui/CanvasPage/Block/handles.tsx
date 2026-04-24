@@ -320,36 +320,53 @@ function MultiRightHandle({
               type="source"
               position={Position.Right}
               id={channel}
-              aria-label={isAppendHandle ? `Add next component (${channel})` : undefined}
-              onClick={
-                isAppendHandle
-                  ? (event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      void onAppendFromNode(nodeId, channel);
-                    }
-                  : undefined
-              }
-              className={
-                isAppendHandle
-                  ? `${APPEND_HANDLE_CLASS} ${APPEND_HANDLE_HOVER_CLASS}`
-                  : isHighlighted
-                    ? "highlighted"
-                    : undefined
-              }
+              className={isHighlighted ? "highlighted" : undefined}
               style={{
-                ...(isAppendHandle ? APPEND_HANDLE_STYLE : HANDLE_STYLE),
-                left: isAppendHandle ? handleLeftX - 6 : handleLeftX,
+                ...HANDLE_STYLE,
+                left: handleLeftX,
                 top: `calc(50% + ${offsetY}px)`,
                 transform: "translateY(-50%)",
                 pointerEvents: isConnectionInteractive ? "auto" : "none",
               }}
             />
             {isAppendHandle ? (
+              <div
+                style={{
+                  position: "absolute",
+                  left: handleLeftX + 12,
+                  top: `calc(50% + ${offsetY}px)`,
+                  transform: "translateY(-50%)",
+                  width: 24,
+                  height: 3,
+                  backgroundColor: "#C9D5E1",
+                  pointerEvents: "none",
+                }}
+              />
+            ) : null}
+            {isAppendHandle ? (
+              <button
+                type="button"
+                aria-label={`Add next component (${channel})`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void onAppendFromNode(nodeId, channel);
+                }}
+                className={`${APPEND_HANDLE_CLASS} ${APPEND_HANDLE_HOVER_CLASS}`}
+                style={{
+                  ...APPEND_HANDLE_STYLE,
+                  left: handleLeftX + 32,
+                  top: `calc(50% + ${offsetY}px)`,
+                  transform: "translateY(-50%)",
+                  position: "absolute",
+                }}
+              />
+            ) : null}
+            {isAppendHandle ? (
               <AppendHandlePreview
                 style={{
                   position: "absolute",
-                  left: handleLeftX + 6,
+                  left: handleLeftX + 52,
                   top: `calc(50% + ${offsetY}px)`,
                   transform: "translateY(-50%)",
                 }}
@@ -378,13 +395,16 @@ function EndNodeAppendConnector({
 
   return (
     <>
-      <div
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={channel}
         style={{
           ...HANDLE_STYLE,
-          position: "absolute",
           right: -21,
           top: 13,
-          pointerEvents: "none",
+          pointerEvents: "auto",
+          transform: "none",
         }}
       />
       <div
@@ -398,10 +418,8 @@ function EndNodeAppendConnector({
           pointerEvents: "none",
         }}
       />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={channel}
+      <button
+        type="button"
         aria-label="Add next component"
         onClick={(event) => {
           event.preventDefault();
@@ -411,14 +429,15 @@ function EndNodeAppendConnector({
         className={`${APPEND_HANDLE_CLASS} ${APPEND_HANDLE_HOVER_CLASS}`}
         style={{
           ...APPEND_HANDLE_STYLE,
-          right: -75,
-          top: 18,
+          right: -87,
+          top: 6,
+          position: "absolute",
         }}
       />
       <AppendHandlePreview
         style={{
           position: "absolute",
-          left: "calc(100% + 81px)",
+          left: "calc(100% + 85px)",
           top: 0,
         }}
         connectorTop={18}
