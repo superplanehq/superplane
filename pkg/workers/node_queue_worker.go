@@ -229,7 +229,12 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContext(), tx, node, queueItem, configFields, onNewEvents)
+	component, err := w.componentForNode(node)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContext(), tx, node, queueItem, configFields, component, onNewEvents)
 	if err != nil {
 
 		//
@@ -277,6 +282,20 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	}
 
 	return []*uuid.UUID{executionID}, queueItem, err
+}
+
+func (w *NodeQueueWorker) componentForNode(node *models.CanvasNode) (core.Component, error) {
+	ref := node.Ref.Data()
+	if node.Type != models.NodeTypeComponent || ref.Component == nil || ref.Component.Name == "" {
+		return nil, nil
+	}
+
+	comp, err := w.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+	}
+
+	return comp, nil
 }
 
 func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {

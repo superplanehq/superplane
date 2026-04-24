@@ -129,6 +129,35 @@ type OutputChannel struct {
 	Description string
 }
 
+// failureLabels is the canonical set of OutputChannel.Label values that
+// indicate a failure outcome. Emitting a payload to a channel whose Label
+// is in this set marks the execution as failed while still creating the
+// channel event so downstream routing continues to work.
+//
+// Matching is intentionally exact (case-sensitive, no trimming). A typo
+// or case variation of a failure label should classify as non-failure so
+// the routing test for that component fails loudly rather than silently
+// recording the wrong result. Component authors should pick a label that
+// matches one of these values verbatim.
+//
+// Add a new entry here only when introducing a new failure-semantic
+// vocabulary word (e.g. "Error", "Crashed"). Keep the set small and
+// explicit — string semantics live here, not scattered across component
+// declarations.
+var failureLabels = map[string]struct{}{
+	"Failure": {},
+	"Failed":  {},
+	"Fail":    {},
+	"Timeout": {},
+}
+
+// IsFailure reports whether this channel's Label marks it as a failure
+// outcome per the failureLabels vocabulary.
+func (c OutputChannel) IsFailure() bool {
+	_, ok := failureLabels[c.Label]
+	return ok
+}
+
 /*
  * ExecutionContext allows the component
  * to control the state and metadata of each execution of it.

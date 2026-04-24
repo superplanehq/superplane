@@ -36,6 +36,7 @@ func BuildProcessQueueContext(
 	node *models.CanvasNode,
 	queueItem *models.CanvasNodeQueueItem,
 	configFields []configuration.Field,
+	component core.Component,
 	onNewEvents func([]models.CanvasEvent),
 ) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
@@ -142,7 +143,7 @@ func BuildProcessQueueContext(
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
-			ExecutionState: NewExecutionStateContext(tx, &execution, onNewEvents),
+			ExecutionState: NewExecutionStateContext(tx, component, &execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
@@ -259,7 +260,7 @@ func BuildProcessQueueContext(
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
-			ExecutionState: NewExecutionStateContext(tx, execution, onNewEvents),
+			ExecutionState: NewExecutionStateContext(tx, component, execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
