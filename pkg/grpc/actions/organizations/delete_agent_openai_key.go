@@ -1,6 +1,7 @@
 package organizations
 
 import (
+	"context"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -17,7 +18,7 @@ func DeleteAgentOpenAIKey(
 ) (*pb.DeleteAgentOpenAIKeyResponse, error) {
 	var settings *models.OrganizationAgentSettings
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := database.TransactionWithContext(context.Background(), database.DefaultOrganizationMutationTimeout, "DeleteAgentOpenAIKey", func(tx *gorm.DB) error {
 		var txErr error
 
 		settings, txErr = findOrCreateOrganizationAgentSettingsInTransaction(tx, orgID)
