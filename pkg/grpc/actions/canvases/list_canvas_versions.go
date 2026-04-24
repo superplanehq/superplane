@@ -48,7 +48,7 @@ func ListCanvasVersionsPaginated(
 	var publishedVersions []models.CanvasVersion
 	var publishedCount int64
 	var draftVersion *models.CanvasVersion
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultReadOnlyTransactionTimeout, "ListCanvasVersions", func(tx *gorm.DB) error {
 		versions, versionsErr := models.ListPublishedCanvasVersionsInTransaction(tx, canvas.ID, int(limit), beforeTime)
 		if versionsErr != nil {
 			return versionsErr

@@ -51,7 +51,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	canAccess := false
-	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	if err := database.TransactionWithContext(ctx, database.DefaultReadOnlyTransactionTimeout, "DescribeCanvasVersion", func(tx *gorm.DB) error {
 		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
 			canAccess = true
 			return nil

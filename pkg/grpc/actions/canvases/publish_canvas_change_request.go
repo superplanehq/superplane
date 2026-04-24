@@ -70,7 +70,7 @@ func PublishCanvasChangeRequest(
 	var liveVersion *models.CanvasVersion
 	var renewedDraftVersion *models.CanvasVersion
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "PublishCanvasChangeRequest", func(tx *gorm.DB) error {
 		canvasForUpdate, canvasErr := models.FindCanvasInTransaction(tx, organizationUUID, canvasUUID)
 		if canvasErr != nil {
 			return canvasErr

@@ -40,7 +40,7 @@ func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID st
 
 	userUUID := uuid.MustParse(userID)
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "DeleteCanvasVersion", func(tx *gorm.DB) error {
 		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {

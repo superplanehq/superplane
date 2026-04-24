@@ -40,7 +40,7 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "CreateCanvasVersion", func(tx *gorm.DB) error {
 		liveVersion, liveVersionErr := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 		if liveVersionErr != nil {
 			if errors.Is(liveVersionErr, gorm.ErrRecordNotFound) {

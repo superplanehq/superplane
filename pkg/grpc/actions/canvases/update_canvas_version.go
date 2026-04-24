@@ -127,7 +127,7 @@ func UpdateCanvasVersionWithUsage(
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultCanvasMutationTimeout, "UpdateCanvasVersion", func(tx *gorm.DB) error {
 		version, err = models.FindCanvasVersionInTransaction(tx, canvasUUID, versionUUID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
