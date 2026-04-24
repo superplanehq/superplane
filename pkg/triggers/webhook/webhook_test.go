@@ -221,6 +221,43 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.Contains(t, data, "headers")
 	})
 
+	t.Run("accepts valid signature via X-Hub-Signature-256 header", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, eventCtx := webhookRequestContext(body, "signature", "secret")
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256="+signature)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventCtx.Count())
+	})
+
+	t.Run("rejects invalid signature in X-Hub-Signature-256 header", func(t *testing.T) {
+		webhook := &Webhook{}
+		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "signature", "secret")
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256=invalid")
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusForbidden, status)
+		require.Error(t, err)
+	})
+
+	t.Run("prefers X-Signature-256 over X-Hub-Signature-256", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, eventCtx := webhookRequestContext(body, "signature", "secret")
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Signature-256", "sha256="+signature)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256=invalid")
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventCtx.Count())
+	})
+
 	t.Run("rejects missing bearer token", func(t *testing.T) {
 		webhook := &Webhook{}
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "bearer", "secret")

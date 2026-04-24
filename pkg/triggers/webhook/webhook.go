@@ -16,6 +16,8 @@ import (
 const (
 	MaxEventSize           = 64 * 1024
 	DefaultHeaderTokenName = "X-Webhook-Token"
+	SignatureHeader        = "X-Signature-256"
+	GitHubSignatureHeader  = "X-Hub-Signature-256"
 )
 
 func init() {
@@ -65,7 +67,7 @@ func (w *Webhook) Documentation() string {
 
 ## Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header
+- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header (the GitHub-compatible ` + "`X-Hub-Signature-256`" + ` header is also accepted)
 - **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
 - **Header Token**: Require a raw token in a custom header (default: ` + "`X-Webhook-Token`" + `)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -242,7 +244,10 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	switch config.Authentication {
 	case "signature":
-		signature := ctx.Headers.Get("X-Signature-256")
+		signature := ctx.Headers.Get(SignatureHeader)
+		if signature == "" {
+			signature = ctx.Headers.Get(GitHubSignatureHeader)
+		}
 		if signature == "" {
 			return http.StatusForbidden, nil, fmt.Errorf("missing signature header")
 		}
