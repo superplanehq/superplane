@@ -60,6 +60,14 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 	require.Len(t, s.expectations, 0, "unused request expectations")
 }
 
+func TestUpdateWithoutFileReturnsError(t *testing.T) {
+	server := newAPITestServer(t)
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	err := (&updateCommand{}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "file")
+}
+
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	autoLayout := buildDefaultAutoLayout()
 
