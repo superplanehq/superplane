@@ -107,8 +107,16 @@ func Test__ExecutionStateContext__Emit(t *testing.T) {
 		assert.NotEmpty(t, reloaded.ResultReason)
 		assert.NotEmpty(t, reloaded.ResultMessage)
 
-		// The routed event must still be persisted.
-		support.VerifyCanvasNodeEventsCount(t, canvas.ID, componentNodeID, 1)
+		// The routed event must still be persisted for this execution.
+		// Scope the count to the execution ID so it's independent of
+		// events left behind by sibling subtests on the same node.
+		var eventsForExecution int64
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasEvent{}).
+			Where("execution_id = ?", execution.ID).
+			Where("channel = ?", "failure").
+			Count(&eventsForExecution).Error)
+		assert.Equal(t, int64(1), eventsForExecution)
 	})
 
 	// Emitting to a non-failure channel must continue to mark the
