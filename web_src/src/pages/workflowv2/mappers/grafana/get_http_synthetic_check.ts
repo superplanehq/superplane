@@ -20,14 +20,12 @@ import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 const CHANNEL_UP = "up";
 const CHANNEL_PARTIAL = "partial";
 const CHANNEL_DOWN = "down";
-const CHANNEL_UNKNOWN = "unknown";
 
 type GetHttpSyntheticCheckOutputs = {
   default?: OutputPayload[];
   up?: OutputPayload[];
   partial?: OutputPayload[];
   down?: OutputPayload[];
-  unknown?: OutputPayload[];
 };
 
 export const getHttpSyntheticCheckMapper: ComponentBaseMapper = {
@@ -86,14 +84,13 @@ function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
   const outputs = execution.outputs as GetHttpSyntheticCheckOutputs | undefined;
   if (!outputs) return null;
 
-  for (const channel of [CHANNEL_DOWN, CHANNEL_PARTIAL, CHANNEL_UP, CHANNEL_UNKNOWN]) {
+  for (const channel of [CHANNEL_DOWN, CHANNEL_PARTIAL, CHANNEL_UP]) {
     const channelOutputs = outputs[channel as keyof GetHttpSyntheticCheckOutputs];
     if (channelOutputs && channelOutputs.length > 0) {
       return channelOutputs[0];
     }
   }
 
-  // Legacy fallback for executions that emitted to the empty channel before `unknown` was introduced.
   const emptyChannel = outputs["" as keyof GetHttpSyntheticCheckOutputs];
   if (emptyChannel && emptyChannel.length > 0) {
     return emptyChannel[0];
@@ -113,10 +110,8 @@ function getActiveChannel(execution: ExecutionInfo): string | null {
   if (outputs.down && outputs.down.length > 0) return CHANNEL_DOWN;
   if (outputs.partial && outputs.partial.length > 0) return CHANNEL_PARTIAL;
   if (outputs.up && outputs.up.length > 0) return CHANNEL_UP;
-  if (outputs.unknown && outputs.unknown.length > 0) return CHANNEL_UNKNOWN;
   if (outputs.default && outputs.default.length > 0) return "default";
 
-  // Legacy fallback for executions that emitted to the empty channel before `unknown` was introduced.
   const emptyChannel = outputs["" as keyof GetHttpSyntheticCheckOutputs];
   if (emptyChannel && emptyChannel.length > 0) return "";
 
@@ -131,8 +126,6 @@ function channelLabel(channel: string): string {
       return "partial";
     case CHANNEL_UP:
       return "up";
-    case CHANNEL_UNKNOWN:
-      return "unknown";
     case "":
       return "no status";
     default:
@@ -160,12 +153,6 @@ export const GET_HTTP_SYNTHETIC_CHECK_STATE_MAP: EventStateMap = {
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },
-  unknown: {
-    icon: "help-circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-slate-100",
-    badgeColor: "bg-slate-500",
-  },
   noStatus: {
     icon: "alert-circle",
     textColor: "text-gray-800",
@@ -179,7 +166,6 @@ function getFinishedSyntheticCheckState(activeChannel: string | null): EventStat
     [CHANNEL_DOWN]: "down",
     [CHANNEL_PARTIAL]: "partial",
     [CHANNEL_UP]: "up",
-    [CHANNEL_UNKNOWN]: "unknown",
     "": "noStatus",
   };
 

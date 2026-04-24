@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";
 import { deleteHttpSyntheticCheckMapper } from "./delete_http_synthetic_check";
-import { getHttpSyntheticCheckMapper, getHttpSyntheticCheckStateFunction } from "./get_http_synthetic_check";
+import { getHttpSyntheticCheckMapper } from "./get_http_synthetic_check";
 import { getGrafanaSyntheticCheckFlatView } from "./synthetic_check_shared";
 import { updateHttpSyntheticCheckMapper } from "./update_http_synthetic_check";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
@@ -325,12 +325,12 @@ describe("grafana synthetic check mappers", () => {
     expect(details["Avg Latency (24h)"]).toBe("0.142s");
   });
 
-  it("get mapper reads payloads from the unknown channel", () => {
+  it("get mapper rounds fractional run counts in details", () => {
     const details = getHttpSyntheticCheckMapper.getExecutionDetails(
       buildExecutionContext("grafana.getHttpSyntheticCheck", {
         execution: {
           outputs: {
-            unknown: [
+            up: [
               buildOutput({
                 configuration: {
                   id: 101,
@@ -343,9 +343,10 @@ describe("grafana synthetic check mappers", () => {
                   settings: { http: { method: "GET" } },
                 },
                 metrics: {
-                  totalRuns24h: 0,
+                  successRuns24h: 144.20027816411684,
+                  failureRuns24h: 0,
+                  totalRuns24h: 144.20027816411684,
                 },
-                checkUrl: "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",
               }),
             ],
           },
@@ -353,29 +354,7 @@ describe("grafana synthetic check mappers", () => {
       }),
     );
 
-    expect(Object.keys(details)[0]).toBe("Fetched At");
-    expect(details.Job).toBe("API health check");
-    expect(details.Target).toBe("GET https://api.example.com/health");
-    expect(details.Schedule).toBe("Every 1m · 3s timeout");
-    expect(details["Last Outcome"]).toBeUndefined();
-  });
-
-  it("get mapper reports unknown state for unknown-channel executions", () => {
-    const state = getHttpSyntheticCheckStateFunction(
-      buildExecution({
-        outputs: {
-          unknown: [
-            buildOutput({
-              configuration: {
-                id: 101,
-              },
-            }),
-          ],
-        },
-      }),
-    );
-
-    expect(state).toBe("unknown");
+    expect(details["Runs (24h)"]).toBe("144 succeeded · 0 failed · 144 total");
   });
 
   it("update mapper tolerates missing outputs", () => {
