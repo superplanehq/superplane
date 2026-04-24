@@ -319,16 +319,25 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         >
           {PERSONAS.map((persona) => {
             const isSelected = mode === persona.mode;
+            const isComingSoon = persona.mode === "agent";
             return (
               <button
-                key={persona.mode}
-                type="button"
-                onClick={() => setMode(persona.mode)}
-                className={`relative text-center rounded-xl p-4 transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? "bg-white dark:bg-gray-800 outline outline-2 outline-primary shadow-md"
-                    : "bg-white/60 dark:bg-gray-800/60 outline outline-slate-950/10 dark:outline-gray-700 hover:bg-white hover:dark:bg-gray-800 hover:shadow-sm"
-                }`}
+              key={persona.mode}
+              type="button"
+              title={isComingSoon ? "Coming soon" : ""}
+              onClick={() => {
+                if (isComingSoon) return;
+                setMode(persona.mode);
+              }}
+              className={`relative text-center rounded-xl p-4 transition-all duration-200 ${
+                isComingSoon
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer"
+              } ${
+                isSelected
+                  ? "bg-white dark:bg-gray-800 outline outline-2 outline-primary shadow-md"
+                  : "bg-white/60 dark:bg-gray-800/60 outline outline-slate-950/10 dark:outline-gray-700 hover:bg-white hover:dark:bg-gray-800 hover:shadow-sm"
+              }`}
               >
                 <div
                   className={`mx-auto mb-2 rounded-lg p-2 w-fit transition-colors duration-200 ${
