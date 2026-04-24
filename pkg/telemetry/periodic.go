@@ -36,6 +36,8 @@ func (p *Periodic) report() {
 	p.reportDatabaseLocks()
 	p.reportLongQueries()
 	p.reportStuckQueueItems()
+	p.reportPendingEvents()
+	p.reportPendingExecutions()
 }
 
 func (p *Periodic) reportDatabaseLocks() {
@@ -75,6 +77,24 @@ func (p *Periodic) reportLongQueries() {
 	RecordDBLongQueriesCount(p.ctx, count)
 }
 
+func (p *Periodic) reportPendingEvents() {
+	count, err := countPendingEvents()
+	if err != nil {
+		return
+	}
+
+	RecordPendingEventsCount(p.ctx, count)
+}
+
+func (p *Periodic) reportPendingExecutions() {
+	count, err := countPendingExecutions()
+	if err != nil {
+		return
+	}
+
+	RecordPendingExecutionsCount(p.ctx, count)
+}
+
 func countStuckQueueNodes() (int64, error) {
 	db := database.Conn()
 
@@ -99,6 +119,34 @@ func countStuckQueueNodes() (int64, error) {
 			)
 		`).
 		Scan(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countPendingEvents() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Raw("SELECT COUNT(id) FROM workflow_events WHERE state = 'pending'").
+		Scan(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func countPendingExecutions() (int64, error) {
+	var count int64
+
+	err := database.Conn().
+		Raw("SELECT COUNT(id) FROM workflow_node_executions WHERE state = 'pending'").
+		Scan(&count).
+		Error
+	if err != nil {
 		return 0, err
 	}
 
