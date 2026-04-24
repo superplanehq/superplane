@@ -496,7 +496,7 @@ func (s *MergeTestSteps) CreateSingleQueueItemForProcess1() {
 func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	fmt.Println("Processing first event")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, &Merge{}, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -509,7 +509,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 	fmt.Println("Processing first event (expect finish)")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, &Merge{}, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -520,7 +520,7 @@ func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, &Merge{}, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)
@@ -531,7 +531,7 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEventExpectNoFinish(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, &Merge{}, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)
@@ -560,14 +560,15 @@ func (s *MergeTestSteps) AssertExecutionFailedWithError(errorMessage string) {
 	assert.Equal(s.t, errorMessage, execution.ResultMessage)
 }
 
-// AssertExecutionFailed checks that the execution finished and emitted to the fail channel.
-// Note: With output channels, conditional stop "passes" the execution but routes to the
-// "fail" channel, similar to how the `if` component routes to true/false channels.
+// AssertExecutionFailed checks that the execution finished with a failed result
+// and emitted to the fail channel. The channel's Result: "failed" declaration
+// propagates the failure status to the execution row while still firing the
+// channel event for downstream routing.
 func (s *MergeTestSteps) AssertExecutionFailed() {
 	var execution models.CanvasNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
 	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
-	assert.Equal(s.t, models.CanvasNodeExecutionResultPassed, execution.Result)
+	assert.Equal(s.t, models.CanvasNodeExecutionResultFailed, execution.Result)
 }
 
 func (s *MergeTestSteps) AssertExecutionPending() {

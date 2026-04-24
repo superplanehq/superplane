@@ -1174,7 +1174,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				HTTP:           s.registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
-				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
+				ExecutionState: contexts.NewExecutionStateContext(tx, component, execution, onNewEvents),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),
 				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
