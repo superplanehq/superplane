@@ -129,8 +129,11 @@ func countPendingEvents() (int64, error) {
 	var count int64
 
 	err := database.Conn().
-		Raw("SELECT COUNT(id) FROM workflow_events WHERE state = 'pending'").
-		Scan(&count).
+		Table("workflow_events AS we").
+		Joins("JOIN workflows AS w ON we.workflow_id = w.id").
+		Where("we.state = ?", "pending").
+		Where("w.deleted_at IS NULL").
+		Count(&count).
 		Error
 	if err != nil {
 		return 0, err
@@ -143,8 +146,9 @@ func countPendingExecutions() (int64, error) {
 	var count int64
 
 	err := database.Conn().
-		Raw("SELECT COUNT(id) FROM workflow_node_executions WHERE state = 'pending'").
-		Scan(&count).
+		Table("workflow_node_executions").
+		Where("state = ?", "pending").
+		Count(&count).
 		Error
 	if err != nil {
 		return 0, err

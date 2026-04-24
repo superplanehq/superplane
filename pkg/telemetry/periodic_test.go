@@ -127,6 +127,26 @@ func TestCountPendingEvents(t *testing.T) {
 	require.Equal(t, int64(1), count)
 }
 
+func TestCountPendingEvents_DeletedWorkflowIsNotCounted(t *testing.T) {
+	database.TruncateTables()
+
+	activeSteps := stuckQueueItemsTestSteps{t: t}
+	activeSteps.CreateWorkflow()
+	activeSteps.CreateWorkflowNode()
+	activeSteps.CreateRootEvent()
+
+	deletedSteps := stuckQueueItemsTestSteps{t: t}
+	deletedSteps.CreateWorkflow()
+	deletedSteps.CreateWorkflowNode()
+	deletedSteps.CreateRootEvent()
+
+	require.NoError(t, deletedSteps.workflow.SoftDelete())
+
+	count, err := countPendingEvents()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
+
 func TestCountPendingExecutions(t *testing.T) {
 	database.TruncateTables()
 
@@ -171,6 +191,7 @@ func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
 	now := time.Now()
 	liveVersionID := uuid.New()
 	workflow := &models.Canvas{
+		ID:             uuid.New(),
 		OrganizationID: uuid.New(),
 		LiveVersionID:  &liveVersionID,
 		Name:           "Test Workflow",
