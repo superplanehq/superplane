@@ -33,7 +33,7 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 	// The reason for a soft deletion here is to ensure we deprovision
 	// and delete its webhooks before we delete the integration itself.
 	//
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultIntegrationOperationTimeout, "DeleteIntegration", func(tx *gorm.DB) error {
 		webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
 		if err != nil {
 			return status.Error(codes.Internal, "failed to list integration webhooks")

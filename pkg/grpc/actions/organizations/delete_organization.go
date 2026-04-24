@@ -11,6 +11,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func DeleteOrganization(ctx context.Context, authService authorization.Authorization, orgID string) (*pb.DeleteOrganizationResponse, error) {
@@ -24,24 +25,20 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 		return nil, status.Error(codes.NotFound, "organization not found")
 	}
 
-	tx := database.Conn().Begin()
-	err = models.SoftDeleteOrganizationInTransaction(tx, organization.ID.String())
-	if err != nil {
-		tx.Rollback()
-		log.Errorf("Error deleting organization %s: %v", orgID, err)
-		return nil, err
-	}
+	err = database.TransactionWithContext(ctx, database.DefaultOrganizationMutationTimeout, "DeleteOrganization", func(tx *gorm.DB) error {
+		if txErr := models.SoftDeleteOrganizationInTransaction(tx, organization.ID.String()); txErr != nil {
+			log.Errorf("Error deleting organization %s: %v", orgID, txErr)
+			return txErr
+		}
 
-	err = authService.DestroyOrganization(tx, organization.ID.String())
-	if err != nil {
-		tx.Rollback()
-		log.Errorf("Error deleting organization roles for %s: %v", orgID, err)
-		return nil, err
-	}
+		if txErr := authService.DestroyOrganization(tx, organization.ID.String()); txErr != nil {
+			log.Errorf("Error deleting organization roles for %s: %v", orgID, txErr)
+			return txErr
+		}
 
-	err = tx.Commit().Error
+		return nil
+	})
 	if err != nil {
-		log.Errorf("Error committing transaction for organization %s (%s) deletion: %v", organization.Name, organization.ID.String(), err)
 		return nil, err
 	}
 

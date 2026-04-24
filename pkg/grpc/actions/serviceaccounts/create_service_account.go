@@ -64,7 +64,7 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 	}
 
 	var sa *models.User
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.TransactionWithContext(ctx, database.DefaultServiceAccountOperationTimeout, "CreateServiceAccount", func(tx *gorm.DB) error {
 		var txErr error
 		sa, txErr = models.CreateServiceAccount(tx, orgUUID, req.Name, description, createdByUUID)
 		if txErr != nil {
