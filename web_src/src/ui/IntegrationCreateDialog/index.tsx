@@ -291,7 +291,7 @@ export function IntegrationCreateDialog({
           )}
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 ph-no-capture">
           {pendingWebhookSetup ? (
             <>
               {webhookStepDescription ?? (
