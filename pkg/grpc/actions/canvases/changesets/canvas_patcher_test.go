@@ -42,7 +42,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
+			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "true"}},
 		)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -69,7 +69,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Edge: &pb.CanvasChangeset_Change_Edge{
 						SourceId: "node-a",
 						TargetId: "node-c",
-						Channel:  "default",
+						Channel:  "true",
 					},
 				},
 				{
@@ -85,7 +85,7 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertHasNodeBlock("node-c", "noop")
 		steps.assertHasNoNodeIntegrationID("node-c")
 		steps.assertNodeCount(2)
-		steps.assertHasEdge("node-a", "node-c", "default")
+		steps.assertHasEdge("node-a", "node-c", "true")
 		steps.assertEdgeCount(1)
 		steps.assertGraphIsValid()
 	})
