@@ -237,6 +237,10 @@ type ExecutionStateContext struct {
 	Type           string
 	Payloads       []any
 	KVs            map[string]string
+	// Channels declares the semantics of each output channel so that
+	// Emit can set Passed=false when a failure channel is used,
+	// mirroring the real ExecutionStateContext behavior.
+	Channels []core.OutputChannel
 }
 
 func (c *ExecutionStateContext) IsFinished() bool {
@@ -251,9 +255,23 @@ func (c *ExecutionStateContext) Pass() error {
 
 func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
 	c.Finished = true
-	c.Passed = true
 	c.Channel = channel
 	c.Type = payloadType
+
+	failed := false
+	for _, ch := range c.Channels {
+		if ch.Name == channel && ch.IsFailure() {
+			failed = true
+			break
+		}
+	}
+	if failed {
+		c.Passed = false
+		c.FailureReason = "error"
+		c.FailureMessage = "routed to failure channel " + channel
+	} else {
+		c.Passed = true
+	}
 
 	// Wrap payloads like the real ExecutionStateContext does
 	wrappedPayloads := make([]any, 0, len(payloads))
