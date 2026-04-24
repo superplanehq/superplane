@@ -4,7 +4,14 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
-import { getAggregateRunStatus, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
+import {
+  badgeColorForEventState,
+  eventMatchesStatusFilters,
+  getAggregateRunStatus,
+  getStatusBadgeProps,
+  resolveNodeIconSlug,
+  type RunsStatusFilter,
+} from "@/pages/workflowv2/lib/canvas-runs";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
@@ -76,6 +83,22 @@ function TriggerIcon({
   });
 }
 
+//
+// Colors are resolved via `badgeColorForEventState` so the status dot uses
+// the same tailwind bg token as the row status badge (and the rest of the
+// Run View). "Completed" covers both `completed` and `cancelled` aggregates
+// -- same grouping the existing filter helper uses -- so emerald is the
+// right bucket color.
+//
+type StatusOptionId = Exclude<RunsStatusFilter, "all">;
+
+const STATUS_OPTIONS: { id: StatusOptionId; label: string; color: string }[] = [
+  { id: "running", label: "Running", color: badgeColorForEventState("running") },
+  { id: "queued", label: "Queued", color: badgeColorForEventState("queued") },
+  { id: "errors", label: "Errors", color: badgeColorForEventState("error") },
+  { id: "completed", label: "Completed", color: badgeColorForEventState("success") },
+];
+
 function computeRunDuration(event: CanvasesCanvasEventWithExecutions): string | null {
   const executions = event.executions || [];
   if (!event.createdAt || executions.length === 0) return null;
@@ -131,6 +154,7 @@ export function RunsSidebar({
 
   const [search, setSearch] = useState("");
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(new Set());
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<StatusOptionId>>(new Set());
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -208,7 +232,8 @@ export function RunsSidebar({
   const searchTrimmed = search.trim().toLowerCase();
   const hasSearch = searchTrimmed.length > 0;
   const hasTriggerFilter = selectedTriggerIds.size > 0;
-  const hasAnyFilter = hasSearch || hasTriggerFilter;
+  const hasStatusFilter = selectedStatuses.size > 0;
+  const hasAnyFilter = hasSearch || hasTriggerFilter || hasStatusFilter;
 
   const filteredEvents = useMemo(() => {
     if (!hasAnyFilter) return decoratedEvents;
@@ -217,9 +242,19 @@ export function RunsSidebar({
       if (hasTriggerFilter) {
         if (!event.nodeId || !selectedTriggerIds.has(event.nodeId)) return false;
       }
+      if (hasStatusFilter && !eventMatchesStatusFilters(event, selectedStatuses)) return false;
       return true;
     });
-  }, [decoratedEvents, hasAnyFilter, hasSearch, searchTrimmed, hasTriggerFilter, selectedTriggerIds]);
+  }, [
+    decoratedEvents,
+    hasAnyFilter,
+    hasSearch,
+    searchTrimmed,
+    hasTriggerFilter,
+    selectedTriggerIds,
+    hasStatusFilter,
+    selectedStatuses,
+  ]);
 
   const handleToggleTrigger = useCallback((id: string) => {
     setSelectedTriggerIds((prev) => {
@@ -230,13 +265,27 @@ export function RunsSidebar({
     });
   }, []);
 
+  const handleToggleStatus = useCallback((id: StatusOptionId) => {
+    setSelectedStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   const handleClearFilters = useCallback(() => {
     setSearch("");
     setSelectedTriggerIds(new Set());
+    setSelectedStatuses(new Set());
   }, []);
 
   const handleClearTriggerFilter = useCallback(() => {
     setSelectedTriggerIds(new Set());
+  }, []);
+
+  const handleClearStatusFilter = useCallback(() => {
+    setSelectedStatuses(new Set());
   }, []);
 
   return (
@@ -259,21 +308,55 @@ export function RunsSidebar({
               size="sm"
               className={cn(
                 "relative h-7 w-7 shrink-0 p-0",
-                hasTriggerFilter && "bg-sky-50 text-sky-700 hover:bg-sky-100",
+                (hasTriggerFilter || hasStatusFilter) && "bg-sky-50 text-sky-700 hover:bg-sky-100",
               )}
               aria-label="Filter runs"
               title="Filter runs"
             >
               <Filter className="h-3.5 w-3.5" />
-              {hasTriggerFilter ? (
+              {hasTriggerFilter || hasStatusFilter ? (
                 <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-semibold text-white">
-                  {selectedTriggerIds.size}
+                  {selectedTriggerIds.size + selectedStatuses.size}
                 </span>
               ) : null}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-64 p-0" sideOffset={6}>
             <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+              <span className="text-[12px] font-medium text-gray-700">Filter by status</span>
+              <button
+                type="button"
+                onClick={handleClearStatusFilter}
+                disabled={!hasStatusFilter}
+                className={cn(
+                  "text-[11px]",
+                  hasStatusFilter ? "text-sky-600 hover:text-sky-800" : "text-gray-300",
+                )}
+              >
+                Clear
+              </button>
+            </div>
+            <div className="py-1">
+              {STATUS_OPTIONS.map((opt) => {
+                const checked = selectedStatuses.has(opt.id);
+                return (
+                  <label
+                    key={opt.id}
+                    className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => handleToggleStatus(opt.id)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className={cn("inline-block h-2 w-2 shrink-0 rounded-full", opt.color)} aria-hidden />
+                    <span className="min-w-0 truncate">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2">
               <span className="text-[12px] font-medium text-gray-700">Filter by trigger</span>
               <button
                 type="button"

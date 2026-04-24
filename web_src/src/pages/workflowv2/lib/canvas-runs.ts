@@ -228,6 +228,30 @@ export function getStatusBadgeProps(
 
 export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
 
+//
+// Checks a run against a set of selected status filters using the same
+// aggregate as the row's status badge (queue-item aware), so filter
+// membership always agrees with what the user sees on the row. An empty
+// set means "no status filter" and matches all runs. Multiple selected
+// statuses use OR semantics. The "completed" bucket intentionally groups
+// both `completed` and `cancelled` aggregates to match the existing
+// single-filter helper and the common mental model of "done".
+//
+export function eventMatchesStatusFilters(
+  event: CanvasesCanvasEventWithExecutions,
+  selected: Set<Exclude<RunsStatusFilter, "all">>,
+): boolean {
+  if (selected.size === 0) return true;
+  const executions = event.executions || [];
+  const pending = (event.queueItems || []).length > 0;
+  const aggregate = getAggregateRunStatus(executions, pending);
+  if (aggregate === "error" && selected.has("errors")) return true;
+  if (aggregate === "running" && selected.has("running")) return true;
+  if (aggregate === "queued" && selected.has("queued")) return true;
+  if ((aggregate === "completed" || aggregate === "cancelled") && selected.has("completed")) return true;
+  return false;
+}
+
 export function filterRunEvents(
   events: CanvasesCanvasEventWithExecutions[],
   nodes: ComponentsNode[],

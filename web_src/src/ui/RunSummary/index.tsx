@@ -493,7 +493,7 @@ function ActivityRow({
 //
 function ReportEmptyState() {
   return (
-    <div className="relative flex flex-col items-center gap-3 overflow-hidden rounded-md border border-dashed border-slate-200 bg-gradient-to-b from-slate-50/60 to-white px-6 py-8 text-center">
+    <div className="relative flex flex-col items-center gap-4 overflow-hidden rounded-md border border-dashed border-slate-200 bg-gradient-to-b from-slate-50/60 to-white px-6 py-16 text-center">
       <span
         className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-indigo-100/40 blur-2xl"
         aria-hidden
@@ -503,31 +503,18 @@ function ReportEmptyState() {
         aria-hidden
       />
 
-      <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white text-indigo-500 shadow-sm ring-1 ring-slate-200">
+      <div className="relative my-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-indigo-500 shadow-sm ring-1 ring-slate-200">
         <FileText className="h-5 w-5" />
         <Sparkles className="absolute -right-1 -top-1 h-3 w-3 text-amber-400" aria-hidden />
       </div>
 
-      <div className="relative flex max-w-md flex-col gap-1">
+      <div className="relative my-2 flex max-w-md flex-col gap-1">
         <p className="text-sm font-semibold text-gray-800">No report for this run</p>
         <p className="text-xs leading-relaxed text-gray-500">
           Reports surface the most important output of a run at a glance. Add a{" "}
           <code className="rounded bg-slate-100 px-1 py-[1px] font-mono text-[11px] text-slate-700">reportTemplate</code>{" "}
           to any trigger or component to populate this section.
         </p>
-      </div>
-
-      <div className="relative mt-1 w-full max-w-sm rounded-md border border-slate-200 bg-white p-3 text-left shadow-sm">
-        <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-          <FileText className="h-3 w-3" />
-          Example
-        </div>
-        <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-slate-700">
-{`reportTemplate: |
-  ### Deploy to production
-  - **Version**: \`{{ outputs.version }}\`
-  - **Region**: {{ inputs.region }}`}
-        </pre>
       </div>
     </div>
   );
