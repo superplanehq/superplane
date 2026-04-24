@@ -190,7 +190,8 @@ type SelectTypeOptions struct {
  * MultiSelectTypeOptions specifies options for multi_select fields
  */
 type MultiSelectTypeOptions struct {
-	Options []FieldOption `json:"options"`
+	Options       []FieldOption `json:"options"`
+	UseCheckboxes bool          `json:"useCheckboxes,omitempty"`
 }
 
 /*
@@ -213,8 +214,9 @@ type ObjectTypeOptions struct {
  * FieldOption represents a selectable option for select / multi_select field types
  */
 type FieldOption struct {
-	Label string `json:"label"`
-	Value string `json:"value"`
+	Label       string `json:"label"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
 }
 
 /*
