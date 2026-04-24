@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
@@ -211,7 +212,7 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 	if len(config.Paths) > 0 {
 		changedFiles := extractChangedFiles(data)
-		if !matchesAnyGlob(config.Paths, changedFiles) {
+		if !matchesAnyGlob(config.Paths, changedFiles, ctx.Logger) {
 			if len(changedFiles) == 0 {
 				ctx.Logger.Infof("Ignoring event - path filter active but no changed files found in payload")
 			} else {
@@ -292,10 +293,11 @@ func extractChangedFiles(data map[string]any) []string {
 }
 
 // matchesAnyGlob returns true if any file in files matches any glob pattern.
-func matchesAnyGlob(patterns []string, files []string) bool {
+func matchesAnyGlob(patterns []string, files []string, logger *logrus.Entry) bool {
 	for _, pattern := range patterns {
 		re, err := exprruntime.GlobToRegex(pattern)
 		if err != nil {
+			logger.Warnf("Skipping invalid path glob pattern %q: %v", pattern, err)
 			continue
 		}
 		for _, file := range files {

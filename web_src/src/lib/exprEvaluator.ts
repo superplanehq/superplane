@@ -724,13 +724,17 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
       "^" +
       pat
         .replace(/[.+?^${}()|[\]\\]/g, "\\$&") // escape regex metacharacters (incl. ?)
-        .replace(/\/\*\*\//g, "\x00")           // /**/ → placeholder \x00
-        .replace(/^\*\*\//g, "\x01")            // **/ at start → placeholder \x01
-        .replace(/\*\*/g, "\x02")               // remaining ** → placeholder \x02
-        .replace(/\*/g, "[^/]*")                // * → within-segment wildcard
-        .replace(/\x00/g, "(/|/.+/)")           // restore /**/ → zero-or-more dirs
-        .replace(/\x01/g, "(.+/)?")             // restore **/ at start → optional prefix
-        .replace(/\x02/g, ".*") +               // restore remaining ** → .*
+        .replace(/\/\*\*\//g, "\x00") // /**/ → placeholder \x00
+        .replace(/^\*\*\//g, "\x01") // **/ at start → placeholder \x01
+        .replace(/\*\*/g, "\x02") // remaining ** → placeholder \x02
+        .replace(/\*/g, "[^/]*") // * → within-segment wildcard
+        // Restore placeholders using split/join to avoid no-control-regex lint errors.
+        .split("\x00")
+        .join("(/|/.+/)") // restore /**/ → zero-or-more dirs
+        .split("\x01")
+        .join("(.+/)?") // restore **/ at start → optional prefix
+        .split("\x02")
+        .join(".*") + // restore remaining ** → .*
       "$";
     const re = new RegExp(reStr);
     const commitList = Array.isArray(commits) ? commits : [];

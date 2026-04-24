@@ -23,7 +23,6 @@ var AllPredicateOperators = []FieldOption{
 	},
 }
 
-
 type Predicate struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`

@@ -22,50 +22,50 @@ describe("exprEvaluator", () => {
     ];
 
     it("returns true when a modified file matches the pattern", () => {
-      expect(evaluateExpr("filePathMatches(commits, \"web_src/**\")", { commits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "web_src/**")', { commits })).toBe(true);
     });
 
     it("returns true when an added file matches the pattern", () => {
-      expect(evaluateExpr("filePathMatches(commits, \"pkg/**\")", { commits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "pkg/**")', { commits })).toBe(true);
     });
 
     it("returns true when a removed file matches the pattern", () => {
-      expect(evaluateExpr("filePathMatches(commits, \"docs/**\")", { commits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "docs/**")', { commits })).toBe(true);
     });
 
     it("returns false when no file matches the pattern", () => {
-      expect(evaluateExpr("filePathMatches(commits, \"migrations/**\")", { commits })).toBe(false);
+      expect(evaluateExpr('filePathMatches(commits, "migrations/**")', { commits })).toBe(false);
     });
 
     it("supports single-segment wildcard", () => {
-      expect(evaluateExpr("filePathMatches(commits, \"pkg/integrations/*\")", { commits })).toBe(false);
-      expect(evaluateExpr("filePathMatches(commits, \"pkg/integrations/github/*\")", { commits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "pkg/integrations/*")', { commits })).toBe(false);
+      expect(evaluateExpr('filePathMatches(commits, "pkg/integrations/github/*")', { commits })).toBe(true);
     });
 
     it("returns false for empty commits", () => {
-      expect(evaluateExpr("filePathMatches(commits, \"pkg/**\")", { commits: [] })).toBe(false);
+      expect(evaluateExpr('filePathMatches(commits, "pkg/**")', { commits: [] })).toBe(false);
     });
 
     it("supports exact match pattern", () => {
-      expect(evaluateExpr("filePathMatches(commits, \"docs/old.md\")", { commits })).toBe(true);
-      expect(evaluateExpr("filePathMatches(commits, \"docs/new.md\")", { commits })).toBe(false);
+      expect(evaluateExpr('filePathMatches(commits, "docs/old.md")', { commits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "docs/new.md")', { commits })).toBe(false);
     });
 
     it("** matches zero intermediate directories", () => {
       const rootCommits = [{ added: ["pkg/foo.go"], modified: [], removed: [] }];
       // pkg/**/foo.go must match pkg/foo.go (zero intermediate dirs)
-      expect(evaluateExpr("filePathMatches(commits, \"pkg/**/foo.go\")", { commits: rootCommits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "pkg/**/foo.go")', { commits: rootCommits })).toBe(true);
       // pkg/**/foo.go must also match pkg/a/foo.go (one intermediate dir)
       const nestedCommits = [{ added: ["pkg/a/foo.go"], modified: [], removed: [] }];
-      expect(evaluateExpr("filePathMatches(commits, \"pkg/**/foo.go\")", { commits: nestedCommits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "pkg/**/foo.go")', { commits: nestedCommits })).toBe(true);
     });
 
     it("**/ at start matches root-level file", () => {
       const rootCommits = [{ added: ["foo.go"], modified: [], removed: [] }];
-      expect(evaluateExpr("filePathMatches(commits, \"**/foo.go\")", { commits: rootCommits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "**/foo.go")', { commits: rootCommits })).toBe(true);
       // also matches nested
       const nestedCommits = [{ added: ["a/b/foo.go"], modified: [], removed: [] }];
-      expect(evaluateExpr("filePathMatches(commits, \"**/foo.go\")", { commits: nestedCommits })).toBe(true);
+      expect(evaluateExpr('filePathMatches(commits, "**/foo.go")', { commits: nestedCommits })).toBe(true);
     });
   });
 });
