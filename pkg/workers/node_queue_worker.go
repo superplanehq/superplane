@@ -224,12 +224,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
-	configFields, err := w.configurationFieldsForNode(tx, node)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	component, err := w.componentForNode(node)
+	component, configFields, err := w.resolveNode(tx, node)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -270,7 +265,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		 * For component nodes, delegate to the component's ProcessQueueItem implementation to handle
 		 * the processing.
 		 */
-		executionID, err = w.processComponentNode(ctx, node)
+		executionID, err = w.processComponentNode(ctx, component, node)
 	case models.NodeTypeBlueprint:
 		/*
 		 * For blueprint nodes, use the default processing logic.
@@ -284,63 +279,46 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	return []*uuid.UUID{executionID}, queueItem, err
 }
 
-func (w *NodeQueueWorker) componentForNode(node *models.CanvasNode) (core.Component, error) {
-	ref := node.Ref.Data()
-	if node.Type != models.NodeTypeComponent || ref.Component == nil || ref.Component.Name == "" {
-		return nil, nil
-	}
-
-	comp, err := w.registry.GetComponent(ref.Component.Name)
-	if err != nil {
-		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
-	}
-
-	return comp, nil
-}
-
-func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {
+// resolveNode resolves a canvas node to its component (nil for blueprint
+// nodes) and the configuration fields that apply. One registry lookup per
+// call for component nodes; the caller threads both values through to
+// avoid repeating the lookup elsewhere in the processing path.
+func (w *NodeQueueWorker) resolveNode(tx *gorm.DB, node *models.CanvasNode) (core.Component, []configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
 	case models.NodeTypeComponent:
 		if ref.Component == nil || ref.Component.Name == "" {
-			return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
+			return nil, nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 		}
 
 		comp, err := w.registry.GetComponent(ref.Component.Name)
 		if err != nil {
-			return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+			return nil, nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 		}
 
-		return comp.Configuration(), nil
+		return comp, comp.Configuration(), nil
 	case models.NodeTypeBlueprint:
 		if ref.Blueprint == nil || ref.Blueprint.ID == "" {
-			return nil, fmt.Errorf("node %s has no blueprint reference", node.NodeID)
+			return nil, nil, fmt.Errorf("node %s has no blueprint reference", node.NodeID)
 		}
 
 		blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
 		if err != nil {
-			return nil, fmt.Errorf("blueprint %s not found: %w", ref.Blueprint.ID, err)
+			return nil, nil, fmt.Errorf("blueprint %s not found: %w", ref.Blueprint.ID, err)
 		}
 
-		return blueprint.Configuration, nil
+		return nil, blueprint.Configuration, nil
 	default:
-		return nil, nil
+		return nil, nil, nil
 	}
 }
 
-func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.CanvasNode) (*uuid.UUID, error) {
-	ref := node.Ref.Data()
-
-	if ref.Component == nil || ref.Component.Name == "" {
+func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, component core.Component, node *models.CanvasNode) (*uuid.UUID, error) {
+	if component == nil {
 		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 	}
 
-	comp, err := w.registry.GetComponent(ref.Component.Name)
-	if err != nil {
-		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
-	}
-
-	return comp.ProcessQueueItem(*ctx)
+	return component.ProcessQueueItem(*ctx)
 }
 
 func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {
