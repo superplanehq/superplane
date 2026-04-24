@@ -408,6 +408,16 @@ func (p *CanvasPatcher) addEdge(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("target node %s not found", edge.GetTargetId())
 	}
 
+	if err := ValidateSourceNodeOutputChannel(
+		p.tx,
+		p.registry,
+		p.orgID,
+		p.nodes[edge.GetSourceId()],
+		edge.GetChannel(),
+	); err != nil {
+		return err
+	}
+
 	edgeKey := p.edgeKey(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel())
 	if _, exists := p.edges[edgeKey]; exists {
 		return nil
