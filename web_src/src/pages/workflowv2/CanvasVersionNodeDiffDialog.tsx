@@ -52,16 +52,13 @@ export function CanvasVersionNodeDiffDialog({
   const changeRequestId = effectiveChangeRequest?.metadata?.id || "";
 
   const diffSummary = useMemo(() => {
-    if (!context) {
-      return null;
-    }
+    if (!context) return null;
+
     return summarizeNodeDiff(context.version, context.previousVersion);
   }, [context]);
   const diffOwner = useMemo(() => {
     const changeRequestOwner = effectiveChangeRequest?.metadata?.owner;
-    if (!changeRequestOwner) {
-      return null;
-    }
+    if (!changeRequestOwner) return null;
 
     const profile = changeRequestOwner.id ? liveVersionOwnerProfilesById?.get(changeRequestOwner.id) : undefined;
     const name = changeRequestOwner.name || profile?.name || "Unknown user";
