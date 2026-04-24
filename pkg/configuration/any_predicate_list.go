@@ -62,3 +62,14 @@ func MatchesAnyPredicate(predicates []Predicate, value string) bool {
 
 	return false
 }
+
+// matchesAnyPredicateInList returns true if any value in values matches any predicate.
+func matchesAnyPredicateInList(predicates []Predicate, values []string) bool {
+	for _, value := range values {
+		if MatchesAnyPredicate(predicates, value) {
+			return true
+		}
+	}
+
+	return false
+}
