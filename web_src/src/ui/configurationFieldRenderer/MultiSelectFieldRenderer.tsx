@@ -57,15 +57,6 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
       });
     }
 
-    options.sort((firstOption, secondOption) => {
-      const labelComparison = firstOption.label.localeCompare(secondOption.label, undefined, { sensitivity: "base" });
-      if (labelComparison !== 0) {
-        return labelComparison;
-      }
-
-      return firstOption.value.localeCompare(secondOption.value, undefined, { sensitivity: "base" });
-    });
-
     return options;
   }, [multiSelectOptions]);
 
