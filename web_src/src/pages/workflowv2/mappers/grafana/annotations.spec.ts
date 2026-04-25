@@ -57,7 +57,7 @@ function buildComponentContext(componentName: string, overrides?: { node?: Parti
     lastExecutions: [],
     currentUser: undefined,
     actions: {
-      invokeNodeExecutionAction: async () => {},
+      invokeNodeExecutionHook: async () => {},
     },
   };
 }
