@@ -224,8 +224,8 @@ func Test__GRPCGatewayRejectsUnknownFields(t *testing.T) {
       "nodes": [{
         "id": "wait-1",
         "name": "wait",
-        "type": "TYPE_COMPONENT",
-        "component": {
+        "type": "TYPE_ACTION",
+        "action": {
           "name": "wait",
           "hello": "what"
         }
