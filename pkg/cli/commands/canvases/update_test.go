@@ -60,6 +60,18 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 	require.Len(t, s.expectations, 0, "unused request expectations")
 }
 
+func TestUpdateRequiresFileFlag(t *testing.T) {
+	t.Helper()
+
+	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
+	emptyFile := ""
+	draft := false
+
+	err := (&updateCommand{file: &emptyFile, draft: &draft}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--file is required")
+}
+
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	autoLayout := buildDefaultAutoLayout()
 

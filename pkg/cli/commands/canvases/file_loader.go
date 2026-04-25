@@ -3,6 +3,7 @@ package canvases
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -42,15 +43,48 @@ func loadCanvasForCreateFromFile(filePath string) (openapi_client.CanvasesCanvas
 	return models.CanvasFromCanvas(*resource), resource.AutoLayout, nil
 }
 
-func loadCanvasFromFile(filePath string) (string, openapi_client.CanvasesCanvas, error) {
+func loadCanvasFromFile(ctx core.CommandContext, filePath string) (string, openapi_client.CanvasesCanvas, error) {
 	resource, err := parseCanvasResourceFromFile(filePath, "update")
 	if err != nil {
 		return "", openapi_client.CanvasesCanvas{}, err
 	}
 
-	if resource.Metadata == nil || resource.Metadata.Id == nil || resource.Metadata.GetId() == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata.id is required for update")
+	fileCanvasID := ""
+	if resource.Metadata != nil && resource.Metadata.Id != nil {
+		fileCanvasID = strings.TrimSpace(resource.Metadata.GetId())
 	}
 
-	return resource.Metadata.GetId(), models.CanvasFromCanvas(*resource), nil
+	activeCanvasID := ""
+	if ctx.Config != nil {
+		activeCanvasID = strings.TrimSpace(ctx.Config.GetActiveCanvas())
+	}
+	if activeCanvasID != "" {
+		resolved, resolveErr := findCanvasID(ctx, ctx.API, activeCanvasID)
+		if resolveErr != nil {
+			return "", openapi_client.CanvasesCanvas{}, resolveErr
+		}
+		activeCanvasID = resolved
+	}
+
+	if fileCanvasID != "" && activeCanvasID != "" && fileCanvasID != activeCanvasID {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf(
+			"canvas metadata.id %q does not match the active canvas %q; clear the active canvas or fix metadata.id",
+			fileCanvasID, activeCanvasID)
+	}
+
+	canvasID := fileCanvasID
+	if canvasID == "" {
+		canvasID = activeCanvasID
+	}
+	if canvasID == "" {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf(
+			"canvas metadata.id is required in the file when no active canvas is set; set one with `superplane canvases active` or add metadata.id to the YAML")
+	}
+
+	canvas := models.CanvasFromCanvas(*resource)
+	meta := canvas.GetMetadata()
+	meta.SetId(canvasID)
+	canvas.SetMetadata(meta)
+
+	return canvasID, canvas, nil
 }

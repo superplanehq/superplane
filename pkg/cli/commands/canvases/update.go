@@ -146,17 +146,12 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		err      error
 	)
 
-	if filePath != "" {
-		canvasID, canvas, err = loadCanvasFromFile(filePath)
-		if err != nil {
-			return err
-		}
-
-	} else {
-		canvasID, canvas, err = loadCanvasFromExisting(ctx)
-		if err != nil {
-			return err
-		}
+	if filePath == "" {
+		return fmt.Errorf("--file is required")
+	}
+	canvasID, canvas, err = loadCanvasFromFile(ctx, filePath)
+	if err != nil {
+		return err
 	}
 
 	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
@@ -246,35 +241,6 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
 		return err
 	})
-}
-
-func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {
-	if len(ctx.Args) > 1 {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one positional argument")
-	}
-
-	target := ""
-	if len(ctx.Args) == 1 {
-		target = ctx.Args[0]
-	} else if ctx.Config != nil {
-		target = strings.TrimSpace(ctx.Config.GetActiveCanvas())
-	}
-
-	if target == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("either --file or <name-or-id> (or an active canvas) is required")
-	}
-
-	canvasID, err := findCanvasID(ctx, ctx.API, target)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	canvas, err := describeCanvasByID(ctx, canvasID)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	return canvasID, canvas, nil
 }
 
 func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openapi_client.CanvasesCanvasAutoLayout, error) {

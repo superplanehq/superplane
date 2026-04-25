@@ -71,9 +71,9 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
-		Use:   "update [name-or-id]",
+		Use:   "update",
 		Short: "Update a canvas from a file",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.NoArgs,
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")

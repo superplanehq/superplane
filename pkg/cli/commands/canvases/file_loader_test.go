@@ -5,8 +5,21 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
+
+type testCanvasConfig struct {
+	activeCanvas string
+}
+
+func (c testCanvasConfig) GetActiveCanvas() string {
+	return c.activeCanvas
+}
+
+func (c testCanvasConfig) SetActiveCanvas(string) error {
+	return nil
+}
 
 func TestLoadCanvasForCreateFromFilePreservesPositionAndMetadata(t *testing.T) {
 	t.Helper()
@@ -108,7 +121,7 @@ autoLayout:
 	}
 }
 
-func TestLoadCanvasFromFileRequiresMetadataIDForUpdate(t *testing.T) {
+func TestLoadCanvasFromFileRequiresMetadataIDOrActiveCanvas(t *testing.T) {
 	t.Helper()
 
 	filePath := filepath.Join(t.TempDir(), "canvas.yaml")
@@ -125,11 +138,75 @@ spec:
 		t.Fatalf("failed to write temp canvas: %v", err)
 	}
 
-	_, _, err := loadCanvasFromFile(filePath)
+	ctx := core.CommandContext{Config: testCanvasConfig{}}
+	_, _, err := loadCanvasFromFile(ctx, filePath)
 	if err == nil {
-		t.Fatalf("expected metadata.id validation error")
+		t.Fatalf("expected validation error when metadata.id and active canvas are unset")
 	}
-	if err.Error() != "canvas metadata.id is required for update" {
+	want := "canvas metadata.id is required in the file when no active canvas is set; set one with `superplane canvases active` or add metadata.id to the YAML"
+	if err.Error() != want {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadCanvasFromFileUsesActiveCanvasWhenMetadataIDMissing(t *testing.T) {
+	t.Helper()
+
+	activeID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	filePath := filepath.Join(t.TempDir(), "canvas.yaml")
+	raw := []byte(`
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: parse-check
+spec:
+  nodes: []
+  edges: []
+`)
+	if err := os.WriteFile(filePath, raw, 0o600); err != nil {
+		t.Fatalf("failed to write temp canvas: %v", err)
+	}
+
+	ctx := core.CommandContext{Config: testCanvasConfig{activeCanvas: activeID}}
+	canvasID, canvas, err := loadCanvasFromFile(ctx, filePath)
+	if err != nil {
+		t.Fatalf("loadCanvasFromFile returned error: %v", err)
+	}
+	if canvasID != activeID {
+		t.Fatalf("expected canvas id %q, got %q", activeID, canvasID)
+	}
+	if canvas.GetMetadata().GetId() != activeID {
+		t.Fatalf("expected metadata id on canvas to be set to %q, got %q", activeID, canvas.GetMetadata().GetId())
+	}
+}
+
+func TestLoadCanvasFromFileRejectsMetadataIDMismatchWithActiveCanvas(t *testing.T) {
+	t.Helper()
+
+	activeID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	fileID := "5f9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	filePath := filepath.Join(t.TempDir(), "canvas.yaml")
+	raw := []byte(`
+apiVersion: v1
+kind: Canvas
+metadata:
+  id: ` + fileID + `
+  name: parse-check
+spec:
+  nodes: []
+  edges: []
+`)
+	if err := os.WriteFile(filePath, raw, 0o600); err != nil {
+		t.Fatalf("failed to write temp canvas: %v", err)
+	}
+
+	ctx := core.CommandContext{Config: testCanvasConfig{activeCanvas: activeID}}
+	_, _, err := loadCanvasFromFile(ctx, filePath)
+	if err == nil {
+		t.Fatalf("expected id mismatch error")
+	}
+	want := `canvas metadata.id "` + fileID + `" does not match the active canvas "` + activeID + `"; clear the active canvas or fix metadata.id`
+	if err.Error() != want {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
