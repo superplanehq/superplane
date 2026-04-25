@@ -119,14 +119,6 @@ func (c *GetPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return 200, nil, nil
 }
 
-func (c *GetPipeline) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetPipeline) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetPipeline) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

@@ -285,14 +285,6 @@ func (c *runAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, e
 	return ctx.DefaultProcessing()
 }
 
-func (c *runAgent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *runAgent) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *runAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

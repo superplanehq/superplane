@@ -155,14 +155,6 @@ func (a *AttachKnowledgeBase) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
-func (a *AttachKnowledgeBase) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (a *AttachKnowledgeBase) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined")
-}
-
 func (a *AttachKnowledgeBase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

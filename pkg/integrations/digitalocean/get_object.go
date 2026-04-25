@@ -240,14 +240,6 @@ func (g *GetObject) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetObject) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GetObject) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (g *GetObject) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

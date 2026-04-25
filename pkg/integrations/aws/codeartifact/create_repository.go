@@ -182,14 +182,6 @@ func (c *CreateRepository) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateRepository) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateRepository) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateRepository) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -489,7 +489,7 @@ func TestEmitEvent(t *testing.T) {
 
 			eventCtx := &contexts.EventContext{}
 
-			ctx := core.TriggerActionContext{
+			ctx := core.TriggerHookContext{
 				Name:          "emitEvent",
 				Configuration: tt.config,
 				Logger:        log.NewEntry(log.StandardLogger()),

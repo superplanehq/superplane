@@ -353,14 +353,6 @@ func (c *QueryLogfire) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	return 200, nil, nil
 }
 
-func (c *QueryLogfire) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *QueryLogfire) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *QueryLogfire) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

@@ -132,11 +132,3 @@ func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	return resources, nil
 }
-
-func (o *OpenAI) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (o *OpenAI) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

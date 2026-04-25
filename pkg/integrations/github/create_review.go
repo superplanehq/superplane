@@ -198,14 +198,6 @@ func (c *CreateReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	return 200, nil, nil
 }
 
-func (c *CreateReview) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateReview) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateReview) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

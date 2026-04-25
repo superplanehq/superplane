@@ -57,8 +57,13 @@ func (s *PanicableComponent) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }
 
-func (s *PanicableComponent) Actions() []core.Action {
-	return s.underlying.Actions()
+func (s *PanicableComponent) Hooks() []core.Hook {
+	hookProvider, ok := s.underlying.(core.ActionHookProvider)
+	if !ok {
+		return []core.Hook{}
+	}
+
+	return hookProvider.Hooks()
 }
 
 func (s *PanicableComponent) OutputChannels(config any) []core.OutputChannel {
@@ -103,16 +108,22 @@ func (s *PanicableComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (id 
 	return s.underlying.ProcessQueueItem(ctx)
 }
 
-func (s *PanicableComponent) HandleAction(ctx core.ActionContext) (err error) {
+func (s *PanicableComponent) HandleHook(ctx core.ActionHookContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger.Errorf("Component %s panicked in HandleAction(%s): %v\nStack: %s",
+			ctx.Logger.Errorf("Component %s panicked in HandleHook(%s): %v\nStack: %s",
 				s.underlying.Name(), ctx.Name, r, debug.Stack())
-			err = fmt.Errorf("component %s panicked in HandleAction(%s): %v",
+			err = fmt.Errorf("component %s panicked in HandleHook(%s): %v",
 				s.underlying.Name(), ctx.Name, r)
 		}
 	}()
-	return s.underlying.HandleAction(ctx)
+
+	hookProvider, ok := s.underlying.(core.ActionHookProvider)
+	if !ok {
+		return fmt.Errorf("component %s has no hook provider", s.underlying.Name())
+	}
+
+	return hookProvider.HandleHook(ctx)
 }
 
 func (s *PanicableComponent) HandleWebhook(ctx core.WebhookRequestContext) (status int, response *core.WebhookResponseBody, err error) {

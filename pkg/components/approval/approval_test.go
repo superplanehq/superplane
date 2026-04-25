@@ -58,7 +58,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 				Metadata: metadata,
 			}
 
-			ctx := core.ActionContext{
+			ctx := core.ActionHookContext{
 				Name: "approve",
 				Parameters: map[string]any{
 					"index": float64(0),
@@ -68,7 +68,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 				Auth:           testCase.auth,
 			}
 
-			err := approval.HandleAction(ctx)
+			err := approval.HandleHook(ctx)
 
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
@@ -124,7 +124,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 				Metadata: metadata,
 			}
 
-			ctx := core.ActionContext{
+			ctx := core.ActionHookContext{
 				Name: "reject",
 				Parameters: map[string]any{
 					"index":  float64(0),
@@ -135,7 +135,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 				Auth:           testCase.auth,
 			}
 
-			err := approval.HandleAction(ctx)
+			err := approval.HandleHook(ctx)
 
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
@@ -166,7 +166,7 @@ func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
 		User: user1,
 	}
 
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name: "reject",
 		Parameters: map[string]any{
 			"index":  float64(0),
@@ -177,7 +177,7 @@ func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
 		Auth:           authCtx,
 	}
 
-	err := approval.HandleAction(ctx)
+	err := approval.HandleHook(ctx)
 
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
@@ -236,7 +236,7 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 				Metadata: metadata,
 			}
 
-			ctx := core.ActionContext{
+			ctx := core.ActionHookContext{
 				Name: "approve",
 				Parameters: map[string]any{
 					"index": float64(0),
@@ -246,7 +246,7 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 				Auth:           testCase.auth,
 			}
 
-			err := approval.HandleAction(ctx)
+			err := approval.HandleHook(ctx)
 
 			assert.NoError(t, err)
 			assert.False(t, stateCtx.Passed)
@@ -278,7 +278,7 @@ func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
 	//
 	// Approving first requirement works
 	//
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
@@ -288,7 +288,7 @@ func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
 		Auth:           authCtx,
 	}
 
-	err := approval.HandleAction(ctx)
+	err := approval.HandleHook(ctx)
 	require.NoError(t, err)
 
 	stored := metadataCtx.Metadata.(*Metadata)
@@ -299,7 +299,7 @@ func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
 	// Approving second one does not work
 	//
 	ctx.Parameters["index"] = float64(1)
-	err = approval.HandleAction(ctx)
+	err = approval.HandleHook(ctx)
 	assert.ErrorContains(t, err, "user has already approved/rejected another requirement")
 }
 
@@ -326,7 +326,7 @@ func TestApproval_HandleAction_CannotApproveRequirementAgain(t *testing.T) {
 	//
 	// Trying to approve requirement that was already approved
 	//
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
@@ -336,7 +336,7 @@ func TestApproval_HandleAction_CannotApproveRequirementAgain(t *testing.T) {
 		Auth:           authCtx,
 	}
 
-	err := approval.HandleAction(ctx)
+	err := approval.HandleHook(ctx)
 	assert.ErrorContains(t, err, "failed to find requirement: record at index 0 is not pending")
 }
 

@@ -103,14 +103,6 @@ func (i *IncidentIO) Sync(ctx core.SyncContext) error {
 
 func (i *IncidentIO) HandleRequest(ctx core.HTTPRequestContext) {}
 
-func (i *IncidentIO) Actions() []core.Action {
-	return nil
-}
-
-func (i *IncidentIO) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (i *IncidentIO) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "severity" {
 		return []core.IntegrationResource{}, nil

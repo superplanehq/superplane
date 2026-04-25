@@ -148,14 +148,6 @@ func (c *CreateAlert) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "sentry.alertRule", []any{alertRule})
 }
 
-func (c *CreateAlert) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateAlert) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -190,14 +190,6 @@ func (c *DeleteRepository) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DeleteRepository) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteRepository) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteRepository) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

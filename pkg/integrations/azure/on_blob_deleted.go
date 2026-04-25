@@ -296,11 +296,11 @@ func (t *OnBlobDeleted) authenticateWebhook(ctx core.WebhookRequestContext) erro
 	return fmt.Errorf("webhook secret required but not provided in Authorization or X-Webhook-Secret header")
 }
 
-func (t *OnBlobDeleted) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnBlobDeleted) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnBlobDeleted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnBlobDeleted) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

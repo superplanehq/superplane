@@ -235,14 +235,6 @@ func (c *UpdateEnvVar) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	return http.StatusOK, nil, nil
 }
 
-func (c *UpdateEnvVar) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateEnvVar) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateEnvVar) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

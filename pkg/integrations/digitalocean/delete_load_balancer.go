@@ -140,14 +140,6 @@ func (d *DeleteLoadBalancer) ProcessQueueItem(ctx core.ProcessQueueContext) (*uu
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteLoadBalancer) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteLoadBalancer) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -396,14 +396,6 @@ func (t *Teams) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
-func (t *Teams) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (t *Teams) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 // generateManifestZIP creates a Teams app manifest ZIP ready for upload to Teams Admin Center.
 func generateManifestZIP(appID, botName string) ([]byte, error) {
 	manifest := map[string]any{

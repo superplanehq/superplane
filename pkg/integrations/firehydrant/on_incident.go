@@ -211,11 +211,11 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	return http.StatusOK, nil, nil
 }
 
-func (t *OnIncident) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnIncident) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnIncident) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

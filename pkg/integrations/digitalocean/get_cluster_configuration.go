@@ -143,10 +143,6 @@ func (g *GetClusterConfiguration) ProcessQueueItem(ctx core.ProcessQueueContext)
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetClusterConfiguration) Actions() []core.Action { return []core.Action{} }
-
-func (g *GetClusterConfiguration) HandleAction(ctx core.ActionContext) error { return nil }
-
 func (g *GetClusterConfiguration) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -167,14 +167,6 @@ func (c *QueryRange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	return 200, nil, nil
 }
 
-func (c *QueryRange) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *QueryRange) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *QueryRange) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

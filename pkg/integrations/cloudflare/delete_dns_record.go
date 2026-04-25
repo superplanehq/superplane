@@ -229,14 +229,6 @@ func (c *DeleteDNSRecord) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *DeleteDNSRecord) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteDNSRecord) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -151,14 +151,6 @@ func (c *ResolveIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (c *ResolveIncident) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ResolveIncident) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *ResolveIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

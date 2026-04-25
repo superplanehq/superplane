@@ -133,14 +133,6 @@ func (c *GetTestReportSummary) HandleWebhook(ctx core.WebhookRequestContext) (in
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetTestReportSummary) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetTestReportSummary) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetTestReportSummary) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

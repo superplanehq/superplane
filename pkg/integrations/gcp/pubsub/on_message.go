@@ -162,10 +162,10 @@ func (t *OnMessage) Setup(ctx core.TriggerContext) error {
 	}, 2*time.Second)
 }
 
-func (t *OnMessage) Actions() []core.Action { return nil }
+func (t *OnMessage) Hooks() []core.Hook { return nil }
 
-func (t *OnMessage) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+func (t *OnMessage) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnMessage) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {

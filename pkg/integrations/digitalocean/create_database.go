@@ -161,14 +161,6 @@ func (c *CreateDatabase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateDatabase) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateDatabase) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateDatabase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

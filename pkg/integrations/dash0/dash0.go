@@ -273,11 +273,3 @@ func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
 
 	ctx.Response.WriteHeader(http.StatusOK)
 }
-
-func (d *Dash0) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *Dash0) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

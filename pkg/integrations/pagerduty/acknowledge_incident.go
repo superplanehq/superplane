@@ -142,14 +142,6 @@ func (c *AcknowledgeIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
-func (c *AcknowledgeIncident) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *AcknowledgeIncident) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *AcknowledgeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

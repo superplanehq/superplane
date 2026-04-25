@@ -163,14 +163,6 @@ func (c *UpdateService) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpdateService) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateService) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

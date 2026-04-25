@@ -193,14 +193,6 @@ func (c *CreateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateIssue) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateIssue) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

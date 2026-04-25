@@ -221,14 +221,6 @@ func (c *RenderPanel) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (c *RenderPanel) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *RenderPanel) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *RenderPanel) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

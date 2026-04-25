@@ -161,14 +161,6 @@ func (c *GetFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetFeatureFlag) Actions() []core.Action {
-	return nil
-}
-
-func (c *GetFeatureFlag) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetFeatureFlag) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

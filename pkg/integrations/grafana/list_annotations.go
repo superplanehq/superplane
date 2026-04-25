@@ -256,14 +256,6 @@ func (l *ListAnnotations) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (l *ListAnnotations) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *ListAnnotations) HandleAction(_ core.ActionContext) error {
-	return nil
-}
-
 func (l *ListAnnotations) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

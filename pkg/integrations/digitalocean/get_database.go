@@ -188,10 +188,6 @@ func (g *GetDatabase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetDatabase) Actions() []core.Action { return []core.Action{} }
-
-func (g *GetDatabase) HandleAction(ctx core.ActionContext) error { return nil }
-
 func (g *GetDatabase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

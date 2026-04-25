@@ -169,18 +169,17 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (w *Webhook) Actions() []core.Action {
-	return []core.Action{
+func (w *Webhook) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "resetAuthentication",
-			Description:    "Reset/regenerate authentication key",
-			UserAccessible: true,
-			Parameters:     []configuration.Field{},
+			Name:       "resetAuthentication",
+			Type:       core.HookTypeUser,
+			Parameters: []configuration.Field{},
 		},
 	}
 }
 
-func (w *Webhook) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (w *Webhook) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "resetAuthentication":
 		return w.resetAuthentication(ctx)
@@ -188,7 +187,7 @@ func (w *Webhook) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, fmt.Errorf("action %s not supported", ctx.Name)
 }
 
-func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string]any, error) {
+func (w *Webhook) resetAuthentication(ctx core.TriggerHookContext) (map[string]any, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {

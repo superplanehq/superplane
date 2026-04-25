@@ -279,14 +279,6 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "sentry.issue", []any{issue})
 }
 
-func (c *UpdateIssue) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateIssue) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

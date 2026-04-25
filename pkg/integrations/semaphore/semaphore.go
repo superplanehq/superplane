@@ -104,14 +104,6 @@ func (s *Semaphore) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (s *Semaphore) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Semaphore) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (s *Semaphore) Components() []core.Component {
 	return []core.Component{
 		&RunWorkflow{},

@@ -231,14 +231,6 @@ func (c *CreateOrUpdateContact) HandleWebhook(ctx core.WebhookRequestContext) (i
 	return 200, nil, nil
 }
 
-func (c *CreateOrUpdateContact) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateOrUpdateContact) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateOrUpdateContact) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

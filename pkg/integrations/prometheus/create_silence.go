@@ -272,14 +272,6 @@ func (c *CreateSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return 200, nil, nil
 }
 
-func (c *CreateSilence) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateSilence) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateSilence) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

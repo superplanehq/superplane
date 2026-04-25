@@ -257,14 +257,6 @@ func (c *ReportMetric) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (c *ReportMetric) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ReportMetric) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *ReportMetric) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

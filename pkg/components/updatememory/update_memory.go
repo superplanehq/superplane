@@ -288,14 +288,6 @@ func (c *UpdateMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("updateMemory does not support actions")
-}
-
 func (c *UpdateMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

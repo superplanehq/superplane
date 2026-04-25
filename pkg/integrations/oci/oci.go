@@ -192,14 +192,6 @@ func (o *OCI) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (o *OCI) HandleRequest(ctx core.HTTPRequestContext) {}
 
-func (o *OCI) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (o *OCI) HandleAction(ctx core.IntegrationActionContext) error {
-	return fmt.Errorf("unknown action: %s", ctx.Name)
-}
-
 func validateConfig(cfg Configuration) error {
 	if strings.TrimSpace(cfg.TenancyOCID) == "" {
 		return fmt.Errorf("tenancyOcid is required")

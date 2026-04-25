@@ -91,11 +91,11 @@ func (t *OnBuild) Setup(ctx core.TriggerContext) error {
 	)
 }
 
-func (t *OnBuild) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnBuild) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnBuild) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnBuild) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

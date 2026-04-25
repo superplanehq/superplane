@@ -131,14 +131,6 @@ func (c *PurgeCache) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	return http.StatusOK, nil, nil
 }
 
-func (c *PurgeCache) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *PurgeCache) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *PurgeCache) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

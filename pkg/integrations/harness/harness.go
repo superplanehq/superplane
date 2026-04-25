@@ -184,11 +184,3 @@ func (h *Harness) ListResources(resourceType string, ctx core.ListResourcesConte
 
 	return []core.IntegrationResource{}, nil
 }
-
-func (h *Harness) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (h *Harness) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

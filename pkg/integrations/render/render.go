@@ -185,14 +185,6 @@ func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContex
 	return resources, nil
 }
 
-func (r *Render) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (r *Render) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func workspaceIDForIntegration(client *Client, integration core.IntegrationContext) (string, error) {
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err == nil && metadata.Workspace != nil && metadata.Workspace.ID != "" {

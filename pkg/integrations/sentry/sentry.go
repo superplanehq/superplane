@@ -446,14 +446,6 @@ func (s *Sentry) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
-func (s *Sentry) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Sentry) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {
 	if !strings.HasSuffix(ctx.Request.URL.Path, "/events") {
 		ctx.Response.WriteHeader(http.StatusNotFound)

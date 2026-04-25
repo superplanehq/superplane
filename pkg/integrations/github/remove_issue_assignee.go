@@ -196,14 +196,6 @@ func (c *RemoveIssueAssignee) HandleWebhook(ctx core.WebhookRequestContext) (int
 	return 200, nil, nil
 }
 
-func (c *RemoveIssueAssignee) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *RemoveIssueAssignee) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *RemoveIssueAssignee) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

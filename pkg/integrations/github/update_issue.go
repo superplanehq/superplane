@@ -253,14 +253,6 @@ func (c *UpdateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return 200, nil, nil
 }
 
-func (c *UpdateIssue) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateIssue) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateIssue) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

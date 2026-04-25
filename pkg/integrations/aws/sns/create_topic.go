@@ -118,14 +118,6 @@ func (c *CreateTopic) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *CreateTopic) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateTopic) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

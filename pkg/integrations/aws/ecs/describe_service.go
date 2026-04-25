@@ -198,14 +198,6 @@ func (c *DescribeService) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DescribeService) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DescribeService) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DescribeService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

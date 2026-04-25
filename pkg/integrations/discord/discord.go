@@ -176,11 +176,3 @@ func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesConte
 
 	return resources, nil
 }
-
-func (d *Discord) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *Discord) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

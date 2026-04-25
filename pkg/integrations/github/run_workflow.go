@@ -478,16 +478,16 @@ func metadataFromPayload(payload map[string]any) (*RunWorkflowExecutionMetadata,
 	}, workflowRun, nil
 }
 
-func (r *RunWorkflow) Actions() []core.Action {
-	return []core.Action{
+func (r *RunWorkflow) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (r *RunWorkflow) HandleAction(ctx core.ActionContext) error {
+func (r *RunWorkflow) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return r.poll(ctx)
@@ -496,7 +496,7 @@ func (r *RunWorkflow) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (r *RunWorkflow) poll(ctx core.ActionContext) error {
+func (r *RunWorkflow) poll(ctx core.ActionHookContext) error {
 	spec := RunWorkflowSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {

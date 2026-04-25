@@ -117,14 +117,6 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Pass()
 }
 
-func (f *Filter) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (f *Filter) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("filter does not support actions")
-}
-
 func (f *Filter) Setup(ctx core.SetupContext) error {
 	return nil
 }

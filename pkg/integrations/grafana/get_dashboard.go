@@ -125,14 +125,6 @@ func (c *GetDashboard) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetDashboard) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetDashboard) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetDashboard) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

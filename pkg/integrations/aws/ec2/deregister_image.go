@@ -218,14 +218,6 @@ func (c *DeregisterImage) getSnapshotIDs(config DeregisterImageConfiguration, cl
 	return snapshotIDs, nil
 }
 
-func (c *DeregisterImage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeregisterImage) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeregisterImage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

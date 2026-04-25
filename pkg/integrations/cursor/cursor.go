@@ -139,11 +139,3 @@ func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	return []core.IntegrationResource{}, nil
 }
-
-func (i *Cursor) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (i *Cursor) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

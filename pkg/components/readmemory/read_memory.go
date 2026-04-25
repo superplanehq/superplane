@@ -344,14 +344,6 @@ func (c *ReadMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (c *ReadMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ReadMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("readMemory does not support actions")
-}
-
 func (c *ReadMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

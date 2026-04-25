@@ -108,14 +108,6 @@ func (h *Honeycomb) Triggers() []core.Trigger {
 	}
 }
 
-func (h *Honeycomb) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (h *Honeycomb) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (h *Honeycomb) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }

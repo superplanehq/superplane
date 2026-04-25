@@ -307,14 +307,6 @@ func (c *UpdateRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return 200, nil, nil
 }
 
-func (c *UpdateRelease) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateRelease) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
