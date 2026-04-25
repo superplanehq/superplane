@@ -6,10 +6,8 @@ import (
 	"net/http"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/exprruntime"
 )
 
 type OnPush struct{}
@@ -17,7 +15,7 @@ type OnPush struct{}
 type OnPushConfiguration struct {
 	Repository string                    `json:"repository" mapstructure:"repository"`
 	Refs       []configuration.Predicate `json:"refs" mapstructure:"refs"`
-	Paths      []string                  `json:"paths" mapstructure:"paths"`
+	Paths      []configuration.Predicate `json:"paths" mapstructure:"paths"`
 }
 
 func (p *OnPush) Name() string {
@@ -46,7 +44,7 @@ func (p *OnPush) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., ` + "`refs/heads/main`" + `, ` + "`refs/tags/*`" + `)
-- **Paths** *(optional)*: Filter by changed file paths using glob patterns (e.g., ` + "`pkg/**`" + `, ` + "`go.sum`" + `). When set, the trigger only fires if at least one added, modified, or removed file matches any pattern. Use ` + "`**`" + ` to match across directories and ` + "`*`" + ` within a single path segment. Leave empty to fire on all pushes regardless of changed files.
+- **Paths** *(optional)*: Filter by changed file paths. When set, the trigger only fires if at least one added, modified, or removed file matches any configured predicate. Leave empty to fire on all pushes regardless of changed files.
 
 ## Event Data
 
@@ -102,18 +100,14 @@ func (p *OnPush) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "paths",
-			Label:       "Paths",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Togglable:   true,
-			Placeholder: "e.g. pkg/**",
+			Name:      "paths",
+			Label:     "Paths",
+			Type:      configuration.FieldTypeAnyPredicateList,
+			Required:  false,
+			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
-					ItemLabel: "Path pattern",
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
 				},
 			},
 		},
@@ -212,7 +206,7 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 
 	if len(config.Paths) > 0 {
 		changedFiles := extractChangedFiles(data)
-		if !matchesAnyGlob(config.Paths, changedFiles, ctx.Logger) {
+		if !configuration.MatchesAnyPredicateInList(config.Paths, changedFiles) {
 			if len(changedFiles) == 0 {
 				ctx.Logger.Infof("Ignoring event - path filter active but no changed files found in payload")
 			} else {
@@ -290,21 +284,4 @@ func extractChangedFiles(data map[string]any) []string {
 	}
 
 	return files
-}
-
-// matchesAnyGlob returns true if any file in files matches any glob pattern.
-func matchesAnyGlob(patterns []string, files []string, logger *logrus.Entry) bool {
-	for _, pattern := range patterns {
-		re, err := exprruntime.GlobToRegex(pattern)
-		if err != nil {
-			logger.Warnf("Skipping invalid path glob pattern %q: %v", pattern, err)
-			continue
-		}
-		for _, file := range files {
-			if re.MatchString(file) {
-				return true
-			}
-		}
-	}
-	return false
 }

@@ -1063,7 +1063,7 @@ The On Push trigger starts a workflow execution when code is pushed to a GitHub 
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., `refs/heads/main`, `refs/tags/*`)
-- **Paths** *(optional)*: Filter by changed file paths using glob patterns (e.g., `pkg/**`, `go.sum`). When set, the trigger only fires if at least one added, modified, or removed file matches any pattern. Use `**` to match across directories and `*` within a single path segment. Leave empty to fire on all pushes regardless of changed files.
+- **Paths** *(optional)*: Filter by changed file paths. When set, the trigger only fires if at least one added, modified, or removed file matches any configured predicate. Leave empty to fire on all pushes regardless of changed files.
 
 ### Event Data
 

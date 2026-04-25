@@ -265,7 +265,6 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
 		exprruntime.DateFunctionOption(),
-		exprruntime.FilePathMatchesFunctionOption(),
 		expr.Function("root", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")
