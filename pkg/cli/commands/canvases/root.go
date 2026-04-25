@@ -65,9 +65,12 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
-		Use:   "update",
+		Use:   "update [name-or-id]",
 		Short: "Update a canvas from a YAML file",
-		Args:  cobra.NoArgs,
+		Long: "Updates the canvas using --file. If metadata.id is omitted in the YAML, pass the canvas name or id, " +
+			"or set an active canvas with `superplane canvases active`. When the file includes metadata.id and a " +
+			"name-or-id argument is given, they must refer to the same canvas.",
+		Args: cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	_ = updateCmd.MarkFlagRequired("file")
