@@ -164,14 +164,6 @@ func (c *DeallocateVMComponent) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *DeallocateVMComponent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeallocateVMComponent) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined for this component")
-}
-
 func (c *DeallocateVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

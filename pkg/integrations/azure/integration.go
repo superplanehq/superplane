@@ -235,16 +235,6 @@ func (a *AzureIntegration) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
-// Actions returns integration-level actions.
-func (a *AzureIntegration) Actions() []core.Action {
-	return []core.Action{}
-}
-
-// HandleAction executes an integration-level action.
-func (a *AzureIntegration) HandleAction(ctx core.IntegrationActionContext) error {
-	return fmt.Errorf("unknown action: %s", ctx.Name)
-}
-
 // ListResources lists Azure resources by resource type.
 func (a *AzureIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {

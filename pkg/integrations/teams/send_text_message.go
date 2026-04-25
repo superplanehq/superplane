@@ -180,14 +180,6 @@ func (c *SendTextMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 	return 200, nil, nil
 }
 
-func (c *SendTextMessage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *SendTextMessage) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *SendTextMessage) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

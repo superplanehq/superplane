@@ -159,11 +159,3 @@ func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesConte
 		return []core.IntegrationResource{}, nil
 	}
 }
-
-func (d *Daytona) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *Daytona) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

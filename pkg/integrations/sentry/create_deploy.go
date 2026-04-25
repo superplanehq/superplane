@@ -226,14 +226,6 @@ func (c *CreateDeploy) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "sentry.deploy", []any{deploy})
 }
 
-func (c *CreateDeploy) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateDeploy) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -274,11 +274,3 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 		return nil, nil
 	}
 }
-
-func (h *Hetzner) Actions() []core.Action {
-	return nil
-}
-
-func (h *Hetzner) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

@@ -252,14 +252,6 @@ func (c *DeleteMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (c *DeleteMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("deleteMemory does not support actions")
-}
-
 func (c *DeleteMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

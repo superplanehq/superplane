@@ -93,14 +93,6 @@ func (c *CircleCI) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (c *CircleCI) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CircleCI) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 const ResourceTypePipelineDefinition = "pipeline-definition"
 
 func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

@@ -231,14 +231,6 @@ func (c *DeletePackageVersions) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DeletePackageVersions) Actions() []core.Action {
-	return nil
-}
-
-func (c *DeletePackageVersions) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeletePackageVersions) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

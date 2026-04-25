@@ -178,14 +178,6 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateLoadBalancerPayloadType, []any{loadBalancer})
 }
 
-func (c *CreateLoadBalancer) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateLoadBalancer) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

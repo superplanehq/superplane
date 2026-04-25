@@ -170,14 +170,6 @@ func (c *GetLastMessage) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, GetLastMessagePayloadType, []any{output})
 }
 
-func (c *GetLastMessage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetLastMessage) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetLastMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

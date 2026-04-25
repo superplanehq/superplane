@@ -177,11 +177,3 @@ func (n *NewRelic) HandleRequest(ctx core.HTTPRequestContext) {
 func (n *NewRelic) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	return []core.IntegrationResource{}, nil
 }
-
-func (n *NewRelic) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (n *NewRelic) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

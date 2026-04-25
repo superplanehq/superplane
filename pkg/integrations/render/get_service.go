@@ -127,14 +127,6 @@ func (c *GetService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetService) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetService) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetService) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

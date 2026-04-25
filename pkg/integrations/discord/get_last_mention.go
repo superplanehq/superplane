@@ -240,14 +240,6 @@ func (c *GetLastMention) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetLastMention) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetLastMention) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetLastMention) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

@@ -234,14 +234,6 @@ func (c *GetHTTPSyntheticCheck) ProcessQueueItem(ctx core.ProcessQueueContext) (
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetHTTPSyntheticCheck) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetHTTPSyntheticCheck) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetHTTPSyntheticCheck) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

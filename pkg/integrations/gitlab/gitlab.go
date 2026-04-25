@@ -505,14 +505,6 @@ func normalizeBaseURL(url string) string {
 	return strings.TrimSuffix(url, "/")
 }
 
-func (g *GitLab) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GitLab) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (g *GitLab) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }

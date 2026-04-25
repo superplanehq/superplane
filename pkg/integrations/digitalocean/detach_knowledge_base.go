@@ -154,14 +154,6 @@ func (d *DetachKnowledgeBase) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
-func (d *DetachKnowledgeBase) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DetachKnowledgeBase) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined")
-}
-
 func (d *DetachKnowledgeBase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

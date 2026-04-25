@@ -224,11 +224,3 @@ func (p *Prometheus) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (p *Prometheus) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
-
-func (p *Prometheus) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (p *Prometheus) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

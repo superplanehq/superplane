@@ -150,14 +150,6 @@ func (c *GetWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetWorkflow) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetWorkflow) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetWorkflow) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

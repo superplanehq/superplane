@@ -179,14 +179,6 @@ func (c *CreateIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return 200, nil, nil
 }
 
-func (c *CreateIssueComment) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateIssueComment) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateIssueComment) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

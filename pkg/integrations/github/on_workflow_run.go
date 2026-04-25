@@ -144,11 +144,11 @@ func (w *OnWorkflowRun) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (w *OnWorkflowRun) Actions() []core.Action {
-	return []core.Action{}
+func (w *OnWorkflowRun) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (w *OnWorkflowRun) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (w *OnWorkflowRun) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

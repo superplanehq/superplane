@@ -231,8 +231,6 @@ func (c *DisposePackageVersions) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DisposePackageVersions) Actions() []core.Action                    { return nil }
-func (c *DisposePackageVersions) HandleAction(ctx core.ActionContext) error { return nil }
 func (c *DisposePackageVersions) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

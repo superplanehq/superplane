@@ -271,14 +271,6 @@ func (c *CopyPackageVersions) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CopyPackageVersions) Actions() []core.Action {
-	return nil
-}
-
-func (c *CopyPackageVersions) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CopyPackageVersions) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

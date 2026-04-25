@@ -160,14 +160,6 @@ func (c *DeleteFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 	return http.StatusOK, nil, nil
 }
 
-func (c *DeleteFeatureFlag) Actions() []core.Action {
-	return nil
-}
-
-func (c *DeleteFeatureFlag) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteFeatureFlag) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

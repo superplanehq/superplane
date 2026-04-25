@@ -230,14 +230,6 @@ func (c *AddReaction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return 200, nil, nil
 }
 
-func (c *AddReaction) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *AddReaction) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *AddReaction) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

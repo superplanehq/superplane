@@ -218,14 +218,6 @@ func (q *QueryTraces) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (q *QueryTraces) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (q *QueryTraces) HandleAction(_ core.ActionContext) error {
-	return nil
-}
-
 func (q *QueryTraces) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

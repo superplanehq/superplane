@@ -93,18 +93,6 @@ type Component interface {
 	Execute(ctx ExecutionContext) error
 
 	/*
-	 * Allows components to define custom actions
-	 * that can be called on specific executions of the component.
-	 */
-	Actions() []Action
-
-	/*
-	 * Execution a custom action - defined in Actions() -
-	 * on a specific execution of the component.
-	 */
-	HandleAction(ctx ActionContext) error
-
-	/*
 	 * Handler for webhooks.
 	 */
 	HandleWebhook(ctx WebhookRequestContext) (int, *WebhookResponseBody, error)
@@ -229,35 +217,6 @@ type RequestContext interface {
 	// Allows the scheduling of a certain component action at a later time
 	//
 	ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error
-}
-
-/*
- * Custom action definition for a component.
- */
-type Action struct {
-	Name           string
-	Description    string
-	UserAccessible bool
-	Parameters     []configuration.Field
-}
-
-/*
- * ActionContext allows the component to execute a custom action,
- * and control the state and metadata of each execution of it.
- */
-type ActionContext struct {
-	Name           string
-	Configuration  any
-	Parameters     map[string]any
-	Logger         *log.Entry
-	HTTP           HTTPContext
-	Metadata       MetadataWriter
-	ExecutionState ExecutionStateContext
-	Auth           AuthReader
-	Requests       RequestContext
-	Integration    IntegrationContext
-	Notifications  NotificationContext
-	Secrets        SecretsContext
 }
 
 /*

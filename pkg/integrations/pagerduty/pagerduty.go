@@ -320,11 +320,3 @@ func (r *TokenResponse) GetExpiration() time.Duration {
 
 	return time.Hour
 }
-
-func (p *PagerDuty) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (p *PagerDuty) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}

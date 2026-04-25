@@ -130,14 +130,6 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (f *If) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (f *If) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("if does not support actions")
-}
-
 func (f *If) Setup(ctx core.SetupContext) error {
 	return nil
 }

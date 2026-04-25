@@ -25,14 +25,16 @@ func (p *panickingComponent) Icon() string                                   { r
 func (p *panickingComponent) Color() string                                  { return "red" }
 func (p *panickingComponent) ExampleOutput() map[string]any                  { return nil }
 func (p *panickingComponent) Configuration() []configuration.Field           { return nil }
-func (p *panickingComponent) Actions() []core.Action                         { return nil }
+func (p *panickingComponent) Hooks() []core.Hook                             { return nil }
 func (p *panickingComponent) OutputChannels(config any) []core.OutputChannel { return nil }
 func (p *panickingComponent) Setup(ctx core.SetupContext) error              { panic("setup panic") }
 func (p *panickingComponent) Execute(ctx core.ExecutionContext) error        { panic("execute panic") }
 func (p *panickingComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	panic("process queue item panic")
 }
-func (p *panickingComponent) HandleAction(ctx core.ActionContext) error { panic("handle action panic") }
+func (p *panickingComponent) HandleHook(ctx core.TriggerHookContext) error {
+	panic("handle hook panic")
+}
 func (p *panickingComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	panic("handle webhook panic")
 }
@@ -80,19 +82,19 @@ func TestPanicableComponent_ProcessQueueItem_CatchesPanic(t *testing.T) {
 	assert.Contains(t, err.Error(), "process queue item panic")
 }
 
-func TestPanicableComponent_HandleAction_CatchesPanic(t *testing.T) {
+func TestPanicableComponent_HandleHook_CatchesPanic(t *testing.T) {
 	comp := &panickingComponent{name: "panicking-comp"}
 	panicable := NewPanicableComponent(comp)
-	ctx := core.ActionContext{
-		Name:   "test-action",
+	ctx := core.ActionHookContext{
+		Name:   "test-hook",
 		Logger: log.NewEntry(log.StandardLogger()),
 	}
 
-	err := panicable.HandleAction(ctx)
+	err := panicable.(core.ActionHookProvider).HandleHook(ctx)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "panicking-comp panicked in HandleAction(test-action)")
-	assert.Contains(t, err.Error(), "handle action panic")
+	assert.Contains(t, err.Error(), "panicking-comp panicked in HandleHook(test-hook)")
+	assert.Contains(t, err.Error(), "handle hook panic")
 }
 
 func TestPanicableComponent_HandleWebhook_CatchesPanic(t *testing.T) {

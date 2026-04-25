@@ -172,10 +172,8 @@ func (c *CreateCase) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateCase) Actions() []core.Action                  { return nil }
-func (c *CreateCase) HandleAction(_ core.ActionContext) error { return nil }
-func (c *CreateCase) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *CreateCase) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *CreateCase) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *CreateCase) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *CreateCase) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

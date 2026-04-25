@@ -146,14 +146,6 @@ func (c *GetFlakyTests) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetFlakyTests) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetFlakyTests) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetFlakyTests) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

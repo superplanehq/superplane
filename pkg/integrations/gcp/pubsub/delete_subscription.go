@@ -104,10 +104,8 @@ func (c *DeleteSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (c *DeleteSubscriptionComponent) Actions() []core.Action                  { return nil }
-func (c *DeleteSubscriptionComponent) HandleAction(_ core.ActionContext) error { return nil }
-func (c *DeleteSubscriptionComponent) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *DeleteSubscriptionComponent) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *DeleteSubscriptionComponent) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *DeleteSubscriptionComponent) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *DeleteSubscriptionComponent) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -1,7 +1,6 @@
 package noop
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -71,14 +70,6 @@ func (c *NoOp) Execute(ctx core.ExecutionContext) error {
 
 func (c *NoOp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
-}
-
-func (c *NoOp) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *NoOp) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("noop does not support actions")
 }
 
 func (c *NoOp) Setup(ctx core.SetupContext) error {

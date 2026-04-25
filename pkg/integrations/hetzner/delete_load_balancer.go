@@ -113,14 +113,6 @@ func (c *DeleteLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteLoadBalancerPayloadType, []any{payload})
 }
 
-func (c *DeleteLoadBalancer) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteLoadBalancer) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

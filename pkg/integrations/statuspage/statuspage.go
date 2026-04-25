@@ -94,14 +94,6 @@ func (s *Statuspage) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (s *Statuspage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Statuspage) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (s *Statuspage) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},

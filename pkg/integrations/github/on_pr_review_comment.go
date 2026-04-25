@@ -74,11 +74,11 @@ func (p *OnPRReviewComment) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnPRReviewComment) Actions() []core.Action {
-	return []core.Action{}
+func (p *OnPRReviewComment) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *OnPRReviewComment) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPRReviewComment) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

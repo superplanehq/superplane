@@ -44,10 +44,6 @@ func (c *testOutputChannelComponent) ProcessQueueItem(core.ProcessQueueContext) 
 
 func (c *testOutputChannelComponent) Execute(core.ExecutionContext) error { return nil }
 
-func (c *testOutputChannelComponent) Actions() []core.Action { return nil }
-
-func (c *testOutputChannelComponent) HandleAction(core.ActionContext) error { return nil }
-
 func (c *testOutputChannelComponent) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

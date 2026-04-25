@@ -103,14 +103,6 @@ func (l *LaunchDarkly) Sync(ctx core.SyncContext) error {
 
 func (l *LaunchDarkly) HandleRequest(ctx core.HTTPRequestContext) {}
 
-func (l *LaunchDarkly) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *LaunchDarkly) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "project":

@@ -233,8 +233,6 @@ type callFunctionResponse struct {
 	Error       string `json:"error"`
 }
 
-func (c *InvokeFunction) Actions() []core.Action                  { return nil }
-func (c *InvokeFunction) HandleAction(_ core.ActionContext) error { return nil }
 func (c *InvokeFunction) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

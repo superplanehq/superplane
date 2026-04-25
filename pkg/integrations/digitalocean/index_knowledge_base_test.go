@@ -144,7 +144,7 @@ func Test__IndexKnowledgeBase__Execute(t *testing.T) {
 	})
 }
 
-func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
+func Test__IndexKnowledgeBase__HandleHook(t *testing.T) {
 	component := &IndexKnowledgeBase{}
 
 	meta := map[string]any{
@@ -178,7 +178,7 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -228,7 +228,7 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 
 		requests := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -260,7 +260,7 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -287,7 +287,7 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 
 		requests := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -319,7 +319,7 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{

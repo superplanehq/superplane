@@ -136,8 +136,6 @@ func (g *GetDatabaseCluster) Cancel(ctx core.ExecutionContext) error { return ni
 func (g *GetDatabaseCluster) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
-func (g *GetDatabaseCluster) Actions() []core.Action                    { return []core.Action{} }
-func (g *GetDatabaseCluster) HandleAction(ctx core.ActionContext) error { return nil }
 func (g *GetDatabaseCluster) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

@@ -276,14 +276,6 @@ func (c *RetryStageExecution) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
-func (c *RetryStageExecution) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *RetryStageExecution) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *RetryStageExecution) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

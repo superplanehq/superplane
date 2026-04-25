@@ -93,18 +93,23 @@ func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return http.StatusOK, nil, nil
 }
 
-func (c *LaunchAgent) Actions() []core.Action {
-	return []core.Action{{Name: "poll", UserAccessible: false}}
+func (c *LaunchAgent) Hooks() []core.Hook {
+	return []core.Hook{
+		{
+			Name: "poll",
+			Type: core.HookTypeInternal,
+		},
+	}
 }
 
-func (c *LaunchAgent) HandleAction(ctx core.ActionContext) error {
+func (c *LaunchAgent) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *LaunchAgent) poll(ctx core.ActionContext) error {
+func (c *LaunchAgent) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -181,7 +186,7 @@ func (c *LaunchAgent) poll(ctx core.ActionContext) error {
 	return c.scheduleNextPoll(ctx, pollAttempt+1, pollErrors)
 }
 
-func (c *LaunchAgent) scheduleNextPoll(ctx core.ActionContext, nextAttempt, errors int) error {
+func (c *LaunchAgent) scheduleNextPoll(ctx core.ActionHookContext, nextAttempt, errors int) error {
 	interval := LaunchAgentInitialPollInterval * time.Duration(1<<uint(min(nextAttempt-1, 8)))
 	if interval > LaunchAgentMaxPollInterval {
 		interval = LaunchAgentMaxPollInterval

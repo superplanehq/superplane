@@ -191,14 +191,6 @@ func (c *CreateDNSRecord) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateDNSRecord) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateDNSRecord) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

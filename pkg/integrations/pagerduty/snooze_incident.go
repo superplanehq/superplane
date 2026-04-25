@@ -169,14 +169,6 @@ func (c *SnoozeIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (c *SnoozeIncident) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *SnoozeIncident) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *SnoozeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

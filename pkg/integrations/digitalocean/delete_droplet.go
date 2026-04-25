@@ -151,14 +151,6 @@ func (d *DeleteDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteDroplet) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteDroplet) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

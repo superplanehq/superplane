@@ -227,14 +227,6 @@ func (s *SendLogEvent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (s *SendLogEvent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *SendLogEvent) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (s *SendLogEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

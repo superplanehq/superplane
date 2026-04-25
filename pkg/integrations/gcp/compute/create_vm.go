@@ -2291,14 +2291,6 @@ func (c *CreateVM) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(createVMOutputChannel, createVMPayloadType, []any{payload})
 }
 
-func (c *CreateVM) Actions() []core.Action {
-	return nil
-}
-
-func (c *CreateVM) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateVM) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }

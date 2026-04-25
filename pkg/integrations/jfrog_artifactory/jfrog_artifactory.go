@@ -111,14 +111,6 @@ func (j *JFrogArtifactory) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (j *JFrogArtifactory) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
-func (j *JFrogArtifactory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (j *JFrogArtifactory) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (j *JFrogArtifactory) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "repository" {
 		return []core.IntegrationResource{}, nil

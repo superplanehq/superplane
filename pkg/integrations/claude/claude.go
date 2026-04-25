@@ -122,11 +122,3 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	return resources, nil
 }
-
-func (i *Claude) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (i *Claude) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
