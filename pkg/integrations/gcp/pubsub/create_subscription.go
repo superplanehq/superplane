@@ -173,13 +173,19 @@ func (c *CreateSubscriptionComponent) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (c *CreateSubscriptionComponent) Actions() []core.Action                  { return nil }
-func (c *CreateSubscriptionComponent) HandleAction(_ core.ActionContext) error { return nil }
-func (c *CreateSubscriptionComponent) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *CreateSubscriptionComponent) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *CreateSubscriptionComponent) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *CreateSubscriptionComponent) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *CreateSubscriptionComponent) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 func (c *CreateSubscriptionComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *CreateSubscriptionComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateSubscriptionComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

@@ -147,18 +147,18 @@ func (c *DeleteCheckRule) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (c *DeleteCheckRule) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteCheckRule) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteCheckRule) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteCheckRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteCheckRule) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

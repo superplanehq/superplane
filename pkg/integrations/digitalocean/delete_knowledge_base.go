@@ -204,14 +204,6 @@ func (d *DeleteKnowledgeBase) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteKnowledgeBase) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteKnowledgeBase) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined")
-}
-
 func (d *DeleteKnowledgeBase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -255,4 +247,12 @@ func resolveDeleteKBMetadata(ctx core.SetupContext, kbID string) error {
 		KnowledgeBaseID:   kbID,
 		KnowledgeBaseName: kb.Name,
 	})
+}
+
+func (d *DeleteKnowledgeBase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteKnowledgeBase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

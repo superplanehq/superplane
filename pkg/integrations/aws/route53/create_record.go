@@ -138,21 +138,21 @@ func (c *CreateRecord) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateRecord) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateRecord) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        pollChangeActionName,
-			Description: "Poll for change status",
+			Name: pollChangeActionName,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateRecord) HandleAction(ctx core.ActionContext) error {
+func (c *CreateRecord) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case pollChangeActionName:
 		return pollChangeUntilSynced(ctx)
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 

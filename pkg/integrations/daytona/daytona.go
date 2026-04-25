@@ -160,10 +160,10 @@ func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesConte
 	}
 }
 
-func (d *Daytona) Actions() []core.Action {
-	return []core.Action{}
+func (d *Daytona) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *Daytona) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *Daytona) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

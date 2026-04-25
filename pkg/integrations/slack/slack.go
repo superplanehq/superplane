@@ -98,14 +98,6 @@ func (s *Slack) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Slack) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
@@ -625,4 +617,12 @@ func (s *Slack) readAndVerify(ctx core.HTTPRequestContext) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+func (s *Slack) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Slack) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

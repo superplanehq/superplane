@@ -135,18 +135,18 @@ func (c *DeleteSnapshot) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (c *DeleteSnapshot) Actions() []core.Action {
-	return nil
-}
-
-func (c *DeleteSnapshot) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteSnapshot) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteSnapshot) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteSnapshot) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteSnapshot) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

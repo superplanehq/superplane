@@ -482,12 +482,12 @@ func Test__RunTask__Execute(t *testing.T) {
 	})
 }
 
-func Test__RunTask__HandleAction(t *testing.T) {
+func Test__RunTask__HandleHook(t *testing.T) {
 	component := &RunTask{}
 
 	t.Run("timeout action before deadline -> reschedules timeout check", func(t *testing.T) {
 		requests := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: runTaskTimeoutAction,
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunTaskExecutionMetadata{
@@ -528,7 +528,7 @@ func Test__RunTask__HandleAction(t *testing.T) {
 		}
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: runTaskTimeoutAction,
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunTaskExecutionMetadata{

@@ -60,18 +60,17 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("node is not a component node")
 	}
 
-	component, err := registry.GetComponent(node.Ref.Data().Component.Name)
+	hookProvider, hookDef, err := registry.FindComponentHook(node.Ref.Data().Component.Name, actionName)
 	if err != nil {
-		return nil, fmt.Errorf("component not found: %w", err)
+		return nil, fmt.Errorf("hook not found: %w", err)
 	}
 
-	actionDef := findAction(component, actionName)
-	if actionDef == nil {
-		return nil, fmt.Errorf("action '%s' not found for component '%s'", actionName, node.Ref.Data().Component.Name)
+	if hookDef.Type != core.HookTypeUser {
+		return nil, fmt.Errorf("hook '%s' cannot be invoked", actionName)
 	}
 
-	if err := configuration.ValidateConfiguration(actionDef.Parameters, parameters); err != nil {
-		return nil, fmt.Errorf("action parameter validation failed: %w", err)
+	if err := configuration.ValidateConfiguration(hookDef.Parameters, parameters); err != nil {
+		return nil, fmt.Errorf("hook parameters validation failed: %w", err)
 	}
 
 	user, err := models.FindActiveUserByID(orgID.String(), userID)
@@ -86,7 +85,7 @@ func InvokeNodeExecutionAction(
 
 	tx := database.Conn()
 	logger := logging.ForExecution(execution, nil)
-	actionCtx := core.ActionContext{
+	actionCtx := core.ActionHookContext{
 		Name:           actionName,
 		Parameters:     parameters,
 		Configuration:  node.Configuration.Data(),
@@ -110,7 +109,7 @@ func InvokeNodeExecutionAction(
 	}
 
 	actionCtx.Logger = logger
-	err = component.HandleAction(actionCtx)
+	err = hookProvider.HandleHook(actionCtx)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
 	}
@@ -126,14 +125,4 @@ func InvokeNodeExecutionAction(
 	}
 
 	return &pb.InvokeNodeExecutionActionResponse{}, nil
-}
-
-func findAction(component core.Component, actionName string) *core.Action {
-	for _, action := range component.Actions() {
-		if action.Name == actionName {
-			return &action
-		}
-	}
-
-	return nil
 }

@@ -136,11 +136,11 @@ func (p *OnWorkflowCompleted) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnWorkflowCompleted) Actions() []core.Action {
-	return []core.Action{}
+func (p *OnWorkflowCompleted) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *OnWorkflowCompleted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnWorkflowCompleted) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
 }
 

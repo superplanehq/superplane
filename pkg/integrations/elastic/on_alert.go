@@ -249,24 +249,23 @@ func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
 	return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
 }
 
-func (t *OnAlertFires) Actions() []core.Action {
-	return []core.Action{
+func (t *OnAlertFires) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           checkAlertConnectorAction,
-			Description:    "Find the Kibana connector and attach it to the alert rule",
-			UserAccessible: false,
+			Name: checkAlertConnectorAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (t *OnAlertFires) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnAlertFires) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	if ctx.Name == checkAlertConnectorAction {
 		return nil, t.checkConnectorAndAttachRule(ctx)
 	}
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+	return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (t *OnAlertFires) checkConnectorAndAttachRule(ctx core.TriggerActionContext) error {
+func (t *OnAlertFires) checkConnectorAndAttachRule(ctx core.TriggerHookContext) error {
 	var meta OnAlertFiresMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
