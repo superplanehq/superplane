@@ -8,13 +8,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import type {
-  ComponentBaseProps,
-  ComponentBaseSpec,
-  EventSection,
-  EventState,
-  EventStateMap,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import type React from "react";
 import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -124,32 +118,70 @@ export const GRAPHQL_STATE_REGISTRY: EventStateRegistry = {
 
 interface Output {
   status?: number | null;
+  body?: unknown;
+}
+
+function getGraphQLOutput(
+  outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
+): Output | undefined {
+  const success = outputs?.success;
+  if (success && success.length > 0) {
+    return success[0]?.data as Output | undefined;
+  }
+
+  const failure = outputs?.failure;
+  if (failure && failure.length > 0) {
+    return failure[0]?.data as Output | undefined;
+  }
+
+  return undefined;
 }
 
 function getGraphQLResponseStatusString(
   outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
 ): string | null {
-  const success = outputs?.success;
-  if (success && success.length > 0) {
-    const response = success[0]?.data as Output | undefined;
-    const status = response?.status;
-    if (status === undefined || status === null) {
-      return null;
-    }
-    return String(status);
+  const status = getGraphQLOutput(outputs)?.status;
+  if (status === undefined || status === null) {
+    return null;
   }
 
-  const failure = outputs?.failure;
-  if (failure && failure.length > 0) {
-    const response = failure[0]?.data as Output | undefined;
-    const status = response?.status;
-    if (status === undefined || status === null) {
-      return null;
-    }
-    return String(status);
+  return String(status);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatGraphQLError(error: unknown): string {
+  if (typeof error === "string") {
+    return error;
   }
 
-  return null;
+  if (isRecord(error) && typeof error.message === "string") {
+    return error.message;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function getGraphQLErrorsString(
+  outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
+): string | null {
+  const body = getGraphQLOutput(outputs)?.body;
+  if (!isRecord(body) || !Array.isArray(body.errors) || body.errors.length === 0) {
+    return null;
+  }
+
+  const errors = body.errors.map(formatGraphQLError).filter(Boolean);
+  if (errors.length === 0) {
+    return null;
+  }
+
+  return errors.join("\n");
 }
 
 export const graphqlMapper: ComponentBaseMapper = {
@@ -169,7 +201,6 @@ export const graphqlMapper: ComponentBaseMapper = {
         : undefined,
       includeEmptyState: !context.lastExecutions[0],
       metadata: getGraphQLMetadataList(context.node),
-      specs: getGraphQLSpecs(context.node),
       eventStateMap: GRAPHQL_EVENT_STATE_MAP,
     };
   },
@@ -182,6 +213,11 @@ export const graphqlMapper: ComponentBaseMapper = {
     const responseStatusString = getGraphQLResponseStatusString(outputs) ?? "";
     if (responseStatusString) {
       details["Response"] = responseStatusString;
+    }
+
+    const errors = getGraphQLErrorsString(outputs);
+    if (errors) {
+      details["Errors"] = errors;
     }
 
     if (metadata?.retry) {
@@ -249,10 +285,6 @@ type GraphQLMetadataRetry = {
 
 type GraphQLConfiguration = {
   url: string;
-  query: string;
-  variables?: Array<{ key: string; value: string }>;
-  headers?: Array<{ name: string; value: string }>;
-  timeoutSeconds: number;
 };
 
 function getGraphQLMetadataList(node: NodeInfo): MetadataItem[] {
@@ -265,82 +297,11 @@ function getGraphQLMetadataList(node: NodeInfo): MetadataItem[] {
   if (configuration.url) {
     metadata.push({
       icon: "link",
-      label: `POST ${configuration.url}`,
-    });
-  }
-
-  if (configuration.query) {
-    metadata.push({
-      icon: "brackets",
-      label: "GraphQL document",
+      label: configuration.url,
     });
   }
 
   return metadata;
-}
-
-function getGraphQLSpecs(node: NodeInfo): ComponentBaseSpec[] {
-  const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as Partial<GraphQLConfiguration> | undefined;
-  if (!configuration) {
-    return specs;
-  }
-
-  if (configuration.query) {
-    specs.push({
-      title: "query",
-      tooltipTitle: "GraphQL query",
-      iconSlug: "brackets",
-      value: configuration.query,
-      contentType: "text",
-    });
-  }
-
-  if (configuration.variables?.length) {
-    specs.push({
-      title: "variable",
-      tooltipTitle: "GraphQL variables",
-      iconSlug: "list",
-      values: configuration.variables.map((v) => ({
-        badges: [
-          {
-            label: v.key ?? "",
-            bgColor: "bg-green-100",
-            textColor: "text-green-800",
-          },
-          {
-            label: v.value ?? "",
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-800",
-          },
-        ],
-      })),
-    });
-  }
-
-  if (configuration.headers?.length) {
-    specs.push({
-      title: "header",
-      tooltipTitle: "request headers",
-      iconSlug: "list",
-      values: configuration.headers.map((header) => ({
-        badges: [
-          {
-            label: header.name ?? "",
-            bgColor: "bg-blue-100",
-            textColor: "text-blue-800",
-          },
-          {
-            label: header.value ?? "",
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-800",
-          },
-        ],
-      })),
-    });
-  }
-
-  return specs;
 }
 
 function getGraphQLEventSections(
