@@ -619,7 +619,7 @@ CREATE TABLE public.workflow_versions (
     name character varying(128) DEFAULT ''::character varying NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     change_management_enabled boolean DEFAULT false NOT NULL,
-    change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL
+    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
