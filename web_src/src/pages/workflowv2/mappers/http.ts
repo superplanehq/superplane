@@ -268,6 +268,13 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
     });
   }
 
+  if (configuration.authorization?.credential?.secret && configuration.authorization.credential.key) {
+    metadata.push({
+      icon: "key",
+      label: "Authorization (organization secret)",
+    });
+  }
+
   // Request body information
   const contentType = configuration.contentType;
   if (
@@ -314,6 +321,10 @@ type HTTPConfiguration = {
   xml?: string;
   timeoutSeconds: number;
   retry?: RetrySpec;
+  authorization?: {
+    credential?: { secret?: string; key?: string };
+    prefix?: string;
+  };
 };
 
 type RetrySpec = {

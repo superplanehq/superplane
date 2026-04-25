@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -48,6 +49,17 @@ type KeyValue struct {
 	Value string `json:"value"`
 }
 
+// AuthorizationSpec sets the outgoing Authorization header from an organization secret, like SSH
+// and other components that use configuration.SecretKeyRef. Generic headers are still plain
+// strings; this block is the supported way to attach a bearer (or other prefixed) token without
+// hardcoding it in header values.
+type AuthorizationSpec struct {
+	Credential configuration.SecretKeyRef `json:"credential" mapstructure:"credential"`
+	// Prefix is prepended before the secret value (e.g. "Bearer " for OAuth). If nil, defaults to
+	// "Bearer ". A non-nil empty string means no prefix (raw token only).
+	Prefix *string `json:"prefix,omitempty" mapstructure:"prefix"`
+}
+
 type Spec struct {
 	Method         string      `json:"method"`
 	URL            string      `json:"url"`
@@ -61,6 +73,9 @@ type Spec struct {
 	TimeoutSeconds *int        `json:"timeoutSeconds,omitempty"`
 	Retry          *RetrySpec  `json:"retry,omitempty"`
 	SuccessCodes   *string     `json:"successCodes,omitempty"`
+	// Authorization: optional; when set, populates the Authorization header from an org secret.
+	// Applied after custom headers, so it overrides any generic Authorization entry in headers.
+	Authorization *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
 }
 
 func (s *Spec) Timeout() time.Duration {
@@ -136,6 +151,7 @@ func (e *HTTP) Documentation() string {
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
+- **Authorization** (optional): Set the Authorization header from an organization secret (e.g. API bearer token) without putting credentials in **Headers**
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
@@ -172,6 +188,10 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 
 	if spec.Method == "" {
 		return fmt.Errorf("method is required")
+	}
+
+	if err := validateAuthorizationForSetup(spec.Authorization); err != nil {
+		return err
 	}
 
 	if spec.ContentType == nil {
@@ -218,6 +238,47 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 		}
 	}
 
+	return nil
+}
+
+// validateAuthorizationForSetup rejects partial secret references (empty block is allowed).
+func validateAuthorizationForSetup(a *AuthorizationSpec) error {
+	if a == nil {
+		return nil
+	}
+	if a.Credential.IsSet() {
+		return nil
+	}
+	if a.Credential.Secret != "" || a.Credential.Key != "" {
+		return fmt.Errorf("authorization: both organization secret and key name are required")
+	}
+	return fmt.Errorf("authorization: credential (organization secret and key) is required when authorization is set")
+}
+
+func applyAuthorizationHeader(secrets core.SecretsContext, spec Spec, req *http.Request) error {
+	if spec.Authorization == nil {
+		return nil
+	}
+	if !spec.Authorization.Credential.IsSet() {
+		return fmt.Errorf("authorization: credential is required")
+	}
+	if secrets == nil {
+		return fmt.Errorf("authorization: secrets context is not available")
+	}
+
+	value, err := secrets.GetKey(spec.Authorization.Credential.Secret, spec.Authorization.Credential.Key)
+	if err != nil {
+		if errors.Is(err, core.ErrSecretKeyNotFound) {
+			return fmt.Errorf("authorization: %w", err)
+		}
+		return fmt.Errorf("authorization: resolve credential: %w", err)
+	}
+
+	prefix := "Bearer "
+	if spec.Authorization.Prefix != nil {
+		prefix = *spec.Authorization.Prefix
+	}
+	req.Header.Set("Authorization", prefix+string(value))
 	return nil
 }
 
@@ -328,6 +389,36 @@ func (e *HTTP) Configuration() []configuration.Field {
 				{
 					"name":  "X-Foo",
 					"value": "Bar",
+				},
+			},
+		},
+		{
+			Name:        "authorization",
+			Label:       "Authorization",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional. Set the Authorization header from an organization secret (e.g. bearer token for APIs). This overrides a generic Authorization row under Headers, if both are set.",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "credential",
+							Label:       "Credential",
+							Type:        configuration.FieldTypeSecretKey,
+							Required:    true,
+							Description: "Secret and key that stores the API token or credential",
+						},
+						{
+							Name:        "prefix",
+							Label:       "Value prefix",
+							Type:        configuration.FieldTypeString,
+							Required:    false,
+							Description: "Text before the secret value, often \"Bearer \" for OAuth. Leave default for standard bearer tokens, or clear for a raw token with no prefix.",
+							Default:     "Bearer ",
+							Placeholder: "Bearer ",
+						},
+					},
 				},
 			},
 		},
@@ -524,6 +615,10 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	if err := validateAuthorizationForSetup(spec.Authorization); err != nil {
+		return err
+	}
+
 	//
 	// Handle request without retries configured.
 	//
@@ -534,7 +629,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	//
 	// Handle request with retries configured
 	//
-	response, err := e.executeRequest(ctx.Logger, ctx.HTTP, spec)
+	response, err := e.executeRequest(ctx.Logger, ctx.Secrets, ctx.HTTP, spec)
 	if err == nil && e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) {
 		return e.processResponse(ctx.Metadata, ctx.ExecutionState, response, spec)
 	}
@@ -576,7 +671,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 }
 
 func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) error {
-	response, err := e.executeRequest(ctx.Logger, ctx.HTTP, spec)
+	response, err := e.executeRequest(ctx.Logger, ctx.Secrets, ctx.HTTP, spec)
 	if err != nil {
 		return ctx.ExecutionState.Emit(
 			FailureOutputChannel,
@@ -633,7 +728,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 	)
 }
 
-func (e *HTTP) executeRequest(logger *log.Entry, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
+func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
 	var body io.Reader
 	var contentType string
 	var err error
@@ -676,6 +771,10 @@ func (e *HTTP) executeRequest(logger *log.Entry, httpCtx core.HTTPContext, spec 
 		for _, header := range *spec.Headers {
 			req.Header.Set(header.Name, header.Value)
 		}
+	}
+
+	if err := applyAuthorizationHeader(secrets, spec, req); err != nil {
+		return nil, err
 	}
 
 	logger.Infof("[%s] %s", spec.Method, spec.URL)
@@ -899,7 +998,7 @@ func (e *HTTP) handleRetryRequest(ctx core.ActionHookContext) error {
 		return err
 	}
 
-	resp, err := e.executeRequest(ctx.Logger, ctx.HTTP, spec)
+	resp, err := e.executeRequest(ctx.Logger, ctx.Secrets, ctx.HTTP, spec)
 
 	//
 	// Handle successful scenario

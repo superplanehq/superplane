@@ -104,6 +104,18 @@ func (c *contextBoundHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
+type fakeSecretsContext struct {
+	value []byte
+	err   error
+}
+
+func (f *fakeSecretsContext) GetKey(_, _ string) ([]byte, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.value, nil
+}
+
 type sequenceHTTPClient struct {
 	errors    []error
 	responses []*http.Response
@@ -174,6 +186,19 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 				"method":       "GET",
 				"url":          "https://api.example.com",
 				"successCodes": "200,404",
+			},
+		},
+		{
+			name: "GET with authorization from secret",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"credential": map[string]any{
+						"secret": "api-creds",
+						"key":    "token",
+					},
+				},
 			},
 		},
 	}
@@ -277,6 +302,20 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			},
 			expectErr: "interval seconds must be less than or equal to 300",
 		},
+		{
+			name: "authorization without full credential",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"credential": map[string]any{
+						"secret": "s",
+						"key":    "",
+					},
+				},
+			},
+			expectErr: "authorization: both organization secret and key name are required",
+		},
 	}
 
 	for _, tt := range tests {
@@ -321,6 +360,95 @@ func TestHTTP__Execute__GET(t *testing.T) {
 
 	body := response["body"].(map[string]any)
 	assert.Equal(t, "world", body["hello"])
+}
+
+func TestHTTP__Execute__SetsAuthorizationFromSecret(t *testing.T) {
+	h := &HTTP{}
+	var gotAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"headers": []map[string]any{
+			{"name": "Authorization", "value": "should-be-overridden"},
+		},
+		"authorization": map[string]any{
+			"prefix": "",
+			"credential": map[string]any{
+				"secret": "org-secret",
+				"key":    "token",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{value: []byte("tok-123")}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "tok-123", gotAuth)
+}
+
+func TestHTTP__Execute__AuthorizationDefaultBearerPrefix(t *testing.T) {
+	h := &HTTP{}
+	var gotAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"credential": map[string]any{
+				"secret": "s",
+				"key":    "k",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{value: []byte("abc")}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "Bearer abc", gotAuth)
+}
+
+func TestHTTP__Execute__AuthorizationSecretMissing(t *testing.T) {
+	h := &HTTP{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"credential": map[string]any{
+				"secret": "s",
+				"key":    "k",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{err: core.ErrSecretKeyNotFound}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	errStr := responsePayload(t, stateCtx)["error"].(string)
+	assert.Contains(t, errStr, "authorization")
 }
 
 func TestHTTP__Execute__ReadsResponseBodyBeforeContextCancellation(t *testing.T) {
