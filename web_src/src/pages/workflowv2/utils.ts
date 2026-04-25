@@ -5,7 +5,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
-  ComponentsComponent,
+  SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   SuperplaneMeUser,
@@ -161,12 +161,12 @@ export function mapExecutionsToSidebarEvents(
 
   return executionsToMap.map((execution) => {
     const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
-    const stateResolver = getState(currentComponentNode?.component?.name || "");
+    const stateResolver = getState(currentComponentNode?.action?.name || "");
     const state = stateResolver(buildExecutionInfo(execution));
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
-    const componentName = currentComponentNode?.component?.name || "";
+    const componentName = currentComponentNode?.action?.name || "";
     const componentMapper = getComponentBaseMapper(componentName);
     const componentSubtitle = componentMapper.subtitle?.({
       node: buildNodeInfo(currentComponentNode as ComponentsNode),
@@ -385,7 +385,7 @@ export function buildRunItemFromExecution(options: {
 }): LogRunItem {
   const { execution, nodes } = options;
   const componentNode = nodes.find((node) => node.id === execution.nodeId);
-  const componentName = componentNode?.component?.name || "";
+  const componentName = componentNode?.action?.name || "";
   const stateResolver = getState(componentName);
   const resolvedState = stateResolver(buildExecutionInfo(execution));
 
@@ -1319,7 +1319,7 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
   };
 }
 
-export function buildComponentDefinition(component?: Partial<ComponentsComponent>): ComponentDefinition {
+export function buildComponentDefinition(component?: Partial<SuperplaneActionsAction>): ComponentDefinition {
   return {
     name: component?.name || "unknown",
     label: component?.label || "Unknown",
@@ -1354,7 +1354,7 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
   return {
     id: node.id!,
     name: node.name || "",
-    componentName: node.type === "TYPE_TRIGGER" ? node.trigger?.name || "" : node.component?.name || "",
+    componentName: node.type === "TYPE_TRIGGER" ? node.trigger?.name || "" : node.action?.name || "",
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
     metadata: node.metadata,

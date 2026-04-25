@@ -22,7 +22,7 @@ spec:
       position:
         x: 408
         "y": 425
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "pagerduty.onIncident"
@@ -40,7 +40,7 @@ spec:
       position:
         x: 933
         "y": 426
-      component:
+      action:
         name: "filter"
       blueprint: null
       trigger: null
@@ -64,7 +64,7 @@ spec:
       position:
         x: 1458
         "y": 427
-      component:
+      action:
         name: "dash0.listIssues"
       blueprint: null
       trigger: null
@@ -84,7 +84,7 @@ spec:
       position:
         x: 1458
         "y": 683
-      component:
+      action:
         name: "dash0.queryPrometheus"
       blueprint: null
       trigger: null
@@ -104,7 +104,7 @@ spec:
       position:
         x: 1458
         "y": 983
-      component:
+      action:
         name: "dash0.queryPrometheus"
       blueprint: null
       trigger: null
@@ -123,7 +123,7 @@ spec:
       position:
         x: 2687
         "y": 435
-      component:
+      action:
         name: "openai.textPrompt"
       blueprint: null
       trigger: null
@@ -147,7 +147,7 @@ spec:
       position:
         x: 3206
         "y": 435
-      component:
+      action:
         name: "github.createIssue"
       blueprint: null
       trigger: null
@@ -168,7 +168,7 @@ spec:
       position:
         x: 353
         "y": 78
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -190,7 +190,7 @@ spec:
       position:
         x: 2079
         "y": 430
-      component:
+      action:
         name: "merge"
       blueprint: null
       trigger: null
@@ -211,7 +211,7 @@ spec:
       position:
         x: 894
         "y": 79
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -232,7 +232,7 @@ spec:
       position:
         x: 1459
         "y": 80
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -253,7 +253,7 @@ spec:
       position:
         x: 2719
         "y": 81
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:

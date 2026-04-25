@@ -261,8 +261,8 @@ func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.Reso
 				{
 					Id:   "node-1",
 					Name: "Initial Name",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.Node_TYPE_ACTION,
+					Action: &componentpb.Node_ActionRef{
 						Name: "noop",
 					},
 				},
@@ -295,8 +295,8 @@ func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRe
 					{
 						Id:   "node-1",
 						Name: nodeName,
-						Type: componentpb.Node_TYPE_COMPONENT,
-						Component: &componentpb.Node_ComponentRef{
+						Type: componentpb.Node_TYPE_ACTION,
+						Action: &componentpb.Node_ActionRef{
 							Name: "noop",
 						},
 					},

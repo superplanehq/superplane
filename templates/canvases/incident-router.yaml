@@ -13,7 +13,7 @@ spec:
       position:
         x: 319
         "y": 501
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "slack.onAppMention"
@@ -31,7 +31,7 @@ spec:
       position:
         x: 893
         "y": 500
-      component:
+      action:
         name: "filter"
       blueprint: null
       trigger: null
@@ -50,7 +50,7 @@ spec:
       position:
         x: 1427
         "y": 500
-      component:
+      action:
         name: "openai.textPrompt"
       blueprint: null
       trigger: null
@@ -69,7 +69,7 @@ spec:
       position:
         x: 1427
         "y": 675
-      component:
+      action:
         name: "openai.textPrompt"
       blueprint: null
       trigger: null
@@ -94,7 +94,7 @@ spec:
       position:
         x: 2487
         "y": 425
-      component:
+      action:
         name: "pagerduty.createIncident"
       blueprint: null
       trigger: null
@@ -118,7 +118,7 @@ spec:
       position:
         x: 2487
         "y": 534
-      component:
+      action:
         name: "github.createIssue"
       blueprint: null
       trigger: null
@@ -139,7 +139,7 @@ spec:
       position:
         x: 863
         "y": 179
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -160,7 +160,7 @@ spec:
       position:
         x: 1445
         "y": 179
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -181,7 +181,7 @@ spec:
       position:
         x: 2471
         "y": 174
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -203,7 +203,7 @@ spec:
       position:
         x: 319
         "y": 920
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onIssueComment"
@@ -225,7 +225,7 @@ spec:
       position:
         x: 1922
         "y": 500
-      component:
+      action:
         name: "merge"
       blueprint: null
       trigger: null
@@ -243,7 +243,7 @@ spec:
       position:
         x: 3011
         "y": 464
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -267,7 +267,7 @@ spec:
       position:
         x: 319
         "y": 710
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onIssue"
@@ -288,7 +288,7 @@ spec:
       position:
         x: 246
         "y": 175
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:

@@ -20,7 +20,7 @@ spec:
       position:
         x: 133
         "y": 403
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onRelease"
@@ -40,7 +40,7 @@ spec:
       position:
         x: 1191
         "y": 402
-      component:
+      action:
         name: "wait"
       blueprint: null
       trigger: null
@@ -62,7 +62,7 @@ spec:
       position:
         x: 1195
         "y": 636
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -86,7 +86,7 @@ spec:
       position:
         x: 1712
         "y": 221
-      component:
+      action:
         name: "dash0.listIssues"
       blueprint: null
       trigger: null
@@ -108,7 +108,7 @@ spec:
       position:
         x: 1715
         "y": 402
-      component:
+      action:
         name: "http"
       blueprint: null
       trigger: null
@@ -131,7 +131,7 @@ spec:
       position:
         x: 2295
         "y": 405
-      component:
+      action:
         name: "merge"
       blueprint: null
       trigger: null
@@ -155,7 +155,7 @@ spec:
       position:
         x: 4026
         "y": 408
-      component:
+      action:
         name: "dash0.listIssues"
       blueprint: null
       trigger: null
@@ -177,7 +177,7 @@ spec:
       position:
         x: 4028
         "y": 480
-      component:
+      action:
         name: "http"
       blueprint: null
       trigger: null
@@ -197,7 +197,7 @@ spec:
       position:
         x: 3480
         "y": 405
-      component:
+      action:
         name: "wait"
       blueprint: null
       trigger: null
@@ -220,7 +220,7 @@ spec:
       position:
         x: 4565
         "y": 479
-      component:
+      action:
         name: "merge"
       blueprint: null
       trigger: null
@@ -238,7 +238,7 @@ spec:
       position:
         x: 1719
         "y": 644
-      component:
+      action:
         name: "pagerduty.listIncidents"
       blueprint: null
       trigger: null
@@ -267,7 +267,7 @@ spec:
       position:
         x: 634
         "y": 402
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -296,7 +296,7 @@ spec:
       position:
         x: 2865
         "y": 411
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -314,7 +314,7 @@ spec:
       position:
         x: 4028
         "y": 555
-      component:
+      action:
         name: "pagerduty.listIncidents"
       blueprint: null
       trigger: null
@@ -335,7 +335,7 @@ spec:
       position:
         x: 126
         "y": -7
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -356,7 +356,7 @@ spec:
       position:
         x: 619
         "y": 59
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -377,7 +377,7 @@ spec:
       position:
         x: 1707
         "y": -173
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -398,7 +398,7 @@ spec:
       position:
         x: 2289
         "y": -31
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -427,7 +427,7 @@ spec:
       position:
         x: 5121
         "y": 399
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -448,7 +448,7 @@ spec:
       position:
         x: 2859
         "y": -21
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:

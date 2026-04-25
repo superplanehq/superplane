@@ -14,7 +14,7 @@ spec:
       position:
         x: 382
         "y": 396
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "schedule"
@@ -35,7 +35,7 @@ spec:
       position:
         x: 862
         "y": 396
-      component:
+      action:
         name: "http"
       blueprint: null
       trigger: null
@@ -63,7 +63,7 @@ spec:
       position:
         x: 1438
         "y": 396
-      component:
+      action:
         name: "upsertMemory"
       blueprint: null
       trigger: null
@@ -86,7 +86,7 @@ spec:
       position:
         x: 1437
         "y": 501
-      component:
+      action:
         name: "readMemory"
       blueprint: null
       trigger: null
@@ -104,7 +104,7 @@ spec:
       position:
         x: 2014
         "y": 396
-      component:
+      action:
         name: "if"
       blueprint: null
       trigger: null
@@ -124,7 +124,7 @@ spec:
       position:
         x: 2638
         "y": 396
-      component:
+      action:
         name: "sendEmail"
       blueprint: null
       trigger: null
@@ -150,7 +150,7 @@ spec:
       position:
         x: 3118
         "y": 396
-      component:
+      action:
         name: "upsertMemory"
       blueprint: null
       trigger: null
