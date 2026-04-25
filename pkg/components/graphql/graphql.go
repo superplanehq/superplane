@@ -46,7 +46,6 @@ type Spec struct {
 	Query          string      `json:"query"`
 	Variables      *[]KeyValue `json:"variables,omitempty"`
 	Headers        *[]Header   `json:"headers,omitempty"`
-	OperationName  *string     `json:"operationName,omitempty"`
 	TimeoutSeconds *int        `json:"timeoutSeconds,omitempty"`
 	SuccessCodes   *string     `json:"successCodes,omitempty"`
 }
@@ -86,8 +85,7 @@ func (e *GraphQL) Documentation() string {
 
 ## Use cases
 
-- **GitHub, GitLab, and other GraphQL APIs** without hand-building escaped JSON for the "query" field
-- **Named operations** via optional operation name
+- **GraphQL APIs** without hand-building escaped JSON for the "query" field
 
 ## Request
 
@@ -95,13 +93,12 @@ func (e *GraphQL) Documentation() string {
 - **Query** — Multi-line GraphQL document (no JSON escaping in the canvas)
 - **Variables** — Optional key/value pairs, merged into a JSON "variables" object (values support expressions)
 - **Headers** — for example Authorization (header names cannot use expressions)
-- **Operation name** — Optional, for named operations
 
 ## Response
 
 Same shape as the HTTP component: **status**, **headers**, and **body** (JSON when possible, otherwise string).
 
-**Note:** Many GraphQL servers return **HTTP 200** even when the response JSON includes a top-level "errors" array. This component classifies success and failure from the **HTTP status** (and optional success code override) like the HTTP component, not from the presence of "errors" in the body. Inspect **data.body** in your workflow to branch on GraphQL errors if needed.
+**Note:** Many GraphQL servers return **HTTP 200** even when the response JSON includes a top-level "errors" array. This component sends responses with a non-empty top-level "errors" array to the **Failure** channel.
 `
 }
 
@@ -139,20 +136,23 @@ func (e *GraphQL) OutputChannels(_ any) []core.OutputChannel {
 }
 
 func (e *GraphQL) Configuration() []configuration.Field {
+	minTimeout := 1
+	maxTimeout := int(MaxTimeout.Seconds())
+
 	return []configuration.Field{
 		{
 			Name:        "url",
 			Label:       "URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Placeholder: "https://api.github.com/graphql",
+			Placeholder: "https://api.example.com/graphql",
 		},
 		{
 			Name:        "query",
 			Label:       "Query",
 			Type:        configuration.FieldTypeText,
 			Required:    true,
-			Placeholder: "query {\n  viewer {\n    login\n  }\n}",
+			Placeholder: "query {\n  node {\n    id\n  }\n}",
 		},
 		{
 			Name:        "variables",
@@ -225,15 +225,6 @@ func (e *GraphQL) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "operationName",
-			Type:        configuration.FieldTypeString,
-			Label:       "Operation name",
-			Required:    false,
-			Togglable:   true,
-			Description: "Name of the operation to execute, for documents with multiple operations",
-			Placeholder: "GetUser",
-		},
-		{
 			Name:        "successCodes",
 			Type:        configuration.FieldTypeString,
 			Label:       "Overwrite success definition",
@@ -250,8 +241,8 @@ func (e *GraphQL) Configuration() []configuration.Field {
 			Default:     10,
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
-					Min: func() *int { min := 1; return &min }(),
-					Max: func() *int { max := int(MaxTimeout.Seconds()); return &max }(),
+					Min: &minTimeout,
+					Max: &maxTimeout,
 				},
 			},
 		},
@@ -303,7 +294,7 @@ func (e *GraphQL) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	if e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) {
+	if e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) && !e.hasGraphQLErrors(bodyData) {
 		return ctx.ExecutionState.Emit(
 			SuccessOutputChannel,
 			"graphql.request.finished",
@@ -326,6 +317,16 @@ func (e *GraphQL) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
+func (e *GraphQL) hasGraphQLErrors(bodyData any) bool {
+	body, ok := bodyData.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	errors, ok := body["errors"].([]any)
+	return ok && len(errors) > 0
+}
+
 func (e *GraphQL) buildRequestBody(spec Spec) ([]byte, error) {
 	payload := map[string]any{
 		"query": spec.Query,
@@ -342,10 +343,6 @@ func (e *GraphQL) buildRequestBody(spec Spec) ([]byte, error) {
 		if len(vars) > 0 {
 			payload["variables"] = vars
 		}
-	}
-
-	if spec.OperationName != nil && strings.TrimSpace(*spec.OperationName) != "" {
-		payload["operationName"] = strings.TrimSpace(*spec.OperationName)
 	}
 
 	return json.Marshal(payload)

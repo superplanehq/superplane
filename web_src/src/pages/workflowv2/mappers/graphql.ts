@@ -250,7 +250,6 @@ type GraphQLMetadataRetry = {
 type GraphQLConfiguration = {
   url: string;
   query: string;
-  operationName?: string;
   variables?: Array<{ key: string; value: string }>;
   headers?: Array<{ name: string; value: string }>;
   timeoutSeconds: number;
@@ -293,16 +292,6 @@ function getGraphQLSpecs(node: NodeInfo): ComponentBaseSpec[] {
       tooltipTitle: "GraphQL query",
       iconSlug: "brackets",
       value: configuration.query,
-      contentType: "text",
-    });
-  }
-
-  if (configuration.operationName) {
-    specs.push({
-      title: "operation",
-      tooltipTitle: "Operation name",
-      iconSlug: "file-text",
-      value: configuration.operationName,
       contentType: "text",
     });
   }

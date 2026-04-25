@@ -1,8 +1,8 @@
 # GraphQL component (workflow)
 
-Native component name: `graphql`. Sends a **POST** with `Content-Type: application/json` to a GraphQL HTTP endpoint. The request body is built in the backend: `query` (string from the multi-line field), optional `variables` (key/value map), optional `operationName`.
+Native component name: `graphql`. Sends a **POST** with `Content-Type: application/json` to a GraphQL HTTP endpoint. The request body is built in the backend: `query` (string from the multi-line field) and optional `variables` (key/value map).
 
-- **URL**: endpoint (e.g. `https://api.github.com/graphql`).
+- **URL**: endpoint (e.g. `https://api.example.com/graphql`).
 
 - **Query**: GraphQL document; use a multi-line string—no need to JSON-escape the document in the canvas.
 
@@ -10,6 +10,4 @@ Native component name: `graphql`. Sends a **POST** with `Content-Type: applicati
 
 - **Headers**: e.g. `Authorization: Bearer …`.
 
-- **Operation name**: for documents with multiple operations.
-
-Outputs match the HTTP component: `data.status`, `data.headers`, `data.body`. **HTTP status** (and optional success code list) defines success vs failure, same as HTTP. A response may be HTTP 200 with a top-level `errors` array in the JSON body; check `data.body` (or downstream logic) to branch on GraphQL errors.
+Outputs match the HTTP component: `data.status`, `data.headers`, `data.body`. **HTTP status** (and optional success code list) defines success vs failure, same as HTTP. A response with a non-empty top-level `errors` array in the JSON body is routed to the `failure` channel, even when the HTTP status is 200.

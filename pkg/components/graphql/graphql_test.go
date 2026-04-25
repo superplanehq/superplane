@@ -84,7 +84,7 @@ func TestGraphQL__Execute__BuildsBodyAndSuccess(t *testing.T) {
 		var payload map[string]any
 		require.NoError(t, json.Unmarshal(body, &payload))
 		assert.Equal(t, q, payload["query"])
-		assert.Equal(t, "op1", payload["operationName"])
+		assert.NotContains(t, payload, "operationName")
 
 		vars, ok := payload["variables"].(map[string]any)
 		require.True(t, ok)
@@ -99,7 +99,6 @@ func TestGraphQL__Execute__BuildsBodyAndSuccess(t *testing.T) {
 	ctx, stateCtx := createExecutionContext(map[string]any{
 		"url":            server.URL,
 		"query":          q,
-		"operationName":  "op1",
 		"timeoutSeconds": 1,
 		"variables": []map[string]any{
 			{"key": "org", "value": "acme"},
@@ -169,6 +168,55 @@ func TestGraphQL__Execute__FailureChannelOnStatus(t *testing.T) {
 
 	data := responsePayload(t, stateCtx)
 	assert.Equal(t, http.StatusBadGateway, data["status"])
+}
+
+func TestGraphQL__Execute__FailureChannelOnGraphQLErrors(t *testing.T) {
+	g := &GraphQL{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"errors":[{"message":"Expected one of SCHEMA, SCALAR"}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stateCtx := createExecutionContext(map[string]any{
+		"url":            server.URL,
+		"query":          "query { a }",
+		"timeoutSeconds": 1,
+	})
+
+	err := g.Execute(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	assert.Equal(t, "graphql.request.failed", stateCtx.Type)
+
+	data := responsePayload(t, stateCtx)
+	assert.Equal(t, http.StatusOK, data["status"])
+	body := data["body"].(map[string]any)
+	errors, ok := body["errors"].([]any)
+	require.True(t, ok)
+	require.Len(t, errors, 1)
+}
+
+func TestGraphQL__Execute__SuccessChannelOnEmptyGraphQLErrors(t *testing.T) {
+	g := &GraphQL{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":{"ok":true},"errors":[]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stateCtx := createExecutionContext(map[string]any{
+		"url":            server.URL,
+		"query":          "query { a }",
+		"timeoutSeconds": 1,
+	})
+
+	err := g.Execute(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, SuccessOutputChannel, stateCtx.Channel)
+	assert.Equal(t, "graphql.request.finished", stateCtx.Type)
 }
 
 func TestGraphQL__BuildRequestBody__SkipsEmptyVariableKeys(t *testing.T) {
