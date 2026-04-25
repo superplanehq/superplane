@@ -425,16 +425,16 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return http.StatusOK, nil, nil
 }
 
-func (t *RunPipeline) Actions() []core.Action {
-	return []core.Action{
+func (t *RunPipeline) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (t *RunPipeline) HandleAction(ctx core.ActionContext) error {
+func (t *RunPipeline) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return t.poll(ctx)
@@ -443,7 +443,7 @@ func (t *RunPipeline) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (t *RunPipeline) poll(ctx core.ActionContext) error {
+func (t *RunPipeline) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

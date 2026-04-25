@@ -419,7 +419,7 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	return c.executeSSH(execCtx)
 }
 
-func (c *SSHCommand) HandleAction(ctx core.ActionContext) error {
+func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "connectionRetry" {
 		if ctx.ExecutionState.IsFinished() {
 			return nil
@@ -645,9 +645,12 @@ func (c *SSHCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (c *SSHCommand) Actions() []core.Action {
-	return []core.Action{
-		{Name: "connectionRetry"},
+func (c *SSHCommand) Hooks() []core.Hook {
+	return []core.Hook{
+		{
+			Name: "connectionRetry",
+			Type: core.HookTypeInternal,
+		},
 	}
 }
 

@@ -304,23 +304,22 @@ func (c *StopTask) OnIntegrationMessage(ctx core.IntegrationMessageContext) erro
 	return emitStopTaskOutput(executionCtx.ExecutionState, task)
 }
 
-func (c *StopTask) Actions() []core.Action {
-	return []core.Action{
+func (c *StopTask) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           stopTaskCheckRuleAvailabilityAction,
-			Description:    "Check if the EventBridge rule is available",
-			UserAccessible: false,
+			Name: stopTaskCheckRuleAvailabilityAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *StopTask) HandleAction(ctx core.ActionContext) error {
+func (c *StopTask) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case stopTaskCheckRuleAvailabilityAction:
 		return c.checkRuleAvailability(ctx)
 
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
@@ -368,7 +367,7 @@ var stopTaskEventDetailFilter = map[string]any{
 	"lastStatus": "STOPPED",
 }
 
-func (c *StopTask) checkRuleAvailability(ctx core.ActionContext) error {
+func (c *StopTask) checkRuleAvailability(ctx core.ActionHookContext) error {
 	metadata := StopTaskNodeMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)

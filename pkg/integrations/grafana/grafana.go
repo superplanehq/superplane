@@ -79,14 +79,6 @@ func (g *Grafana) Configuration() []configuration.Field {
 	}
 }
 
-func (g *Grafana) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
 		&CreateAlertRule{},
@@ -338,4 +330,12 @@ func formatSilenceResourceLabel(s Silence) string {
 		return fmt.Sprintf("%s (%s)", comment, idShort)
 	}
 	return fmt.Sprintf("%s [%s] (%s)", comment, state, idShort)
+}
+
+func (g *Grafana) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *Grafana) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

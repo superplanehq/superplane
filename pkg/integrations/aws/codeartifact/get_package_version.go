@@ -270,14 +270,6 @@ func (c *GetPackageVersion) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *GetPackageVersion) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetPackageVersion) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetPackageVersion) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -299,4 +291,12 @@ func (c *GetPackageVersion) normalizeConfig(config GetPackageVersionConfiguratio
 	config.Namespace = strings.TrimSpace(config.Namespace)
 	config.Version = strings.TrimSpace(config.Version)
 	return config
+}
+
+func (c *GetPackageVersion) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetPackageVersion) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

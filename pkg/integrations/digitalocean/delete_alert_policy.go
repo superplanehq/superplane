@@ -140,18 +140,18 @@ func (d *DeleteAlertPolicy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uui
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteAlertPolicy) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteAlertPolicy) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (d *DeleteAlertPolicy) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (d *DeleteAlertPolicy) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteAlertPolicy) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

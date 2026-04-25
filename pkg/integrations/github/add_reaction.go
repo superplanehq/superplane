@@ -230,14 +230,6 @@ func (c *AddReaction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return 200, nil, nil
 }
 
-func (c *AddReaction) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *AddReaction) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *AddReaction) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -275,4 +267,12 @@ func parseCommentID(value string) (int64, error) {
 	}
 
 	return int64(floatValue), nil
+}
+
+func (c *AddReaction) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddReaction) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }
