@@ -13,7 +13,7 @@ const ComponentName = "noop"
 const PayloadType = "noop.finished"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &NoOp{})
+	registry.RegisterAction(ComponentName, &NoOp{})
 }
 
 type NoOp struct{}

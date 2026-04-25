@@ -148,8 +148,8 @@ func (p *Prometheus) Configuration() []configuration.Field {
 	}
 }
 
-func (p *Prometheus) Components() []core.Component {
-	return []core.Component{
+func (p *Prometheus) Actions() []core.Action {
+	return []core.Action{
 		&GetAlert{},
 		&CreateSilence{},
 		&ExpireSilence{},

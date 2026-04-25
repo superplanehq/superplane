@@ -21,7 +21,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent(ComponentName, &SendEmail{})
+	registry.RegisterAction(ComponentName, &SendEmail{})
 }
 
 type SendEmail struct{}

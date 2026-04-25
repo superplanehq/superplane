@@ -96,8 +96,8 @@ func (a *AzureIntegration) Configuration() []configuration.Field {
 	}
 }
 
-func (a *AzureIntegration) Components() []core.Component {
-	return []core.Component{
+func (a *AzureIntegration) Actions() []core.Action {
+	return []core.Action{
 		&CreateVMComponent{},
 		&DeleteVMComponent{},
 		&StartVMComponent{},

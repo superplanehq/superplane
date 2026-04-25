@@ -76,8 +76,8 @@ func (e *Elastic) Configuration() []configuration.Field {
 	}
 }
 
-func (e *Elastic) Components() []core.Component {
-	return []core.Component{
+func (e *Elastic) Actions() []core.Action {
+	return []core.Action{
 		&IndexDocument{},
 		&CreateCase{},
 		&GetCase{},

@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -170,13 +171,11 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Register a test integration that always fails on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(
-			support.DummyIntegrationOptions{
-				OnSync: func(ctx core.SyncContext) error {
-					return errors.New("oops")
-				},
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				return errors.New("oops")
 			},
-		)
+		})
 
 		name := support.RandomName("integration")
 		appConfig, err := structpb.NewStruct(map[string]interface{}{})
@@ -214,7 +213,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil

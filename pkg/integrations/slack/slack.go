@@ -98,8 +98,8 @@ func (s *Slack) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Slack) Components() []core.Component {
-	return []core.Component{
+func (s *Slack) Actions() []core.Action {
+	return []core.Action{
 		&SendTextMessage{},
 		&WaitForButtonClick{},
 	}

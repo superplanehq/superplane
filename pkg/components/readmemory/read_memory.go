@@ -22,7 +22,7 @@ const ChannelNameFound = "found"
 const ChannelNameNotFound = "notFound"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &ReadMemory{})
+	registry.RegisterAction(ComponentName, &ReadMemory{})
 }
 
 type ReadMemory struct{}

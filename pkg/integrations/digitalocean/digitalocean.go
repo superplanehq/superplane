@@ -89,8 +89,8 @@ func (d *DigitalOcean) Configuration() []configuration.Field {
 	}
 }
 
-func (d *DigitalOcean) Components() []core.Component {
-	return []core.Component{
+func (d *DigitalOcean) Actions() []core.Action {
+	return []core.Action{
 		&CreateDroplet{},
 		&GetDroplet{},
 		&DeleteDroplet{},

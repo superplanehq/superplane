@@ -104,8 +104,8 @@ func (s *Semaphore) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (s *Semaphore) Components() []core.Component {
-	return []core.Component{
+func (s *Semaphore) Actions() []core.Action {
+	return []core.Action{
 		&RunWorkflow{},
 		&GetPipeline{},
 	}

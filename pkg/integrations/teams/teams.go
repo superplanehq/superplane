@@ -140,8 +140,8 @@ func (t *Teams) Configuration() []configuration.Field {
 	}
 }
 
-func (t *Teams) Components() []core.Component {
-	return []core.Component{
+func (t *Teams) Actions() []core.Action {
+	return []core.Action{
 		&SendTextMessage{},
 	}
 }

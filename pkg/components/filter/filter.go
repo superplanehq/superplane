@@ -14,7 +14,7 @@ import (
 const ComponentName = "filter"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &Filter{})
+	registry.RegisterAction(ComponentName, &Filter{})
 }
 
 type Spec struct {

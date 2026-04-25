@@ -97,8 +97,8 @@ func (r *Render) Configuration() []configuration.Field {
 	}
 }
 
-func (r *Render) Components() []core.Component {
-	return []core.Component{
+func (r *Render) Actions() []core.Action {
+	return []core.Action{
 		&Deploy{},
 		&GetService{},
 		&GetDeploy{},

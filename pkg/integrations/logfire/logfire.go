@@ -196,8 +196,8 @@ func (l *Logfire) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (l *Logfire) Components() []core.Component {
-	return []core.Component{
+func (l *Logfire) Actions() []core.Action {
+	return []core.Action{
 		&QueryLogfire{},
 	}
 }
