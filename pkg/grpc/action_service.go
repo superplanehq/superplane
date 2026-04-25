@@ -1,10 +1,10 @@
-package components
+package grpc
 
 import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	pb "github.com/superplanehq/superplane/pkg/protos/components"
+	pb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
@@ -12,10 +12,24 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func DescribeComponent(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeComponentResponse, error) {
-	action, err := registry.GetAction(name)
+type ActionService struct {
+	registry *registry.Registry
+}
+
+func NewActionService(registry *registry.Registry) *ActionService {
+	return &ActionService{registry: registry}
+}
+
+func (s *ActionService) ListActions(ctx context.Context, req *pb.ListActionsRequest) (*pb.ListActionsResponse, error) {
+	return &pb.ListActionsResponse{
+		Actions: actions.SerializeActions(s.registry.ListActions()),
+	}, nil
+}
+
+func (s *ActionService) DescribeAction(ctx context.Context, req *pb.DescribeActionRequest) (*pb.DescribeActionResponse, error) {
+	action, err := s.registry.GetAction(req.Name)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "action %s not found", name)
+		return nil, status.Errorf(codes.NotFound, "action %s not found", req.Name)
 	}
 
 	outputChannels := action.OutputChannels(nil)
@@ -37,8 +51,8 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 		exampleOutput, _ = structpb.NewStruct(output)
 	}
 
-	return &pb.DescribeComponentResponse{
-		Component: &pb.Component{
+	return &pb.DescribeActionResponse{
+		Action: &pb.Action{
 			Name:           action.Name(),
 			Label:          action.Label(),
 			Description:    action.Description(),

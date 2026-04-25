@@ -7,10 +7,10 @@ import type { SidebarEvent } from "../types";
 import { TimeAgo } from "@/components/TimeAgo";
 import type {
   CanvasesCanvasNodeExecution,
-  SuperplaneComponentsNode as ComponentsNode,
-  ComponentsComponent,
+  SuperplaneComponentsNode,
   TriggersTrigger,
   BlueprintsBlueprint,
+  SuperplaneActionsAction,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../../componentBase";
 import type { ChildExecution } from "@/ui/chainItem";
@@ -19,15 +19,15 @@ import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 
 function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,
-  workflowNode: ComponentsNode,
-  workflowNodes: ComponentsNode[],
+  workflowNode: SuperplaneComponentsNode,
+  workflowNodes: SuperplaneComponentsNode[],
 ): { current?: Record<string, any>; payload?: any; configuration?: any } {
   const tabData: { current?: Record<string, any>; payload?: any; configuration?: any } = {};
 
   let currentData: Record<string, any> = {};
 
-  if (workflowNode?.component?.name) {
-    const customDetails = getExecutionDetails(workflowNode.component.name, execution, workflowNode, workflowNodes);
+  if (workflowNode?.action?.name) {
+    const customDetails = getExecutionDetails(workflowNode.action.name, execution, workflowNode, workflowNodes);
     if (customDetails && Object.keys(customDetails).length > 0) {
       currentData = { ...customDetails };
     }
@@ -78,8 +78,8 @@ function buildExecutionTabData(
 
 function convertSidebarEventToChainItem(
   triggerEvent: SidebarEvent,
-  workflowNodes: ComponentsNode[] = [],
-  _components: ComponentsComponent[] = [],
+  workflowNodes: SuperplaneComponentsNode[] = [],
+  _actions: SuperplaneActionsAction[] = [],
   triggers: TriggersTrigger[] = [],
   getTabData?: (event: SidebarEvent) => any,
 ): ChainItemData {
@@ -139,8 +139,8 @@ interface ExecutionChainPageProps {
   ) => { map: EventStateMap; state: EventState };
   getTabData?: (event: SidebarEvent) => any;
   onEventClick?: (event: SidebarEvent) => void;
-  workflowNodes?: ComponentsNode[]; // Workflow spec nodes for metadata lookup
-  components?: ComponentsComponent[]; // Component metadata
+  workflowNodes?: SuperplaneComponentsNode[]; // Workflow spec nodes for metadata lookup
+  actions?: SuperplaneActionsAction[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
   blueprints?: BlueprintsBlueprint[]; // Blueprint metadata
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
@@ -156,7 +156,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   getExecutionState,
   getTabData,
   workflowNodes = [],
-  components = [],
+  actions = [],
   triggers = [],
   blueprints = [],
   onHighlightedNodesChange,
@@ -235,10 +235,10 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           nodeDisplayName = workflowNode.name || nodeDisplayName;
 
           // Get icon based on node type
-          if (workflowNode.type === "TYPE_COMPONENT" && workflowNode.component?.name) {
-            const componentMeta = components.find((c) => c.name === workflowNode.component!.name);
+          if (workflowNode.type === "TYPE_ACTION" && workflowNode.action?.name) {
+            const componentMeta = actions.find((c) => c.name === workflowNode.action!.name);
             nodeIconSlug = componentMeta?.icon || "box";
-            nodeIconSrc = getHeaderIconSrc(workflowNode.component.name);
+            nodeIconSrc = getHeaderIconSrc(workflowNode.action?.name);
           } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
             const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
             nodeIconSlug = triggerMeta?.icon || "play";
@@ -271,13 +271,13 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                 if (blueprint?.nodes) {
                   const blueprintNode = blueprint.nodes.find((node: any) => node.id === nodeId);
                   if (blueprintNode) {
-                    componentName = blueprintNode.name || blueprintNode.component?.name || "Unknown";
+                    componentName = blueprintNode.name || blueprintNode.action?.name || "Unknown";
 
                     // Get component icon from components metadata
-                    if (blueprintNode.component?.name) {
-                      const componentMeta = components.find((c) => c.name === blueprintNode.component!.name);
+                    if (blueprintNode.action?.name) {
+                      const componentMeta = actions.find((c) => c.name === blueprintNode.action!.name);
                       componentIcon = componentMeta?.icon || "box";
-                      componentIconSrc = getHeaderIconSrc(blueprintNode.component.name);
+                      componentIconSrc = getHeaderIconSrc(blueprintNode.action?.name);
                     }
                   }
                 }
@@ -325,7 +325,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           originalExecution: exec, // Pass the full execution data
           childExecutions,
           workflowNode,
-          tabData: buildExecutionTabData(exec, workflowNode || ({} as ComponentsNode), workflowNodes),
+          tabData: buildExecutionTabData(exec, workflowNode || ({} as SuperplaneComponentsNode), workflowNodes),
         };
       });
 
@@ -339,7 +339,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       loadInFlightRef.current = false;
       setLoading(false);
     }
-  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints, getExecutionState]);
+  }, [eventId, loadExecutionChain, workflowNodes, actions, triggers, blueprints, getExecutionState]);
 
   // Load execution chain data
   useEffect(() => {
@@ -480,7 +480,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
               <div className="mb-6">
                 <h2 className="text-[13px] font-medium text-gray-500 mb-3">This run was triggered by</h2>
                 <ChainItem
-                  item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
+                  item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, actions, triggers, getTabData)}
                   index={-1}
                   totalItems={undefined}
                   isOpen={openEventIds.has(triggerEvent.id)}

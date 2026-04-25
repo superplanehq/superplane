@@ -14,10 +14,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
-	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
@@ -131,8 +131,8 @@ func RunServer(
 	meService := NewMeService(authService)
 	mepb.RegisterMeServer(grpcServer, meService)
 
-	componentService := NewComponentService(registry)
-	pbComponents.RegisterComponentsServer(grpcServer, componentService)
+	actionService := NewActionService(registry)
+	pbActions.RegisterActionsServer(grpcServer, actionService)
 
 	triggerService := NewTriggerService(registry)
 	triggerPb.RegisterTriggersServer(grpcServer, triggerService)

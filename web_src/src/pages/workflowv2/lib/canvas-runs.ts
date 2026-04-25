@@ -14,7 +14,7 @@ export function resolveNodeIconSlug(
   node: ComponentsNode | undefined,
   componentIconMap: Record<string, string>,
 ): string | undefined {
-  const name = node?.component?.name || node?.trigger?.name;
+  const name = node?.action?.name || node?.trigger?.name;
   if (!name) return undefined;
   return componentIconMap[name];
 }
@@ -48,7 +48,7 @@ export function computeDuration(execution: CanvasesCanvasNodeExecutionRef): stri
 
 export function resolveExecutionDisplayStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]): string {
   const node = nodes.find((n) => n.id === execution.nodeId);
-  const componentName = node?.component?.name || "";
+  const componentName = node?.action?.name || "";
   const stateResolver = getState(componentName);
   const componentState = stateResolver(buildExecutionInfo(execution));
 

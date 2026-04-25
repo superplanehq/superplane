@@ -1,5 +1,5 @@
 import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
-import type { TriggersTrigger, ComponentsComponent, IntegrationsIntegrationDefinition } from "@/api-client";
+import type { TriggersTrigger, SuperplaneActionsAction, IntegrationsIntegrationDefinition } from "@/api-client";
 
 const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory", "upsertmemory"]);
 
@@ -10,7 +10,7 @@ function isMemoryBlock(block: BuildingBlock): boolean {
 // Build categories of building blocks from live data
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
-  components: ComponentsComponent[],
+  components: SuperplaneActionsAction[],
   availableIntegrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
   const deprecatedTriggerNames = new Set(["github", "semaphore"]);
@@ -79,8 +79,8 @@ export function buildBuildingBlockCategories(
     }
 
     // Add components from this application
-    if (integration.components) {
-      integration.components.forEach((c) => {
+    if (integration.actions) {
+      integration.actions.forEach((c) => {
         const block: BuildingBlock = {
           name: c.name!,
           label: c.label,
