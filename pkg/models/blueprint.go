@@ -71,8 +71,12 @@ func (b *Blueprint) FindRootNode() *Node {
 }
 
 func FindBlueprint(orgID, id string) (*Blueprint, error) {
+	return FindBlueprintInTransaction(database.Conn(), orgID, id)
+}
+
+func FindBlueprintInTransaction(tx *gorm.DB, orgID, id string) (*Blueprint, error) {
 	var blueprint Blueprint
-	err := database.Conn().
+	err := tx.
 		Where("organization_id = ?", orgID).
 		Where("id = ?", id).
 		First(&blueprint).

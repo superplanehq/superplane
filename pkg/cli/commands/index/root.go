@@ -15,6 +15,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root.AddCommand(newTriggersCommand(options))
 	root.AddCommand(newComponentsCommand(options))
 	root.AddCommand(newWidgetsCommand(options))
+	root.AddCommand(newDumpCommand(options))
 
 	return root
 }
