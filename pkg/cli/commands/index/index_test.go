@@ -27,12 +27,12 @@ const integrationsListResponse = `{
 	]
 }`
 
-const componentsListResponse = `{
-	"components": [
+const actionsListResponse = `{
+	"actions": [
 		{
 			"name": "http",
 			"label": "HTTP",
-			"description": "HTTP request component",
+			"description": "HTTP request action",
 			"configuration": [{"name": "url", "type": "string", "required": true}],
 			"exampleOutput": {"status": 200}
 		}
@@ -91,15 +91,15 @@ func TestIntegrationsListReturnsFullJSON(t *testing.T) {
 	require.Contains(t, raw, "slack")
 }
 
-// Components tests
+// Actions tests
 
-func TestComponentsListReturnsSummaryJSON(t *testing.T) {
-	server := newIndexServer(t, "GET", "/api/v1/components", componentsListResponse)
+func TestActionsListReturnsSummaryJSON(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/actions", actionsListResponse)
 	ctx, stdout := newIndexCommandContext(t, server, "json")
 	name := ""
 	from := ""
 	full := false
-	cmd := &componentsCommand{name: &name, from: &from, full: &full}
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)
@@ -116,13 +116,13 @@ func TestComponentsListReturnsSummaryJSON(t *testing.T) {
 	require.NotContains(t, raw, "url")
 }
 
-func TestComponentsListReturnsFullJSON(t *testing.T) {
-	server := newIndexServer(t, "GET", "/api/v1/components", componentsListResponse)
+func TestActionsListReturnsFullJSON(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/actions", actionsListResponse)
 	ctx, stdout := newIndexCommandContext(t, server, "json")
 	name := ""
 	from := ""
 	full := true
-	cmd := &componentsCommand{name: &name, from: &from, full: &full}
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)

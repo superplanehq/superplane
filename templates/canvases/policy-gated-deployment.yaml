@@ -16,7 +16,7 @@ spec:
       position:
         x: 135
         "y": 616
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -37,7 +37,7 @@ spec:
       position:
         x: 1079
         "y": 559
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -58,7 +58,7 @@ spec:
       position:
         x: 1567
         "y": -49
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -79,7 +79,7 @@ spec:
       position:
         x: 2195
         "y": 592
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -100,7 +100,7 @@ spec:
       position:
         x: 2745
         "y": 40
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -118,7 +118,7 @@ spec:
       position:
         x: 600
         "y": 322
-      component:
+      action:
         name: "filter"
       blueprint: null
       trigger: null
@@ -139,7 +139,7 @@ spec:
       position:
         x: 597
         "y": 51
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -165,7 +165,7 @@ spec:
       position:
         x: 136
         "y": 324
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onWorkflowRun"
@@ -190,7 +190,7 @@ spec:
       position:
         x: 1078
         "y": 321
-      component:
+      action:
         name: "timeGate"
       blueprint: null
       trigger: null
@@ -209,7 +209,7 @@ spec:
       position:
         x: 1567
         "y": 321
-      component:
+      action:
         name: "approval"
       blueprint: null
       trigger: null
@@ -233,7 +233,7 @@ spec:
       position:
         x: 2192
         "y": 315
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -252,7 +252,7 @@ spec:
       position:
         x: 2736
         "y": 322
-      component:
+      action:
         name: "openai.textPrompt"
       blueprint: null
       trigger: null
@@ -277,7 +277,7 @@ spec:
       position:
         x: 2740
         "y": 514
-      component:
+      action:
         name: "pagerduty.createIncident"
       blueprint: null
       trigger: null
@@ -299,7 +299,7 @@ spec:
       position:
         x: 3221
         "y": 321
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null

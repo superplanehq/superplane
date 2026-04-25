@@ -19,7 +19,7 @@ spec:
       position:
         x: 1925
         "y": 257
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onRelease"
@@ -43,7 +43,7 @@ spec:
       position:
         x: 1928
         "y": 558
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onRelease"
@@ -67,7 +67,7 @@ spec:
       position:
         x: 1932
         "y": 866
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onRelease"
@@ -98,7 +98,7 @@ spec:
       position:
         x: 2528
         "y": 254
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -129,7 +129,7 @@ spec:
       position:
         x: 2530
         "y": 557
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -160,7 +160,7 @@ spec:
       position:
         x: 2530
         "y": 866
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -182,7 +182,7 @@ spec:
       position:
         x: 3241
         "y": 741
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -204,7 +204,7 @@ spec:
       position:
         x: 3832
         "y": 438
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -229,7 +229,7 @@ spec:
       position:
         x: 3829
         "y": 610
-      component:
+      action:
         name: "pagerduty.createIncident"
       blueprint: null
       trigger: null
@@ -260,7 +260,7 @@ spec:
       position:
         x: 3239
         "y": 406
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -281,7 +281,7 @@ spec:
       position:
         x: 1904
         "y": -114
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -302,7 +302,7 @@ spec:
       position:
         x: 2525
         "y": -124
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -323,7 +323,7 @@ spec:
       position:
         x: 3246
         "y": 122
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:

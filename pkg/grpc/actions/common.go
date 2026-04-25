@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -712,7 +713,7 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		}
 
 		if node.Ref.Component != nil {
-			result[i].Component = &componentpb.Node_ComponentRef{
+			result[i].Action = &componentpb.Node_ActionRef{
 				Name: node.Ref.Component.Name,
 			}
 		}
@@ -868,7 +869,7 @@ func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Ed
 
 func ProtoToNodeType(nodeType componentpb.Node_Type) string {
 	switch nodeType {
-	case componentpb.Node_TYPE_COMPONENT:
+	case componentpb.Node_TYPE_ACTION:
 		return models.NodeTypeComponent
 	case componentpb.Node_TYPE_BLUEPRINT:
 		return models.NodeTypeBlueprint
@@ -889,8 +890,10 @@ func NodeTypeToProto(nodeType string) componentpb.Node_Type {
 		return componentpb.Node_TYPE_TRIGGER
 	case models.NodeTypeWidget:
 		return componentpb.Node_TYPE_WIDGET
+	case models.NodeTypeComponent:
+		return componentpb.Node_TYPE_ACTION
 	default:
-		return componentpb.Node_TYPE_COMPONENT
+		return componentpb.Node_TYPE_ACTION
 	}
 }
 
@@ -898,10 +901,10 @@ func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
 	ref := models.NodeRef{}
 
 	switch node.Type {
-	case componentpb.Node_TYPE_COMPONENT:
-		if node.Component != nil {
+	case componentpb.Node_TYPE_ACTION:
+		if node.Action != nil {
 			ref.Component = &models.ComponentRef{
-				Name: node.Component.Name,
+				Name: node.Action.Name,
 			}
 		}
 	case componentpb.Node_TYPE_BLUEPRINT:
@@ -1039,39 +1042,6 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	}
 }
 
-func SerializeActions(in []core.Action) []*componentpb.Component {
-	out := make([]*componentpb.Component, len(in))
-	for i, action := range in {
-		outputChannels := action.OutputChannels(nil)
-		channels := make([]*componentpb.OutputChannel, len(outputChannels))
-		for j, channel := range outputChannels {
-			channels[j] = &componentpb.OutputChannel{
-				Name: channel.Name,
-			}
-		}
-
-		configFields := action.Configuration()
-		configuration := make([]*configpb.Field, len(configFields))
-		for j, field := range configFields {
-			configuration[j] = ConfigurationFieldToProto(field)
-		}
-		exampleOutput, _ := structpb.NewStruct(action.ExampleOutput())
-
-		out[i] = &componentpb.Component{
-			Name:           action.Name(),
-			Label:          action.Label(),
-			Description:    action.Description(),
-			Icon:           action.Icon(),
-			Color:          action.Color(),
-			OutputChannels: channels,
-			Configuration:  configuration,
-			ExampleOutput:  exampleOutput,
-		}
-	}
-
-	return out
-}
-
 func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
@@ -1131,6 +1101,38 @@ func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {
 			Icon:          widget.Icon(),
 			Color:         widget.Color(),
 			Configuration: configuration,
+		}
+	}
+	return out
+}
+
+func SerializeActions(in []core.Action) []*actionpb.Action {
+	out := make([]*actionpb.Action, len(in))
+	for i, action := range in {
+		outputChannels := action.OutputChannels(nil)
+		channels := make([]*actionpb.OutputChannel, len(outputChannels))
+		for j, channel := range outputChannels {
+			channels[j] = &actionpb.OutputChannel{
+				Name: channel.Name,
+			}
+		}
+
+		configFields := action.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+		exampleOutput, _ := structpb.NewStruct(action.ExampleOutput())
+
+		out[i] = &actionpb.Action{
+			Name:           action.Name(),
+			Label:          action.Label(),
+			Description:    action.Description(),
+			Icon:           action.Icon(),
+			Color:          action.Color(),
+			OutputChannels: channels,
+			Configuration:  configuration,
+			ExampleOutput:  exampleOutput,
 		}
 	}
 	return out

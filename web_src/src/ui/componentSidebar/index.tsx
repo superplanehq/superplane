@@ -32,7 +32,7 @@ import type {
   ConfigurationField,
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
-  ComponentsComponent,
+  SuperplaneActionsAction,
   TriggersTrigger,
   BlueprintsBlueprint,
   OrganizationsIntegration,
@@ -146,7 +146,7 @@ interface ComponentSidebarProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
+  actions?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
 
@@ -221,7 +221,7 @@ export const ComponentSidebar = ({
   componentPayloadLabel,
   componentDocumentationUrl,
   workflowNodes = [],
-  components = [],
+  actions = [],
   triggers = [],
   blueprints = [],
   onHighlightedNodesChange,
@@ -739,7 +739,7 @@ export const ComponentSidebar = ({
                   loadExecutionChain={loadExecutionChain}
                   getExecutionState={getExecutionState}
                   workflowNodes={workflowNodes}
-                  components={components}
+                  actions={actions}
                 />
               </TabsContent>
             )}
@@ -866,7 +866,7 @@ export const ComponentSidebar = ({
                       getTabData={getTabData}
                       onEventClick={onEventClick}
                       workflowNodes={workflowNodes}
-                      components={components}
+                      actions={actions}
                       triggers={triggers}
                       blueprints={blueprints}
                       onHighlightedNodesChange={onHighlightedNodesChange}

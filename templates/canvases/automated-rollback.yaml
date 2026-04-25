@@ -17,7 +17,7 @@ spec:
       position:
         x: 1764
         "y": 290
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -37,7 +37,7 @@ spec:
       position:
         x: 1758
         "y": 392
-      component:
+      action:
         name: "wait"
       blueprint: null
       trigger: null
@@ -61,7 +61,7 @@ spec:
       position:
         x: 2258
         "y": 392
-      component:
+      action:
         name: "dash0.listIssues"
       blueprint: null
       trigger: null
@@ -83,7 +83,7 @@ spec:
       position:
         x: 1763
         "y": 618
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -105,7 +105,7 @@ spec:
       position:
         x: 1116
         "y": 293
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -127,7 +127,7 @@ spec:
       position:
         x: 2857
         "y": 433
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -153,7 +153,7 @@ spec:
       position:
         x: 554
         "y": 404
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onWorkflowRun"
@@ -177,7 +177,7 @@ spec:
       position:
         x: 1119
         "y": 403
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -198,7 +198,7 @@ spec:
       position:
         x: 547
         "y": -89
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -219,7 +219,7 @@ spec:
       position:
         x: 1093
         "y": -75
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -240,7 +240,7 @@ spec:
       position:
         x: 1754
         "y": -143
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -261,7 +261,7 @@ spec:
       position:
         x: 2258
         "y": 101
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:

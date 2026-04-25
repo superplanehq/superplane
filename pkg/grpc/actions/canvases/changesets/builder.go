@@ -6,7 +6,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	componentspb "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -209,7 +209,7 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 		Name: proposedNode.Name,
 		// Keep explicit presence for add-node changes.
 		IsCollapsed: proto.Bool(proposedNode.IsCollapsed),
-		Position: &componentspb.Position{
+		Position: &componentpb.Position{
 			X: int32(proposedNode.Position.X),
 			Y: int32(proposedNode.Position.Y),
 		},
@@ -266,7 +266,7 @@ func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (
 	// If the position is different, we set position in the change.
 	//
 	if proposedNode.Position.X != currentNode.Position.X || proposedNode.Position.Y != currentNode.Position.Y {
-		n.Position = &componentspb.Position{
+		n.Position = &componentpb.Position{
 			X: int32(proposedNode.Position.X),
 			Y: int32(proposedNode.Position.Y),
 		}
