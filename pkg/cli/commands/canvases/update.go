@@ -140,23 +140,13 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 	draftMode := c.draft != nil && *c.draft
 
-	var (
-		canvasID string
-		canvas   openapi_client.CanvasesCanvas
-		err      error
-	)
+	if filePath == "" {
+		return fmt.Errorf("--file is required")
+	}
 
-	if filePath != "" {
-		canvasID, canvas, err = loadCanvasFromFile(filePath)
-		if err != nil {
-			return err
-		}
-
-	} else {
-		canvasID, canvas, err = loadCanvasFromExisting(ctx)
-		if err != nil {
-			return err
-		}
+	canvasID, canvas, err := loadCanvasFromFile(filePath)
+	if err != nil {
+		return err
 	}
 
 	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
@@ -248,35 +238,6 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	})
 }
 
-func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {
-	if len(ctx.Args) > 1 {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one positional argument")
-	}
-
-	target := ""
-	if len(ctx.Args) == 1 {
-		target = ctx.Args[0]
-	} else if ctx.Config != nil {
-		target = strings.TrimSpace(ctx.Config.GetActiveCanvas())
-	}
-
-	if target == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("either --file or <name-or-id> (or an active canvas) is required")
-	}
-
-	canvasID, err := findCanvasID(ctx, ctx.API, target)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	canvas, err := describeCanvasByID(ctx, canvasID)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	return canvasID, canvas, nil
-}
-
 func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openapi_client.CanvasesCanvasAutoLayout, error) {
 	normalizedValue := strings.ToLower(strings.TrimSpace(value))
 	switch normalizedValue {
@@ -340,18 +301,6 @@ func autoLayoutFlagsWereSet(ctx core.CommandContext) bool {
 	}
 
 	return flags.Changed("auto-layout") || flags.Changed("auto-layout-scope") || flags.Changed("auto-layout-node")
-}
-
-func describeCanvasByID(ctx core.CommandContext, canvasID string) (openapi_client.CanvasesCanvas, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
-	if err != nil {
-		return openapi_client.CanvasesCanvas{}, err
-	}
-	if response.Canvas == nil {
-		return openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas %q not found", canvasID)
-	}
-
-	return *response.Canvas, nil
 }
 
 func buildDefaultAutoLayout() openapi_client.CanvasesCanvasAutoLayout {

@@ -191,7 +191,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if versionID == "" {
-			return fmt.Errorf("no draft version found; run `superplane canvases update %s --draft ...` first", canvasID)
+			return fmt.Errorf("no draft version found; run `superplane canvases update -f <path-to-yaml> --draft ...` first")
 		}
 	}
 
