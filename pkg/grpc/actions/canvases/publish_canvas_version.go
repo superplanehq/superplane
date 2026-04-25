@@ -58,6 +58,14 @@ func PublishCanvasVersion(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
+	if modeErr != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
+	}
+	if changeManagementEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "change management is enabled for this canvas; create a change request instead")
+	}
+
 	publishedVersion, err := publishDraftVersionInTransaction(
 		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
