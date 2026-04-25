@@ -59,8 +59,8 @@ func (i *IncidentIO) Configuration() []configuration.Field {
 	}
 }
 
-func (i *IncidentIO) Components() []core.Component {
-	return []core.Component{
+func (i *IncidentIO) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 	}
 }

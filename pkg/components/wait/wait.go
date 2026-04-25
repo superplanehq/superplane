@@ -18,7 +18,7 @@ import (
 const PayloadType = "wait.finished"
 
 func init() {
-	registry.RegisterComponent("wait", &Wait{})
+	registry.RegisterAction("wait", &Wait{})
 }
 
 type Wait struct{}

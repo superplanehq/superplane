@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	registry.RegisterComponent("timeGate", &TimeGate{})
+	registry.RegisterAction("timeGate", &TimeGate{})
 }
 
 type TimeGate struct{}

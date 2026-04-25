@@ -35,7 +35,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("http", &HTTP{})
+	registry.RegisterAction("http", &HTTP{})
 }
 
 type Header struct {

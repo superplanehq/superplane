@@ -16,7 +16,7 @@ const ComponentName = "addMemory"
 const PayloadType = "memory.added"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &AddMemory{})
+	registry.RegisterAction(ComponentName, &AddMemory{})
 }
 
 type AddMemory struct{}

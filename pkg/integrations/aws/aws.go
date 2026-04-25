@@ -134,8 +134,8 @@ func (a *AWS) Configuration() []configuration.Field {
 	}
 }
 
-func (a *AWS) Components() []core.Component {
-	return []core.Component{
+func (a *AWS) Actions() []core.Action {
+	return []core.Action{
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},

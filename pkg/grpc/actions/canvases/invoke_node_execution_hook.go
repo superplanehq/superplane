@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func InvokeNodeExecutionAction(
+func InvokeNodeExecutionHook(
 	ctx context.Context,
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
@@ -29,9 +29,9 @@ func InvokeNodeExecutionAction(
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
 	executionID uuid.UUID,
-	actionName string,
+	hookName string,
 	parameters map[string]any,
-) (*pb.InvokeNodeExecutionActionResponse, error) {
+) (*pb.InvokeNodeExecutionHookResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -60,13 +60,13 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("node is not a component node")
 	}
 
-	hookProvider, hookDef, err := registry.FindComponentHook(node.Ref.Data().Component.Name, actionName)
+	hookProvider, hookDef, err := registry.FindActionHook(node.Ref.Data().Component.Name, hookName)
 	if err != nil {
 		return nil, fmt.Errorf("hook not found: %w", err)
 	}
 
 	if hookDef.Type != core.HookTypeUser {
-		return nil, fmt.Errorf("hook '%s' cannot be invoked", actionName)
+		return nil, fmt.Errorf("hook '%s' cannot be invoked", hookName)
 	}
 
 	if err := configuration.ValidateConfiguration(hookDef.Parameters, parameters); err != nil {
@@ -86,7 +86,7 @@ func InvokeNodeExecutionAction(
 	tx := database.Conn()
 	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionHookContext{
-		Name:           actionName,
+		Name:           hookName,
 		Parameters:     parameters,
 		Configuration:  node.Configuration.Data(),
 		HTTP:           registry.HTTPContext(),
@@ -124,5 +124,5 @@ func InvokeNodeExecutionAction(
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
-	return &pb.InvokeNodeExecutionActionResponse{}, nil
+	return &pb.InvokeNodeExecutionHookResponse{}, nil
 }

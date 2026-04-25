@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { Puzzle } from "lucide-react";
 import {
-  canvasesInvokeNodeExecutionAction,
+  canvasesInvokeNodeExecutionHook,
   type BlueprintsBlueprint,
   type CanvasesCanvasEvent,
   type CanvasesCanvasNodeExecution,
@@ -416,14 +416,14 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
 
 function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): ActionContext {
   return {
-    invokeNodeExecutionAction: async (executionId: string, actionName: string, parameters: unknown) => {
+    invokeNodeExecutionHook: async (executionId: string, hookName: string, parameters: unknown) => {
       try {
-        await canvasesInvokeNodeExecutionAction(
+        await canvasesInvokeNodeExecutionHook(
           withOrganizationHeader({
             path: {
               canvasId,
               executionId,
-              actionName,
+              hookName,
             },
             body: {
               parameters,
@@ -434,7 +434,7 @@ function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: 
           queryKey: canvasKeys.nodeExecution(canvasId, nodeId),
         });
       } catch (error) {
-        showErrorToast(getApiErrorMessage(error, "failed to invoke action"));
+        showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
       }
     },
   };

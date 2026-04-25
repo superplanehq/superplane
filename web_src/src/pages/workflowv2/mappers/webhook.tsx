@@ -1,6 +1,6 @@
 import { useState } from "react";
 import React from "react";
-import { canvasesInvokeNodeTriggerAction } from "@/api-client";
+import { canvasesInvokeNodeTriggerHook } from "@/api-client";
 import { getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type {
@@ -246,12 +246,12 @@ const ResetAuthButton: React.FC<{
 
     setIsResetting(true);
     try {
-      const response = await canvasesInvokeNodeTriggerAction(
+      const response = await canvasesInvokeNodeTriggerHook(
         withOrganizationHeader({
           path: {
             canvasId: canvasId,
             nodeId: nodeId,
-            actionName: "resetAuthentication",
+            hookName: "resetAuthentication",
           },
           body: {
             parameters: {},

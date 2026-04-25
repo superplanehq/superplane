@@ -30,7 +30,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("approval", &Approval{})
+	registry.RegisterAction("approval", &Approval{})
 }
 
 /*

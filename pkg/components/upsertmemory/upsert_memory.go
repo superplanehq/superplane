@@ -18,7 +18,7 @@ const OperationUpdated = "updated"
 const OperationCreated = "created"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &UpsertMemory{})
+	registry.RegisterAction(ComponentName, &UpsertMemory{})
 }
 
 type UpsertMemory struct{}

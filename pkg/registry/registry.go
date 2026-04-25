@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	registeredComponents      = make(map[string]core.Component)
+	registeredActions         = make(map[string]core.Action)
 	registeredTriggers        = make(map[string]core.Trigger)
 	registeredIntegrations    = make(map[string]core.Integration)
 	registeredWebhookHandlers = make(map[string]core.WebhookHandler)
@@ -19,10 +19,10 @@ var (
 	mu                        sync.RWMutex
 )
 
-func RegisterComponent(name string, c core.Component) {
+func RegisterAction(name string, a core.Action) {
 	mu.Lock()
 	defer mu.Unlock()
-	registeredComponents[name] = c
+	registeredActions[name] = a
 }
 
 func RegisterTrigger(name string, t core.Trigger) {
@@ -61,7 +61,7 @@ type Registry struct {
 	Encryptor       crypto.Encryptor
 	Integrations    map[string]core.Integration
 	WebhookHandlers map[string]core.WebhookHandler
-	Components      map[string]core.Component
+	Actions         map[string]core.Action
 	Triggers        map[string]core.Trigger
 	Widgets         map[string]core.Widget
 }
@@ -75,7 +75,7 @@ func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry
 	r := &Registry{
 		Encryptor:       encryptor,
 		httpCtx:         httpCtx,
-		Components:      map[string]core.Component{},
+		Actions:         map[string]core.Action{},
 		Triggers:        map[string]core.Trigger{},
 		Integrations:    map[string]core.Integration{},
 		WebhookHandlers: map[string]core.WebhookHandler{},
@@ -94,8 +94,8 @@ func (r *Registry) Init() {
 	mu.RLock()
 	defer mu.RUnlock()
 
-	for name, component := range registeredComponents {
-		r.Components[name] = NewPanicableComponent(component)
+	for name, action := range registeredActions {
+		r.Actions[name] = NewPanicableAction(action)
 	}
 
 	for name, trigger := range registeredTriggers {
@@ -151,32 +151,32 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 	return r.GetIntegrationTrigger(parts[0], name)
 }
 
-func (r *Registry) ListComponents() []core.Component {
-	components := make([]core.Component, 0, len(r.Components))
-	for _, component := range r.Components {
-		components = append(components, component)
+func (r *Registry) ListActions() []core.Action {
+	actions := make([]core.Action, 0, len(r.Actions))
+	for _, action := range r.Actions {
+		actions = append(actions, action)
 	}
 
-	sort.Slice(components, func(i, j int) bool {
-		return components[i].Name() < components[j].Name()
+	sort.Slice(actions, func(i, j int) bool {
+		return actions[i].Name() < actions[j].Name()
 	})
 
-	return components
+	return actions
 }
 
-func (r *Registry) GetComponent(name string) (core.Component, error) {
+func (r *Registry) GetAction(name string) (core.Action, error) {
 	parts := strings.SplitN(name, ".", 2)
 
 	if len(parts) == 1 {
-		component, ok := r.Components[name]
+		action, ok := r.Actions[name]
 		if !ok {
-			return nil, fmt.Errorf("component %s not registered", name)
+			return nil, fmt.Errorf("action %s not registered", name)
 		}
 
-		return component, nil
+		return action, nil
 	}
 
-	return r.GetIntegrationComponent(parts[0], name)
+	return r.GetIntegrationAction(parts[0], name)
 }
 
 func (r *Registry) GetWidget(name string) (core.Widget, error) {
@@ -248,38 +248,38 @@ func (r *Registry) GetIntegrationTrigger(appName, triggerName string) (core.Trig
 	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, appName)
 }
 
-func (r *Registry) GetIntegrationComponent(appName, componentName string) (core.Component, error) {
+func (r *Registry) GetIntegrationAction(appName, actionName string) (core.Action, error) {
 	integration, err := r.GetIntegration(appName)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, component := range integration.Components() {
-		if component.Name() == componentName {
-			return component, nil
+	for _, action := range integration.Actions() {
+		if action.Name() == actionName {
+			return action, nil
 		}
 	}
 
-	return nil, fmt.Errorf("component %s not found for integration %s", componentName, appName)
+	return nil, fmt.Errorf("action %s not found for integration %s", actionName, appName)
 }
 
 func (r *Registry) IsCoreBlock(name string) bool {
 	return !strings.Contains(name, ".")
 }
 
-func (r *Registry) FindComponentHook(componentName, hookName string) (core.Component, *core.Hook, error) {
-	component, err := r.GetComponent(componentName)
+func (r *Registry) FindActionHook(actionName, hookName string) (core.Action, *core.Hook, error) {
+	action, err := r.GetAction(actionName)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	for _, hook := range component.Hooks() {
+	for _, hook := range action.Hooks() {
 		if hook.Name == hookName {
-			return component, &hook, nil
+			return action, &hook, nil
 		}
 	}
 
-	return nil, nil, fmt.Errorf("hook %s not found for component %s", hookName, componentName)
+	return nil, nil, fmt.Errorf("hook %s not found for action %s", hookName, actionName)
 }
 
 func (r *Registry) FindTriggerHook(triggerName, hookName string) (core.Trigger, *core.Hook, error) {

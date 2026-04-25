@@ -134,9 +134,9 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			}
 		}
 
-		_, err := registry.GetComponent(node.Component.Name)
+		_, err := registry.GetAction(node.Component.Name)
 		if err != nil {
-			return fmt.Errorf("component %s not found", node.Component.Name)
+			return fmt.Errorf("action %s not found", node.Component.Name)
 		}
 
 		return nil

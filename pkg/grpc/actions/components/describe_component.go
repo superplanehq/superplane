@@ -13,12 +13,12 @@ import (
 )
 
 func DescribeComponent(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeComponentResponse, error) {
-	component, err := registry.GetComponent(name)
+	action, err := registry.GetAction(name)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "component %s not found", name)
+		return nil, status.Errorf(codes.NotFound, "action %s not found", name)
 	}
 
-	outputChannels := component.OutputChannels(nil)
+	outputChannels := action.OutputChannels(nil)
 	channels := make([]*pb.OutputChannel, len(outputChannels))
 	for i, channel := range outputChannels {
 		channels[i] = &pb.OutputChannel{
@@ -26,24 +26,24 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 		}
 	}
 
-	configFields := component.Configuration()
+	configFields := action.Configuration()
 	configuration := make([]*configpb.Field, len(configFields))
 	for i, field := range configFields {
 		configuration[i] = actions.ConfigurationFieldToProto(field)
 	}
 
 	var exampleOutput *structpb.Struct
-	if output := component.ExampleOutput(); output != nil {
+	if output := action.ExampleOutput(); output != nil {
 		exampleOutput, _ = structpb.NewStruct(output)
 	}
 
 	return &pb.DescribeComponentResponse{
 		Component: &pb.Component{
-			Name:           component.Name(),
-			Label:          component.Label(),
-			Description:    component.Description(),
-			Icon:           component.Icon(),
-			Color:          component.Color(),
+			Name:           action.Name(),
+			Label:          action.Label(),
+			Description:    action.Description(),
+			Icon:           action.Icon(),
+			Color:          action.Color(),
 			OutputChannels: channels,
 			Configuration:  configuration,
 			ExampleOutput:  exampleOutput,

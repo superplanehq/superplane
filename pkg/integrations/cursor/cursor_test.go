@@ -175,7 +175,7 @@ func Test__Cursor__Sync(t *testing.T) {
 
 func Test__Cursor__Components(t *testing.T) {
 	c := &Cursor{}
-	components := c.Components()
+	components := c.Actions()
 
 	assert.Len(t, components, 3)
 

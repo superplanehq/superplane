@@ -109,8 +109,8 @@ func (n *NewRelic) Configuration() []configuration.Field {
 	}
 }
 
-func (n *NewRelic) Components() []core.Component {
-	return []core.Component{
+func (n *NewRelic) Actions() []core.Action {
+	return []core.Action{
 		&ReportMetric{},
 		&RunNRQLQuery{},
 	}

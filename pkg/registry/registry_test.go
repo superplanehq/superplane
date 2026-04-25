@@ -8,15 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
-	support "github.com/superplanehq/superplane/test/support"
 	supportcontexts "github.com/superplanehq/superplane/test/support/contexts"
+	"github.com/superplanehq/superplane/test/support/impl"
 )
 
-func TestRegistry_FindComponentHook(t *testing.T) {
-	t.Run("finds hook on registered component", func(t *testing.T) {
+func TestRegistry_FindActionHook(t *testing.T) {
+	t.Run("finds hook on registered action", func(t *testing.T) {
 		called := false
-		component := support.NewDummyComponent(support.DummyComponentOptions{
-			Name:  "unit_component",
+		action := impl.NewDummyAction(impl.DummyActionOptions{
+			Name:  "unit_action",
 			Hooks: []core.Hook{{Name: "unit-hook", Type: core.HookTypeUser}},
 			HandleHookFunc: func(ctx core.ActionHookContext) error {
 				called = true
@@ -26,18 +26,18 @@ func TestRegistry_FindComponentHook(t *testing.T) {
 		})
 
 		r := &registry.Registry{
-			Components:   map[string]core.Component{"unit_component": registry.NewPanicableComponent(component)},
+			Actions:      map[string]core.Action{"unit_action": registry.NewPanicableAction(action)},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{},
 		}
 
-		gotComponent, hook, err := r.FindComponentHook("unit_component", "unit-hook")
+		gotAction, hook, err := r.FindActionHook("unit_action", "unit-hook")
 		require.NoError(t, err)
 		require.NotNil(t, hook)
 		assert.Equal(t, "unit-hook", hook.Name)
-		assert.Equal(t, "unit_component", gotComponent.Name())
+		assert.Equal(t, "unit_action", gotAction.Name())
 
-		err = gotComponent.HandleHook(core.ActionHookContext{
+		err = gotAction.HandleHook(core.ActionHookContext{
 			Name:           "unit-hook",
 			Logger:         log.NewEntry(log.StandardLogger()),
 			HTTP:           &supportcontexts.HTTPContext{},
@@ -55,7 +55,7 @@ func TestRegistry_FindComponentHook(t *testing.T) {
 
 	t.Run("finds hook on integration component", func(t *testing.T) {
 		called := false
-		component := support.NewDummyComponent(support.DummyComponentOptions{
+		component := impl.NewDummyAction(impl.DummyActionOptions{
 			Name:  "unitapp.action",
 			Hooks: []core.Hook{{Name: "integration-action", Type: core.HookTypeUser}},
 			HandleHookFunc: func(ctx core.ActionHookContext) error {
@@ -65,23 +65,23 @@ func TestRegistry_FindComponentHook(t *testing.T) {
 			},
 		})
 
-		integration := support.NewDummyIntegration(support.DummyIntegrationOptions{
-			Components: []core.Component{component},
+		integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			Actions: []core.Action{component},
 		})
 
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{"unitapp": registry.NewPanicableIntegration(integration)},
 		}
 
-		gotComponent, hook, err := r.FindComponentHook("unitapp.action", "integration-action")
+		gotAction, hook, err := r.FindActionHook("unitapp.action", "integration-action")
 		require.NoError(t, err)
 		require.NotNil(t, hook)
 		assert.Equal(t, "integration-action", hook.Name)
-		assert.Equal(t, "unitapp.action", gotComponent.Name())
+		assert.Equal(t, "unitapp.action", gotAction.Name())
 
-		err = gotComponent.HandleHook(core.ActionHookContext{
+		err = gotAction.HandleHook(core.ActionHookContext{
 			Name:           "integration-action",
 			Logger:         log.NewEntry(log.StandardLogger()),
 			HTTP:           &supportcontexts.HTTPContext{},
@@ -99,38 +99,38 @@ func TestRegistry_FindComponentHook(t *testing.T) {
 
 	t.Run("returns error when component is missing", func(t *testing.T) {
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{},
 		}
 
-		_, _, err := r.FindComponentHook("missing_component", "any-hook")
+		_, _, err := r.FindActionHook("missing_action", "any-hook")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "component missing_component not registered")
+		assert.Contains(t, err.Error(), "action missing_action not registered")
 	})
 
 	t.Run("returns error when hook is missing", func(t *testing.T) {
-		component := support.NewDummyComponent(support.DummyComponentOptions{
-			Name:  "unit_component",
+		action := impl.NewDummyAction(impl.DummyActionOptions{
+			Name:  "unit_action",
 			Hooks: []core.Hook{},
 		})
 
 		r := &registry.Registry{
-			Components:   map[string]core.Component{"unit_component": registry.NewPanicableComponent(component)},
+			Actions:      map[string]core.Action{"unit_action": registry.NewPanicableAction(action)},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{},
 		}
 
-		_, _, err := r.FindComponentHook("unit_component", "missing-hook")
+		_, _, err := r.FindActionHook("unit_action", "missing-hook")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "hook missing-hook not found for component unit_component")
+		assert.Contains(t, err.Error(), "hook missing-hook not found for action unit_action")
 	})
 }
 
 func TestRegistry_FindTriggerHook(t *testing.T) {
 	t.Run("finds hook on registered trigger", func(t *testing.T) {
 		called := false
-		trigger := support.NewDummyTrigger(support.DummyTriggerOptions{
+		trigger := impl.NewDummyTrigger(impl.DummyTriggerOptions{
 			Name:  "unit_trigger",
 			Hooks: []core.Hook{{Name: "emit", Type: core.HookTypeInternal}},
 			HandleHookFunc: func(ctx core.TriggerHookContext) (map[string]any, error) {
@@ -141,7 +141,7 @@ func TestRegistry_FindTriggerHook(t *testing.T) {
 		})
 
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{"unit_trigger": registry.NewPanicableTrigger(trigger)},
 			Integrations: map[string]core.Integration{},
 		}
@@ -168,7 +168,7 @@ func TestRegistry_FindTriggerHook(t *testing.T) {
 
 	t.Run("returns error when trigger is missing", func(t *testing.T) {
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{},
 		}
@@ -179,13 +179,13 @@ func TestRegistry_FindTriggerHook(t *testing.T) {
 	})
 
 	t.Run("returns error when hook is missing", func(t *testing.T) {
-		trigger := support.NewDummyTrigger(support.DummyTriggerOptions{
+		trigger := impl.NewDummyTrigger(impl.DummyTriggerOptions{
 			Name:  "unit_trigger",
 			Hooks: []core.Hook{},
 		})
 
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{"unit_trigger": registry.NewPanicableTrigger(trigger)},
 			Integrations: map[string]core.Integration{},
 		}
@@ -199,7 +199,7 @@ func TestRegistry_FindTriggerHook(t *testing.T) {
 func TestRegistry_FindIntegrationHook(t *testing.T) {
 	t.Run("finds hook on registered integration", func(t *testing.T) {
 		called := false
-		integration := support.NewDummyIntegration(support.DummyIntegrationOptions{
+		integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			Hooks: []core.Hook{{Name: "provision", Type: core.HookTypeUser}},
 			HandleHook: func(ctx core.IntegrationHookContext) error {
 				called = true
@@ -209,7 +209,7 @@ func TestRegistry_FindIntegrationHook(t *testing.T) {
 		})
 
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{"unit_integration": registry.NewPanicableIntegration(integration)},
 		}
@@ -234,7 +234,7 @@ func TestRegistry_FindIntegrationHook(t *testing.T) {
 
 	t.Run("returns error when integration is missing", func(t *testing.T) {
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{},
 		}
@@ -245,12 +245,12 @@ func TestRegistry_FindIntegrationHook(t *testing.T) {
 	})
 
 	t.Run("returns error when hook is missing", func(t *testing.T) {
-		integration := support.NewDummyIntegration(support.DummyIntegrationOptions{
+		integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			Hooks: []core.Hook{},
 		})
 
 		r := &registry.Registry{
-			Components:   map[string]core.Component{},
+			Actions:      map[string]core.Action{},
 			Triggers:     map[string]core.Trigger{},
 			Integrations: map[string]core.Integration{"unit_integration": registry.NewPanicableIntegration(integration)},
 		}
