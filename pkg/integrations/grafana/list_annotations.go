@@ -321,3 +321,11 @@ func filterAnnotations(annotations []Annotation, panelID *int64, text string) []
 
 	return filtered
 }
+
+func (l *ListAnnotations) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListAnnotations) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

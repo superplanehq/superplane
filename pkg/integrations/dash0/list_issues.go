@@ -392,3 +392,11 @@ func (l *ListIssues) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 func (l *ListIssues) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (l *ListIssues) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListIssues) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

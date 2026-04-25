@@ -331,3 +331,11 @@ func (c *UpdateRedirectRule) HandleWebhook(ctx core.WebhookRequestContext) (int,
 func (c *UpdateRedirectRule) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *UpdateRedirectRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateRedirectRule) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

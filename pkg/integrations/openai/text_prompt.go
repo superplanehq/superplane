@@ -210,3 +210,11 @@ func extractResponseText(response *OpenAIResponse) string {
 func (c *CreateResponse) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateResponse) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateResponse) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

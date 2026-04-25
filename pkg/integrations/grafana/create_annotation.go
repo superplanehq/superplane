@@ -573,3 +573,11 @@ func annotationURLTimeRangeMS(timeMS, timeEndMS int64) (int64, int64, bool) {
 
 	return 0, 0, false
 }
+
+func (c *CreateAnnotation) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateAnnotation) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

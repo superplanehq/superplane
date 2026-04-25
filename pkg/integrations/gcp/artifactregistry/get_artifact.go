@@ -283,3 +283,11 @@ func (c *GetArtifact) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *GetArtifact) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *GetArtifact) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetArtifact) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

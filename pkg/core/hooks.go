@@ -20,13 +20,8 @@ type Hook struct {
 }
 
 /*
- * Hook provider for Action implementations.
+ * Context for executing a action hook.
  */
-type ActionHookProvider interface {
-	Hooks() []Hook
-	HandleHook(ActionHookContext) error
-}
-
 type ActionHookContext struct {
 	Name           string
 	Configuration  any
@@ -43,15 +38,8 @@ type ActionHookContext struct {
 }
 
 /*
- * Hook provider for Trigger implementations.
+ * Context for executing a trigger hook.
  */
-type TriggerHookProvider interface {
-	Hooks() []Hook
-
-	// TODO: returning map[string]any here is a bad idea
-	HandleHook(TriggerHookContext) (map[string]any, error)
-}
-
 type TriggerHookContext struct {
 	Name          string
 	Parameters    map[string]any
@@ -66,13 +54,8 @@ type TriggerHookContext struct {
 }
 
 /*
- * Hook provider for Integration implementations.
+ * Context for executing a integration hook.
  */
-type IntegrationHookProvider interface {
-	Hooks() []Hook
-	HandleHook(ctx IntegrationHookContext) error
-}
-
 type IntegrationHookContext struct {
 	Name            string
 	Parameters      any

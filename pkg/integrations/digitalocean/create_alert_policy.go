@@ -196,3 +196,11 @@ func (c *CreateAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 func (c *CreateAlertPolicy) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateAlertPolicy) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateAlertPolicy) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

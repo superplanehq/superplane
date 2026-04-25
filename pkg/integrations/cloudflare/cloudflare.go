@@ -197,3 +197,11 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 func (c *Cloudflare) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
+
+func (c *Cloudflare) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *Cloudflare) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

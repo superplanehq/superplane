@@ -187,3 +187,11 @@ func (c *IndexDocument) HandleWebhook(_ core.WebhookRequestContext) (int, *core.
 func (c *IndexDocument) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *IndexDocument) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *IndexDocument) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

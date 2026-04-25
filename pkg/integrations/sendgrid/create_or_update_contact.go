@@ -271,3 +271,11 @@ func filterListIDs(values []string) []string {
 
 	return result
 }
+
+func (c *CreateOrUpdateContact) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateOrUpdateContact) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -193,3 +193,11 @@ func (g *GetDatabase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 }
 
 func (g *GetDatabase) Cleanup(ctx core.SetupContext) error { return nil }
+
+func (g *GetDatabase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetDatabase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

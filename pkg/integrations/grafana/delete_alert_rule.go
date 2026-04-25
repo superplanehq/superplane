@@ -140,3 +140,11 @@ func (c *DeleteAlertRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (c *DeleteAlertRule) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteAlertRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteAlertRule) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

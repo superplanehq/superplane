@@ -141,3 +141,11 @@ func (j *JFrogArtifactory) ListResources(resourceType string, ctx core.ListResou
 
 	return resources, nil
 }
+
+func (j *JFrogArtifactory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (j *JFrogArtifactory) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

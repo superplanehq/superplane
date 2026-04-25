@@ -169,3 +169,11 @@ func (c *PurgeQueue) Cancel(ctx core.ExecutionContext) error {
 func (c *PurgeQueue) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *PurgeQueue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *PurgeQueue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

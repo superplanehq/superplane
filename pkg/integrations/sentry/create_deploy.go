@@ -264,3 +264,11 @@ func validateCreateDeployConfiguration(config CreateDeployConfiguration) error {
 	}
 	return nil
 }
+
+func (c *CreateDeploy) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateDeploy) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -129,3 +129,11 @@ func (c *CreateTopic) Cancel(ctx core.ExecutionContext) error {
 func (c *CreateTopic) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateTopic) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateTopic) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

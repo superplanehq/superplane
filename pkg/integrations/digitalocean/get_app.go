@@ -152,3 +152,11 @@ func (g *GetApp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 func (g *GetApp) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (g *GetApp) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetApp) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

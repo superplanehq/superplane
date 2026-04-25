@@ -257,3 +257,11 @@ func hasCaseUpdates(config UpdateCaseConfiguration) bool {
 
 	return config.Tags != nil
 }
+
+func (c *UpdateCase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateCase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

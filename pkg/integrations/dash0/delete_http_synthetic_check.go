@@ -139,3 +139,11 @@ func (c *DeleteHTTPSyntheticCheck) HandleWebhook(ctx core.WebhookRequestContext)
 func (c *DeleteHTTPSyntheticCheck) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteHTTPSyntheticCheck) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteHTTPSyntheticCheck) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

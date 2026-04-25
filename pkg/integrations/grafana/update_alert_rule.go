@@ -137,3 +137,11 @@ func (c *UpdateAlertRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (c *UpdateAlertRule) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *UpdateAlertRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateAlertRule) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

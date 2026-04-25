@@ -159,3 +159,11 @@ func validateGetDashboardSpec(spec GetDashboardSpec) error {
 
 	return nil
 }
+
+func (c *GetDashboard) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetDashboard) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

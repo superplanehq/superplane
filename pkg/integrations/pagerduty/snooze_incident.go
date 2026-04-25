@@ -176,3 +176,11 @@ func (c *SnoozeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 func (c *SnoozeIncident) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *SnoozeIncident) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SnoozeIncident) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

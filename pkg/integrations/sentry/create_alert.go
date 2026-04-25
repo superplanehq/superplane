@@ -214,3 +214,11 @@ func validateCreateAlertConfiguration(config CreateAlertConfiguration) error {
 
 	return nil
 }
+
+func (c *CreateAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateAlert) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

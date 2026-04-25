@@ -157,3 +157,11 @@ func (s *SMTP) ListResources(resourceType string, ctx core.ListResourcesContext)
 	// SMTP doesn't have resources to list
 	return []core.IntegrationResource{}, nil
 }
+
+func (s *SMTP) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *SMTP) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

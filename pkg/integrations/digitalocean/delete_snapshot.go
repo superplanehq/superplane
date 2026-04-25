@@ -142,3 +142,11 @@ func (c *DeleteSnapshot) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 func (c *DeleteSnapshot) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteSnapshot) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteSnapshot) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

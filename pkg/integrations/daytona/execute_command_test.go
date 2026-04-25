@@ -275,7 +275,7 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 	})
 }
 
-func Test__ExecuteCommand__HandleAction(t *testing.T) {
+func Test__ExecuteCommand__HandleHook(t *testing.T) {
 	component := ExecuteCommand{}
 
 	t.Run("poll reschedules when command is still running", func(t *testing.T) {

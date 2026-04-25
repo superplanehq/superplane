@@ -589,3 +589,11 @@ func listInstallationRepositories(ctx context.Context, client *github.Client) ([
 
 	return out, nil
 }
+
+func (g *GitHub) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GitHub) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

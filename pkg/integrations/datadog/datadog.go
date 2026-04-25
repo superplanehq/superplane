@@ -143,3 +143,11 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	return []core.IntegrationResource{}, nil
 }
+
+func (d *Datadog) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *Datadog) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

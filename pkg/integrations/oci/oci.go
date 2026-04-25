@@ -245,3 +245,11 @@ var allRegions = []configuration.FieldOption{
 	{Label: "me-jeddah-1", Value: "me-jeddah-1"},
 	{Label: "af-johannesburg-1", Value: "af-johannesburg-1"},
 }
+
+func (o *OCI) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (o *OCI) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

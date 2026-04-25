@@ -65,6 +65,10 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("hook not found: %w", err)
 	}
 
+	if hookDef.Type != core.HookTypeUser {
+		return nil, fmt.Errorf("hook '%s' cannot be invoked", actionName)
+	}
+
 	if err := configuration.ValidateConfiguration(hookDef.Parameters, parameters); err != nil {
 		return nil, fmt.Errorf("hook parameters validation failed: %w", err)
 	}

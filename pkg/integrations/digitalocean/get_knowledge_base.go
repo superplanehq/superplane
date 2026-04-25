@@ -301,3 +301,11 @@ func (g *GetKnowledgeBase) HandleWebhook(ctx core.WebhookRequestContext) (int, *
 func (g *GetKnowledgeBase) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (g *GetKnowledgeBase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetKnowledgeBase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

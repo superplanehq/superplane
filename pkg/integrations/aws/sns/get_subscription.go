@@ -156,3 +156,11 @@ func (c *GetSubscription) Cancel(ctx core.ExecutionContext) error {
 func (c *GetSubscription) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetSubscription) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetSubscription) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

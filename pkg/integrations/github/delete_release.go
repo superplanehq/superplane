@@ -247,3 +247,11 @@ func (c *DeleteRelease) Cancel(ctx core.ExecutionContext) error {
 func (c *DeleteRelease) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteRelease) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

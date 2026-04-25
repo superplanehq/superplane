@@ -154,3 +154,11 @@ func (l *ListLogEntries) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 func (l *ListLogEntries) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (l *ListLogEntries) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListLogEntries) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

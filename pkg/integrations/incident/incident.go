@@ -128,3 +128,11 @@ func (i *IncidentIO) ListResources(resourceType string, ctx core.ListResourcesCo
 	}
 	return resources, nil
 }
+
+func (i *IncidentIO) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (i *IncidentIO) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

@@ -236,3 +236,11 @@ func (c *DeleteDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (c *DeleteDNSRecord) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteDNSRecord) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteDNSRecord) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

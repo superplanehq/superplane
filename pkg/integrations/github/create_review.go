@@ -205,3 +205,11 @@ func (c *CreateReview) Cancel(ctx core.ExecutionContext) error {
 func (c *CreateReview) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateReview) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateReview) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

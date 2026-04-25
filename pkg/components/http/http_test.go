@@ -625,7 +625,7 @@ func TestHTTP__Execute__NetworkErrorWithRetrySchedulesAction(t *testing.T) {
 	assert.Contains(t, metadata.Retry.LastError, "connection refused")
 }
 
-func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
+func TestHTTP__HandleHook__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	h := &HTTP{}
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -674,7 +674,7 @@ func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	assert.Contains(t, metadata.Retry.LastError, "temporary outage")
 }
 
-func TestHTTP__HandleAction__RetryRequest_SuccessAfterNetworkError(t *testing.T) {
+func TestHTTP__HandleHook__RetryRequest_SuccessAfterNetworkError(t *testing.T) {
 	h := &HTTP{}
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}

@@ -268,3 +268,11 @@ func parseCommentID(value string) (int64, error) {
 
 	return int64(floatValue), nil
 }
+
+func (c *AddReaction) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddReaction) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

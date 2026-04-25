@@ -227,3 +227,11 @@ func (r *TokenResponse) GetExpiration() time.Duration {
 }
 
 func (s *ServiceNow) HandleRequest(ctx core.HTTPRequestContext) {}
+
+func (s *ServiceNow) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *ServiceNow) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

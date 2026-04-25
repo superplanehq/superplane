@@ -135,3 +135,11 @@ func decodeListSilencesSpec(config any) (ListSilencesSpec, error) {
 	}
 	return spec, nil
 }
+
+func (l *ListSilences) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListSilences) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

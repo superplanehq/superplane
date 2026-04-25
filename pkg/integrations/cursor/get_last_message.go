@@ -181,3 +181,11 @@ func (c *GetLastMessage) Cancel(ctx core.ExecutionContext) error {
 func (c *GetLastMessage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetLastMessage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetLastMessage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

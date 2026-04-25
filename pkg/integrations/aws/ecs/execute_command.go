@@ -232,3 +232,11 @@ func (c *ExecuteCommand) normalizeConfig(config ExecuteCommandConfiguration) Exe
 	config.Command = strings.TrimSpace(config.Command)
 	return config
 }
+
+func (c *ExecuteCommand) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ExecuteCommand) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

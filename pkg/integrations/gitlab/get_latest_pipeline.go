@@ -127,3 +127,11 @@ func (c *GetLatestPipeline) Cancel(ctx core.ExecutionContext) error {
 func (c *GetLatestPipeline) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetLatestPipeline) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetLatestPipeline) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

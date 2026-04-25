@@ -564,3 +564,11 @@ func (c *CreateHTTPSyntheticCheck) HandleWebhook(ctx core.WebhookRequestContext)
 func (c *CreateHTTPSyntheticCheck) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateHTTPSyntheticCheck) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateHTTPSyntheticCheck) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

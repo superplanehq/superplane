@@ -256,3 +256,11 @@ func (p *PutObject) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 func (p *PutObject) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (p *PutObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (p *PutObject) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

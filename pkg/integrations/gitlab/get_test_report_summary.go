@@ -140,3 +140,11 @@ func (c *GetTestReportSummary) Cancel(ctx core.ExecutionContext) error {
 func (c *GetTestReportSummary) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetTestReportSummary) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetTestReportSummary) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

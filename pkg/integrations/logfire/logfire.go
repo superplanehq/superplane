@@ -207,3 +207,11 @@ func (l *Logfire) Triggers() []core.Trigger {
 		&OnAlertReceived{},
 	}
 }
+
+func (l *Logfire) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *Logfire) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

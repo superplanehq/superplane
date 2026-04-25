@@ -208,3 +208,11 @@ func (c *DeleteRepository) normalizeConfig(config DeleteRepositoryConfiguration)
 	config.Repository = strings.TrimSpace(config.Repository)
 	return config
 }
+
+func (c *DeleteRepository) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteRepository) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

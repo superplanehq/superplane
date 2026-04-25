@@ -259,3 +259,11 @@ func (c *GetRelease) Cancel(ctx core.ExecutionContext) error {
 func (c *GetRelease) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetRelease) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

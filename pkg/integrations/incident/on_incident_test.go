@@ -201,7 +201,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__OnIncident__HandleAction__SetSecret(t *testing.T) {
+func Test__OnIncident__HandleHook__SetSecret(t *testing.T) {
 	trigger := &OnIncident{}
 
 	t.Run("setSecret stores secret and updates metadata", func(t *testing.T) {

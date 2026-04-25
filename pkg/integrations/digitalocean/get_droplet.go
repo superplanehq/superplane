@@ -153,3 +153,11 @@ func (g *GetDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 func (g *GetDroplet) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (g *GetDroplet) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetDroplet) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

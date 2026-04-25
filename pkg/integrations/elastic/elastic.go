@@ -286,3 +286,11 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 
 	return nil, fmt.Errorf("unsupported resourceType %q", resourceType)
 }
+
+func (e *Elastic) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (e *Elastic) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

@@ -197,3 +197,11 @@ func (c *UpdateService) normalizeConfig(config UpdateServiceConfiguration) Updat
 	config.Service = strings.TrimSpace(config.Service)
 	return config
 }
+
+func (c *UpdateService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateService) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -138,7 +138,7 @@ func (c *UpsertRecord) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpsertRecord) Actions() []core.Hook {
+func (c *UpsertRecord) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: pollChangeActionName,

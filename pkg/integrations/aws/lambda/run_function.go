@@ -318,3 +318,11 @@ func parseLambdaReportValue(value string) (string, bool) {
 func (c *RunFunction) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *RunFunction) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *RunFunction) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -124,3 +124,11 @@ func (c *DeleteLoadBalancer) Cancel(ctx core.ExecutionContext) error {
 func (c *DeleteLoadBalancer) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteLoadBalancer) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteLoadBalancer) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

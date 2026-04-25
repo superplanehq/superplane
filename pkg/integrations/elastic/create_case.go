@@ -180,3 +180,11 @@ func (c *CreateCase) HandleWebhook(_ core.WebhookRequestContext) (int, *core.Web
 func (c *CreateCase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *CreateCase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateCase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

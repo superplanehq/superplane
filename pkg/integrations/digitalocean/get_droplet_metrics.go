@@ -332,3 +332,11 @@ func (g *GetDropletMetrics) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 func (g *GetDropletMetrics) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (g *GetDropletMetrics) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetDropletMetrics) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -307,3 +307,11 @@ func (c *UpsertMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 func (c *UpsertMemory) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *UpsertMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpsertMemory) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

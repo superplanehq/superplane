@@ -175,3 +175,11 @@ func (c *PublishMessage) HandleWebhook(_ core.WebhookRequestContext) (int, *core
 func (c *PublishMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *PublishMessage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *PublishMessage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

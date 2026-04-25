@@ -167,3 +167,11 @@ func (c *DeleteFeatureFlag) Cancel(ctx core.ExecutionContext) error {
 func (c *DeleteFeatureFlag) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteFeatureFlag) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteFeatureFlag) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

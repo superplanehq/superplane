@@ -392,3 +392,11 @@ func validateQueryTimeValue(value *string, timezone *string) error {
 	_, _, err := parseGrafanaQueryTime(strings.TrimSpace(*value), timezone)
 	return err
 }
+
+func (q *QueryDataSource) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (q *QueryDataSource) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -200,3 +200,11 @@ func (c *GetTestMetrics) Cancel(ctx core.ExecutionContext) error {
 func (c *GetTestMetrics) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetTestMetrics) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetTestMetrics) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

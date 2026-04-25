@@ -36,6 +36,10 @@ func (c *testOutputChannelComponent) OutputChannels(any) []core.OutputChannel { 
 
 func (c *testOutputChannelComponent) Configuration() []configuration.Field { return nil }
 
+func (c *testOutputChannelComponent) Hooks() []core.Hook { return nil }
+
+func (c *testOutputChannelComponent) HandleHook(core.ActionHookContext) error { return nil }
+
 func (c *testOutputChannelComponent) Setup(core.SetupContext) error { return nil }
 
 func (c *testOutputChannelComponent) ProcessQueueItem(core.ProcessQueueContext) (*uuid.UUID, error) {

@@ -408,7 +408,7 @@ func (c *CopyImage) OnIntegrationMessage(ctx core.IntegrationMessageContext) err
 	)
 }
 
-func (c *CopyImage) Actions() []core.Hook {
+func (c *CopyImage) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: "checkRuleAvailability",

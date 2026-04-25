@@ -138,3 +138,11 @@ func sanitizeExpireSilenceConfiguration(config ExpireSilenceConfiguration) Expir
 	config.Silence = strings.TrimSpace(config.Silence)
 	return config
 }
+
+func (c *ExpireSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ExpireSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

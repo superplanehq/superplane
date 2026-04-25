@@ -292,3 +292,11 @@ func (c *GetPackageVersion) normalizeConfig(config GetPackageVersionConfiguratio
 	config.Version = strings.TrimSpace(config.Version)
 	return config
 }
+
+func (c *GetPackageVersion) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetPackageVersion) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

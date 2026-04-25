@@ -49,12 +49,7 @@ func (s *PanicableIntegration) Configuration() []configuration.Field {
 }
 
 func (s *PanicableIntegration) Hooks() []core.Hook {
-	hookProvider, ok := s.underlying.(core.IntegrationHookProvider)
-	if !ok {
-		return []core.Hook{}
-	}
-
-	return hookProvider.Hooks()
+	return s.underlying.Hooks()
 }
 
 func (s *PanicableIntegration) Components() []core.Component {
@@ -110,12 +105,7 @@ func (s *PanicableIntegration) HandleHook(ctx core.IntegrationHookContext) (err 
 		}
 	}()
 
-	hookProvider, ok := s.underlying.(core.IntegrationHookProvider)
-	if !ok {
-		return fmt.Errorf("integration %s has no hook provider", s.underlying.Name())
-	}
-
-	return hookProvider.HandleHook(ctx)
+	return s.underlying.HandleHook(ctx)
 }
 
 func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.IntegrationResource, err error) {

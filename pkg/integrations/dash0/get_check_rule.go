@@ -159,3 +159,11 @@ func (c *GetCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 func (c *GetCheckRule) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetCheckRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetCheckRule) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

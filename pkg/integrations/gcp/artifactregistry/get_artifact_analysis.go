@@ -378,3 +378,11 @@ func (c *GetArtifactAnalysis) Cleanup(_ core.SetupContext) error    { return nil
 func (c *GetArtifactAnalysis) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *GetArtifactAnalysis) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetArtifactAnalysis) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

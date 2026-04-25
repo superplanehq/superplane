@@ -597,3 +597,11 @@ func inRoundedRect(x, y, x0, y0, x1, y1, r int) bool {
 
 	return false
 }
+
+func (t *Teams) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (t *Teams) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

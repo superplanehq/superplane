@@ -232,3 +232,11 @@ func decodeUpdateAlertConfiguration(input any) (UpdateAlertConfiguration, error)
 
 	return config, nil
 }
+
+func (c *UpdateAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateAlert) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

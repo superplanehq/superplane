@@ -229,3 +229,11 @@ func (c *DeregisterImage) Cancel(ctx core.ExecutionContext) error {
 func (c *DeregisterImage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeregisterImage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeregisterImage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

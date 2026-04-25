@@ -263,3 +263,11 @@ func (c *DeleteMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 func (c *DeleteMemory) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteMemory) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

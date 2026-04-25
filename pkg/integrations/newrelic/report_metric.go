@@ -320,3 +320,11 @@ func toSummaryValue(value any) (map[string]any, error) {
 
 	return result, nil
 }
+
+func (c *ReportMetric) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ReportMetric) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

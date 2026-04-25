@@ -136,3 +136,11 @@ func (f *Filter) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 func (f *Filter) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (f *Filter) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (f *Filter) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

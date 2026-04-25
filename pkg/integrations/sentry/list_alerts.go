@@ -160,3 +160,11 @@ func decodeListAlertsConfiguration(input any) (ListAlertsConfiguration, error) {
 	config.Project = strings.TrimSpace(config.Project)
 	return config, nil
 }
+
+func (c *ListAlerts) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ListAlerts) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

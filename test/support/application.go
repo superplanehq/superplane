@@ -96,7 +96,7 @@ type DummyComponentOptions struct {
 	SetupFunc         func(ctx core.SetupContext) error
 	ProcessQueueFunc  func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
 	ExecuteFunc       func(ctx core.ExecutionContext) error
-	HandleHookFunc    func(ctx core.TriggerHookContext) error
+	HandleHookFunc    func(ctx core.ActionHookContext) error
 	HandleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
 	CancelFunc        func(ctx core.ExecutionContext) error
 	CleanupFunc       func(ctx core.SetupContext) error
@@ -106,7 +106,7 @@ type DummyComponent struct {
 	setupFunc         func(ctx core.SetupContext) error
 	processQueueFunc  func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
 	executeFunc       func(ctx core.ExecutionContext) error
-	handleHookFunc    func(ctx core.TriggerHookContext) error
+	handleHookFunc    func(ctx core.ActionHookContext) error
 	handleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
 	cancelFunc        func(ctx core.ExecutionContext) error
 	cleanupFunc       func(ctx core.SetupContext) error
@@ -185,7 +185,7 @@ func (t *DummyComponent) Hooks() []core.Hook {
 	return nil
 }
 
-func (t *DummyComponent) HandleHook(ctx core.TriggerHookContext) error {
+func (t *DummyComponent) HandleHook(ctx core.ActionHookContext) error {
 	if t.handleHookFunc == nil {
 		return nil
 	}

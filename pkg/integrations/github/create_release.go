@@ -431,3 +431,11 @@ func (c *CreateRelease) Cancel(ctx core.ExecutionContext) error {
 func (c *CreateRelease) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateRelease) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -138,3 +138,11 @@ func (c *PurgeCache) Cancel(ctx core.ExecutionContext) error {
 func (c *PurgeCache) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *PurgeCache) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *PurgeCache) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

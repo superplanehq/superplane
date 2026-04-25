@@ -104,3 +104,11 @@ func (f *FireHydrant) Sync(ctx core.SyncContext) error {
 func (f *FireHydrant) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
+
+func (f *FireHydrant) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (f *FireHydrant) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

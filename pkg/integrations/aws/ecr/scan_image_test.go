@@ -200,7 +200,7 @@ func Test__ScanImage__HandleHook(t *testing.T) {
 			Name: "unknown",
 		})
 
-		require.ErrorContains(t, err, "unknown hook")
+		require.ErrorContains(t, err, "unknown action")
 	})
 
 	t.Run("scan still in progress -> schedules poll", func(t *testing.T) {

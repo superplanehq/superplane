@@ -287,3 +287,11 @@ func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowU
 
 	return result
 }
+
+func (g *GetWorkflowUsage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetWorkflowUsage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

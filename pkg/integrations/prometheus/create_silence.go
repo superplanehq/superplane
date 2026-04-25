@@ -290,3 +290,11 @@ func sanitizeCreateSilenceConfiguration(config CreateSilenceConfiguration) Creat
 	config.Comment = strings.TrimSpace(config.Comment)
 	return config
 }
+
+func (c *CreateSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

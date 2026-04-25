@@ -110,3 +110,11 @@ func (c *DeleteTopicComponent) HandleWebhook(_ core.WebhookRequestContext) (int,
 func (c *DeleteTopicComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *DeleteTopicComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteTopicComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

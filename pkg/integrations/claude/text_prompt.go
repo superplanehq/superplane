@@ -253,3 +253,11 @@ func extractMessageText(response *CreateMessageResponse) string {
 	}
 	return builder.String()
 }
+
+func (c *TextPrompt) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *TextPrompt) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

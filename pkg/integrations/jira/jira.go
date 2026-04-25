@@ -128,3 +128,11 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
+
+func (j *Jira) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (j *Jira) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

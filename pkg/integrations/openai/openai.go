@@ -132,3 +132,11 @@ func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	return resources, nil
 }
+
+func (o *OpenAI) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (o *OpenAI) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

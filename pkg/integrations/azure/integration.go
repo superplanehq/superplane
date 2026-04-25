@@ -357,3 +357,11 @@ func loadConfig(ctx core.IntegrationContext) (*Configuration, error) {
 		SubscriptionID: string(subscriptionID),
 	}, nil
 }
+
+func (a *AzureIntegration) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (a *AzureIntegration) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

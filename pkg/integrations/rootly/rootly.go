@@ -163,3 +163,11 @@ func hmacEqual(a, b []byte) bool {
 	}
 	return result == 0
 }
+
+func (r *Rootly) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (r *Rootly) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

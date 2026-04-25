@@ -420,3 +420,11 @@ type MessageEntity struct {
 	Offset int    `json:"offset"`
 	Length int    `json:"length"`
 }
+
+func (t *Telegram) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (t *Telegram) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

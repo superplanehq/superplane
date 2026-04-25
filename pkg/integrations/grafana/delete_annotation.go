@@ -215,3 +215,11 @@ func parseAnnotationIDString(s string) (int64, error) {
 	}
 	return id, nil
 }
+
+func (d *DeleteAnnotation) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteAnnotation) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

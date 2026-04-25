@@ -191,3 +191,11 @@ func (c *EnableImageDeprecation) Cancel(ctx core.ExecutionContext) error {
 func (c *EnableImageDeprecation) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *EnableImageDeprecation) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *EnableImageDeprecation) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

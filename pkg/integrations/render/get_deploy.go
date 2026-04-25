@@ -148,3 +148,11 @@ func (c *GetDeploy) Cancel(ctx core.ExecutionContext) error {
 func (c *GetDeploy) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetDeploy) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetDeploy) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

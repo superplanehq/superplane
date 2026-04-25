@@ -227,3 +227,11 @@ func (q *QueryPrometheus) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (q *QueryPrometheus) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (q *QueryPrometheus) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (q *QueryPrometheus) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -166,3 +166,11 @@ func decodeGetIssueConfiguration(input any) (GetIssueConfiguration, error) {
 	config.IssueID = strings.TrimSpace(config.IssueID)
 	return config, nil
 }
+
+func (c *GetIssue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetIssue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

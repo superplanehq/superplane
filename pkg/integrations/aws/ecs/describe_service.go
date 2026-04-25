@@ -216,3 +216,11 @@ func (c *DescribeService) normalizeConfig(config DescribeServiceConfiguration) D
 	config.Service = strings.TrimSpace(config.Service)
 	return config
 }
+
+func (c *DescribeService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DescribeService) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

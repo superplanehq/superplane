@@ -139,7 +139,7 @@ func (c *DeleteRecord) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DeleteRecord) Actions() []core.Hook {
+func (c *DeleteRecord) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: pollChangeActionName,

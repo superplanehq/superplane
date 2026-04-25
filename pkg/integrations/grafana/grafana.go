@@ -331,3 +331,11 @@ func formatSilenceResourceLabel(s Silence) string {
 	}
 	return fmt.Sprintf("%s [%s] (%s)", comment, state, idShort)
 }
+
+func (g *Grafana) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *Grafana) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

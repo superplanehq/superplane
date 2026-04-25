@@ -166,3 +166,11 @@ func (g *GetArtifactInfo) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (g *GetArtifactInfo) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (g *GetArtifactInfo) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetArtifactInfo) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

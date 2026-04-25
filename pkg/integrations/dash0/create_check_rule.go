@@ -402,3 +402,11 @@ func (c *CreateCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (c *CreateCheckRule) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateCheckRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateCheckRule) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -294,3 +294,11 @@ func resolveSignedPreview(signed *bool) bool {
 
 	return *signed
 }
+
+func (p *GetPreviewURLComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (p *GetPreviewURLComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

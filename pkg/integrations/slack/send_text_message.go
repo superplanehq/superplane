@@ -178,3 +178,11 @@ func (c *SendTextMessage) Cancel(ctx core.ExecutionContext) error {
 func (c *SendTextMessage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *SendTextMessage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendTextMessage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

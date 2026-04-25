@@ -517,3 +517,11 @@ func formatSilenceInstant(value any) string {
 	}
 	return fmt.Sprintf("%v", value)
 }
+
+func (c *CreateSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

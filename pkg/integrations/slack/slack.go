@@ -618,3 +618,11 @@ func (s *Slack) readAndVerify(ctx core.HTTPRequestContext) ([]byte, error) {
 
 	return body, nil
 }
+
+func (s *Slack) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Slack) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

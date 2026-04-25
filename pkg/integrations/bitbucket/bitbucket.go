@@ -178,3 +178,11 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 func (b *Bitbucket) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
+
+func (b *Bitbucket) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (b *Bitbucket) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

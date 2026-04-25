@@ -203,3 +203,11 @@ func (c *GetImageScanFindings) Cancel(ctx core.ExecutionContext) error {
 func (c *GetImageScanFindings) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetImageScanFindings) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetImageScanFindings) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

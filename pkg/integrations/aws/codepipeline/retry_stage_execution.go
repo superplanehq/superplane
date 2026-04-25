@@ -287,3 +287,11 @@ func (c *RetryStageExecution) Cancel(ctx core.ExecutionContext) error {
 func (c *RetryStageExecution) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *RetryStageExecution) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *RetryStageExecution) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

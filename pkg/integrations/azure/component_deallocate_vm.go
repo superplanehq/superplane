@@ -171,3 +171,11 @@ func (c *DeallocateVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (i
 func (c *DeallocateVMComponent) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeallocateVMComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeallocateVMComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

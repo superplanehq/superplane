@@ -158,3 +158,11 @@ func validateDeleteSilenceSpec(spec DeleteSilenceSpec) error {
 	}
 	return nil
 }
+
+func (d *DeleteSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

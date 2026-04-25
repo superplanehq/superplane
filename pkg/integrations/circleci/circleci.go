@@ -173,3 +173,11 @@ func (c *CircleCI) Triggers() []core.Trigger {
 		&OnWorkflowCompleted{},
 	}
 }
+
+func (c *CircleCI) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CircleCI) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

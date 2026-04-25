@@ -124,3 +124,11 @@ func (c *DeleteSnapshot) Cancel(ctx core.ExecutionContext) error {
 func (c *DeleteSnapshot) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteSnapshot) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteSnapshot) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

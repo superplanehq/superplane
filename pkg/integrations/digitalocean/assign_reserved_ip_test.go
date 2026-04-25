@@ -444,6 +444,6 @@ func Test__AssignReservedIP__HandleHook(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
+		assert.Contains(t, err.Error(), "unknown hook")
 	})
 }

@@ -360,3 +360,11 @@ func (c *CreateVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 func (c *CreateVMComponent) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateVMComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateVMComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

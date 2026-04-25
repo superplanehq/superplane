@@ -169,3 +169,11 @@ func (c *DeleteQueue) Cancel(ctx core.ExecutionContext) error {
 func (c *DeleteQueue) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DeleteQueue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteQueue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

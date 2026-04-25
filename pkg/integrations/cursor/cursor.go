@@ -139,3 +139,11 @@ func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	return []core.IntegrationResource{}, nil
 }
+
+func (i *Cursor) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (i *Cursor) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

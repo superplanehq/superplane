@@ -163,3 +163,11 @@ func (c *RunNRQLQuery) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 func (c *RunNRQLQuery) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *RunNRQLQuery) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *RunNRQLQuery) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

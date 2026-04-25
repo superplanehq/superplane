@@ -254,3 +254,11 @@ func (c *DeletePackageVersions) normalizeConfig(config DeletePackageVersionsConf
 	config.ExpectedStatus = strings.TrimSpace(config.ExpectedStatus)
 	return config
 }
+
+func (c *DeletePackageVersions) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeletePackageVersions) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

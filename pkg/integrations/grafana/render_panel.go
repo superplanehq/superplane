@@ -270,3 +270,11 @@ func validateRenderPanelSpec(spec RenderPanelSpec) error {
 
 	return nil
 }
+
+func (c *RenderPanel) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *RenderPanel) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

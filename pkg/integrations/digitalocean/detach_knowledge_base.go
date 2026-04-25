@@ -161,3 +161,11 @@ func (d *DetachKnowledgeBase) HandleWebhook(ctx core.WebhookRequestContext) (int
 func (d *DetachKnowledgeBase) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (d *DetachKnowledgeBase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DetachKnowledgeBase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

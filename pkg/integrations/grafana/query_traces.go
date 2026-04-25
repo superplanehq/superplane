@@ -257,3 +257,11 @@ func validateQueryTracesSpec(spec QueryTracesSpec) error {
 	}
 	return nil
 }
+
+func (q *QueryTraces) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (q *QueryTraces) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

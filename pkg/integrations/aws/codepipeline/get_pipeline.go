@@ -165,3 +165,11 @@ func (c *GetPipeline) Cancel(ctx core.ExecutionContext) error {
 func (c *GetPipeline) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetPipeline) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetPipeline) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

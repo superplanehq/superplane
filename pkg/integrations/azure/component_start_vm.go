@@ -168,3 +168,11 @@ func (c *StartVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *
 func (c *StartVMComponent) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *StartVMComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *StartVMComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

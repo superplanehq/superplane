@@ -221,3 +221,11 @@ func (c *CreateService) normalizeConfig(config CreateServiceConfiguration) Creat
 
 	return config
 }
+
+func (c *CreateService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateService) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

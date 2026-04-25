@@ -508,3 +508,11 @@ func normalizeBaseURL(url string) string {
 func (g *GitLab) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
+
+func (g *GitLab) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GitLab) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

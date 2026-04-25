@@ -242,3 +242,11 @@ func (c *UpdateEnvVar) Cancel(ctx core.ExecutionContext) error {
 func (c *UpdateEnvVar) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *UpdateEnvVar) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateEnvVar) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

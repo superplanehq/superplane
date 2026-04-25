@@ -198,3 +198,11 @@ func (c *CreateDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (c *CreateDNSRecord) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateDNSRecord) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateDNSRecord) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

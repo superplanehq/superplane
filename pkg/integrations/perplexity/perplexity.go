@@ -136,3 +136,11 @@ func (p *Perplexity) ListResources(resourceType string, ctx core.ListResourcesCo
 
 	return []core.IntegrationResource{}, nil
 }
+
+func (p *Perplexity) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (p *Perplexity) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

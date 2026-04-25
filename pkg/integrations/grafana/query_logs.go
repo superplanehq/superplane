@@ -263,3 +263,11 @@ func validateQueryLogsSpec(spec QueryLogsSpec) error {
 	}
 	return nil
 }
+
+func (q *QueryLogs) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (q *QueryLogs) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -223,7 +223,7 @@ func Test__CreateRepositorySandbox__Execute(t *testing.T) {
 	assert.Equal(t, "npm ci", *metadata.Bootstrap.Script)
 }
 
-func Test__CreateRepositorySandbox__HandleAction(t *testing.T) {
+func Test__CreateRepositorySandbox__HandleHook(t *testing.T) {
 	component := CreateRepositorySandbox{}
 
 	t.Run("waits while sandbox is creating", func(t *testing.T) {

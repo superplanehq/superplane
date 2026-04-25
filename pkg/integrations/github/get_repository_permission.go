@@ -144,3 +144,11 @@ func (c *GetRepositoryPermission) Cancel(ctx core.ExecutionContext) error {
 func (c *GetRepositoryPermission) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetRepositoryPermission) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetRepositoryPermission) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

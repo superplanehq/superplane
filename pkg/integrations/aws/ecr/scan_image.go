@@ -224,7 +224,7 @@ func (c *ScanImage) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *ScanImage) Actions() []core.Hook {
+func (c *ScanImage) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: "pollFindings",

@@ -355,3 +355,11 @@ func (c *ReadMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 func (c *ReadMemory) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *ReadMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ReadMemory) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -264,3 +264,11 @@ func buildMetadata(workspaceID string, workspacePlan string) Metadata {
 		},
 	}
 }
+
+func (r *Render) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (r *Render) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

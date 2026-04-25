@@ -304,3 +304,11 @@ func (c *UpdateIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 func (c *UpdateIncident) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *UpdateIncident) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateIncident) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

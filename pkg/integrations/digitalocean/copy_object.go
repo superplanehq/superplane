@@ -270,3 +270,11 @@ func (c *CopyObject) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 func (c *CopyObject) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CopyObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CopyObject) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

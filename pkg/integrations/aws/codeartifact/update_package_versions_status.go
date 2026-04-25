@@ -302,3 +302,11 @@ func (c *UpdatePackageVersionsStatus) normalizeConfig(config UpdatePackageVersio
 	config.ExpectedStatus = strings.TrimSpace(config.ExpectedStatus)
 	return config
 }
+
+func (c *UpdatePackageVersionsStatus) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdatePackageVersionsStatus) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

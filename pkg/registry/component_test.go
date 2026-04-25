@@ -32,7 +32,7 @@ func (p *panickingComponent) Execute(ctx core.ExecutionContext) error        { p
 func (p *panickingComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	panic("process queue item panic")
 }
-func (p *panickingComponent) HandleHook(ctx core.TriggerHookContext) error {
+func (p *panickingComponent) HandleHook(ctx core.ActionHookContext) error {
 	panic("handle hook panic")
 }
 func (p *panickingComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -90,7 +90,7 @@ func TestPanicableComponent_HandleHook_CatchesPanic(t *testing.T) {
 		Logger: log.NewEntry(log.StandardLogger()),
 	}
 
-	err := panicable.(core.ActionHookProvider).HandleHook(ctx)
+	err := panicable.HandleHook(ctx)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "panicking-comp panicked in HandleHook(test-hook)")

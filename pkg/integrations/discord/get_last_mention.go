@@ -299,3 +299,11 @@ func parseDateTimeWithUTCDefault(value string) (time.Time, error) {
 		value,
 	)
 }
+
+func (c *GetLastMention) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetLastMention) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

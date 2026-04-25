@@ -157,3 +157,11 @@ func (c *GetWorkflow) Cancel(ctx core.ExecutionContext) error {
 func (c *GetWorkflow) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetWorkflow) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetWorkflow) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

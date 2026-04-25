@@ -99,12 +99,7 @@ func (s *PanicableTrigger) HandleHook(ctx core.TriggerHookContext) (result map[s
 		}
 	}()
 
-	hookProvider, ok := s.underlying.(core.TriggerHookProvider)
-	if !ok {
-		return nil, fmt.Errorf("trigger %s has no hook provider", s.underlying.Name())
-	}
-
-	return hookProvider.HandleHook(ctx)
+	return s.underlying.HandleHook(ctx)
 }
 
 func (s *PanicableTrigger) Cleanup(ctx core.TriggerContext) (err error) {

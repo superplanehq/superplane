@@ -331,7 +331,7 @@ func (c *CreateImage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *CreateImage) Actions() []core.Hook {
+func (c *CreateImage) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: "checkRuleAvailability",

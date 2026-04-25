@@ -182,3 +182,11 @@ func (c *AddIssueAssignee) Cancel(ctx core.ExecutionContext) error {
 func (c *AddIssueAssignee) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *AddIssueAssignee) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddIssueAssignee) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

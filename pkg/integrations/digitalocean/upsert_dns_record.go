@@ -224,3 +224,11 @@ func (u *UpsertDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 func (u *UpsertDNSRecord) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (u *UpsertDNSRecord) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (u *UpsertDNSRecord) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

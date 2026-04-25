@@ -185,3 +185,11 @@ func (d *DeleteDatabase) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 func (d *DeleteDatabase) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (d *DeleteDatabase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteDatabase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

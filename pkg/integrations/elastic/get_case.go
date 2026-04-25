@@ -149,3 +149,11 @@ func (c *GetCase) HandleWebhook(_ core.WebhookRequestContext) (int, *core.Webhoo
 func (c *GetCase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *GetCase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetCase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

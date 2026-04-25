@@ -138,7 +138,7 @@ func (c *CreateRecord) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateRecord) Actions() []core.Hook {
+func (c *CreateRecord) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: pollChangeActionName,

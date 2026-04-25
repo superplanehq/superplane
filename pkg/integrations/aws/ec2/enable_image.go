@@ -172,3 +172,11 @@ func (c *EnableImage) Cancel(ctx core.ExecutionContext) error {
 func (c *EnableImage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *EnableImage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *EnableImage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

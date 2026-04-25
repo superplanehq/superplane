@@ -375,3 +375,11 @@ func (c *QueryLogfire) Cleanup(ctx core.SetupContext) error {
 
 	return nil
 }
+
+func (c *QueryLogfire) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *QueryLogfire) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

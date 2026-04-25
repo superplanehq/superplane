@@ -181,3 +181,11 @@ func (c *AddIssueLabel) Cancel(ctx core.ExecutionContext) error {
 func (c *AddIssueLabel) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *AddIssueLabel) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddIssueLabel) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

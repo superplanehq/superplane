@@ -309,3 +309,11 @@ func decodeUpdateIssueConfiguration(input any) (UpdateIssueConfiguration, error)
 
 	return config, nil
 }
+
+func (c *UpdateIssue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateIssue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

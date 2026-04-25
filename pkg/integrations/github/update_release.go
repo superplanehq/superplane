@@ -314,3 +314,11 @@ func (c *UpdateRelease) Cancel(ctx core.ExecutionContext) error {
 func (c *UpdateRelease) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *UpdateRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateRelease) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

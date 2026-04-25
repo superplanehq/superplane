@@ -175,3 +175,11 @@ func sanitizeGetAlertConfiguration(config GetAlertConfiguration) GetAlertConfigu
 	config.State = strings.ToLower(strings.TrimSpace(config.State))
 	return config
 }
+
+func (c *GetAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetAlert) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

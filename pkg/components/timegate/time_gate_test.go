@@ -9,7 +9,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
+func TestTimeGate_HandleHook_PushThrough_Finishes(t *testing.T) {
 	tg := &TimeGate{}
 
 	stateCtx := &contexts.ExecutionStateContext{}

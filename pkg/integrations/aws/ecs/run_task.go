@@ -733,7 +733,7 @@ func (c *RunTask) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	return emitRunTaskOutput(executionCtx.ExecutionState, tasks, failures, timedOut)
 }
 
-func (c *RunTask) Actions() []core.Hook {
+func (c *RunTask) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: runTaskCheckRuleAvailabilityAction,

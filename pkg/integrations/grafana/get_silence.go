@@ -159,3 +159,11 @@ func validateGetSilenceSpec(spec GetSilenceSpec) error {
 	}
 	return nil
 }
+
+func (g *GetSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

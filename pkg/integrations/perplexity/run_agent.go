@@ -340,3 +340,11 @@ func extractCitations(response *AgentResponse) []citation {
 
 	return citations
 }
+
+func (c *runAgent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *runAgent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

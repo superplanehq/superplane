@@ -190,7 +190,7 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 	})
 }
 
-func Test__CreateSandbox__HandleAction(t *testing.T) {
+func Test__CreateSandbox__HandleHook(t *testing.T) {
 	component := CreateSandbox{}
 
 	t.Run("poll reschedules when sandbox is still creating", func(t *testing.T) {

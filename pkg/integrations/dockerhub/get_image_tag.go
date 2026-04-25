@@ -165,3 +165,11 @@ func (c *GetImageTag) Cancel(ctx core.ExecutionContext) error {
 func (c *GetImageTag) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetImageTag) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetImageTag) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

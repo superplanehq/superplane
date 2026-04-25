@@ -62,6 +62,12 @@ type Integration interface {
 	Cleanup(ctx IntegrationCleanupContext) error
 
 	/*
+	 * Allows integrations to define and execute  hooks.
+	 */
+	Hooks() []Hook
+	HandleHook(ctx IntegrationHookContext) error
+
+	/*
 	 * List resources of a given type.
 	 */
 	ListResources(resourceType string, ctx ListResourcesContext) ([]IntegrationResource, error)

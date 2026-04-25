@@ -247,3 +247,11 @@ func (g *GetObject) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 func (g *GetObject) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (g *GetObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetObject) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

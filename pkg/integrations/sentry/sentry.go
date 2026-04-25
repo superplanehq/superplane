@@ -1107,3 +1107,11 @@ func missingCredentialsMessage(config Configuration) string {
 
 	return fmt.Sprintf("Sentry configuration is incomplete: missing %s", strings.Join(missing, " and "))
 }
+
+func (s *Sentry) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Sentry) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

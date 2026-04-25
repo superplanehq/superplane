@@ -88,9 +88,15 @@ type Component interface {
 	 * so it is the responsibility of the component to control it.
 	 *
 	 * Components should finish the execution or move it to waiting state.
-	 * Components can also implement async components by combining Execute() and HandleAction().
+	 * Components can also implement async components by combining Execute() and HandleHook().
 	 */
 	Execute(ctx ExecutionContext) error
+
+	/*
+	 * Allows components to define and execute custom hooks.
+	 */
+	Hooks() []Hook
+	HandleHook(ctx ActionHookContext) error
 
 	/*
 	 * Handler for webhooks.

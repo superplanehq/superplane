@@ -241,3 +241,11 @@ func (c *InvokeFunction) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *InvokeFunction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *InvokeFunction) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *InvokeFunction) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -121,13 +121,3 @@ func InvokeNodeTriggerAction(
 		Result: resultStruct,
 	}, nil
 }
-
-func findTriggerHook(trigger core.Trigger, hookName string) *core.Hook {
-	for _, hook := range trigger.Hooks() {
-		if hook.Name == hookName {
-			return &hook
-		}
-	}
-
-	return nil
-}

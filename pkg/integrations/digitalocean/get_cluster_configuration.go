@@ -148,3 +148,11 @@ func (g *GetClusterConfiguration) HandleWebhook(ctx core.WebhookRequestContext) 
 }
 
 func (g *GetClusterConfiguration) Cleanup(ctx core.SetupContext) error { return nil }
+
+func (g *GetClusterConfiguration) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetClusterConfiguration) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

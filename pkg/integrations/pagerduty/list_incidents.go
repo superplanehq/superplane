@@ -217,3 +217,11 @@ func (l *ListIncidents) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 func (l *ListIncidents) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (l *ListIncidents) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListIncidents) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

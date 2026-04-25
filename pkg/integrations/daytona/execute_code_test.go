@@ -285,7 +285,7 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 	})
 }
 
-func Test__ExecuteCode__HandleAction(t *testing.T) {
+func Test__ExecuteCode__HandleHook(t *testing.T) {
 	component := ExecuteCode{}
 
 	t.Run("poll reschedules when command is still running", func(t *testing.T) {
@@ -451,7 +451,7 @@ func Test__ExecuteCode__HandleAction(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
+		assert.Contains(t, err.Error(), "unknown hook")
 	})
 }
 

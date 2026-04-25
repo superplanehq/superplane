@@ -168,3 +168,11 @@ func (c *GetFeatureFlag) Cancel(ctx core.ExecutionContext) error {
 func (c *GetFeatureFlag) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetFeatureFlag) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetFeatureFlag) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

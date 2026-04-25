@@ -234,7 +234,7 @@ func Test__WaitForButtonClick__Execute(t *testing.T) {
 	})
 }
 
-func Test__WaitForButtonClick__HandleAction(t *testing.T) {
+func Test__WaitForButtonClick__HandleHook(t *testing.T) {
 	component := &WaitForButtonClick{}
 
 	t.Run("button click -> emits received event and cleans up subscription", func(t *testing.T) {

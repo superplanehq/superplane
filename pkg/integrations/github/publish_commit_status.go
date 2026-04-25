@@ -230,3 +230,11 @@ func (c *PublishCommitStatus) Cancel(ctx core.ExecutionContext) error {
 func (c *PublishCommitStatus) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *PublishCommitStatus) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *PublishCommitStatus) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

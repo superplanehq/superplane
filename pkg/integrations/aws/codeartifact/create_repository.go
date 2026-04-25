@@ -201,3 +201,11 @@ func (c *CreateRepository) normalizeConfig(config CreateRepositoryConfiguration)
 	config.Description = strings.TrimSpace(config.Description)
 	return config
 }
+
+func (c *CreateRepository) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateRepository) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

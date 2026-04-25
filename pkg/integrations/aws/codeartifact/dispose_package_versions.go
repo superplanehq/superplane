@@ -248,3 +248,11 @@ func (c *DisposePackageVersions) normalizeConfig(config DisposePackageVersionsCo
 	config.ExpectedStatus = strings.TrimSpace(config.ExpectedStatus)
 	return config
 }
+
+func (c *DisposePackageVersions) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DisposePackageVersions) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

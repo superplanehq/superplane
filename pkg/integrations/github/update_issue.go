@@ -260,3 +260,11 @@ func (c *UpdateIssue) Cancel(ctx core.ExecutionContext) error {
 func (c *UpdateIssue) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *UpdateIssue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateIssue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

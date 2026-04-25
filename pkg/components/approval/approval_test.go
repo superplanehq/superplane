@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
+func TestApproval_HandleHook_Approved_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
 	role := models.RoleOrgOwner
@@ -78,7 +78,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 	}
 }
 
-func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
+func TestApproval_HandleHook_Rejected_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
 	role := models.RoleOrgOwner
@@ -145,7 +145,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	}
 }
 
-func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
+func TestApproval_HandleHook_RejectImmediatelyFinishes(t *testing.T) {
 	approval := &Approval{}
 
 	user1 := &core.User{ID: "test-user-1"}
@@ -187,7 +187,7 @@ func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
 	assert.Equal(t, StateRejected, stored.Result)
 }
 
-func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
+func TestApproval_HandleHook_StillPending_DoesNotCallPass(t *testing.T) {
 	approval := &Approval{}
 
 	role := models.RoleOrgOwner
@@ -255,7 +255,7 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	}
 }
 
-func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
+func TestApproval_HandleHook_ApproveOnceAcrossAllRequirements(t *testing.T) {
 	approval := &Approval{}
 
 	user := &core.User{ID: "test-user"}
@@ -303,7 +303,7 @@ func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
 	assert.ErrorContains(t, err, "user has already approved/rejected another requirement")
 }
 
-func TestApproval_HandleAction_CannotApproveRequirementAgain(t *testing.T) {
+func TestApproval_HandleHook_CannotApproveRequirementAgain(t *testing.T) {
 	approval := &Approval{}
 
 	user := &core.User{ID: "test-user"}

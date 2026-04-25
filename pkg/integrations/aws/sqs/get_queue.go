@@ -170,3 +170,11 @@ func (c *GetQueue) Cancel(ctx core.ExecutionContext) error {
 func (c *GetQueue) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetQueue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetQueue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

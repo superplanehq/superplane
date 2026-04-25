@@ -334,3 +334,11 @@ func mapKeys(input map[string]struct{}) []string {
 	}
 	return result
 }
+
+func (c *SendEmail) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendEmail) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

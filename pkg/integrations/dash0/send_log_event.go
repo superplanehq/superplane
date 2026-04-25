@@ -234,3 +234,11 @@ func (s *SendLogEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 func (s *SendLogEvent) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (s *SendLogEvent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *SendLogEvent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

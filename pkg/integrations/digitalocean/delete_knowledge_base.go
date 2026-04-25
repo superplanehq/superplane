@@ -248,3 +248,11 @@ func resolveDeleteKBMetadata(ctx core.SetupContext, kbID string) error {
 		KnowledgeBaseName: kb.Name,
 	})
 }
+
+func (d *DeleteKnowledgeBase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteKnowledgeBase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

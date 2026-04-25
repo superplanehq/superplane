@@ -134,3 +134,11 @@ func (s *SendGrid) HandleRequest(ctx core.HTTPRequestContext) {
 func (s *SendGrid) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	return []core.IntegrationResource{}, nil
 }
+
+func (s *SendGrid) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *SendGrid) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

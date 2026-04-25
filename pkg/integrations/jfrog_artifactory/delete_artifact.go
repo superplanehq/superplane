@@ -149,3 +149,11 @@ func (d *DeleteArtifact) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 func (d *DeleteArtifact) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (d *DeleteArtifact) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteArtifact) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

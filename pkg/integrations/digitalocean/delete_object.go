@@ -176,3 +176,11 @@ func (d *DeleteObject) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 func (d *DeleteObject) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (d *DeleteObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteObject) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

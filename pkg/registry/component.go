@@ -58,12 +58,7 @@ func (s *PanicableComponent) Configuration() []configuration.Field {
 }
 
 func (s *PanicableComponent) Hooks() []core.Hook {
-	hookProvider, ok := s.underlying.(core.ActionHookProvider)
-	if !ok {
-		return []core.Hook{}
-	}
-
-	return hookProvider.Hooks()
+	return s.underlying.Hooks()
 }
 
 func (s *PanicableComponent) OutputChannels(config any) []core.OutputChannel {
@@ -118,12 +113,7 @@ func (s *PanicableComponent) HandleHook(ctx core.ActionHookContext) (err error) 
 		}
 	}()
 
-	hookProvider, ok := s.underlying.(core.ActionHookProvider)
-	if !ok {
-		return fmt.Errorf("component %s has no hook provider", s.underlying.Name())
-	}
-
-	return hookProvider.HandleHook(ctx)
+	return s.underlying.HandleHook(ctx)
 }
 
 func (s *PanicableComponent) HandleWebhook(ctx core.WebhookRequestContext) (status int, response *core.WebhookResponseBody, err error) {

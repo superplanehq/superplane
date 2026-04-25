@@ -79,7 +79,7 @@ func Test__Webhook__Setup(t *testing.T) {
 	})
 }
 
-func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
+func Test__Webhook__HandleHook__ResetAuthentication(t *testing.T) {
 	t.Run("resets signature authentication", func(t *testing.T) {
 		webhook := &Webhook{}
 		webhookCtx := &contexts.NodeWebhookContext{Secret: "secret-key"}

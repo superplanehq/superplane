@@ -320,3 +320,11 @@ func (r *TokenResponse) GetExpiration() time.Duration {
 
 	return time.Hour
 }
+
+func (p *PagerDuty) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (p *PagerDuty) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

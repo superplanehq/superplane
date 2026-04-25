@@ -2345,3 +2345,11 @@ type CreateVMConfig struct {
 	NetworkingConfig       `mapstructure:",squash"`
 	OSAndStorageConfig     `mapstructure:",squash"`
 }
+
+func (c *CreateVM) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateVM) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

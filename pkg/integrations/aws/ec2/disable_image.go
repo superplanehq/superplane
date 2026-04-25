@@ -166,3 +166,11 @@ func (c *DisableImage) Cancel(ctx core.ExecutionContext) error {
 func (c *DisableImage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *DisableImage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DisableImage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

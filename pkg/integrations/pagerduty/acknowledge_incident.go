@@ -149,3 +149,11 @@ func (c *AcknowledgeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int
 func (c *AcknowledgeIncident) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *AcknowledgeIncident) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AcknowledgeIncident) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

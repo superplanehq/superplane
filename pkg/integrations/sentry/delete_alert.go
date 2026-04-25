@@ -197,3 +197,11 @@ func decodeDeleteAlertConfiguration(input any) (DeleteAlertConfiguration, error)
 	config.AlertID = strings.TrimSpace(config.AlertID)
 	return config, nil
 }
+
+func (c *DeleteAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteAlert) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

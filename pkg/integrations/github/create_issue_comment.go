@@ -186,3 +186,11 @@ func (c *CreateIssueComment) Cancel(ctx core.ExecutionContext) error {
 func (c *CreateIssueComment) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *CreateIssueComment) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateIssueComment) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

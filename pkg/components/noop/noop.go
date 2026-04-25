@@ -87,3 +87,11 @@ func (c *NoOp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webhook
 func (c *NoOp) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *NoOp) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *NoOp) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

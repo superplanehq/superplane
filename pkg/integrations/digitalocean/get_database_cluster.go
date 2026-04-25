@@ -140,3 +140,11 @@ func (g *GetDatabaseCluster) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return http.StatusOK, nil, nil
 }
 func (g *GetDatabaseCluster) Cleanup(ctx core.SetupContext) error { return nil }
+
+func (g *GetDatabaseCluster) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetDatabaseCluster) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

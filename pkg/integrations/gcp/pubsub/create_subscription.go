@@ -181,3 +181,11 @@ func (c *CreateSubscriptionComponent) HandleWebhook(_ core.WebhookRequestContext
 func (c *CreateSubscriptionComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *CreateSubscriptionComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateSubscriptionComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

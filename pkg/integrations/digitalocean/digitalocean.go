@@ -174,3 +174,11 @@ func (d *DigitalOcean) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (d *DigitalOcean) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
+
+func (d *DigitalOcean) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DigitalOcean) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

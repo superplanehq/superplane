@@ -139,3 +139,11 @@ func (c *GetBuild) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *GetBuild) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *GetBuild) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetBuild) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

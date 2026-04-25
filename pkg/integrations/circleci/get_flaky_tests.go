@@ -153,3 +153,11 @@ func (c *GetFlakyTests) Cancel(ctx core.ExecutionContext) error {
 func (c *GetFlakyTests) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetFlakyTests) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetFlakyTests) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

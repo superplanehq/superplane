@@ -159,3 +159,11 @@ func (h *Honeycomb) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(404)
 	_, _ = ctx.Response.Write([]byte("not found"))
 }
+
+func (h *Honeycomb) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (h *Honeycomb) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

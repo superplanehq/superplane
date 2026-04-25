@@ -215,3 +215,11 @@ func (c *GetLastWorkflow) Cancel(ctx core.ExecutionContext) error {
 func (c *GetLastWorkflow) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetLastWorkflow) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetLastWorkflow) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -122,3 +122,11 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	return resources, nil
 }
+
+func (i *Claude) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (i *Claude) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

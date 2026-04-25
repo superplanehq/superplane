@@ -134,3 +134,11 @@ func (c *GetService) Cancel(ctx core.ExecutionContext) error {
 func (c *GetService) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *GetService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetService) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -274,3 +274,11 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 		return nil, nil
 	}
 }
+
+func (h *Hetzner) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (h *Hetzner) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

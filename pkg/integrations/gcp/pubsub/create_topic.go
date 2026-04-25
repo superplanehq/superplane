@@ -105,3 +105,11 @@ func (c *CreateTopicComponent) HandleWebhook(_ core.WebhookRequestContext) (int,
 func (c *CreateTopicComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *CreateTopicComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateTopicComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

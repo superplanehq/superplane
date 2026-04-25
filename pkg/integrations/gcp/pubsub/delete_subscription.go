@@ -112,3 +112,11 @@ func (c *DeleteSubscriptionComponent) HandleWebhook(_ core.WebhookRequestContext
 func (c *DeleteSubscriptionComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
+
+func (c *DeleteSubscriptionComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteSubscriptionComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

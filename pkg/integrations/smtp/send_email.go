@@ -318,3 +318,11 @@ func parseEmailList(emails string) ([]string, error) {
 func (c *SendEmail) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *SendEmail) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendEmail) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

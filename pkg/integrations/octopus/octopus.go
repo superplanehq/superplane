@@ -311,3 +311,11 @@ func spaceIDForIntegration(client *Client, integration core.IntegrationContext) 
 
 	return space.ID, nil
 }
+
+func (o *Octopus) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (o *Octopus) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

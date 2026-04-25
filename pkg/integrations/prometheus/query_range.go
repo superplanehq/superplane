@@ -182,3 +182,11 @@ func sanitizeQueryRangeConfiguration(config QueryRangeConfiguration) QueryRangeC
 	config.Step = strings.TrimSpace(config.Step)
 	return config
 }
+
+func (c *QueryRange) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *QueryRange) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

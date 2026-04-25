@@ -134,3 +134,11 @@ func sanitizeQueryConfiguration(config QueryConfiguration) QueryConfiguration {
 	config.Query = strings.TrimSpace(config.Query)
 	return config
 }
+
+func (c *Query) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *Query) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

@@ -147,3 +147,11 @@ func (d *DeleteLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int,
 func (d *DeleteLoadBalancer) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (d *DeleteLoadBalancer) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteLoadBalancer) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

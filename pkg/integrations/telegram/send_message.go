@@ -207,3 +207,11 @@ func (c *SendMessage) Cancel(ctx core.ExecutionContext) error {
 func (c *SendMessage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *SendMessage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendMessage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

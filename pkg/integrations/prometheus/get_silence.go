@@ -163,3 +163,11 @@ func sanitizeGetSilenceConfiguration(config GetSilenceConfiguration) GetSilenceC
 	}
 	return config
 }
+
+func (c *GetSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

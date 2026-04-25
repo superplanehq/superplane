@@ -176,3 +176,11 @@ func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesConte
 
 	return resources, nil
 }
+
+func (d *Discord) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *Discord) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

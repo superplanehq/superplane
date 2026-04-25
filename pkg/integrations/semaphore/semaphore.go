@@ -116,3 +116,11 @@ func (s *Semaphore) Triggers() []core.Trigger {
 		&OnPipelineDone{},
 	}
 }
+
+func (s *Semaphore) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Semaphore) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

@@ -490,7 +490,7 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return http.StatusOK, nil, nil
 }
 
-func (r *RunPipeline) Actions() []core.Hook {
+func (r *RunPipeline) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: "poll",

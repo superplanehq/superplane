@@ -221,3 +221,11 @@ func resolveKBNodeMetadata(ctx core.SetupContext, agentID, kbID string) error {
 
 	return ctx.Metadata.Set(meta)
 }
+
+func (a *AttachKnowledgeBase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (a *AttachKnowledgeBase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

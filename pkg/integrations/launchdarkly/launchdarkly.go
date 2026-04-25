@@ -182,3 +182,11 @@ func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResources
 		return []core.IntegrationResource{}, nil
 	}
 }
+
+func (l *LaunchDarkly) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *LaunchDarkly) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

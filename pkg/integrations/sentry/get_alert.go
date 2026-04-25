@@ -201,3 +201,11 @@ func decodeGetAlertConfiguration(input any) (GetAlertConfiguration, error) {
 	config.AlertID = strings.TrimSpace(config.AlertID)
 	return config, nil
 }
+
+func (c *GetAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetAlert) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

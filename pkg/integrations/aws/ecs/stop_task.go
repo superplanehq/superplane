@@ -304,7 +304,7 @@ func (c *StopTask) OnIntegrationMessage(ctx core.IntegrationMessageContext) erro
 	return emitStopTaskOutput(executionCtx.ExecutionState, task)
 }
 
-func (c *StopTask) Actions() []core.Hook {
+func (c *StopTask) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: stopTaskCheckRuleAvailabilityAction,

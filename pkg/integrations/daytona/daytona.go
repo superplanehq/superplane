@@ -159,3 +159,11 @@ func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesConte
 		return []core.IntegrationResource{}, nil
 	}
 }
+
+func (d *Daytona) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *Daytona) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
+}

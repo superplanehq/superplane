@@ -294,3 +294,11 @@ func (c *CopyPackageVersions) normalizeConfig(config CopyPackageVersionsConfigur
 	config.Versions = strings.TrimSpace(config.Versions)
 	return config
 }
+
+func (c *CopyPackageVersions) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CopyPackageVersions) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

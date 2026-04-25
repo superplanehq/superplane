@@ -221,3 +221,11 @@ func (c *AddMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 func (c *AddMemory) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
+
+func (c *AddMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddMemory) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
