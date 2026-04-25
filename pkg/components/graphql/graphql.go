@@ -83,27 +83,23 @@ func (e *GraphQL) Description() string {
 func (e *GraphQL) Documentation() string {
 	return `The GraphQL component runs a GraphQL document against a URL using the standard **GraphQL over HTTP** JSON body shape.
 
-## Use cases
-
-- **GraphQL APIs** without hand-building escaped JSON for the "query" field
-
 ## Request
 
 - **URL** — GraphQL HTTP endpoint (supports expressions)
 - **Query** — Multi-line GraphQL document (no JSON escaping in the canvas)
-- **Variables** — Optional key/value pairs, merged into a JSON "variables" object (values support expressions)
-- **Headers** — for example Authorization (header names cannot use expressions)
+- **Variables** — Key/value pairs merged into the request variables object
+- **Headers** — Request headers
 
 ## Response
 
-Same shape as the HTTP component: **status**, **headers**, and **body** (JSON when possible, otherwise string).
-
-**Note:** Many GraphQL servers return **HTTP 200** even when the response JSON includes a top-level "errors" array. This component sends responses with a non-empty top-level "errors" array to the **Failure** channel.
+- **status** - Responde status code
+- **headers** - Response headers
+- **body** - Response body converted to JSON
 `
 }
 
 func (e *GraphQL) Icon() string {
-	return "globe"
+	return "network"
 }
 
 func (e *GraphQL) Color() string {

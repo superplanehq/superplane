@@ -15,6 +15,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
+import graphqlIcon from "@/assets/icons/graphql.svg";
 
 // Same states as HTTP — GraphQL uses the same success/failure output shape.
 const GRAPHQL_EVENT_STATE_MAP: EventStateMap = {
@@ -187,7 +188,8 @@ function getGraphQLErrorsString(
 export const graphqlMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
-      iconSlug: context.componentDefinition.icon || "globe",
+      iconSrc: graphqlIcon,
+      iconSlug: context.componentDefinition.icon || "network",
       iconColor: getColorClass("black"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
