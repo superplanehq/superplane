@@ -34,7 +34,7 @@ func serializeIntegrations(in []core.Integration) []*pb.IntegrationDefinition {
 			Description:   integration.Description(),
 			Instructions:  integration.Instructions(),
 			Configuration: configuration,
-			Components:    actions.SerializeActions(integration.Actions()),
+			Actions:       actions.SerializeActions(integration.Actions()),
 			Triggers:      actions.SerializeTriggers(integration.Triggers()),
 		}
 	}

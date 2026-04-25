@@ -27,7 +27,7 @@ const templatesListResponse = `{
 			"spec": {
 				"nodes": [
 					{"id": "trigger-001", "name": "Check every 10 minutes", "type": "TYPE_TRIGGER"},
-					{"id": "http-001", "name": "Health check request", "type": "TYPE_COMPONENT"}
+					{"id": "http-001", "name": "Health check request", "type": "TYPE_ACTION"}
 				],
 				"edges": [
 					{"sourceId": "trigger-001", "targetId": "http-001", "channel": "default"}

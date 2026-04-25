@@ -20,7 +20,7 @@ spec:
       position:
         x: 133
         "y": 403
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "github.onRelease"
@@ -31,7 +31,7 @@ spec:
       warningMessage: ""
     - id: "component-node-70p83y"
       name: "Wait for the changes to propagate"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         mode: "interval"
         unit: "minutes"
@@ -40,7 +40,7 @@ spec:
       position:
         x: 1191
         "y": 402
-      component:
+      action:
         name: "wait"
       blueprint: null
       trigger: null
@@ -51,7 +51,7 @@ spec:
       warningMessage: ""
     - id: "component-node-7z3mea"
       name: "Slack: Deployment failed"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "Deployment of the {{$['Listen to new Releases'].data.release.name}} has failed. \n\nCheck the workflow for details: {{$['Deploy 10%'].data.workflow_run.html_url}}"
@@ -62,7 +62,7 @@ spec:
       position:
         x: 1195
         "y": 636
-      component:
+      action:
         name: "slack.sendTextMessage"
       blueprint: null
       trigger: null
@@ -73,7 +73,7 @@ spec:
       warningMessage: ""
     - id: "component-node-1krig8"
       name: "Check if there are any alerts 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         checkRules:
@@ -86,7 +86,7 @@ spec:
       position:
         x: 1712
         "y": 221
-      component:
+      action:
         name: "dash0.listIssues"
       blueprint: null
       trigger: null
@@ -97,7 +97,7 @@ spec:
       warningMessage: ""
     - id: "component-node-3c9afc"
       name: "Health Check: Ping server 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         method: "POST"
         retries: 3
@@ -108,7 +108,7 @@ spec:
       position:
         x: 1715
         "y": 402
-      component:
+      action:
         name: "http"
       blueprint: null
       trigger: null
@@ -119,7 +119,7 @@ spec:
       warningMessage: ""
     - id: "merge-merge-vckyv1"
       name: "Wait for all the checks to finish"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         enableStopIf: true
         enableTimeout: true
@@ -131,7 +131,7 @@ spec:
       position:
         x: 2295
         "y": 405
-      component:
+      action:
         name: "merge"
       blueprint: null
       trigger: null
@@ -142,7 +142,7 @@ spec:
       warningMessage: ""
     - id: "dash0-listissues-check-if-there-are-any-alerts-pbjufl"
       name: "Check if there are any alerts 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         checkRules:
@@ -155,7 +155,7 @@ spec:
       position:
         x: 4026
         "y": 408
-      component:
+      action:
         name: "dash0.listIssues"
       blueprint: null
       trigger: null
@@ -166,7 +166,7 @@ spec:
       warningMessage: ""
     - id: "http-health-check--ping-server-spb8ma"
       name: "Health Check: Ping server 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         method: "POST"
         retries: 3
@@ -177,7 +177,7 @@ spec:
       position:
         x: 4028
         "y": 480
-      component:
+      action:
         name: "http"
       blueprint: null
       trigger: null
@@ -188,7 +188,7 @@ spec:
       warningMessage: ""
     - id: "wait-wait-for-the-changes-to-propagate-9f6hct"
       name: "Wait for the changes to propagate 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         mode: "interval"
         unit: "minutes"
@@ -197,7 +197,7 @@ spec:
       position:
         x: 3480
         "y": 405
-      component:
+      action:
         name: "wait"
       blueprint: null
       trigger: null
@@ -208,7 +208,7 @@ spec:
       warningMessage: ""
     - id: "merge-merge-as9s0i"
       name: "Wait for all the checks to finish - final"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         enableStopIf: true
         enableTimeout: true
@@ -220,7 +220,7 @@ spec:
       position:
         x: 4565
         "y": 479
-      component:
+      action:
         name: "merge"
       blueprint: null
       trigger: null
@@ -231,14 +231,14 @@ spec:
       warningMessage: ""
     - id: "pagerduty-listincidents-pagerduty-listincidents-kcozn1"
       name: "Check if there are open issues 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         services: null
       position:
         x: 1719
         "y": 644
-      component:
+      action:
         name: "pagerduty.listIncidents"
       blueprint: null
       trigger: null
@@ -249,7 +249,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-t0ed50"
       name: "Deploy 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "environment"
@@ -267,7 +267,7 @@ spec:
       position:
         x: 634
         "y": 402
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -278,7 +278,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-deploy-10--w3pcg4"
       name: "Deploy 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "environment"
@@ -296,7 +296,7 @@ spec:
       position:
         x: 2865
         "y": 411
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -307,14 +307,14 @@ spec:
       warningMessage: ""
     - id: "pagerduty-listincidents-check-if-there-are-open-issues-jl7aze"
       name: "Check if there are open issues  50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         services: null
       position:
         x: 4028
         "y": 555
-      component:
+      action:
         name: "pagerduty.listIncidents"
       blueprint: null
       trigger: null
@@ -335,7 +335,7 @@ spec:
       position:
         x: 126
         "y": -7
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -356,7 +356,7 @@ spec:
       position:
         x: 619
         "y": 59
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -377,7 +377,7 @@ spec:
       position:
         x: 1707
         "y": -173
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -398,7 +398,7 @@ spec:
       position:
         x: 2289
         "y": -31
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:
@@ -409,7 +409,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-0ae6uu"
       name: "Deploy 100%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "environment"
@@ -427,7 +427,7 @@ spec:
       position:
         x: 5121
         "y": 399
-      component:
+      action:
         name: "github.runWorkflow"
       blueprint: null
       trigger: null
@@ -448,7 +448,7 @@ spec:
       position:
         x: 2859
         "y": -21
-      component: null
+      action: null
       blueprint: null
       trigger: null
       widget:

@@ -6,7 +6,7 @@ import {
   type CanvasesCanvasEvent,
   type CanvasesCanvasNodeExecution,
   type CanvasesCanvasNodeQueueItem,
-  type ComponentsComponent,
+  type SuperplaneActionsAction,
   type SuperplaneComponentsEdge as ComponentsEdge,
   type SuperplaneComponentsNode as ComponentsNode,
   type TriggersTrigger,
@@ -38,7 +38,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 type PrepareComponentNodeArgs = {
   nodes: ComponentsNode[];
   node: ComponentsNode;
-  components: ComponentsComponent[];
+  components: SuperplaneActionsAction[];
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
   canvasId: string;
@@ -52,7 +52,7 @@ type PrepareComponentNodeArgs = {
 type PrepareComponentBaseNodeArgs = {
   nodes: ComponentsNode[];
   node: ComponentsNode;
-  components: ComponentsComponent[];
+  components: SuperplaneActionsAction[];
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
   canvasId: string;
@@ -338,7 +338,7 @@ export function prepareCompositeNode(
 export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode {
   const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser, edges } =
     args;
-  const isPlaceholder = !node.component?.name && node.name === "New Component";
+  const isPlaceholder = !node.action?.name && node.name === "New Component";
 
   if (isPlaceholder) {
     return buildPlaceholderComponentNode(node);
@@ -361,17 +361,17 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
 export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): CanvasNode {
   const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser } = args;
   const executions = nodeExecutionsMap[node.id!] || [];
-  const metadata = components.find((c) => c.name === node.component?.name);
-  const displayLabel = node.name || metadata?.label || node.component?.name || "Component";
-  const componentDef = components.find((c) => c.name === node.component?.name);
+  const metadata = components.find((c) => c.name === node.action?.name);
+  const displayLabel = node.name || metadata?.label || node.action?.name || "Component";
+  const componentDef = components.find((c) => c.name === node.action?.name);
   const fallbackComponentDef = componentDef || {
-    name: node.component?.name,
+    name: node.action?.name,
     label: node.name,
   };
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   try {
-    const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props({
+    const componentBaseProps = getComponentBaseMapper(node.action?.name || "").props({
       nodes: nodes.map((n) => buildNodeInfo(n)),
       node: buildNodeInfo(node),
       componentDefinition: buildComponentDefinition(fallbackComponentDef),
@@ -383,7 +383,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     });
 
     if (!componentBaseProps.iconSrc) {
-      const resolvedIconSrc = getHeaderIconSrc(node.component?.name);
+      const resolvedIconSrc = getHeaderIconSrc(node.action?.name);
       if (resolvedIconSrc) {
         componentBaseProps.iconSrc = resolvedIconSrc;
       }

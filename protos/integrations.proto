@@ -3,7 +3,7 @@ syntax = "proto3";
 package Superplane.Integrations;
 
 import "configuration.proto";
-import "components.proto";
+import "actions.proto";
 import "triggers.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
@@ -53,7 +53,7 @@ message IntegrationDefinition {
   string icon = 3;
   string description = 4;
   repeated Configuration.Field configuration = 5;
-  repeated Components.Component components = 6;
+  repeated Actions.Action actions = 6;
   repeated Triggers.Trigger triggers = 7;
   string instructions = 8;
 }

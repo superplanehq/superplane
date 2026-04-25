@@ -6,7 +6,7 @@ describe("getNodeIntegrationName", () => {
   const availableIntegrations = [
     {
       name: "github",
-      components: [{ name: "github.create_issue" }],
+      actions: [{ name: "github.create_issue" }],
       triggers: [{ name: "github.on_push" }],
     },
   ];
@@ -15,8 +15,8 @@ describe("getNodeIntegrationName", () => {
     expect(
       getNodeIntegrationName(
         {
-          type: "TYPE_COMPONENT",
-          component: { name: "github.create_issue" },
+          type: "TYPE_ACTION",
+          action: { name: "github.create_issue" },
         },
         availableIntegrations,
       ),
