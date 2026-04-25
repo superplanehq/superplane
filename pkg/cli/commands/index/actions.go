@@ -254,7 +254,7 @@ func (c *actionsCommand) findActionByName(ctx core.CommandContext, name string) 
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.SuperplaneActionsAction{}, fmt.Errorf("component %q not found: no integration named %q", name, integrationName)
+			return openapi_client.SuperplaneActionsAction{}, fmt.Errorf("action %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationComponent(integration, componentName)
 	}
@@ -275,5 +275,5 @@ func findIntegrationComponent(integration openapi_client.IntegrationsIntegration
 		}
 	}
 
-	return openapi_client.SuperplaneActionsAction{}, fmt.Errorf("component %q not found in integration %q", name, integration.GetName())
+	return openapi_client.SuperplaneActionsAction{}, fmt.Errorf("action %q not found in integration %q", name, integration.GetName())
 }
