@@ -19,6 +19,7 @@ export interface ChildExecution {
   badgeColor?: string;
   backgroundColor?: string;
   componentIcon?: string;
+  componentIconSrc?: string;
 }
 
 export interface ChainItemData {
@@ -29,6 +30,7 @@ export interface ChainItemData {
   nodeDisplayName?: string; // The actual display name from workflow node
   nodeIcon?: string;
   nodeIconSlug?: string; // Icon slug from component/trigger/blueprint metadata
+  nodeIconSrc?: string;
   state?: string; // Make state optional since it will be calculated
   executionId?: string;
   originalExecution?: CanvasesCanvasNodeExecution; // Add execution data
@@ -53,6 +55,40 @@ interface ChainItemProps {
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
+}
+
+type ChainItemIconSource = Pick<ChainItemData, "nodeIcon" | "nodeIconSlug" | "nodeIconSrc"> &
+  Pick<ChildExecution, "componentIcon" | "componentIconSrc">;
+
+interface ChainItemIconProps {
+  item: Partial<ChainItemIconSource>;
+  size?: number;
+  className?: string;
+}
+
+function ChainItemIcon({
+  item,
+  size = 16,
+  className = "text-gray-800",
+}: ChainItemIconProps): React.ReactElement | null {
+  const iconSrc = item.nodeIconSrc || item.componentIconSrc;
+  const iconSlug = item.nodeIconSlug || item.nodeIcon || item.componentIcon;
+  if (!iconSrc && !iconSlug) {
+    return null;
+  }
+
+  return (
+    <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+      {iconSrc ? (
+        <img src={iconSrc} alt="" className="h-4 w-4 object-contain" />
+      ) : (
+        React.createElement(resolveIcon(iconSlug), {
+          size,
+          className,
+        })
+      )}
+    </div>
+  );
 }
 
 function getReactNodeText(node: React.ReactNode): string {
@@ -198,15 +234,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* First row: Component icon/name and state badge */}
         <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {/* Component Icon */}
-            {(item.nodeIconSlug || item.nodeIcon) && (
-              <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                {React.createElement(resolveIcon(item.nodeIconSlug || item.nodeIcon), {
-                  size: 16,
-                  className: "text-gray-800",
-                })}
-              </div>
-            )}
+            <ChainItemIcon item={item} />
             <span className="text-sm text-gray-800 truncate min-w-0 font-semibold">
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
@@ -263,15 +291,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                       className: "text-gray-400",
                     })}
                   </div>
-                  {/* Component Icon */}
-                  {child.componentIcon && (
-                    <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                      {React.createElement(resolveIcon(child.componentIcon), {
-                        size: 14,
-                        className: "text-gray-500",
-                      })}
-                    </div>
-                  )}
+                  <ChainItemIcon item={child} size={14} className="text-gray-500" />
                   <span className="text-sm text-gray-500 truncate flex-1">{child.name}</span>
                 </div>
                 <div
