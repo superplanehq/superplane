@@ -58,7 +58,7 @@ function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): Co
       groups: ["developers"],
     },
     actions: {
-      invokeNodeExecutionAction: async () => {},
+      invokeNodeExecutionHook: async () => {},
     },
   };
 }
