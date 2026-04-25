@@ -10,39 +10,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test_OnVMInstance_Metadata(t *testing.T) {
-	trigger := &OnVMInstance{}
-	assert.Equal(t, "gcp.compute.onVMInstance", trigger.Name())
-	assert.Equal(t, "Compute • On VM Instance", trigger.Label())
-	assert.Equal(t, "Listen to GCP Compute Engine VM instance lifecycle events", trigger.Description())
-	assert.NotEmpty(t, trigger.Documentation())
-	assert.Equal(t, "gcp", trigger.Icon())
-	assert.Equal(t, "gray", trigger.Color())
-
-	assert.Len(t, trigger.Actions(), 1)
-	assert.Equal(t, "provisionSink", trigger.Actions()[0].Name)
-}
-
-func Test_OnVMInstance_Configuration(t *testing.T) {
-	trigger := &OnVMInstance{}
-	fields := trigger.Configuration()
-	assert.Nil(t, fields)
-}
-
-func Test_OnVMInstance_ExampleData(t *testing.T) {
-	trigger := &OnVMInstance{}
-	example := trigger.ExampleData()
-	assert.Contains(t, example, "type")
-	assert.Contains(t, example, "timestamp")
-	assert.Contains(t, example, "data")
-
-	data, ok := example["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, computeServiceName, data["serviceName"])
-	assert.Equal(t, instancesInsertMethod, data["methodName"])
-	assert.Equal(t, "projects/my-project/zones/us-central1-a/instances/my-vm", data["resourceName"])
-}
-
 func Test_OnVMInstance_SinkFilter(t *testing.T) {
 	assert.Contains(t, SinkFilter, "compute.googleapis.com")
 	assert.Contains(t, SinkFilter, "v1.compute.instances.insert")

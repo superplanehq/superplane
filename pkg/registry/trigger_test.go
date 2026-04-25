@@ -24,13 +24,13 @@ func (p *panickingTrigger) Icon() string                         { return "icon"
 func (p *panickingTrigger) Color() string                        { return "blue" }
 func (p *panickingTrigger) ExampleData() map[string]any          { return nil }
 func (p *panickingTrigger) Configuration() []configuration.Field { return nil }
-func (p *panickingTrigger) Actions() []core.Action               { return nil }
+func (p *panickingTrigger) Hooks() []core.Hook                   { return nil }
 func (p *panickingTrigger) Setup(ctx core.TriggerContext) error  { panic("setup panic") }
 func (p *panickingTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	panic("handle webhook panic")
 }
-func (p *panickingTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	panic("handle action panic")
+func (p *panickingTrigger) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	panic("handle hook panic")
 }
 func (p *panickingTrigger) Cleanup(ctx core.TriggerContext) error { panic("cleanup panic") }
 
@@ -61,19 +61,19 @@ func TestPanicableTrigger_HandleWebhook_CatchesPanic(t *testing.T) {
 	assert.Contains(t, err.Error(), "handle webhook panic")
 }
 
-func TestPanicableTrigger_HandleAction_CatchesPanic(t *testing.T) {
+func TestPanicableTrigger_HandleHook_CatchesPanic(t *testing.T) {
 	trig := &panickingTrigger{name: "panicking-trigger"}
 	panicable := NewPanicableTrigger(trig)
-	ctx := core.TriggerActionContext{
-		Name:   "test-action",
+	ctx := core.TriggerHookContext{
+		Name:   "test-hook",
 		Logger: log.NewEntry(log.StandardLogger()),
 	}
 
-	_, err := panicable.HandleAction(ctx)
+	_, err := panicable.HandleHook(ctx)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "panicking-trigger panicked in HandleAction(test-action)")
-	assert.Contains(t, err.Error(), "handle action panic")
+	assert.Contains(t, err.Error(), "panicking-trigger panicked in HandleHook(test-hook)")
+	assert.Contains(t, err.Error(), "handle hook panic")
 }
 
 func TestPanicableTrigger_Cleanup_CatchesPanic(t *testing.T) {

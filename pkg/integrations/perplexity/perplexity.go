@@ -137,10 +137,10 @@ func (p *Perplexity) ListResources(resourceType string, ctx core.ListResourcesCo
 	return []core.IntegrationResource{}, nil
 }
 
-func (p *Perplexity) Actions() []core.Action {
-	return []core.Action{}
+func (p *Perplexity) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *Perplexity) HandleAction(ctx core.IntegrationActionContext) error {
+func (p *Perplexity) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

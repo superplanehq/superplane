@@ -141,18 +141,18 @@ func (c *GetDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetDeploy) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetDeploy) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetDeploy) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *GetDeploy) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetDeploy) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetDeploy) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

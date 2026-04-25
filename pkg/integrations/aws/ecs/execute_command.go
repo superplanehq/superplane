@@ -189,14 +189,6 @@ func (c *ExecuteCommand) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *ExecuteCommand) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ExecuteCommand) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -239,4 +231,12 @@ func (c *ExecuteCommand) normalizeConfig(config ExecuteCommandConfiguration) Exe
 	config.Container = strings.TrimSpace(config.Container)
 	config.Command = strings.TrimSpace(config.Command)
 	return config
+}
+
+func (c *ExecuteCommand) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ExecuteCommand) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

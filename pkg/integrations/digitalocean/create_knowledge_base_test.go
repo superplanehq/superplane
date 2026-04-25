@@ -894,8 +894,8 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 	}
 
 	// buildPollCtx builds an ActionContext for the poll action with pre-set metadata.
-	buildPollCtx := func(httpContext *contexts.HTTPContext) core.ActionContext {
-		return core.ActionContext{
+	buildPollCtx := func(httpContext *contexts.HTTPContext) core.ActionHookContext {
+		return core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
@@ -929,7 +929,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
@@ -945,7 +945,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
@@ -962,7 +962,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to start indexing job")
@@ -976,7 +976,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
@@ -992,7 +992,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
@@ -1007,7 +1007,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.NoError(t, err)
 		execState := ctx.ExecutionState.(*contexts.ExecutionStateContext)
@@ -1023,7 +1023,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.NoError(t, err)
 		execState := ctx.ExecutionState.(*contexts.ExecutionStateContext)
@@ -1051,7 +1051,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbCompletedWithDB))},
 			},
 		}
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
@@ -1063,7 +1063,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 			Requests: &contexts.RequestContext{},
 		}
 
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 		require.NoError(t, err)
 		execState := ctx.ExecutionState.(*contexts.ExecutionStateContext)
 		require.Len(t, execState.Payloads, 1)
@@ -1080,7 +1080,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		}
 
 		ctx := buildPollCtx(httpContext)
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "indexing job")
@@ -1091,7 +1091,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		ctx := buildPollCtx(httpContext)
 		ctx.ExecutionState = &contexts.ExecutionStateContext{Finished: true, KVs: map[string]string{}}
 
-		err := component.HandleAction(ctx)
+		err := component.HandleHook(ctx)
 
 		require.NoError(t, err)
 		assert.Empty(t, httpContext.Requests)

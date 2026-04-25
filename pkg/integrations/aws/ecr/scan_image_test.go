@@ -192,11 +192,11 @@ func Test__ScanImage__Execute(t *testing.T) {
 	})
 }
 
-func Test__ScanImage__HandleAction(t *testing.T) {
+func Test__ScanImage__HandleHook(t *testing.T) {
 	component := &ScanImage{}
 
-	t.Run("unknown action -> error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+	t.Run("unknown hook -> error", func(t *testing.T) {
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "unknown",
 		})
 
@@ -218,7 +218,7 @@ func Test__ScanImage__HandleAction(t *testing.T) {
 		}
 
 		requests := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:     "pollFindings",
 			HTTP:     httpContext,
 			Requests: requests,
@@ -259,7 +259,7 @@ func Test__ScanImage__HandleAction(t *testing.T) {
 		}
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "pollFindings",
 			HTTP:           httpContext,
 			ExecutionState: execState,

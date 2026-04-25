@@ -171,12 +171,12 @@ func (t *OnArtifactAnalysis) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnArtifactAnalysis) Actions() []core.Action {
-	return nil
+func (t *OnArtifactAnalysis) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnArtifactAnalysis) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+func (t *OnArtifactAnalysis) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnArtifactAnalysis) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {

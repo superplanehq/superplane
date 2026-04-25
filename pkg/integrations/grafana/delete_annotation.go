@@ -134,14 +134,6 @@ func (d *DeleteAnnotation) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteAnnotation) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteAnnotation) HandleAction(_ core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteAnnotation) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -222,4 +214,12 @@ func parseAnnotationIDString(s string) (int64, error) {
 		return 0, errors.New("annotation must be a positive integer")
 	}
 	return id, nil
+}
+
+func (d *DeleteAnnotation) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteAnnotation) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

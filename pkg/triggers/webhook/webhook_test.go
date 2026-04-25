@@ -79,7 +79,7 @@ func Test__Webhook__Setup(t *testing.T) {
 	})
 }
 
-func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
+func Test__Webhook__HandleHook__ResetAuthentication(t *testing.T) {
 	t.Run("resets signature authentication", func(t *testing.T) {
 		webhook := &Webhook{}
 		webhookCtx := &contexts.NodeWebhookContext{Secret: "secret-key"}
@@ -87,7 +87,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "signature"},
 		}
 
-		result, err := webhook.HandleAction(core.TriggerActionContext{
+		result, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "signature"},
 			Metadata:      metadataCtx,
@@ -105,7 +105,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "bearer"},
 		}
 
-		result, err := webhook.HandleAction(core.TriggerActionContext{
+		result, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "bearer"},
 			Metadata:      metadataCtx,
@@ -123,7 +123,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "header_token"},
 		}
 
-		result, err := webhook.HandleAction(core.TriggerActionContext{
+		result, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "header_token"},
 			Metadata:      metadataCtx,
@@ -140,7 +140,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "none"},
 		}
 
-		_, err := webhook.HandleAction(core.TriggerActionContext{
+		_, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "none"},
 			Metadata:      metadataCtx,

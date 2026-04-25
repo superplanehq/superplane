@@ -110,7 +110,7 @@ func Test__IntegrationRequestWorker_SyncError(t *testing.T) {
 	assert.Contains(t, integration.StateDescription, "Sync failed: sync failed")
 }
 
-func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
+func Test__AppInstallationRequestWorker_InvokeHook(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -119,16 +119,16 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 	//
 	// Register a dummy application and install it.
 	//
-	var actionCalled bool
+	var hookCalled bool
 	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
-		Actions: []core.Action{
+		Hooks: []core.Hook{
 			{
 				Name:       "test",
 				Parameters: []configuration.Field{},
 			},
 		},
-		HandleAction: func(ctx core.IntegrationActionContext) error {
-			actionCalled = true
+		HandleHook: func(ctx core.IntegrationHookContext) error {
+			hookCalled = true
 			return nil
 		},
 	})
@@ -158,10 +158,10 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
 	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
-	assert.True(t, actionCalled)
+	assert.True(t, hookCalled)
 }
 
-func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
+func Test__AppInstallationRequestWorker_InvokeHookError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -170,16 +170,16 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 	//
 	// Register a dummy application and install it.
 	//
-	var actionCalled bool
+	var hookCalled bool
 	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
-		Actions: []core.Action{
+		Hooks: []core.Hook{
 			{
 				Name:       "test",
 				Parameters: []configuration.Field{},
 			},
 		},
-		HandleAction: func(ctx core.IntegrationActionContext) error {
-			actionCalled = true
+		HandleHook: func(ctx core.IntegrationHookContext) error {
+			hookCalled = true
 			return errors.New("action failed")
 		},
 	})
@@ -208,5 +208,5 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
 	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
-	assert.True(t, actionCalled)
+	assert.True(t, hookCalled)
 }
