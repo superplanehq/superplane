@@ -615,7 +615,11 @@ CREATE TABLE public.workflow_versions (
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    state character varying(32) NOT NULL
+    state character varying(32) NOT NULL,
+    name character varying(128) DEFAULT ''::character varying NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    change_management_enabled boolean DEFAULT false NOT NULL,
+    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -627,15 +631,12 @@ CREATE TABLE public.workflows (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     name character varying(128) NOT NULL,
-    description text,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
-    live_version_id uuid NOT NULL,
-    change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL,
-    change_management_enabled boolean DEFAULT false NOT NULL
+    live_version_id uuid NOT NULL
 );
 
 
@@ -1928,7 +1929,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260414233443	f
+20260422175935	f
 \.
 
 

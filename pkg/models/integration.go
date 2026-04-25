@@ -143,7 +143,8 @@ func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReferen
 	err := database.Conn().
 		Table("workflow_nodes AS wn").
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
-		Select("w.id as canvas_id, w.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
+		Joins("JOIN workflow_versions AS live_version ON live_version.id = w.live_version_id").
+		Select("w.id as canvas_id, live_version.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
 		Where("wn.app_installation_id = ?", integrationID).
 		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).
