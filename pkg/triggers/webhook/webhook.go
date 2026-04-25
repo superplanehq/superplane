@@ -16,6 +16,10 @@ import (
 const (
 	MaxEventSize           = 64 * 1024
 	DefaultHeaderTokenName = "X-Webhook-Token"
+	// Signature256Header is the default HMAC-SHA256 signature header for custom webhook clients.
+	Signature256Header = "X-Signature-256"
+	// GitHubSignature256Header is the HMAC-SHA256 signature header GitHub sends for repository and org webhooks.
+	GitHubSignature256Header = "X-Hub-Signature-256"
 )
 
 func init() {
@@ -65,7 +69,7 @@ func (w *Webhook) Documentation() string {
 
 ## Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header
+- **Signature (HMAC)**: Verify requests using HMAC-SHA256 in the ` + "`X-Signature-256`" + ` or ` + "`X-Hub-Signature-256`" + ` header (GitHub webhooks)
 - **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
 - **Header Token**: Require a raw token in a custom header (default: ` + "`X-Webhook-Token`" + `)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -242,17 +246,11 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	switch config.Authentication {
 	case "signature":
-		signature := ctx.Headers.Get("X-Signature-256")
-		if signature == "" {
-			return http.StatusForbidden, nil, fmt.Errorf("missing signature header")
+		verified, err := verifyHMACSignature256Headers(secret, ctx.Body, ctx.Headers)
+		if err != nil {
+			return http.StatusForbidden, nil, err
 		}
-
-		signature = strings.TrimPrefix(signature, "sha256=")
-		if signature == "" {
-			return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
-		}
-
-		if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+		if !verified {
 			return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
 		}
 	case "bearer":
@@ -310,4 +308,34 @@ func (c Configuration) HeaderTokenName() string {
 	}
 
 	return DefaultHeaderTokenName
+}
+
+// verifyHMACSignature256Headers checks the raw body against HMAC-SHA256 values from
+// X-Signature-256 and/or X-Hub-Signature-256 (e.g. GitHub webhooks). The sha256= prefix
+// is stripped when present; each non-empty value is tried until one verifies.
+func verifyHMACSignature256Headers(secret, body []byte, headers http.Header) (bool, error) {
+	var values []string
+	for _, name := range []string{Signature256Header, GitHubSignature256Header} {
+		raw := headers.Get(name)
+		if raw == "" {
+			continue
+		}
+		hex := strings.TrimPrefix(raw, "sha256=")
+		if hex == "" {
+			return false, fmt.Errorf("invalid signature format")
+		}
+		values = append(values, hex)
+	}
+
+	if len(values) == 0 {
+		return false, fmt.Errorf("missing signature header")
+	}
+
+	for _, hex := range values {
+		if err := crypto.VerifySignature(secret, body, hex); err == nil {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
