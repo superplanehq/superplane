@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	MaxEventSize           = 64 * 1024
-	DefaultHeaderTokenName = "X-Webhook-Token"
+	MaxEventSize               = 64 * 1024
+	DefaultHeaderTokenName     = "X-Webhook-Token"
+	DefaultSignatureHeaderName = "X-Signature-256"
 )
 
 func init() {
@@ -30,8 +31,9 @@ type Metadata struct {
 }
 
 type Configuration struct {
-	Authentication string `json:"authentication"`
-	HeaderName     string `json:"headerName" mapstructure:"headerName"`
+	Authentication      string `json:"authentication"`
+	HeaderName          string `json:"headerName" mapstructure:"headerName"`
+	SignatureHeaderName string `json:"signatureHeaderName" mapstructure:"signatureHeaderName"`
 }
 
 func (w *Webhook) Name() string {
@@ -65,7 +67,7 @@ func (w *Webhook) Documentation() string {
 
 ## Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header
+- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in a configurable HTTP header (default: ` + "`X-Signature-256`" + `; e.g. ` + "`X-Hub-Signature-256`" + ` for GitHub)
 - **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
 - **Header Token**: Require a raw token in a custom header (default: ` + "`X-Webhook-Token`" + `)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -116,6 +118,20 @@ func (w *Webhook) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "signatureHeaderName",
+			Label:       "Header",
+			Type:        configuration.FieldTypeString,
+			Default:     DefaultSignatureHeaderName,
+			Placeholder: DefaultSignatureHeaderName,
+			Description: "HTTP header that carries the HMAC-SHA256 signature (sha256= prefix)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authentication", Values: []string{"signature"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "authentication", Values: []string{"signature"}},
+			},
+		},
+		{
 			Name:        "headerName",
 			Label:       "Header Name",
 			Type:        configuration.FieldTypeString,
@@ -143,6 +159,10 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Authentication == "signature" && config.SignatureHeaderName != "" && strings.TrimSpace(config.SignatureHeaderName) == "" {
+		return fmt.Errorf("signature header name cannot be empty")
 	}
 
 	if metadata.URL != "" && metadata.Authentication == config.Authentication {
@@ -242,7 +262,8 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	switch config.Authentication {
 	case "signature":
-		signature := ctx.Headers.Get("X-Signature-256")
+		headerName := config.HMACSignatureHeaderName()
+		signature := ctx.Headers.Get(headerName)
 		if signature == "" {
 			return http.StatusForbidden, nil, fmt.Errorf("missing signature header")
 		}
@@ -310,4 +331,13 @@ func (c Configuration) HeaderTokenName() string {
 	}
 
 	return DefaultHeaderTokenName
+}
+
+// HMACSignatureHeaderName returns the HTTP header used for the HMAC signature (HMAC / "signature" auth).
+// When unset in stored configuration, the default matches previous behavior.
+func (c Configuration) HMACSignatureHeaderName() string {
+	if strings.TrimSpace(c.SignatureHeaderName) == "" {
+		return DefaultSignatureHeaderName
+	}
+	return strings.TrimSpace(c.SignatureHeaderName)
 }
