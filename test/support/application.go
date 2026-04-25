@@ -11,19 +11,33 @@ import (
 //
 
 type DummyTriggerOptions struct {
+	Name              string
+	Hooks             []core.Hook
+	HandleHookFunc    func(ctx core.TriggerHookContext) (map[string]any, error)
 	SetupFunc         func(ctx core.TriggerContext) error
 	HandleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
 	CleanupFunc       func(ctx core.SetupContext) error
 }
 
 type DummyTrigger struct {
+	name              string
+	hooks             []core.Hook
+	handleHookFunc    func(ctx core.TriggerHookContext) (map[string]any, error)
 	setupFunc         func(ctx core.TriggerContext) error
 	handleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
 	cleanupFunc       func(ctx core.SetupContext) error
 }
 
 func NewDummyTrigger(options DummyTriggerOptions) *DummyTrigger {
+	name := options.Name
+	if name == "" {
+		name = "dummy"
+	}
+
 	return &DummyTrigger{
+		name:              name,
+		hooks:             options.Hooks,
+		handleHookFunc:    options.HandleHookFunc,
 		setupFunc:         options.SetupFunc,
 		handleWebhookFunc: options.HandleWebhookFunc,
 		cleanupFunc:       options.CleanupFunc,
@@ -31,7 +45,7 @@ func NewDummyTrigger(options DummyTriggerOptions) *DummyTrigger {
 }
 
 func (t *DummyTrigger) Name() string {
-	return "dummy"
+	return t.name
 }
 
 func (t *DummyTrigger) Label() string {
@@ -63,7 +77,7 @@ func (t *DummyTrigger) Configuration() []configuration.Field {
 }
 
 func (t *DummyTrigger) Hooks() []core.Hook {
-	return nil
+	return t.hooks
 }
 
 func (t *DummyTrigger) Setup(ctx core.TriggerContext) error {
@@ -74,6 +88,9 @@ func (t *DummyTrigger) Setup(ctx core.TriggerContext) error {
 }
 
 func (t *DummyTrigger) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	if t.handleHookFunc != nil {
+		return t.handleHookFunc(ctx)
+	}
 	return nil, nil
 }
 
@@ -93,6 +110,8 @@ func (t *DummyTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 //
 
 type DummyComponentOptions struct {
+	Name              string
+	Hooks             []core.Hook
 	SetupFunc         func(ctx core.SetupContext) error
 	ProcessQueueFunc  func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
 	ExecuteFunc       func(ctx core.ExecutionContext) error
@@ -103,6 +122,8 @@ type DummyComponentOptions struct {
 }
 
 type DummyComponent struct {
+	name              string
+	hooks             []core.Hook
 	setupFunc         func(ctx core.SetupContext) error
 	processQueueFunc  func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
 	executeFunc       func(ctx core.ExecutionContext) error
@@ -113,7 +134,14 @@ type DummyComponent struct {
 }
 
 func NewDummyComponent(options DummyComponentOptions) *DummyComponent {
+	name := options.Name
+	if name == "" {
+		name = "dummy"
+	}
+
 	return &DummyComponent{
+		name:              name,
+		hooks:             options.Hooks,
 		setupFunc:         options.SetupFunc,
 		processQueueFunc:  options.ProcessQueueFunc,
 		executeFunc:       options.ExecuteFunc,
@@ -125,7 +153,7 @@ func NewDummyComponent(options DummyComponentOptions) *DummyComponent {
 }
 
 func (t *DummyComponent) Name() string {
-	return "dummy"
+	return t.name
 }
 
 func (t *DummyComponent) Label() string {
@@ -182,7 +210,7 @@ func (t *DummyComponent) Execute(ctx core.ExecutionContext) error {
 }
 
 func (t *DummyComponent) Hooks() []core.Hook {
-	return nil
+	return t.hooks
 }
 
 func (t *DummyComponent) HandleHook(ctx core.ActionHookContext) error {

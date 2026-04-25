@@ -1,7 +1,6 @@
 package core
 
 import (
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
@@ -61,7 +60,7 @@ type IntegrationHookContext struct {
 	Parameters      any
 	Configuration   any
 	WebhooksBaseURL string
-	Logger          *logrus.Entry
+	Logger          *log.Entry
 	Requests        RequestContext
 	Integration     IntegrationContext
 	HTTP            HTTPContext
