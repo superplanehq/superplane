@@ -13,8 +13,9 @@ import type {
   SuperplaneActionsAction,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../../componentBase";
-import type { ChildExecution } from "@/ui/chainItem/ChainItem";
+import type { ChildExecution } from "@/ui/chainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 
 function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,
@@ -228,6 +229,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
         // Get metadata based on node type
         let nodeDisplayName = exec.componentName || exec.nodeId || "Unknown";
         let nodeIconSlug = "box";
+        let nodeIconSrc: string | undefined;
 
         if (workflowNode) {
           nodeDisplayName = workflowNode.name || nodeDisplayName;
@@ -236,6 +238,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           if (workflowNode.type === "TYPE_ACTION" && workflowNode.action?.name) {
             const componentMeta = actions.find((c) => c.name === workflowNode.action!.name);
             nodeIconSlug = componentMeta?.icon || "box";
+            nodeIconSrc = getHeaderIconSrc(workflowNode.component.name);
           } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
             const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
             nodeIconSlug = triggerMeta?.icon || "play";
@@ -260,6 +263,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
               let badgeColor = "bg-gray-400";
               let componentName = "Unknown";
               let componentIcon = "box";
+              let componentIconSrc: string | undefined;
 
               // Find the blueprint node information
               if (workflowNode?.blueprint?.id && nodeId) {
@@ -273,6 +277,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                     if (blueprintNode.action?.name) {
                       const componentMeta = actions.find((c) => c.name === blueprintNode.action!.name);
                       componentIcon = componentMeta?.icon || "box";
+                      componentIconSrc = getHeaderIconSrc(blueprintNode.component.name);
                     }
                   }
                 }
@@ -290,6 +295,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                   badgeColor,
                   backgroundColor: map[state]?.backgroundColor,
                   componentIcon,
+                  componentIconSrc,
                 };
               }
 
@@ -300,6 +306,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                 executionId: childExec.id || "",
                 badgeColor,
                 componentIcon,
+                componentIconSrc,
               };
             });
         }
@@ -312,6 +319,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           nodeDisplayName,
           nodeIcon: exec.nodeIcon || "box",
           nodeIconSlug,
+          nodeIconSrc,
           state: exec.state || "neutral",
           executionId: exec.id,
           originalExecution: exec, // Pass the full execution data
