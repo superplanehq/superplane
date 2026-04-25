@@ -37,9 +37,17 @@ func UpdateCanvas(
 
 	organizationUUID := uuid.MustParse(organizationID)
 
-	canvas, err := findWritableCanvas(organizationUUID, canvasID)
+	canvas, err := models.FindCanvas(organizationUUID, canvasID)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if _, templateErr := models.FindCanvasTemplate(canvasID); templateErr == nil {
+				return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
+			}
+		}
+		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+	}
+	if canvas.IsTemplate {
+		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -75,25 +83,6 @@ func UpdateCanvas(
 	}
 
 	return &pb.UpdateCanvasResponse{Canvas: serializedCanvas}, nil
-}
-
-func findWritableCanvas(organizationUUID, canvasID uuid.UUID) (*models.Canvas, error) {
-	canvas, err := models.FindCanvas(organizationUUID, canvasID)
-	if err == nil {
-		if canvas.IsTemplate {
-			return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-		}
-
-		return canvas, nil
-	}
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if _, templateErr := models.FindCanvasTemplate(canvasID); templateErr == nil {
-			return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-		}
-	}
-
-	return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 }
 
 func updateCanvasInTransaction(

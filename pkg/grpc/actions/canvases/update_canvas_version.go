@@ -92,21 +92,16 @@ func UpdateCanvasVersionWithUsage(
 
 	changeManagementEnabled := false
 	var changeRequestApprovers []models.CanvasChangeRequestApprover
-	if pbCanvas.Spec != nil && pbCanvas.Spec.ChangeManagement != nil {
-		changeManagementEnabled = pbCanvas.Spec.ChangeManagement.Enabled
+	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
+		changeManagementEnabled = changeManagement.Enabled
 
-		changeRequestApprovers, err = parseCanvasChangeRequestApprovalConfig(pbCanvas.Spec.ChangeManagement)
+		changeRequestApprovers, err = parseAndValidateCanvasChangeRequestApprovers(
+			authService,
+			organizationID,
+			changeManagement,
+		)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", err)
-		}
-		if changeRequestApprovers != nil {
-			if validateErr := validateCanvasChangeRequestApprovers(
-				authService,
-				organizationID,
-				changeRequestApprovers,
-			); validateErr != nil {
-				return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", validateErr)
-			}
+			return nil, err
 		}
 	}
 
@@ -178,12 +173,14 @@ func UpdateCanvasVersionWithUsage(
 			return status.Error(codes.InvalidArgument, "canvas name is required")
 		}
 
-		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, nextName)
-		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
-			return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
-		}
-		if findErr != nil {
-			return findErr
+		if version.Name != nextName {
+			findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, nextName)
+			if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
+				return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+			}
+			if findErr != nil {
+				return findErr
+			}
 		}
 
 		now := time.Now()

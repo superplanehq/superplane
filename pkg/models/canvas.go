@@ -15,10 +15,12 @@ import (
 var ErrCanvasNameAlreadyExists = errors.New("canvas name already exists")
 
 type Canvas struct {
-	ID                      uuid.UUID
-	OrganizationID          uuid.UUID
-	LiveVersionID           *uuid.UUID
-	IsTemplate              bool
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	LiveVersionID  *uuid.UUID
+	IsTemplate     bool
+	// The `->` tag marks fields as read-only in GORM. These values are projected
+	// from the live version via SELECT aliases; they are not stored on workflows.
 	Name                    string                                           `gorm:"column:name;->"`
 	Description             string                                           `gorm:"column:description;->"`
 	ChangeManagementEnabled bool                                             `gorm:"column:change_management_enabled;->"`

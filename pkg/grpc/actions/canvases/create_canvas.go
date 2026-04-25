@@ -79,22 +79,18 @@ func CreateCanvas(
 
 	changeManagementEnabled := organizationChangeManagementEnabled
 	changeRequestApprovers := models.DefaultCanvasChangeRequestApprovers()
-	if pbCanvas.Spec != nil && pbCanvas.Spec.ChangeManagement != nil {
-		changeManagementEnabled = pbCanvas.Spec.ChangeManagement.Enabled
+	if changeManagement := pbCanvas.GetSpec().GetChangeManagement(); changeManagement != nil {
+		changeManagementEnabled = changeManagement.Enabled
 
-		approvers, parseErr := parseCanvasChangeRequestApprovalConfig(pbCanvas.Spec.ChangeManagement)
-		if parseErr != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", parseErr)
+		approvers, approversErr := parseAndValidateCanvasChangeRequestApprovers(
+			authService,
+			organizationID.String(),
+			changeManagement,
+		)
+		if approversErr != nil {
+			return nil, approversErr
 		}
-
 		if approvers != nil {
-			if validateErr := validateCanvasChangeRequestApprovers(
-				authService,
-				organizationID.String(),
-				approvers,
-			); validateErr != nil {
-				return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", validateErr)
-			}
 			changeRequestApprovers = approvers
 		}
 	}

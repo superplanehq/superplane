@@ -7,10 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/registry"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -65,12 +66,34 @@ func validateCanvasChangeRequestApprovers(
 	return nil
 }
 
+func parseAndValidateCanvasChangeRequestApprovers(
+	authService authorization.Authorization,
+	organizationID string,
+	changeManagement *pb.Canvas_ChangeManagement,
+) ([]models.CanvasChangeRequestApprover, error) {
+	approvers, err := parseCanvasChangeRequestApprovalConfig(changeManagement)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", err)
+	}
+	if approvers == nil {
+		return nil, nil
+	}
+	if err := validateCanvasChangeRequestApprovers(authService, organizationID, approvers); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid change request approval config: %v", err)
+	}
+
+	return approvers, nil
+}
+
 func ensureCanvasNameAvailableInTransaction(
 	tx *gorm.DB,
 	organizationID uuid.UUID,
 	canvasID uuid.UUID,
 	name string,
 ) error {
+	// Canvas names now live on workflow_versions, so we no longer have a simple
+	// organization-scoped DB unique constraint to rely on. Lock the organization
+	// row to serialize this read-before-write uniqueness check.
 	if err := tx.
 		Model(&models.Organization{}).
 		Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -118,20 +141,4 @@ func publishCanvasVersionInTransaction(
 	}
 
 	return publisher.Publish(ctx)
-}
-
-func buildCanvasPublisherOptions(
-	reg *registry.Registry,
-	organizationUUID uuid.UUID,
-	encryptor crypto.Encryptor,
-	authService authorization.Authorization,
-	webhookBaseURL string,
-) changesets.CanvasPublisherOptions {
-	return changesets.CanvasPublisherOptions{
-		Registry:       reg,
-		OrgID:          organizationUUID,
-		Encryptor:      encryptor,
-		AuthService:    authService,
-		WebhookBaseURL: webhookBaseURL,
-	}
 }
