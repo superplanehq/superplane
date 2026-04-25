@@ -42,15 +42,3 @@ func loadCanvasForCreateFromFile(filePath string) (openapi_client.CanvasesCanvas
 	return models.CanvasFromCanvas(*resource), resource.AutoLayout, nil
 }
 
-func loadCanvasFromFile(filePath string) (string, openapi_client.CanvasesCanvas, error) {
-	resource, err := parseCanvasResourceFromFile(filePath, "update")
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	if resource.Metadata == nil || resource.Metadata.Id == nil || resource.Metadata.GetId() == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata.id is required for update")
-	}
-
-	return resource.Metadata.GetId(), models.CanvasFromCanvas(*resource), nil
-}
