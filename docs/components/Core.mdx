@@ -159,7 +159,7 @@ The Webhook trigger starts a new workflow execution when an HTTP request is rece
 
 ### Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the `X-Signature-256` header
+- **Signature (HMAC)**: Verify requests using an HMAC-SHA256 signature
 - **Bearer Token**: Require a Bearer token in the `Authorization` header
 - **Header Token**: Require a raw token in a custom header (default: `X-Webhook-Token`)
 - **None (unsafe)**: No authentication (not recommended for production)
