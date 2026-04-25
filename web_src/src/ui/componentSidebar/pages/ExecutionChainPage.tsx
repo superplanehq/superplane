@@ -238,7 +238,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           if (workflowNode.type === "TYPE_ACTION" && workflowNode.action?.name) {
             const componentMeta = actions.find((c) => c.name === workflowNode.action!.name);
             nodeIconSlug = componentMeta?.icon || "box";
-            nodeIconSrc = getHeaderIconSrc(workflowNode.component.name);
+            nodeIconSrc = getHeaderIconSrc(workflowNode.action?.name);
           } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
             const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
             nodeIconSlug = triggerMeta?.icon || "play";
@@ -277,7 +277,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                     if (blueprintNode.action?.name) {
                       const componentMeta = actions.find((c) => c.name === blueprintNode.action!.name);
                       componentIcon = componentMeta?.icon || "box";
-                      componentIconSrc = getHeaderIconSrc(blueprintNode.component.name);
+                      componentIconSrc = getHeaderIconSrc(blueprintNode.action?.name);
                     }
                   }
                 }

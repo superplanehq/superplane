@@ -606,6 +606,9 @@ def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details(
     assert shape.nodes[0].b == "github.onPush"
     assert shape.nodes[0].n == "On Push"
     assert shape.nodes[0].k == "trigger"
+    assert shape.nodes[1].b == "slack.sendTextMessage"
+    assert shape.nodes[1].n == "Notify Slack"
+    assert shape.nodes[1].k == "action"
     assert shape.edges[0].s == "On Push"
     assert shape.edges[0].t == "Notify Slack"
     assert not hasattr(shape.edges[0], "channel")

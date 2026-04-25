@@ -826,7 +826,7 @@ class SuperplaneClient:
         summary = self.describe_editing_canvas(canvas_id, canvas_version_id)
         node_kind_by_type = {
             "TYPE_TRIGGER": "trigger",
-            "TYPE_ACTION": "component",
+            "TYPE_ACTION": "action",
             "TYPE_BLUEPRINT": "blueprint",
             "TYPE_WIDGET": "widget",
         }
