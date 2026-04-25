@@ -92,6 +92,27 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 	require.Equal(t, codes.AlreadyExists, status.Code(err))
 }
 
+func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvas := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name: "   ",
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	baseURL := "https://example.com"
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.Equal(t, "canvas name is required", status.Convert(err).Message())
+}
+
 func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -126,6 +147,33 @@ func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.
 	createdCanvas, findErr := models.FindCanvas(r.Organization.ID, createdCanvasUUID)
 	require.NoError(t, findErr)
 	require.True(t, createdCanvas.ChangeManagementEnabled)
+}
+
+func TestCreateCanvasResponseShowsCanvasLevelChangeManagementWhenEnabled(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvas := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name: "Canvas level change management",
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{},
+			Edges: []*componentpb.Edge{},
+			ChangeManagement: &pb.Canvas_ChangeManagement{
+				Enabled: true,
+			},
+		},
+	}
+
+	baseURL := "https://example.com"
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotNil(t, response.Canvas)
+	require.NotNil(t, response.Canvas.Spec)
+	require.NotNil(t, response.Canvas.Spec.ChangeManagement)
+	require.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
 }
 
 func TestCreateCanvasOnFreshOrganization(t *testing.T) {
