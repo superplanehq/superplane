@@ -92,8 +92,8 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (i *Cursor) Components() []core.Component {
-	return []core.Component{
+func (i *Cursor) Actions() []core.Action {
+	return []core.Action{
 		&LaunchAgent{},
 		&GetDailyUsageData{},
 		&GetLastMessage{},

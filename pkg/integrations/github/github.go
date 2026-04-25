@@ -103,8 +103,8 @@ func (g *GitHub) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GitHub) Components() []core.Component {
-	return []core.Component{
+func (g *GitHub) Actions() []core.Action {
+	return []core.Action{
 		&GetIssue{},
 		&GetRepositoryPermission{},
 		&CreateIssue{},

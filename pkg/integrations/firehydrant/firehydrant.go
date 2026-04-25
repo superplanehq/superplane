@@ -60,8 +60,8 @@ func (f *FireHydrant) Configuration() []configuration.Field {
 	}
 }
 
-func (f *FireHydrant) Components() []core.Component {
-	return []core.Component{
+func (f *FireHydrant) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 	}
 }

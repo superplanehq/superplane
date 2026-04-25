@@ -77,7 +77,7 @@ func TestValidateSourceNodeOutputChannel(t *testing.T) {
 	})
 
 	t.Run("wrong channel on resolvable component returns error", func(t *testing.T) {
-		reg.Components["test-component"] = &testOutputChannelComponent{
+		reg.Actions["test-action"] = &testOutputChannelComponent{
 			channels: []core.OutputChannel{
 				{Name: "success"},
 				{Name: "failure"},
@@ -90,7 +90,7 @@ func TestValidateSourceNodeOutputChannel(t *testing.T) {
 				ID:   "node-a",
 				Type: models.NodeTypeComponent,
 				Ref: models.NodeRef{
-					Component: &models.ComponentRef{Name: "test-component"},
+					Component: &models.ComponentRef{Name: "test-action"},
 				},
 			},
 			"default",

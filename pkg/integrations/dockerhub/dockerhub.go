@@ -65,8 +65,8 @@ func (d *DockerHub) Configuration() []configuration.Field {
 	}
 }
 
-func (d *DockerHub) Components() []core.Component {
-	return []core.Component{
+func (d *DockerHub) Actions() []core.Action {
+	return []core.Action{
 		&GetImageTag{},
 	}
 }

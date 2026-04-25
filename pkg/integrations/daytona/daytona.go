@@ -60,8 +60,8 @@ func (d *Daytona) Configuration() []configuration.Field {
 	}
 }
 
-func (d *Daytona) Components() []core.Component {
-	return []core.Component{
+func (d *Daytona) Actions() []core.Action {
+	return []core.Action{
 		&CreateSandbox{},
 		&CreateRepositorySandbox{},
 		&GetPreviewURLComponent{},

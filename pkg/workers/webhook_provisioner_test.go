@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 )
 
 type BadEncryptor struct{}
@@ -55,8 +56,8 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
 			return nil, errors.New("oops")
 		},
@@ -98,8 +99,8 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
 			return nil, errors.New("oops")
 		},

@@ -126,7 +126,7 @@ func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testin
 
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "hook non-existent-action not found for component noop")
+	assert.Contains(t, err.Error(), "hook non-existent-action not found for action noop")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }

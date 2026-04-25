@@ -166,8 +166,8 @@ func (g *GitLab) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GitLab) Components() []core.Component {
-	return []core.Component{
+func (g *GitLab) Actions() []core.Action {
+	return []core.Action{
 		&CreateIssue{},
 		&RunPipeline{},
 		&GetPipeline{},

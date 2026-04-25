@@ -96,8 +96,8 @@ func (h *Honeycomb) Configuration() []configuration.Field {
 	}
 }
 
-func (h *Honeycomb) Components() []core.Component {
-	return []core.Component{
+func (h *Honeycomb) Actions() []core.Action {
+	return []core.Action{
 		&CreateEvent{},
 	}
 }

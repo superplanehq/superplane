@@ -50,8 +50,8 @@ func (p *Perplexity) Configuration() []configuration.Field {
 	}
 }
 
-func (p *Perplexity) Components() []core.Component {
-	return []core.Component{
+func (p *Perplexity) Actions() []core.Action {
+	return []core.Action{
 		&runAgent{},
 	}
 }

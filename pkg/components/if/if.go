@@ -16,7 +16,7 @@ const ChannelNameTrue = "true"
 const ChannelNameFalse = "false"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &If{})
+	registry.RegisterAction(ComponentName, &If{})
 }
 
 type If struct{}

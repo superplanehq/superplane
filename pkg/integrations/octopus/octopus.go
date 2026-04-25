@@ -86,8 +86,8 @@ func (o *Octopus) Configuration() []configuration.Field {
 	}
 }
 
-func (o *Octopus) Components() []core.Component {
-	return []core.Component{
+func (o *Octopus) Actions() []core.Action {
+	return []core.Action{
 		&DeployRelease{},
 	}
 }
