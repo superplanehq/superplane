@@ -221,6 +221,23 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.Contains(t, data, "headers")
 	})
 
+	t.Run("accepts valid signature on configured header e.g. GitHub", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, eventCtx := webhookRequestContextWithConfig(
+			body,
+			map[string]any{"authentication": "signature", "signatureHeader": "X-Hub-Signature-256"},
+			"secret",
+		)
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256="+signature)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventCtx.Count())
+	})
+
 	t.Run("rejects missing bearer token", func(t *testing.T) {
 		webhook := &Webhook{}
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "bearer", "secret")
@@ -333,13 +350,17 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 }
 
 func webhookRequestContext(body []byte, authentication string, secret string) (core.WebhookRequestContext, *contexts.EventContext) {
+	return webhookRequestContextWithConfig(body, map[string]any{"authentication": authentication}, secret)
+}
+
+func webhookRequestContextWithConfig(body []byte, configuration map[string]any, secret string) (core.WebhookRequestContext, *contexts.EventContext) {
 	eventCtx := &contexts.EventContext{}
 	webhookCtx := &contexts.NodeWebhookContext{Secret: secret}
 
 	return core.WebhookRequestContext{
 		Body:          body,
 		Headers:       http.Header{},
-		Configuration: map[string]any{"authentication": authentication},
+		Configuration: configuration,
 		Webhook:       webhookCtx,
 		Events:        eventCtx,
 	}, eventCtx
