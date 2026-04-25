@@ -69,7 +69,7 @@ func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 }
 
 func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	switch ctx.CurrentStep {
+	switch ctx.Step {
 	case "selectOrganization":
 		return s.onSelectOrganizationSubmit(ctx.Inputs, ctx)
 	case "enterAPIToken":
@@ -80,7 +80,7 @@ func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 }
 
 func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
-	switch ctx.CurrentStep {
+	switch ctx.Step {
 	case "selectOrganization":
 		return s.onSelectOrganizationRevert(ctx)
 	case "enterAPIToken":

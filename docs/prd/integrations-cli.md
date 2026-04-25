@@ -22,14 +22,21 @@ superplane integrations setup init \
 
 This creates the integration, and sets its initial state, showing instructions and inputs in the output.
 
-To submit the next step, you use `setup submit`:
+To submit the current pending step and proceed to the next, use `setup next`:
 
 ```
-superplane integrations setup submit \
+superplane integrations setup next \
   --name rtx \
   --integration semaphore \
-  --step-name <step-name> \
   --step-inputs '...'
+```
+
+To revert the last submitted step, use `setup previous`:
+
+```
+superplane integrations setup previous \
+  --name rtx \
+  --integration semaphore
 ```
 
 If for some reason, you started and came back to the setup flow later, you can find the setup status with `setup status`:

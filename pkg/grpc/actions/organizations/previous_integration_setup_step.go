@@ -67,8 +67,10 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 			return err
 		}
 
+		stepToRevert := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
+
 		ctx := core.SetupStepContext{
-			CurrentStep:    setupState.CurrentStep.Name,
+			Step:           stepToRevert.Name,
 			IntegrationID:  integration.ID,
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),
@@ -83,12 +85,11 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 		}
 
 		//
-		// Current step becomes the last previous step,
-		// and the previous steps are all the previous steps except the current one
+		// Current step becomes the step we just reverted to,
+		// and previous steps are all previous steps before it.
 		//
 		newState := models.SetupState{}
-		lastStep := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
-		newState.CurrentStep = &lastStep
+		newState.CurrentStep = &stepToRevert
 		newState.PreviousSteps = setupState.PreviousSteps[:len(setupState.PreviousSteps)-1]
 		newStateWrapper := datatypes.NewJSONType(newState)
 		integration.SetupState = &newStateWrapper

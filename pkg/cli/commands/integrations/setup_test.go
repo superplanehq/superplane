@@ -34,14 +34,17 @@ func TestSetupInitCreatesIntegrationAndRendersFirstStep(t *testing.T) {
 					"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
 					"status": {
 						"state": "pending",
-						"nextStep": {
-							"type": "INPUTS",
-							"name": "selectOrganization",
-							"label": "What is your Semaphore Organization URL?",
-							"instructions": "Enter your organization URL.",
-							"inputs": [
-								{"name": "organizationUrl", "label": "Semaphore Organization URL", "type": "string", "required": true}
-							]
+						"setupState": {
+							"currentStep": {
+								"type": "INPUTS",
+								"name": "selectOrganization",
+								"label": "What is your Semaphore Organization URL?",
+								"instructions": "Enter your organization URL.",
+								"inputs": [
+									{"name": "organizationUrl", "label": "Semaphore Organization URL", "type": "string", "required": true}
+								]
+							},
+							"previousSteps": []
 						}
 					}
 				}
@@ -74,7 +77,8 @@ func TestSetupInitCreatesIntegrationAndRendersFirstStep(t *testing.T) {
 	raw := stdout.String()
 	require.Contains(t, raw, "Integration ID: int-1")
 	require.Contains(t, raw, "Next Step: selectOrganization")
-	require.Contains(t, raw, "Enter your organization URL.")
+	require.Contains(t, raw, "Instructions:")
+	require.Contains(t, raw, "organizationUrl")
 }
 
 func TestSetupStatusReturnsCurrentStep(t *testing.T) {
@@ -94,10 +98,13 @@ func TestSetupStatusReturnsCurrentStep(t *testing.T) {
 					"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
 					"status": {
 						"state": "pending",
-						"nextStep": {
-							"type": "INPUTS",
-							"name": "enterAPIToken",
-							"inputs": [{"name": "apiToken", "type": "string", "required": true, "sensitive": true}]
+						"setupState": {
+							"currentStep": {
+								"type": "INPUTS",
+								"name": "enterAPIToken",
+								"inputs": [{"name": "apiToken", "type": "string", "required": true, "sensitive": true}]
+							},
+							"previousSteps": [{"type":"INPUTS","name":"selectOrganization"}]
 						}
 					}
 				}
@@ -122,8 +129,8 @@ func TestSetupStatusReturnsCurrentStep(t *testing.T) {
 	require.Contains(t, raw, "Next Step: enterAPIToken")
 }
 
-func TestSetupSubmitParsesJSONInputsAndSubmitsStep(t *testing.T) {
-	var submitBody map[string]interface{}
+func TestSetupNextParsesJSONInputsAndSubmitsStep(t *testing.T) {
+	var nextBody map[string]interface{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -141,18 +148,21 @@ func TestSetupSubmitParsesJSONInputsAndSubmitsStep(t *testing.T) {
 					"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
 					"status": {
 						"state": "pending",
-						"nextStep": {
-							"type": "INPUTS",
-							"name": "enterAPIToken",
-							"inputs": [{"name": "apiToken", "type": "string", "required": true, "sensitive": true}]
+						"setupState": {
+							"currentStep": {
+								"type": "INPUTS",
+								"name": "enterAPIToken",
+								"inputs": [{"name": "apiToken", "type": "string", "required": true, "sensitive": true}]
+							},
+							"previousSteps": [{"type":"INPUTS","name":"selectOrganization"}]
 						}
 					}
 				}
 			}`)
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/organizations/org-1/integrations/int-1/steps":
+		case r.Method == http.MethodPatch && r.URL.Path == "/api/v1/organizations/org-1/integrations/int-1/next":
 			payload, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(payload, &submitBody))
+			require.NoError(t, json.Unmarshal(payload, &nextBody))
 			writeJSON(w, `{
 				"integration": {
 					"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
@@ -169,19 +179,16 @@ func TestSetupSubmitParsesJSONInputsAndSubmitsStep(t *testing.T) {
 
 	name := "rtx"
 	integration := "semaphore"
-	stepName := "enterAPIToken"
 	stepInputs := `{"apiToken":"token-123","enabled":true}`
-	cmd := &setupSubmitCommand{
+	cmd := &setupNextCommand{
 		setupTarget: setupTarget{name: &name, integration: &integration},
-		stepName:    &stepName,
 		stepInputs:  &stepInputs,
 	}
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, "enterAPIToken", submitBody["stepName"])
-	inputs, ok := submitBody["inputs"].(map[string]interface{})
+	inputs, ok := nextBody["inputs"].(map[string]interface{})
 	require.True(t, ok)
 	require.Equal(t, "token-123", inputs["apiToken"])
 	require.Equal(t, true, inputs["enabled"])
@@ -191,8 +198,73 @@ func TestSetupSubmitParsesJSONInputsAndSubmitsStep(t *testing.T) {
 	require.Contains(t, raw, "Next Step: none")
 }
 
+func TestSetupPreviousRevertsToPreviousStep(t *testing.T) {
+	var previousBody map[string]interface{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/me":
+			writeSetupMeResponse(w)
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/organizations/org-1/integrations":
+			writeJSON(w, `{
+				"integrations": [
+					{"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"}, "status": {"state": "pending"}}
+				]
+			}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/organizations/org-1/integrations/int-1":
+			writeJSON(w, `{
+				"integration": {
+					"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
+					"status": {
+						"state": "pending",
+						"setupState": {
+							"currentStep": {"type":"INPUTS","name":"enterAPIToken"},
+							"previousSteps": [{"type":"INPUTS","name":"selectOrganization"}]
+						}
+					}
+				}
+			}`)
+		case r.Method == http.MethodPatch && r.URL.Path == "/api/v1/organizations/org-1/integrations/int-1/previous":
+			payload, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(payload, &previousBody))
+			writeJSON(w, `{
+				"integration": {
+					"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
+					"status": {
+						"state": "pending",
+						"setupState": {
+							"currentStep": {"type":"INPUTS","name":"selectOrganization"},
+							"previousSteps": []
+						}
+					}
+				}
+			}`)
+		default:
+			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stdout := newSetupTestContext(t, server, "text", nil)
+
+	name := "rtx"
+	integration := "semaphore"
+	cmd := &setupPreviousCommand{
+		setupTarget: setupTarget{name: &name, integration: &integration},
+	}
+
+	err := cmd.Execute(ctx)
+	require.NoError(t, err)
+	require.Equal(t, map[string]interface{}{}, previousBody)
+
+	raw := stdout.String()
+	require.Contains(t, raw, "State: pending")
+	require.Contains(t, raw, "Next Step: selectOrganization")
+}
+
 func TestSetupInitInteractiveCompletesFlow(t *testing.T) {
-	submitCalls := 0
+	nextCalls := 0
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -204,28 +276,30 @@ func TestSetupInitInteractiveCompletesFlow(t *testing.T) {
 					"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
 					"status": {
 						"state": "pending",
-						"nextStep": {
-							"type": "INPUTS",
-							"label": "What is your Semaphore Organization URL?",
-							"instructions": "Provide your Semaphore organization URL.",
-							"name": "selectOrganization",
-							"inputs": [
-								{"name": "organizationUrl", "label": "Semaphore Organization URL", "type": "string", "required": true}
-							]
+						"setupState": {
+							"currentStep": {
+								"type": "INPUTS",
+								"label": "What is your Semaphore Organization URL?",
+								"instructions": "Provide your Semaphore organization URL.",
+								"name": "selectOrganization",
+								"inputs": [
+									{"name": "organizationUrl", "label": "Semaphore Organization URL", "type": "string", "required": true}
+								]
+							},
+							"previousSteps": []
 						}
 					}
 				}
 			}`)
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/organizations/org-1/integrations/int-1/steps":
-			submitCalls++
+		case r.Method == http.MethodPatch && r.URL.Path == "/api/v1/organizations/org-1/integrations/int-1/next":
+			nextCalls++
 			payload := map[string]interface{}{}
 			rawBody, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 			require.NoError(t, json.Unmarshal(rawBody, &payload))
 
-			switch submitCalls {
+			switch nextCalls {
 			case 1:
-				require.Equal(t, "selectOrganization", payload["stepName"])
 				inputs := payload["inputs"].(map[string]interface{})
 				require.Equal(t, "https://acme.semaphoreci.com", inputs["organizationUrl"])
 				writeJSON(w, `{
@@ -233,20 +307,22 @@ func TestSetupInitInteractiveCompletesFlow(t *testing.T) {
 						"metadata": {"id": "int-1", "name": "rtx", "integrationName": "semaphore"},
 						"status": {
 							"state": "pending",
-							"nextStep": {
-								"type": "INPUTS",
-								"label": "Enter Semaphore API token",
-								"instructions": "Provide your API token.",
-								"name": "enterAPIToken",
-								"inputs": [
-									{"name": "apiToken", "label": "API Token", "type": "string", "required": true, "sensitive": true}
-								]
+							"setupState": {
+								"currentStep": {
+									"type": "INPUTS",
+									"label": "Enter Semaphore API token",
+									"instructions": "Provide your API token.",
+									"name": "enterAPIToken",
+									"inputs": [
+										{"name": "apiToken", "label": "API Token", "type": "string", "required": true, "sensitive": true}
+									]
+								},
+								"previousSteps": [{"type":"INPUTS","name":"selectOrganization"}]
 							}
 						}
 					}
 				}`)
 			case 2:
-				require.Equal(t, "enterAPIToken", payload["stepName"])
 				inputs := payload["inputs"].(map[string]interface{})
 				require.Equal(t, "secret-token", inputs["apiToken"])
 				writeJSON(w, `{
@@ -256,7 +332,7 @@ func TestSetupInitInteractiveCompletesFlow(t *testing.T) {
 					}
 				}`)
 			default:
-				t.Fatalf("unexpected submit call count %d", submitCalls)
+				t.Fatalf("unexpected next call count %d", nextCalls)
 			}
 		default:
 			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
@@ -277,7 +353,7 @@ func TestSetupInitInteractiveCompletesFlow(t *testing.T) {
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 2, submitCalls)
+	require.Equal(t, 2, nextCalls)
 	require.Contains(t, stdout.String(), "New integration 'rtx' (int-1) created")
 	require.Contains(t, stdout.String(), "Next step: What is your Semaphore Organization URL?")
 	require.Contains(t, stdout.String(), "Inputs required: Semaphore Organization URL")

@@ -183,7 +183,7 @@ func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 }
 
 func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	switch ctx.CurrentStep {
+	switch ctx.Step {
 	case SetupStepSelectOwner:
 		return g.onSelectOwnerSubmit(ctx.Inputs, ctx)
 	case SetupStepSelectResources:

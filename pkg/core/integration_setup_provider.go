@@ -34,7 +34,7 @@ type RedirectPrompt struct {
 }
 
 type SetupStepContext struct {
-	CurrentStep    string
+	Step           string
 	Inputs         any
 	IntegrationID  uuid.UUID
 	OrganizationID string

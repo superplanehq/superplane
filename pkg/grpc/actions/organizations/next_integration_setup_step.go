@@ -59,7 +59,7 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 		}
 
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
-			CurrentStep:    setupState.CurrentStep.Name,
+			Step:           setupState.CurrentStep.Name,
 			Inputs:         getStepInputs(inputs),
 			IntegrationID:  integration.ID,
 			OrganizationID: orgID,

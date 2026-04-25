@@ -28,10 +28,13 @@ type setupStatusCommand struct {
 	setupTarget
 }
 
-type setupSubmitCommand struct {
+type setupNextCommand struct {
 	setupTarget
-	stepName   *string
 	stepInputs *string
+}
+
+type setupPreviousCommand struct {
+	setupTarget
 }
 
 func newSetupCommand(options core.BindOptions) *cobra.Command {
@@ -75,27 +78,51 @@ func newSetupCommand(options core.BindOptions) *cobra.Command {
 	_ = statusCmd.MarkFlagRequired("integration")
 	core.Bind(statusCmd, &setupStatusCommand{setupTarget: setupTarget{name: &statusName, integration: &statusIntegration}}, options)
 
-	var submitName string
-	var submitIntegration string
-	var submitStepName string
-	var submitStepInputs string
-	submitCmd := &cobra.Command{
-		Use:   "submit",
-		Short: "Submit the next setup step inputs for an integration",
+	var nextName string
+	var nextIntegration string
+	var nextStepInputs string
+	nextCmd := &cobra.Command{
+		Use:   "next",
+		Short: "Submit the current setup step inputs for an integration",
 		Args:  cobra.NoArgs,
 	}
-	submitCmd.Flags().StringVar(&submitName, "name", "", "connected integration name")
-	submitCmd.Flags().StringVar(&submitIntegration, "integration", "", "integration definition name")
-	submitCmd.Flags().StringVar(&submitStepName, "step-name", "", "step name returned in the previous next step")
-	submitCmd.Flags().StringVar(&submitStepInputs, "step-inputs", "", "step inputs as JSON/YAML object or key=value,key2=value2")
-	_ = submitCmd.MarkFlagRequired("name")
-	_ = submitCmd.MarkFlagRequired("integration")
-	_ = submitCmd.MarkFlagRequired("step-name")
-	core.Bind(submitCmd, &setupSubmitCommand{setupTarget: setupTarget{name: &submitName, integration: &submitIntegration}, stepName: &submitStepName, stepInputs: &submitStepInputs}, options)
+	nextCmd.Flags().StringVar(&nextName, "name", "", "connected integration name")
+	nextCmd.Flags().StringVar(&nextIntegration, "integration", "", "integration definition name")
+	nextCmd.Flags().StringVar(&nextStepInputs, "step-inputs", "", "step inputs as JSON/YAML object or key=value,key2=value2")
+	_ = nextCmd.MarkFlagRequired("name")
+	_ = nextCmd.MarkFlagRequired("integration")
+	core.Bind(
+		nextCmd,
+		&setupNextCommand{
+			setupTarget: setupTarget{name: &nextName, integration: &nextIntegration},
+			stepInputs:  &nextStepInputs,
+		},
+		options,
+	)
+
+	var previousName string
+	var previousIntegration string
+	previousCmd := &cobra.Command{
+		Use:   "previous",
+		Short: "Revert the last submitted setup step for an integration",
+		Args:  cobra.NoArgs,
+	}
+	previousCmd.Flags().StringVar(&previousName, "name", "", "connected integration name")
+	previousCmd.Flags().StringVar(&previousIntegration, "integration", "", "integration definition name")
+	_ = previousCmd.MarkFlagRequired("name")
+	_ = previousCmd.MarkFlagRequired("integration")
+	core.Bind(
+		previousCmd,
+		&setupPreviousCommand{
+			setupTarget: setupTarget{name: &previousName, integration: &previousIntegration},
+		},
+		options,
+	)
 
 	setupCmd.AddCommand(initCmd)
 	setupCmd.AddCommand(statusCmd)
-	setupCmd.AddCommand(submitCmd)
+	setupCmd.AddCommand(nextCmd)
+	setupCmd.AddCommand(previousCmd)
 
 	return setupCmd
 }
@@ -187,7 +214,7 @@ func runInteractiveSetup(
 		}
 
 		metadata := integration.GetMetadata()
-		integration, err = submitSetupStep(ctx, organizationID, metadata.GetId(), step.GetName(), stepInputs)
+		integration, err = nextSetupStep(ctx, organizationID, metadata.GetId(), stepInputs)
 		if err != nil {
 			return err
 		}
@@ -257,18 +284,10 @@ func formatInputsRequiredSummary(step openapi_client.IntegrationSetupStepDefinit
 	return strings.Join(formatted, ", ")
 }
 
-func (c *setupSubmitCommand) Execute(ctx core.CommandContext) error {
+func (c *setupNextCommand) Execute(ctx core.CommandContext) error {
 	name, integrationName, err := c.setupTarget.values()
 	if err != nil {
 		return err
-	}
-
-	stepName := ""
-	if c.stepName != nil {
-		stepName = strings.TrimSpace(*c.stepName)
-	}
-	if stepName == "" {
-		return fmt.Errorf("--step-name is required")
 	}
 
 	stepInputs, err := parseSetupStepInputs(c.stepInputs)
@@ -287,7 +306,38 @@ func (c *setupSubmitCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	metadata := integration.GetMetadata()
-	integration, err = submitSetupStep(ctx, organizationID, metadata.GetId(), stepName, stepInputs)
+	integration, err = nextSetupStep(ctx, organizationID, metadata.GetId(), stepInputs)
+	if err != nil {
+		return err
+	}
+
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(integration)
+	}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		return renderSetupStateText(stdout, integration)
+	})
+}
+
+func (c *setupPreviousCommand) Execute(ctx core.CommandContext) error {
+	name, integrationName, err := c.setupTarget.values()
+	if err != nil {
+		return err
+	}
+
+	organizationID, err := core.ResolveOrganizationID(ctx)
+	if err != nil {
+		return err
+	}
+
+	integration, err := findIntegrationForSetup(ctx, organizationID, name, integrationName)
+	if err != nil {
+		return err
+	}
+
+	metadata := integration.GetMetadata()
+	integration, err = previousSetupStep(ctx, organizationID, metadata.GetId())
 	if err != nil {
 		return err
 	}
@@ -368,11 +418,10 @@ func findIntegrationForSetup(
 	return openapi_client.OrganizationsIntegration{}, fmt.Errorf("integration %q with definition %q not found", name, integrationName)
 }
 
-func submitSetupStep(
+func nextSetupStep(
 	ctx core.CommandContext,
 	organizationID string,
 	integrationID string,
-	stepName string,
 	stepInputs map[string]interface{},
 ) (openapi_client.OrganizationsIntegration, error) {
 	if stepInputs == nil {
@@ -385,6 +434,22 @@ func submitSetupStep(
 	response, _, err := ctx.API.OrganizationAPI.
 		OrganizationsNextIntegrationSetupStep(ctx.Context, organizationID, integrationID).
 		Body(body).
+		Execute()
+	if err != nil {
+		return openapi_client.OrganizationsIntegration{}, err
+	}
+
+	return response.GetIntegration(), nil
+}
+
+func previousSetupStep(
+	ctx core.CommandContext,
+	organizationID string,
+	integrationID string,
+) (openapi_client.OrganizationsIntegration, error) {
+	response, _, err := ctx.API.OrganizationAPI.
+		OrganizationsPreviousIntegrationSetupStep(ctx.Context, organizationID, integrationID).
+		Body(map[string]interface{}{}).
 		Execute()
 	if err != nil {
 		return openapi_client.OrganizationsIntegration{}, err
