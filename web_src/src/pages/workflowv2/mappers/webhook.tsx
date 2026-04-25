@@ -19,10 +19,12 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast } from "@/lib/toast";
 
 const DEFAULT_HEADER_TOKEN_NAME = "X-Webhook-Token";
+const DEFAULT_SIGNATURE_HEADER = "X-Signature-256";
 
 interface WebhookConfiguration {
   authentication?: string;
   headerName?: string;
+  signatureHeader?: string;
 }
 
 interface WebhookMetadata {
@@ -30,16 +32,19 @@ interface WebhookMetadata {
   authentication?: string;
 }
 
-function formatAuthenticationMethod(auth: string, headerName?: string): string {
+function formatAuthenticationMethod(
+  auth: string,
+  options?: { headerName?: string; signatureHeader?: string },
+): string {
   switch (auth) {
     case "none":
       return "No authentication";
     case "signature":
-      return "HMAC signature";
+      return `HMAC signature (${options?.signatureHeader || DEFAULT_SIGNATURE_HEADER})`;
     case "bearer":
       return "Bearer token";
     case "header_token":
-      return `Header token (${headerName || DEFAULT_HEADER_TOKEN_NAME})`;
+      return `Header token (${options?.headerName || DEFAULT_HEADER_TOKEN_NAME})`;
     default:
       return "Unknown authentication";
   }
@@ -139,7 +144,10 @@ export const webhookTriggerRenderer: TriggerRenderer = {
           icon: "shield-check",
           label: formatAuthenticationMethod(
             metadata?.authentication || configuration?.authentication || "none",
-            configuration?.headerName,
+            {
+              headerName: configuration?.headerName,
+              signatureHeader: configuration?.signatureHeader,
+            },
           ),
         },
       ],
@@ -321,6 +329,7 @@ export const webhookCustomFieldRenderer: CustomFieldRenderer = {
     const config = node.configuration as WebhookConfiguration | undefined;
     const authMethod = config?.authentication || "none";
     const headerName = config?.headerName || DEFAULT_HEADER_TOKEN_NAME;
+    const signatureHeaderName = config?.signatureHeader?.trim() || DEFAULT_SIGNATURE_HEADER;
     const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 
     // State to track the currently displayed secret
@@ -346,7 +355,7 @@ export SIGNATURE=$(echo -n "$PAYLOAD" \\
   | xxd -p -c 256)
 
 curl -X POST \\
-  -H "X-Signature-256: sha256=$SIGNATURE" \\
+  -H "${signatureHeaderName}: sha256=$SIGNATURE" \\
   -H "Content-Type: application/json" \\
   --data-binary "$PAYLOAD" \\
   ${webhookUrl}`;
