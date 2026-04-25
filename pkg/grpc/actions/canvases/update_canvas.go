@@ -274,5 +274,9 @@ func saveCanvasMetadataUpdate(tx *gorm.DB, lockedCanvas *models.Canvas, liveVers
 		return err
 	}
 
-	return tx.Save(lockedCanvas).Error
+	if err := tx.Save(lockedCanvas).Error; err != nil {
+		return mapCanvasNameUniqueConstraintError(err)
+	}
+
+	return nil
 }

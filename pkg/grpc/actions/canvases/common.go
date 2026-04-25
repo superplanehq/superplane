@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,6 +15,9 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
+
+const canvasNameAlreadyExistsMessage = "Canvas with the same name already exists"
+const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
 
 func validateCanvasChangeRequestApprovers(
 	authService authorization.Authorization,
@@ -99,6 +103,25 @@ func ensureCanvasNameAvailableInTransaction(
 	}
 
 	return nil
+}
+
+func mapCanvasNameUniqueConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if isCanvasNameUniqueConstraintError(err) {
+		return status.Error(codes.AlreadyExists, canvasNameAlreadyExistsMessage)
+	}
+
+	return err
+}
+
+func isCanvasNameUniqueConstraintError(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) &&
+		pgErr.Code == "23505" &&
+		pgErr.ConstraintName == canvasNameUniqueConstraint
 }
 
 func publishCanvasVersionInTransaction(

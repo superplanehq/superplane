@@ -141,7 +141,7 @@ func CreateCanvas(
 		//
 		err := tx.Clauses(clause.Returning{}).Create(&canvas).Error
 		if err != nil {
-			return err
+			return mapCanvasNameUniqueConstraintError(err)
 		}
 
 		//
