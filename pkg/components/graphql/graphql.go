@@ -1,0 +1,436 @@
+package graphql
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/registry"
+)
+
+const (
+	DefaultTimeout = time.Second * 30
+	MaxTimeout     = time.Second * 30
+
+	SuccessOutputChannel = "success"
+	FailureOutputChannel = "failure"
+)
+
+func init() {
+	registry.RegisterComponent("graphql", &GraphQL{})
+}
+
+type Header struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type KeyValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type Spec struct {
+	URL            string      `json:"url"`
+	Query          string      `json:"query"`
+	Variables      *[]KeyValue `json:"variables,omitempty"`
+	Headers        *[]Header   `json:"headers,omitempty"`
+	OperationName  *string     `json:"operationName,omitempty"`
+	TimeoutSeconds *int        `json:"timeoutSeconds,omitempty"`
+	SuccessCodes   *string     `json:"successCodes,omitempty"`
+}
+
+func (s *Spec) Timeout() time.Duration {
+	if s.TimeoutSeconds == nil {
+		return DefaultTimeout
+	}
+
+	return time.Duration(*s.TimeoutSeconds) * time.Second
+}
+
+func (s *Spec) GetSuccessCodes() string {
+	if s.SuccessCodes == nil {
+		return "2xx"
+	}
+
+	return *s.SuccessCodes
+}
+
+type GraphQL struct{}
+
+func (e *GraphQL) Name() string {
+	return "graphql"
+}
+
+func (e *GraphQL) Label() string {
+	return "GraphQL Request"
+}
+
+func (e *GraphQL) Description() string {
+	return "Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)"
+}
+
+func (e *GraphQL) Documentation() string {
+	return `The GraphQL component runs a GraphQL document against a URL using the standard **GraphQL over HTTP** JSON body shape.
+
+## Use cases
+
+- **GitHub, GitLab, and other GraphQL APIs** without hand-building escaped JSON for the "query" field
+- **Named operations** via optional operation name
+
+## Request
+
+- **URL** — GraphQL HTTP endpoint (supports expressions)
+- **Query** — Multi-line GraphQL document (no JSON escaping in the canvas)
+- **Variables** — Optional key/value pairs, merged into a JSON "variables" object (values support expressions)
+- **Headers** — for example Authorization (header names cannot use expressions)
+- **Operation name** — Optional, for named operations
+
+## Response
+
+Same shape as the HTTP component: **status**, **headers**, and **body** (JSON when possible, otherwise string).
+
+**Note:** Many GraphQL servers return **HTTP 200** even when the response JSON includes a top-level "errors" array. This component classifies success and failure from the **HTTP status** (and optional success code override) like the HTTP component, not from the presence of "errors" in the body. Inspect **data.body** in your workflow to branch on GraphQL errors if needed.
+`
+}
+
+func (e *GraphQL) Icon() string {
+	return "globe"
+}
+
+func (e *GraphQL) Color() string {
+	return "violet"
+}
+
+func (e *GraphQL) Setup(ctx core.SetupContext) error {
+	spec := Spec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	if spec.URL == "" {
+		return fmt.Errorf("url is required")
+	}
+
+	if strings.TrimSpace(spec.Query) == "" {
+		return fmt.Errorf("query is required")
+	}
+
+	return nil
+}
+
+func (e *GraphQL) OutputChannels(_ any) []core.OutputChannel {
+	return []core.OutputChannel{
+		{Name: SuccessOutputChannel, Label: "Success"},
+		{Name: FailureOutputChannel, Label: "Failure"},
+	}
+}
+
+func (e *GraphQL) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "url",
+			Label:       "URL",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "https://api.github.com/graphql",
+		},
+		{
+			Name:        "query",
+			Label:       "Query",
+			Type:        configuration.FieldTypeText,
+			Required:    true,
+			Placeholder: "query {\n  viewer {\n    login\n  }\n}",
+		},
+		{
+			Name:        "variables",
+			Label:       "Variables",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Key/value pairs merged into the request variables object",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Variable",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "key",
+								Type:        configuration.FieldTypeString,
+								Label:       "Key",
+								Required:    true,
+								Placeholder: "owner",
+							},
+							{
+								Name:        "value",
+								Type:        configuration.FieldTypeString,
+								Label:       "Value",
+								Required:    true,
+								Placeholder: "acme",
+							},
+						},
+					},
+				},
+			},
+			Default: []map[string]any{
+				{
+					"key":   "name",
+					"value": "value",
+				},
+			},
+		},
+		{
+			Name:        "headers",
+			Label:       "Headers",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Custom headers to send with this request",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Header",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "name",
+								Type:        configuration.FieldTypeString,
+								Label:       "Header Name",
+								Required:    true,
+								Placeholder: "Authorization",
+							},
+							{
+								Name:        "value",
+								Type:        configuration.FieldTypeString,
+								Label:       "Header Value",
+								Required:    true,
+								Placeholder: "Bearer …",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "operationName",
+			Type:        configuration.FieldTypeString,
+			Label:       "Operation name",
+			Required:    false,
+			Togglable:   true,
+			Description: "Name of the operation to execute, for documents with multiple operations",
+			Placeholder: "GetUser",
+		},
+		{
+			Name:        "successCodes",
+			Type:        configuration.FieldTypeString,
+			Label:       "Overwrite success definition",
+			Required:    false,
+			Togglable:   true,
+			Description: "Comma-separated list of success status codes (e.g., 200, 201, 2xx). Leave empty for default 2xx behavior",
+			Default:     "2xx",
+		},
+		{
+			Name:        "timeoutSeconds",
+			Type:        configuration.FieldTypeNumber,
+			Label:       "Timeout (seconds)",
+			Description: "Timeout in seconds for the request",
+			Default:     10,
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 1; return &min }(),
+					Max: func() *int { max := int(MaxTimeout.Seconds()); return &max }(),
+				},
+			},
+		},
+	}
+}
+
+func (e *GraphQL) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return ctx.DefaultProcessing()
+}
+
+func (e *GraphQL) Execute(ctx core.ExecutionContext) error {
+	spec := Spec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	response, err := e.postGraphQLRequest(ctx.Logger, ctx.HTTP, spec)
+	if err != nil {
+		return ctx.ExecutionState.Emit(
+			FailureOutputChannel,
+			"graphql.request.failed",
+			[]any{map[string]any{
+				"error": fmt.Sprintf("error executing request: %v", err),
+			}},
+		)
+	}
+
+	defer response.Body.Close()
+
+	respBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return ctx.ExecutionState.Emit(
+			FailureOutputChannel,
+			"graphql.request.failed",
+			[]any{map[string]any{
+				"status":  response.StatusCode,
+				"headers": response.Header,
+				"error":   fmt.Errorf("failed to read response: %v", err),
+			}},
+		)
+	}
+
+	var bodyData any
+	if len(respBody) > 0 {
+		err := json.Unmarshal(respBody, &bodyData)
+		if err != nil {
+			bodyData = string(respBody)
+		}
+	}
+
+	if e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) {
+		return ctx.ExecutionState.Emit(
+			SuccessOutputChannel,
+			"graphql.request.finished",
+			[]any{map[string]any{
+				"status":  response.StatusCode,
+				"headers": response.Header,
+				"body":    bodyData,
+			}},
+		)
+	}
+
+	return ctx.ExecutionState.Emit(
+		FailureOutputChannel,
+		"graphql.request.failed",
+		[]any{map[string]any{
+			"status":  response.StatusCode,
+			"headers": response.Header,
+			"body":    bodyData,
+		}},
+	)
+}
+
+func (e *GraphQL) buildRequestBody(spec Spec) ([]byte, error) {
+	payload := map[string]any{
+		"query": spec.Query,
+	}
+
+	if spec.Variables != nil && len(*spec.Variables) > 0 {
+		vars := make(map[string]any, len(*spec.Variables))
+		for _, kv := range *spec.Variables {
+			if kv.Key == "" {
+				continue
+			}
+			vars[kv.Key] = kv.Value
+		}
+		if len(vars) > 0 {
+			payload["variables"] = vars
+		}
+	}
+
+	if spec.OperationName != nil && strings.TrimSpace(*spec.OperationName) != "" {
+		payload["operationName"] = strings.TrimSpace(*spec.OperationName)
+	}
+
+	return json.Marshal(payload)
+}
+
+func (e *GraphQL) postGraphQLRequest(logger *log.Entry, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
+	body, err := e.buildRequestBody(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal GraphQL payload: %w", err)
+	}
+
+	reqCtx, cancel := context.WithTimeout(context.Background(), spec.Timeout())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, spec.URL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	if spec.Headers != nil {
+		for _, header := range *spec.Headers {
+			req.Header.Set(header.Name, header.Value)
+		}
+	}
+
+	logger.Infof("[POST] %s", spec.URL)
+	resp, err := httpCtx.Do(req)
+	if err != nil {
+		if reqCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("request timed out after %s", spec.Timeout())
+		}
+
+		return nil, err
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	return resp, nil
+}
+
+func (e *GraphQL) isSuccessfulResponse(statusCode int, successCodes string) bool {
+	codes := strings.Split(successCodes, ",")
+	for _, code := range codes {
+		code = strings.TrimSpace(code)
+
+		if strings.HasSuffix(code, "xx") {
+			prefix := strings.TrimSuffix(code, "xx")
+			statusStr := strconv.Itoa(statusCode)
+			if strings.HasPrefix(statusStr, prefix) {
+				return true
+			}
+		} else {
+			expectedCode, err := strconv.Atoi(code)
+			if err == nil && statusCode == expectedCode {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (e *GraphQL) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (e *GraphQL) HandleAction(_ core.ActionContext) error {
+	return fmt.Errorf("graphql does not support actions")
+}
+
+func (e *GraphQL) Cancel(_ core.ExecutionContext) error {
+	return nil
+}
+
+func (e *GraphQL) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
+}
+
+func (e *GraphQL) Cleanup(_ core.SetupContext) error {
+	return nil
+}
