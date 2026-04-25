@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func validateCanvasChangeRequestApprovers(
@@ -91,18 +90,6 @@ func ensureCanvasNameAvailableInTransaction(
 	canvasID uuid.UUID,
 	name string,
 ) error {
-	// Canvas names now live on workflow_versions, so we no longer have a simple
-	// organization-scoped DB unique constraint to rely on. Lock the organization
-	// row to serialize this read-before-write uniqueness check.
-	if err := tx.
-		Model(&models.Organization{}).
-		Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ?", organizationID).
-		First(&models.Organization{}).
-		Error; err != nil {
-		return err
-	}
-
 	existingCanvas, err := models.FindCanvasByNameInTransaction(tx, name, organizationID)
 	if err == nil && existingCanvas.ID != canvasID {
 		return models.ErrCanvasNameAlreadyExists

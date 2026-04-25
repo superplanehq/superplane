@@ -16,13 +16,6 @@ FROM public.workflows AS w
 WHERE w.id = v.workflow_id;
 
 ALTER TABLE public.workflows
-  DROP CONSTRAINT IF EXISTS unique_canvas_in_organization;
-
-ALTER TABLE public.workflows
-  DROP CONSTRAINT IF EXISTS workflows_organization_id_name_key;
-
-ALTER TABLE public.workflows
-  DROP COLUMN IF EXISTS name,
   DROP COLUMN IF EXISTS description,
   DROP COLUMN IF EXISTS change_management_enabled,
   DROP COLUMN IF EXISTS change_request_approvers;

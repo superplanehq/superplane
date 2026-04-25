@@ -630,6 +630,7 @@ CREATE TABLE public.workflow_versions (
 CREATE TABLE public.workflows (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
+    name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     created_by uuid,
@@ -1028,6 +1029,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 ALTER TABLE ONLY public.workflow_versions
     ADD CONSTRAINT workflow_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflows workflows_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflows
+    ADD CONSTRAINT workflows_organization_id_name_key UNIQUE (organization_id, name);
 
 
 --

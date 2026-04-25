@@ -200,6 +200,11 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			Where("id = ?", *existingCanvas.LiveVersionID).
 			Update("name", "publish-duplicate-live").
 			Error)
+		require.NoError(t, database.Conn().
+			Model(&models.Canvas{}).
+			Where("id = ?", existingCanvas.ID).
+			Update("name", "publish-duplicate-live").
+			Error)
 
 		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)

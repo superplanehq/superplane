@@ -227,6 +227,7 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	}
 
 	canvas.LiveVersionID = &version.ID
+	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 	return tx.Save(canvas).Error
 }
@@ -349,6 +350,7 @@ func PublishCanvasDraftInTransaction(
 	}
 
 	canvas.LiveVersionID = &version.ID
+	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 
 	if err := tx.Save(canvas).Error; err != nil {

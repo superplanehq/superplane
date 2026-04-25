@@ -88,8 +88,8 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			Metadata: &pb.Canvas_Metadata{
 				Id:             canvas.ID.String(),
 				OrganizationId: canvas.OrganizationID.String(),
-				Name:           liveVersion.Name,
-				Description:    liveVersion.Description,
+				Name:           canvas.Name,
+				Description:    canvas.Description,
 				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
@@ -98,7 +98,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			Spec: &pb.Canvas_Spec{
 				Nodes:            serializedNodes,
 				Edges:            actions.EdgesToProto(liveVersion.Edges),
-				ChangeManagement: serializeChangeManagement(changeManagementEnabled, liveVersion.EffectiveChangeRequestApprovers()),
+				ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
 			},
 			Status: nil,
 		}, nil
@@ -140,8 +140,8 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		Metadata: &pb.Canvas_Metadata{
 			Id:             canvas.ID.String(),
 			OrganizationId: canvas.OrganizationID.String(),
-			Name:           liveVersion.Name,
-			Description:    liveVersion.Description,
+			Name:           canvas.Name,
+			Description:    canvas.Description,
 			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
@@ -150,7 +150,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		Spec: &pb.Canvas_Spec{
 			Nodes:            serializedNodes,
 			Edges:            actions.EdgesToProto(liveVersion.Edges),
-			ChangeManagement: serializeChangeManagement(changeManagementEnabled, liveVersion.EffectiveChangeRequestApprovers()),
+			ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,

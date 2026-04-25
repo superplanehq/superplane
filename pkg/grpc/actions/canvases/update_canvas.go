@@ -267,6 +267,7 @@ func applyCanvasChangeManagementEnabledUpdate(liveVersion *models.CanvasVersion,
 func saveCanvasMetadataUpdate(tx *gorm.DB, lockedCanvas *models.Canvas, liveVersion *models.CanvasVersion) error {
 	now := time.Now()
 	liveVersion.UpdatedAt = &now
+	lockedCanvas.Name = liveVersion.Name
 	lockedCanvas.UpdatedAt = &now
 
 	if err := tx.Save(liveVersion).Error; err != nil {

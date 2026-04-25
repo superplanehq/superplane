@@ -121,6 +121,7 @@ func CreateCanvas(
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
 		IsTemplate:     false,
+		Name:           name,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
@@ -219,6 +220,8 @@ func CreateCanvas(
 	}
 
 	canvas.ChangeManagementEnabled = changeManagementEnabled
+	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)
+	canvas.Description = pbCanvas.Metadata.Description
 
 	var user *models.User
 	if canvas.CreatedBy != nil {

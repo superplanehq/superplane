@@ -19,9 +19,9 @@ type Canvas struct {
 	OrganizationID uuid.UUID
 	LiveVersionID  *uuid.UUID
 	IsTemplate     bool
+	Name           string
 	// The `->` tag marks fields as read-only in GORM. These values are projected
 	// from the live version via SELECT aliases; they are not stored on workflows.
-	Name                    string                                           `gorm:"column:name;->"`
 	Description             string                                           `gorm:"column:description;->"`
 	ChangeManagementEnabled bool                                             `gorm:"column:change_management_enabled;->"`
 	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover] `gorm:"column:change_request_approvers;->"`
@@ -51,7 +51,6 @@ func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
 		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
 		Select(
 			"workflows.*",
-			"live_version.name AS name",
 			"live_version.description AS description",
 			"live_version.change_management_enabled AS change_management_enabled",
 			"live_version.change_request_approvers AS change_request_approvers",
@@ -120,7 +119,10 @@ func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 
 	newName := fmt.Sprintf("%s (deleted-%d)", c.Name, timestamp)
 	return tx.Transaction(func(innerTx *gorm.DB) error {
-		if err := innerTx.Model(c).Update("deleted_at", now).Error; err != nil {
+		if err := innerTx.Model(c).Updates(map[string]any{
+			"name":       newName,
+			"deleted_at": now,
+		}).Error; err != nil {
 			return err
 		}
 
@@ -150,7 +152,7 @@ func FindCanvasByName(name string, organizationID uuid.UUID) (*Canvas, error) {
 func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
 	err := queryCanvasWithLiveVersion(tx).
-		Where("live_version.name = ? AND workflows.organization_id = ?", name, organizationID).
+		Where("workflows.name = ? AND workflows.organization_id = ?", name, organizationID).
 		First(&canvas).
 		Error
 
@@ -170,7 +172,7 @@ func FindCanvasTemplateByNameInTransaction(tx *gorm.DB, name string) (*Canvas, e
 	err := queryCanvasWithLiveVersion(tx).
 		Where("workflows.organization_id = ?", TemplateOrganizationID).
 		Where("workflows.is_template = ?", true).
-		Where("live_version.name = ?", name).
+		Where("workflows.name = ?", name).
 		First(&canvas).
 		Error
 
