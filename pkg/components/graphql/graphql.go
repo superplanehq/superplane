@@ -31,7 +31,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("graphql", &GraphQL{})
+	registry.RegisterAction("graphql", &GraphQL{})
 }
 
 type Header struct {
