@@ -89,8 +89,8 @@ func (d *Datadog) Configuration() []configuration.Field {
 	}
 }
 
-func (d *Datadog) Components() []core.Component {
-	return []core.Component{
+func (d *Datadog) Actions() []core.Action {
+	return []core.Action{
 		&CreateEvent{},
 	}
 }

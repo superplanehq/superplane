@@ -68,8 +68,8 @@ func (d *Discord) Configuration() []configuration.Field {
 	}
 }
 
-func (d *Discord) Components() []core.Component {
-	return []core.Component{
+func (d *Discord) Actions() []core.Action {
+	return []core.Action{
 		&SendTextMessage{},
 		&GetLastMention{},
 	}

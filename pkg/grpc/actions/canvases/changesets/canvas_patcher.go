@@ -350,12 +350,12 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef models.NodeRef) ([]configuration.Field, error) {
 	switch nodeType {
 	case models.NodeTypeComponent:
-		component, err := p.registry.GetComponent(nodeRef.Component.Name)
+		action, err := p.registry.GetAction(nodeRef.Component.Name)
 		if err != nil {
 			return nil, err
 		}
 
-		return component.Configuration(), nil
+		return action.Configuration(), nil
 
 	case models.NodeTypeTrigger:
 		trigger, err := p.registry.GetTrigger(nodeRef.Trigger.Name)
@@ -463,9 +463,9 @@ func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string,
 	}
 
 	//
-	// Check if the block is a component
+	// Check if the block is an action
 	//
-	_, err := p.registry.GetComponent(node.GetBlock())
+	_, err := p.registry.GetAction(node.GetBlock())
 	if err == nil {
 		return models.NodeTypeComponent, &models.NodeRef{
 			Component: &models.ComponentRef{Name: node.GetBlock()},

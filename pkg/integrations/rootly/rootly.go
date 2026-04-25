@@ -59,8 +59,8 @@ func (r *Rootly) Configuration() []configuration.Field {
 	}
 }
 
-func (r *Rootly) Components() []core.Component {
-	return []core.Component{
+func (r *Rootly) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 		&CreateEvent{},
 		&UpdateIncident{},

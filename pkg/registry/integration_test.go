@@ -21,7 +21,7 @@ func (p *panickingIntegration) Icon() string                         { return "i
 func (p *panickingIntegration) Description() string                  { return "description" }
 func (p *panickingIntegration) Instructions() string                 { return "instructions" }
 func (p *panickingIntegration) Configuration() []configuration.Field { return nil }
-func (p *panickingIntegration) Components() []core.Component         { return nil }
+func (p *panickingIntegration) Actions() []core.Action               { return nil }
 func (p *panickingIntegration) Triggers() []core.Trigger             { return nil }
 func (p *panickingIntegration) Sync(ctx core.SyncContext) error      { panic("sync panic") }
 func (p *panickingIntegration) Hooks() []core.Hook                   { return nil }

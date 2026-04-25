@@ -83,8 +83,8 @@ func (s *SendGrid) Configuration() []configuration.Field {
 	}
 }
 
-func (s *SendGrid) Components() []core.Component {
-	return []core.Component{
+func (s *SendGrid) Actions() []core.Action {
+	return []core.Action{
 		&SendEmail{},
 		&CreateOrUpdateContact{},
 	}

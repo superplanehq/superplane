@@ -356,7 +356,7 @@ func (p *CanvasPublisher) setupNode(ctx context.Context, node *models.CanvasNode
 	case models.NodeTypeTrigger:
 		return p.setupTrigger(ctx, node)
 	case models.NodeTypeComponent:
-		return p.setupComponent(ctx, node)
+		return p.setupAction(ctx, node)
 	case models.NodeTypeWidget:
 		return nil
 	}
@@ -402,9 +402,9 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 	return trigger.Setup(triggerCtx)
 }
 
-func (p *CanvasPublisher) setupComponent(ctx context.Context, node *models.CanvasNode) error {
+func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNode) error {
 	ref := node.Ref.Data()
-	component, err := p.options.Registry.GetComponent(ref.Component.Name)
+	action, err := p.options.Registry.GetAction(ref.Component.Name)
 	if err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func (p *CanvasPublisher) setupComponent(ctx context.Context, node *models.Canva
 	}
 
 	setupCtx.Logger = logger
-	return component.Setup(setupCtx)
+	return action.Setup(setupCtx)
 }
 
 func (p *CanvasPublisher) ensureNewNodeID(node models.Node) string {

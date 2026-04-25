@@ -218,7 +218,7 @@ func Test__NewRelic__Sync(t *testing.T) {
 
 func Test__NewRelic__Components(t *testing.T) {
 	n := &NewRelic{}
-	components := n.Components()
+	components := n.Actions()
 
 	require.Len(t, components, 2)
 	assert.Equal(t, "newrelic.reportMetric", components[0].Name())

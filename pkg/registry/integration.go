@@ -52,11 +52,11 @@ func (s *PanicableIntegration) Hooks() []core.Hook {
 	return s.underlying.Hooks()
 }
 
-func (s *PanicableIntegration) Components() []core.Component {
-	components := s.underlying.Components()
-	safe := make([]core.Component, len(components))
-	for i, c := range components {
-		safe[i] = NewPanicableComponent(c)
+func (s *PanicableIntegration) Actions() []core.Action {
+	actions := s.underlying.Actions()
+	safe := make([]core.Action, len(actions))
+	for i, a := range actions {
+		safe[i] = NewPanicableAction(a)
 	}
 	return safe
 }

@@ -79,8 +79,8 @@ func (g *Grafana) Configuration() []configuration.Field {
 	}
 }
 
-func (g *Grafana) Components() []core.Component {
-	return []core.Component{
+func (g *Grafana) Actions() []core.Action {
+	return []core.Action{
 		&CreateAlertRule{},
 		&DeleteAlertRule{},
 		&GetAlertRule{},

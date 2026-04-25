@@ -97,8 +97,8 @@ func (s *ServiceNow) Configuration() []configuration.Field {
 	}
 }
 
-func (s *ServiceNow) Components() []core.Component {
-	return []core.Component{
+func (s *ServiceNow) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 		&GetIncident{},
 	}

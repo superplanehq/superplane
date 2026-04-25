@@ -58,8 +58,8 @@ func (l *LaunchDarkly) Configuration() []configuration.Field {
 	}
 }
 
-func (l *LaunchDarkly) Components() []core.Component {
-	return []core.Component{
+func (l *LaunchDarkly) Actions() []core.Action {
+	return []core.Action{
 		&GetFeatureFlag{},
 		&DeleteFeatureFlag{},
 	}

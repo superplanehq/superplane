@@ -76,9 +76,9 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 	if node.Type == models.NodeTypeComponent {
 		ref := node.Ref.Data()
 		if ref.Component != nil {
-			component, err := registry.GetComponent(ref.Component.Name)
+			action, err := registry.GetAction(ref.Component.Name)
 			if err != nil {
-				log.Errorf("component %s not found: %v", ref.Component.Name, err)
+				log.Errorf("action %s not found: %v", ref.Component.Name, err)
 				return err
 			}
 
@@ -117,7 +117,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 			}
 
 			ctx.Logger = logger
-			if err := component.Cancel(ctx); err != nil {
+			if err := action.Cancel(ctx); err != nil {
 				log.Errorf("failed to cancel component execution %s: %v", execution.ID.String(), err)
 			}
 		}

@@ -99,8 +99,8 @@ func (s *SMTP) Configuration() []configuration.Field {
 	}
 }
 
-func (s *SMTP) Components() []core.Component {
-	return []core.Component{
+func (s *SMTP) Actions() []core.Action {
+	return []core.Action{
 		&SendEmail{},
 	}
 }

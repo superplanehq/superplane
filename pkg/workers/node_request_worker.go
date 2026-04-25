@@ -214,7 +214,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindComponentHook(nodeRef.Component.Name, spec.InvokeAction.ActionName)
+	hookProvider, _, err := w.registry.FindActionHook(nodeRef.Component.Name, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("failed to find hook: %v", err)
 	}
@@ -288,7 +288,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindComponentHook(node.Ref.Data().Component.Name, spec.InvokeAction.ActionName)
+	hookProvider, _, err := w.registry.FindActionHook(node.Ref.Data().Component.Name, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
@@ -368,7 +368,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindComponentHook(childNode.Ref.Component.Name, spec.InvokeAction.ActionName)
+	hookProvider, _, err := w.registry.FindActionHook(childNode.Ref.Component.Name, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}

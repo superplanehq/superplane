@@ -42,9 +42,9 @@ type Integration interface {
 	Configuration() []configuration.Field
 
 	/*
-	 * The list of components exposed by the integration.
+	 * The list of actions exposed by the integration.
 	 */
-	Components() []Component
+	Actions() []Action
 
 	/*
 	 * The list of triggers exposed by the integration.
@@ -111,13 +111,13 @@ type WebhookHandlerContext struct {
 	Webhook     WebhookContext
 }
 
-type IntegrationComponent interface {
+type IntegrationAction interface {
 
 	/*
-	 * IntegrationComponent inherits all the methods from Component interface,
+	 * IntegrationAction inherits all the methods from Action interface,
 	 * and adds a couple more, which are only applicable to app actions.
 	 */
-	Component
+	Action
 
 	OnIntegrationMessage(ctx IntegrationMessageContext) error
 }

@@ -72,8 +72,8 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 	}
 }
 
-func (c *Cloudflare) Components() []core.Component {
-	return []core.Component{
+func (c *Cloudflare) Actions() []core.Action {
+	return []core.Action{
 		&CreateDNSRecord{},
 		&UpdateRedirectRule{},
 		&UpdateDNSRecord{},

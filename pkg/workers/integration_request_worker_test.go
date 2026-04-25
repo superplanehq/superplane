@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 )
 
 func Test__IntegrationRequestWorker_Sync(t *testing.T) {
@@ -25,7 +26,7 @@ func Test__IntegrationRequestWorker_Sync(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var syncCalled bool
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		OnSync: func(ctx core.SyncContext) error {
 			ctx.Integration.Ready()
 			syncCalled = true
@@ -71,7 +72,7 @@ func Test__IntegrationRequestWorker_SyncError(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var syncCalled bool
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		OnSync: func(ctx core.SyncContext) error {
 			syncCalled = true
 			return errors.New("sync failed")
@@ -120,7 +121,7 @@ func Test__AppInstallationRequestWorker_InvokeHook(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var hookCalled bool
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		Hooks: []core.Hook{
 			{
 				Name:       "test",
@@ -171,7 +172,7 @@ func Test__AppInstallationRequestWorker_InvokeHookError(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var hookCalled bool
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		Hooks: []core.Hook{
 			{
 				Name:       "test",

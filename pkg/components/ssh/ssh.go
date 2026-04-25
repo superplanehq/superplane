@@ -23,7 +23,7 @@ const (
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func init() {
-	registry.RegisterComponent("ssh", &SSHCommand{})
+	registry.RegisterAction("ssh", &SSHCommand{})
 }
 
 type SSHCommand struct{}

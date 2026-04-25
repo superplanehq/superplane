@@ -159,8 +159,8 @@ func (g *GCP) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GCP) Components() []core.Component {
-	return []core.Component{
+func (g *GCP) Actions() []core.Action {
+	return []core.Action{
 		&compute.CreateVM{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},

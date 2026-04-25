@@ -62,8 +62,8 @@ func (h *Harness) Configuration() []configuration.Field {
 	}
 }
 
-func (h *Harness) Components() []core.Component {
-	return []core.Component{
+func (h *Harness) Actions() []core.Action {
+	return []core.Action{
 		&RunPipeline{},
 	}
 }

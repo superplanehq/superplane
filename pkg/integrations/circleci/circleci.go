@@ -157,8 +157,8 @@ func (c *CircleCI) listPipelineDefinitions(ctx core.ListResourcesContext) ([]cor
 	return resources, nil
 }
 
-func (c *CircleCI) Components() []core.Component {
-	return []core.Component{
+func (c *CircleCI) Actions() []core.Action {
+	return []core.Action{
 		&RunPipeline{},
 		&GetWorkflow{},
 		&GetLastWorkflow{},
