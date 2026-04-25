@@ -21,7 +21,7 @@ func Test__DescribeComponent(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Equal(t, "component nope not found", s.Message())
+		assert.Equal(t, "action nope not found", s.Message())
 	})
 
 	t.Run("describe existing component", func(t *testing.T) {
