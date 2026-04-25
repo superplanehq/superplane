@@ -77,8 +77,8 @@ func (t *Telegram) Configuration() []configuration.Field {
 	}
 }
 
-func (t *Telegram) Components() []core.Component {
-	return []core.Component{
+func (t *Telegram) Actions() []core.Action {
+	return []core.Action{
 		&SendMessage{},
 		&WaitForButtonClick{},
 	}

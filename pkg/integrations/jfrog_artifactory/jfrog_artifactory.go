@@ -61,8 +61,8 @@ func (j *JFrogArtifactory) Configuration() []configuration.Field {
 	}
 }
 
-func (j *JFrogArtifactory) Components() []core.Component {
-	return []core.Component{
+func (j *JFrogArtifactory) Actions() []core.Action {
+	return []core.Action{
 		&GetArtifactInfo{},
 		&DeleteArtifact{},
 	}

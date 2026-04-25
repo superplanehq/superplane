@@ -18,7 +18,7 @@ const ChannelNameDeleted = "deleted"
 const ChannelNameNotFound = "notFound"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &DeleteMemory{})
+	registry.RegisterAction(ComponentName, &DeleteMemory{})
 }
 
 type DeleteMemory struct{}

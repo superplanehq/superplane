@@ -198,8 +198,8 @@ func (s *Sentry) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Sentry) Components() []core.Component {
-	return []core.Component{
+func (s *Sentry) Actions() []core.Action {
+	return []core.Action{
 		&CreateAlert{},
 		&UpdateAlert{},
 		&DeleteAlert{},

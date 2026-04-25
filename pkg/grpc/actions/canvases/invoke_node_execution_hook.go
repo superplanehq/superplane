@@ -60,7 +60,7 @@ func InvokeNodeExecutionHook(
 		return nil, fmt.Errorf("node is not a component node")
 	}
 
-	hookProvider, hookDef, err := registry.FindComponentHook(node.Ref.Data().Component.Name, hookName)
+	hookProvider, hookDef, err := registry.FindActionHook(node.Ref.Data().Component.Name, hookName)
 	if err != nil {
 		return nil, fmt.Errorf("hook not found: %w", err)
 	}

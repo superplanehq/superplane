@@ -7,13 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Test__DescribeComponent(t *testing.T) {
 	r := support.Setup(t)
-	r.Registry.Components["test"] = support.NewDummyComponent(support.DummyComponentOptions{})
+	r.Registry.Actions["test"] = impl.NewDummyAction(impl.DummyActionOptions{})
 
 	t.Run("component does not exist -> error", func(t *testing.T) {
 		_, err := DescribeComponent(context.Background(), r.Registry, "nope")

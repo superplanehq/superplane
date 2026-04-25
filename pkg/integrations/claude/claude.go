@@ -48,8 +48,8 @@ func (i *Claude) Configuration() []configuration.Field {
 	}
 }
 
-func (i *Claude) Components() []core.Component {
-	return []core.Component{
+func (i *Claude) Actions() []core.Action {
+	return []core.Action{
 		&TextPrompt{},
 	}
 }

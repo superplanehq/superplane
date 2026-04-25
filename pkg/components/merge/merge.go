@@ -26,7 +26,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("merge", &Merge{})
+	registry.RegisterAction("merge", &Merge{})
 }
 
 /*

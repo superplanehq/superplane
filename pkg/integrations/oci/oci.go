@@ -114,8 +114,8 @@ func (o *OCI) Configuration() []configuration.Field {
 	}
 }
 
-func (o *OCI) Components() []core.Component {
-	return []core.Component{
+func (o *OCI) Actions() []core.Action {
+	return []core.Action{
 		&CreateComputeInstance{},
 	}
 }

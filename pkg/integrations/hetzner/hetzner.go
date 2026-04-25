@@ -55,8 +55,8 @@ func (h *Hetzner) Configuration() []configuration.Field {
 	}
 }
 
-func (h *Hetzner) Components() []core.Component {
-	return []core.Component{
+func (h *Hetzner) Actions() []core.Action {
+	return []core.Action{
 		&CreateServer{},
 		&CreateSnapshot{},
 		&DeleteSnapshot{},

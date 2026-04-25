@@ -57,8 +57,8 @@ func (o *OpenAI) Configuration() []configuration.Field {
 	}
 }
 
-func (o *OpenAI) Components() []core.Component {
-	return []core.Component{
+func (o *OpenAI) Actions() []core.Action {
+	return []core.Action{
 		&CreateResponse{},
 	}
 }

@@ -94,8 +94,8 @@ func (s *Statuspage) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (s *Statuspage) Components() []core.Component {
-	return []core.Component{
+func (s *Statuspage) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 		&UpdateIncident{},
 		&GetIncident{},
