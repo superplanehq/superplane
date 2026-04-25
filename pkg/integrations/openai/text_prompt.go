@@ -173,14 +173,6 @@ func (c *CreateResponse) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateResponse) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateResponse) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateResponse) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -216,5 +208,13 @@ func extractResponseText(response *OpenAIResponse) string {
 }
 
 func (c *CreateResponse) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateResponse) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateResponse) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

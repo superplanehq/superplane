@@ -467,20 +467,20 @@ func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)
 }
 
-func (c *CreateComputeInstance) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *CreateComputeInstance) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *CreateComputeInstance) HandleAction(ctx core.ActionContext) error {
+func (c *CreateComputeInstance) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *CreateComputeInstance) poll(ctx core.ActionContext) error {
+func (c *CreateComputeInstance) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -529,7 +529,7 @@ func (c *CreateComputeInstance) poll(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CreateComputeInstance) emitInstance(ctx core.ActionContext, client *Client, instance *Instance, metadata CreateInstanceExecutionMetadata) error {
+func (c *CreateComputeInstance) emitInstance(ctx core.ActionHookContext, client *Client, instance *Instance, metadata CreateInstanceExecutionMetadata) error {
 	payload := instanceToMap(instance)
 
 	c.enrichWithVNICIPs(ctx, client, instance, payload)
@@ -544,7 +544,7 @@ func (c *CreateComputeInstance) emitInstance(ctx core.ActionContext, client *Cli
 // enrichWithVNICIPs looks up the primary VNIC for the instance and adds publicIp / privateIp
 // to payload. Errors are logged as warnings so a transient VNIC-lookup failure does not block
 // the execution from completing.
-func (c *CreateComputeInstance) enrichWithVNICIPs(ctx core.ActionContext, client *Client, instance *Instance, payload map[string]any) {
+func (c *CreateComputeInstance) enrichWithVNICIPs(ctx core.ActionHookContext, client *Client, instance *Instance, payload map[string]any) {
 	attachments, err := client.ListVNICAttachments(instance.CompartmentID, instance.ID)
 	if err != nil {
 		ctx.Logger.Warnf("failed to list VNIC attachments for instance %s: %v", instance.ID, err)
@@ -571,7 +571,7 @@ func (c *CreateComputeInstance) enrichWithVNICIPs(ctx core.ActionContext, client
 // ensureBlockVolumeAttached attaches the configured block volume (if any) to the instance and
 // records the resulting attachment ID in metadata before returning, making the step idempotent
 // across retries.
-func (c *CreateComputeInstance) ensureBlockVolumeAttached(ctx core.ActionContext, client *Client, instance *Instance, metadata *CreateInstanceExecutionMetadata, payload map[string]any) error {
+func (c *CreateComputeInstance) ensureBlockVolumeAttached(ctx core.ActionHookContext, client *Client, instance *Instance, metadata *CreateInstanceExecutionMetadata, payload map[string]any) error {
 	if metadata.BlockVolumeID == "" {
 		return nil
 	}

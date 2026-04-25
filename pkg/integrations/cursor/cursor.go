@@ -140,10 +140,10 @@ func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 	return []core.IntegrationResource{}, nil
 }
 
-func (i *Cursor) Actions() []core.Action {
-	return []core.Action{}
+func (i *Cursor) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (i *Cursor) HandleAction(ctx core.IntegrationActionContext) error {
+func (i *Cursor) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

@@ -119,16 +119,16 @@ func (d *DockerHub) ListResources(resourceType string, ctx core.ListResourcesCon
 	return listDockerHubResources(resourceType, ctx)
 }
 
-func (d *DockerHub) Actions() []core.Action {
-	return []core.Action{
+func (d *DockerHub) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "refreshAccessToken",
-			Description: "Refresh access token",
+			Name: "refreshAccessToken",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (d *DockerHub) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *DockerHub) HandleHook(ctx core.IntegrationHookContext) error {
 	switch ctx.Name {
 	case "refreshAccessToken":
 		refreshIn, err := refreshAccessToken(ctx.HTTP, ctx.Integration)
@@ -139,6 +139,6 @@ func (d *DockerHub) HandleAction(ctx core.IntegrationActionContext) error {
 		return ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, *refreshIn)
 
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }

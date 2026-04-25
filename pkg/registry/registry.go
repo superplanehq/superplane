@@ -266,3 +266,48 @@ func (r *Registry) GetIntegrationComponent(appName, componentName string) (core.
 func (r *Registry) IsCoreBlock(name string) bool {
 	return !strings.Contains(name, ".")
 }
+
+func (r *Registry) FindComponentHook(componentName, hookName string) (core.Component, *core.Hook, error) {
+	component, err := r.GetComponent(componentName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, hook := range component.Hooks() {
+		if hook.Name == hookName {
+			return component, &hook, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("hook %s not found for component %s", hookName, componentName)
+}
+
+func (r *Registry) FindTriggerHook(triggerName, hookName string) (core.Trigger, *core.Hook, error) {
+	trigger, err := r.GetTrigger(triggerName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, hook := range trigger.Hooks() {
+		if hook.Name == hookName {
+			return trigger, &hook, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("hook %s not found for trigger %s", hookName, triggerName)
+}
+
+func (r *Registry) FindIntegrationHook(integrationName, hookName string) (core.Integration, *core.Hook, error) {
+	integration, err := r.GetIntegration(integrationName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, hook := range integration.Hooks() {
+		if hook.Name == hookName {
+			return integration, &hook, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("hook %s not found for integration %s", hookName, integrationName)
+}

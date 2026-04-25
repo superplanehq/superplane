@@ -254,7 +254,7 @@ func Test__AssignReservedIP__Execute(t *testing.T) {
 	})
 }
 
-func Test__AssignReservedIP__HandleAction(t *testing.T) {
+func Test__AssignReservedIP__HandleHook(t *testing.T) {
 	component := &AssignReservedIP{}
 
 	t.Run("poll: in-progress -> reschedules poll", func(t *testing.T) {
@@ -280,7 +280,7 @@ func Test__AssignReservedIP__HandleAction(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{
@@ -327,7 +327,7 @@ func Test__AssignReservedIP__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{
@@ -375,7 +375,7 @@ func Test__AssignReservedIP__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{
@@ -417,7 +417,7 @@ func Test__AssignReservedIP__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{
@@ -437,13 +437,13 @@ func Test__AssignReservedIP__HandleAction(t *testing.T) {
 	})
 
 	t.Run("unknown action -> returns error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "unknown",
 			ExecutionState: &contexts.ExecutionStateContext{},
 			Metadata:       &contexts.MetadataContext{},
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
+		assert.Contains(t, err.Error(), "unknown hook")
 	})
 }

@@ -275,10 +275,10 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 	}
 }
 
-func (h *Hetzner) Actions() []core.Action {
-	return nil
+func (h *Hetzner) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (h *Hetzner) HandleAction(ctx core.IntegrationActionContext) error {
+func (h *Hetzner) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

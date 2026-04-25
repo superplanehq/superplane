@@ -625,7 +625,7 @@ func TestHTTP__Execute__NetworkErrorWithRetrySchedulesAction(t *testing.T) {
 	assert.Contains(t, metadata.Retry.LastError, "connection refused")
 }
 
-func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
+func TestHTTP__HandleHook__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	h := &HTTP{}
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -651,7 +651,7 @@ func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	require.NoError(t, err)
 
 	actionRequestCtx := &contexts.RequestContext{}
-	actionCtx := core.ActionContext{
+	actionCtx := core.ActionHookContext{
 		Logger:         log.NewEntry(log.StandardLogger()),
 		Name:           "retryRequest",
 		Configuration:  execCtx.Configuration,
@@ -661,7 +661,7 @@ func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 		HTTP:           httpCtx,
 	}
 
-	err = h.HandleAction(actionCtx)
+	err = h.HandleHook(actionCtx)
 	require.NoError(t, err)
 
 	assert.False(t, stateCtx.Finished)
@@ -674,7 +674,7 @@ func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	assert.Contains(t, metadata.Retry.LastError, "temporary outage")
 }
 
-func TestHTTP__HandleAction__RetryRequest_SuccessAfterNetworkError(t *testing.T) {
+func TestHTTP__HandleHook__RetryRequest_SuccessAfterNetworkError(t *testing.T) {
 	h := &HTTP{}
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -705,7 +705,7 @@ func TestHTTP__HandleAction__RetryRequest_SuccessAfterNetworkError(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, "retryRequest", requestCtx.Action)
 
-	actionCtx := core.ActionContext{
+	actionCtx := core.ActionHookContext{
 		Logger:         log.NewEntry(log.StandardLogger()),
 		Name:           "retryRequest",
 		Configuration:  execCtx.Configuration,
@@ -715,7 +715,7 @@ func TestHTTP__HandleAction__RetryRequest_SuccessAfterNetworkError(t *testing.T)
 		HTTP:           httpCtx,
 	}
 
-	err = h.HandleAction(actionCtx)
+	err = h.HandleHook(actionCtx)
 	require.NoError(t, err)
 
 	assert.True(t, stateCtx.Passed)

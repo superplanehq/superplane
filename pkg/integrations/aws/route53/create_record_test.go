@@ -330,15 +330,15 @@ func TestCreateRecord_Execute(t *testing.T) {
 	})
 }
 
-func TestCreateRecord_HandleAction(t *testing.T) {
+func TestCreateRecord_HandleHook(t *testing.T) {
 	component := &CreateRecord{}
 
 	t.Run("unknown action -> error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "unknown",
 		})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "unknown action")
+		require.Contains(t, err.Error(), "unknown hook")
 	})
 
 	t.Run("pollChange status still PENDING -> schedules poll again", func(t *testing.T) {
@@ -359,7 +359,7 @@ func TestCreateRecord_HandleAction(t *testing.T) {
 			},
 		}
 		requests := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:     pollChangeActionName,
 			HTTP:     httpContext,
 			Requests: requests,
@@ -402,7 +402,7 @@ func TestCreateRecord_HandleAction(t *testing.T) {
 			},
 		}
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           pollChangeActionName,
 			HTTP:           httpContext,
 			ExecutionState: execState,
