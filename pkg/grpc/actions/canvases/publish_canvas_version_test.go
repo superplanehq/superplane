@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -151,6 +152,79 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
 		require.NoError(t, err)
 		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
+	})
+
+	t.Run("metadata-only draft version -> publishes without graph changes", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-metadata-only")
+
+		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+		require.NoError(t, err)
+		draftVersionID := createVersionResponse.Version.Metadata.Id
+
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasVersion{}).
+			Where("id = ?", uuid.MustParse(draftVersionID)).
+			Updates(map[string]any{
+				"name":        "publish-metadata-only-renamed",
+				"description": "updated through metadata-only publish",
+			}).
+			Error)
+
+		resp, err := PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvasID, draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, resp.Version)
+		assert.Equal(t, pb.CanvasVersion_STATE_PUBLISHED, resp.Version.Metadata.State)
+		assert.Equal(t, "publish-metadata-only-renamed", resp.Version.Metadata.Name)
+		assert.Equal(t, "updated through metadata-only publish", resp.Version.Metadata.Description)
+
+		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
+		require.NoError(t, err)
+		assert.Equal(t, "publish-metadata-only-renamed", canvas.Name)
+		assert.Equal(t, "updated through metadata-only publish", canvas.Description)
+		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
+	})
+
+	t.Run("draft version with duplicate name -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		existingCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasVersion{}).
+			Where("id = ?", *existingCanvas.LiveVersionID).
+			Update("name", "publish-duplicate-live").
+			Error)
+		require.NoError(t, database.Conn().
+			Model(&models.Canvas{}).
+			Where("id = ?", existingCanvas.ID).
+			Update("name", "publish-duplicate-live").
+			Error)
+
+		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		draftVersionID := createVersionResponse.Version.Metadata.Id
+
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasVersion{}).
+			Where("id = ?", uuid.MustParse(draftVersionID)).
+			Update("name", "publish-duplicate-live").
+			Error)
+
+		_, err = PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.AlreadyExists, s.Code())
 	})
 
 }
