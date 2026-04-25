@@ -152,10 +152,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const errorMessage =
     typeof item.originalExecution?.resultMessage === "string" ? item.originalExecution.resultMessage : "";
   const isError = item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && errorMessage !== "";
-  const currentTabData = item.tabData?.current as
-    | Record<string, string | number | boolean | React.ReactElement | null | undefined>
-    | undefined;
-  const currentTabDataEntries = currentTabData ? Object.entries(currentTabData) : [];
 
   return (
     <div className="relative">
@@ -247,7 +243,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         )}
 
         {/* Expandable content */}
-        {isOpen && item.tabData ? (
+        {isOpen && item.tabData && (
           <div
             className="mt-3 ml-7 rounded-sm bg-white outline outline-slate-950/20 text-gray-500 w-[calc(100%-2rem)] mb-1"
             onClick={(e) => e.stopPropagation()}
@@ -255,7 +251,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {/* Tab Navigation */}
             <div className="flex items-center h-8 border-b-1 border-gray-300">
               <div className="flex">
-                {currentTabData && (
+                {!!item.tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
                     className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1  ${
@@ -269,7 +265,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   </button>
                 )}
               </div>
-              {item.tabData.payload && (
+              {!!item.tabData.payload && (
                 <button
                   onClick={() => setActiveTab("payload")}
                   className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
@@ -282,7 +278,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   Payload
                 </button>
               )}
-              {item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
+              {!!item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
                 <button
                   onClick={() => setActiveTab("configuration")}
                   className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
@@ -298,9 +294,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             </div>
 
             {/* Tab Content */}
-            {activeTab === "current" && currentTabDataEntries.length > 0 ? (
+            {activeTab === "current" && !!item.tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
-                {currentTabDataEntries.map(([key, value]) => {
+                {Object.entries(item.tabData.current).map(([key, value]) => {
                   const stringValue = String(value);
                   const isUrlValue = isUrl(stringValue);
 
@@ -346,9 +342,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   </div>
                 )}
               </div>
-            ) : null}
+            )}
 
-            {activeTab === "payload" && item.tabData.payload && (
+            {activeTab === "payload" && !!item.tabData.payload && (
               <div className="w-full">
                 <div className="flex items-center justify-between mb-2 relative">
                   <div className="flex items-center gap-1 absolute right-1.5 top-1.5">
@@ -392,7 +388,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               </div>
             )}
 
-            {activeTab === "configuration" && configurationPreview && (
+            {activeTab === "configuration" && !!configurationPreview && (
               <div className="w-full">
                 <div className="flex items-center justify-between mb-2 relative">
                   <div className="flex items-center gap-1 absolute right-1.5 top-1.5">
@@ -436,7 +432,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               </div>
             )}
           </div>
-        ) : null}
+        )}
 
         {/* Payload Modal */}
         <Dialog
