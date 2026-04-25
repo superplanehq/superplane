@@ -27,6 +27,7 @@ func createExecutionContext(config map[string]any) (core.ExecutionContext, *cont
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		HTTP:           &http.Client{},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},
 	}, stateCtx
 }
 
@@ -67,6 +68,21 @@ func TestGraphQL__Setup__MissingQuery(t *testing.T) {
 	err := g.Setup(core.SetupContext{Configuration: map[string]any{"url": "https://api.example.com/graphql"}})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "query is required")
+}
+
+func TestGraphQL__Setup__BearerAuthorizationRequiresToken(t *testing.T) {
+	g := &GraphQL{}
+	err := g.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"url":   "https://api.example.com/graphql",
+			"query": "{ __typename }",
+			"authorization": map[string]any{
+				"type": AuthorizationTypeBearer,
+			},
+		},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bearer token credential is required")
 }
 
 func TestGraphQL__Execute__BuildsBodyAndSuccess(t *testing.T) {
@@ -118,6 +134,41 @@ func TestGraphQL__Execute__BuildsBodyAndSuccess(t *testing.T) {
 	inner, ok := body["data"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, true, inner["ok"])
+}
+
+func TestGraphQL__Execute__AddsBearerAuthorizationHeader(t *testing.T) {
+	g := &GraphQL{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer secret-token", r.Header.Get("Authorization"))
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":{"ok":true}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stateCtx := createExecutionContext(map[string]any{
+		"url":            server.URL,
+		"query":          "{ ok }",
+		"timeoutSeconds": 1,
+		"authorization": map[string]any{
+			"type": AuthorizationTypeBearer,
+			"token": map[string]any{
+				"secret": "graphql",
+				"key":    "token",
+			},
+		},
+	})
+	ctx.Secrets = &contexts.SecretsContext{
+		Values: map[string][]byte{
+			"graphql/token": []byte(" secret-token "),
+		},
+	}
+
+	err := g.Execute(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, SuccessOutputChannel, stateCtx.Channel)
 }
 
 func TestGraphQL__Execute__OmitEmptyVariables(t *testing.T) {

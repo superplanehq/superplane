@@ -25,6 +25,9 @@ const (
 
 	SuccessOutputChannel = "success"
 	FailureOutputChannel = "failure"
+
+	AuthorizationTypeNone   = "none"
+	AuthorizationTypeBearer = "bearer"
 )
 
 func init() {
@@ -46,8 +49,14 @@ type Spec struct {
 	Query          string      `json:"query"`
 	Variables      *[]KeyValue `json:"variables,omitempty"`
 	Headers        *[]Header   `json:"headers,omitempty"`
+	Authorization  AuthSpec    `json:"authorization,omitempty" mapstructure:"authorization"`
 	TimeoutSeconds *int        `json:"timeoutSeconds,omitempty"`
 	SuccessCodes   *string     `json:"successCodes,omitempty"`
+}
+
+type AuthSpec struct {
+	Type  string                     `json:"type" mapstructure:"type"`
+	Token configuration.SecretKeyRef `json:"token" mapstructure:"token"`
 }
 
 func (s *Spec) Timeout() time.Duration {
@@ -89,10 +98,11 @@ func (e *GraphQL) Documentation() string {
 - **Query** — Multi-line GraphQL document (no JSON escaping in the canvas)
 - **Variables** — Key/value pairs merged into the request variables object
 - **Headers** — Request headers
+- **Authorization** — Optional bearer token stored in an organization Secret
 
 ## Response
 
-- **status** - Responde status code
+- **status** - Response status code
 - **headers** - Response headers
 - **body** - Response body converted to JSON
 `
@@ -121,7 +131,7 @@ func (e *GraphQL) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("query is required")
 	}
 
-	return nil
+	return e.validateAuthorization(spec.Authorization)
 }
 
 func (e *GraphQL) OutputChannels(_ any) []core.OutputChannel {
@@ -134,6 +144,7 @@ func (e *GraphQL) OutputChannels(_ any) []core.OutputChannel {
 func (e *GraphQL) Configuration() []configuration.Field {
 	minTimeout := 1
 	maxTimeout := int(MaxTimeout.Seconds())
+	bearerOnly := []configuration.VisibilityCondition{{Field: "type", Values: []string{AuthorizationTypeBearer}}}
 
 	return []configuration.Field{
 		{
@@ -142,6 +153,44 @@ func (e *GraphQL) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "https://api.example.com/graphql",
+		},
+		{
+			Name:        "authorization",
+			Label:       "Authorization",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Description: "Optional Authorization header for this request",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "type",
+							Label:       "Type",
+							Type:        configuration.FieldTypeSelect,
+							Required:    true,
+							Default:     AuthorizationTypeNone,
+							Description: "Authorization method",
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "None", Value: AuthorizationTypeNone},
+										{Label: "Bearer token", Value: AuthorizationTypeBearer},
+									},
+								},
+							},
+						},
+						{
+							Name:                 "token",
+							Label:                "Token",
+							Type:                 configuration.FieldTypeSecretKey,
+							Required:             false,
+							Description:          "Stored credential that holds the bearer token",
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "type", Values: []string{AuthorizationTypeBearer}}},
+							VisibilityConditions: bearerOnly,
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "query",
@@ -206,14 +255,14 @@ func (e *GraphQL) Configuration() []configuration.Field {
 								Type:        configuration.FieldTypeString,
 								Label:       "Header Name",
 								Required:    true,
-								Placeholder: "Authorization",
+								Placeholder: "X-Request-ID",
 							},
 							{
 								Name:        "value",
 								Type:        configuration.FieldTypeString,
 								Label:       "Header Value",
 								Required:    true,
-								Placeholder: "Bearer …",
+								Placeholder: "request-123",
 							},
 						},
 					},
@@ -256,7 +305,7 @@ func (e *GraphQL) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	response, err := e.postGraphQLRequest(ctx.Logger, ctx.HTTP, spec)
+	response, err := e.postGraphQLRequest(ctx.Logger, ctx.HTTP, ctx.Secrets, spec)
 	if err != nil {
 		return ctx.ExecutionState.Emit(
 			FailureOutputChannel,
@@ -323,6 +372,22 @@ func (e *GraphQL) hasGraphQLErrors(bodyData any) bool {
 	return ok && len(errors) > 0
 }
 
+func (e *GraphQL) validateAuthorization(auth AuthSpec) error {
+	if auth.Type == "" || auth.Type == AuthorizationTypeNone {
+		return nil
+	}
+
+	if auth.Type != AuthorizationTypeBearer {
+		return fmt.Errorf("invalid authorization type: %s", auth.Type)
+	}
+
+	if !auth.Token.IsSet() {
+		return fmt.Errorf("bearer token credential is required")
+	}
+
+	return nil
+}
+
 func (e *GraphQL) buildRequestBody(spec Spec) ([]byte, error) {
 	payload := map[string]any{
 		"query": spec.Query,
@@ -344,7 +409,7 @@ func (e *GraphQL) buildRequestBody(spec Spec) ([]byte, error) {
 	return json.Marshal(payload)
 }
 
-func (e *GraphQL) postGraphQLRequest(logger *log.Entry, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
+func (e *GraphQL) postGraphQLRequest(logger *log.Entry, httpCtx core.HTTPContext, secrets core.SecretsContext, spec Spec) (*http.Response, error) {
 	body, err := e.buildRequestBody(spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal GraphQL payload: %w", err)
@@ -364,6 +429,19 @@ func (e *GraphQL) postGraphQLRequest(logger *log.Entry, httpCtx core.HTTPContext
 		for _, header := range *spec.Headers {
 			req.Header.Set(header.Name, header.Value)
 		}
+	}
+
+	if spec.Authorization.Type == AuthorizationTypeBearer {
+		if secrets == nil {
+			return nil, fmt.Errorf("secrets context is required for bearer authorization")
+		}
+
+		token, err := secrets.GetKey(spec.Authorization.Token.Secret, spec.Authorization.Token.Key)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get bearer token: %w", err)
+		}
+
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", strings.TrimSpace(string(token))))
 	}
 
 	logger.Infof("[POST] %s", spec.URL)
