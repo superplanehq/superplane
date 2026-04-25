@@ -336,7 +336,8 @@ export const webhookCustomFieldRenderer: CustomFieldRenderer = {
       switch (authMethod) {
         case "signature":
           title = "HMAC Signature Authentication";
-          description = "Use HMAC SHA-256 signature to authenticate your webhook requests.";
+          description =
+            "Use HMAC SHA-256 signature to authenticate your webhook requests. You can use X-Signature-256 or X-Hub-Signature-256 (e.g. GitHub sends the latter).";
           signatureKey = secret || "<your-signature-key>";
           code = `export SIGNATURE_KEY="${signatureKey}"
 export PAYLOAD='{"hello":"world"}'

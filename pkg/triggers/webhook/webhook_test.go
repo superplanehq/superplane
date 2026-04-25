@@ -221,6 +221,33 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.Contains(t, data, "headers")
 	})
 
+	t.Run("accepts X-Hub-Signature-256 for GitHub-style webhooks", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, eventCtx := webhookRequestContext(body, "signature", "secret")
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256="+signature)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventCtx.Count())
+	})
+
+	t.Run("prefers X-Signature-256 when both HMAC headers are set", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, _ := webhookRequestContext(body, "signature", "secret")
+		correct := computeSignature("secret", body)
+		wrong := computeSignature("wrong", body)
+		ctx.Headers.Set("X-Signature-256", "sha256="+correct)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256="+wrong)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+	})
+
 	t.Run("rejects missing bearer token", func(t *testing.T) {
 		webhook := &Webhook{}
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "bearer", "secret")

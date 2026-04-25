@@ -16,6 +16,11 @@ import (
 const (
 	MaxEventSize           = 64 * 1024
 	DefaultHeaderTokenName = "X-Webhook-Token"
+	// HMACSignatureHeaderName is the primary header for HMAC-SHA256 verification.
+	HMACSignatureHeaderName = "X-Signature-256"
+	// HubSignature256HeaderName is the header GitHub (and other providers) use for the same
+	// sha256=... HMAC value.
+	HubSignature256HeaderName = "X-Hub-Signature-256"
 )
 
 func init() {
@@ -65,7 +70,7 @@ func (w *Webhook) Documentation() string {
 
 ## Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header
+- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` or ` + "`X-Hub-Signature-256`" + ` header (GitHub uses the latter)
 - **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
 - **Header Token**: Require a raw token in a custom header (default: ` + "`X-Webhook-Token`" + `)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -242,7 +247,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	switch config.Authentication {
 	case "signature":
-		signature := ctx.Headers.Get("X-Signature-256")
+		signature := hmacSignatureFromHeaders(ctx.Headers)
 		if signature == "" {
 			return http.StatusForbidden, nil, fmt.Errorf("missing signature header")
 		}
@@ -310,4 +315,15 @@ func (c Configuration) HeaderTokenName() string {
 	}
 
 	return DefaultHeaderTokenName
+}
+
+// hmacSignatureFromHeaders returns the sha256=... HMAC value from a supported header.
+// X-Signature-256 is checked first, then X-Hub-Signature-256 (GitHub).
+func hmacSignatureFromHeaders(h http.Header) string {
+	for _, name := range []string{HMACSignatureHeaderName, HubSignature256HeaderName} {
+		if s := h.Get(name); s != "" {
+			return s
+		}
+	}
+	return ""
 }
