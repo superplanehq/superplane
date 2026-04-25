@@ -9,7 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -80,7 +80,7 @@ func UpdateNodePause(ctx context.Context, registry *registry.Registry, canvasID,
 	}, nil
 }
 
-func serializeCanvasNode(node *models.CanvasNode) (*compb.Node, error) {
+func serializeCanvasNode(node *models.CanvasNode) (*componentpb.Node, error) {
 	var integrationID *string
 	if node.AppInstallationID != nil {
 		id := node.AppInstallationID.String()

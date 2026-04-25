@@ -14,7 +14,7 @@ spec:
       position:
         x: 382
         "y": 396
-      component: null
+      action: null
       blueprint: null
       trigger:
         name: "schedule"
@@ -25,7 +25,7 @@ spec:
       warningMessage: ""
     - id: "http-check-002"
       name: "Health check request"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         method: "GET"
         url: "https://httpbin.org/status/500"
@@ -35,7 +35,7 @@ spec:
       position:
         x: 862
         "y": 396
-      component:
+      action:
         name: "http"
       blueprint: null
       trigger: null
@@ -46,7 +46,7 @@ spec:
       warningMessage: ""
     - id: "upsert-healthy-004"
       name: "Remember healthy status"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         namespace: "healthCheckMonitor"
         matchList:
@@ -63,7 +63,7 @@ spec:
       position:
         x: 1438
         "y": 396
-      component:
+      action:
         name: "upsertMemory"
       blueprint: null
       trigger: null
@@ -74,7 +74,7 @@ spec:
       warningMessage: ""
     - id: "read-status-005"
       name: "Read previous status"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         namespace: "healthCheckMonitor"
         resultMode: "latest"
@@ -86,7 +86,7 @@ spec:
       position:
         x: 1437
         "y": 501
-      component:
+      action:
         name: "readMemory"
       blueprint: null
       trigger: null
@@ -97,14 +97,14 @@ spec:
       warningMessage: ""
     - id: "if-previously-healthy-006"
       name: "Was previously healthy?"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         expression: '$["Read previous status"].data.data.values[0].lastStatus == "ok"'
       metadata: null
       position:
         x: 2014
         "y": 396
-      component:
+      action:
         name: "if"
       blueprint: null
       trigger: null
@@ -115,7 +115,7 @@ spec:
       warningMessage: ""
     - id: "send-email-003"
       name: "Send alert email"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         recipients: []
         subject: "Endpoint is down (status {{ $[\"Health check request\"].data.status }})"
@@ -124,7 +124,7 @@ spec:
       position:
         x: 2638
         "y": 396
-      component:
+      action:
         name: "sendEmail"
       blueprint: null
       trigger: null
@@ -135,7 +135,7 @@ spec:
       warningMessage: ""
     - id: "upsert-down-007"
       name: "Remember down status"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         namespace: "healthCheckMonitor"
         matchList:
@@ -150,7 +150,7 @@ spec:
       position:
         x: 3118
         "y": 396
-      component:
+      action:
         name: "upsertMemory"
       blueprint: null
       trigger: null

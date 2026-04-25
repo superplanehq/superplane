@@ -1,11 +1,16 @@
-import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, SuperplaneComponentsNode } from "@/api-client";
+import type {
+  BlueprintsBlueprint,
+  CanvasesCanvas,
+  SuperplaneActionsAction,
+  SuperplaneComponentsNode,
+} from "@/api-client";
 
 export type LayoutScope = "full-canvas" | "connected-component";
 
 export type LayoutEngineApplyOptions = {
   nodeIds?: string[];
   scope?: LayoutScope;
-  components?: ComponentsComponent[];
+  components?: SuperplaneActionsAction[];
   blueprints?: BlueprintsBlueprint[];
 };
 
