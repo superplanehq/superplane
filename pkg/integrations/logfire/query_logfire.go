@@ -353,14 +353,6 @@ func (c *QueryLogfire) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	return 200, nil, nil
 }
 
-func (c *QueryLogfire) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *QueryLogfire) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *QueryLogfire) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -381,5 +373,13 @@ func (c *QueryLogfire) Cleanup(ctx core.SetupContext) error {
 		_ = ctx.Integration.SetSecret(secretName, []byte{})
 	}
 
+	return nil
+}
+
+func (c *QueryLogfire) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *QueryLogfire) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

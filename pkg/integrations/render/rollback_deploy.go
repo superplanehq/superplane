@@ -191,24 +191,24 @@ func (c *RollbackDeploy) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, RollbackDeployPollInterval)
 }
 
-func (c *RollbackDeploy) Actions() []core.Action {
-	return []core.Action{
+func (c *RollbackDeploy) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *RollbackDeploy) HandleAction(ctx core.ActionContext) error {
+func (c *RollbackDeploy) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return c.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (c *RollbackDeploy) poll(ctx core.ActionContext) error {
+func (c *RollbackDeploy) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

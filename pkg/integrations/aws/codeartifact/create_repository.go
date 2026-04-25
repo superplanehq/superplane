@@ -182,14 +182,6 @@ func (c *CreateRepository) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateRepository) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateRepository) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateRepository) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -208,4 +200,12 @@ func (c *CreateRepository) normalizeConfig(config CreateRepositoryConfiguration)
 	config.Repository = strings.TrimSpace(config.Repository)
 	config.Description = strings.TrimSpace(config.Description)
 	return config
+}
+
+func (c *CreateRepository) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateRepository) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

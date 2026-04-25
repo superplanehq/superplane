@@ -109,14 +109,6 @@ func (r *Rootly) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (r *Rootly) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (r *Rootly) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 // verifyWebhookSignature verifies the Rootly webhook signature.
 // The signature format is: "t=<timestamp>, v1=<signature>"
 // where signature = HMAC-SHA256(timestamp + body, secret)
@@ -170,4 +162,12 @@ func hmacEqual(a, b []byte) bool {
 		result |= a[i] ^ b[i]
 	}
 	return result == 0
+}
+
+func (r *Rootly) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (r *Rootly) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

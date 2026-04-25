@@ -378,18 +378,20 @@ func (c *WaitForButtonClick) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return http.StatusOK, nil, nil
 }
 
-func (c *WaitForButtonClick) Actions() []core.Action {
-	return []core.Action{
+func (c *WaitForButtonClick) Hooks() []core.Hook {
+	return []core.Hook{
 		{
 			Name: ActionButtonClick,
+			Type: core.HookTypeInternal,
 		},
 		{
 			Name: ActionTimeout,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *WaitForButtonClick) HandleAction(ctx core.ActionContext) error {
+func (c *WaitForButtonClick) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case ActionButtonClick:
 		return c.handleButtonClick(ctx)
@@ -400,7 +402,7 @@ func (c *WaitForButtonClick) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *WaitForButtonClick) handleButtonClick(ctx core.ActionContext) error {
+func (c *WaitForButtonClick) handleButtonClick(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -436,7 +438,7 @@ func (c *WaitForButtonClick) handleButtonClick(ctx core.ActionContext) error {
 	)
 }
 
-func (c *WaitForButtonClick) handleTimeout(ctx core.ActionContext) error {
+func (c *WaitForButtonClick) handleTimeout(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

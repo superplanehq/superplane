@@ -62,15 +62,10 @@ type Integration interface {
 	Cleanup(ctx IntegrationCleanupContext) error
 
 	/*
-	 * The list of actions exposed by the integration.
+	 * Allows integrations to define and execute  hooks.
 	 */
-	Actions() []Action
-
-	/*
-	 * Execute an action - defined in Actions() -
-	 * on the integration.
-	 */
-	HandleAction(ctx IntegrationActionContext) error
+	Hooks() []Hook
+	HandleHook(ctx IntegrationHookContext) error
 
 	/*
 	 * List resources of a given type.
@@ -120,7 +115,7 @@ type IntegrationComponent interface {
 
 	/*
 	 * IntegrationComponent inherits all the methods from Component interface,
-	 * and adds a couple more, which are only applicable to app components.
+	 * and adds a couple more, which are only applicable to app actions.
 	 */
 	Component
 
@@ -188,17 +183,6 @@ type IntegrationCleanupContext struct {
 	Logger         *logrus.Entry
 	HTTP           HTTPContext
 	Integration    IntegrationContext
-}
-
-type IntegrationActionContext struct {
-	Name            string
-	Parameters      any
-	Configuration   any
-	WebhooksBaseURL string
-	Logger          *logrus.Entry
-	Requests        RequestContext
-	Integration     IntegrationContext
-	HTTP            HTTPContext
 }
 
 /*

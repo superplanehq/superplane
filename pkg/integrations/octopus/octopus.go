@@ -164,14 +164,6 @@ func (o *Octopus) ListResources(resourceType string, ctx core.ListResourcesConte
 	}
 }
 
-func (o *Octopus) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (o *Octopus) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func listSpaceResources(client *Client) ([]core.IntegrationResource, error) {
 	spaces, err := client.ListSpaces()
 	if err != nil {
@@ -318,4 +310,12 @@ func spaceIDForIntegration(client *Client, integration core.IntegrationContext) 
 	})
 
 	return space.ID, nil
+}
+
+func (o *Octopus) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (o *Octopus) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }
