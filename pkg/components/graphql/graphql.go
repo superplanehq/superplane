@@ -486,12 +486,12 @@ func (e *GraphQL) isSuccessfulResponse(statusCode int, successCodes string) bool
 	return false
 }
 
-func (e *GraphQL) Actions() []core.Action {
-	return []core.Action{}
+func (e *GraphQL) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (e *GraphQL) HandleAction(_ core.ActionContext) error {
-	return fmt.Errorf("graphql does not support actions")
+func (e *GraphQL) HandleHook(_ core.ActionHookContext) error {
+	return nil
 }
 
 func (e *GraphQL) Cancel(_ core.ExecutionContext) error {
