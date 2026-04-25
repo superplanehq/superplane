@@ -33,7 +33,7 @@ spec:
       warningMessage: ""
     - id: "component-node-1xyxrf"
       name: "Is it P1 or P2"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         expression: "$[\"Listen for new incidents\"].data.incident.priority.summary == \"P1\" || $[\"Listen for new incidents\"].data.incident.priority.summary == \"P2\""
       metadata: null
@@ -51,7 +51,7 @@ spec:
       warningMessage: ""
     - id: "component-node-wa0ctm"
       name: "Get all failing checks"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         checkRules:
@@ -75,7 +75,7 @@ spec:
       warningMessage: ""
     - id: "component-node-4pjwv9"
       name: "Get DB Memory Usage"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         dataset: "default"
         query: "avg_over_time(\n  {otel_metric_name=\"cloudsql.googleapis.com/database/memory/utilization\", otel_metric_type=\"gauge\", service_name=\"superplane-staging\"}[5m]\n)[60m:5m]\n"
@@ -95,7 +95,7 @@ spec:
       warningMessage: ""
     - id: "component-node-hbriwb"
       name: "Get DB CPU Usage"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         dataset: "default"
         query: "max_over_time(\n  {otel_metric_name=\"cloudsql.googleapis.com/database/cpu/utilization\", otel_metric_type=\"gauge\", service_name=\"superplane-staging\"}[5m]\n)[60m:5m]\n"
@@ -115,7 +115,7 @@ spec:
       warningMessage: ""
     - id: "component-node-rxe22i"
       name: "Create a Summary"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         input: "You are generating the BODY text for a GitHub issue. Output MUST be valid GitHub-flavored Markdown.\n\nGoal:\n- Review Dash0 failing checks and Prometheus DB CPU and DB Memory metrics (last 60 minutes).\n- Describe what is happening and what is impacted, based strictly on the data.\n\nHard rules:\n- Output Markdown ONLY.\n- Use real line breaks (press Enter). Do NOT output \"\\n\".\n- Be factual and concise. No speculation unless explicitly labeled.\n- DO NOT suggest fixes, mitigations, or next steps.\n- DO NOT include recommendations, advice, or action items.\n- If data is missing or unclear, state \"Unknown\".\n- Do not invent values.\n- Do not mention internal node/component names.\n\nOutput format (use these exact headings):\n\n## Summary\n- 2 to 4 short bullets, high-signal only\n- Describe symptoms and impact, not causes or solutions\n\n## Dash0 failing checks\n- Bullet list\n- Include: check name, severity/state (if present), short description\n\n## Database metrics (last 60 minutes)\n\n### CPU usage\n- Peak:\n- Overall trend:\n- Notable spikes:\n\n### Memory usage\n- Peak:\n- Overall trend:\n- Notable spikes:\n\nData:\n\nDash0 failing checks:\n{{$['Get all failing checks'].data}}\n\nDB CPU usage time series:\n{{ $[\"Get DB CPU Usage\"].data }}\n\nDB Memory usage time series:\n{{ $[\"Get DB Memory Usage\"].data }}\n"
         model: "gpt-5.2"
@@ -134,7 +134,7 @@ spec:
       warningMessage: ""
     - id: "component-node-n6s8ec"
       name: "Open an Issue"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         body: "{{$['Create a Summary'].data.text}}"
         repository: "puppy-describer"
@@ -179,7 +179,7 @@ spec:
       warningMessage: ""
     - id: "merge-merge-1fzi6q"
       name: "merge"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         enableStopIf: false
         enableTimeout: true

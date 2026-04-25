@@ -6,7 +6,7 @@ spec:
   nodes:
     - id: "component-node-yh15un"
       name: "Slack: Rollback Success"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "✅ Rollback completed successfully\n\nThe system has been restored to the last known good state for {{ $['Listen for Failed deployments'].data.repository.name }}\n\nWorkflow: {{$['Execute Rollback'].data.workflow_run.html_url}}\n\n🟢 No further action required."
@@ -28,7 +28,7 @@ spec:
       warningMessage: ""
     - id: "component-node-fswk8u"
       name: "Wait for the system to recover"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         mode: "interval"
         unit: "minutes"
@@ -48,7 +48,7 @@ spec:
       warningMessage: ""
     - id: "component-node-g0f7j5"
       name: "Check if there are any alerts"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         checkRules:
@@ -72,7 +72,7 @@ spec:
       warningMessage: ""
     - id: "component-node-yfk4ek"
       name: "Slack: Rollback Failed"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "❌ Rollback failed\n\nRollback for {{ $['Listen for Failed deployments'].data.repository.full_name }} failed.\n\nWorkflow: {{ $['Execute Rollback'].data.html_url }}\n\n⚠️ Action required: Open the workflow link to troubleshoot."
@@ -94,7 +94,7 @@ spec:
       warningMessage: ""
     - id: "component-node-aktoyi"
       name: "Slack: Starting Rollback"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "❌ Deployment failed\n🔄 Rollback started\n\nRepository: {{ $['Listen for Failed deployments'].data.repository.full_name }}\n\n\nFailed Workflow Link: {{$['Listen for Failed deployments'].data.workflow_run.html_url}}\n\nRollback is currently in progress."
@@ -116,7 +116,7 @@ spec:
       warningMessage: ""
     - id: "component-node-pdfas0"
       name: "Slack: Health checks failing"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "⚠️ Health checks still failing 10 minutes after rollback\n\nDash0 reports {{ len($['Check if there are any alerts'].data.data.result) }} failing check(s)\n\n🔴 Critical: {{ count($['Check if there are any alerts'].data.data.result, .value[1] == \"2\") }} | 🟡 Degraded: {{ count($['Check if there are any alerts'].data.data.result, .value[1] == \"1\") }}\n\n🚨 Action required: Investigate Dash0, the system is still unhealthy after rollback."
@@ -164,7 +164,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-z5400d"
       name: "Execute Rollback"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         ref: "main"
         repository: "monarch-app"

@@ -111,7 +111,7 @@ spec:
       warningMessage: ""
     - id: "component-node-c4ecox"
       name: "Forward only builds from main branch"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         expression: "$[\"Listen for successful CI\"].data.workflow_run.head_branch == \"main\""
       metadata: null
@@ -176,7 +176,7 @@ spec:
       warningMessage: ""
     - id: "timegate-timegate-vjyba3"
       name: "Run only during work hours"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         days:
           - "monday"
@@ -201,7 +201,7 @@ spec:
       warningMessage: ""
     - id: "approval-approval-pxl5ja"
       name: "Get Approvals"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         items:
           - type: "anyone"
@@ -220,7 +220,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-3ywh59"
       name: "Run Deployment"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         ref: "main"
         repository: "terraform"
@@ -244,7 +244,7 @@ spec:
       warningMessage: ""
     - id: "openai-textprompt-openai-textprompt-x2hhhi"
       name: "Generate Summary"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         input: "You are generating the final Slack message text that will be sent directly to Slack.\n\nYour task:\n- Review the JSON data provided below\n- Produce a concise Slack message summarizing:\n  - What was deployed\n  - When it was deployed\n  - The deployed commit (with link)\n  - The deployment pipeline (with link)\n\nCRITICAL formatting rules:\n- Insert REAL line breaks by pressing Enter between lines\n- DO NOT use escaped newline characters like \\n\n- Output must contain multiple lines exactly as Slack should display them\n- Use Slack link format: <url|label>\n- Plain text only, no Markdown blocks\n- No explanations, no surrounding text\n\nOutput rules:\n- Return ONLY the Slack message text\n- Do not repeat the input data\n- Do not describe what you are doing\n\nInput data:\n{{root().data}}\n{{ $['Get Approvals'].data }}\n{{ $[\"Run Deployment\"].data }}\n"
         model: "gpt-5.2"
@@ -263,7 +263,7 @@ spec:
       warningMessage: ""
     - id: "pagerduty-createincident-pagerduty-createincident-vwbqsu"
       name: "Create PD Incident"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         description: "The deployment to production has failed. \n\nLink to the workflow: {{ $[\"Run Deployment\"].data.workflow_run.html_url }}"
         service: "PQEAM2I"
@@ -288,7 +288,7 @@ spec:
       warningMessage: ""
     - id: "slack-sendtextmessage-slack-sendtextmessage-c2n7es"
       name: "Send Slack Message"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "{{$['Generate Summary'].data.text}}"

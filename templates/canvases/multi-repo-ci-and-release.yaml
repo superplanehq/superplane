@@ -78,7 +78,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-lduxm8"
       name: "Build Docker Image - Front"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "service"
@@ -109,7 +109,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-build-docker-image-8vfqh4"
       name: "Build Docker Image - Billing"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "service"
@@ -140,7 +140,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-build-docker-image-obpokg"
       name: "Build Docker Image - App"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "service"
@@ -171,7 +171,7 @@ spec:
       warningMessage: ""
     - id: "slack-sendtextmessage-slack-sendtextmessage-pgdv24"
       name: "Slack: Send alert that build failed"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "Your CI for {{ root().data.repository.full_name }} release: {{ root().data.release.name }} has failed. \n\nCheck workflow here {{previous().data.workflow_run.html_url}}"
@@ -193,7 +193,7 @@ spec:
       warningMessage: ""
     - id: "component-node-r7stbz"
       name: "Slack: Notify on successful deployment"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "Deployment of the {{ root().data.repository.full_name }} - {{ root().data.release.name }} was successful!"
@@ -215,7 +215,7 @@ spec:
       warningMessage: ""
     - id: "component-node-lkrxcj"
       name: "PD: Open Incident if Deploy fails"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         description: "Deployment of the service {{ root().data.repository.full_name}} has failed."
         service: "PQEAM2I"
@@ -240,7 +240,7 @@ spec:
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-wy2088"
       name: "Roll out to Kubernetes"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "service"

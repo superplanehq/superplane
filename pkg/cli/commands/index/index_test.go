@@ -21,7 +21,7 @@ const integrationsListResponse = `{
 			"label": "Slack",
 			"description": "Slack integration",
 			"configuration": [{"name": "token", "type": "string", "required": true}],
-			"components": [{"name": "slack.post-message"}],
+			"actions": [{"name": "slack.post-message"}],
 			"triggers": [{"name": "slack.message-received"}]
 		}
 	]
@@ -109,7 +109,7 @@ func TestActionsListReturnsSummaryJSON(t *testing.T) {
 	require.Len(t, result, 1)
 	require.Equal(t, "http", result[0]["name"])
 	require.Equal(t, "HTTP", result[0]["label"])
-	require.Equal(t, "HTTP request component", result[0]["description"])
+	require.Equal(t, "HTTP request action", result[0]["description"])
 
 	raw := stdout.String()
 	require.NotContains(t, raw, "exampleOutput")
