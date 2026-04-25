@@ -3,44 +3,15 @@ import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode, CanvasesCanvasEvent } from "@/api-client";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
-
-export interface ChildExecution {
-  name: string;
-  state: string;
-  nodeId: string;
-  executionId: string;
-  badgeColor?: string;
-  backgroundColor?: string;
-  componentIcon?: string;
-}
-
-export interface ChainItemData {
-  id: string;
-  nodeId: string;
-  componentName: string;
-  nodeName?: string;
-  nodeDisplayName?: string; // The actual display name from workflow node
-  nodeIcon?: string;
-  nodeIconSlug?: string; // Icon slug from component/trigger/blueprint metadata
-  state?: string; // Make state optional since it will be calculated
-  executionId?: string;
-  originalExecution?: CanvasesCanvasNodeExecution; // Add execution data
-  originalEvent?: CanvasesCanvasEvent; // Add event data for trigger events
-  childExecutions?: ChildExecution[]; // Add child executions for composite components
-  workflowNode?: SuperplaneComponentsNode; // Add workflow node for subtitle generation
-  tabData?: {
-    current?: Record<string, any>;
-    payload?: any;
-    configuration?: any;
-  };
-}
+import { ChainItemIcon } from "./ChainItemIcon";
+import type { ChainItemData } from "./types";
 
 interface ChainItemProps {
   item: ChainItemData;
@@ -198,15 +169,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* First row: Component icon/name and state badge */}
         <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {/* Component Icon */}
-            {(item.nodeIconSlug || item.nodeIcon) && (
-              <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                {React.createElement(resolveIcon(item.nodeIconSlug || item.nodeIcon), {
-                  size: 16,
-                  className: "text-gray-800",
-                })}
-              </div>
-            )}
+            <ChainItemIcon item={item} />
             <span className="text-sm text-gray-800 truncate min-w-0 font-semibold">
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
@@ -263,15 +226,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                       className: "text-gray-400",
                     })}
                   </div>
-                  {/* Component Icon */}
-                  {child.componentIcon && (
-                    <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                      {React.createElement(resolveIcon(child.componentIcon), {
-                        size: 14,
-                        className: "text-gray-500",
-                      })}
-                    </div>
-                  )}
+                  <ChainItemIcon item={child} size={14} className="text-gray-500" />
                   <span className="text-sm text-gray-500 truncate flex-1">{child.name}</span>
                 </div>
                 <div
