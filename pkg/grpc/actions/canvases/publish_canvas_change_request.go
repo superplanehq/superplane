@@ -160,7 +160,7 @@ func PublishCanvasChangeRequest(
 			return createVersionErr
 		}
 
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
+		liveVersion, err = models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
 		if err != nil {
 			return err
 		}

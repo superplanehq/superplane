@@ -350,6 +350,7 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 			"workflows.organization_id",
 			"workflows.live_version_id",
 			"workflows.is_template",
+			"workflows.name",
 			"workflows.created_by",
 			"workflows.created_at",
 			"workflows.updated_at",
