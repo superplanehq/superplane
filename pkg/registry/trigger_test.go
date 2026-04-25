@@ -30,7 +30,7 @@ func (p *panickingTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *
 	panic("handle webhook panic")
 }
 func (p *panickingTrigger) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
-	panic("handle action panic")
+	panic("handle hook panic")
 }
 func (p *panickingTrigger) Cleanup(ctx core.TriggerContext) error { panic("cleanup panic") }
 

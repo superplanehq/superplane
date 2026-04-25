@@ -9,8 +9,8 @@ import (
 type HookType string
 
 const (
-	HookTypeInternal = "internal"
-	HookTypeUser     = "user"
+	HookTypeInternal HookType = "internal"
+	HookTypeUser     HookType = "user"
 )
 
 type Hook struct {
