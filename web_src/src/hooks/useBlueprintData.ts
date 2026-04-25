@@ -5,8 +5,8 @@ import {
   blueprintsCreateBlueprint,
   blueprintsUpdateBlueprint,
   blueprintsDeleteBlueprint,
-  componentsListComponents,
-  componentsDescribeComponent,
+  actionsListActions,
+  actionsDescribeAction,
 } from "../api-client/sdk.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
@@ -145,8 +145,8 @@ export const useComponents = (organizationId: string) => {
   return useQuery({
     queryKey: componentKeys.list(organizationId),
     queryFn: async () => {
-      const response = await componentsListComponents(withOrganizationHeader({}));
-      return response.data?.components || [];
+      const response = await actionsListActions(withOrganizationHeader({}));
+      return response.data?.actions || [];
     },
     enabled: !!organizationId,
   });
@@ -156,12 +156,12 @@ export const useComponent = (organizationId: string, componentName: string) => {
   return useQuery({
     queryKey: componentKeys.detail(organizationId, componentName),
     queryFn: async () => {
-      const response = await componentsDescribeComponent(
+      const response = await actionsDescribeAction(
         withOrganizationHeader({
           path: { name: componentName },
         }),
       );
-      return response.data?.component;
+      return response.data?.action;
     },
     enabled: !!organizationId && !!componentName,
   });

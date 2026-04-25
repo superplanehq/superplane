@@ -29,7 +29,7 @@ func newDumpCommand(options core.BindOptions) *cobra.Command {
 
 type indexDump struct {
 	Integrations []openapi_client.IntegrationsIntegrationDefinition `json:"integrations"`
-	Components   []openapi_client.ComponentsComponent               `json:"components"`
+	Actions      []openapi_client.SuperplaneActionsAction           `json:"actions"`
 	Triggers     []openapi_client.TriggersTrigger                   `json:"triggers"`
 }
 
@@ -57,12 +57,12 @@ func (c *dumpCommand) Execute(ctx core.CommandContext) error {
 	})
 
 	g.Go(func() error {
-		resp, _, err := ctx.API.ComponentAPI.ComponentsListComponents(gctx).Execute()
+		resp, _, err := ctx.API.ActionAPI.ActionsListActions(gctx).Execute()
 		if err != nil {
-			return fmt.Errorf("fetching components: %w", err)
+			return fmt.Errorf("fetching actions: %w", err)
 		}
 		mu.Lock()
-		dump.Components = resp.GetComponents()
+		dump.Actions = resp.GetActions()
 		mu.Unlock()
 		return nil
 	})

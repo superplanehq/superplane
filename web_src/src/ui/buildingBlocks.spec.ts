@@ -1,4 +1,4 @@
-import type { ComponentsComponent } from "@/api-client";
+import type { SuperplaneActionsAction } from "@/api-client";
 import { describe, expect, it } from "vitest";
 import { buildBuildingBlockCategories } from "./buildingBlocks";
 
@@ -10,7 +10,7 @@ describe("buildBuildingBlockCategories", () => {
   });
 
   it("only returns blocks provided by live inputs", () => {
-    const component: ComponentsComponent = {
+    const component: SuperplaneActionsAction = {
       name: "deploy",
       label: "Deploy",
       description: "Deploy the current release",
