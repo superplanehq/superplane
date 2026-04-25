@@ -58,8 +58,8 @@ func InvokeNodeTriggerAction(
 		return nil, status.Errorf(codes.NotFound, "hook not found: %v", err)
 	}
 
-	// Check if action is user accessible
-	if hookDef.Type == core.HookTypeUser {
+	// Check if hook is user accessible
+	if hookDef.Type != core.HookTypeUser {
 		return nil, status.Errorf(codes.PermissionDenied, "hook '%s' cannot be invoked by user", hookName)
 	}
 
