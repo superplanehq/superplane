@@ -19,10 +19,13 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast } from "@/lib/toast";
 
 const DEFAULT_HEADER_TOKEN_NAME = "X-Webhook-Token";
+const DEFAULT_SIGNATURE_HEADER_NAME = "X-Signature-256";
 
 interface WebhookConfiguration {
   authentication?: string;
   headerName?: string;
+  /** HTTP header for HMAC signature when authentication is "signature" */
+  signatureHeaderName?: string;
 }
 
 interface WebhookMetadata {
@@ -30,12 +33,12 @@ interface WebhookMetadata {
   authentication?: string;
 }
 
-function formatAuthenticationMethod(auth: string, headerName?: string): string {
+function formatAuthenticationMethod(auth: string, headerName?: string, signatureHeaderName?: string): string {
   switch (auth) {
     case "none":
       return "No authentication";
     case "signature":
-      return "HMAC signature";
+      return `HMAC signature (${signatureHeaderName || DEFAULT_SIGNATURE_HEADER_NAME})`;
     case "bearer":
       return "Bearer token";
     case "header_token":
@@ -140,6 +143,7 @@ export const webhookTriggerRenderer: TriggerRenderer = {
           label: formatAuthenticationMethod(
             metadata?.authentication || configuration?.authentication || "none",
             configuration?.headerName,
+            configuration?.signatureHeaderName,
           ),
         },
       ],
@@ -321,6 +325,7 @@ export const webhookCustomFieldRenderer: CustomFieldRenderer = {
     const config = node.configuration as WebhookConfiguration | undefined;
     const authMethod = config?.authentication || "none";
     const headerName = config?.headerName || DEFAULT_HEADER_TOKEN_NAME;
+    const signatureHeaderName = config?.signatureHeaderName || DEFAULT_SIGNATURE_HEADER_NAME;
     const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 
     // State to track the currently displayed secret
@@ -346,7 +351,7 @@ export SIGNATURE=$(echo -n "$PAYLOAD" \\
   | xxd -p -c 256)
 
 curl -X POST \\
-  -H "X-Signature-256: sha256=$SIGNATURE" \\
+  -H "${signatureHeaderName}: sha256=$SIGNATURE" \\
   -H "Content-Type: application/json" \\
   --data-binary "$PAYLOAD" \\
   ${webhookUrl}`;

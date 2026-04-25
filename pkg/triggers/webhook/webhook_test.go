@@ -77,6 +77,25 @@ func Test__Webhook__Setup(t *testing.T) {
 		require.Equal(t, "existing-url", metadata.URL)
 		require.Equal(t, "bearer", metadata.Authentication)
 	})
+
+	t.Run("rejects signature auth with blank signature header name", func(t *testing.T) {
+		webhook := &Webhook{}
+		metadataCtx := &contexts.MetadataContext{Metadata: Metadata{}}
+		webhookCtx := &contexts.NodeWebhookContext{}
+
+		ctx := core.TriggerContext{
+			Configuration: map[string]any{
+				"authentication":      "signature",
+				"signatureHeaderName": "  ",
+			},
+			Metadata: metadataCtx,
+			Webhook:  webhookCtx,
+		}
+
+		err := webhook.Setup(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "signature header name cannot be empty")
+	})
 }
 
 func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
@@ -151,6 +170,17 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 	})
 }
 
+func Test__Configuration__HMACSignatureHeaderName(t *testing.T) {
+	t.Run("returns default when empty or whitespace", func(t *testing.T) {
+		require.Equal(t, DefaultSignatureHeaderName, (Configuration{}).HMACSignatureHeaderName())
+		require.Equal(t, DefaultSignatureHeaderName, (Configuration{SignatureHeaderName: "  "}).HMACSignatureHeaderName())
+	})
+
+	t.Run("trims and returns custom header", func(t *testing.T) {
+		require.Equal(t, "X-Hub-Signature-256", (Configuration{SignatureHeaderName: "  X-Hub-Signature-256  "}).HMACSignatureHeaderName())
+	})
+}
+
 func Test__Webhook__HandleWebhook(t *testing.T) {
 	t.Run("rejects payloads larger than MaxEventSize", func(t *testing.T) {
 		webhook := &Webhook{}
@@ -173,7 +203,9 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 
 	t.Run("rejects missing signature header", func(t *testing.T) {
 		webhook := &Webhook{}
-		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "signature", "secret")
+		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "signature", "secret", map[string]any{
+			"signatureHeaderName": "X-Hub-Signature-256",
+		})
 
 		status, _, err := webhook.HandleWebhook(ctx)
 		require.Equal(t, http.StatusForbidden, status)
@@ -219,6 +251,36 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.True(t, ok)
 		require.Contains(t, data, "body")
 		require.Contains(t, data, "headers")
+	})
+
+	t.Run("accepts valid signature on configured custom header (GitHub)", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, eventCtx := webhookRequestContext(body, "signature", "secret", map[string]any{
+			"signatureHeaderName": "X-Hub-Signature-256",
+		})
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256="+signature)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, eventCtx.Count())
+	})
+
+	t.Run("empty signatureHeaderName in config uses default header", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"ok":true}`)
+		ctx, _ := webhookRequestContext(body, "signature", "secret", map[string]any{
+			"signatureHeaderName": "   ",
+		})
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Signature-256", "sha256="+signature)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
 	})
 
 	t.Run("rejects missing bearer token", func(t *testing.T) {
@@ -332,14 +394,21 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 	})
 }
 
-func webhookRequestContext(body []byte, authentication string, secret string) (core.WebhookRequestContext, *contexts.EventContext) {
+func webhookRequestContext(body []byte, authentication string, secret string, configExtras ...map[string]any) (core.WebhookRequestContext, *contexts.EventContext) {
 	eventCtx := &contexts.EventContext{}
 	webhookCtx := &contexts.NodeWebhookContext{Secret: secret}
+
+	cfg := map[string]any{"authentication": authentication}
+	for _, extra := range configExtras {
+		for k, v := range extra {
+			cfg[k] = v
+		}
+	}
 
 	return core.WebhookRequestContext{
 		Body:          body,
 		Headers:       http.Header{},
-		Configuration: map[string]any{"authentication": authentication},
+		Configuration: cfg,
 		Webhook:       webhookCtx,
 		Events:        eventCtx,
 	}, eventCtx
