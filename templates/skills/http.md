@@ -1,15 +1,5 @@
-# HTTP Request component
+# HTTP Request
 
-## Secure API authentication
+Use **Authorization** (org secret + key) for `Authorization` tokens, not the **Headers** list. Default prefix is `Bearer `; use an empty prefix for a raw token. If both set `Authorization`, **Authorization** wins.
 
-Use the **Authorization** section (not the generic **Headers** list) to send `Authorization` from an organization secret.
-
-- **Credential**: pick the organization secret and the key name that stores the token.
-- **Value prefix**: defaults to `Bearer ` (include the trailing space). Use an empty prefix if the secret is the full header value with no scheme.
-
-The **Headers** list remains for non-sensitive headers; if both define `Authorization`, the **Authorization** section wins at runtime.
-
-## Typical REST call
-
-- **Method** / **URL** as needed.
-- Optional **Body** (JSON, form, text, or XML) for POST/PUT/PATCH.
+For POST/PUT/PATCH, set **Method**, **URL**, and optional **Body** as needed.

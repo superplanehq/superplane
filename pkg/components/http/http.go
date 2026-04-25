@@ -49,33 +49,25 @@ type KeyValue struct {
 	Value string `json:"value"`
 }
 
-// AuthorizationSpec sets the outgoing Authorization header from an organization secret, like SSH
-// and other components that use configuration.SecretKeyRef. Generic headers are still plain
-// strings; this block is the supported way to attach a bearer (or other prefixed) token without
-// hardcoding it in header values.
 type AuthorizationSpec struct {
 	Credential configuration.SecretKeyRef `json:"credential" mapstructure:"credential"`
-	// Prefix is prepended before the secret value (e.g. "Bearer " for OAuth). If nil, defaults to
-	// "Bearer ". A non-nil empty string means no prefix (raw token only).
-	Prefix *string `json:"prefix,omitempty" mapstructure:"prefix"`
+	Prefix     *string                    `json:"prefix,omitempty" mapstructure:"prefix"`
 }
 
 type Spec struct {
-	Method         string      `json:"method"`
-	URL            string      `json:"url"`
-	QueryParams    *[]KeyValue `json:"queryParams,omitempty"`
-	Headers        *[]Header   `json:"headers,omitempty"`
-	ContentType    *string     `json:"contentType,omitempty"`
-	JSON           *any        `json:"json,omitempty"`
-	XML            *string     `json:"xml,omitempty"`
-	Text           *string     `json:"text,omitempty"`
-	FormData       *[]KeyValue `json:"formData,omitempty"`
-	TimeoutSeconds *int        `json:"timeoutSeconds,omitempty"`
-	Retry          *RetrySpec  `json:"retry,omitempty"`
-	SuccessCodes   *string     `json:"successCodes,omitempty"`
-	// Authorization: optional; when set, populates the Authorization header from an org secret.
-	// Applied after custom headers, so it overrides any generic Authorization entry in headers.
-	Authorization *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	Method         string             `json:"method"`
+	URL            string             `json:"url"`
+	QueryParams    *[]KeyValue        `json:"queryParams,omitempty"`
+	Headers        *[]Header          `json:"headers,omitempty"`
+	ContentType    *string            `json:"contentType,omitempty"`
+	JSON           *any               `json:"json,omitempty"`
+	XML            *string            `json:"xml,omitempty"`
+	Text           *string            `json:"text,omitempty"`
+	FormData       *[]KeyValue        `json:"formData,omitempty"`
+	TimeoutSeconds *int               `json:"timeoutSeconds,omitempty"`
+	Retry          *RetrySpec         `json:"retry,omitempty"`
+	SuccessCodes   *string            `json:"successCodes,omitempty"`
+	Authorization  *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
 }
 
 func (s *Spec) Timeout() time.Duration {
@@ -151,7 +143,7 @@ func (e *HTTP) Documentation() string {
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
-- **Authorization** (optional): Set the Authorization header from an organization secret (e.g. API bearer token) without putting credentials in **Headers**
+- **Authorization** (optional): token from an organization secret (not the **Headers** list)
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
@@ -241,7 +233,6 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-// validateAuthorizationForSetup rejects partial secret references (empty block is allowed).
 func validateAuthorizationForSetup(a *AuthorizationSpec) error {
 	if a == nil {
 		return nil
@@ -398,7 +389,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeObject,
 			Required:    false,
 			Togglable:   true,
-			Description: "Optional. Set the Authorization header from an organization secret (e.g. bearer token for APIs). This overrides a generic Authorization row under Headers, if both are set.",
+			Description: "Bearer or other token from an organization secret. Overrides an Authorization row under Headers if both are set.",
 			TypeOptions: &configuration.TypeOptions{
 				Object: &configuration.ObjectTypeOptions{
 					Schema: []configuration.Field{
@@ -414,7 +405,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 							Label:       "Value prefix",
 							Type:        configuration.FieldTypeString,
 							Required:    false,
-							Description: "Text before the secret value, often \"Bearer \" for OAuth. Leave default for standard bearer tokens, or clear for a raw token with no prefix.",
+							Description: "Usually \"Bearer \" (default). Clear for a raw token only.",
 							Default:     "Bearer ",
 							Placeholder: "Bearer ",
 						},
