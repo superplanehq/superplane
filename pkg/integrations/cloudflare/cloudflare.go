@@ -198,10 +198,10 @@ func (c *Cloudflare) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (c *Cloudflare) Actions() []core.Action {
-	return []core.Action{}
+func (c *Cloudflare) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (c *Cloudflare) HandleAction(ctx core.IntegrationActionContext) error {
+func (c *Cloudflare) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

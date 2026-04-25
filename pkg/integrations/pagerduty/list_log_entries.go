@@ -147,18 +147,18 @@ func (l *ListLogEntries) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (l *ListLogEntries) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *ListLogEntries) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (l *ListLogEntries) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (l *ListLogEntries) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (l *ListLogEntries) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListLogEntries) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

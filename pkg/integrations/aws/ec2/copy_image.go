@@ -408,17 +408,16 @@ func (c *CopyImage) OnIntegrationMessage(ctx core.IntegrationMessageContext) err
 	)
 }
 
-func (c *CopyImage) Actions() []core.Action {
-	return []core.Action{
+func (c *CopyImage) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "checkRuleAvailability",
-			Description:    "Check if the EventBridge rule is available",
-			UserAccessible: false,
+			Name: "checkRuleAvailability",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CopyImage) HandleAction(ctx core.ActionContext) error {
+func (c *CopyImage) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "checkRuleAvailability":
 		return c.checkRuleAvailability(ctx)
@@ -439,7 +438,7 @@ func (c *CopyImage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *CopyImage) checkRuleAvailability(ctx core.ActionContext) error {
+func (c *CopyImage) checkRuleAvailability(ctx core.ActionHookContext) error {
 	nodeMetadata := CopyImageNodeMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)

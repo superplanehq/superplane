@@ -198,18 +198,18 @@ func (m *ManageDropletPower) ProcessQueueItem(ctx core.ProcessQueueContext) (*uu
 	return ctx.DefaultProcessing()
 }
 
-func (m *ManageDropletPower) Actions() []core.Action {
-	return []core.Action{
+func (m *ManageDropletPower) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (m *ManageDropletPower) HandleAction(ctx core.ActionContext) error {
+func (m *ManageDropletPower) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {

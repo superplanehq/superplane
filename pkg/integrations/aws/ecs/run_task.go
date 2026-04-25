@@ -733,22 +733,20 @@ func (c *RunTask) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	return emitRunTaskOutput(executionCtx.ExecutionState, tasks, failures, timedOut)
 }
 
-func (c *RunTask) Actions() []core.Action {
-	return []core.Action{
+func (c *RunTask) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           runTaskCheckRuleAvailabilityAction,
-			Description:    "Check if the EventBridge rule is available",
-			UserAccessible: false,
+			Name: runTaskCheckRuleAvailabilityAction,
+			Type: core.HookTypeInternal,
 		},
 		{
-			Name:           runTaskTimeoutAction,
-			Description:    "Complete waiting execution after timeout",
-			UserAccessible: false,
+			Name: runTaskTimeoutAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *RunTask) HandleAction(ctx core.ActionContext) error {
+func (c *RunTask) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case runTaskCheckRuleAvailabilityAction:
 		return c.checkRuleAvailability(ctx)
@@ -757,7 +755,7 @@ func (c *RunTask) HandleAction(ctx core.ActionContext) error {
 		return c.handleTimeout(ctx)
 
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
@@ -918,7 +916,7 @@ func hasConfigKey(configuration any, key string) bool {
 	return exists
 }
 
-func (c *RunTask) checkRuleAvailability(ctx core.ActionContext) error {
+func (c *RunTask) checkRuleAvailability(ctx core.ActionHookContext) error {
 	metadata := RunTaskNodeMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
@@ -936,7 +934,7 @@ func (c *RunTask) checkRuleAvailability(ctx core.ActionContext) error {
 	)
 }
 
-func (c *RunTask) handleTimeout(ctx core.ActionContext) error {
+func (c *RunTask) handleTimeout(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

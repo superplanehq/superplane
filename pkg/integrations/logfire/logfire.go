@@ -196,14 +196,6 @@ func (l *Logfire) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (l *Logfire) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *Logfire) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (l *Logfire) Components() []core.Component {
 	return []core.Component{
 		&QueryLogfire{},
@@ -214,4 +206,12 @@ func (l *Logfire) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAlertReceived{},
 	}
+}
+
+func (l *Logfire) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *Logfire) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

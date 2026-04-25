@@ -490,17 +490,15 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return http.StatusOK, nil, nil
 }
 
-func (r *RunPipeline) Actions() []core.Action {
-	return []core.Action{
+func (r *RunPipeline) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
-			Description:    "Check pipeline execution status",
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 		{
-			Name:           "finish",
-			UserAccessible: true,
-			Description:    "Manually finish the execution",
+			Name: "finish",
+			Type: core.HookTypeUser,
 			Parameters: []configuration.Field{
 				{
 					Name:     "data",
@@ -513,7 +511,7 @@ func (r *RunPipeline) Actions() []core.Action {
 	}
 }
 
-func (r *RunPipeline) HandleAction(ctx core.ActionContext) error {
+func (r *RunPipeline) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return r.poll(ctx)
@@ -524,7 +522,7 @@ func (r *RunPipeline) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (r *RunPipeline) poll(ctx core.ActionContext) error {
+func (r *RunPipeline) poll(ctx core.ActionHookContext) error {
 	spec := RunPipelineSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -597,7 +595,7 @@ func (r *RunPipeline) poll(ctx core.ActionContext) error {
 	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{outputPayload})
 }
 
-func (r *RunPipeline) finish(ctx core.ActionContext) error {
+func (r *RunPipeline) finish(ctx core.ActionHookContext) error {
 	metadata := RunPipelineExecutionMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {

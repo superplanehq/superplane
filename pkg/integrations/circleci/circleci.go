@@ -93,14 +93,6 @@ func (c *CircleCI) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (c *CircleCI) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CircleCI) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 const ResourceTypePipelineDefinition = "pipeline-definition"
 
 func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -180,4 +172,12 @@ func (c *CircleCI) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnWorkflowCompleted{},
 	}
+}
+
+func (c *CircleCI) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CircleCI) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

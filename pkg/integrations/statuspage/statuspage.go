@@ -94,14 +94,6 @@ func (s *Statuspage) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (s *Statuspage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Statuspage) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (s *Statuspage) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
@@ -112,4 +104,12 @@ func (s *Statuspage) Components() []core.Component {
 
 func (s *Statuspage) Triggers() []core.Trigger {
 	return []core.Trigger{}
+}
+
+func (s *Statuspage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Statuspage) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

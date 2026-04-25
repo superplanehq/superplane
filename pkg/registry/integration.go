@@ -48,8 +48,8 @@ func (s *PanicableIntegration) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }
 
-func (s *PanicableIntegration) Actions() []core.Action {
-	return s.underlying.Actions()
+func (s *PanicableIntegration) Hooks() []core.Hook {
+	return s.underlying.Hooks()
 }
 
 func (s *PanicableIntegration) Components() []core.Component {
@@ -95,16 +95,17 @@ func (s *PanicableIntegration) Cleanup(ctx core.IntegrationCleanupContext) (err 
 	return s.underlying.Cleanup(ctx)
 }
 
-func (s *PanicableIntegration) HandleAction(ctx core.IntegrationActionContext) (err error) {
+func (s *PanicableIntegration) HandleHook(ctx core.IntegrationHookContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger.Errorf("Component %s panicked in HandleAction(): %v\nStack: %s",
+			ctx.Logger.Errorf("Integration %s panicked in HandleHook(): %v\nStack: %s",
 				s.underlying.Name(), r, debug.Stack())
-			err = fmt.Errorf("integration %s panicked in HandleAction(): %v",
+			err = fmt.Errorf("integration %s panicked in HandleHook(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
-	return s.underlying.HandleAction(ctx)
+
+	return s.underlying.HandleHook(ctx)
 }
 
 func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.IntegrationResource, err error) {

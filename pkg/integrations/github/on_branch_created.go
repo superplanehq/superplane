@@ -121,11 +121,11 @@ func (t *OnBranchCreated) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnBranchCreated) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnBranchCreated) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnBranchCreated) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnBranchCreated) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 
