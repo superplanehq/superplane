@@ -133,8 +133,8 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 						{
 							Id:   "http-1",
 							Name: "HTTP Request",
-							Type: componentpb.Node_TYPE_COMPONENT,
-							Component: &componentpb.Node_ComponentRef{
+							Type: componentpb.Node_TYPE_ACTION,
+							Action: &componentpb.Node_ActionRef{
 								Name: "http",
 							},
 							Configuration: structFromAnyMap(t, map[string]any{
@@ -145,8 +145,8 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 						{
 							Id:   "if-1",
 							Name: "If",
-							Type: componentpb.Node_TYPE_COMPONENT,
-							Component: &componentpb.Node_ComponentRef{
+							Type: componentpb.Node_TYPE_ACTION,
+							Action: &componentpb.Node_ActionRef{
 								Name: "if",
 							},
 							Configuration: structFromAnyMap(t, map[string]any{

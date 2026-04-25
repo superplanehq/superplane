@@ -1,7 +1,7 @@
 import type {
   BlueprintsBlueprint,
   CanvasesCanvas,
-  ComponentsComponent,
+  SuperplaneActionsAction,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
@@ -557,13 +557,13 @@ export class ElkLayoutEngine implements LayoutEngine {
 
   private resolveNodeOutputChannels(
     node: ComponentsNode,
-    components: ComponentsComponent[],
+    components: SuperplaneActionsAction[],
     blueprints: BlueprintsBlueprint[],
   ): string[] {
     const defaultChannels = ["default"];
 
     if (node.type === "TYPE_BLUEPRINT") {
-      const componentMeta = components.find((c) => c.name === node.component?.name);
+      const componentMeta = components.find((c) => c.name === node.action?.name);
       const blueprint = blueprints.find((candidate) => candidate.id === node.blueprint?.id);
       return (
         componentMeta?.outputChannels?.map((channel) => channel.name!).filter(Boolean) ||
@@ -572,8 +572,8 @@ export class ElkLayoutEngine implements LayoutEngine {
       );
     }
 
-    if (node.type === "TYPE_COMPONENT" && node.component?.name) {
-      const meta = components.find((component) => component.name === node.component?.name);
+    if (node.type === "TYPE_ACTION" && node.action?.name) {
+      const meta = components.find((component) => component.name === node.action?.name);
       return meta?.outputChannels?.map((channel) => channel.name!).filter(Boolean) || defaultChannels;
     }
 
@@ -582,7 +582,7 @@ export class ElkLayoutEngine implements LayoutEngine {
 
   private buildOutputChannelsByNodeId(
     workflow: CanvasesCanvas,
-    components: ComponentsComponent[],
+    components: SuperplaneActionsAction[],
     blueprints: BlueprintsBlueprint[],
   ): Map<string, string[]> {
     const map = new Map<string, string[]>();
