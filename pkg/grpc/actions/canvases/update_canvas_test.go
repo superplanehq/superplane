@@ -85,6 +85,11 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NoError(t, findErr)
 		assert.Equal(t, newName, updatedCanvas.Name)
 		assert.Equal(t, newDescription, updatedCanvas.Description)
+
+		liveVersion, findVersionErr := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, findVersionErr)
+		assert.Equal(t, newName, liveVersion.Name)
+		assert.Equal(t, newDescription, liveVersion.Description)
 	})
 
 	t.Run("duplicate name -> error", func(t *testing.T) {
@@ -131,6 +136,10 @@ func Test__UpdateCanvas(t *testing.T) {
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
 		assert.True(t, updatedCanvas.ChangeManagementEnabled)
+
+		liveVersion, findVersionErr := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, findVersionErr)
+		assert.True(t, liveVersion.ChangeManagementEnabled)
 	})
 
 	t.Run("organization change management enabled keeps effective canvas change management enabled", func(t *testing.T) {
@@ -170,6 +179,10 @@ func Test__UpdateCanvas(t *testing.T) {
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
 		assert.False(t, updatedCanvas.ChangeManagementEnabled)
+
+		liveVersion, findVersionErr := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, findVersionErr)
+		assert.False(t, liveVersion.ChangeManagementEnabled)
 	})
 
 	t.Run("organization change management disabled allows effective canvas change management to be enabled", func(t *testing.T) {
@@ -198,6 +211,10 @@ func Test__UpdateCanvas(t *testing.T) {
 		updatedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
 		require.NoError(t, findErr)
 		assert.True(t, updatedCanvas.ChangeManagementEnabled)
+
+		liveVersion, findVersionErr := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, findVersionErr)
+		assert.True(t, liveVersion.ChangeManagementEnabled)
 	})
 
 	t.Run("updates change request approval config", func(t *testing.T) {
@@ -228,6 +245,12 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.Len(t, response.Canvas.Spec.ChangeManagement.Approvals, 1)
 		assert.Equal(t, pb.Canvas_ChangeManagement_Approver_TYPE_USER, response.Canvas.Spec.ChangeManagement.Approvals[0].Type)
 		assert.Equal(t, user.ID.String(), response.Canvas.Spec.ChangeManagement.Approvals[0].UserId)
+
+		liveVersion, findVersionErr := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, findVersionErr)
+		require.Len(t, liveVersion.ChangeRequestApprovers, 1)
+		assert.Equal(t, models.CanvasChangeRequestApproverTypeUser, liveVersion.ChangeRequestApprovers[0].Type)
+		assert.Equal(t, user.ID.String(), liveVersion.ChangeRequestApprovers[0].User)
 	})
 
 	t.Run("invalid change request approval config user returns invalid argument", func(t *testing.T) {

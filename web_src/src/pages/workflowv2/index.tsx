@@ -205,7 +205,7 @@ export function WorkflowPageV2() {
     isFetching: canvasFetching,
     error: canvasError,
   } = useCanvas(organizationId!, canvasId!, {
-    enabled: !activeCanvasVersion?.metadata?.id,
+    enabled: true,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -512,14 +512,11 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
-  // changeManagement lives on Canvas.Spec but is NOT part of CanvasVersion.Spec.
-  // Optimistic cache updates that spread version.spec into canvas.spec can
-  // temporarily wipe the field, so we latch to the last truthy API value.
-  const changeManagementEnabledRef = useRef(false);
-  if (liveCanvas?.spec?.changeManagement != null) {
-    changeManagementEnabledRef.current = liveCanvas.spec.changeManagement.enabled ?? false;
-  }
-  const isChangeManagementDisabled = !changeManagementEnabledRef.current;
+  const isChangeManagementDisabled = !(
+    liveCanvasVersion?.spec?.changeManagement?.enabled ??
+    liveCanvas?.spec?.changeManagement?.enabled ??
+    false
+  );
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
@@ -1377,10 +1374,26 @@ export function WorkflowPageV2() {
 
     try {
       const response = await createCanvasVersionMutation.mutateAsync();
-      const version = response?.data?.version;
+      let version = response?.data?.version;
       if (!version) {
         showErrorToast("Failed to create canvas version");
         return;
+      }
+
+      const liveMetadata = liveCanvas?.metadata;
+      const liveSpec = liveCanvasVersion?.spec ?? liveCanvas?.spec;
+      if (version.metadata?.id && liveMetadata?.name && version.spec) {
+        const seededResponse = await updateCanvasVersionMutation.mutateAsync({
+          versionId: version.metadata.id,
+          name: liveMetadata.name,
+          description: liveMetadata.description,
+          nodes: version.spec.nodes,
+          edges: version.spec.edges,
+          changeManagement: liveSpec?.changeManagement,
+          preserveLocalCanvasState: true,
+          invalidateRelatedQueries: false,
+        });
+        version = seededResponse?.data?.version ?? version;
       }
 
       activeCanvasVersionIdRef.current = version.metadata?.id || "";
@@ -1403,6 +1416,11 @@ export function WorkflowPageV2() {
 
         return {
           ...current,
+          metadata: {
+            ...current.metadata,
+            name: liveMetadata?.name ?? current.metadata?.name,
+            description: liveMetadata?.description ?? current.metadata?.description,
+          },
           spec: { ...current.spec, ...version.spec },
         };
       });
@@ -1421,6 +1439,9 @@ export function WorkflowPageV2() {
     hasEditableVersion,
     hasUnsavedChanges,
     createCanvasVersionMutation,
+    updateCanvasVersionMutation,
+    liveCanvas,
+    liveCanvasVersion,
     queryClient,
     setSearchParams,
     setLastSavedWorkflowSnapshot,
