@@ -13,7 +13,7 @@ import type {
   BlueprintsBlueprint,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../../componentBase";
-import type { ChildExecution } from "@/ui/chainItem/ChainItem";
+import type { ChildExecution } from "@/ui/chainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 
