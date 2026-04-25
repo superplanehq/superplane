@@ -32,10 +32,7 @@ interface WebhookMetadata {
   authentication?: string;
 }
 
-function formatAuthenticationMethod(
-  auth: string,
-  options?: { headerName?: string; signatureHeader?: string },
-): string {
+function formatAuthenticationMethod(auth: string, options?: { headerName?: string; signatureHeader?: string }): string {
   switch (auth) {
     case "none":
       return "No authentication";
@@ -142,13 +139,10 @@ export const webhookTriggerRenderer: TriggerRenderer = {
         },
         {
           icon: "shield-check",
-          label: formatAuthenticationMethod(
-            metadata?.authentication || configuration?.authentication || "none",
-            {
-              headerName: configuration?.headerName,
-              signatureHeader: configuration?.signatureHeader,
-            },
-          ),
+          label: formatAuthenticationMethod(metadata?.authentication || configuration?.authentication || "none", {
+            headerName: configuration?.headerName,
+            signatureHeader: configuration?.signatureHeader,
+          }),
         },
       ],
     };
