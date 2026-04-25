@@ -20,19 +20,30 @@ import (
 )
 
 func createExecutionContext(config map[string]any) (core.ExecutionContext, *contexts.ExecutionStateContext, *contexts.MetadataContext) {
+	return createExecutionContextWithSecrets(config, nil)
+}
+
+func createExecutionContextWithSecrets(
+	config map[string]any,
+	secrets *contexts.SecretsContext,
+) (core.ExecutionContext, *contexts.ExecutionStateContext, *contexts.MetadataContext) {
 	if _, ok := config["timeoutSeconds"]; !ok {
 		config["timeoutSeconds"] = 1
 	}
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
-	return core.ExecutionContext{
+	exec := core.ExecutionContext{
 		Logger:         log.NewEntry(log.StandardLogger()),
 		Configuration:  config,
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		HTTP:           &http.Client{},
-	}, stateCtx, metadataCtx
+	}
+	if secrets != nil {
+		exec.Secrets = secrets
+	}
+	return exec, stateCtx, metadataCtx
 }
 
 func decodeMetadata(t *testing.T, metadataCtx *contexts.MetadataContext) Metadata {
@@ -284,6 +295,85 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			err := h.Setup(core.SetupContext{Configuration: tt.config})
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectErr)
+		})
+	}
+}
+
+func TestHTTP__Setup__HeaderValueValidation(t *testing.T) {
+	h := &HTTP{}
+
+	t.Run("partial flat secret is rejected", func(t *testing.T) {
+		err := h.Setup(core.SetupContext{Configuration: map[string]any{
+			"method": "GET",
+			"url":    "https://example.com",
+			"headers": []map[string]any{
+				{"name": "X-Auth", "value": "plain", "secret": "only-name"},
+			},
+		}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "both secret and key are required")
+	})
+
+	t.Run("string value and secret is rejected", func(t *testing.T) {
+		err := h.Setup(core.SetupContext{Configuration: map[string]any{
+			"method": "GET",
+			"url":    "https://example.com",
+			"headers": []map[string]any{
+				{"name": "X-Auth", "value": "plain", "secret": "s", "key": "k"},
+			},
+		}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not both")
+	})
+}
+
+func TestHTTP__Execute__GET_HeaderSecretKeyRef(t *testing.T) {
+	h := &HTTP{}
+	secretStore := &contexts.SecretsContext{Values: map[string][]byte{
+		"my-api-token/token": []byte("secret-token-value"),
+	}}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "Bearer secret-token-value", r.Header.Get("Authorization"))
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	for _, name := range []string{"flat secret fields", "nested value object"} {
+		t.Run(name, func(t *testing.T) {
+			var headers any
+			switch name {
+			case "flat secret fields":
+				headers = []map[string]any{{
+					"name":   "Authorization",
+					"value":  "",
+					"secret": "my-api-token",
+					"key":    "token",
+					"prefix": "Bearer ",
+				}}
+			case "nested value object":
+				headers = []map[string]any{{
+					"name": "Authorization",
+					"value": map[string]any{
+						"secret": "my-api-token",
+						"key":    "token",
+						"prefix": "Bearer ",
+					},
+				}}
+			}
+
+			ctx, stateCtx, _ := createExecutionContextWithSecrets(map[string]any{
+				"method":  "GET",
+				"url":     server.URL,
+				"headers": headers,
+			}, secretStore)
+
+			err := h.Execute(ctx)
+			require.NoError(t, err)
+			assert.True(t, stateCtx.Passed)
+			assert.Equal(t, "http.request.finished", stateCtx.Type)
 		})
 	}
 }

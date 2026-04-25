@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -38,9 +39,16 @@ func init() {
 	registry.RegisterAction("http", &HTTP{})
 }
 
+// Header supports a literal string value or a value resolved from an organization
+// secret (see configuration.SecretKeyRef) with an optional prefix (e.g. "Bearer " for Authorization).
 type Header struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name string `json:"name" mapstructure:"name"`
+	// Value is a plain string, or a map: { "secret", "key", "prefix" } (as in the HTTP component issue example).
+	Value any `json:"value,omitempty" mapstructure:"value"`
+	// Flat form (same as nested value.secret / value.key / value.prefix) for UIs and YAML.
+	Secret string `json:"secret,omitempty" mapstructure:"secret"`
+	Key    string `json:"key,omitempty" mapstructure:"key"`
+	Prefix string `json:"prefix,omitempty" mapstructure:"prefix"`
 }
 
 type KeyValue struct {
@@ -77,6 +85,118 @@ func (s *Spec) GetSuccessCodes() string {
 	}
 
 	return *s.SuccessCodes
+}
+
+func (h *Header) hasSecretKeyRef() bool {
+	if h.Secret != "" && h.Key != "" {
+		return true
+	}
+	if m, ok := h.Value.(map[string]any); ok {
+		secret, _ := m["secret"].(string)
+		k, _ := m["key"].(string)
+		return secret != "" && k != ""
+	}
+	return false
+}
+
+func (h *Header) secretKeyRef() (ref configuration.SecretKeyRef, prefix string) {
+	if h.Secret != "" && h.Key != "" {
+		return configuration.SecretKeyRef{Secret: h.Secret, Key: h.Key}, h.Prefix
+	}
+	if m, ok := h.Value.(map[string]any); ok {
+		secret, _ := m["secret"].(string)
+		k, _ := m["key"].(string)
+		if secret == "" || k == "" {
+			return configuration.SecretKeyRef{}, ""
+		}
+		p, _ := m["prefix"].(string)
+		if p == "" {
+			p = h.Prefix
+		}
+		return configuration.SecretKeyRef{Secret: secret, Key: k}, p
+	}
+	return configuration.SecretKeyRef{}, ""
+}
+
+func (h *Header) validate() error {
+	flatPartial := (h.Secret != "" && h.Key == "") || (h.Secret == "" && h.Key != "")
+	if flatPartial {
+		return fmt.Errorf("header %q: when using an organization secret, both secret and key are required", h.Name)
+	}
+
+	if h.Name == "" {
+		return errors.New("header: name is required for each entry in the list")
+	}
+
+	if h.Value == nil {
+		if h.Secret == "" || h.Key == "" {
+			return fmt.Errorf("header %q: set a value or reference an organization secret with secret and key", h.Name)
+		}
+		return nil
+	}
+
+	switch v := h.Value.(type) {
+	case string:
+		if v == "" {
+			if h.hasSecretKeyRef() {
+				return nil
+			}
+			return fmt.Errorf("header %q: set a value or an organization secret reference (secret and key)", h.Name)
+		}
+		if h.Secret != "" || h.Key != "" {
+			return fmt.Errorf("header %q: use a string value or top-level secret and key, not both", h.Name)
+		}
+		if h.Prefix != "" {
+			return fmt.Errorf("header %q: prefix is only used with organization secret references, not a plain value", h.Name)
+		}
+		return nil
+	case map[string]any:
+		if h.Secret != "" || h.Key != "" {
+			return fmt.Errorf("header %q: use value with secret, key, and optional prefix, or use top-level secret and key, not both", h.Name)
+		}
+		for k := range v {
+			if k != "secret" && k != "key" && k != "prefix" {
+				return fmt.Errorf("header %q: the value object may only include secret, key, and optional prefix", h.Name)
+			}
+		}
+		secret, _ := v["secret"].(string)
+		k, _ := v["key"].(string)
+		if secret == "" || k == "" {
+			return fmt.Errorf("header %q: value.secret and value.key are required for organization secret references in the value object", h.Name)
+		}
+		_, inMap := v["prefix"]
+		if inMap && h.Prefix != "" {
+			return fmt.Errorf("header %q: use either top-level prefix or value.prefix, not both", h.Name)
+		}
+		return nil
+	default:
+		return fmt.Errorf("header %q: value must be a string or an object with secret, key, and optional prefix", h.Name)
+	}
+}
+
+func (h *Header) resolvedValue(secrets core.SecretsContext) (string, error) {
+	if h.hasSecretKeyRef() {
+		if secrets == nil {
+			return "", fmt.Errorf("header %q: organization secrets are not available for this execution", h.Name)
+		}
+		ref, prefix := h.secretKeyRef()
+		if !ref.IsSet() {
+			return "", fmt.Errorf("header %q: secret reference is invalid", h.Name)
+		}
+		keyMaterial, err := secrets.GetKey(ref.Secret, ref.Key)
+		if err != nil {
+			return "", fmt.Errorf("header %q: %w", h.Name, err)
+		}
+		return prefix + string(keyMaterial), nil
+	}
+	if h.Value == nil {
+		return "", nil
+	}
+	s, ok := h.Value.(string)
+	if !ok {
+		return "", fmt.Errorf("header %q: value must be a string when not using a secret", h.Name)
+	}
+	return s, nil
 }
 
 type RetrySpec struct {
@@ -135,7 +255,7 @@ func (e *HTTP) Documentation() string {
 - **URL**: The endpoint to call (supports expressions)
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
-- **Headers**: Custom HTTP headers (header names cannot use expressions)
+- **Headers**: Custom HTTP headers (header names cannot use expressions). Header values can be a string, or reference an organization secret (name and key) with an optional prefix to prepend (for example a Bearer token prefix for the Authorization header)
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
@@ -172,6 +292,14 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 
 	if spec.Method == "" {
 		return fmt.Errorf("method is required")
+	}
+
+	if spec.Headers != nil {
+		for i := range *spec.Headers {
+			if err := (*spec.Headers)[i].validate(); err != nil {
+				return err
+			}
+		}
 	}
 
 	if spec.ContentType == nil {
@@ -317,8 +445,30 @@ func (e *HTTP) Configuration() []configuration.Field {
 								Name:        "value",
 								Type:        configuration.FieldTypeString,
 								Label:       "Header Value",
-								Required:    true,
+								Required:    false,
+								Description: "Plain text, or leave empty and set organization secret + key below",
 								Placeholder: "application/json",
+							},
+							{
+								Name:        "secret",
+								Type:        configuration.FieldTypeString,
+								Label:       "Secret (name)",
+								Required:    false,
+								Description: "Organization secret name; use with Key for sensitive header values (for example API tokens)",
+							},
+							{
+								Name:        "key",
+								Type:        configuration.FieldTypeString,
+								Label:       "Secret key",
+								Required:    false,
+								Description: "Key within the selected organization secret",
+							},
+							{
+								Name:        "prefix",
+								Type:        configuration.FieldTypeString,
+								Label:       "Prefix",
+								Required:    false,
+								Description: "Optional text before the secret value, such as a Bearer prefix with a trailing space",
 							},
 						},
 					},
@@ -534,7 +684,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 	//
 	// Handle request with retries configured
 	//
-	response, err := e.executeRequest(ctx.Logger, ctx.HTTP, spec)
+	response, err := e.executeRequest(ctx.Logger, ctx.HTTP, ctx.Secrets, spec)
 	if err == nil && e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) {
 		return e.processResponse(ctx.Metadata, ctx.ExecutionState, response, spec)
 	}
@@ -576,7 +726,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 }
 
 func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) error {
-	response, err := e.executeRequest(ctx.Logger, ctx.HTTP, spec)
+	response, err := e.executeRequest(ctx.Logger, ctx.HTTP, ctx.Secrets, spec)
 	if err != nil {
 		return ctx.ExecutionState.Emit(
 			FailureOutputChannel,
@@ -633,7 +783,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 	)
 }
 
-func (e *HTTP) executeRequest(logger *log.Entry, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
+func (e *HTTP) executeRequest(logger *log.Entry, httpCtx core.HTTPContext, secrets core.SecretsContext, spec Spec) (*http.Response, error) {
 	var body io.Reader
 	var contentType string
 	var err error
@@ -673,8 +823,13 @@ func (e *HTTP) executeRequest(logger *log.Entry, httpCtx core.HTTPContext, spec 
 	}
 
 	if spec.Headers != nil {
-		for _, header := range *spec.Headers {
-			req.Header.Set(header.Name, header.Value)
+		for i := range *spec.Headers {
+			h := &(*spec.Headers)[i]
+			val, err := h.resolvedValue(secrets)
+			if err != nil {
+				return nil, err
+			}
+			req.Header.Set(h.Name, val)
 		}
 	}
 
@@ -899,7 +1054,7 @@ func (e *HTTP) handleRetryRequest(ctx core.ActionHookContext) error {
 		return err
 	}
 
-	resp, err := e.executeRequest(ctx.Logger, ctx.HTTP, spec)
+	resp, err := e.executeRequest(ctx.Logger, ctx.HTTP, ctx.Secrets, spec)
 
 	//
 	// Handle successful scenario
