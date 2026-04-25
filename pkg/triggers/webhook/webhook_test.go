@@ -8,9 +8,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func Test__Webhook__Configuration__Validation(t *testing.T) {
+	webhook := &Webhook{}
+	fields := webhook.Configuration()
+
+	t.Run("signature mode accepts configured header", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"authentication":  "signature",
+			"signatureHeader": "X-Hub-Signature-256",
+		})
+		require.NoError(t, err)
+	})
+}
 
 func Test__Webhook__Setup(t *testing.T) {
 	t.Run("sets metadata when missing", func(t *testing.T) {
@@ -180,6 +194,32 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("rejects missing custom signature header", func(t *testing.T) {
+		webhook := &Webhook{}
+		ctx, _ := webhookRequestContextWithConfig(
+			[]byte(`{"ok":true}`),
+			map[string]any{"authentication": "signature", "signatureHeader": "X-Hub-Signature-256"},
+			"secret",
+		)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusForbidden, status)
+		require.Error(t, err)
+	})
+
+	t.Run("rejects blank-only configured signature header", func(t *testing.T) {
+		webhook := &Webhook{}
+		ctx, _ := webhookRequestContextWithConfig(
+			[]byte(`{"ok":true}`),
+			map[string]any{"authentication": "signature", "signatureHeader": "   "},
+			"secret",
+		)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusBadRequest, status)
+		require.Error(t, err)
+	})
+
 	t.Run("rejects invalid signature format", func(t *testing.T) {
 		webhook := &Webhook{}
 		ctx, _ := webhookRequestContext([]byte(`{"ok":true}`), "signature", "secret")
@@ -219,6 +259,23 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.True(t, ok)
 		require.Contains(t, data, "body")
 		require.Contains(t, data, "headers")
+	})
+
+	t.Run("accepts valid signature on configured header e.g. GitHub", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, eventCtx := webhookRequestContextWithConfig(
+			body,
+			map[string]any{"authentication": "signature", "signatureHeader": "X-Hub-Signature-256"},
+			"secret",
+		)
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256="+signature)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventCtx.Count())
 	})
 
 	t.Run("rejects missing bearer token", func(t *testing.T) {
@@ -333,13 +390,17 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 }
 
 func webhookRequestContext(body []byte, authentication string, secret string) (core.WebhookRequestContext, *contexts.EventContext) {
+	return webhookRequestContextWithConfig(body, map[string]any{"authentication": authentication}, secret)
+}
+
+func webhookRequestContextWithConfig(body []byte, configuration map[string]any, secret string) (core.WebhookRequestContext, *contexts.EventContext) {
 	eventCtx := &contexts.EventContext{}
 	webhookCtx := &contexts.NodeWebhookContext{Secret: secret}
 
 	return core.WebhookRequestContext{
 		Body:          body,
 		Headers:       http.Header{},
-		Configuration: map[string]any{"authentication": authentication},
+		Configuration: configuration,
 		Webhook:       webhookCtx,
 		Events:        eventCtx,
 	}, eventCtx
