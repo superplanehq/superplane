@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	MaxEventSize           = 64 * 1024
-	DefaultHeaderTokenName = "X-Webhook-Token"
-	DefaultSignatureHeader = "X-Signature-256"
+	MaxEventSize             = 64 * 1024
+	DefaultHeaderTokenName   = "X-Webhook-Token"
+	DefaultSignatureHeader   = "X-Signature-256"
+	MinSignatureHeaderLength = 1
 )
 
 func init() {
@@ -67,7 +68,7 @@ func (w *Webhook) Documentation() string {
 
 ## Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using an HMAC-SHA256 signature in a configurable header (default: ` + "`X-Signature-256`" + `; e.g. use ` + "`X-Hub-Signature-256`" + ` for GitHub)
+- **Signature (HMAC)**: Verify requests using an HMAC-SHA256 signature
 - **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
 - **Header Token**: Require a raw token in a custom header (default: ` + "`X-Webhook-Token`" + `)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -98,7 +99,6 @@ func (w *Webhook) Color() string {
 }
 
 func (w *Webhook) Configuration() []configuration.Field {
-	signatureHeaderStringMin := 1
 	return []configuration.Field{
 
 		{
@@ -124,17 +124,12 @@ func (w *Webhook) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Default:     DefaultSignatureHeader,
 			Placeholder: DefaultSignatureHeader,
-			Description: "HTTP header that contains the HMAC signature (values such as " + DefaultSignatureHeader + " or X-Hub-Signature-256)",
+			Description: "HTTP header that contains the HMAC signature",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authentication", Values: []string{"signature"}},
 			},
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "authentication", Values: []string{"signature"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				String: &configuration.StringTypeOptions{
-					MinLength: &signatureHeaderStringMin,
-				},
 			},
 		},
 		{
@@ -264,9 +259,6 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	switch config.Authentication {
 	case "signature":
-		if config.SignatureHeader != "" && strings.TrimSpace(config.SignatureHeader) == "" {
-			return http.StatusBadRequest, nil, fmt.Errorf("signature header name cannot be empty")
-		}
 		headerName := config.SignatureHeaderName()
 		signature := ctx.Headers.Get(headerName)
 		if signature == "" {
@@ -338,9 +330,6 @@ func (c Configuration) HeaderTokenName() string {
 	return DefaultHeaderTokenName
 }
 
-// SignatureHeaderName returns the HTTP header to read the HMAC from.
-// It defaults to DefaultSignatureHeader when unset, empty, or only whitespace, so
-// existing workflows that omit the field keep prior behavior.
 func (c Configuration) SignatureHeaderName() string {
 	if strings.TrimSpace(c.SignatureHeader) == "" {
 		return DefaultSignatureHeader
