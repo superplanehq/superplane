@@ -167,14 +167,6 @@ func (c *QueryRange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	return 200, nil, nil
 }
 
-func (c *QueryRange) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *QueryRange) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *QueryRange) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -189,4 +181,12 @@ func sanitizeQueryRangeConfiguration(config QueryRangeConfiguration) QueryRangeC
 	config.End = strings.TrimSpace(config.End)
 	config.Step = strings.TrimSpace(config.Step)
 	return config
+}
+
+func (c *QueryRange) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *QueryRange) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

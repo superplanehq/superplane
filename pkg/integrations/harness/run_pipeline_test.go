@@ -280,7 +280,7 @@ func Test__RunPipeline__Poll_EmitsSuccessForCompletedStatus(t *testing.T) {
 	executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	metadataCtx := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1", PipelineIdentifier: "deploy-prod", Status: "running"}}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           RunPipelinePollAction,
 		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
 		HTTP:           httpCtx,
@@ -312,7 +312,7 @@ func Test__RunPipeline__Poll_ReschedulesOnAPIFailure(t *testing.T) {
 	metadataCtx := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1", PipelineIdentifier: "deploy-prod", Status: "running"}}
 	requestCtx := &contexts.RequestContext{}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           RunPipelinePollAction,
 		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
 		HTTP:           httpCtx,
@@ -350,7 +350,7 @@ func Test__RunPipeline__Poll_ReschedulesWhenNotTerminal(t *testing.T) {
 	metadataCtx := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1", PipelineIdentifier: "deploy-prod", Status: "running"}}
 	requestCtx := &contexts.RequestContext{}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           RunPipelinePollAction,
 		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
 		HTTP:           httpCtx,
@@ -383,7 +383,7 @@ func Test__RunPipeline__Poll_EmitsFailed(t *testing.T) {
 	executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	metadataCtx := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1", PipelineIdentifier: "deploy-prod", Status: "running"}}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           RunPipelinePollAction,
 		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
 		HTTP:           httpCtx,
@@ -421,7 +421,7 @@ func Test__RunPipeline__Poll_EmitsFailedForErrored(t *testing.T) {
 	executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	metadataCtx := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1", PipelineIdentifier: "deploy-prod", Status: "running"}}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           RunPipelinePollAction,
 		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
 		HTTP:           httpCtx,
@@ -464,7 +464,7 @@ func Test__RunPipeline__Poll_EmitsFailedAfterMaxPollErrors(t *testing.T) {
 		},
 	}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           RunPipelinePollAction,
 		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
 		HTTP:           httpCtx,
@@ -497,7 +497,7 @@ func Test__RunPipeline__Poll_ParsesNumericTimestamps(t *testing.T) {
 	executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	metadataCtx := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1", PipelineIdentifier: "deploy-prod", Status: "running"}}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           RunPipelinePollAction,
 		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
 		HTTP:           httpCtx,

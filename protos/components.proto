@@ -48,17 +48,6 @@ service Components {
       tags: "Component";
     };
   }
-
-  rpc ListComponentActions(ListComponentActionsRequest) returns (ListComponentActionsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/components/{name}/actions"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List component actions";
-      description: "Returns available actions for a component";
-      tags: "Component";
-    };
-  }
 }
 
 message ListComponentsRequest {}

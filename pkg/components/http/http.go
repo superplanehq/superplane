@@ -864,24 +864,25 @@ func (e *HTTP) serializePayload(spec Spec) (io.Reader, string, error) {
 	}
 }
 
-func (e *HTTP) Actions() []core.Action {
-	return []core.Action{
+func (e *HTTP) Hooks() []core.Hook {
+	return []core.Hook{
 		{
 			Name: "retryRequest",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (e *HTTP) HandleAction(ctx core.ActionContext) error {
+func (e *HTTP) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "retryRequest":
 		return e.handleRetryRequest(ctx)
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (e *HTTP) handleRetryRequest(ctx core.ActionContext) error {
+func (e *HTTP) handleRetryRequest(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

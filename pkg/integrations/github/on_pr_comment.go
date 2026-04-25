@@ -73,11 +73,11 @@ func (p *OnPRComment) Setup(ctx core.TriggerContext) error {
 	return setupPRCommentTrigger(ctx, WebhookConfiguration{EventType: "issue_comment"})
 }
 
-func (p *OnPRComment) Actions() []core.Action {
-	return []core.Action{}
+func (p *OnPRComment) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *OnPRComment) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPRComment) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

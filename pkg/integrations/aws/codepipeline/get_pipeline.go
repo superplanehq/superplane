@@ -154,14 +154,6 @@ func (c *GetPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetPipeline) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetPipeline) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -171,5 +163,13 @@ func (c *GetPipeline) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *GetPipeline) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetPipeline) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetPipeline) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
