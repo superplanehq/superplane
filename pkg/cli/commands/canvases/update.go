@@ -12,6 +12,7 @@ import (
 type updateCommand struct {
 	file            *string
 	draft           *bool
+	dryRun          *bool
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
@@ -139,6 +140,13 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
 	}
 	draftMode := c.draft != nil && *c.draft
+	dryRun := c.dryRun != nil && *c.dryRun
+	if dryRun && !draftMode {
+		return fmt.Errorf("--dry-run requires --draft (validation runs against your draft without publishing)")
+	}
+	if dryRun && filePath == "" {
+		return fmt.Errorf("--dry-run requires --file")
+	}
 
 	var (
 		canvasID string
@@ -157,6 +165,24 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if dryRun {
+		cmContext, err := resolveChangeManagementContext(ctx, canvasID)
+		if err != nil {
+			return err
+		}
+		if cmContext.changeManagementEnabled && !draftMode {
+			return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
+		}
+		targetVersionID, err := findCurrentUserDraftVersionID(ctx, canvasID)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(targetVersionID) == "" {
+			return fmt.Errorf("no draft version found to validate against; run `superplane canvases update --file <path> --draft` once to create a draft, then use --dry-run")
+		}
+		return validateCanvasUpdateDryRun(ctx, canvasID, canvas, targetVersionID)
 	}
 
 	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
@@ -227,25 +253,38 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		metadata := version.GetMetadata()
-		spec := version.GetSpec()
+		return writeCanvasUpdateSuccessSummary(stdout, version)
+	})
+}
 
-		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
-		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
-		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
-		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
+func writeCanvasUpdateSuccessSummary(stdout io.Writer, version openapi_client.CanvasesCanvasVersion) error {
+	metadata := version.GetMetadata()
+	spec := version.GetSpec()
 
-		integrations := make(map[string]struct{})
-		for _, node := range spec.GetNodes() {
-			if ref, ok := node.GetIntegrationOk(); ok && ref != nil {
-				if id := ref.GetId(); id != "" {
-					integrations[id] = struct{}{}
-				}
+	_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+	_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
+	_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
+	_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
+
+	integrations := make(map[string]struct{})
+	for _, node := range spec.GetNodes() {
+		if ref, ok := node.GetIntegrationOk(); ok && ref != nil {
+			if id := ref.GetId(); id != "" {
+				integrations[id] = struct{}{}
 			}
 		}
-		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
-		return err
-	})
+	}
+	_, _ = fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
+
+	issues := collectCanvasNodeIssues(spec)
+	if len(issues) == 0 {
+		return nil
+	}
+	_, _ = fmt.Fprintln(stdout, "Node issues from validation:")
+	for _, issue := range issues {
+		_, _ = fmt.Fprintln(stdout, formatNodeIssuesLine(issue))
+	}
+	return nil
 }
 
 func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {

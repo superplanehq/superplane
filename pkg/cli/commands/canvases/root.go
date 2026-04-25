@@ -67,22 +67,29 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 
 	var updateFile string
 	var updateDraft bool
+	var updateDryRun bool
 	var updateAutoLayout string
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
 		Use:   "update [name-or-id]",
 		Short: "Update a canvas from a file",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Update a canvas from a file.
+
+Use --draft --dry-run to validate YAML against your current draft without saving
+(useful for CI and agent loops). Dry-run calls the same server-side validation as apply.`,
+		Args: cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
+	updateCmd.Flags().BoolVar(&updateDryRun, "dry-run", false, "validate the update against your draft without persisting (requires --draft)")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(updateCmd, &updateCommand{
 		file:            &updateFile,
 		draft:           &updateDraft,
+		dryRun:          &updateDryRun,
 		autoLayout:      &updateAutoLayout,
 		autoLayoutScope: &updateAutoLayoutScope,
 		autoLayoutNodes: &updateAutoLayoutNodes,

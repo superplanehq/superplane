@@ -418,6 +418,94 @@ func TestUpdateFromFileDisableChangeManagementFailsWhenOrganizationEnforcesIt(t 
 	})
 }
 
+func TestUpdateDryRunRequiresDraftFlag(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	content := []byte(
+		"apiVersion: v1\n" +
+			"kind: Canvas\n" +
+			"metadata:\n" +
+			"  id: " + canvasID + "\n" +
+			"  name: dry-run-test\n" +
+			"spec:\n" +
+			"  nodes: []\n" +
+			"  edges: []\n",
+	)
+	require.NoError(t, os.WriteFile(filePath, content, 0o644))
+
+	draft := false
+	dryRun := true
+	file := filePath
+	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
+
+	err := (&updateCommand{file: &file, draft: &draft, dryRun: &dryRun}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--dry-run requires --draft")
+}
+
+func TestUpdateDryRunNoChangesAgainstDraft(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	versionID := "ver-draft-1"
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"dry-run"},"spec":{"changeManagement":{"enabled":false}}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"` + versionID + `","canvasId":"` + canvasID + `","isPublished":false}}]}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions/" + versionID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
+			},
+		},
+	)
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	content := []byte(
+		"apiVersion: v1\n" +
+			"kind: Canvas\n" +
+			"metadata:\n" +
+			"  id: " + canvasID + "\n" +
+			"  name: dry-run-test\n" +
+			"spec:\n" +
+			"  nodes: []\n" +
+			"  edges: []\n",
+	)
+	require.NoError(t, os.WriteFile(filePath, content, 0o644))
+
+	file := filePath
+	draft := true
+	dryRun := true
+	ctx, stdout := newCreateCommandContextForTest(t, server.server, "text")
+
+	err := (&updateCommand{file: &file, draft: &draft, dryRun: &dryRun}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), "Dry-run: no changes")
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions/" + versionID,
+	})
+}
+
 func writeTestCanvasFileWithChangeManagementEnabled(t *testing.T, canvasID string, enabled bool) string {
 	t.Helper()
 
