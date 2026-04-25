@@ -51,7 +51,7 @@ function buildComponentContext(componentName: string, nodeOverrides?: Partial<No
     lastExecutions: [],
     currentUser: undefined,
     actions: {
-      invokeNodeExecutionAction: async () => {},
+      invokeNodeExecutionHook: async () => {},
     },
   };
 }

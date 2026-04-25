@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func InvokeNodeTriggerAction(
+func InvokeNodeTriggerHook(
 	ctx context.Context,
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
@@ -32,7 +32,7 @@ func InvokeNodeTriggerAction(
 	hookName string,
 	parameters map[string]any,
 	webhookBaseURL string,
-) (*pb.InvokeNodeTriggerActionResponse, error) {
+) (*pb.InvokeNodeTriggerHookResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -117,7 +117,7 @@ func InvokeNodeTriggerAction(
 		return nil, status.Errorf(codes.Internal, "failed to create result struct: %v", err)
 	}
 
-	return &pb.InvokeNodeTriggerActionResponse{
+	return &pb.InvokeNodeTriggerHookResponse{
 		Result: resultStruct,
 	}, nil
 }
