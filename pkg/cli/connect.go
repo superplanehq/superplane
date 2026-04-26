@@ -51,6 +51,10 @@ func (c *ConnectCommand) Execute(ctx core.CommandContext) error {
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 			_, err := fmt.Fprintf(stdout, "Connected to %q (%s)\n", orgName, baseURL)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(stdout, "%s\n", core.AgentSkillsHint())
 			return err
 		})
 	}

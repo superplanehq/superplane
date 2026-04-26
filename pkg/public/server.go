@@ -1089,7 +1089,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
 
-	return s.executeComponentNode(ctx, body, headers, node, onNewEvents)
+	return s.executeActionNode(ctx, body, headers, node, onNewEvents)
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
@@ -1127,11 +1127,11 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
-	component, err := s.registry.GetComponent(ref.Component.Name)
+	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("component not found: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("action not found: %w", err)
 	}
 
 	logger := logging.ForNode(node)
@@ -1147,7 +1147,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
-	return component.HandleWebhook(core.WebhookRequestContext{
+	return action.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),

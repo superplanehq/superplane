@@ -10,6 +10,6 @@ import (
 
 func ListComponents(ctx context.Context, registry *registry.Registry) (*pb.ListComponentsResponse, error) {
 	return &pb.ListComponentsResponse{
-		Components: actions.SerializeComponents(registry.ListComponents()),
+		Components: actions.SerializeActions(registry.ListActions()),
 	}, nil
 }

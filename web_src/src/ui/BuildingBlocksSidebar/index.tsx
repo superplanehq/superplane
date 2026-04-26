@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { CategorySection } from "./CategorySection";
+import { findFirstVisibleBlock, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 export type { AgentContext, AgentMode } from "@/components/AgentSidebar/agentChat";
@@ -24,6 +25,13 @@ export interface BuildingBlocksSidebarProps {
   disabled?: boolean;
   disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
+  /**
+   * Called when the user submits the filter input (presses Enter) and at least
+   * one block matches the current filter. Receives the first visible block in
+   * the same order the sidebar renders them. No-op when the filter is empty
+   * or has zero matches — the caller never has to handle a "no block" case.
+   */
+  onEnterSubmit?: (block: BuildingBlock) => void;
 }
 
 export function BuildingBlocksSidebar({
@@ -35,6 +43,7 @@ export function BuildingBlocksSidebar({
   disabled = false,
   disabledMessage,
   onBlockClick,
+  onEnterSubmit,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
 
@@ -51,6 +60,7 @@ export function BuildingBlocksSidebar({
       disabled={disabled}
       disabledTooltip={disabledTooltip}
       onBlockClick={onBlockClick}
+      onEnterSubmit={onEnterSubmit}
     />
   );
 }
@@ -63,6 +73,7 @@ interface OpenBuildingBlocksSidebarProps {
   disabled: boolean;
   disabledTooltip: string;
   onBlockClick?: (block: BuildingBlock) => void;
+  onEnterSubmit?: (block: BuildingBlock) => void;
 }
 
 function OpenBuildingBlocksSidebar({
@@ -73,9 +84,10 @@ function OpenBuildingBlocksSidebar({
   disabled,
   disabledTooltip,
   onBlockClick,
+  onEnterSubmit,
 }: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "component">("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isDraggingRef = useRef(false);
@@ -239,6 +251,20 @@ function OpenBuildingBlocksSidebar({
               className="pl-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || disabled || !onEnterSubmit) {
+                  return;
+                }
+                if (searchTerm.trim().length === 0) {
+                  return;
+                }
+                const firstBlock = findFirstVisibleBlock(sortedCategories, searchTerm, typeFilter);
+                if (!firstBlock) {
+                  return;
+                }
+                e.preventDefault();
+                onEnterSubmit(firstBlock);
+              }}
             />
           </div>
           <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>

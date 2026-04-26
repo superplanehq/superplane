@@ -123,8 +123,9 @@ func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.S
 	}
 	for i, opt := range opts.Options {
 		pbOpts.Options[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -136,12 +137,14 @@ func multiSelectTypeOptionsToProto(opts *configuration.MultiSelectTypeOptions) *
 	}
 
 	pbOpts := &configpb.MultiSelectTypeOptions{
-		Options: make([]*configpb.SelectOption, len(opts.Options)),
+		Options:       make([]*configpb.SelectOption, len(opts.Options)),
+		UseCheckboxes: opts.UseCheckboxes,
 	}
 	for i, opt := range opts.Options {
 		pbOpts.Options[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -248,8 +251,9 @@ func anyPredicateListTypeOptionsToProto(opts *configuration.AnyPredicateListType
 	}
 	for i, opt := range opts.Operators {
 		pbOpts.Operators[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -400,8 +404,9 @@ func protoToSelectTypeOptions(pbOpts *configpb.SelectTypeOptions) *configuration
 	}
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -413,12 +418,14 @@ func protoToMultiSelectTypeOptions(pbOpts *configpb.MultiSelectTypeOptions) *con
 	}
 
 	opts := &configuration.MultiSelectTypeOptions{
-		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
+		Options:       make([]configuration.FieldOption, len(pbOpts.Options)),
+		UseCheckboxes: pbOpts.UseCheckboxes,
 	}
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -575,8 +582,9 @@ func protoToAnyPredicateListTypeOptions(pbOpts *configpb.AnyPredicateListTypeOpt
 	}
 	for i, pbOpt := range pbOpts.Operators {
 		opts.Operators[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -1031,10 +1039,10 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	}
 }
 
-func SerializeComponents(in []core.Component) []*componentpb.Component {
+func SerializeActions(in []core.Action) []*componentpb.Component {
 	out := make([]*componentpb.Component, len(in))
-	for i, component := range in {
-		outputChannels := component.OutputChannels(nil)
+	for i, action := range in {
+		outputChannels := action.OutputChannels(nil)
 		channels := make([]*componentpb.OutputChannel, len(outputChannels))
 		for j, channel := range outputChannels {
 			channels[j] = &componentpb.OutputChannel{
@@ -1042,19 +1050,19 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 			}
 		}
 
-		configFields := component.Configuration()
+		configFields := action.Configuration()
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
 		}
-		exampleOutput, _ := structpb.NewStruct(component.ExampleOutput())
+		exampleOutput, _ := structpb.NewStruct(action.ExampleOutput())
 
 		out[i] = &componentpb.Component{
-			Name:           component.Name(),
-			Label:          component.Label(),
-			Description:    component.Description(),
-			Icon:           component.Icon(),
-			Color:          component.Color(),
+			Name:           action.Name(),
+			Label:          action.Label(),
+			Description:    action.Description(),
+			Icon:           action.Icon(),
+			Color:          action.Color(),
 			OutputChannels: channels,
 			Configuration:  configuration,
 			ExampleOutput:  exampleOutput,

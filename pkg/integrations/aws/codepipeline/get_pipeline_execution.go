@@ -195,14 +195,6 @@ func (c *GetPipelineExecution) ProcessQueueItem(ctx core.ProcessQueueContext) (*
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetPipelineExecution) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetPipelineExecution) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetPipelineExecution) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -212,5 +204,13 @@ func (c *GetPipelineExecution) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *GetPipelineExecution) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetPipelineExecution) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetPipelineExecution) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

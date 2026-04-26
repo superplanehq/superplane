@@ -229,11 +229,11 @@ func (t *OnMention) OnIntegrationMessage(ctx core.IntegrationMessageContext) err
 	return ctx.Events.Emit("teams.bot.mention", ctx.Message)
 }
 
-func (t *OnMention) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnMention) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnMention) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnMention) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

@@ -10,6 +10,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "canvases",
 		Short:   "Manage canvases",
+		Long:    core.AgentSkillsHelp(),
 		Aliases: []string{"canvas"},
 	}
 
@@ -46,7 +47,12 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create [canvas-name]",
 		Short: "Create a canvas",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Create a canvas by name or from a file.
+
+AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
+- ` + core.SkillsInstallCommand("superplane-canvas-builder") + `
+- ` + core.SkillsInstallCommand("superplane-cli"),
+		Args: cobra.MaximumNArgs(1),
 	}
 	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
 	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")

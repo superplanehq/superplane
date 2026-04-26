@@ -54,6 +54,7 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 			_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", response.User.GetOrganizationId())
 			_, _ = fmt.Fprintf(stdout, "Organization: %s\n", organizationLabel)
 			_, _ = fmt.Fprintf(stdout, "Change Management: %s\n", changeManagementLabel)
+			_, _ = fmt.Fprintf(stdout, "\n%s\n", core.AgentSkillsHint())
 			return nil
 		})
 	}

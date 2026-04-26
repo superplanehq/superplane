@@ -23,7 +23,7 @@ const (
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func init() {
-	registry.RegisterComponent("ssh", &SSHCommand{})
+	registry.RegisterAction("ssh", &SSHCommand{})
 }
 
 type SSHCommand struct{}
@@ -419,7 +419,7 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	return c.executeSSH(execCtx)
 }
 
-func (c *SSHCommand) HandleAction(ctx core.ActionContext) error {
+func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "connectionRetry" {
 		if ctx.ExecutionState.IsFinished() {
 			return nil
@@ -645,9 +645,12 @@ func (c *SSHCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (c *SSHCommand) Actions() []core.Action {
-	return []core.Action{
-		{Name: "connectionRetry"},
+func (c *SSHCommand) Hooks() []core.Hook {
+	return []core.Hook{
+		{
+			Name: "connectionRetry",
+			Type: core.HookTypeInternal,
+		},
 	}
 }
 

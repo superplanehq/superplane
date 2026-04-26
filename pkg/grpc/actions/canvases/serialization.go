@@ -262,6 +262,11 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 	// Find shadowed names within connected components
 	nodeWarnings := actions.FindShadowedNameWarnings(canvas.Spec.Nodes, canvas.Spec.Edges)
+	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
+	nodesByID := make(map[string]models.Node, len(nodes))
+	for _, node := range nodes {
+		nodesByID[node.ID] = node
+	}
 
 	for i, edge := range canvas.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -283,10 +288,17 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
+
+		if err := changesets.ValidateSourceNodeOutputChannel(
+			registry,
+			nodesByID[edge.SourceId],
+			edge.Channel,
+		); err != nil {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: %v", i, err)
+		}
 	}
 
 	// Convert proto nodes to models, adding validation errors and warnings where applicable
-	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
 	edges := actions.ProtoToEdges(canvas.Spec.Edges)
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
@@ -323,12 +335,12 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("component name is required")
 		}
 
-		component, err := findAndValidateComponent(registry, organizationID, node)
+		action, err := findAndValidateAction(registry, organizationID, node)
 		if err != nil {
 			return err
 		}
 
-		return configuration.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
+		return configuration.ValidateConfiguration(action.Configuration(), node.Configuration.AsMap())
 
 	case compb.Node_TYPE_BLUEPRINT:
 		if node.Blueprint == nil {
@@ -409,14 +421,14 @@ func findAndValidateWidget(registry *registry.Registry, organizationID string, n
 	return registry.GetWidget(node.Widget.Name)
 }
 
-func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (core.Component, error) {
+func findAndValidateAction(registry *registry.Registry, organizationID string, node *compb.Node) (core.Action, error) {
 	parts := strings.SplitN(node.Component.Name, ".", 2)
 	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid component name: %s", node.Component.Name)
+		return nil, fmt.Errorf("invalid action name: %s", node.Component.Name)
 	}
 
 	if len(parts) == 1 {
-		return registry.GetComponent(parts[0])
+		return registry.GetAction(parts[0])
 	}
 
 	err := validateIntegration(organizationID, node.Integration)
@@ -424,7 +436,7 @@ func findAndValidateComponent(registry *registry.Registry, organizationID string
 		return nil, err
 	}
 
-	return registry.GetIntegrationComponent(parts[0], node.Component.Name)
+	return registry.GetIntegrationAction(parts[0], node.Component.Name)
 }
 
 func validateIntegration(organizationID string, ref *compb.IntegrationRef) error {

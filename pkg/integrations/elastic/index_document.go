@@ -179,13 +179,19 @@ func (c *IndexDocument) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *IndexDocument) Actions() []core.Action                  { return nil }
-func (c *IndexDocument) HandleAction(_ core.ActionContext) error { return nil }
-func (c *IndexDocument) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *IndexDocument) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *IndexDocument) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *IndexDocument) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *IndexDocument) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 func (c *IndexDocument) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *IndexDocument) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *IndexDocument) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

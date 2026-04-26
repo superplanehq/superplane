@@ -224,11 +224,11 @@ func (t *OnMessage) OnIntegrationMessage(ctx core.IntegrationMessageContext) err
 	return ctx.Events.Emit("teams.channel.message", ctx.Message)
 }
 
-func (t *OnMessage) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnMessage) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnMessage) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnMessage) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

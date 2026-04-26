@@ -132,8 +132,8 @@ func (p *PagerDuty) Configuration() []configuration.Field {
 	}
 }
 
-func (p *PagerDuty) Components() []core.Component {
-	return []core.Component{
+func (p *PagerDuty) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 		&UpdateIncident{},
 		&AcknowledgeIncident{},
@@ -321,10 +321,10 @@ func (r *TokenResponse) GetExpiration() time.Duration {
 	return time.Hour
 }
 
-func (p *PagerDuty) Actions() []core.Action {
-	return []core.Action{}
+func (p *PagerDuty) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *PagerDuty) HandleAction(ctx core.IntegrationActionContext) error {
+func (p *PagerDuty) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

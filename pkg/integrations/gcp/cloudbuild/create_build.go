@@ -885,7 +885,7 @@ func completeCreateBuildExecution(executionState core.ExecutionStateContext, bui
 	return executionState.Emit(createBuildFailedOutputChannel, createBuildPayloadType, []any{build})
 }
 
-func (c *CreateBuild) poll(ctx core.ActionContext) error {
+func (c *CreateBuild) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -940,16 +940,16 @@ func (c *CreateBuild) poll(ctx core.ActionContext) error {
 	return completeCreateBuildExecution(ctx.ExecutionState, build)
 }
 
-func (c *CreateBuild) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateBuild) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           createBuildPollAction,
-			UserAccessible: false,
+			Name: createBuildPollAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateBuild) HandleAction(ctx core.ActionContext) error {
+func (c *CreateBuild) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case createBuildPollAction:
 		return c.poll(ctx)
