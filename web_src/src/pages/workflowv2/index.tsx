@@ -565,18 +565,18 @@ export function WorkflowPageV2() {
   const [isMemoryViewModalOpen, setIsMemoryViewModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
-      return true;
+      return false;
     }
 
     const stored = window.localStorage.getItem(CANVAS_VERSION_CONTROL_STORAGE_KEY);
     if (stored === null) {
-      return true;
+      return false;
     }
 
     try {
       return JSON.parse(stored) as boolean;
     } catch {
-      return true;
+      return false;
     }
   });
   /** After creating a change request, hide draft Discard until the user enters edit mode again. */
