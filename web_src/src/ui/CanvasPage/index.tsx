@@ -35,7 +35,6 @@ import {
 } from "react";
 
 import type {
-  BlueprintsBlueprint,
   CanvasChangesetChange,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
@@ -314,7 +313,6 @@ export interface CanvasPageProps {
   workflowNodes?: ComponentsNode[];
   components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
 
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -1256,7 +1254,6 @@ function CanvasPage(props: CanvasPageProps) {
             workflowNodes={props.workflowNodes}
             components={props.components}
             triggers={props.triggers}
-            blueprints={props.blueprints}
             onHighlightedNodesChange={setHighlightedNodeIds}
             focusRequest={props.focusRequest}
             onExecutionChainHandled={props.onExecutionChainHandled}
@@ -1320,7 +1317,6 @@ function Sidebar({
   workflowNodes,
   components,
   triggers,
-  blueprints,
   onHighlightedNodesChange,
   focusRequest,
   onExecutionChainHandled,
@@ -1371,7 +1367,6 @@ function Sidebar({
   workflowNodes?: ComponentsNode[];
   components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
@@ -1547,7 +1542,6 @@ function Sidebar({
       workflowNodes={workflowNodes}
       actions={components}
       triggers={triggers}
-      blueprints={blueprints}
       onHighlightedNodesChange={onHighlightedNodesChange}
       executionChainEventId={focusRequest?.executionChain?.eventId || null}
       executionChainExecutionId={focusRequest?.executionChain?.executionId || null}

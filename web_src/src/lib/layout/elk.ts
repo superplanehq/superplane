@@ -1,9 +1,4 @@
-import type {
-  BlueprintsBlueprint,
-  CanvasesCanvas,
-  SuperplaneActionsAction,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
+import type { CanvasesCanvas, SuperplaneActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
 
@@ -52,11 +47,7 @@ export class ElkLayoutEngine implements LayoutEngine {
       return workflow;
     }
 
-    const outputChannelsByNodeId = this.buildOutputChannelsByNodeId(
-      workflow,
-      options?.components || [],
-      options?.blueprints || [],
-    );
+    const outputChannelsByNodeId = this.buildOutputChannelsByNodeId(workflow, options?.components || []);
     const layoutedPositions = await this.resolvePackedLayoutedPositions(workflow, layoutNodes, outputChannelsByNodeId);
 
     if (layoutedPositions.size === 0) {
@@ -555,22 +546,8 @@ export class ElkLayoutEngine implements LayoutEngine {
     });
   }
 
-  private resolveNodeOutputChannels(
-    node: ComponentsNode,
-    components: SuperplaneActionsAction[],
-    blueprints: BlueprintsBlueprint[],
-  ): string[] {
+  private resolveNodeOutputChannels(node: ComponentsNode, components: SuperplaneActionsAction[]): string[] {
     const defaultChannels = ["default"];
-
-    if (node.type === "TYPE_BLUEPRINT") {
-      const componentMeta = components.find((c) => c.name === node.component);
-      const blueprint = blueprints.find((candidate) => candidate.id === node.component);
-      return (
-        componentMeta?.outputChannels?.map((channel) => channel.name!).filter(Boolean) ||
-        blueprint?.outputChannels?.map((channel) => channel.name!).filter(Boolean) ||
-        defaultChannels
-      );
-    }
 
     if (node.type === "TYPE_ACTION" && node.component) {
       const meta = components.find((component) => component.name === node.component);
@@ -583,7 +560,6 @@ export class ElkLayoutEngine implements LayoutEngine {
   private buildOutputChannelsByNodeId(
     workflow: CanvasesCanvas,
     components: SuperplaneActionsAction[],
-    blueprints: BlueprintsBlueprint[],
   ): Map<string, string[]> {
     const map = new Map<string, string[]>();
     for (const node of workflow.spec?.nodes || []) {
@@ -591,7 +567,7 @@ export class ElkLayoutEngine implements LayoutEngine {
         continue;
       }
 
-      map.set(node.id, this.resolveNodeOutputChannels(node, components, blueprints));
+      map.set(node.id, this.resolveNodeOutputChannels(node, components));
     }
 
     return map;

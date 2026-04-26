@@ -790,8 +790,6 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 
 func NodeTypeToProto(nodeType string) componentpb.Node_Type {
 	switch nodeType {
-	case models.NodeTypeBlueprint:
-		return componentpb.Node_TYPE_BLUEPRINT
 	case models.NodeTypeTrigger:
 		return componentpb.Node_TYPE_TRIGGER
 	case models.NodeTypeWidget:

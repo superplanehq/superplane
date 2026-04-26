@@ -9,9 +9,8 @@ option go_package = "github.com/superplanehq/superplane/pkg/protos/components";
 message Node {
   enum Type {
     TYPE_ACTION = 0;
-    TYPE_BLUEPRINT = 1;
-    TYPE_TRIGGER = 2;
-    TYPE_WIDGET = 3;
+    TYPE_TRIGGER = 1;
+    TYPE_WIDGET = 2;
   }
 
   string id = 1;
