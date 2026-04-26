@@ -130,7 +130,9 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
 
