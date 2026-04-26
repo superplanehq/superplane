@@ -681,7 +681,7 @@ func ProtoToNodes(registry *registry.Registry, nodes []*componentpb.Node) []mode
 			warningMessage = node.WarningMessage
 		}
 
-		nodeType, nodeRef := ComponentToNodeTypeAndRef(registry, node.Type, node.Component)
+		nodeType, nodeRef := ComponentToNodeTypeAndRef(node.Type, node.Component)
 
 		//
 		// NOTE: we do not include metadata in here,
@@ -705,7 +705,7 @@ func ProtoToNodes(registry *registry.Registry, nodes []*componentpb.Node) []mode
 	return result
 }
 
-func ComponentToNodeTypeAndRef(registry *registry.Registry, nodeType componentpb.Node_Type, component string) (string, *models.NodeRef) {
+func ComponentToNodeTypeAndRef(nodeType componentpb.Node_Type, component string) (string, *models.NodeRef) {
 	switch nodeType {
 	case componentpb.Node_TYPE_ACTION:
 		return models.NodeTypeComponent, &models.NodeRef{
