@@ -663,7 +663,7 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 	return field
 }
 
-func ProtoToNodes(registry *registry.Registry, nodes []*componentpb.Node) []models.Node {
+func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		var integrationID *string
