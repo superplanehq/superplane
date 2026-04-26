@@ -67,6 +67,9 @@ blocks:
         - name: "Check: Example Payloads"
           commands:
             - make check.example.payloads
+        - name: "Check: Canvas templates"
+          commands:
+            - make check.templates
         - name: "Check: Generated Artifacts"
           commands:
             - make check.generated.artifacts
