@@ -55,6 +55,7 @@ func (s *TestContext) Start() {
 	os.Setenv("PUBLIC_API_PORT", "8001")
 	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
 	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
+	os.Setenv("ALLOWED_WS_ORIGINS", "http://127.0.0.1:8001")
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
