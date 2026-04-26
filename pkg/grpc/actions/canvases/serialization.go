@@ -259,7 +259,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	}
 
 	// Find shadowed names within connected components
-	nodes := actions.ProtoToNodes(registry, canvas.Spec.Nodes)
+	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
 	nodeWarnings := actions.FindShadowedNameWarnings(registry, canvas.Spec.Nodes, canvas.Spec.Edges)
 	nodesByID := make(map[string]models.Node, len(nodes))
 	for _, node := range nodes {
