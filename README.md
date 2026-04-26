@@ -14,7 +14,7 @@ use such as Git, CI/CD, observability, incident response, infra, and notificatio
   <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
 </p>
 
-This project is in alpha stage and moving quickly. Expect rough edges and occasional
+This project is in the alpha stage and moving quickly. Expect rough edges and occasional
 breaking changes while we stabilize the core model and integrations.
 If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
 Early feedback is extremely valuable.
@@ -43,6 +43,11 @@ A few concrete things teams build with SuperPlane:
 - **Progressive delivery (10% → 30% → 60% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
 - **Release train with a multi-repo ship set**: wait for tags/builds from a set of services, fan-in once all are ready, then dispatch a coordinated deploy.
 - **“First 5 minutes” incident triage**: on incident created, fetch context in parallel (recent deploys + health signals), generate an evidence pack, and open an issue.
+
+## Prerequisites
+
+- Docker installed on your system
+- Basic knowledge of running containers
 
 ## Quick start
 
