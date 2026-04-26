@@ -1,19 +1,13 @@
-package templates
+package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
-	"testing"
 
-	"github.com/ghodss/yaml"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/protobuf/encoding/protojson"
+	"github.com/superplanehq/superplane/pkg/templates"
 
 	// Register the same actions, triggers, and integrations that production uses, so
 	// template YAMLs validate like seeding does.
@@ -84,61 +78,19 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
-// templateDirForTest returns the repo's templates/canvases directory, independent of
-// TEMPLATE_DIR, so CI and local go test can validate the same files as the server
-// (which sets TEMPLATE_DIR at deploy time).
-func templateDirForTest(t *testing.T) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller(0) failed")
-	}
-	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
-	return filepath.Join(repoRoot, "templates", "canvases")
-}
-
-// TestCanvasesTemplatesParse like SeedTemplates' canvas parsing, ensure every
-// built-in template YAML is valid and passes edge and component validation.
-func TestCanvasesTemplatesParse(t *testing.T) {
+func main() {
 	reg, err := registry.NewRegistry(crypto.NewNoOpEncryptor(), registry.HTTPOptions{})
 	if err != nil {
-		t.Fatalf("registry: %v", err)
-	}
-	orgID := models.TemplateOrganizationID.String()
-
-	dir := templateDirForTest(t)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read %s: %v", dir, err)
+		exitWithError(err)
 	}
 
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
-			continue
-		}
-		path := filepath.Join(dir, e.Name())
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read %s: %v", path, err)
-		}
-		jsonData, err := yaml.YAMLToJSON(data)
-		if err != nil {
-			t.Fatalf("%s: yaml to json: %v", e.Name(), err)
-		}
-		var canvas pb.Canvas
-		if err := protojson.Unmarshal(jsonData, &canvas); err != nil {
-			t.Fatalf("%s: protojson: %v", e.Name(), err)
-		}
-		if canvas.Metadata == nil {
-			t.Fatalf("%s: missing metadata", e.Name())
-		}
-		if canvas.Metadata.Name == "" {
-			t.Fatalf("%s: missing name", e.Name())
-		}
-		canvas.Metadata.IsTemplate = true
-		_, _, err = canvases.ParseCanvas(reg, orgID, &canvas)
-		if err != nil {
-			t.Fatalf("%s: ParseCanvas: %v", e.Name(), err)
-		}
+	dir := filepath.Join("templates", "canvases")
+	if err := templates.ValidateCanvasTemplates(reg, dir); err != nil {
+		exitWithError(err)
 	}
+}
+
+func exitWithError(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
 }
