@@ -67,7 +67,6 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
               email: accountData.email,
               name: accountData.name,
               installation_admin: accountData.installation_admin,
-              is_internal: accountData.email.endsWith("@superplane.com"),
             });
           }
         }
