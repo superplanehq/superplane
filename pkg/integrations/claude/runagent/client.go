@@ -1,20 +1,40 @@
-package claude
+package runagent
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// Managed session API (Claude Managed Agents). See
-// https://platform.claude.com/docs/en/managed-agents/sessions
+const (
+	defaultBaseURL             = "https://api.anthropic.com/v1"
+	anthropicVersionValue      = "2023-06-01"
+	anthropicBetaManagedAgents = "managed-agents-2026-04-01"
+)
+
+type Client struct {
+	APIKey  string
+	BaseURL string
+	http    core.HTTPContext
+}
+
+type claudeErrorResponse struct {
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
 
 // CreateManagedSessionRequest is the body for POST /v1/sessions.
 type CreateManagedSessionRequest struct {
-	// Agent is the agent ID string, or use AgentPin for a specific version.
+	// Agent is the agent ID string, or use AgentID/AgentVersion for a specific version.
 	Agent string
 	// AgentID and AgentVersion pin the session to a version when both are set.
 	AgentID       string
@@ -27,6 +47,16 @@ type CreateManagedSessionRequest struct {
 type ManagedSession struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
+}
+
+type ManagedSessionEvent struct {
+	Type    string                       `json:"type"`
+	Content []ManagedSessionContentBlock `json:"content"`
+}
+
+type ManagedSessionContentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
 }
 
 // createManagedSessionBody is the JSON body for session creation.
@@ -49,6 +79,28 @@ type userMessageEvent struct {
 // sendSessionEventsRequest wraps events for POST .../sessions/{id}/events.
 type sendSessionEventsRequest struct {
 	Events []userMessageEvent `json:"events"`
+}
+
+type listSessionEventsResponse struct {
+	Data     []ManagedSessionEvent `json:"data"`
+	NextPage string                `json:"next_page"`
+}
+
+func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("no integration context")
+	}
+
+	apiKey, err := ctx.GetConfig("apiKey")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		APIKey:  string(apiKey),
+		BaseURL: defaultBaseURL,
+		http:    httpClient,
+	}, nil
 }
 
 // buildCreateSessionBody maps CreateManagedSessionRequest to JSON.
@@ -139,6 +191,97 @@ func (c *Client) GetManagedSession(sessionID string) (*ManagedSession, error) {
 	return &out, nil
 }
 
+func (c *Client) ListManagedSessionEvents(sessionID string) ([]ManagedSessionEvent, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("session id is required")
+	}
+
+	var events []ManagedSessionEvent
+	page := ""
+	for {
+		params := url.Values{}
+		params.Set("limit", "1000")
+		params.Set("order", "asc")
+		if page != "" {
+			params.Set("page", page)
+		}
+
+		URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/events?" + params.Encode()
+		responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
+		if err != nil {
+			return nil, err
+		}
+
+		var out listSessionEventsResponse
+		if err := json.Unmarshal(responseBody, &out); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal session events: %w", err)
+		}
+		events = append(events, out.Data...)
+		if out.NextPage == "" {
+			return events, nil
+		}
+		page = out.NextPage
+	}
+}
+
+func (c *Client) GetLastManagedSessionAgentMessage(sessionID string) (string, error) {
+	events, err := c.ListManagedSessionEvents(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return lastAgentMessageFromEvents(events), nil
+}
+
+func (c *Client) GetLastManagedSessionAgentMessageWithRetry(sessionID string, attempts int, delay time.Duration) (string, []ManagedSessionEvent, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var events []ManagedSessionEvent
+	for i := 0; i < attempts; i++ {
+		var err error
+		events, err = c.ListManagedSessionEvents(sessionID)
+		if err != nil {
+			return "", events, err
+		}
+
+		message := lastAgentMessageFromEvents(events)
+		if message != "" || i == attempts-1 {
+			return message, events, nil
+		}
+
+		time.Sleep(delay)
+	}
+	return "", events, nil
+}
+
+func lastAgentMessageFromEvents(events []ManagedSessionEvent) string {
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].Type != "agent.message" && events[i].Type != "assistant.message" {
+			continue
+		}
+
+		parts := []string{}
+		for _, block := range events[i].Content {
+			if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+				parts = append(parts, block.Text)
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, "\n")
+		}
+	}
+	return ""
+}
+
+func managedSessionEventTypes(events []ManagedSessionEvent) string {
+	types := make([]string, 0, len(events))
+	for _, event := range events {
+		types = append(types, event.Type)
+	}
+	return strings.Join(types, ", ")
+}
+
 // SendManagedSessionUserMessage appends a user.message event to the session.
 // The events endpoint uses ?beta=true per the Managed Agents API.
 func (c *Client) SendManagedSessionUserMessage(sessionID, text string) error {
@@ -194,4 +337,47 @@ func (c *Client) DeleteManagedSession(sessionID string) error {
 	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID)
 	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
 	return err
+}
+
+func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta string) ([]byte, error) {
+	req, err := http.NewRequest(method, URL, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request: %v", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("anthropic-version", anthropicVersionValue)
+	if beta != "" {
+		req.Header.Set("anthropic-beta", beta)
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		var apiErr claudeErrorResponse
+		var errorMessage string
+		if err := json.Unmarshal(responseBody, &apiErr); err == nil && apiErr.Error.Message != "" {
+			errorMessage = apiErr.Error.Message
+		} else {
+			errorMessage = string(responseBody)
+		}
+
+		if res.StatusCode == http.StatusUnauthorized {
+			return nil, fmt.Errorf("Claude credentials are invalid or expired: %s", errorMessage)
+		}
+
+		return nil, fmt.Errorf("request failed (%d): %s", res.StatusCode, errorMessage)
+	}
+	return responseBody, nil
 }

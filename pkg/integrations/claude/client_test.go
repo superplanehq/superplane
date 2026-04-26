@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -67,55 +66,6 @@ func TestNewClient(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestClient_ManagedSessions(t *testing.T) {
-	t.Run("CreateManagedSession", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBufferString(`{"id":"sess_1","status":"running"}`)),
-			}},
-		}
-		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
-		s, err := client.CreateManagedSession(CreateManagedSessionRequest{
-			Agent:         "ag_1",
-			EnvironmentID: "env_1",
-		})
-		if err != nil {
-			t.Fatalf("CreateManagedSession: %v", err)
-		}
-		if s.ID != "sess_1" {
-			t.Errorf("id: got %q", s.ID)
-		}
-		if len(httpCtx.Requests) != 1 {
-			t.Fatalf("expected 1 request, got %d", len(httpCtx.Requests))
-		}
-		req := httpCtx.Requests[0]
-		if req.Header.Get("anthropic-beta") != anthropicBetaManagedAgents {
-			t.Errorf("expected managed agents beta header")
-		}
-		if req.Method != http.MethodPost || !strings.HasSuffix(req.URL.Path, "/sessions") {
-			t.Errorf("unexpected request: %s %s", req.Method, req.URL.String())
-		}
-	})
-
-	t.Run("GetManagedSession", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBufferString(`{"id":"s","status":"idle"}`)),
-			}},
-		}
-		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
-		s, err := client.GetManagedSession("s")
-		if err != nil {
-			t.Fatalf("GetManagedSession: %v", err)
-		}
-		if s.Status != "idle" {
-			t.Errorf("status: %q", s.Status)
-		}
-	})
 }
 
 func TestClient_Verify(t *testing.T) {

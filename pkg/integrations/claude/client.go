@@ -13,9 +13,6 @@ import (
 const (
 	defaultBaseURL        = "https://api.anthropic.com/v1"
 	anthropicVersionValue = "2023-06-01"
-	// anthropicBetaManagedAgents is required on all Managed Agents API requests.
-	// See: https://platform.claude.com/docs/en/managed-agents/overview
-	anthropicBetaManagedAgents = "managed-agents-2026-04-01"
 )
 
 type Client struct {
@@ -129,12 +126,6 @@ func (c *Client) CreateMessage(req CreateMessageRequest) (*CreateMessageResponse
 }
 
 func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {
-	return c.execRequestWithBeta(method, URL, body, "")
-}
-
-// execRequestWithBeta performs an API request. When beta is non-empty, it is sent
-// as the anthropic-beta header (use anthropicBetaManagedAgents for Managed Agents).
-func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta string) ([]byte, error) {
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
@@ -144,9 +135,6 @@ func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta st
 	}
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
-	if beta != "" {
-		req.Header.Set("anthropic-beta", beta)
-	}
 
 	res, err := c.http.Do(req)
 	if err != nil {

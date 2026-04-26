@@ -1,4 +1,4 @@
-package claude
+package runagent
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ func (a *RunAgent) Documentation() string {
 
 ## Output
 
-Emits a finished payload with **session** status and **session id** so downstream steps can branch. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.`
+Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.`
 }
 
 func (a *RunAgent) Icon() string { return "bot" }
@@ -45,11 +45,11 @@ func (a *RunAgent) Icon() string { return "bot" }
 func (a *RunAgent) Color() string { return "#C9784D" }
 
 func (a *RunAgent) ExampleOutput() map[string]any {
-	return getRunAgentExampleOutput()
+	return getExampleOutput()
 }
 
 func (a *RunAgent) OutputChannels(config any) []core.OutputChannel {
-	return []core.OutputChannel{{Name: runAgentDefaultChannel, Label: "Default"}}
+	return []core.OutputChannel{{Name: defaultChannel, Label: "Default"}}
 }
 
 func (a *RunAgent) Configuration() []configuration.Field {
@@ -101,14 +101,11 @@ func (a *RunAgent) Configuration() []configuration.Field {
 }
 
 func (a *RunAgent) Setup(ctx core.SetupContext) error {
-	spec, err := decodeRunAgentSpec(ctx.Configuration)
+	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
 		return err
 	}
-	if err := validateRunAgentSpec(spec); err != nil {
-		return err
-	}
-	return nil
+	return validateSpec(spec)
 }
 
 func (a *RunAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -116,11 +113,11 @@ func (a *RunAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, e
 }
 
 func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
-	spec, err := decodeRunAgentSpec(ctx.Configuration)
+	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
 		return err
 	}
-	if err := validateRunAgentSpec(spec); err != nil {
+	if err := validateSpec(spec); err != nil {
 		return err
 	}
 
@@ -148,7 +145,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create managed agent session: %w", err)
 	}
 
-	metadata := RunAgentExecutionMetadata{}
+	metadata := ExecutionMetadata{}
 	mergeSessionIntoMetadata(&metadata, session)
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
@@ -162,7 +159,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
 
-	// Refresh status after work may have already progressed
+	// Refresh status after work may have already progressed.
 	refreshed, err := client.GetManagedSession(session.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
@@ -171,18 +168,25 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	_ = ctx.Metadata.Set(metadata)
 
 	if refreshed != nil && isSessionTerminal(refreshed.Status) {
-		out := buildRunAgentOutput(refreshed.Status, session.ID)
-		return ctx.ExecutionState.Emit(runAgentDefaultChannel, runAgentPayloadType, []any{out})
+		lastMessage, events, err := client.GetLastManagedSessionAgentMessageWithRetry(session.ID, finalMessageReads, finalMessageDelay)
+		if err != nil {
+			ctx.Logger.Warnf("Failed to fetch final message for managed session %s: %v", session.ID, err)
+		}
+		if err == nil && lastMessage == "" {
+			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", session.ID, managedSessionEventTypes(events))
+		}
+		out := buildOutput(refreshed.Status, session.ID, lastMessage)
+		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
 	ctx.Logger.Infof("Started Managed Agent session %s. Waiting for completion (polling)...", session.ID)
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, runAgentInitialPoll)
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
 }
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
 
-func decodeRunAgentSpec(config any) (RunAgentSpec, error) {
-	var spec RunAgentSpec
+func decodeSpec(config any) (Spec, error) {
+	var spec Spec
 	if err := mapstructure.Decode(config, &spec); err != nil {
 		return spec, fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -213,7 +217,7 @@ func decodeStringList(v any) []string {
 	}
 }
 
-func validateRunAgentSpec(spec RunAgentSpec) error {
+func validateSpec(spec Spec) error {
 	if strings.TrimSpace(spec.Agent) == "" {
 		return fmt.Errorf("agent is required")
 	}

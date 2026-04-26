@@ -1,4 +1,4 @@
-package claude
+package runagent
 
 import (
 	"io"
@@ -50,6 +50,7 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"user.message","content":[{"type":"text","text":"Hello"}]},{"type":"agent.message","content":[{"type":"text","text":"Done"}]}],"next_page":null}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{
@@ -73,16 +74,19 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	err := a.Execute(execCtx)
 	require.NoError(t, err)
 	require.True(t, executionState.Finished)
-	assert.Equal(t, runAgentPayloadType, executionState.Type)
-	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(RunAgentOutputPayload).Status)
+	assert.Equal(t, payloadType, executionState.Type)
+	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+	assert.Equal(t, "Done", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
 	assert.Equal(t, "", requestsCtx.Action)
 
-	require.Len(t, httpContext.Requests, 3)
+	require.Len(t, httpContext.Requests, 4)
 	assert.Equal(t, "POST", httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/sessions")
 	assert.Equal(t, anthropicBetaManagedAgents, httpContext.Requests[0].Header.Get("anthropic-beta"))
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/events")
 	assert.Equal(t, "GET", httpContext.Requests[2].Method)
+	assert.Equal(t, "GET", httpContext.Requests[3].Method)
+	assert.Contains(t, httpContext.Requests[3].URL.Path, "/events")
 }
 
 func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
@@ -114,7 +118,7 @@ func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, executionState.Finished)
 	assert.Equal(t, "poll", requestsCtx.Action)
-	assert.Equal(t, runAgentInitialPoll, requestsCtx.Duration)
+	assert.Equal(t, initialPoll, requestsCtx.Duration)
 }
 
 func Test__RunAgent__poll__terminal(t *testing.T) {
@@ -122,13 +126,14 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"agent.message","content":[{"type":"text","text":"Earlier"}]},{"type":"agent.message","content":[{"type":"text","text":"Final"}]}]}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	metadataCtx := &contexts.MetadataContext{
-		Metadata: RunAgentExecutionMetadata{
-			Session: &RunAgentSessionMetadata{ID: "sess_1", Status: "running"},
+		Metadata: ExecutionMetadata{
+			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
 		},
 	}
 	hookCtx := core.ActionHookContext{
@@ -145,21 +150,22 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	err := a.HandleHook(hookCtx)
 	require.NoError(t, err)
 	require.True(t, executionState.Finished)
-	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(RunAgentOutputPayload).Status)
+	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+	assert.Equal(t, "Final", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
 }
 
 func Test__RunAgent__poll__timeout(t *testing.T) {
 	a := &RunAgent{}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	metadataCtx := &contexts.MetadataContext{
-		Metadata: RunAgentExecutionMetadata{
-			Session: &RunAgentSessionMetadata{ID: "sess_1", Status: "running"},
+		Metadata: ExecutionMetadata{
+			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
 		},
 	}
 	hookCtx := core.ActionHookContext{
 		Name: "poll",
 		Parameters: map[string]any{
-			"attempt": float64(runAgentMaxPollAttempts + 1),
+			"attempt": float64(maxPollAttempts + 1),
 			"errors":  float64(0),
 		},
 		Metadata:       metadataCtx,
@@ -170,7 +176,7 @@ func Test__RunAgent__poll__timeout(t *testing.T) {
 	err := a.HandleHook(hookCtx)
 	require.NoError(t, err)
 	require.True(t, executionState.Finished)
-	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(RunAgentOutputPayload).Status)
+	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
 }
 
 func Test__RunAgent__scheduleNextPoll(t *testing.T) {
@@ -180,13 +186,50 @@ func Test__RunAgent__scheduleNextPoll(t *testing.T) {
 		Requests:       rc,
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		Metadata: &contexts.MetadataContext{
-			Metadata: RunAgentExecutionMetadata{Session: &RunAgentSessionMetadata{ID: "s", Status: "running"}},
+			Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "s", Status: "running"}},
 		},
 	}
 	err := a.scheduleNextPoll(hookCtx, 3, 0)
 	require.NoError(t, err)
-	assert.Equal(t, 4*runAgentInitialPoll, rc.Duration)
-	assert.LessOrEqual(t, rc.Duration, runAgentMaxPollInterval)
+	assert.Equal(t, 4*initialPoll, rc.Duration)
+	assert.LessOrEqual(t, rc.Duration, maxPollInterval)
+}
+
+func TestClient_ManagedSessions(t *testing.T) {
+	t.Run("CreateManagedSession", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`)),
+			}},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		s, err := client.CreateManagedSession(CreateManagedSessionRequest{
+			Agent:         "ag_1",
+			EnvironmentID: "env_1",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "sess_1", s.ID)
+		require.Len(t, httpCtx.Requests, 1)
+
+		req := httpCtx.Requests[0]
+		assert.Equal(t, anthropicBetaManagedAgents, req.Header.Get("anthropic-beta"))
+		assert.Equal(t, http.MethodPost, req.Method)
+		assert.True(t, strings.HasSuffix(req.URL.Path, "/sessions"))
+	})
+
+	t.Run("GetManagedSession", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"s","status":"idle"}`)),
+			}},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		s, err := client.GetManagedSession("s")
+		require.NoError(t, err)
+		assert.Equal(t, "idle", s.Status)
+	})
 }
 
 func Test__buildCreateSessionBody__latest(t *testing.T) {

@@ -1,4 +1,4 @@
-package claude
+package runagent
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		return nil
 	}
 
-	metadata := RunAgentExecutionMetadata{}
+	metadata := ExecutionMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
@@ -54,10 +54,10 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		errs = int(e)
 	}
 
-	if attempt > runAgentMaxPollAttempts {
+	if attempt > maxPollAttempts {
 		ctx.Logger.Errorf("Managed session %s exceeded max poll attempts", metadata.Session.ID)
-		out := buildRunAgentOutput("timeout", metadata.Session.ID)
-		return ctx.ExecutionState.Emit(runAgentDefaultChannel, runAgentPayloadType, []any{out})
+		out := buildOutput("timeout", metadata.Session.ID)
+		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -68,10 +68,10 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 	sess, err := client.GetManagedSession(metadata.Session.ID)
 	if err != nil {
 		errs++
-		if errs >= runAgentMaxPollErrors {
+		if errs >= maxPollErrors {
 			ctx.Logger.Errorf("Managed session %s: polling failed repeatedly: %v", metadata.Session.ID, err)
-			out := buildRunAgentOutput("error", metadata.Session.ID)
-			return ctx.ExecutionState.Emit(runAgentDefaultChannel, runAgentPayloadType, []any{out})
+			out := buildOutput("error", metadata.Session.ID)
+			return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 		}
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
@@ -83,18 +83,24 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 	if isSessionTerminal(sess.Status) {
-		out := buildRunAgentOutput(sess.Status, metadata.Session.ID)
-		return ctx.ExecutionState.Emit(runAgentDefaultChannel, runAgentPayloadType, []any{out})
+		lastMessage, events, err := client.GetLastManagedSessionAgentMessageWithRetry(metadata.Session.ID, finalMessageReads, finalMessageDelay)
+		if err != nil {
+			ctx.Logger.Warnf("Failed to fetch final message for managed session %s: %v", metadata.Session.ID, err)
+		}
+		if err == nil && lastMessage == "" {
+			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", metadata.Session.ID, managedSessionEventTypes(events))
+		}
+		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage)
+		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 
-	// still running (or rescheduling)
 	return a.scheduleNextPoll(ctx, attempt+1, 0)
 }
 
 func (a *RunAgent) scheduleNextPoll(ctx core.ActionHookContext, nextAttempt, errors int) error {
-	interval := runAgentInitialPoll * time.Duration(1<<uint(min(nextAttempt-1, 8)))
-	if interval > runAgentMaxPollInterval {
-		interval = runAgentMaxPollInterval
+	interval := initialPoll * time.Duration(1<<uint(min(nextAttempt-1, 8)))
+	if interval > maxPollInterval {
+		interval = maxPollInterval
 	}
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{
 		"attempt": nextAttempt,
@@ -103,7 +109,7 @@ func (a *RunAgent) scheduleNextPoll(ctx core.ActionHookContext, nextAttempt, err
 }
 
 func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
-	metadata := RunAgentExecutionMetadata{}
+	metadata := ExecutionMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return nil
 	}
