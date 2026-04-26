@@ -1,6 +1,10 @@
 import { Puzzle } from "lucide-react";
 import type { ComponentType } from "react";
-import type { SuperplaneComponentsNode as ComponentsNode, ComponentsComponent, TriggersTrigger } from "@/api-client";
+import type {
+  SuperplaneComponentsNode as ComponentsNode,
+  SuperplaneActionsAction,
+  TriggersTrigger,
+} from "@/api-client";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "../mappers/safeMappers";
@@ -58,7 +62,7 @@ export function buildComponentFallbackCanvasNode({
 }: {
   node: ComponentsNode;
   displayLabel: string;
-  metadata?: ComponentsComponent;
+  metadata?: SuperplaneActionsAction;
 }): CanvasNode {
   return {
     id: node.id!,
