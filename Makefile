@@ -226,9 +226,7 @@ check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
 
 check.templates:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
-	$(COMPOSE) run --rm app bash -c "go run ./scripts/check_canvases_templates"
+	$(COMPOSE) exec app go run ./scripts/check_canvases_templates/main.go
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
