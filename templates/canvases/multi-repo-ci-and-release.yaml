@@ -19,15 +19,9 @@ spec:
       position:
         x: 1925
         "y": 257
-      action: null
-      blueprint: null
       trigger:
         name: "github.onRelease"
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-onrelease-github-onrelease-utjyd2"
       name: "Listen for new releases of Billing"
       type: "TYPE_TRIGGER"
@@ -43,15 +37,9 @@ spec:
       position:
         x: 1928
         "y": 558
-      action: null
-      blueprint: null
       trigger:
         name: "github.onRelease"
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-onrelease-github-onrelease-ayop2u"
       name: "Listen for new releases of App"
       type: "TYPE_TRIGGER"
@@ -67,15 +55,9 @@ spec:
       position:
         x: 1932
         "y": 866
-      action: null
-      blueprint: null
       trigger:
         name: "github.onRelease"
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-lduxm8"
       name: "Build Docker Image - Front"
       type: "TYPE_ACTION"
@@ -100,13 +82,7 @@ spec:
         "y": 254
       action:
         name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-build-docker-image-8vfqh4"
       name: "Build Docker Image - Billing"
       type: "TYPE_ACTION"
@@ -131,13 +107,7 @@ spec:
         "y": 557
       action:
         name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-build-docker-image-obpokg"
       name: "Build Docker Image - App"
       type: "TYPE_ACTION"
@@ -162,13 +132,7 @@ spec:
         "y": 866
       action:
         name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "slack-sendtextmessage-slack-sendtextmessage-pgdv24"
       name: "Slack: Send alert that build failed"
       type: "TYPE_ACTION"
@@ -184,13 +148,7 @@ spec:
         "y": 741
       action:
         name: "slack.sendTextMessage"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-r7stbz"
       name: "Slack: Notify on successful deployment"
       type: "TYPE_ACTION"
@@ -206,13 +164,7 @@ spec:
         "y": 438
       action:
         name: "slack.sendTextMessage"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-lkrxcj"
       name: "PD: Open Incident if Deploy fails"
       type: "TYPE_ACTION"
@@ -231,13 +183,7 @@ spec:
         "y": 610
       action:
         name: "pagerduty.createIncident"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-wy2088"
       name: "Roll out to Kubernetes"
       type: "TYPE_ACTION"
@@ -262,13 +208,7 @@ spec:
         "y": 406
       action:
         name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation-cvxv7j"
       name: "annotation"
       type: "TYPE_WIDGET"
@@ -277,19 +217,12 @@ spec:
         height: 272
         text: "## Multi-repo release triggers\n\nThis Canvas listens for new releases published across three different repositories: **Front**, **Billing**, and **App**.\n\nWhen any of these repositories publishes a release, the corresponding CI workflow is triggered.\n\n\n### To set up\n1. Click each trigger node to open the sidebar configuration.\n2. Connect your GitHub account.\n3. Select the repositories you want to monitor for releases."
         width: 416
-      metadata: null
       position:
         x: 1904
         "y": -114
-      action: null
-      blueprint: null
-      trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation2-561f8l"
       name: "annotation2"
       type: "TYPE_WIDGET"
@@ -298,19 +231,12 @@ spec:
         height: 273
         text: "### CI builds per repository\n\nEach release triggers a separate CI workflow to build the Docker image for that service.\n\nThis pattern uses one build node per repository, but depending on how your CI is organized, you could consolidate into a single workflow that handles all repositories.\n\nThe build workflows receive parameters like service name, release name, and tag from the release event payload."
         width: 353
-      metadata: null
       position:
         x: 2525
         "y": -124
-      action: null
-      blueprint: null
-      trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation3-pau27b"
       name: "annotation3"
       type: "TYPE_WIDGET"
@@ -319,19 +245,12 @@ spec:
         height: 212
         text: "### Unified deployment and notifications\n\nA single deployment workflow handles all services, using parameters to identify which service and release to deploy.\n\nThese parameters are collected from **event payloads** emitted by upstream components.\n\nThe Slack notifications also use payload data to construct messages dynamically.\n\nBy using **root()** and **previous()** selectors instead of referencing individual nodes, the workflow automatically uses data from whichever repository triggered the release—no need to duplicate logic for each service."
         width: 954
-      metadata: null
       position:
         x: 3246
         "y": 122
-      action: null
-      blueprint: null
-      trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
   edges:
     - sourceId: "github-onrelease-github-onrelease-ljbrv2"
       targetId: "github-runworkflow-github-runworkflow-lduxm8"

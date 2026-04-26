@@ -34,16 +34,16 @@ message Node {
   string name = 2;
   Type type = 3;
   google.protobuf.Struct configuration = 4;
-  google.protobuf.Struct metadata = 5;
+  optional google.protobuf.Struct metadata = 5;
   Position position = 6;
-  ActionRef action = 7;
-  BlueprintRef blueprint = 8;
-  TriggerRef trigger = 9;
-  WidgetRef widget = 10;
+  optional ActionRef action = 7;
+  optional BlueprintRef blueprint = 8;
+  optional TriggerRef trigger = 9;
+  optional WidgetRef widget = 10;
   bool is_collapsed = 11;
-  IntegrationRef integration = 12;
-  string error_message = 13;
-  string warning_message = 14;
+  optional IntegrationRef integration = 12;
+  optional string error_message = 13;
+  optional string warning_message = 14;
   bool paused = 15;
 }
 
@@ -59,6 +59,6 @@ message Edge {
 }
 
 message IntegrationRef {
-  string id = 1;
-  string name = 2;
+  optional string id = 1;
+  optional string name = 2;
 }

@@ -146,11 +146,11 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 }
 
 func validateIntegration(organizationID string, ref *componentpb.IntegrationRef) error {
-	if ref == nil || ref.Id == "" {
+	if ref == nil || ref.Id == nil {
 		return fmt.Errorf("integration is required")
 	}
 
-	integrationID, err := uuid.Parse(ref.Id)
+	integrationID, err := uuid.Parse(*ref.Id)
 	if err != nil {
 		return fmt.Errorf("invalid integration ID: %v", err)
 	}
