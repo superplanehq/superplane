@@ -9,42 +9,22 @@ option go_package = "github.com/superplanehq/superplane/pkg/protos/components";
 message Node {
   enum Type {
     TYPE_ACTION = 0;
-    TYPE_BLUEPRINT = 1;
-    TYPE_TRIGGER = 2;
-    TYPE_WIDGET = 3;
-  }
-
-  message ActionRef {
-    string name = 1;
-  }
-
-  message TriggerRef {
-    string name = 1;
-  }
-
-  message WidgetRef {
-    string name = 1;
-  }
-
-  message BlueprintRef {
-    string id = 1;
+    TYPE_TRIGGER = 1;
+    TYPE_WIDGET = 2;
   }
 
   string id = 1;
   string name = 2;
   Type type = 3;
-  google.protobuf.Struct configuration = 4;
-  optional google.protobuf.Struct metadata = 5;
-  Position position = 6;
-  optional ActionRef action = 7;
-  optional BlueprintRef blueprint = 8;
-  optional TriggerRef trigger = 9;
-  optional WidgetRef widget = 10;
-  bool is_collapsed = 11;
-  optional IntegrationRef integration = 12;
-  optional string error_message = 13;
-  optional string warning_message = 14;
-  bool paused = 15;
+  string component = 4;
+  google.protobuf.Struct configuration = 5;
+  optional google.protobuf.Struct metadata = 6;
+  Position position = 7;
+  bool is_collapsed = 8;
+  optional IntegrationRef integration = 9;
+  optional string error_message = 10;
+  optional string warning_message = 11;
+  bool paused = 12;
 }
 
 message Position {

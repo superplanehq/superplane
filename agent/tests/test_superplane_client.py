@@ -309,13 +309,13 @@ def test_describe_canvas_maps_nodes_and_edges() -> None:
                                 "id": "node-trigger",
                                 "name": "On Push",
                                 "type": "TYPE_TRIGGER",
-                                "trigger": {"name": "github.onPush"},
+                                "component": "github.onPush",
                             },
                             {
                                 "id": "node-action",
                                 "name": "Notify Slack",
                                 "type": "TYPE_ACTION",
-                                "action": {"name": "slack.sendTextMessage"},
+                                "component": "slack.sendTextMessage",
                             },
                         ],
                         "edges": [
@@ -352,7 +352,7 @@ def test_describe_editing_canvas_prefers_version_nodes_and_live_metadata_name() 
                                 "id": "live-only",
                                 "name": "Live node",
                                 "type": "TYPE_ACTION",
-                                "action": {"name": "noop"},
+                                "component": "noop",
                             }
                         ],
                         "edges": [],
@@ -368,7 +368,7 @@ def test_describe_editing_canvas_prefers_version_nodes_and_live_metadata_name() 
                                 "id": "draft-only",
                                 "name": "Draft node",
                                 "type": "TYPE_ACTION",
-                                "action": {"name": "slack.sendTextMessage"},
+                                "component": "slack.sendTextMessage",
                             }
                         ],
                         "edges": [],
@@ -470,7 +470,7 @@ def test_get_node_details_includes_recent_events() -> None:
                                 "id": "node-action",
                                 "name": "Notify Slack",
                                 "type": "TYPE_ACTION",
-                                "action": {"name": "slack.sendTextMessage"},
+                                "component": "slack.sendTextMessage",
                                 "configuration": {"channel": "#alerts", "text": "hello"},
                                 "errorMessage": "missing scope",
                                 "warningMessage": "deprecated field",
@@ -576,13 +576,13 @@ def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details(
                                 "id": "node-trigger",
                                 "name": "On Push",
                                 "type": "TYPE_TRIGGER",
-                                "trigger": {"name": "github.onPush"},
+                                "component": "github.onPush",
                             },
                             {
                                 "id": "node-action",
                                 "name": "Notify Slack",
                                 "type": "TYPE_ACTION",
-                                "action": {"name": "slack.sendTextMessage"},
+                                "component": "slack.sendTextMessage",
                             },
                         ],
                         "edges": [
