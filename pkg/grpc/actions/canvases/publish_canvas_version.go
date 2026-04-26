@@ -58,6 +58,14 @@ func PublishCanvasVersion(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
+	if modeErr != nil {
+		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
+	}
+	if changeManagementEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "change management is enabled for this canvas; create a change request instead")
+	}
+
 	publishedVersion, err := publishDraftVersionInTransaction(
 		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
@@ -111,25 +119,32 @@ func publishDraftVersionInTransaction(
 			return status.Error(codes.PermissionDenied, "version owner mismatch")
 		}
 
+		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
+		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
+			return status.Error(codes.AlreadyExists, "Canvas with the same name already exists")
+		}
+		if nameErr != nil {
+			return nameErr
+		}
+
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
 		if err != nil {
 			return err
 		}
 
-		publisher, err := changesets.NewCanvasPublisher(tx, version, liveVersion, changesets.CanvasPublisherOptions{
-			Registry:       reg,
-			OrgID:          organizationUUID,
-			Encryptor:      encryptor,
-			AuthService:    authService,
-			WebhookBaseURL: webhookBaseURL,
-		})
-
-		if err != nil {
-			log.Errorf("failed to create canvas publisher: %v", err)
-			return err
-		}
-
-		err = publisher.Publish(ctx)
+		err = publishCanvasVersionInTransaction(
+			ctx,
+			tx,
+			liveVersion,
+			version,
+			changesets.CanvasPublisherOptions{
+				Registry:       reg,
+				OrgID:          organizationUUID,
+				Encryptor:      encryptor,
+				AuthService:    authService,
+				WebhookBaseURL: webhookBaseURL,
+			},
+		)
 		if err != nil {
 			log.Errorf("failed to publish canvas version: %v", err)
 			return err

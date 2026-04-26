@@ -398,21 +398,37 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 		}
 
 		version := models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  workflow.ID,
-			OwnerID:     &userID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice(expandedNodes),
-			Edges:       datatypes.NewJSONSlice(edges),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:                      liveVersionID,
+			WorkflowID:              workflow.ID,
+			OwnerID:                 &userID,
+			State:                   models.CanvasVersionStatePublished,
+			Name:                    workflow.Name,
+			Description:             workflow.Description,
+			ChangeManagementEnabled: workflow.ChangeManagementEnabled,
+			ChangeRequestApprovers:  datatypes.NewJSONSlice(models.DefaultCanvasChangeRequestApprovers()),
+			PublishedAt:             &now,
+			Nodes:                   datatypes.NewJSONSlice(expandedNodes),
+			Edges:                   datatypes.NewJSONSlice(edges),
+			CreatedAt:               &now,
+			UpdatedAt:               &now,
 		}
 
 		return tx.Create(&version).Error
 	}))
 
 	return workflow, createdNodes
+}
+
+func SetCanvasChangeManagementEnabled(t require.TestingT, canvasID uuid.UUID, enabled bool) {
+	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+	require.NoError(t, err)
+	require.NotNil(t, canvas.LiveVersionID)
+
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasVersion{}).
+		Where("id = ?", *canvas.LiveVersionID).
+		Update("change_management_enabled", enabled).
+		Error)
 }
 
 func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
