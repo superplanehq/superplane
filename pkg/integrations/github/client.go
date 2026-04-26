@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
