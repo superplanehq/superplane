@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	supportcontexts "github.com/superplanehq/superplane/test/support/contexts"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -258,5 +259,209 @@ func TestRegistry_FindIntegrationHook(t *testing.T) {
 		_, _, err := r.FindIntegrationHook("unit_integration", "missing-hook")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "hook missing-hook not found for integration unit_integration")
+	})
+}
+
+func TestRegistry_FindConfigurableComponent(t *testing.T) {
+	t.Run("finds action", func(t *testing.T) {
+		action := impl.NewDummyAction(impl.DummyActionOptions{Name: "unit_action"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{"unit_action": registry.NewPanicableAction(action)},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		component, err := r.FindConfigurableComponent("unit_action")
+		require.NoError(t, err)
+
+		foundAction, ok := component.(core.Action)
+		require.True(t, ok)
+		assert.Equal(t, "unit_action", foundAction.Name())
+	})
+
+	t.Run("finds integration action", func(t *testing.T) {
+		action := impl.NewDummyAction(impl.DummyActionOptions{Name: "unitapp.action"})
+		integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			Actions: []core.Action{action},
+		})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{"unitapp": registry.NewPanicableIntegration(integration)},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		component, err := r.FindConfigurableComponent("unitapp.action")
+		require.NoError(t, err)
+
+		foundAction, ok := component.(core.Action)
+		require.True(t, ok)
+		assert.Equal(t, "unitapp.action", foundAction.Name())
+	})
+
+	t.Run("finds trigger", func(t *testing.T) {
+		trigger := impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "unit_trigger"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{"unit_trigger": registry.NewPanicableTrigger(trigger)},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		component, err := r.FindConfigurableComponent("unit_trigger")
+		require.NoError(t, err)
+
+		foundTrigger, ok := component.(core.Trigger)
+		require.True(t, ok)
+		assert.Equal(t, "unit_trigger", foundTrigger.Name())
+	})
+
+	t.Run("finds widget", func(t *testing.T) {
+		widget := impl.NewDummyWidget(impl.DummyWidgetOptions{Name: "unit_widget"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{"unit_widget": widget},
+		}
+
+		component, err := r.FindConfigurableComponent("unit_widget")
+		require.NoError(t, err)
+
+		foundWidget, ok := component.(core.Widget)
+		require.True(t, ok)
+		assert.Equal(t, "unit_widget", foundWidget.Name())
+	})
+
+	t.Run("prefers action when action and trigger share the same name", func(t *testing.T) {
+		action := impl.NewDummyAction(impl.DummyActionOptions{Name: "shared_name"})
+		trigger := impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "shared_name"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{"shared_name": registry.NewPanicableAction(action)},
+			Triggers:     map[string]core.Trigger{"shared_name": registry.NewPanicableTrigger(trigger)},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{"shared_name": impl.NewDummyWidget(impl.DummyWidgetOptions{Name: "shared_name"})},
+		}
+
+		component, err := r.FindConfigurableComponent("shared_name")
+		require.NoError(t, err)
+
+		foundAction, ok := component.(core.Action)
+		require.True(t, ok)
+		assert.Equal(t, "shared_name", foundAction.Name())
+	})
+
+	t.Run("returns error when component is missing", func(t *testing.T) {
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		_, err := r.FindConfigurableComponent("missing_component")
+		require.Error(t, err)
+		assert.EqualError(t, err, "component missing_component not found")
+	})
+}
+
+func TestRegistry_ComponentType(t *testing.T) {
+	t.Run("returns component for action", func(t *testing.T) {
+		action := impl.NewDummyAction(impl.DummyActionOptions{Name: "unit_action"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{"unit_action": registry.NewPanicableAction(action)},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		componentType, err := r.ComponentType("unit_action")
+		require.NoError(t, err)
+		assert.Equal(t, models.NodeTypeComponent, componentType)
+	})
+
+	t.Run("returns component for integration action", func(t *testing.T) {
+		action := impl.NewDummyAction(impl.DummyActionOptions{Name: "unitapp.action"})
+		integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			Actions: []core.Action{action},
+		})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{"unitapp": registry.NewPanicableIntegration(integration)},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		componentType, err := r.ComponentType("unitapp.action")
+		require.NoError(t, err)
+		assert.Equal(t, models.NodeTypeComponent, componentType)
+	})
+
+	t.Run("returns trigger for trigger", func(t *testing.T) {
+		trigger := impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "unit_trigger"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{"unit_trigger": registry.NewPanicableTrigger(trigger)},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		componentType, err := r.ComponentType("unit_trigger")
+		require.NoError(t, err)
+		assert.Equal(t, models.NodeTypeTrigger, componentType)
+	})
+
+	t.Run("returns widget for widget", func(t *testing.T) {
+		widget := impl.NewDummyWidget(impl.DummyWidgetOptions{Name: "unit_widget"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{"unit_widget": widget},
+		}
+
+		componentType, err := r.ComponentType("unit_widget")
+		require.NoError(t, err)
+		assert.Equal(t, models.NodeTypeWidget, componentType)
+	})
+
+	t.Run("prefers component when action and trigger share the same name", func(t *testing.T) {
+		action := impl.NewDummyAction(impl.DummyActionOptions{Name: "shared_name"})
+		trigger := impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "shared_name"})
+
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{"shared_name": registry.NewPanicableAction(action)},
+			Triggers:     map[string]core.Trigger{"shared_name": registry.NewPanicableTrigger(trigger)},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{"shared_name": impl.NewDummyWidget(impl.DummyWidgetOptions{Name: "shared_name"})},
+		}
+
+		componentType, err := r.ComponentType("shared_name")
+		require.NoError(t, err)
+		assert.Equal(t, models.NodeTypeComponent, componentType)
+	})
+
+	t.Run("returns error when component is missing", func(t *testing.T) {
+		r := &registry.Registry{
+			Actions:      map[string]core.Action{},
+			Triggers:     map[string]core.Trigger{},
+			Integrations: map[string]core.Integration{},
+			Widgets:      map[string]core.Widget{},
+		}
+
+		componentType, err := r.ComponentType("missing_component")
+		require.Error(t, err)
+		assert.Empty(t, componentType)
+		assert.EqualError(t, err, "component missing_component not found")
 	})
 }
