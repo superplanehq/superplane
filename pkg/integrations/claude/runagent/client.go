@@ -17,6 +17,7 @@ const (
 	defaultBaseURL             = "https://api.anthropic.com/v1"
 	anthropicVersionValue      = "2023-06-01"
 	anthropicBetaManagedAgents = "managed-agents-2026-04-01"
+	sessionEventsPageLimit     = "20"
 )
 
 type Client struct {
@@ -200,8 +201,8 @@ func (c *Client) ListManagedSessionEvents(sessionID string) ([]ManagedSessionEve
 	page := ""
 	for {
 		params := url.Values{}
-		params.Set("limit", "1000")
-		params.Set("order", "asc")
+		params.Set("limit", sessionEventsPageLimit)
+		params.Set("order", "desc")
 		if page != "" {
 			params.Set("page", page)
 		}
@@ -256,13 +257,13 @@ func (c *Client) GetLastManagedSessionAgentMessageWithRetry(sessionID string, at
 }
 
 func lastAgentMessageFromEvents(events []ManagedSessionEvent) string {
-	for i := len(events) - 1; i >= 0; i-- {
-		if events[i].Type != "agent.message" && events[i].Type != "assistant.message" {
+	for _, event := range events {
+		if event.Type != "agent.message" && event.Type != "assistant.message" {
 			continue
 		}
 
 		parts := []string{}
-		for _, block := range events[i].Content {
+		for _, block := range event.Content {
 			if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
 				parts = append(parts, block.Text)
 			}

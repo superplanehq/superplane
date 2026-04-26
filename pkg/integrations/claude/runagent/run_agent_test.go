@@ -87,6 +87,8 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, "GET", httpContext.Requests[2].Method)
 	assert.Equal(t, "GET", httpContext.Requests[3].Method)
 	assert.Contains(t, httpContext.Requests[3].URL.Path, "/events")
+	assert.Equal(t, "desc", httpContext.Requests[3].URL.Query().Get("order"))
+	assert.Equal(t, sessionEventsPageLimit, httpContext.Requests[3].URL.Query().Get("limit"))
 }
 
 func Test__RunAgent__Execute__schedulesPoll(t *testing.T) {
@@ -126,7 +128,7 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"agent.message","content":[{"type":"text","text":"Earlier"}]},{"type":"agent.message","content":[{"type":"text","text":"Final"}]}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"agent.message","content":[{"type":"text","text":"Final"}]},{"type":"agent.message","content":[{"type":"text","text":"Earlier"}]}]}`))},
 		},
 	}
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
