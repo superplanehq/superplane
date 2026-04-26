@@ -227,6 +227,7 @@ check.lint.ui.baseline.update:
 
 check.templates:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 	$(COMPOSE) run --rm app bash -c "go run ./scripts/check_canvases_templates"
 
 check.build.app:
