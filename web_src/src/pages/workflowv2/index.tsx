@@ -5408,6 +5408,7 @@ export function WorkflowPageV2() {
       <CanvasMemoryModal
         open={isMemoryViewModalOpen}
         onOpenChange={setIsMemoryViewModalOpen}
+        canvasId={canvasId!}
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
         isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
         errorMessage={
