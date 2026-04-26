@@ -16,7 +16,7 @@ describe("getNodeIntegrationName", () => {
       getNodeIntegrationName(
         {
           type: "TYPE_ACTION",
-          action: { name: "github.create_issue" },
+          component: "github.create_issue",
         },
         availableIntegrations,
       ),
@@ -28,7 +28,7 @@ describe("getNodeIntegrationName", () => {
       getNodeIntegrationName(
         {
           type: "TYPE_TRIGGER",
-          trigger: { name: "github.on_push" },
+          component: "github.on_push",
         },
         availableIntegrations,
       ),
@@ -40,7 +40,7 @@ describe("getNodeIntegrationName", () => {
       getNodeIntegrationName(
         {
           type: "TYPE_WIDGET",
-          widget: { name: "annotation" },
+          component: "annotation",
         },
         availableIntegrations,
       ),

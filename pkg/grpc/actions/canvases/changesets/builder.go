@@ -205,9 +205,9 @@ func blockNameFromNode(node models.Node) string {
 
 func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_Node, error) {
 	n := &pb.CanvasChangeset_Change_Node{
-		Id:   proposedNode.ID,
-		Name: proposedNode.Name,
-		// Keep explicit presence for add-node changes.
+		Id:          proposedNode.ID,
+		Name:        proposedNode.Name,
+		Block:       blockNameFromNode(proposedNode),
 		IsCollapsed: proto.Bool(proposedNode.IsCollapsed),
 		Position: &componentpb.Position{
 			X: int32(proposedNode.Position.X),
@@ -215,12 +215,6 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 		},
 	}
 
-	blockName := blockNameFromNode(proposedNode)
-	if blockName == "" {
-		return nil, fmt.Errorf("block name is required for node %s", proposedNode.ID)
-	}
-
-	n.Block = blockName
 	if proposedNode.IntegrationID != nil {
 		n.IntegrationId = *proposedNode.IntegrationID
 	}
