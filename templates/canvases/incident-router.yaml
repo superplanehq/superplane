@@ -12,8 +12,7 @@ spec:
       position:
         x: 319
         "y": 501
-      trigger:
-        name: "slack.onAppMention"
+      component: "slack.onAppMention"
       isCollapsed: false
       errorMessage: "integration is required"
     - id: "component-node-micxb6"
@@ -24,8 +23,7 @@ spec:
       position:
         x: 893
         "y": 500
-      action:
-        name: "filter"
+      component: "filter"
       isCollapsed: false
     - id: "component-node-683h8w"
       name: "Generate issue title"
@@ -36,8 +34,7 @@ spec:
       position:
         x: 1427
         "y": 500
-      action:
-        name: "openai.textPrompt"
+      component: "openai.textPrompt"
       isCollapsed: false
     - id: "component-node-hw4ezb"
       name: "Generate issue description"
@@ -48,8 +45,7 @@ spec:
       position:
         x: 1427
         "y": 675
-      action:
-        name: "openai.textPrompt"
+      component: "openai.textPrompt"
       isCollapsed: false
     - id: "component-node-rcby5g"
       name: "Create PD incident"
@@ -67,8 +63,7 @@ spec:
       position:
         x: 2487
         "y": 425
-      action:
-        name: "pagerduty.createIncident"
+      component: "pagerduty.createIncident"
       isCollapsed: true
     - id: "component-node-c9hql3"
       name: "Create issue on GitHub"
@@ -85,8 +80,7 @@ spec:
       position:
         x: 2487
         "y": 534
-      action:
-        name: "github.createIssue"
+      component: "github.createIssue"
       isCollapsed: true
     - id: "annotation-annotation2-88tc68"
       name: "annotation2"
@@ -99,8 +93,7 @@ spec:
       position:
         x: 863
         "y": 179
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation3-q7feag"
       name: "annotation3"
@@ -113,8 +106,7 @@ spec:
       position:
         x: 1445
         "y": 179
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation4-l5nxvh"
       name: "annotation4"
@@ -127,8 +119,7 @@ spec:
       position:
         x: 2471
         "y": 174
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "github-onissuecomment-github-onissuecomment-fyflwt"
       name: "Listen to issue Comments"
@@ -143,8 +134,7 @@ spec:
       position:
         x: 319
         "y": 920
-      trigger:
-        name: "github.onIssueComment"
+      component: "github.onIssueComment"
       isCollapsed: false
     - id: "merge-merge-jjlkwm"
       name: "Wait for both Title and Description"
@@ -158,8 +148,7 @@ spec:
       position:
         x: 1922
         "y": 500
-      action:
-        name: "merge"
+      component: "merge"
       isCollapsed: true
     - id: "component-node-doptqx"
       name: "Send Slack Notification"
@@ -169,8 +158,7 @@ spec:
       position:
         x: 3011
         "y": 464
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
       errorMessage: "field 'channel' is required"
     - id: "github-onissue-github-onissue-aq6dfc"
@@ -188,8 +176,7 @@ spec:
       position:
         x: 319
         "y": 710
-      trigger:
-        name: "github.onIssue"
+      component: "github.onIssue"
       isCollapsed: false
     - id: "annotation-annotation5-601278"
       name: "annotation5"
@@ -202,8 +189,7 @@ spec:
       position:
         x: 246
         "y": 175
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
   edges:
     - sourceId: "slack-onappmention-slack-onappmention-knb9lx"

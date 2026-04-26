@@ -123,6 +123,44 @@ func (r *Registry) HTTPContext() *HTTPContext {
 	return r.httpCtx
 }
 
+func (r *Registry) FindConfigurableComponent(name string) (core.Configurable, error) {
+	action, err := r.GetAction(name)
+	if err == nil {
+		return action.(core.Configurable), nil
+	}
+
+	trigger, err := r.GetTrigger(name)
+	if err == nil {
+		return trigger.(core.Configurable), nil
+	}
+
+	widget, err := r.GetWidget(name)
+	if err == nil {
+		return widget.(core.Configurable), nil
+	}
+
+	return nil, fmt.Errorf("component %s not found", name)
+}
+
+func (r *Registry) ComponentKind(name string) (core.ComponentKind, error) {
+	_, err := r.GetAction(name)
+	if err == nil {
+		return core.ComponentKindAction, nil
+	}
+
+	_, err = r.GetTrigger(name)
+	if err == nil {
+		return core.ComponentKindTrigger, nil
+	}
+
+	_, err = r.GetWidget(name)
+	if err == nil {
+		return core.ComponentKindWidget, nil
+	}
+
+	return "", fmt.Errorf("component %s not found", name)
+}
+
 func (r *Registry) ListTriggers() []core.Trigger {
 	triggers := make([]core.Trigger, 0, len(r.Triggers))
 	for _, trigger := range r.Triggers {

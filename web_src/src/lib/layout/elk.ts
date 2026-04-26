@@ -563,8 +563,8 @@ export class ElkLayoutEngine implements LayoutEngine {
     const defaultChannels = ["default"];
 
     if (node.type === "TYPE_BLUEPRINT") {
-      const componentMeta = components.find((c) => c.name === node.action?.name);
-      const blueprint = blueprints.find((candidate) => candidate.id === node.blueprint?.id);
+      const componentMeta = components.find((c) => c.name === node.component);
+      const blueprint = blueprints.find((candidate) => candidate.id === node.component);
       return (
         componentMeta?.outputChannels?.map((channel) => channel.name!).filter(Boolean) ||
         blueprint?.outputChannels?.map((channel) => channel.name!).filter(Boolean) ||
@@ -572,8 +572,8 @@ export class ElkLayoutEngine implements LayoutEngine {
       );
     }
 
-    if (node.type === "TYPE_ACTION" && node.action?.name) {
-      const meta = components.find((component) => component.name === node.action?.name);
+    if (node.type === "TYPE_ACTION" && node.component) {
+      const meta = components.find((component) => component.name === node.component);
       return meta?.outputChannels?.map((channel) => channel.name!).filter(Boolean) || defaultChannels;
     }
 

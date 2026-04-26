@@ -42,7 +42,7 @@ export function makeComponentsNode(overrides: Partial<ComponentsNode> = {}): Com
     type: "TYPE_ACTION",
     position: { x: 0, y: 0 },
     configuration: {},
-    action: { name: "noop" },
+    component: "noop",
     ...overrides,
   } as ComponentsNode;
 }

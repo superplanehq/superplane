@@ -15,8 +15,7 @@ spec:
       position:
         x: 135
         "y": 616
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-note-l5pp1j"
       name: "Note"
@@ -29,8 +28,7 @@ spec:
       position:
         x: 1079
         "y": 559
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-note-fids38"
       name: "Note"
@@ -43,8 +41,7 @@ spec:
       position:
         x: 1567
         "y": -49
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-note-fhs8t3"
       name: "Note"
@@ -57,8 +54,7 @@ spec:
       position:
         x: 2195
         "y": 592
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-note-xw4fhl"
       name: "Note"
@@ -71,8 +67,7 @@ spec:
       position:
         x: 2745
         "y": 40
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "component-node-c4ecox"
       name: "Forward only builds from main branch"
@@ -82,8 +77,7 @@ spec:
       position:
         x: 600
         "y": 322
-      action:
-        name: "filter"
+      component: "filter"
       isCollapsed: false
     - id: "annotation-note-yngiv2"
       name: "Note"
@@ -96,8 +90,7 @@ spec:
       position:
         x: 597
         "y": 51
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "github-onworkflowrun-github-onworkflowrun-gavi3b"
       name: "Listen for successful CI"
@@ -116,8 +109,7 @@ spec:
       position:
         x: 136
         "y": 324
-      trigger:
-        name: "github.onWorkflowRun"
+      component: "github.onWorkflowRun"
       isCollapsed: false
     - id: "timegate-timegate-vjyba3"
       name: "Run only during work hours"
@@ -134,8 +126,7 @@ spec:
       position:
         x: 1078
         "y": 321
-      action:
-        name: "timeGate"
+      component: "timeGate"
       isCollapsed: false
     - id: "approval-approval-pxl5ja"
       name: "Get Approvals"
@@ -146,8 +137,7 @@ spec:
       position:
         x: 1567
         "y": 321
-      action:
-        name: "approval"
+      component: "approval"
       isCollapsed: false
     - id: "github-runworkflow-github-runworkflow-3ywh59"
       name: "Run Deployment"
@@ -164,8 +154,7 @@ spec:
       position:
         x: 2192
         "y": 315
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "openai-textprompt-openai-textprompt-x2hhhi"
       name: "Generate Summary"
@@ -176,8 +165,7 @@ spec:
       position:
         x: 2736
         "y": 322
-      action:
-        name: "openai.textPrompt"
+      component: "openai.textPrompt"
       isCollapsed: false
     - id: "pagerduty-createincident-pagerduty-createincident-vwbqsu"
       name: "Create PD Incident"
@@ -195,8 +183,7 @@ spec:
       position:
         x: 2740
         "y": 514
-      action:
-        name: "pagerduty.createIncident"
+      component: "pagerduty.createIncident"
       isCollapsed: true
     - id: "slack-sendtextmessage-slack-sendtextmessage-c2n7es"
       name: "Send Slack Message"
@@ -211,8 +198,7 @@ spec:
       position:
         x: 3221
         "y": 321
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
   edges:
     - sourceId: "github-onworkflowrun-github-onworkflowrun-gavi3b"

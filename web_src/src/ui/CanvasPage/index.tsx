@@ -670,7 +670,7 @@ function CanvasPage(props: CanvasPageProps) {
     (nodeId: string) => {
       // Check if this is a placeholder - if so, open building blocks sidebar instead
       const workflowNode = props.workflowNodes?.find((n) => n.id === nodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.action?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isPlaceholder) {
         // For placeholders, open building blocks sidebar
@@ -814,7 +814,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Check if templateNodeId is a placeholder (persisted node) or legacy pending connection (local-only)
       const workflowNode = props.workflowNodes?.find((n) => n.id === templateNodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.action?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isPlaceholder && props.onPlaceholderConfigure) {
         // Handle placeholder node (persisted)
@@ -1392,7 +1392,7 @@ function Sidebar({
       return false;
     }
     const selectedNode = workflowNodes.find((node) => node.id === state.componentSidebar.selectedNodeId);
-    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.widget?.name === "annotation";
+    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.component === "annotation";
   }, [state.componentSidebar.selectedNodeId, workflowNodes]);
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
@@ -1969,7 +1969,7 @@ function CanvasContent({
       const isAnnotationNode = clickedNode?.data?.type === "annotation";
 
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.action?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isAnnotationNode) {
         return;

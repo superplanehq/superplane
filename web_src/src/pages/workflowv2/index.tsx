@@ -2235,7 +2235,7 @@ export function WorkflowPageV2() {
         }
 
         if (chainNode.type === "TYPE_TRIGGER") {
-          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
+          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.component);
 
           // Store node metadata with trigger info
           nodeMetadata[chainNodeId] = {
@@ -2262,7 +2262,7 @@ export function WorkflowPageV2() {
         }
 
         // For components (non-triggers)
-        const componentMetadata = allComponents.find((component) => component.name === chainNode.action?.name);
+        const componentMetadata = allComponents.find((component) => component.name === chainNode.component);
 
         // Store node metadata with component info
         nodeMetadata[chainNodeId] = {
@@ -2551,29 +2551,29 @@ export function WorkflowPageV2() {
       let blockName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
-        const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
+        const blueprintMetadata = blueprints.find((b) => b.id === node.component);
         configurationFields = blueprintMetadata?.configuration || [];
         displayLabel = blueprintMetadata?.name || displayLabel;
       } else if (node.type === "TYPE_ACTION") {
-        const componentMetadata = allComponents.find((c) => c.name === node.action?.name);
+        const componentMetadata = allComponents.find((c) => c.name === node.component);
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
-        blockName = node.action?.name;
+        blockName = node.component;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
         integrationLabel = integrationName
           ? availableIntegrations.find((i) => i.name === integrationName)?.label
           : undefined;
       } else if (node.type === "TYPE_TRIGGER") {
-        const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
+        const triggerMetadata = allTriggers.find((t) => t.name === node.component);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
-        blockName = node.trigger?.name;
+        blockName = node.component;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
         integrationLabel = integrationName
           ? availableIntegrations.find((i) => i.name === integrationName)?.label
           : undefined;
       } else if (node.type === "TYPE_WIDGET") {
-        const widget = widgets.find((w) => w.name === node.widget?.name);
+        const widget = widgets.find((w) => w.name === node.component);
         if (widget) {
           configurationFields = widget.configuration || [];
           displayLabel = widget.label || "Widget";
@@ -3090,17 +3090,17 @@ export function WorkflowPageV2() {
             },
       };
 
-      // Add type-specific reference
+      // Add type-specific component reference
       if (buildingBlock.name === "annotation") {
         // Annotation nodes are now widgets
-        newNode.widget = { name: "annotation" };
+        newNode.component = "annotation";
         newNode.configuration = { text: "", color: "yellow" };
       } else if (buildingBlock.type === "component") {
-        newNode.action = { name: buildingBlock.name };
+        newNode.component = buildingBlock.name;
       } else if (buildingBlock.type === "trigger") {
-        newNode.trigger = { name: buildingBlock.name };
+        newNode.component = buildingBlock.name;
       } else if (buildingBlock.type === "blueprint") {
-        newNode.blueprint = { id: buildingBlock.id };
+        newNode.component = buildingBlock.id;
       }
 
       // Add the new node to the workflow
@@ -3374,13 +3374,13 @@ export function WorkflowPageV2() {
         configuration: filteredConfiguration,
       };
 
-      // Add the reference that was missing
+      // Add the component reference that was missing
       if (data.buildingBlock.type === "component") {
-        updatedNode.action = { name: data.buildingBlock.name };
+        updatedNode.component = data.buildingBlock.name;
       } else if (data.buildingBlock.type === "trigger") {
-        updatedNode.trigger = { name: data.buildingBlock.name };
+        updatedNode.component = data.buildingBlock.name;
       } else if (data.buildingBlock.type === "blueprint") {
-        updatedNode.blueprint = { id: data.buildingBlock.id };
+        updatedNode.component = data.buildingBlock.id;
       }
 
       const updatedNodes = [...(canvas.spec?.nodes || [])];
@@ -3576,12 +3576,12 @@ export function WorkflowPageV2() {
 
         let baseName = nodeToDuplicate.name?.trim() || "";
         if (!baseName) {
-          if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-            baseName = nodeToDuplicate.trigger.name;
-          } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.action?.name) {
-            baseName = nodeToDuplicate.action.name;
-          } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
-            const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
+          if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.component) {
+            baseName = nodeToDuplicate.component;
+          } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.component) {
+            baseName = nodeToDuplicate.component;
+          } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.component) {
+            const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.component);
             baseName = blueprintMetadata?.name || "blueprint";
           } else {
             baseName = "node";
@@ -3919,13 +3919,13 @@ export function WorkflowPageV2() {
 
       let baseName = nodeToDuplicate.name?.trim() || "";
       if (!baseName) {
-        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-          baseName = nodeToDuplicate.trigger.name;
-        } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.action?.name) {
-          baseName = nodeToDuplicate.action.name;
-        } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
+        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.component) {
+          baseName = nodeToDuplicate.component;
+        } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.component) {
+          baseName = nodeToDuplicate.component;
+        } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.component) {
           // For blueprints, we need to find the blueprint metadata to get the name
-          const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
+          const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.component);
           baseName = blueprintMetadata?.name || "blueprint";
         } else {
           baseName = "node";
@@ -4879,11 +4879,11 @@ export function WorkflowPageV2() {
       }
 
       let componentName = "default";
-      if (node.type === "TYPE_ACTION" && node.action?.name) {
-        componentName = node.action.name;
-      } else if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
-        componentName = node.trigger.name;
-      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
+      if (node.type === "TYPE_ACTION" && node.component) {
+        componentName = node.component;
+      } else if (node.type === "TYPE_TRIGGER" && node.component) {
+        componentName = node.component;
+      } else if (node.type === "TYPE_BLUEPRINT" && node.component) {
         componentName = "default";
       }
 
@@ -4901,11 +4901,11 @@ export function WorkflowPageV2() {
       if (!node) return null;
 
       let componentName = "";
-      if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
-        componentName = node.trigger.name;
-      } else if (node.type === "TYPE_ACTION" && node.action?.name) {
-        componentName = node.action.name;
-      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
+      if (node.type === "TYPE_TRIGGER" && node.component) {
+        componentName = node.component;
+      } else if (node.type === "TYPE_ACTION" && node.component) {
+        componentName = node.component;
+      } else if (node.type === "TYPE_BLUEPRINT" && node.component) {
         componentName = "default";
       }
 
@@ -5679,7 +5679,7 @@ function prepareNode(
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode);
     case "TYPE_BLUEPRINT": {
-      const componentMetadata = components.find((c) => c.name === node.action?.name);
+      const componentMetadata = components.find((c) => c.name === node.component);
       const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
 
       // Override outputChannels with component metadata if available
@@ -5743,11 +5743,9 @@ function prepareSidebarData(
 
   // Get metadata based on node type
   const blueprintMetadata =
-    node.type === "TYPE_BLUEPRINT" ? blueprints.find((b) => b.id === node.blueprint?.id) : undefined;
-  const componentMetadata =
-    node.type === "TYPE_ACTION" ? components.find((c) => c.name === node.action?.name) : undefined;
-  const triggerMetadata =
-    node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.trigger?.name) : undefined;
+    node.type === "TYPE_BLUEPRINT" ? blueprints.find((b) => b.id === node.component) : undefined;
+  const componentMetadata = node.type === "TYPE_ACTION" ? components.find((c) => c.name === node.component) : undefined;
+  const triggerMetadata = node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.component) : undefined;
 
   const nodeTitle =
     componentMetadata?.label || blueprintMetadata?.name || triggerMetadata?.label || node.name || "Unknown";
