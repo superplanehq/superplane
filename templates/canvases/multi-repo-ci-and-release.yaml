@@ -19,8 +19,7 @@ spec:
       position:
         x: 1925
         "y": 257
-      trigger:
-        name: "github.onRelease"
+      component: "github.onRelease"
       isCollapsed: false
     - id: "github-onrelease-github-onrelease-utjyd2"
       name: "Listen for new releases of Billing"
@@ -37,8 +36,7 @@ spec:
       position:
         x: 1928
         "y": 558
-      trigger:
-        name: "github.onRelease"
+      component: "github.onRelease"
       isCollapsed: false
     - id: "github-onrelease-github-onrelease-ayop2u"
       name: "Listen for new releases of App"
@@ -55,8 +53,7 @@ spec:
       position:
         x: 1932
         "y": 866
-      trigger:
-        name: "github.onRelease"
+      component: "github.onRelease"
       isCollapsed: false
     - id: "github-runworkflow-github-runworkflow-lduxm8"
       name: "Build Docker Image - Front"
@@ -80,8 +77,7 @@ spec:
       position:
         x: 2528
         "y": 254
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "github-runworkflow-build-docker-image-8vfqh4"
       name: "Build Docker Image - Billing"
@@ -105,8 +101,7 @@ spec:
       position:
         x: 2530
         "y": 557
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "github-runworkflow-build-docker-image-obpokg"
       name: "Build Docker Image - App"
@@ -130,8 +125,7 @@ spec:
       position:
         x: 2530
         "y": 866
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "slack-sendtextmessage-slack-sendtextmessage-pgdv24"
       name: "Slack: Send alert that build failed"
@@ -146,8 +140,7 @@ spec:
       position:
         x: 3241
         "y": 741
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
     - id: "component-node-r7stbz"
       name: "Slack: Notify on successful deployment"
@@ -162,8 +155,7 @@ spec:
       position:
         x: 3832
         "y": 438
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
     - id: "component-node-lkrxcj"
       name: "PD: Open Incident if Deploy fails"
@@ -181,8 +173,7 @@ spec:
       position:
         x: 3829
         "y": 610
-      action:
-        name: "pagerduty.createIncident"
+      component: "pagerduty.createIncident"
       isCollapsed: true
     - id: "github-runworkflow-github-runworkflow-wy2088"
       name: "Roll out to Kubernetes"
@@ -206,8 +197,7 @@ spec:
       position:
         x: 3239
         "y": 406
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "annotation-annotation-cvxv7j"
       name: "annotation"
@@ -220,8 +210,7 @@ spec:
       position:
         x: 1904
         "y": -114
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation2-561f8l"
       name: "annotation2"
@@ -234,8 +223,7 @@ spec:
       position:
         x: 2525
         "y": -124
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation3-pau27b"
       name: "annotation3"
@@ -248,8 +236,7 @@ spec:
       position:
         x: 3246
         "y": 122
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
   edges:
     - sourceId: "github-onrelease-github-onrelease-ljbrv2"

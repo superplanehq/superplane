@@ -9,7 +9,6 @@ import type {
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode,
   TriggersTrigger,
-  BlueprintsBlueprint,
   SuperplaneActionsAction,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../../componentBase";
@@ -26,8 +25,8 @@ function buildExecutionTabData(
 
   let currentData: Record<string, any> = {};
 
-  if (workflowNode?.action?.name) {
-    const customDetails = getExecutionDetails(workflowNode.action.name, execution, workflowNode, workflowNodes);
+  if (workflowNode?.component) {
+    const customDetails = getExecutionDetails(workflowNode.component, execution, workflowNode, workflowNodes);
     if (customDetails && Object.keys(customDetails).length > 0) {
       currentData = { ...customDetails };
     }
@@ -94,8 +93,8 @@ function convertSidebarEventToChainItem(
     nodeDisplayName = workflowNode.name || nodeDisplayName;
 
     // Get icon based on node type
-    if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
-      const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+    if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.component) {
+      const triggerMeta = triggers.find((t) => t.name === workflowNode.component!);
       nodeIconSlug = triggerMeta?.icon || "play";
     }
   }
@@ -142,7 +141,6 @@ interface ExecutionChainPageProps {
   workflowNodes?: SuperplaneComponentsNode[]; // Workflow spec nodes for metadata lookup
   actions?: SuperplaneActionsAction[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
-  blueprints?: BlueprintsBlueprint[]; // Blueprint metadata
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 }
 
@@ -158,7 +156,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   workflowNodes = [],
   actions = [],
   triggers = [],
-  blueprints = [],
   onHighlightedNodesChange,
 }) => {
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
@@ -235,20 +232,17 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           nodeDisplayName = workflowNode.name || nodeDisplayName;
 
           // Get icon based on node type
-          if (workflowNode.type === "TYPE_ACTION" && workflowNode.action?.name) {
-            const componentMeta = actions.find((c) => c.name === workflowNode.action!.name);
+          if (workflowNode.type === "TYPE_ACTION" && workflowNode.component) {
+            const componentMeta = actions.find((c) => c.name === workflowNode.component!);
             nodeIconSlug = componentMeta?.icon || "box";
-            nodeIconSrc = getHeaderIconSrc(workflowNode.action?.name);
-          } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
-            const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+            nodeIconSrc = getHeaderIconSrc(workflowNode.component);
+          } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.component) {
+            const triggerMeta = triggers.find((t) => t.name === workflowNode.component!);
             nodeIconSlug = triggerMeta?.icon || "play";
-          } else if (workflowNode.type === "TYPE_BLUEPRINT" && workflowNode.blueprint?.id) {
-            const blueprintMeta = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
-            nodeIconSlug = blueprintMeta?.icon || "box";
           }
         }
 
-        // Process child executions for composite components
+        // Process child executions when present.
         let childExecutions: ChildExecution[] | undefined = undefined;
         if (exec.childExecutions && exec.childExecutions.length > 0) {
           childExecutions = exec.childExecutions
@@ -259,29 +253,10 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
               return timeA - timeB;
             })
             .map((childExec: any) => {
-              const nodeId = childExec?.nodeId?.split(":")?.at(-1);
               let badgeColor = "bg-gray-400";
-              let componentName = "Unknown";
+              const componentName = childExec.nodeName || childExec.nodeId || "Unknown";
               let componentIcon = "box";
-              let componentIconSrc: string | undefined;
-
-              // Find the blueprint node information
-              if (workflowNode?.blueprint?.id && nodeId) {
-                const blueprint = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
-                if (blueprint?.nodes) {
-                  const blueprintNode = blueprint.nodes.find((node: any) => node.id === nodeId);
-                  if (blueprintNode) {
-                    componentName = blueprintNode.name || blueprintNode.action?.name || "Unknown";
-
-                    // Get component icon from components metadata
-                    if (blueprintNode.action?.name) {
-                      const componentMeta = actions.find((c) => c.name === blueprintNode.action!.name);
-                      componentIcon = componentMeta?.icon || "box";
-                      componentIconSrc = getHeaderIconSrc(blueprintNode.action?.name);
-                    }
-                  }
-                }
-              }
+              let componentIconSrc: string | undefined = undefined;
 
               if (getExecutionState) {
                 const { map, state } = getExecutionState(exec.nodeId, childExec);
@@ -339,7 +314,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       loadInFlightRef.current = false;
       setLoading(false);
     }
-  }, [eventId, loadExecutionChain, workflowNodes, actions, triggers, blueprints, getExecutionState]);
+  }, [eventId, loadExecutionChain, workflowNodes, actions, triggers, getExecutionState]);
 
   // Load execution chain data
   useEffect(() => {
