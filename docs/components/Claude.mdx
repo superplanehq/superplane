@@ -9,12 +9,49 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Run Claude Agent" href="#run-claude-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
   <LinkCard title="Text Prompt" href="#text-prompt" description="Generate a response using Anthropic's Claude models via the Messages API" />
 </CardGrid>
 
 ## Instructions
 
 To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
+
+<a id="run-claude-agent"></a>
+
+## Run Claude Agent
+
+The **Run Claude Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
+
+### Prerequisites
+
+- A **Claude API key** on the integration.
+- An **agent** and **environment** already created in the Anthropic API (or Console). This step references them by ID.
+
+### Configuration
+
+- **Agent ID** and optional **Version**: the Managed Agent to run (latest, or a pinned version if **Version** is set).
+- **Environment ID**: The environment the session runs in.
+- **Prompt**: The user message (task) sent to the agent.
+- **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
+
+### Output
+
+Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "lastMessage": "Finished the requested task.",
+    "sessionId": "sess_01ExampleManagedSession",
+    "status": "idle"
+  },
+  "timestamp": "2026-04-26T12:00:00Z",
+  "type": "claude.runAgent.finished"
+}
+```
 
 <a id="text-prompt"></a>
 
