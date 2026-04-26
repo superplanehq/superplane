@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"testing"
 
-	gh "github.com/google/go-github/v74/github"
+	gh "github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"

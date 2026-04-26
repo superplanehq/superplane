@@ -28,7 +28,6 @@ import {
   componentMappers as githubComponentMappers,
   triggerRenderers as githubTriggerRenderers,
   eventStateRegistry as githubEventStateRegistry,
-  customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
 import {
   componentMappers as gitlabComponentMappers,
@@ -439,7 +438,6 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 };
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
-  github: githubCustomFieldRenderers,
   grafana: grafanaCustomFieldRenderers,
   newrelic: newrelicCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
