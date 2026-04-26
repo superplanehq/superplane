@@ -233,16 +233,10 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 
 func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (*pb.CanvasChangeset_Change_Node, error) {
 	n := &pb.CanvasChangeset_Change_Node{
-		Id:   proposedNode.ID,
-		Name: proposedNode.Name,
+		Id:    proposedNode.ID,
+		Name:  proposedNode.Name,
+		Block: blockNameFromNode(proposedNode),
 	}
-
-	blockName := blockNameFromNode(proposedNode)
-	if blockName == "" {
-		return nil, fmt.Errorf("block name is required for node %s", proposedNode.ID)
-	}
-
-	n.Block = blockName
 
 	//
 	// If the configuration is different, we set configuration in the change.

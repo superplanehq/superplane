@@ -256,7 +256,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
               let badgeColor = "bg-gray-400";
               const componentName = childExec.nodeName || childExec.nodeId || "Unknown";
               let componentIcon = "box";
-              let componentIconSrc: string | undefined = undefined;
 
               if (getExecutionState) {
                 const { map, state } = getExecutionState(exec.nodeId, childExec);
@@ -269,8 +268,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                   executionId: childExec.id || "",
                   badgeColor,
                   backgroundColor: map[state]?.backgroundColor,
-                  componentIcon,
-                  componentIconSrc,
+                  componentIcon: "box"
                 };
               }
 
@@ -280,8 +278,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                 nodeId: childExec.nodeId || "",
                 executionId: childExec.id || "",
                 badgeColor,
-                componentIcon,
-                componentIconSrc,
+                componentIcon: "box"
               };
             });
         }
