@@ -666,18 +666,18 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		var integrationID *string
-		if node.Integration != nil && node.Integration.Id != "" {
-			integrationID = &node.Integration.Id
+		if node.Integration != nil && node.Integration.Id != nil {
+			integrationID = node.Integration.Id
 		}
 
 		var errorMessage *string
-		if node.ErrorMessage != "" {
-			errorMessage = &node.ErrorMessage
+		if node.ErrorMessage != nil {
+			errorMessage = node.ErrorMessage
 		}
 
 		var warningMessage *string
-		if node.WarningMessage != "" {
-			warningMessage = &node.WarningMessage
+		if node.WarningMessage != nil {
+			warningMessage = node.WarningMessage
 		}
 
 		//
@@ -746,16 +746,16 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 
 		if node.IntegrationID != nil && *node.IntegrationID != "" {
 			result[i].Integration = &componentpb.IntegrationRef{
-				Id: *node.IntegrationID,
+				Id: node.IntegrationID,
 			}
 		}
 
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
-			result[i].ErrorMessage = *node.ErrorMessage
+			result[i].ErrorMessage = node.ErrorMessage
 		}
 
 		if node.WarningMessage != nil && *node.WarningMessage != "" {
-			result[i].WarningMessage = *node.WarningMessage
+			result[i].WarningMessage = node.WarningMessage
 		}
 	}
 

@@ -19,13 +19,7 @@ spec:
         "y": 290
       action:
         name: "slack.sendTextMessage"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-fswk8u"
       name: "Wait for the system to recover"
       type: "TYPE_ACTION"
@@ -33,19 +27,12 @@ spec:
         mode: "interval"
         unit: "minutes"
         waitFor: "10"
-      metadata: null
       position:
         x: 1758
         "y": 392
       action:
         name: "wait"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-g0f7j5"
       name: "Check if there are any alerts"
       type: "TYPE_ACTION"
@@ -63,13 +50,7 @@ spec:
         "y": 392
       action:
         name: "dash0.listIssues"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-yfk4ek"
       name: "Slack: Rollback Failed"
       type: "TYPE_ACTION"
@@ -85,13 +66,7 @@ spec:
         "y": 618
       action:
         name: "slack.sendTextMessage"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-aktoyi"
       name: "Slack: Starting Rollback"
       type: "TYPE_ACTION"
@@ -107,13 +82,7 @@ spec:
         "y": 293
       action:
         name: "slack.sendTextMessage"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-pdfas0"
       name: "Slack: Health checks failing"
       type: "TYPE_ACTION"
@@ -129,13 +98,7 @@ spec:
         "y": 433
       action:
         name: "slack.sendTextMessage"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-onworkflowrun-github-onworkflowrun-k6enyi"
       name: "Listen for Failed deployments"
       type: "TYPE_TRIGGER"
@@ -153,15 +116,9 @@ spec:
       position:
         x: 554
         "y": 404
-      action: null
-      blueprint: null
       trigger:
         name: "github.onWorkflowRun"
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-z5400d"
       name: "Execute Rollback"
       type: "TYPE_ACTION"
@@ -179,13 +136,7 @@ spec:
         "y": 403
       action:
         name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-note-ar1tgr"
       name: "Note"
       type: "TYPE_WIDGET"
@@ -194,19 +145,12 @@ spec:
         height: 439
         text: "## GitHub deployment failure trigger\n\nThis node listens to deployment workflows in your repository and forwards all **failed** events.\n\n\n### To set up\n1. Click the node to open the sidebar configuration.\n2. Follow the instructions to connect your GitHub account.\n3. Once connected, select the node again and choose:\n   - Repository\n   - Workflow\n   - Branch (optional)\n\n\n### How this works\nWhen a deployment workflow fails, SuperPlane captures the event and triggers this Canvas.  \nThe failure details flow downstream and are used to initiate an automated rollback."
         width: 368
-      metadata: null
       position:
         x: 547
         "y": -89
-      action: null
-      blueprint: null
-      trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-note-ar2rbk"
       name: "Note"
       type: "TYPE_WIDGET"
@@ -215,19 +159,12 @@ spec:
         height: 278
         text: "### Automated rollback execution\n\nWhen a failed deployment is detected, two actions happen in parallel:\n\n**Notification**: A Slack message is sent immediately to inform the team that a rollback is starting.\n\n**Rollback**: The configured rollback workflow is triggered in GitHub Actions.\n\nSuperPlane tracks the rollback workflow progress and routes the event based on the outcome - success or failure."
         width: 363
-      metadata: null
       position:
         x: 1093
         "y": -75
-      action: null
-      blueprint: null
-      trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-note-ar3hlt"
       name: "Note"
       type: "TYPE_WIDGET"
@@ -236,19 +173,12 @@ spec:
         height: 370
         text: "### Post-rollback health verification\n\nAfter a successful rollback, the **Wait** component pauses the Canvas for 10 minutes to allow the system to stabilize before running health checks.\n\nThe **Slack** components use data from **payloads emitted by upstream components** to construct success and failure messages.  \nFor example, repository names and workflow URLs are pulled directly from the trigger event.\n\n**Payload data** can be used in various component configurations, including wait durations and message templates.  \n\nOpen any node sidebar to explore available event data and configuration options."
         width: 402
-      metadata: null
       position:
         x: 1754
         "y": -143
-      action: null
-      blueprint: null
-      trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-note-ar4res"
       name: "Note"
       type: "TYPE_WIDGET"
@@ -257,19 +187,12 @@ spec:
         height: 211
         text: "### Health check and notifications\n\nThe **Dash0 List Issues** component queries your Dash0 instance for any failing check rules.\n\nTo use this component, you need to have **check rules** configured in your Dash0 instance.  \nThe component evaluates their status and routes the event based on severity.\n\nIf **degraded** or **critical** checks are detected, a Slack message is sent with a summary of the failing checks.\n\nOpen the Slack node sidebar to see how advanced expressions are used to count and categorize alerts in the message."
         width: 975
-      metadata: null
       position:
         x: 2258
         "y": 101
-      action: null
-      blueprint: null
-      trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
   edges:
     - sourceId: "component-node-fswk8u"
       targetId: "component-node-g0f7j5"
