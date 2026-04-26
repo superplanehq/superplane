@@ -131,24 +131,18 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 				Spec: &pb.Canvas_Spec{
 					Nodes: []*componentpb.Node{
 						{
-							Id:   "http-1",
-							Name: "HTTP Request",
-							Type: componentpb.Node_TYPE_ACTION,
-							Action: &componentpb.Node_ActionRef{
-								Name: "http",
-							},
+							Id:        "http-1",
+							Name:      "HTTP Request",
+							Component: "http",
 							Configuration: structFromAnyMap(t, map[string]any{
 								"method": "GET",
 								"url":    "https://example.com",
 							}),
 						},
 						{
-							Id:   "if-1",
-							Name: "If",
-							Type: componentpb.Node_TYPE_ACTION,
-							Action: &componentpb.Node_ActionRef{
-								Name: "if",
-							},
+							Id:        "if-1",
+							Name:      "If",
+							Component: "if",
 							Configuration: structFromAnyMap(t, map[string]any{
 								"expression": "true",
 							}),

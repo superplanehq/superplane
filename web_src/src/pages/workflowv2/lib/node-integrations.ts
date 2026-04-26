@@ -13,14 +13,14 @@ export function getNodeIntegrationName(
 ): string | undefined {
   if (node.type === "TYPE_ACTION") {
     const match = availableIntegrations.find((integration) =>
-      integration.actions?.some((component: SuperplaneActionsAction) => component.name === node.action?.name),
+      integration.actions?.some((component: SuperplaneActionsAction) => component.name === node.component),
     );
     return match?.name;
   }
 
   if (node.type === "TYPE_TRIGGER") {
     const match = availableIntegrations.find((integration) =>
-      integration.triggers?.some((trigger: TriggersTrigger) => trigger.name === node.trigger?.name),
+      integration.triggers?.some((trigger: TriggersTrigger) => trigger.name === node.component),
     );
     return match?.name;
   }

@@ -29,9 +29,7 @@ function makeNode(overrides: Partial<SuperplaneComponentsNode> = {}): Superplane
     name: "Broken Component",
     type: "TYPE_ACTION",
     position: { x: 10, y: 20 },
-    action: {
-      name: "approval",
-    },
+    component: "approval",
     configuration: {},
     ...overrides,
   });
@@ -54,9 +52,7 @@ function makeTriggerNode(overrides: Partial<SuperplaneComponentsNode> = {}): Sup
     name: "Incoming Event",
     type: "TYPE_TRIGGER",
     position: { x: 0, y: 0 },
-    trigger: {
-      name: "webhook",
-    },
+    component: "webhook",
     configuration: {},
     ...overrides,
   });

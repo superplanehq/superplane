@@ -26,8 +26,8 @@ function buildExecutionTabData(
 
   let currentData: Record<string, any> = {};
 
-  if (workflowNode?.action?.name) {
-    const customDetails = getExecutionDetails(workflowNode.action.name, execution, workflowNode, workflowNodes);
+  if (workflowNode?.component) {
+    const customDetails = getExecutionDetails(workflowNode.component, execution, workflowNode, workflowNodes);
     if (customDetails && Object.keys(customDetails).length > 0) {
       currentData = { ...customDetails };
     }
@@ -94,8 +94,8 @@ function convertSidebarEventToChainItem(
     nodeDisplayName = workflowNode.name || nodeDisplayName;
 
     // Get icon based on node type
-    if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
-      const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+    if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.component) {
+      const triggerMeta = triggers.find((t) => t.name === workflowNode.component!);
       nodeIconSlug = triggerMeta?.icon || "play";
     }
   }
@@ -235,15 +235,15 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           nodeDisplayName = workflowNode.name || nodeDisplayName;
 
           // Get icon based on node type
-          if (workflowNode.type === "TYPE_ACTION" && workflowNode.action?.name) {
-            const componentMeta = actions.find((c) => c.name === workflowNode.action!.name);
+          if (workflowNode.type === "TYPE_ACTION" && workflowNode.component) {
+            const componentMeta = actions.find((c) => c.name === workflowNode.component!);
             nodeIconSlug = componentMeta?.icon || "box";
-            nodeIconSrc = getHeaderIconSrc(workflowNode.action?.name);
-          } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.trigger?.name) {
-            const triggerMeta = triggers.find((t) => t.name === workflowNode.trigger!.name);
+            nodeIconSrc = getHeaderIconSrc(workflowNode.component);
+          } else if (workflowNode.type === "TYPE_TRIGGER" && workflowNode.component) {
+            const triggerMeta = triggers.find((t) => t.name === workflowNode.component!);
             nodeIconSlug = triggerMeta?.icon || "play";
-          } else if (workflowNode.type === "TYPE_BLUEPRINT" && workflowNode.blueprint?.id) {
-            const blueprintMeta = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
+          } else if (workflowNode.type === "TYPE_BLUEPRINT" && workflowNode.component) {
+            const blueprintMeta = blueprints.find((b) => b.id === workflowNode.component!);
             nodeIconSlug = blueprintMeta?.icon || "box";
           }
         }
@@ -266,18 +266,18 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
               let componentIconSrc: string | undefined;
 
               // Find the blueprint node information
-              if (workflowNode?.blueprint?.id && nodeId) {
-                const blueprint = blueprints.find((b) => b.id === workflowNode.blueprint!.id);
+              if (workflowNode?.component && nodeId) {
+                const blueprint = blueprints.find((b) => b.id === workflowNode.component!);
                 if (blueprint?.nodes) {
                   const blueprintNode = blueprint.nodes.find((node: any) => node.id === nodeId);
                   if (blueprintNode) {
-                    componentName = blueprintNode.name || blueprintNode.action?.name || "Unknown";
+                    componentName = blueprintNode.name || blueprintNode.component || "Unknown";
 
                     // Get component icon from components metadata
-                    if (blueprintNode.action?.name) {
-                      const componentMeta = actions.find((c) => c.name === blueprintNode.action!.name);
+                    if (blueprintNode.component) {
+                      const componentMeta = actions.find((c) => c.name === blueprintNode.component!);
                       componentIcon = componentMeta?.icon || "box";
-                      componentIconSrc = getHeaderIconSrc(blueprintNode.action?.name);
+                      componentIconSrc = getHeaderIconSrc(blueprintNode.component);
                     }
                   }
                 }
