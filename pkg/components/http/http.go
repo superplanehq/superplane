@@ -33,6 +33,10 @@ const (
 
 	SuccessOutputChannel = "success"
 	FailureOutputChannel = "failure"
+
+	AuthorizationTypeBearer       = "bearer"
+	AuthorizationTypeBasicAuth    = "basic_auth"
+	AuthorizationTypeCustomHeader = "custom_header"
 )
 
 func init() {
@@ -50,8 +54,12 @@ type KeyValue struct {
 }
 
 type AuthorizationSpec struct {
-	Credential configuration.SecretKeyRef `json:"credential" mapstructure:"credential"`
-	Prefix     *string                    `json:"prefix,omitempty" mapstructure:"prefix"`
+	Type       string                     `json:"type" mapstructure:"type"`
+	Credential configuration.SecretKeyRef `json:"credential,omitempty" mapstructure:"credential"`
+	Username   string                     `json:"username,omitempty" mapstructure:"username"`
+	Password   configuration.SecretKeyRef `json:"password,omitempty" mapstructure:"password"`
+	HeaderName string                     `json:"headerName,omitempty" mapstructure:"headerName"`
+	Value      configuration.SecretKeyRef `json:"value,omitempty" mapstructure:"value"`
 }
 
 type Spec struct {
@@ -143,7 +151,7 @@ func (e *HTTP) Documentation() string {
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
-- **Authorization** (optional): token from an organization secret (not the **Headers** list)
+- **Authorization** (optional): Bearer Token, Basic Auth password, or custom header value
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
@@ -182,7 +190,7 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("method is required")
 	}
 
-	if err := validateAuthorizationForSetup(spec.Authorization); err != nil {
+	if err := validateAuthorizationSpec(spec.Authorization); err != nil {
 		return err
 	}
 
@@ -233,44 +241,85 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func validateAuthorizationForSetup(a *AuthorizationSpec) error {
+func validateAuthorizationSpec(a *AuthorizationSpec) error {
 	if a == nil {
 		return nil
 	}
-	if a.Credential.IsSet() {
+
+	switch a.Type {
+	case "":
+		return fmt.Errorf("authorization: type is required when authorization is set")
+	case AuthorizationTypeBearer:
+		return validateSecretKeyRef("authorization bearer credential", a.Credential)
+	case AuthorizationTypeBasicAuth:
+		if a.Username == "" {
+			return fmt.Errorf("authorization basic auth: username is required")
+		}
+		return validateSecretKeyRef("authorization basic auth password", a.Password)
+	case AuthorizationTypeCustomHeader:
+		if a.HeaderName == "" {
+			return fmt.Errorf("authorization custom header: header name is required")
+		}
+		return validateSecretKeyRef("authorization custom header value", a.Value)
+	default:
+		return fmt.Errorf("authorization: invalid type: %s", a.Type)
+	}
+}
+
+func validateSecretKeyRef(name string, ref configuration.SecretKeyRef) error {
+	if ref.IsSet() {
 		return nil
 	}
-	if a.Credential.Secret != "" || a.Credential.Key != "" {
-		return fmt.Errorf("authorization: both organization secret and key name are required")
+	if ref.Secret != "" || ref.Key != "" {
+		return fmt.Errorf("%s: both organization secret and key name are required", name)
 	}
-	return fmt.Errorf("authorization: credential (organization secret and key) is required when authorization is set")
+	return fmt.Errorf("%s: organization secret and key are required", name)
 }
 
 func applyAuthorizationHeader(secrets core.SecretsContext, spec Spec, req *http.Request) error {
 	if spec.Authorization == nil {
 		return nil
 	}
-	if !spec.Authorization.Credential.IsSet() {
-		return fmt.Errorf("authorization: credential is required")
-	}
 	if secrets == nil {
 		return fmt.Errorf("authorization: secrets context is not available")
 	}
 
-	value, err := secrets.GetKey(spec.Authorization.Credential.Secret, spec.Authorization.Credential.Key)
-	if err != nil {
-		if errors.Is(err, core.ErrSecretKeyNotFound) {
-			return fmt.Errorf("authorization: %w", err)
+	switch spec.Authorization.Type {
+	case AuthorizationTypeBearer:
+		value, err := resolveAuthorizationSecret(secrets, "bearer credential", spec.Authorization.Credential)
+		if err != nil {
+			return err
 		}
-		return fmt.Errorf("authorization: resolve credential: %w", err)
+		req.Header.Set("Authorization", "Bearer "+string(value))
+	case AuthorizationTypeBasicAuth:
+		password, err := resolveAuthorizationSecret(secrets, "basic auth password", spec.Authorization.Password)
+		if err != nil {
+			return err
+		}
+		req.SetBasicAuth(spec.Authorization.Username, string(password))
+	case AuthorizationTypeCustomHeader:
+		value, err := resolveAuthorizationSecret(secrets, "custom header value", spec.Authorization.Value)
+		if err != nil {
+			return err
+		}
+		req.Header.Set(spec.Authorization.HeaderName, string(value))
+	default:
+		return fmt.Errorf("authorization: invalid type: %s", spec.Authorization.Type)
 	}
 
-	prefix := "Bearer "
-	if spec.Authorization.Prefix != nil {
-		prefix = *spec.Authorization.Prefix
-	}
-	req.Header.Set("Authorization", prefix+string(value))
 	return nil
+}
+
+func resolveAuthorizationSecret(secrets core.SecretsContext, name string, ref configuration.SecretKeyRef) ([]byte, error) {
+	value, err := secrets.GetKey(ref.Secret, ref.Key)
+	if err != nil {
+		if errors.Is(err, core.ErrSecretKeyNotFound) {
+			return nil, fmt.Errorf("authorization %s: %w", name, err)
+		}
+		return nil, fmt.Errorf("authorization %s: resolve secret: %w", name, err)
+	}
+
+	return value, nil
 }
 
 func (e *HTTP) OutputChannels(configuration any) []core.OutputChannel {
@@ -306,6 +355,98 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "https://api.example.com/endpoint",
+		},
+		{
+			Name:        "authorization",
+			Label:       "Authorization",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Togglable:   true,
+			Description: "Configure request authentication",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "type",
+							Label:       "Type",
+							Type:        configuration.FieldTypeSelect,
+							Required:    true,
+							Default:     AuthorizationTypeBearer,
+							Description: "Authorization method to use for this request",
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Bearer Token", Value: AuthorizationTypeBearer},
+										{Label: "Basic Auth", Value: AuthorizationTypeBasicAuth},
+										{Label: "Custom Header", Value: AuthorizationTypeCustomHeader},
+									},
+								},
+							},
+						},
+						{
+							Name:        "credential",
+							Label:       "Token",
+							Type:        configuration.FieldTypeSecretKey,
+							Description: "Secret and key that stores the bearer token",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "type", Values: []string{AuthorizationTypeBearer}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "type", Values: []string{AuthorizationTypeBearer}},
+							},
+						},
+						{
+							Name:        "username",
+							Label:       "Username",
+							Type:        configuration.FieldTypeString,
+							Description: "Username for Basic Auth",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "type", Values: []string{AuthorizationTypeBasicAuth}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "type", Values: []string{AuthorizationTypeBasicAuth}},
+							},
+						},
+						{
+							Name:        "password",
+							Label:       "Password",
+							Type:        configuration.FieldTypeSecretKey,
+							Description: "Secret and key that stores the Basic Auth password",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "type", Values: []string{AuthorizationTypeBasicAuth}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "type", Values: []string{AuthorizationTypeBasicAuth}},
+							},
+						},
+						{
+							Name:        "headerName",
+							Label:       "Header name",
+							Type:        configuration.FieldTypeString,
+							Description: "Custom header name that will receive the secret value",
+							Placeholder: "X-API-Key",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "type", Values: []string{AuthorizationTypeCustomHeader}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "type", Values: []string{AuthorizationTypeCustomHeader}},
+							},
+						},
+						{
+							Name:        "value",
+							Label:       "Value",
+							Type:        configuration.FieldTypeSecretKey,
+							Description: "Secret and key that stores the custom header value",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "type", Values: []string{AuthorizationTypeCustomHeader}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "type", Values: []string{AuthorizationTypeCustomHeader}},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "queryParams",
@@ -380,36 +521,6 @@ func (e *HTTP) Configuration() []configuration.Field {
 				{
 					"name":  "X-Foo",
 					"value": "Bar",
-				},
-			},
-		},
-		{
-			Name:        "authorization",
-			Label:       "Authorization",
-			Type:        configuration.FieldTypeObject,
-			Required:    false,
-			Togglable:   true,
-			Description: "Bearer or other token from an organization secret. Overrides an Authorization row under Headers if both are set.",
-			TypeOptions: &configuration.TypeOptions{
-				Object: &configuration.ObjectTypeOptions{
-					Schema: []configuration.Field{
-						{
-							Name:        "credential",
-							Label:       "Credential",
-							Type:        configuration.FieldTypeSecretKey,
-							Required:    true,
-							Description: "Secret and key that stores the API token or credential",
-						},
-						{
-							Name:        "prefix",
-							Label:       "Value prefix",
-							Type:        configuration.FieldTypeString,
-							Required:    false,
-							Description: "Usually \"Bearer \" (default). Clear for a raw token only.",
-							Default:     "Bearer ",
-							Placeholder: "Bearer ",
-						},
-					},
 				},
 			},
 		},
@@ -606,7 +717,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := validateAuthorizationForSetup(spec.Authorization); err != nil {
+	if err := validateAuthorizationSpec(spec.Authorization); err != nil {
 		return err
 	}
 

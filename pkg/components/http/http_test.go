@@ -189,14 +189,45 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 			},
 		},
 		{
-			name: "GET with authorization from secret",
+			name: "GET with bearer authorization from secret",
 			config: map[string]any{
 				"method": "GET",
 				"url":    "https://api.example.com",
 				"authorization": map[string]any{
+					"type": AuthorizationTypeBearer,
 					"credential": map[string]any{
 						"secret": "api-creds",
 						"key":    "token",
+					},
+				},
+			},
+		},
+		{
+			name: "GET with basic auth from secret",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type":     AuthorizationTypeBasicAuth,
+					"username": "deploy",
+					"password": map[string]any{
+						"secret": "api-creds",
+						"key":    "password",
+					},
+				},
+			},
+		},
+		{
+			name: "GET with custom header authorization from secret",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type":       AuthorizationTypeCustomHeader,
+					"headerName": "X-API-Key",
+					"value": map[string]any{
+						"secret": "api-creds",
+						"key":    "api-key",
 					},
 				},
 			},
@@ -308,13 +339,58 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 				"method": "GET",
 				"url":    "https://api.example.com",
 				"authorization": map[string]any{
+					"type": AuthorizationTypeBearer,
 					"credential": map[string]any{
 						"secret": "s",
 						"key":    "",
 					},
 				},
 			},
-			expectErr: "authorization: both organization secret and key name are required",
+			expectErr: "authorization bearer credential: both organization secret and key name are required",
+		},
+		{
+			name: "authorization without type",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"credential": map[string]any{
+						"secret": "s",
+						"key":    "k",
+					},
+				},
+			},
+			expectErr: "authorization: type is required",
+		},
+		{
+			name: "basic auth without username",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type": AuthorizationTypeBasicAuth,
+					"password": map[string]any{
+						"secret": "s",
+						"key":    "k",
+					},
+				},
+			},
+			expectErr: "authorization basic auth: username is required",
+		},
+		{
+			name: "custom header without header name",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type": AuthorizationTypeCustomHeader,
+					"value": map[string]any{
+						"secret": "s",
+						"key":    "k",
+					},
+				},
+			},
+			expectErr: "authorization custom header: header name is required",
 		},
 	}
 
@@ -381,7 +457,7 @@ func TestHTTP__Execute__SetsAuthorizationFromSecret(t *testing.T) {
 			{"name": "Authorization", "value": "should-be-overridden"},
 		},
 		"authorization": map[string]any{
-			"prefix": "",
+			"type": AuthorizationTypeBearer,
 			"credential": map[string]any{
 				"secret": "org-secret",
 				"key":    "token",
@@ -393,10 +469,10 @@ func TestHTTP__Execute__SetsAuthorizationFromSecret(t *testing.T) {
 	err := h.Execute(ctx)
 	require.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
-	assert.Equal(t, "tok-123", gotAuth)
+	assert.Equal(t, "Bearer tok-123", gotAuth)
 }
 
-func TestHTTP__Execute__AuthorizationDefaultBearerPrefix(t *testing.T) {
+func TestHTTP__Execute__SetsBasicAuthFromSecret(t *testing.T) {
 	h := &HTTP{}
 	var gotAuth string
 
@@ -411,7 +487,9 @@ func TestHTTP__Execute__AuthorizationDefaultBearerPrefix(t *testing.T) {
 		"method": "GET",
 		"url":    server.URL,
 		"authorization": map[string]any{
-			"credential": map[string]any{
+			"type":     AuthorizationTypeBasicAuth,
+			"username": "deploy",
+			"password": map[string]any{
 				"secret": "s",
 				"key":    "k",
 			},
@@ -422,7 +500,38 @@ func TestHTTP__Execute__AuthorizationDefaultBearerPrefix(t *testing.T) {
 	err := h.Execute(ctx)
 	require.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
-	assert.Equal(t, "Bearer abc", gotAuth)
+	assert.Equal(t, "Basic ZGVwbG95OmFiYw==", gotAuth)
+}
+
+func TestHTTP__Execute__SetsCustomHeaderFromSecret(t *testing.T) {
+	h := &HTTP{}
+	var gotHeader string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Get("X-API-Key")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"type":       AuthorizationTypeCustomHeader,
+			"headerName": "X-API-Key",
+			"value": map[string]any{
+				"secret": "s",
+				"key":    "k",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{value: []byte("abc")}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "abc", gotHeader)
 }
 
 func TestHTTP__Execute__AuthorizationSecretMissing(t *testing.T) {
@@ -436,6 +545,7 @@ func TestHTTP__Execute__AuthorizationSecretMissing(t *testing.T) {
 		"method": "GET",
 		"url":    server.URL,
 		"authorization": map[string]any{
+			"type": AuthorizationTypeBearer,
 			"credential": map[string]any{
 				"secret": "s",
 				"key":    "k",
