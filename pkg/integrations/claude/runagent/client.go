@@ -35,10 +35,8 @@ type claudeErrorResponse struct {
 
 // CreateManagedSessionRequest is the body for POST /v1/sessions.
 type CreateManagedSessionRequest struct {
-	// Agent is the agent ID string, or use AgentID/AgentVersion for a specific version.
-	Agent string
-	// AgentID and AgentVersion pin the session to a version when both are set.
-	AgentID       string
+	// Agent is the agent ID string, or the ID used with AgentVersion for a specific version.
+	Agent         string
 	AgentVersion  *int
 	EnvironmentID string
 	VaultIDs      []string
@@ -110,25 +108,18 @@ func buildCreateSessionBody(req CreateManagedSessionRequest) (createManagedSessi
 		return createManagedSessionBody{}, fmt.Errorf("environmentId is required")
 	}
 
-	var agent any
-	switch {
-	case req.AgentVersion != nil:
-		aid := req.AgentID
-		if aid == "" {
-			aid = req.Agent
-		}
-		if strings.TrimSpace(aid) == "" {
-			return createManagedSessionBody{}, fmt.Errorf("agent is required when version is set")
-		}
+	agentID := strings.TrimSpace(req.Agent)
+	if agentID == "" {
+		return createManagedSessionBody{}, fmt.Errorf("agent is required")
+	}
+
+	var agent any = agentID
+	if req.AgentVersion != nil {
 		agent = map[string]any{
 			"type":    "agent",
-			"id":      strings.TrimSpace(aid),
+			"id":      agentID,
 			"version": *req.AgentVersion,
 		}
-	case strings.TrimSpace(req.Agent) != "":
-		agent = strings.TrimSpace(req.Agent)
-	default:
-		return createManagedSessionBody{}, fmt.Errorf("agent is required")
 	}
 
 	return createManagedSessionBody{
@@ -192,45 +183,48 @@ func (c *Client) GetManagedSession(sessionID string) (*ManagedSession, error) {
 	return &out, nil
 }
 
-func (c *Client) ListManagedSessionEvents(sessionID string) ([]ManagedSessionEvent, error) {
+func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]ManagedSessionEvent, string, error) {
 	if sessionID == "" {
-		return nil, fmt.Errorf("session id is required")
+		return nil, "", fmt.Errorf("session id is required")
 	}
 
-	var events []ManagedSessionEvent
-	page := ""
-	for {
-		params := url.Values{}
-		params.Set("limit", sessionEventsPageLimit)
-		params.Set("order", "desc")
-		if page != "" {
-			params.Set("page", page)
-		}
-
-		URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/events?" + params.Encode()
-		responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
-		if err != nil {
-			return nil, err
-		}
-
-		var out listSessionEventsResponse
-		if err := json.Unmarshal(responseBody, &out); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal session events: %w", err)
-		}
-		events = append(events, out.Data...)
-		if out.NextPage == "" {
-			return events, nil
-		}
-		page = out.NextPage
+	params := url.Values{}
+	params.Set("limit", sessionEventsPageLimit)
+	params.Set("order", "desc")
+	if page != "" {
+		params.Set("page", page)
 	}
+
+	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/events?" + params.Encode()
+	responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var out listSessionEventsResponse
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, "", fmt.Errorf("failed to unmarshal session events: %w", err)
+	}
+	return out.Data, out.NextPage, nil
 }
 
-func (c *Client) GetLastManagedSessionAgentMessage(sessionID string) (string, error) {
-	events, err := c.ListManagedSessionEvents(sessionID)
-	if err != nil {
-		return "", err
+func (c *Client) GetLastManagedSessionAgentMessage(sessionID string) (string, []ManagedSessionEvent, error) {
+	seen := []ManagedSessionEvent{}
+	page := ""
+	for {
+		events, nextPage, err := c.listManagedSessionEventsPage(sessionID, page)
+		if err != nil {
+			return "", seen, err
+		}
+		seen = append(seen, events...)
+
+		message := lastAgentMessageFromEvents(events)
+		if message != "" || nextPage == "" {
+			return message, seen, nil
+		}
+
+		page = nextPage
 	}
-	return lastAgentMessageFromEvents(events), nil
 }
 
 func (c *Client) GetLastManagedSessionAgentMessageWithRetry(sessionID string, attempts int, delay time.Duration) (string, []ManagedSessionEvent, error) {
@@ -241,12 +235,11 @@ func (c *Client) GetLastManagedSessionAgentMessageWithRetry(sessionID string, at
 	var events []ManagedSessionEvent
 	for i := 0; i < attempts; i++ {
 		var err error
-		events, err = c.ListManagedSessionEvents(sessionID)
+		message, events, err := c.GetLastManagedSessionAgentMessage(sessionID)
 		if err != nil {
 			return "", events, err
 		}
 
-		message := lastAgentMessageFromEvents(events)
 		if message != "" || i == attempts-1 {
 			return message, events, nil
 		}

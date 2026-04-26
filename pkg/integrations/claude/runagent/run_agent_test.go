@@ -234,6 +234,33 @@ func TestClient_ManagedSessions(t *testing.T) {
 	})
 }
 
+func TestClient_GetLastManagedSessionAgentMessage(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"data":[{"type":"user.message","content":[{"type":"text","text":"Hello"}]}],"next_page":"page_2"}`)),
+			},
+			{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"data":[{"type":"agent.message","content":[{"type":"text","text":"Done"}]}],"next_page":"page_3"}`)),
+			},
+		},
+	}
+	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+
+	message, events, err := client.GetLastManagedSessionAgentMessage("sess_1")
+	require.NoError(t, err)
+	assert.Equal(t, "Done", message)
+	require.Len(t, events, 2)
+	require.Len(t, httpCtx.Requests, 2)
+
+	assert.Equal(t, "desc", httpCtx.Requests[0].URL.Query().Get("order"))
+	assert.Equal(t, sessionEventsPageLimit, httpCtx.Requests[0].URL.Query().Get("limit"))
+	assert.Empty(t, httpCtx.Requests[0].URL.Query().Get("page"))
+	assert.Equal(t, "page_2", httpCtx.Requests[1].URL.Query().Get("page"))
+}
+
 func Test__buildCreateSessionBody__latest(t *testing.T) {
 	b, err := buildCreateSessionBody(CreateManagedSessionRequest{
 		Agent:         "  ag  ",

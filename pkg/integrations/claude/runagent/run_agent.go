@@ -129,15 +129,9 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	aid := strings.TrimSpace(spec.Agent)
 	createReq := CreateManagedSessionRequest{
 		Agent:         aid,
-		AgentID:       aid,
 		AgentVersion:  spec.Version,
 		EnvironmentID: strings.TrimSpace(spec.EnvironmentID),
 		VaultIDs:      spec.VaultIDs,
-	}
-	if spec.Version == nil {
-		createReq.AgentID = ""
-	} else {
-		createReq.Agent = ""
 	}
 
 	session, err := client.CreateManagedSession(createReq)
