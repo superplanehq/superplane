@@ -117,7 +117,7 @@ func validateOutputChannelReference(registry *registry.Registry, nodes []*compon
 	//
 	// Check if the node has the output channel referenced
 	//
-	action, err := registry.GetAction(node.Component.Name)
+	action, err := registry.GetAction(node.Action.Name)
 	if err != nil {
 		return err
 	}
