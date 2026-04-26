@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 var (
@@ -142,20 +143,20 @@ func (r *Registry) FindConfigurableComponent(name string) (core.Configurable, er
 	return nil, fmt.Errorf("component %s not found", name)
 }
 
-func (r *Registry) ComponentKind(name string) (core.ComponentKind, error) {
+func (r *Registry) ComponentType(name string) (string, error) {
 	_, err := r.GetAction(name)
 	if err == nil {
-		return core.ComponentKindAction, nil
+		return models.NodeTypeComponent, nil
 	}
 
 	_, err = r.GetTrigger(name)
 	if err == nil {
-		return core.ComponentKindTrigger, nil
+		return models.NodeTypeTrigger, nil
 	}
 
 	_, err = r.GetWidget(name)
 	if err == nil {
-		return core.ComponentKindWidget, nil
+		return models.NodeTypeWidget, nil
 	}
 
 	return "", fmt.Errorf("component %s not found", name)

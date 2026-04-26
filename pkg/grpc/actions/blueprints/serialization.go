@@ -92,11 +92,7 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 	}
 
 	// Convert proto nodes to models, adding validation errors and warnings where applicable
-	nodes, err := actions.ProtoToNodes(registry, blueprint.Nodes)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	nodes := actions.ProtoToNodes(registry, blueprint.Nodes)
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
 			nodes[i].ErrorMessage = &errorMsg

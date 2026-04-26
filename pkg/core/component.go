@@ -9,14 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type ComponentKind string
-
-const (
-	ComponentKindAction  ComponentKind = "action"
-	ComponentKindTrigger ComponentKind = "trigger"
-	ComponentKindWidget  ComponentKind = "widget"
-)
-
 var ErrSecretKeyNotFound = errors.New("secret or key not found")
 
 /*

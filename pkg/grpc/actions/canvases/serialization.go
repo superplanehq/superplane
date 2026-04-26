@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -236,7 +235,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	}
 
 	nodeIDs := make(map[string]bool)
-	nodeTypeByID := make(map[string]core.ComponentKind)
+	nodeTypeByID := make(map[string]componentpb.Node_Type)
 	nodeValidationErrors := make(map[string]string)
 
 	for i, node := range canvas.Spec.Nodes {
@@ -252,26 +251,16 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: duplicate node id", node.Id)
 		}
 
-		nodeType, err := registry.ComponentKind(node.Component)
-		if err != nil {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %d: %v", i, err)
-		}
-
 		nodeIDs[node.Id] = true
-		nodeTypeByID[node.Id] = nodeType
-
+		nodeTypeByID[node.Id] = node.Type
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
 	// Find shadowed names within connected components
+	nodes := actions.ProtoToNodes(registry, canvas.Spec.Nodes)
 	nodeWarnings := actions.FindShadowedNameWarnings(registry, canvas.Spec.Nodes, canvas.Spec.Edges)
-	nodes, err := actions.ProtoToNodes(registry, canvas.Spec.Nodes)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	nodesByID := make(map[string]models.Node, len(nodes))
 	for _, node := range nodes {
 		nodesByID[node.ID] = node
@@ -290,11 +279,11 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if nodeTypeByID[edge.SourceId] == core.ComponentKindWidget {
+		if nodeTypeByID[edge.SourceId] == componentpb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
-		if nodeTypeByID[edge.TargetId] == core.ComponentKindWidget {
+		if nodeTypeByID[edge.TargetId] == componentpb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 

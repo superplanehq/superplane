@@ -2,7 +2,6 @@ package actions
 
 import (
 	"encoding/json"
-	"fmt"
 	"slices"
 
 	uuid "github.com/google/uuid"
@@ -664,7 +663,7 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 	return field
 }
 
-func ProtoToNodes(registry *registry.Registry, nodes []*componentpb.Node) ([]models.Node, error) {
+func ProtoToNodes(registry *registry.Registry, nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		var integrationID *string
@@ -682,10 +681,7 @@ func ProtoToNodes(registry *registry.Registry, nodes []*componentpb.Node) ([]mod
 			warningMessage = node.WarningMessage
 		}
 
-		nodeType, nodeRef, err := ComponentToNodeTypeAndRef(registry, node.Component)
-		if err != nil {
-			return nil, err
-		}
+		nodeType, nodeRef := ComponentToNodeTypeAndRef(registry, node.Type, node.Component)
 
 		//
 		// NOTE: we do not include metadata in here,
@@ -706,37 +702,32 @@ func ProtoToNodes(registry *registry.Registry, nodes []*componentpb.Node) ([]mod
 		}
 	}
 
-	return result, nil
+	return result
 }
 
-func ComponentToNodeTypeAndRef(registry *registry.Registry, component string) (string, *models.NodeRef, error) {
-	kind, err := registry.ComponentKind(component)
-	if err != nil {
-		return "", nil, err
-	}
-
-	switch kind {
-	case core.ComponentKindAction:
+func ComponentToNodeTypeAndRef(registry *registry.Registry, nodeType componentpb.Node_Type, component string) (string, *models.NodeRef) {
+	switch nodeType {
+	case componentpb.Node_TYPE_ACTION:
 		return models.NodeTypeComponent, &models.NodeRef{
 			Component: &models.ComponentRef{
 				Name: component,
 			},
-		}, nil
-	case core.ComponentKindTrigger:
+		}
+	case componentpb.Node_TYPE_TRIGGER:
 		return models.NodeTypeTrigger, &models.NodeRef{
 			Trigger: &models.TriggerRef{
 				Name: component,
 			},
-		}, nil
-	case core.ComponentKindWidget:
+		}
+	case componentpb.Node_TYPE_WIDGET:
 		return models.NodeTypeWidget, &models.NodeRef{
 			Widget: &models.WidgetRef{
 				Name: component,
 			},
-		}, nil
+		}
+	default:
+		return models.NodeTypeComponent, &models.NodeRef{}
 	}
-
-	return "", nil, fmt.Errorf("component %s is not a valid component", component)
 }
 
 func NodesToProto(nodes []models.Node) []*componentpb.Node {
@@ -840,12 +831,12 @@ func FindShadowedNameWarnings(registry *registry.Registry, nodes []*componentpb.
 	nodeNameByID := make(map[string]string)
 
 	for _, node := range nodes {
-		kind, err := registry.ComponentKind(node.Component)
+		nodeType, err := registry.ComponentType(node.Component)
 		if err != nil {
 			continue
 		}
 
-		if kind == core.ComponentKindWidget {
+		if nodeType == models.NodeTypeWidget {
 			continue // Skip widgets
 		}
 
