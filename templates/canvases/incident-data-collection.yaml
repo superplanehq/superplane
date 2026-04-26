@@ -22,8 +22,7 @@ spec:
       position:
         x: 408
         "y": 425
-      trigger:
-        name: "pagerduty.onIncident"
+      component: "pagerduty.onIncident"
       isCollapsed: false
     - id: "component-node-1xyxrf"
       name: "Is it P1 or P2"
@@ -33,8 +32,7 @@ spec:
       position:
         x: 933
         "y": 426
-      action:
-        name: "filter"
+      component: "filter"
       isCollapsed: false
     - id: "component-node-wa0ctm"
       name: "Get all failing checks"
@@ -51,8 +49,7 @@ spec:
       position:
         x: 1458
         "y": 427
-      action:
-        name: "dash0.listIssues"
+      component: "dash0.listIssues"
       isCollapsed: false
     - id: "component-node-4pjwv9"
       name: "Get DB Memory Usage"
@@ -64,8 +61,7 @@ spec:
       position:
         x: 1458
         "y": 683
-      action:
-        name: "dash0.queryPrometheus"
+      component: "dash0.queryPrometheus"
       isCollapsed: false
     - id: "component-node-hbriwb"
       name: "Get DB CPU Usage"
@@ -77,8 +73,7 @@ spec:
       position:
         x: 1458
         "y": 983
-      action:
-        name: "dash0.queryPrometheus"
+      component: "dash0.queryPrometheus"
       isCollapsed: false
     - id: "component-node-rxe22i"
       name: "Create a Summary"
@@ -89,8 +84,7 @@ spec:
       position:
         x: 2687
         "y": 435
-      action:
-        name: "openai.textPrompt"
+      component: "openai.textPrompt"
       isCollapsed: false
     - id: "component-node-n6s8ec"
       name: "Open an Issue"
@@ -107,8 +101,7 @@ spec:
       position:
         x: 3206
         "y": 435
-      action:
-        name: "github.createIssue"
+      component: "github.createIssue"
       isCollapsed: false
     - id: "annotation-annotation-4a9uck"
       name: "annotation"
@@ -121,8 +114,7 @@ spec:
       position:
         x: 353
         "y": 78
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "merge-merge-1fzi6q"
       name: "merge"
@@ -136,8 +128,7 @@ spec:
       position:
         x: 2079
         "y": 430
-      action:
-        name: "merge"
+      component: "merge"
       isCollapsed: false
     - id: "annotation-annotation2-hrxq4u"
       name: "annotation2"
@@ -150,8 +141,7 @@ spec:
       position:
         x: 894
         "y": 79
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation3-7m2g95"
       name: "annotation3"
@@ -164,8 +154,7 @@ spec:
       position:
         x: 1459
         "y": 80
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation4-31cjr5"
       name: "annotation4"
@@ -178,8 +167,7 @@ spec:
       position:
         x: 2719
         "y": 81
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
   edges:
     - sourceId: "pagerduty-onincident-pagerduty-onincident-7ar72t"

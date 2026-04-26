@@ -112,7 +112,7 @@ export function mapTriggerEventsToSidebarEvents(
 }
 
 export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: ComponentsNode): SidebarEvent {
-  const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
+  const triggerRenderer = getTriggerRenderer(node.component || "");
   const eventInfo = buildEventInfo(event);
   const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: eventInfo });
   const values = triggerRenderer.getRootEventValues({ event: eventInfo });
@@ -161,12 +161,12 @@ export function mapExecutionsToSidebarEvents(
 
   return executionsToMap.map((execution) => {
     const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
-    const stateResolver = getState(currentComponentNode?.action?.name || "");
+    const stateResolver = getState(currentComponentNode?.component || "");
     const state = stateResolver(buildExecutionInfo(execution));
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
 
-    const componentName = currentComponentNode?.action?.name || "";
+    const componentName = currentComponentNode?.component || "";
     const componentMapper = getComponentBaseMapper(componentName);
     const componentSubtitle = componentMapper.subtitle?.({
       node: buildNodeInfo(currentComponentNode as ComponentsNode),
@@ -216,7 +216,7 @@ export function getNextInQueueInfo(
   }
 
   const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
 
   const { title, subtitle } = queueItem.rootEvent
     ? rootTriggerRenderer.getTitleAndSubtitle({
@@ -242,7 +242,7 @@ export function mapQueueItemsToSidebarEvents(
   const queueItemsToMap = limit ? queueItems.slice(0, limit) : queueItems;
   return queueItemsToMap.map((item) => {
     const rootTriggerNode = nodes.find((n) => n.id === item.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
 
     const { title, subtitle } = item.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle({
@@ -385,7 +385,7 @@ export function buildRunItemFromExecution(options: {
 }): LogRunItem {
   const { execution, nodes } = options;
   const componentNode = nodes.find((node) => node.id === execution.nodeId);
-  const componentName = componentNode?.action?.name || "";
+  const componentName = componentNode?.component || "";
   const stateResolver = getState(componentName);
   const resolvedState = stateResolver(buildExecutionInfo(execution));
 
@@ -421,7 +421,7 @@ export function buildRunEntryFromEvent(options: {
 }): LogEntry {
   const { event, nodes, runItems = [] } = options;
   const triggerNode = nodes.find((node) => node.id === event.nodeId);
-  const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
+  const triggerRenderer = getTriggerRenderer(triggerNode?.component || "");
   const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(event) });
   const rootValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(event) });
 
@@ -1195,7 +1195,7 @@ export function buildTabData(
     if (!triggerEvent) return undefined;
 
     const tabData: TabData = {};
-    const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
+    const triggerRenderer = getTriggerRenderer(node.component || "");
     const eventValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(triggerEvent) });
 
     tabData.current = {
@@ -1225,7 +1225,7 @@ export function buildTabData(
 
     if (queueItem.rootEvent) {
       const rootTriggerNode = workflowNodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-      const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+      const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
       const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(queueItem.rootEvent!) });
 
       tabData.root = Object.assign({}, rootEventValues, {
@@ -1272,7 +1272,7 @@ export function buildTabData(
   // Root tab: root event data
   if (execution.rootEvent) {
     const rootTriggerNode = workflowNodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
     const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(execution.rootEvent!) });
 
     tabData.root = {
@@ -1354,7 +1354,7 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
   return {
     id: node.id!,
     name: node.name || "",
-    componentName: node.type === "TYPE_TRIGGER" ? node.trigger?.name || "" : node.action?.name || "",
+    componentName: node.component || "",
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
     metadata: node.metadata,

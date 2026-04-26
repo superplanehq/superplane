@@ -95,10 +95,7 @@ describe("filterRunEvents", () => {
       id: "trigger-1",
       name: "Deploy Trigger",
       type: "TYPE_TRIGGER",
-      trigger: {
-        name: "unknown-trigger",
-      },
-      action: undefined,
+      component: "unknown-trigger",
     }),
     makeComponentsNode({
       id: "node-success",

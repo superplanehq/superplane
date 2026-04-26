@@ -75,7 +75,7 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 	}
 
 	// Find shadowed names within connected components
-	nodeWarnings := actions.FindShadowedNameWarnings(blueprint.Nodes, blueprint.Edges)
+	nodeWarnings := actions.FindShadowedNameWarnings(registry, blueprint.Nodes, blueprint.Edges)
 
 	for i, edge := range blueprint.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -111,38 +111,29 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *componentpb.Node) error {
-	switch node.Type {
-	case componentpb.Node_TYPE_ACTION:
-		if node.Action == nil {
-			return fmt.Errorf("action reference is required for action ref type")
-		}
-
-		if node.Action.Name == "" {
-			return fmt.Errorf("action name is required")
-		}
-
-		// Check if this is an application action (contains a dot)
-		parts := strings.SplitN(node.Action.Name, ".", 2)
-		if len(parts) > 2 {
-			return fmt.Errorf("invalid action name: %s", node.Action.Name)
-		}
-
-		// For application components, validate the app installation
-		if len(parts) == 2 {
-			if err := validateIntegration(organizationID, node.Integration); err != nil {
-				return err
-			}
-		}
-
-		_, err := registry.GetAction(node.Action.Name)
-		if err != nil {
-			return fmt.Errorf("action %s not found", node.Action.Name)
-		}
-
-		return nil
-	default:
-		return fmt.Errorf("invalid node type")
+	if node.Component == "" {
+		return fmt.Errorf("component name is required")
 	}
+
+	// Check if this is an application action (contains a dot)
+	parts := strings.SplitN(node.Component, ".", 2)
+	if len(parts) > 2 {
+		return fmt.Errorf("invalid component name: %s", node.Component)
+	}
+
+	// For application components, validate the app installation
+	if len(parts) == 2 {
+		if err := validateIntegration(organizationID, node.Integration); err != nil {
+			return err
+		}
+	}
+
+	_, err := registry.GetAction(node.Component)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func validateIntegration(organizationID string, ref *componentpb.IntegrationRef) error {

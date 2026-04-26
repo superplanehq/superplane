@@ -107,11 +107,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   }, [item.nodeId, item.originalExecution, getExecutionState, item.state]);
 
   const componentSubtitle = useMemo(() => {
-    if (!item.workflowNode?.action?.name || !item.originalExecution) {
+    if (!item.workflowNode?.component || !item.originalExecution) {
       return undefined;
     }
 
-    const mapper = getComponentBaseMapper(item.workflowNode.action.name);
+    const mapper = getComponentBaseMapper(item.workflowNode.component);
 
     // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
     const subtitle = mapper.subtitle?.({

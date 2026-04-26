@@ -17,8 +17,7 @@ spec:
       position:
         x: 1764
         "y": 290
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
     - id: "component-node-fswk8u"
       name: "Wait for the system to recover"
@@ -30,8 +29,7 @@ spec:
       position:
         x: 1758
         "y": 392
-      action:
-        name: "wait"
+      component: "wait"
       isCollapsed: false
     - id: "component-node-g0f7j5"
       name: "Check if there are any alerts"
@@ -48,8 +46,7 @@ spec:
       position:
         x: 2258
         "y": 392
-      action:
-        name: "dash0.listIssues"
+      component: "dash0.listIssues"
       isCollapsed: false
     - id: "component-node-yfk4ek"
       name: "Slack: Rollback Failed"
@@ -64,8 +61,7 @@ spec:
       position:
         x: 1763
         "y": 618
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
     - id: "component-node-aktoyi"
       name: "Slack: Starting Rollback"
@@ -80,8 +76,7 @@ spec:
       position:
         x: 1116
         "y": 293
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
     - id: "component-node-pdfas0"
       name: "Slack: Health checks failing"
@@ -96,8 +91,7 @@ spec:
       position:
         x: 2857
         "y": 433
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
     - id: "github-onworkflowrun-github-onworkflowrun-k6enyi"
       name: "Listen for Failed deployments"
@@ -116,8 +110,7 @@ spec:
       position:
         x: 554
         "y": 404
-      trigger:
-        name: "github.onWorkflowRun"
+      component: "github.onWorkflowRun"
       isCollapsed: false
     - id: "github-runworkflow-github-runworkflow-z5400d"
       name: "Execute Rollback"
@@ -134,8 +127,7 @@ spec:
       position:
         x: 1119
         "y": 403
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "annotation-note-ar1tgr"
       name: "Note"
@@ -148,8 +140,7 @@ spec:
       position:
         x: 547
         "y": -89
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-note-ar2rbk"
       name: "Note"
@@ -162,8 +153,7 @@ spec:
       position:
         x: 1093
         "y": -75
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-note-ar3hlt"
       name: "Note"
@@ -176,8 +166,7 @@ spec:
       position:
         x: 1754
         "y": -143
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-note-ar4res"
       name: "Note"
@@ -190,8 +179,7 @@ spec:
       position:
         x: 2258
         "y": 101
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
   edges:
     - sourceId: "component-node-fswk8u"

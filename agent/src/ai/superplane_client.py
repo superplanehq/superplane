@@ -180,11 +180,7 @@ class SuperplaneClient:
         if not isinstance(node_id, str) or not node_id:
             return None
 
-        block_name: str | None = None
-        if item.trigger is not None and isinstance(item.trigger.name, str):
-            block_name = item.trigger.name
-        elif item.action is not None and isinstance(item.action.name, str):
-            block_name = item.action.name
+        block_name = item.component if isinstance(item.component, str) and item.component else None
 
         return CanvasNode(
             id=node_id,
