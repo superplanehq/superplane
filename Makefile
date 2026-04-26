@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts check.templates compose.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -224,6 +224,9 @@ check.lint.ui.knip:
 
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
+
+check.templates:
+	$(COMPOSE) exec app go run ./scripts/check_canvases_templates/main.go
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
