@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts check.templates compose.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.backend check.generated.artifacts check.templates compose.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -125,6 +125,16 @@ format.go:
 
 check.format.go:
 	$(COMPOSE) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
+
+# All backend "Check: *" Semaphore steps (sequential; one CI job for faster prologue, less fan-out)
+check.backend:
+	$(MAKE) check.db.structure
+	$(MAKE) check.db.migrations
+	$(MAKE) check.components.docs
+	$(MAKE) check.format.go
+	$(MAKE) check.example.payloads
+	$(MAKE) check.templates
+	$(MAKE) check.generated.artifacts
 
 format.js:
 	cd web_src && npm run format
