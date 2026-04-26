@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts check.templates compose.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -224,6 +224,10 @@ check.lint.ui.knip:
 
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
+
+# Run after pb.gen: parses templates/canvases/*.yaml the same way template seeding does.
+check.templates:
+	go test ./pkg/templates/ -count=1 -run TestCanvasesTemplatesParse
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
