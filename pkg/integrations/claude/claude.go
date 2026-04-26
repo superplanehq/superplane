@@ -6,6 +6,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -51,6 +52,7 @@ func (i *Claude) Configuration() []configuration.Field {
 func (i *Claude) Actions() []core.Action {
 	return []core.Action{
 		&TextPrompt{},
+		&runagent.RunAgent{},
 	}
 }
 
