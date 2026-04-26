@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -182,7 +182,7 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 	//
 	// Prepare the status request based on the configuration
 	//
-	repoStatus := &github.RepoStatus{
+	repoStatus := github.RepoStatus{
 		State:   &config.State,
 		Context: &config.Context,
 	}
