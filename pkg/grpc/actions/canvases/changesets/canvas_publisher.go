@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -18,6 +19,11 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+// ErrNoChangesToPublish is returned when the draft version is identical to the
+// live version, meaning there is nothing to publish. Callers should treat this
+// as a client-side precondition failure rather than an internal error.
+var ErrNoChangesToPublish = errors.New("no changes between live and draft version being applied")
 
 /*
  * CanvasPublisher takes the live version and the proposed version,
@@ -90,7 +96,7 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	}
 
 	if changeset == nil || len(changeset.Changes) == 0 {
-		return nil, fmt.Errorf("no changes between live and draft version being applied")
+		return nil, ErrNoChangesToPublish
 	}
 
 	allNodes, err := models.FindCanvasNodesUnscopedInTransaction(tx, liveVersion.WorkflowID)

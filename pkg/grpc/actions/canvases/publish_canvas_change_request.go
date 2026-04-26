@@ -164,6 +164,9 @@ func PublishCanvasChangeRequest(
 			WebhookBaseURL: webhookBaseURL,
 		})
 		if err != nil {
+			if errors.Is(err, changesets.ErrNoChangesToPublish) {
+				return status.Error(codes.FailedPrecondition, "change request has no changes to publish")
+			}
 			return err
 		}
 
