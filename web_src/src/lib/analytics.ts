@@ -38,9 +38,6 @@ export const analytics = {
     });
   },
 
-  canvasRename: (canvasId: string, organizationId: string) => {
-    posthog.capture("canvas:canvas_rename", { canvas_id: canvasId, organization_id: organizationId });
-  },
 
   yamlExport: (canvasId: string, organizationId: string) => {
     posthog.capture("canvas:yaml_export", { canvas_id: canvasId, organization_id: organizationId });
