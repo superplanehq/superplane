@@ -225,9 +225,9 @@ check.lint.ui.knip:
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
 
-# Run after pb.gen: parses templates/canvases/*.yaml the same way template seeding does.
+# Parse templates/canvases/*.yaml like template seeding (protos + go test; see script).
 check.templates:
-	go test ./pkg/templates/ -count=1 -run TestCanvasesTemplatesParse
+	$(COMPOSE) run --rm app bash -c "bash /app/scripts/check_canvases_templates.sh"
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
