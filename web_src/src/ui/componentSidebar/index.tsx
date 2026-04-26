@@ -34,7 +34,6 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   SuperplaneActionsAction,
   TriggersTrigger,
-  BlueprintsBlueprint,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
@@ -148,7 +147,6 @@ interface ComponentSidebarProps {
   workflowNodes?: ComponentsNode[];
   actions?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
 
   // Highlighting callback for execution chain nodes
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
@@ -223,7 +221,6 @@ export const ComponentSidebar = ({
   workflowNodes = [],
   actions = [],
   triggers = [],
-  blueprints = [],
   onHighlightedNodesChange,
   executionChainEventId,
   executionChainExecutionId,
@@ -868,7 +865,6 @@ export const ComponentSidebar = ({
                       workflowNodes={workflowNodes}
                       actions={actions}
                       triggers={triggers}
-                      blueprints={blueprints}
                       onHighlightedNodesChange={onHighlightedNodesChange}
                     />
                   )}

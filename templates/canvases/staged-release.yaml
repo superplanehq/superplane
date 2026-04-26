@@ -20,8 +20,7 @@ spec:
       position:
         x: 133
         "y": 403
-      trigger:
-        name: "github.onRelease"
+      component: "github.onRelease"
       isCollapsed: false
     - id: "component-node-70p83y"
       name: "Wait for the changes to propagate"
@@ -33,8 +32,7 @@ spec:
       position:
         x: 1191
         "y": 402
-      action:
-        name: "wait"
+      component: "wait"
       isCollapsed: false
     - id: "component-node-7z3mea"
       name: "Slack: Deployment failed"
@@ -49,8 +47,7 @@ spec:
       position:
         x: 1195
         "y": 636
-      action:
-        name: "slack.sendTextMessage"
+      component: "slack.sendTextMessage"
       isCollapsed: true
     - id: "component-node-1krig8"
       name: "Check if there are any alerts 10%"
@@ -67,8 +64,7 @@ spec:
       position:
         x: 1712
         "y": 221
-      action:
-        name: "dash0.listIssues"
+      component: "dash0.listIssues"
       isCollapsed: false
     - id: "component-node-3c9afc"
       name: "Health Check: Ping server 10%"
@@ -82,8 +78,7 @@ spec:
       position:
         x: 1715
         "y": 402
-      action:
-        name: "http"
+      component: "http"
       isCollapsed: false
     - id: "merge-merge-vckyv1"
       name: "Wait for all the checks to finish"
@@ -98,8 +93,7 @@ spec:
       position:
         x: 2295
         "y": 405
-      action:
-        name: "merge"
+      component: "merge"
       isCollapsed: false
     - id: "dash0-listissues-check-if-there-are-any-alerts-pbjufl"
       name: "Check if there are any alerts 50%"
@@ -116,8 +110,7 @@ spec:
       position:
         x: 4026
         "y": 408
-      action:
-        name: "dash0.listIssues"
+      component: "dash0.listIssues"
       isCollapsed: true
     - id: "http-health-check--ping-server-spb8ma"
       name: "Health Check: Ping server 50%"
@@ -131,8 +124,7 @@ spec:
       position:
         x: 4028
         "y": 480
-      action:
-        name: "http"
+      component: "http"
       isCollapsed: true
     - id: "wait-wait-for-the-changes-to-propagate-9f6hct"
       name: "Wait for the changes to propagate 50%"
@@ -144,8 +136,7 @@ spec:
       position:
         x: 3480
         "y": 405
-      action:
-        name: "wait"
+      component: "wait"
       isCollapsed: false
     - id: "merge-merge-as9s0i"
       name: "Wait for all the checks to finish - final"
@@ -160,8 +151,7 @@ spec:
       position:
         x: 4565
         "y": 479
-      action:
-        name: "merge"
+      component: "merge"
       isCollapsed: true
     - id: "pagerduty-listincidents-pagerduty-listincidents-kcozn1"
       name: "Check if there are open issues 10%"
@@ -172,8 +162,7 @@ spec:
       position:
         x: 1719
         "y": 644
-      action:
-        name: "pagerduty.listIncidents"
+      component: "pagerduty.listIncidents"
       isCollapsed: false
     - id: "github-runworkflow-github-runworkflow-t0ed50"
       name: "Deploy 10%"
@@ -195,8 +184,7 @@ spec:
       position:
         x: 634
         "y": 402
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "github-runworkflow-deploy-10--w3pcg4"
       name: "Deploy 50%"
@@ -218,8 +206,7 @@ spec:
       position:
         x: 2865
         "y": 411
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "pagerduty-listincidents-check-if-there-are-open-issues-jl7aze"
       name: "Check if there are open issues  50%"
@@ -230,8 +217,7 @@ spec:
       position:
         x: 4028
         "y": 555
-      action:
-        name: "pagerduty.listIncidents"
+      component: "pagerduty.listIncidents"
       isCollapsed: true
     - id: "annotation-annotation-dsxtwd"
       name: "annotation"
@@ -245,8 +231,7 @@ spec:
       position:
         x: 126
         "y": -7
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation2-xt7sds"
       name: "annotation2"
@@ -260,8 +245,7 @@ spec:
       position:
         x: 619
         "y": 59
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation3-e3jalx"
       name: "annotation3"
@@ -274,8 +258,7 @@ spec:
       position:
         x: 1707
         "y": -173
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "annotation-annotation4-55btsm"
       name: "annotation4"
@@ -288,8 +271,7 @@ spec:
       position:
         x: 2289
         "y": -31
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
     - id: "github-runworkflow-github-runworkflow-0ae6uu"
       name: "Deploy 100%"
@@ -311,8 +293,7 @@ spec:
       position:
         x: 5121
         "y": 399
-      action:
-        name: "github.runWorkflow"
+      component: "github.runWorkflow"
       isCollapsed: false
     - id: "annotation-annotation5-0fn8v7"
       name: "annotation5"
@@ -325,8 +306,7 @@ spec:
       position:
         x: 2859
         "y": -21
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
   edges:
     - sourceId: "component-node-70p83y"

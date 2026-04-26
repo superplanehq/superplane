@@ -19,8 +19,7 @@ spec:
     - id: manual-plan-start
       name: manual_plan_start
       type: TYPE_TRIGGER
-      trigger:
-        name: start
+      component: start
       configuration:
         templates:
           - name: Incident Report
@@ -81,9 +80,8 @@ spec:
     - id: wait-1
       name: wait
       type: TYPE_ACTION
-      action:
-        name: wait
-        hello: what
+      component: wait
+      hello: what
 `)
 
 	_, err := ParseCanvas(raw)

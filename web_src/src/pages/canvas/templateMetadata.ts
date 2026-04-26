@@ -29,7 +29,7 @@ export function extractIntegrations(nodes: SuperplaneComponentsNode[] | undefine
   const integrations = new Set<string>();
 
   for (const node of nodes) {
-    const blockName = node.action?.name || node.trigger?.name;
+    const blockName = node.component;
     if (!blockName) continue;
 
     const rawPrefix = blockName.split(".")[0];
