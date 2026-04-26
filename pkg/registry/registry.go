@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 var (
@@ -121,6 +122,44 @@ func (r *Registry) Init() {
 
 func (r *Registry) HTTPContext() *HTTPContext {
 	return r.httpCtx
+}
+
+func (r *Registry) FindConfigurableComponent(name string) (core.Configurable, error) {
+	action, err := r.GetAction(name)
+	if err == nil {
+		return action.(core.Configurable), nil
+	}
+
+	trigger, err := r.GetTrigger(name)
+	if err == nil {
+		return trigger.(core.Configurable), nil
+	}
+
+	widget, err := r.GetWidget(name)
+	if err == nil {
+		return widget.(core.Configurable), nil
+	}
+
+	return nil, fmt.Errorf("component %s not found", name)
+}
+
+func (r *Registry) ComponentType(name string) (string, error) {
+	_, err := r.GetAction(name)
+	if err == nil {
+		return models.NodeTypeComponent, nil
+	}
+
+	_, err = r.GetTrigger(name)
+	if err == nil {
+		return models.NodeTypeTrigger, nil
+	}
+
+	_, err = r.GetWidget(name)
+	if err == nil {
+		return models.NodeTypeWidget, nil
+	}
+
+	return "", fmt.Errorf("component %s not found", name)
 }
 
 func (r *Registry) ListTriggers() []core.Trigger {

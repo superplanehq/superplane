@@ -14,6 +14,7 @@ import (
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -680,6 +681,8 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			warningMessage = node.WarningMessage
 		}
 
+		nodeType, nodeRef := ComponentToNodeTypeAndRef(node.Type, node.Component)
+
 		//
 		// NOTE: we do not include metadata in here,
 		// to avoid allowing requests to override node metadata.
@@ -688,8 +691,8 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		result[i] = models.Node{
 			ID:             node.Id,
 			Name:           node.Name,
-			Type:           ProtoToNodeType(node.Type),
-			Ref:            ProtoToNodeRef(node),
+			Type:           nodeType,
+			Ref:            *nodeRef,
 			Configuration:  node.Configuration.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
@@ -698,7 +701,33 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			WarningMessage: warningMessage,
 		}
 	}
+
 	return result
+}
+
+func ComponentToNodeTypeAndRef(nodeType componentpb.Node_Type, component string) (string, *models.NodeRef) {
+	switch nodeType {
+	case componentpb.Node_TYPE_ACTION:
+		return models.NodeTypeComponent, &models.NodeRef{
+			Component: &models.ComponentRef{
+				Name: component,
+			},
+		}
+	case componentpb.Node_TYPE_TRIGGER:
+		return models.NodeTypeTrigger, &models.NodeRef{
+			Trigger: &models.TriggerRef{
+				Name: component,
+			},
+		}
+	case componentpb.Node_TYPE_WIDGET:
+		return models.NodeTypeWidget, &models.NodeRef{
+			Widget: &models.WidgetRef{
+				Name: component,
+			},
+		}
+	default:
+		return models.NodeTypeComponent, &models.NodeRef{}
+	}
 }
 
 func NodesToProto(nodes []models.Node) []*componentpb.Node {
@@ -713,27 +742,15 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		}
 
 		if node.Ref.Component != nil {
-			result[i].Action = &componentpb.Node_ActionRef{
-				Name: node.Ref.Component.Name,
-			}
-		}
-
-		if node.Ref.Blueprint != nil {
-			result[i].Blueprint = &componentpb.Node_BlueprintRef{
-				Id: node.Ref.Blueprint.ID,
-			}
+			result[i].Component = node.Ref.Component.Name
 		}
 
 		if node.Ref.Trigger != nil {
-			result[i].Trigger = &componentpb.Node_TriggerRef{
-				Name: node.Ref.Trigger.Name,
-			}
+			result[i].Component = node.Ref.Trigger.Name
 		}
 
 		if node.Ref.Widget != nil {
-			result[i].Widget = &componentpb.Node_WidgetRef{
-				Name: node.Ref.Widget.Name,
-			}
+			result[i].Component = node.Ref.Widget.Name
 		}
 
 		if node.Configuration != nil {
@@ -760,6 +777,19 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 	}
 
 	return result
+}
+
+func NodeTypeToProto(nodeType string) componentpb.Node_Type {
+	switch nodeType {
+	case models.NodeTypeTrigger:
+		return componentpb.Node_TYPE_TRIGGER
+	case models.NodeTypeWidget:
+		return componentpb.Node_TYPE_WIDGET
+	case models.NodeTypeComponent:
+		return componentpb.Node_TYPE_ACTION
+	default:
+		return componentpb.Node_TYPE_ACTION
+	}
 }
 
 func ProtoToEdges(edges []*componentpb.Edge) []models.Edge {
@@ -789,7 +819,7 @@ func EdgesToProto(edges []models.Edge) []*componentpb.Edge {
 // FindShadowedNameWarnings detects nodes with duplicate names within connected components.
 // Only nodes that are connected (directly or transitively) and share the same name will be flagged.
 // Returns a map of node ID -> warning message.
-func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Edge) map[string]string {
+func FindShadowedNameWarnings(registry *registry.Registry, nodes []*componentpb.Node, edges []*componentpb.Edge) map[string]string {
 	warnings := make(map[string]string)
 
 	if len(nodes) == 0 {
@@ -801,9 +831,15 @@ func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Ed
 	nodeNameByID := make(map[string]string)
 
 	for _, node := range nodes {
-		if node.Type == componentpb.Node_TYPE_WIDGET {
+		nodeType, err := registry.ComponentType(node.Component)
+		if err != nil {
+			continue
+		}
+
+		if nodeType == models.NodeTypeWidget {
 			continue // Skip widgets
 		}
+
 		nodeIDs[node.Id] = true
 		nodeNameByID[node.Id] = node.Name
 	}
@@ -865,69 +901,6 @@ func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Ed
 	}
 
 	return warnings
-}
-
-func ProtoToNodeType(nodeType componentpb.Node_Type) string {
-	switch nodeType {
-	case componentpb.Node_TYPE_ACTION:
-		return models.NodeTypeComponent
-	case componentpb.Node_TYPE_BLUEPRINT:
-		return models.NodeTypeBlueprint
-	case componentpb.Node_TYPE_TRIGGER:
-		return models.NodeTypeTrigger
-	case componentpb.Node_TYPE_WIDGET:
-		return models.NodeTypeWidget
-	default:
-		return ""
-	}
-}
-
-func NodeTypeToProto(nodeType string) componentpb.Node_Type {
-	switch nodeType {
-	case models.NodeTypeBlueprint:
-		return componentpb.Node_TYPE_BLUEPRINT
-	case models.NodeTypeTrigger:
-		return componentpb.Node_TYPE_TRIGGER
-	case models.NodeTypeWidget:
-		return componentpb.Node_TYPE_WIDGET
-	case models.NodeTypeComponent:
-		return componentpb.Node_TYPE_ACTION
-	default:
-		return componentpb.Node_TYPE_ACTION
-	}
-}
-
-func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
-	ref := models.NodeRef{}
-
-	switch node.Type {
-	case componentpb.Node_TYPE_ACTION:
-		if node.Action != nil {
-			ref.Component = &models.ComponentRef{
-				Name: node.Action.Name,
-			}
-		}
-	case componentpb.Node_TYPE_BLUEPRINT:
-		if node.Blueprint != nil {
-			ref.Blueprint = &models.BlueprintRef{
-				ID: node.Blueprint.Id,
-			}
-		}
-	case componentpb.Node_TYPE_TRIGGER:
-		if node.Trigger != nil {
-			ref.Trigger = &models.TriggerRef{
-				Name: node.Trigger.Name,
-			}
-		}
-	case componentpb.Node_TYPE_WIDGET:
-		if node.Widget != nil {
-			ref.Widget = &models.WidgetRef{
-				Name: node.Widget.Name,
-			}
-		}
-	}
-
-	return ref
 }
 
 func PositionToProto(position models.Position) *componentpb.Position {
