@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts compose.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts check.templates compose.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -224,6 +224,11 @@ check.lint.ui.knip:
 
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
+
+check.templates:
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm app bash -c "go run ./scripts/check_canvases_templates"
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
