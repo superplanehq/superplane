@@ -60,6 +60,123 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 	require.Len(t, s.expectations, 0, "unused request expectations")
 }
 
+func TestUpdateWithoutFileReturnsError(t *testing.T) {
+	server := newAPITestServer(t)
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	err := (&updateCommand{}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "file")
+}
+
+type stubActiveCanvasConfig struct {
+	active string
+}
+
+func (s stubActiveCanvasConfig) GetActiveCanvas() string { return s.active }
+
+func (s stubActiveCanvasConfig) SetActiveCanvas(string) error { return nil }
+
+func writeTestCanvasFileWithoutMetadataID(t *testing.T, name string) string {
+	t.Helper()
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	content := []byte(
+		"apiVersion: v1\nkind: Canvas\nmetadata:\n  name: " + name + "\nspec:\n  nodes: []\n  edges: []\n",
+	)
+	require.NoError(t, os.WriteFile(filePath, content, 0o644))
+	return filePath
+}
+
+func writeTestCanvasFileWithMetadataID(t *testing.T, name, canvasID string) string {
+	t.Helper()
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	content := []byte(
+		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: " + canvasID + "\n  name: " + name + "\nspec:\n  nodes: []\n  edges: []\n",
+	)
+	require.NoError(t, os.WriteFile(filePath, content, 0o644))
+	return filePath
+}
+
+func TestResolveCanvasForFileUpdateWithoutFileIDUsesPositional(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	server := newAPITestServer(t, requestExpectation{
+		method: http.MethodGet,
+		path:   "/api/v1/canvases",
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"` + canvasID + `","name":"parse-check"}}]}`))
+		},
+	})
+
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "parse-check")
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{"parse-check"}
+
+	gotID, canvas, err := resolveCanvasForFileUpdate(ctx, filePath)
+	require.NoError(t, err)
+	require.Equal(t, canvasID, gotID)
+	md := canvas.GetMetadata()
+	require.Equal(t, canvasID, (&md).GetId())
+
+	server.AssertCalls(t, []string{http.MethodGet + " /api/v1/canvases"})
+}
+
+func TestResolveCanvasForFileUpdateWithoutFileIDUsesActiveCanvas(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	server := newAPITestServer(t, requestExpectation{
+		method: http.MethodGet,
+		path:   "/api/v1/canvases",
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"` + canvasID + `","name":"parse-check"}}]}`))
+		},
+	})
+
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "parse-check")
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{}
+	ctx.Config = stubActiveCanvasConfig{active: "parse-check"}
+
+	gotID, canvas, err := resolveCanvasForFileUpdate(ctx, filePath)
+	require.NoError(t, err)
+	require.Equal(t, canvasID, gotID)
+	md := canvas.GetMetadata()
+	require.Equal(t, canvasID, (&md).GetId())
+
+	server.AssertCalls(t, []string{http.MethodGet + " /api/v1/canvases"})
+}
+
+func TestResolveCanvasForFileUpdateWithoutFileIDRequiresTarget(t *testing.T) {
+	server := newAPITestServer(t)
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "parse-check")
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{}
+
+	_, _, err := resolveCanvasForFileUpdate(ctx, filePath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "metadata.id is empty")
+
+	require.Empty(t, server.calls)
+	require.Empty(t, server.expectations)
+}
+
+func TestResolveCanvasForFileUpdateRejectsIDMismatchWithUUIDArg(t *testing.T) {
+	server := newAPITestServer(t)
+	fileID := "11111111-1111-1111-1111-111111111111"
+	otherID := "22222222-2222-2222-2222-222222222222"
+	filePath := writeTestCanvasFileWithMetadataID(t, "a", fileID)
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{otherID}
+
+	_, _, err := resolveCanvasForFileUpdate(ctx, filePath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not match")
+
+	require.Empty(t, server.calls)
+	require.Empty(t, server.expectations)
+}
+
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	autoLayout := buildDefaultAutoLayout()
 

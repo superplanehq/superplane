@@ -107,7 +107,7 @@ autoLayout:
 	}
 }
 
-func TestLoadCanvasFromFileRequiresMetadataIDForUpdate(t *testing.T) {
+func TestParseCanvasResourceFromFileUpdateParsesWithoutMetadataID(t *testing.T) {
 	t.Helper()
 
 	filePath := filepath.Join(t.TempDir(), "canvas.yaml")
@@ -124,11 +124,14 @@ spec:
 		t.Fatalf("failed to write temp canvas: %v", err)
 	}
 
-	_, _, err := loadCanvasFromFile(filePath)
-	if err == nil {
-		t.Fatalf("expected metadata.id validation error")
+	resource, err := parseCanvasResourceFromFile(filePath, "update")
+	if err != nil {
+		t.Fatalf("parseCanvasResourceFromFile: %v", err)
 	}
-	if err.Error() != "canvas metadata.id is required for update" {
-		t.Fatalf("unexpected error: %v", err)
+	if resource.Metadata == nil || resource.Metadata.GetName() != "parse-check" {
+		t.Fatalf("unexpected metadata: %#v", resource.Metadata)
+	}
+	if resource.Metadata.Id != nil && resource.Metadata.GetId() != "" {
+		t.Fatalf("expected empty id, got %q", resource.Metadata.GetId())
 	}
 }

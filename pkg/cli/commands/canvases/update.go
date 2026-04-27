@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -120,6 +121,80 @@ func planCanvasChangeManagementUpdate(
 	return plan, nil
 }
 
+// resolveCanvasForFileUpdate parses --file and determines the target canvas id.
+// If metadata.id is set in the file, it is authoritative; an optional positional
+// name-or-id must resolve to the same id. If metadata.id is omitted, the canvas is
+// resolved from the positional argument or the configured active canvas.
+func resolveCanvasForFileUpdate(ctx core.CommandContext, filePath string) (string, openapi_client.CanvasesCanvas, error) {
+	resource, err := parseCanvasResourceFromFile(filePath, "update")
+	if err != nil {
+		return "", openapi_client.CanvasesCanvas{}, err
+	}
+
+	if len(ctx.Args) > 1 {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one optional canvas name or id")
+	}
+
+	positional := ""
+	if len(ctx.Args) == 1 {
+		positional = strings.TrimSpace(ctx.Args[0])
+	}
+
+	fileID := ""
+	if resource.Metadata != nil && resource.Metadata.Id != nil {
+		fileID = strings.TrimSpace(resource.Metadata.GetId())
+	}
+
+	var canvasID string
+
+	switch {
+	case fileID != "":
+		canvasID = fileID
+		if positional != "" {
+			resolved, ferr := findCanvasID(ctx, ctx.API, positional)
+			if ferr != nil {
+				return "", openapi_client.CanvasesCanvas{}, ferr
+			}
+			if !strings.EqualFold(strings.TrimSpace(resolved), strings.TrimSpace(fileID)) {
+				return "", openapi_client.CanvasesCanvas{}, fmt.Errorf(
+					"canvas file metadata.id %q does not match argument %q (resolved id %q)",
+					fileID, positional, resolved,
+				)
+			}
+		}
+	case positional != "":
+		var ferr error
+		canvasID, ferr = findCanvasID(ctx, ctx.API, positional)
+		if ferr != nil {
+			return "", openapi_client.CanvasesCanvas{}, ferr
+		}
+	default:
+		if ctx.Config == nil {
+			return "", openapi_client.CanvasesCanvas{}, fmt.Errorf(
+				"canvas metadata.id is empty: pass a canvas name or id, or set an active canvas with `superplane canvases active`",
+			)
+		}
+		active := strings.TrimSpace(ctx.Config.GetActiveCanvas())
+		if active == "" {
+			return "", openapi_client.CanvasesCanvas{}, fmt.Errorf(
+				"canvas metadata.id is empty: pass a canvas name or id, or set an active canvas with `superplane canvases active`",
+			)
+		}
+		var ferr error
+		canvasID, ferr = findCanvasID(ctx, ctx.API, active)
+		if ferr != nil {
+			return "", openapi_client.CanvasesCanvas{}, ferr
+		}
+	}
+
+	if resource.Metadata == nil {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata is required")
+	}
+	resource.Metadata.SetId(canvasID)
+	canvas := models.CanvasFromCanvas(*resource)
+	return canvasID, canvas, nil
+}
+
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	filePath := ""
 	if c.file != nil {
@@ -140,23 +215,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 	draftMode := c.draft != nil && *c.draft
 
-	var (
-		canvasID string
-		canvas   openapi_client.CanvasesCanvas
-		err      error
-	)
-
-	if filePath != "" {
-		canvasID, canvas, err = loadCanvasFromFile(filePath)
-		if err != nil {
-			return err
-		}
-
-	} else {
-		canvasID, canvas, err = loadCanvasFromExisting(ctx)
-		if err != nil {
-			return err
-		}
+	canvasID, canvas, err := resolveCanvasForFileUpdate(ctx, filePath)
+	if err != nil {
+		return err
 	}
 
 	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
@@ -248,35 +309,6 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	})
 }
 
-func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {
-	if len(ctx.Args) > 1 {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one positional argument")
-	}
-
-	target := ""
-	if len(ctx.Args) == 1 {
-		target = ctx.Args[0]
-	} else if ctx.Config != nil {
-		target = strings.TrimSpace(ctx.Config.GetActiveCanvas())
-	}
-
-	if target == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("either --file or <name-or-id> (or an active canvas) is required")
-	}
-
-	canvasID, err := findCanvasID(ctx, ctx.API, target)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	canvas, err := describeCanvasByID(ctx, canvasID)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	return canvasID, canvas, nil
-}
-
 func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openapi_client.CanvasesCanvasAutoLayout, error) {
 	normalizedValue := strings.ToLower(strings.TrimSpace(value))
 	switch normalizedValue {
@@ -340,18 +372,6 @@ func autoLayoutFlagsWereSet(ctx core.CommandContext) bool {
 	}
 
 	return flags.Changed("auto-layout") || flags.Changed("auto-layout-scope") || flags.Changed("auto-layout-node")
-}
-
-func describeCanvasByID(ctx core.CommandContext, canvasID string) (openapi_client.CanvasesCanvas, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
-	if err != nil {
-		return openapi_client.CanvasesCanvas{}, err
-	}
-	if response.Canvas == nil {
-		return openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas %q not found", canvasID)
-	}
-
-	return *response.Canvas, nil
 }
 
 func buildDefaultAutoLayout() openapi_client.CanvasesCanvasAutoLayout {
