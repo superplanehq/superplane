@@ -125,11 +125,11 @@ func (d *DeleteHTTPSyntheticCheck) ProcessQueueItem(ctx core.ProcessQueueContext
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteHTTPSyntheticCheck) Actions() []core.Action {
-	return []core.Action{}
+func (d *DeleteHTTPSyntheticCheck) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *DeleteHTTPSyntheticCheck) HandleAction(ctx core.ActionContext) error {
+func (d *DeleteHTTPSyntheticCheck) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

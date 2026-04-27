@@ -169,11 +169,11 @@ func (g *GetHTTPSyntheticCheck) ProcessQueueItem(ctx core.ProcessQueueContext) (
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetHTTPSyntheticCheck) Actions() []core.Action {
-	return []core.Action{}
+func (g *GetHTTPSyntheticCheck) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (g *GetHTTPSyntheticCheck) HandleAction(ctx core.ActionContext) error {
+func (g *GetHTTPSyntheticCheck) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

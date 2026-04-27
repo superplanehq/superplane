@@ -106,7 +106,10 @@ func (c *UpdateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("error configuring synthetic check alerts: %w", err)
 		}
 	} else if existing != nil {
-		alerts = existing.Alerts
+		alerts, err = client.ListCheckAlerts(id)
+		if err != nil {
+			return fmt.Errorf("error loading synthetic check alerts: %w", err)
+		}
 	}
 	updated.Alerts = alerts
 
@@ -131,11 +134,11 @@ func (c *UpdateHTTPSyntheticCheck) ProcessQueueItem(ctx core.ProcessQueueContext
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateHTTPSyntheticCheck) Actions() []core.Action {
-	return []core.Action{}
+func (c *UpdateHTTPSyntheticCheck) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (c *UpdateHTTPSyntheticCheck) HandleAction(ctx core.ActionContext) error {
+func (c *UpdateHTTPSyntheticCheck) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

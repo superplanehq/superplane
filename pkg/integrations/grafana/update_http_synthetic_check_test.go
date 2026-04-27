@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,4 +114,70 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 	tlsConfig := settings["tlsConfig"].(map[string]any)
 	assert.Equal(t, "api.example.com", tlsConfig["serverName"])
 	assert.Equal(t, true, tlsConfig["insecureSkipVerify"])
+}
+
+func Test__UpdateHTTPSyntheticCheck__Execute__PreservesExistingAlertsWhenAlertsSectionOmitted(t *testing.T) {
+	component := &UpdateHTTPSyntheticCheck{}
+	checkJSON := `{
+		"id": 101,
+		"tenantId": 1,
+		"job": "API health",
+		"target": "https://api.example.com/health",
+		"frequency": 30000,
+		"timeout": 5000,
+		"enabled": true,
+		"basicMetricsOnly": true,
+		"settings": {"http": {"method": "GET"}},
+		"probes": [1,2]
+	}`
+	alertsJSON := `{"alerts":[{"name":"ProbeFailedExecutionsTooHigh","threshold":2,"period":"5m"}]}`
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			grafanaSyntheticDataSourceResponse(),
+			grafanaSyntheticCheckGetResponse(checkJSON),
+			grafanaSyntheticHTTPResponse(checkJSON),
+			grafanaSyntheticHTTPResponse(alertsJSON),
+		},
+	}
+
+	execCtx := &contexts.ExecutionStateContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"syntheticCheck": "101",
+			"job":            "API health",
+			"request": map[string]any{
+				"target": "https://api.example.com/health",
+				"method": "GET",
+			},
+			"schedule": map[string]any{
+				"probes":    []string{"1", "2"},
+				"timeout":   5000,
+				"frequency": 30,
+			},
+		},
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "grafana-token",
+			},
+		},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 4)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[3].Method)
+	assert.True(t, strings.HasSuffix(httpContext.Requests[3].URL.Path, "/sm/check/101/alerts"))
+
+	require.Len(t, execCtx.Payloads, 1)
+	payload := execCtx.Payloads[0].(map[string]any)
+	data := payload["data"].(map[string]any)
+	alerts := data["alerts"].([]SyntheticCheckAlert)
+	require.Len(t, alerts, 1)
+	assert.Equal(t, "ProbeFailedExecutionsTooHigh", alerts[0].Name)
+
+	check := data["check"].(*SyntheticCheck)
+	require.Len(t, check.Alerts, 1)
+	assert.Equal(t, int64(2), check.Alerts[0].Threshold)
 }
