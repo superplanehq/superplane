@@ -220,18 +220,18 @@ func (q *QueryPrometheus) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (q *QueryPrometheus) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (q *QueryPrometheus) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (q *QueryPrometheus) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (q *QueryPrometheus) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (q *QueryPrometheus) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (q *QueryPrometheus) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

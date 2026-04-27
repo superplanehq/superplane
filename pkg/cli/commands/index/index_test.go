@@ -21,18 +21,18 @@ const integrationsListResponse = `{
 			"label": "Slack",
 			"description": "Slack integration",
 			"configuration": [{"name": "token", "type": "string", "required": true}],
-			"components": [{"name": "slack.post-message"}],
+			"actions": [{"name": "slack.post-message"}],
 			"triggers": [{"name": "slack.message-received"}]
 		}
 	]
 }`
 
-const componentsListResponse = `{
-	"components": [
+const actionsListResponse = `{
+	"actions": [
 		{
 			"name": "http",
 			"label": "HTTP",
-			"description": "HTTP request component",
+			"description": "HTTP request action",
 			"configuration": [{"name": "url", "type": "string", "required": true}],
 			"exampleOutput": {"status": 200}
 		}
@@ -91,15 +91,15 @@ func TestIntegrationsListReturnsFullJSON(t *testing.T) {
 	require.Contains(t, raw, "slack")
 }
 
-// Components tests
+// Actions tests
 
-func TestComponentsListReturnsSummaryJSON(t *testing.T) {
-	server := newIndexServer(t, "GET", "/api/v1/components", componentsListResponse)
+func TestActionsListReturnsSummaryJSON(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/actions", actionsListResponse)
 	ctx, stdout := newIndexCommandContext(t, server, "json")
 	name := ""
 	from := ""
 	full := false
-	cmd := &componentsCommand{name: &name, from: &from, full: &full}
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)
@@ -109,20 +109,20 @@ func TestComponentsListReturnsSummaryJSON(t *testing.T) {
 	require.Len(t, result, 1)
 	require.Equal(t, "http", result[0]["name"])
 	require.Equal(t, "HTTP", result[0]["label"])
-	require.Equal(t, "HTTP request component", result[0]["description"])
+	require.Equal(t, "HTTP request action", result[0]["description"])
 
 	raw := stdout.String()
 	require.NotContains(t, raw, "exampleOutput")
 	require.NotContains(t, raw, "url")
 }
 
-func TestComponentsListReturnsFullJSON(t *testing.T) {
-	server := newIndexServer(t, "GET", "/api/v1/components", componentsListResponse)
+func TestActionsListReturnsFullJSON(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/actions", actionsListResponse)
 	ctx, stdout := newIndexCommandContext(t, server, "json")
 	name := ""
 	from := ""
 	full := true
-	cmd := &componentsCommand{name: &name, from: &from, full: &full}
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)

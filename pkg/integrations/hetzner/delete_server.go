@@ -130,20 +130,20 @@ func (c *DeleteServer) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeleteServerPollInterval)
 }
 
-func (c *DeleteServer) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *DeleteServer) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *DeleteServer) HandleAction(ctx core.ActionContext) error {
+func (c *DeleteServer) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (c *DeleteServer) poll(ctx core.ActionContext) error {
+func (c *DeleteServer) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

@@ -180,18 +180,18 @@ func (c *ListAlertRules) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (c *ListAlertRules) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ListAlertRules) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *ListAlertRules) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *ListAlertRules) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *ListAlertRules) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ListAlertRules) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

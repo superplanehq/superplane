@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
-	gh "github.com/google/go-github/v74/github"
+	gh "github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -178,7 +179,7 @@ func (g *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	report, _, err := client.Billing.GetUsageReportOrg(
+	report, _, err := client.Billing.GetOrganizationUsageReport(
 		context.Background(),
 		appMetadata.Owner,
 		nil,
@@ -210,14 +211,6 @@ func (g *GetWorkflowUsage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 
 func (g *GetWorkflowUsage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
-}
-
-func (g *GetWorkflowUsage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GetWorkflowUsage) HandleAction(ctx core.ActionContext) error {
-	return nil
 }
 
 func (g *GetWorkflowUsage) Cancel(ctx core.ExecutionContext) error {
@@ -268,7 +261,7 @@ func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowU
 	}
 
 	for _, item := range report.UsageItems {
-		if item.GetProduct() != "actions" {
+		if item == nil || !strings.EqualFold(item.Product, "actions") {
 			continue
 		}
 
@@ -279,19 +272,24 @@ func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowU
 			}
 		}
 
-		if item.Quantity != nil {
-			result.MinutesUsed += *item.Quantity
+		result.MinutesUsed += item.Quantity
+
+		if item.SKU != "" {
+			result.MinutesUsedBreakdown[item.SKU] = result.MinutesUsedBreakdown[item.SKU] + int(item.Quantity)
 		}
 
-		sku := item.GetSKU()
-		if sku != "" && item.Quantity != nil {
-			result.MinutesUsedBreakdown[sku] = result.MinutesUsedBreakdown[sku] + int(*item.Quantity)
-		}
-
-		if item.NetAmount != nil && *item.NetAmount > 0 {
-			result.TotalPaidMinutesUsed += *item.NetAmount / 0.008
+		if item.NetAmount > 0 {
+			result.TotalPaidMinutesUsed += item.NetAmount / 0.008
 		}
 	}
 
 	return result
+}
+
+func (g *GetWorkflowUsage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetWorkflowUsage) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

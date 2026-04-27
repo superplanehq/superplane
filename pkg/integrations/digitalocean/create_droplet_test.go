@@ -197,7 +197,7 @@ func Test__CreateDroplet__Execute(t *testing.T) {
 	})
 }
 
-func Test__CreateDroplet__HandleAction(t *testing.T) {
+func Test__CreateDroplet__HandleHook(t *testing.T) {
 	component := &CreateDroplet{}
 
 	t.Run("droplet active -> emits with IP address", func(t *testing.T) {
@@ -238,7 +238,7 @@ func Test__CreateDroplet__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -289,7 +289,7 @@ func Test__CreateDroplet__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -339,7 +339,7 @@ func Test__CreateDroplet__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

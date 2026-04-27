@@ -236,14 +236,6 @@ func (q *QueryDataSource) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (q *QueryDataSource) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (q *QueryDataSource) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (q *QueryDataSource) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -399,4 +391,12 @@ func validateQueryTimeValue(value *string, timezone *string) error {
 
 	_, _, err := parseGrafanaQueryTime(strings.TrimSpace(*value), timezone)
 	return err
+}
+
+func (q *QueryDataSource) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (q *QueryDataSource) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

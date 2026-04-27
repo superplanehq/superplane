@@ -304,7 +304,7 @@ func (s *CanvasService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEvent
 	)
 }
 
-func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionRequest) (*pb.InvokeNodeExecutionActionResponse, error) {
+func (s *CanvasService) InvokeNodeExecutionHook(ctx context.Context, req *pb.InvokeNodeExecutionHookRequest) (*pb.InvokeNodeExecutionHookResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
 	canvasID, err := uuid.Parse(req.CanvasId)
@@ -317,7 +317,7 @@ func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.I
 		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
 	}
 
-	return canvases.InvokeNodeExecutionAction(
+	return canvases.InvokeNodeExecutionHook(
 		ctx,
 		s.authService,
 		s.encryptor,
@@ -325,12 +325,12 @@ func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.I
 		uuid.MustParse(organizationID),
 		canvasID,
 		executionID,
-		req.ActionName,
+		req.HookName,
 		req.Parameters.AsMap(),
 	)
 }
 
-func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.InvokeNodeTriggerActionRequest) (*pb.InvokeNodeTriggerActionResponse, error) {
+func (s *CanvasService) InvokeNodeTriggerHook(ctx context.Context, req *pb.InvokeNodeTriggerHookRequest) (*pb.InvokeNodeTriggerHookResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
 	canvasID, err := uuid.Parse(req.CanvasId)
@@ -342,11 +342,11 @@ func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.Inv
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	if req.ActionName == "" {
-		return nil, status.Error(codes.InvalidArgument, "action_name is required")
+	if req.HookName == "" {
+		return nil, status.Error(codes.InvalidArgument, "hook_name is required")
 	}
 
-	return canvases.InvokeNodeTriggerAction(
+	return canvases.InvokeNodeTriggerHook(
 		ctx,
 		s.authService,
 		s.encryptor,
@@ -354,7 +354,7 @@ func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.Inv
 		uuid.MustParse(organizationID),
 		canvasID,
 		req.NodeId,
-		req.ActionName,
+		req.HookName,
 		req.Parameters.AsMap(),
 		s.webhookBaseURL,
 	)

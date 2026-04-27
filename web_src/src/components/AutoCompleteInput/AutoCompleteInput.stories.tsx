@@ -27,10 +27,12 @@ type Story = StoryObj<typeof meta>;
 
 const exprLangObject = {
   $: {
-    data: {
-      version: "1.2.3",
-      service: "api",
-      env: "prod",
+    trigger: {
+      data: {
+        version: "1.2.3",
+        service: "api",
+        env: "prod",
+      },
     },
     deploy: {
       id: "dep_123",
@@ -42,7 +44,7 @@ const exprLangObject = {
 export const ExprLanguage: Story = {
   args: {
     exampleObj: exprLangObject,
-    placeholder: "{{ $.data.version }} deployment",
+    placeholder: "{{ $.trigger.data.version }} deployment",
     inputSize: "sm",
     startWord: "{",
     prefix: "{{ ",

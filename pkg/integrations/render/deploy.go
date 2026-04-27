@@ -229,24 +229,24 @@ func (c *Deploy) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeployPollInterval)
 }
 
-func (c *Deploy) Actions() []core.Action {
-	return []core.Action{
+func (c *Deploy) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *Deploy) HandleAction(ctx core.ActionContext) error {
+func (c *Deploy) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return c.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (c *Deploy) poll(ctx core.ActionContext) error {
+func (c *Deploy) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

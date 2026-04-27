@@ -109,6 +109,65 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		assert.Equal(t, codes.ResourceExhausted, s.Code())
 		assert.Equal(t, "canvas node limit exceeded", s.Message())
 	})
+
+	t.Run("invalid source output channel -> error", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err = UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			&pb.Canvas{
+				Metadata: &pb.Canvas_Metadata{
+					Name: canvas.Name,
+				},
+				Spec: &pb.Canvas_Spec{
+					Nodes: []*componentpb.Node{
+						{
+							Id:        "http-1",
+							Name:      "HTTP Request",
+							Component: "http",
+							Configuration: structFromAnyMap(t, map[string]any{
+								"method": "GET",
+								"url":    "https://example.com",
+							}),
+						},
+						{
+							Id:        "if-1",
+							Name:      "If",
+							Component: "if",
+							Configuration: structFromAnyMap(t, map[string]any{
+								"expression": "true",
+							}),
+						},
+					},
+					Edges: []*componentpb.Edge{
+						{
+							SourceId: "http-1",
+							TargetId: "if-1",
+							Channel:  "default",
+						},
+					},
+				},
+			},
+			nil,
+			"",
+			r.AuthService,
+		)
+
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), `source node http-1 does not have output channel "default"`)
+	})
 }
 
 func testPbCanvas(name string) *pb.Canvas {

@@ -218,14 +218,6 @@ func (q *QueryTraces) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (q *QueryTraces) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (q *QueryTraces) HandleAction(_ core.ActionContext) error {
-	return nil
-}
-
 func (q *QueryTraces) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -263,5 +255,13 @@ func validateQueryTracesSpec(spec QueryTracesSpec) error {
 	if err := validateQueryTimeValue(spec.TimeTo, nil); err != nil {
 		return fmt.Errorf("timeTo: %w", err)
 	}
+	return nil
+}
+
+func (q *QueryTraces) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (q *QueryTraces) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
