@@ -197,7 +197,7 @@ export function WorkflowPageV2() {
     isFetching: canvasFetching,
     error: canvasError,
   } = useCanvas(organizationId!, canvasId!, {
-    enabled: !activeCanvasVersion?.metadata?.id,
+    enabled: true,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -504,14 +504,11 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
-  // changeManagement lives on Canvas.Spec but is NOT part of CanvasVersion.Spec.
-  // Optimistic cache updates that spread version.spec into canvas.spec can
-  // temporarily wipe the field, so we latch to the last truthy API value.
-  const changeManagementEnabledRef = useRef(false);
-  if (liveCanvas?.spec?.changeManagement != null) {
-    changeManagementEnabledRef.current = liveCanvas.spec.changeManagement.enabled ?? false;
-  }
-  const isChangeManagementDisabled = !changeManagementEnabledRef.current;
+  const isChangeManagementDisabled = !(
+    liveCanvas?.spec?.changeManagement?.enabled ??
+    liveCanvasVersion?.spec?.changeManagement?.enabled ??
+    false
+  );
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
@@ -1395,6 +1392,11 @@ export function WorkflowPageV2() {
 
         return {
           ...current,
+          metadata: {
+            ...current.metadata,
+            name: version.metadata?.name ?? current.metadata?.name,
+            description: version.metadata?.description ?? current.metadata?.description,
+          },
           spec: { ...current.spec, ...version.spec },
         };
       });
