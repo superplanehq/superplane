@@ -133,7 +133,7 @@ function getNodeAnalyticsProps(
   return {
     nodeType: node.type === "TYPE_TRIGGER" ? "trigger" : node.type === "TYPE_WIDGET" ? "annotation" : "action",
     integration: getNodeIntegrationName(node, availableIntegrations),
-    nodeRef: node.trigger?.name ?? node.component?.name ?? node.blueprint?.id ?? node.widget?.name,
+    nodeRef: node.component,
   };
 }
 
