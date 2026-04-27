@@ -344,3 +344,188 @@ export interface ResolveIncidentConfiguration extends IncidentSelectionConfigura
 export interface AddIncidentActivityConfiguration extends IncidentSelectionConfiguration {
   body?: string;
 }
+
+export interface SyntheticCheckHeaderInput {
+  name?: string;
+  value?: string;
+}
+
+export interface SyntheticCheckLabelInput {
+  name?: string;
+  value?: string;
+}
+
+export interface SyntheticCheckBasicAuthInput {
+  username?: string;
+  password?: string;
+}
+
+export interface SyntheticCheckHeaderMatchInput {
+  header?: string;
+  regexp?: string;
+  allowMissing?: boolean;
+}
+
+export interface GrafanaSyntheticCheckTLSConfig {
+  insecureSkipVerify?: boolean;
+  serverName?: string;
+  caCert?: string;
+  clientCert?: string;
+  clientKey?: string;
+}
+
+export interface SyntheticCheckAlertInput {
+  name?: string;
+  threshold?: number;
+  period?: string;
+  runbookUrl?: string;
+}
+
+/** Grouped HTTP request settings (matches workflow UI sections). */
+export interface HttpSyntheticCheckRequestConfiguration {
+  target?: string;
+  method?: string;
+  headers?: SyntheticCheckHeaderInput[];
+  body?: string;
+  noFollowRedirects?: boolean;
+  basicAuth?: SyntheticCheckBasicAuthInput;
+  bearerToken?: string;
+}
+
+/** Grouped schedule / probe settings. */
+export interface HttpSyntheticCheckScheduleConfiguration {
+  enabled?: boolean;
+  frequency?: number;
+  timeout?: number;
+  probes?: string[];
+}
+
+/** Grouped response validation rules. */
+export interface HttpSyntheticCheckValidationConfiguration {
+  failIfSSL?: boolean;
+  failIfNotSSL?: boolean;
+  validStatusCodes?: number[];
+  failIfBodyMatchesRegexp?: string[];
+  failIfBodyNotMatchesRegexp?: string[];
+  failIfHeaderMatchesRegexp?: SyntheticCheckHeaderMatchInput[];
+}
+
+export interface CreateHttpSyntheticCheckConfiguration {
+  job?: string;
+  labels?: SyntheticCheckLabelInput[];
+  request?: HttpSyntheticCheckRequestConfiguration;
+  schedule?: HttpSyntheticCheckScheduleConfiguration;
+  validation?: HttpSyntheticCheckValidationConfiguration;
+  alerts?: SyntheticCheckAlertInput[];
+  /** Legacy flat keys — still present on older workflow nodes until re-saved. */
+  target?: string;
+  enabled?: boolean;
+  frequency?: number;
+  timeout?: number;
+  probes?: string[];
+  method?: string;
+  headers?: SyntheticCheckHeaderInput[];
+  body?: string;
+  noFollowRedirects?: boolean;
+  failIfSSL?: boolean;
+  failIfNotSSL?: boolean;
+  validStatusCodes?: number[];
+  failIfBodyMatchesRegexp?: string[];
+  failIfBodyNotMatchesRegexp?: string[];
+  failIfHeaderMatchesRegexp?: SyntheticCheckHeaderMatchInput[];
+  basicAuth?: SyntheticCheckBasicAuthInput;
+  bearerToken?: string;
+}
+
+export interface UpdateHttpSyntheticCheckConfiguration extends CreateHttpSyntheticCheckConfiguration {
+  syntheticCheck?: string;
+}
+
+export interface GetHttpSyntheticCheckConfiguration {
+  syntheticCheck?: string;
+}
+
+export interface DeleteHttpSyntheticCheckConfiguration {
+  syntheticCheck?: string;
+}
+
+export interface SyntheticCheckNodeMetadata {
+  checkLabel?: string;
+  /** Human-readable probe locations from setup (name + region); preferred over raw probe IDs in the canvas. */
+  probeSummary?: string;
+}
+
+export interface GrafanaSyntheticCheckLabel {
+  name?: string;
+  value?: string;
+}
+
+export interface GrafanaSyntheticCheckHTTPSettings {
+  method?: string;
+  headers?: string[];
+  body?: string;
+  validStatusCodes?: number[];
+  noFollowRedirects?: boolean;
+  failIfSSL?: boolean;
+  failIfNotSSL?: boolean;
+  failIfHeaderMatchesRegexp?: SyntheticCheckHeaderMatchInput[];
+  tlsConfig?: GrafanaSyntheticCheckTLSConfig;
+}
+
+export interface GrafanaSyntheticCheckAlert {
+  name?: string;
+  threshold?: number;
+  period?: string;
+  runbookUrl?: string;
+}
+
+export interface GrafanaSyntheticCheck {
+  id?: number;
+  job?: string;
+  target?: string;
+  frequency?: number;
+  timeout?: number;
+  enabled?: boolean;
+  labels?: GrafanaSyntheticCheckLabel[];
+  probes?: number[];
+  created?: number;
+  modified?: number;
+  settings?: {
+    http?: GrafanaSyntheticCheckHTTPSettings;
+  };
+  alerts?: GrafanaSyntheticCheckAlert[];
+}
+
+export interface GrafanaSyntheticCheckMetrics {
+  lastOutcome?: string;
+  uptimePercent24h?: number;
+  reachabilityPercent24h?: number;
+  successRuns24h?: number;
+  failureRuns24h?: number;
+  totalRuns24h?: number;
+  averageLatencySeconds24h?: number;
+  sslEarliestExpiryAt?: string;
+  sslEarliestExpiryDays?: number;
+  frequencyMilliseconds?: number;
+  lastExecutionAt?: string;
+}
+
+export interface SyntheticCheckMutationOutput {
+  check?: GrafanaSyntheticCheck;
+  checkUrl?: string;
+  alerts?: GrafanaSyntheticCheckAlert[];
+}
+
+export interface GetHttpSyntheticCheckOutput {
+  configuration?: GrafanaSyntheticCheck;
+  metrics?: GrafanaSyntheticCheckMetrics;
+  checkUrl?: string;
+  alerts?: GrafanaSyntheticCheckAlert[];
+}
+
+export interface DeleteHttpSyntheticCheckOutput {
+  syntheticCheck?: string;
+  job?: string;
+  target?: string;
+  deleted?: boolean;
+}
