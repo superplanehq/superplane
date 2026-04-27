@@ -1372,22 +1372,6 @@ export function WorkflowPageV2() {
         return;
       }
 
-      const liveMetadata = liveCanvas?.metadata;
-      const liveSpec = liveCanvasVersion?.spec ?? liveCanvas?.spec;
-      if (version.metadata?.id && liveMetadata?.name && version.spec) {
-        const seededResponse = await updateCanvasVersionMutation.mutateAsync({
-          versionId: version.metadata.id,
-          name: liveMetadata.name,
-          description: liveMetadata.description,
-          nodes: version.spec.nodes,
-          edges: version.spec.edges,
-          changeManagement: liveSpec?.changeManagement,
-          preserveLocalCanvasState: true,
-          invalidateRelatedQueries: false,
-        });
-        version = seededResponse?.data?.version ?? version;
-      }
-
       activeCanvasVersionIdRef.current = version.metadata?.id || "";
       setActiveCanvasVersion(version);
       setHasUnsavedChanges(false);
@@ -1410,8 +1394,8 @@ export function WorkflowPageV2() {
           ...current,
           metadata: {
             ...current.metadata,
-            name: liveMetadata?.name ?? current.metadata?.name,
-            description: liveMetadata?.description ?? current.metadata?.description,
+            name: version.metadata?.name ?? current.metadata?.name,
+            description: version.metadata?.description ?? current.metadata?.description,
           },
           spec: { ...current.spec, ...version.spec },
         };
@@ -1431,9 +1415,7 @@ export function WorkflowPageV2() {
     hasEditableVersion,
     hasUnsavedChanges,
     createCanvasVersionMutation,
-    updateCanvasVersionMutation,
     liveCanvas,
-    liveCanvasVersion,
     queryClient,
     setSearchParams,
     setLastSavedWorkflowSnapshot,
