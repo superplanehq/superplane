@@ -28,6 +28,7 @@ var instancePowerTargetStates = map[string]string{
 type ManageInstancePower struct{}
 
 type ManageInstancePowerSpec struct {
+	Instance   string `json:"instance" mapstructure:"instance"`
 	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
 	Action     string `json:"action" mapstructure:"action"`
 }
@@ -99,7 +100,7 @@ func (c *ManageInstancePower) ExampleOutput() map[string]any {
 func (c *ManageInstancePower) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "instance",
 			Label:       "Instance",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -131,13 +132,20 @@ func (c *ManageInstancePower) Configuration() []configuration.Field {
 	}
 }
 
+func (s ManageInstancePowerSpec) selectedInstance() string {
+	if strings.TrimSpace(s.Instance) != "" {
+		return s.Instance
+	}
+	return s.InstanceID
+}
+
 func (c *ManageInstancePower) Setup(ctx core.SetupContext) error {
 	spec := ManageInstancePowerSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(spec.InstanceID) == "" {
-		return errors.New("instanceId is required")
+	if strings.TrimSpace(spec.selectedInstance()) == "" {
+		return errors.New("instance is required")
 	}
 	if strings.TrimSpace(spec.Action) == "" {
 		return errors.New("action is required")
@@ -153,19 +161,20 @@ func (c *ManageInstancePower) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+	instance := spec.selectedInstance()
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	if _, err := client.InstanceAction(spec.InstanceID, spec.Action); err != nil {
+	if _, err := client.InstanceAction(instance, spec.Action); err != nil {
 		return fmt.Errorf("failed to run instance action: %w", err)
 	}
 
 	targetState := instancePowerTargetStates[spec.Action]
 	if err := ctx.Metadata.Set(ManageInstancePowerMetadata{
-		InstanceID:  spec.InstanceID,
+		InstanceID:  instance,
 		Action:      spec.Action,
 		TargetState: targetState,
 	}); err != nil {

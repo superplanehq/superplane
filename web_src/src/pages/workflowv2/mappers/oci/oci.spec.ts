@@ -81,7 +81,7 @@ function buildComponentContext(overrides?: {
     },
     lastExecutions: overrides?.lastExecutions ?? [],
     currentUser: undefined,
-    actions: { invokeNodeExecutionAction: async () => {} },
+    actions: { invokeNodeExecutionHook: async () => {} },
   };
 }
 
@@ -141,7 +141,7 @@ const componentCases: Array<{
   {
     name: "manageInstancePower",
     mapper: manageInstancePowerMapper,
-    config: { instanceId: "ocid1.instance.oc1.eu-frankfurt-1.example", action: "STOP" },
+    config: { instance: "ocid1.instance.oc1.eu-frankfurt-1.example", action: "STOP" },
     metadata: [
       { icon: "server", label: "ocid1.instance.oc1.eu-frankfurt-1.example" },
       { icon: "zap", label: "STOP" },
