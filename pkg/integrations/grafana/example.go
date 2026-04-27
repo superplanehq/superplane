@@ -61,6 +61,24 @@ var exampleOutputListAnnotationsBytes []byte
 //go:embed example_output_delete_annotation.json
 var exampleOutputDeleteAnnotationBytes []byte
 
+//go:embed example_output_declare_incident.json
+var exampleOutputDeclareIncidentBytes []byte
+
+//go:embed example_output_declare_drill.json
+var exampleOutputDeclareDrillBytes []byte
+
+//go:embed example_output_get_incident.json
+var exampleOutputGetIncidentBytes []byte
+
+//go:embed example_output_update_incident.json
+var exampleOutputUpdateIncidentBytes []byte
+
+//go:embed example_output_resolve_incident.json
+var exampleOutputResolveIncidentBytes []byte
+
+//go:embed example_output_add_incident_activity.json
+var exampleOutputAddIncidentActivityBytes []byte
+
 var exampleOutputQueryDataSourceOnce sync.Once
 var exampleOutputQueryDataSource map[string]any
 
@@ -114,6 +132,24 @@ var exampleOutputListAnnotations map[string]any
 
 var exampleOutputDeleteAnnotationOnce sync.Once
 var exampleOutputDeleteAnnotation map[string]any
+
+var exampleOutputDeclareIncidentOnce sync.Once
+var exampleOutputDeclareIncident map[string]any
+
+var exampleOutputDeclareDrillOnce sync.Once
+var exampleOutputDeclareDrill map[string]any
+
+var exampleOutputGetIncidentOnce sync.Once
+var exampleOutputGetIncident map[string]any
+
+var exampleOutputUpdateIncidentOnce sync.Once
+var exampleOutputUpdateIncident map[string]any
+
+var exampleOutputResolveIncidentOnce sync.Once
+var exampleOutputResolveIncident map[string]any
+
+var exampleOutputAddIncidentActivityOnce sync.Once
+var exampleOutputAddIncidentActivity map[string]any
 
 func (q *QueryDataSource) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryDataSourceOnce, exampleOutputQueryDataSourceBytes, &exampleOutputQueryDataSource)
@@ -213,4 +249,48 @@ func (l *ListAnnotations) ExampleOutput() map[string]any {
 
 func (d *DeleteAnnotation) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAnnotationOnce, exampleOutputDeleteAnnotationBytes, &exampleOutputDeleteAnnotation)
+}
+
+func (d *DeclareIncident) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeclareIncidentOnce,
+		exampleOutputDeclareIncidentBytes,
+		&exampleOutputDeclareIncident,
+	)
+}
+
+func (d *DeclareDrill) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeclareDrillOnce,
+		exampleOutputDeclareDrillBytes,
+		&exampleOutputDeclareDrill,
+	)
+}
+
+func (g *GetIncident) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIncidentOnce, exampleOutputGetIncidentBytes, &exampleOutputGetIncident)
+}
+
+func (u *UpdateIncident) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputUpdateIncidentOnce,
+		exampleOutputUpdateIncidentBytes,
+		&exampleOutputUpdateIncident,
+	)
+}
+
+func (r *ResolveIncident) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputResolveIncidentOnce,
+		exampleOutputResolveIncidentBytes,
+		&exampleOutputResolveIncident,
+	)
+}
+
+func (a *AddIncidentActivity) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputAddIncidentActivityOnce,
+		exampleOutputAddIncidentActivityBytes,
+		&exampleOutputAddIncidentActivity,
+	)
 }

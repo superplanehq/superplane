@@ -15,14 +15,18 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Incident Activity" href="#add-incident-activity" description="Add a note to a Grafana IRM incident activity timeline" />
   <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
   <LinkCard title="Create Annotation" href="#create-annotation" description="Create an annotation in Grafana to mark deploys, incidents, or other operational events on timelines" />
   <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
+  <LinkCard title="Declare Drill" href="#declare-drill" description="Declare a Grafana IRM drill incident" />
+  <LinkCard title="Declare Incident" href="#declare-incident" description="Declare a Grafana IRM incident" />
   <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
   <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
   <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
   <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
   <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Retrieve a Grafana IRM incident" />
   <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
   <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
   <LinkCard title="List Annotations" href="#list-annotations" description="List Grafana annotations filtered by tag, dashboard, or time range" />
@@ -31,7 +35,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Query Logs" href="#query-logs" description="Run a LogQL query against a Loki data source and return structured log results" />
   <LinkCard title="Query Traces" href="#query-traces" description="Run a TraceQL query against a Tempo data source and return matching traces" />
   <LinkCard title="Render Panel" href="#render-panel" description="Construct a Grafana image render URL for a dashboard panel" />
+  <LinkCard title="Resolve Incident" href="#resolve-incident" description="Resolve a Grafana IRM incident" />
   <LinkCard title="Update Alert Rule" href="#update-alert-rule" description="Update an existing Grafana-managed alert rule from structured alert settings" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update supported Grafana IRM incident fields" />
 </CardGrid>
 
 ## Instructions
@@ -98,6 +104,37 @@ The trigger emits the full Grafana webhook payload, including:
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.alert.firing"
+}
+```
+
+<a id="add-incident-activity"></a>
+
+## Add Incident Activity
+
+The Add Incident Activity component posts a user note to a Grafana IRM incident timeline.
+
+### Configuration
+
+- **Incident**: The incident to update (required)
+- **Body**: Note body (required)
+
+### Output
+
+Returns the created activity item.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "activityItemID": "activity-123",
+    "activityKind": "userNote",
+    "body": "Root cause identified and mitigation is in progress.",
+    "createdTime": "2026-04-20T10:05:00Z",
+    "incidentID": "incident-123"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.activityAdded"
 }
 ```
 
@@ -311,6 +348,109 @@ Returns the ID of the newly created silence.
   },
   "timestamp": "2026-03-31T10:24:30Z",
   "type": "grafana.silence.created"
+}
+```
+
+<a id="declare-drill"></a>
+
+## Declare Drill
+
+The Declare Drill component creates a new drill incident in Grafana IRM.
+
+### Use Cases
+
+- **Operational exercises**: Run incident response drills without affecting production metrics
+- **Process validation**: Test runbooks, roles, and integrations in a safe environment
+
+### Configuration
+
+- **Title**: Drill title (required)
+- **Severity**: Pending, Critical, Major, or Minor (required)
+- **Description**: Optional initial status update added to the drill
+- **Labels**: Optional drill labels
+- **Status**: Start the drill as active or resolved
+- **Start Time**: Optional time when the drill began
+
+### Output
+
+Returns the created Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": true,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "drill"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Simulated database failover exercise for the API tier.",
+    "title": "Quarterly response drill"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.declared"
+}
+```
+
+<a id="declare-incident"></a>
+
+## Declare Incident
+
+The Declare Incident component creates a new incident in Grafana IRM.
+
+### Use Cases
+
+- **Automated incident declaration**: Open an incident when a deployment, alert, or workflow detects a production issue
+
+### Configuration
+
+- **Title**: Incident title (required)
+- **Severity**: Pending, Critical, Major, or Minor (required)
+- **Description**: Optional initial status update added to the incident
+- **Labels**: Optional incident labels
+- **Status**: Start the incident as active or resolved
+- **Start Time**: Optional time when the incident began
+
+### Output
+
+Returns the created Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.declared"
 }
 ```
 
@@ -593,6 +733,48 @@ Returns the Grafana dashboard object, including title, slug, URL, folder, tags, 
   },
   "timestamp": "2026-03-31T10:24:30Z",
   "type": "grafana.dashboard"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component retrieves a single incident from Grafana IRM.
+
+### Configuration
+
+- **Incident**: The incident to retrieve (required)
+
+### Output
+
+Returns the full Grafana IRM incident object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident"
 }
 ```
 
@@ -1081,6 +1263,50 @@ Returns the Grafana render URL along with the dashboard UID and panel.
 }
 ```
 
+<a id="resolve-incident"></a>
+
+## Resolve Incident
+
+The Resolve Incident component marks an existing Grafana IRM incident as resolved.
+
+### Configuration
+
+- **Incident**: The incident to resolve (required)
+- **Summary**: Optional resolution note added to the incident activity before resolving
+
+### Output
+
+Returns the resolved Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "closedTime": "2026-04-20T10:10:00Z",
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:10:00Z",
+    "severity": "minor",
+    "status": "resolved",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:10:00Z",
+  "type": "grafana.incident.resolved"
+}
+```
+
 <a id="update-alert-rule"></a>
 
 ## Update Alert Rule
@@ -1209,6 +1435,55 @@ Returns the updated Grafana alert rule object after the provisioning API applies
   },
   "timestamp": "2026-03-31T10:20:30Z",
   "type": "grafana.alertRule"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component updates supported fields on an existing Grafana IRM incident.
+
+### Configuration
+
+- **Incident**: The incident to update (required)
+- **Title**: Optional new incident title
+- **Severity**: Optional new severity: Pending, Critical, Major, or Minor
+- **Labels**: Optional labels to add to the incident
+- **Is Drill**: Optional drill flag
+
+### Output
+
+Returns the updated Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      },
+      {
+        "label": "customer-impacting"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:07:00Z",
+    "severity": "major",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:07:00Z",
+  "type": "grafana.incident.updated"
 }
 ```
 

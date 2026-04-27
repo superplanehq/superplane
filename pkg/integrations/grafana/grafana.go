@@ -11,14 +11,16 @@ import (
 )
 
 const (
-	resourceTypeDataSource   = "data-source"
-	resourceTypeSilence      = "silence"
-	resourceTypeAlertRule    = "alert-rule"
-	resourceTypeContactPoint = "contact-point"
-	resourceTypeRuleGroup    = "rule-group"
-	resourceTypeDashboard    = "dashboard"
-	resourceTypePanel        = "panel"
-	resourceTypeAnnotation   = "annotation"
+	resourceTypeDataSource       = "data-source"
+	resourceTypeSilence          = "silence"
+	resourceTypeAlertRule        = "alert-rule"
+	resourceTypeContactPoint     = "contact-point"
+	resourceTypeRuleGroup        = "rule-group"
+	resourceTypeDashboard        = "dashboard"
+	resourceTypePanel            = "panel"
+	resourceTypeAnnotation       = "annotation"
+	resourceTypeIncident         = "incident"
+	resourceTypeIncidentSeverity = "incident-severity"
 )
 
 func init() {
@@ -96,6 +98,12 @@ func (g *Grafana) Actions() []core.Action {
 		&DeleteAnnotation{},
 		&CreateSilence{},
 		&DeleteSilence{},
+		&DeclareIncident{},
+		&DeclareDrill{},
+		&GetIncident{},
+		&UpdateIncident{},
+		&ResolveIncident{},
+		&AddIncidentActivity{},
 		&GetSilence{},
 		&ListSilences{},
 	}
@@ -125,9 +133,13 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if resourceType == resourceTypeIncidentSeverity {
+		return grafanaIncidentSeverityResources(), nil
+	}
+
 	switch resourceType {
 	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule, resourceTypeContactPoint, resourceTypeRuleGroup,
-		resourceTypeDashboard, resourceTypePanel, resourceTypeAnnotation, resourceTypeSilence:
+		resourceTypeDashboard, resourceTypePanel, resourceTypeAnnotation, resourceTypeIncident, resourceTypeSilence:
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -227,6 +239,32 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 				Type: resourceTypeAnnotation,
 				Name: formatAnnotationResourceName(annotation),
 				ID:   strconv.FormatInt(annotation.ID, 10),
+			})
+		}
+
+		return resources, nil
+	case resourceTypeIncident:
+		incidents, err := client.ListIncidents(100)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(incidents))
+		for _, incident := range incidents {
+			id := strings.TrimSpace(incident.IncidentID)
+			if id == "" {
+				continue
+			}
+
+			label := formatIncidentResourceLabel(id, incident.Title, incident.Status)
+			if label == "" {
+				label = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeIncident,
+				Name: label,
+				ID:   id,
 			})
 		}
 
