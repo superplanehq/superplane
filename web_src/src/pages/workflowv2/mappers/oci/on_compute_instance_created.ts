@@ -44,10 +44,13 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
     const envelope = getEventEnvelope(context.event);
     const data = envelope?.data;
     return compactDetails([
-      ["Triggered At", context.event?.createdAt ? new Date(context.event.createdAt).toLocaleString() : undefined],
       [
-        "Event Time",
-        !context.event?.createdAt && envelope?.eventTime ? new Date(envelope.eventTime).toLocaleString() : undefined,
+        "Triggered At",
+        context.event?.createdAt
+          ? new Date(context.event.createdAt).toLocaleString()
+          : envelope?.eventTime
+            ? new Date(envelope.eventTime).toLocaleString()
+            : undefined,
       ],
       ["Instance Name", data?.resourceName],
       ["Instance ID", data?.resourceId],
