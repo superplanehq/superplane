@@ -22,6 +22,10 @@ type WorkflowTemplateSummary = {
   edges?: SuperplaneComponentsEdge[];
 };
 
+function getCanvasCreateMethod(templateId?: string): "template" | "ui" {
+  return templateId ? "template" : "ui";
+}
+
 export function useCreateCanvasModalState() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
@@ -56,6 +60,8 @@ export function useCreateCanvasModalState() {
       description: data.description,
       nodes: selectedTemplate?.spec?.nodes,
       edges: selectedTemplate?.spec?.edges,
+      method: getCanvasCreateMethod(data.templateId),
+      templateId: data.templateId,
     });
 
     if (result?.data?.canvas?.metadata?.id) {
