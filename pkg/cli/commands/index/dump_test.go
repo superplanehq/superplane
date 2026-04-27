@@ -32,7 +32,7 @@ func newMultiRouteIndexServer(t *testing.T, routes map[string]string) *httptest.
 func TestDumpWritesFullRegistryToFile(t *testing.T) {
 	server := newMultiRouteIndexServer(t, map[string]string{
 		"/api/v1/integrations": integrationsListResponse,
-		"/api/v1/components":   componentsListResponse,
+		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
 	})
 
@@ -57,8 +57,8 @@ func TestDumpWritesFullRegistryToFile(t *testing.T) {
 	require.Len(t, dump.Integrations, 1)
 	require.Equal(t, "slack", dump.Integrations[0].GetName())
 
-	require.Len(t, dump.Components, 1)
-	require.Equal(t, "http", dump.Components[0].GetName())
+	require.Len(t, dump.Actions, 1)
+	require.Equal(t, "http", dump.Actions[0].GetName())
 
 	require.Len(t, dump.Triggers, 1)
 	require.Equal(t, "cron", dump.Triggers[0].GetName())
@@ -67,7 +67,7 @@ func TestDumpWritesFullRegistryToFile(t *testing.T) {
 func TestDumpIntegrationContainsNestedFields(t *testing.T) {
 	server := newMultiRouteIndexServer(t, map[string]string{
 		"/api/v1/integrations": integrationsListResponse,
-		"/api/v1/components":   componentsListResponse,
+		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
 	})
 
@@ -90,7 +90,7 @@ func TestDumpIntegrationContainsNestedFields(t *testing.T) {
 func TestDumpFullComponentFields(t *testing.T) {
 	server := newMultiRouteIndexServer(t, map[string]string{
 		"/api/v1/integrations": integrationsListResponse,
-		"/api/v1/components":   componentsListResponse,
+		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
 	})
 
@@ -106,7 +106,7 @@ func TestDumpFullComponentFields(t *testing.T) {
 	var dump indexDump
 	require.NoError(t, json.Unmarshal(raw, &dump))
 
-	component := dump.Components[0]
+	component := dump.Actions[0]
 	require.Equal(t, "HTTP", component.GetLabel())
 
 	config := component.GetConfiguration()
@@ -121,7 +121,7 @@ func TestDumpFullComponentFields(t *testing.T) {
 func TestDumpFullTriggerFields(t *testing.T) {
 	server := newMultiRouteIndexServer(t, map[string]string{
 		"/api/v1/integrations": integrationsListResponse,
-		"/api/v1/components":   componentsListResponse,
+		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
 	})
 
@@ -177,7 +177,7 @@ func TestDumpErrorOnAPIFailure(t *testing.T) {
 func TestDumpErrorOnUnwritablePath(t *testing.T) {
 	server := newMultiRouteIndexServer(t, map[string]string{
 		"/api/v1/integrations": integrationsListResponse,
-		"/api/v1/components":   componentsListResponse,
+		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
 	})
 
@@ -194,7 +194,7 @@ func TestDumpErrorOnUnwritablePath(t *testing.T) {
 func TestDumpUsesProvidedOpenAPITypes(t *testing.T) {
 	server := newMultiRouteIndexServer(t, map[string]string{
 		"/api/v1/integrations": integrationsListResponse,
-		"/api/v1/components":   componentsListResponse,
+		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
 	})
 
@@ -214,8 +214,8 @@ func TestDumpUsesProvidedOpenAPITypes(t *testing.T) {
 	var integration openapi_client.IntegrationsIntegrationDefinition
 	require.IsType(t, integration, dump.Integrations[0])
 
-	var component openapi_client.ComponentsComponent
-	require.IsType(t, component, dump.Components[0])
+	var action openapi_client.SuperplaneActionsAction
+	require.IsType(t, action, dump.Actions[0])
 
 	var trigger openapi_client.TriggersTrigger
 	require.IsType(t, trigger, dump.Triggers[0])

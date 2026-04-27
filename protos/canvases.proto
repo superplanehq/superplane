@@ -1074,3 +1074,15 @@ message CanvasVersionMessage {
   string version_id = 2;
   google.protobuf.Timestamp timestamp = 3;
 }
+
+message NotificationEmailRequested {
+  string organization_id = 1;
+  string title = 2;
+  string body = 3;
+  string url = 4;
+  string url_label = 5;
+  repeated string emails = 6;
+  repeated string groups = 7;
+  repeated string roles = 8;
+  google.protobuf.Timestamp timestamp = 9;
+}

@@ -20,38 +20,23 @@ spec:
       position:
         x: 133
         "y": 403
-      component: null
-      blueprint: null
-      trigger:
-        name: "github.onRelease"
-      widget: null
+      component: "github.onRelease"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-70p83y"
       name: "Wait for the changes to propagate"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         mode: "interval"
         unit: "minutes"
         waitFor: "10"
-      metadata: null
       position:
         x: 1191
         "y": 402
-      component:
-        name: "wait"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "wait"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-7z3mea"
       name: "Slack: Deployment failed"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         channel: "C09AJT3BF1Q"
         text: "Deployment of the {{$['Listen to new Releases'].data.release.name}} has failed. \n\nCheck the workflow for details: {{$['Deploy 10%'].data.workflow_run.html_url}}"
@@ -62,18 +47,11 @@ spec:
       position:
         x: 1195
         "y": 636
-      component:
-        name: "slack.sendTextMessage"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "slack.sendTextMessage"
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-1krig8"
       name: "Check if there are any alerts 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         checkRules:
@@ -86,40 +64,25 @@ spec:
       position:
         x: 1712
         "y": 221
-      component:
-        name: "dash0.listIssues"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "dash0.listIssues"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-3c9afc"
       name: "Health Check: Ping server 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         method: "POST"
         retries: 3
         timeoutSeconds: 10
         timeoutStrategy: "exponential"
         url: "https://url.to-your.server/check"
-      metadata: null
       position:
         x: 1715
         "y": 402
-      component:
-        name: "http"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "http"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "merge-merge-vckyv1"
       name: "Wait for all the checks to finish"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         enableStopIf: true
         enableTimeout: true
@@ -127,22 +90,14 @@ spec:
           unit: "minutes"
           value: 2
         stopIfExpression: "$['Check if there are open issues 10%'].data.total>0 || $[\"Health Check: Ping server 10%\"].data.body.healthy == false || $[\"Check if there are any alerts 10%\"].data.status !=\"clear\""
-      metadata: null
       position:
         x: 2295
         "y": 405
-      component:
-        name: "merge"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "merge"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "dash0-listissues-check-if-there-are-any-alerts-pbjufl"
       name: "Check if there are any alerts 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         checkRules:
@@ -155,60 +110,37 @@ spec:
       position:
         x: 4026
         "y": 408
-      component:
-        name: "dash0.listIssues"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "dash0.listIssues"
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "http-health-check--ping-server-spb8ma"
       name: "Health Check: Ping server 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         method: "POST"
         retries: 3
         timeoutSeconds: 10
         timeoutStrategy: "exponential"
         url: "https://url.to-your.server/check"
-      metadata: null
       position:
         x: 4028
         "y": 480
-      component:
-        name: "http"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "http"
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "wait-wait-for-the-changes-to-propagate-9f6hct"
       name: "Wait for the changes to propagate 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         mode: "interval"
         unit: "minutes"
         waitFor: "10"
-      metadata: null
       position:
         x: 3480
         "y": 405
-      component:
-        name: "wait"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "wait"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "merge-merge-as9s0i"
       name: "Wait for all the checks to finish - final"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         enableStopIf: true
         enableTimeout: true
@@ -216,40 +148,25 @@ spec:
           unit: "minutes"
           value: 2
         stopIfExpression: "$['Check if there are open issues 50%'].data.total>0 || $[\"Health Check: Ping server 50%\"].data.body.healthy == false || $[\"Check if there are any alerts 50%\"].data.status !=\"clear\""
-      metadata: null
       position:
         x: 4565
         "y": 479
-      component:
-        name: "merge"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "merge"
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "pagerduty-listincidents-pagerduty-listincidents-kcozn1"
       name: "Check if there are open issues 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         services: null
       position:
         x: 1719
         "y": 644
-      component:
-        name: "pagerduty.listIncidents"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "pagerduty.listIncidents"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-t0ed50"
       name: "Deploy 10%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "environment"
@@ -267,18 +184,11 @@ spec:
       position:
         x: 634
         "y": 402
-      component:
-        name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "github.runWorkflow"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-deploy-10--w3pcg4"
       name: "Deploy 50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "environment"
@@ -296,33 +206,19 @@ spec:
       position:
         x: 2865
         "y": 411
-      component:
-        name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "github.runWorkflow"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "pagerduty-listincidents-check-if-there-are-open-issues-jl7aze"
       name: "Check if there are open issues  50%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         services: null
       position:
         x: 4028
         "y": 555
-      component:
-        name: "pagerduty.listIncidents"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "pagerduty.listIncidents"
       isCollapsed: true
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation-dsxtwd"
       name: "annotation"
       type: "TYPE_WIDGET"
@@ -335,15 +231,8 @@ spec:
       position:
         x: 126
         "y": -7
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation2-xt7sds"
       name: "annotation2"
       type: "TYPE_WIDGET"
@@ -356,15 +245,8 @@ spec:
       position:
         x: 619
         "y": 59
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation3-e3jalx"
       name: "annotation3"
       type: "TYPE_WIDGET"
@@ -373,19 +255,11 @@ spec:
         height: 336
         text: "### Health checks\n\nThree different checks run in parallel to verify system health:\n\n**Dash0 List Issues**: Queries your Dash0 instance for failing check rules. You need to have check rules configured in Dash0.\n\n**HTTP Health Check**: Pings a custom endpoint to verify the application is up and responding correctly.\n\n**PagerDuty List Incidents**: Checks if there are any open incidents that might indicate problems with the deployment."
         width: 365
-      metadata: null
       position:
         x: 1707
         "y": -173
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation4-55btsm"
       name: "annotation4"
       type: "TYPE_WIDGET"
@@ -394,22 +268,14 @@ spec:
         height: 319
         text: "### Merge and conditional stop\n\nThe **Merge** component waits for all health checks to complete before proceeding.\n\nIt has two important configurations:\n- **Timeout**: Limits how long to wait for all checks\n- **Conditional Stop**: Stops the workflow immediately if any check fails\n\nOpen the node sidebar to see the stop condition expression.  \n\nConsider adding a notification component to alert your team if health checks fail or timeout."
         width: 382
-      metadata: null
       position:
         x: 2289
         "y": -31
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-0ae6uu"
       name: "Deploy 100%"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         inputs:
           - name: "environment"
@@ -427,15 +293,8 @@ spec:
       position:
         x: 5121
         "y": 399
-      component:
-        name: "github.runWorkflow"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "github.runWorkflow"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation5-0fn8v7"
       name: "annotation5"
       type: "TYPE_WIDGET"
@@ -444,19 +303,11 @@ spec:
         height: 193
         text: "### Staged rollout progression\n\nThis Canvas repeats the deploy-and-verify cycle for **10%**, **50%**, and finally **100%** of servers.\n\nEach stage runs the same health checks before proceeding to the next.\n\nNodes can be collapsed or expanded to reduce visual clutter.  \nHover on any node to toggle its collapsed view from hover menu."
         width: 493
-      metadata: null
       position:
         x: 2859
         "y": -21
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
   edges:
     - sourceId: "component-node-70p83y"
       targetId: "component-node-1krig8"
@@ -466,7 +317,7 @@ spec:
       channel: "default"
     - sourceId: "component-node-3c9afc"
       targetId: "merge-merge-vckyv1"
-      channel: "default"
+      channel: "success"
     - sourceId: "component-node-1krig8"
       targetId: "merge-merge-vckyv1"
       channel: "critical"
@@ -493,7 +344,7 @@ spec:
       channel: "critical"
     - sourceId: "http-health-check--ping-server-spb8ma"
       targetId: "merge-merge-as9s0i"
-      channel: "default"
+      channel: "success"
     - sourceId: "component-node-70p83y"
       targetId: "pagerduty-listincidents-pagerduty-listincidents-kcozn1"
       channel: "default"
