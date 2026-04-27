@@ -207,26 +207,26 @@ func (p *OnImagePush) provisionRule(integration core.IntegrationContext, request
 	)
 }
 
-func (p *OnImagePush) Actions() []core.Action {
-	return []core.Action{
+func (p *OnImagePush) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "checkRuleAvailability",
-			Description: "Check if the EventBridge rule is available",
+			Name: "checkRuleAvailability",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (p *OnImagePush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnImagePush) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "checkRuleAvailability":
 		return p.checkRuleAvailability(ctx)
 
 	default:
-		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (p *OnImagePush) checkRuleAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnImagePush) checkRuleAvailability(ctx core.TriggerHookContext) (map[string]any, error) {
 	metadata := OnImagePushMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {

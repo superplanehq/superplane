@@ -210,18 +210,18 @@ func (l *ListIncidents) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (l *ListIncidents) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *ListIncidents) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (l *ListIncidents) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (l *ListIncidents) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (l *ListIncidents) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListIncidents) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

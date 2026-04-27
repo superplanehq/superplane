@@ -159,8 +159,8 @@ func (g *GCP) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GCP) Components() []core.Component {
-	return []core.Component{
+func (g *GCP) Actions() []core.Action {
+	return []core.Action{
 		&compute.CreateVM{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
@@ -779,15 +779,15 @@ func (g *GCP) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
-func (g *GCP) Actions() []core.Action {
-	return []core.Action{
-		{Name: gcpcommon.ActionNameEnsureCloudBuild},
-		{Name: gcpcommon.ActionNameEnsureArtifactRegistry},
-		{Name: gcpcommon.ActionNameEnsurePubSubOnMessage},
+func (g *GCP) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: gcpcommon.ActionNameEnsureCloudBuild, Type: core.HookTypeInternal},
+		{Name: gcpcommon.ActionNameEnsureArtifactRegistry, Type: core.HookTypeInternal},
+		{Name: gcpcommon.ActionNameEnsurePubSubOnMessage, Type: core.HookTypeInternal},
 	}
 }
 
-func (g *GCP) HandleAction(ctx core.IntegrationActionContext) error {
+func (g *GCP) HandleHook(ctx core.IntegrationHookContext) error {
 	switch ctx.Name {
 	case gcpcommon.ActionNameEnsureCloudBuild:
 		return g.handleEnsureCloudBuild(ctx)
@@ -796,11 +796,11 @@ func (g *GCP) HandleAction(ctx core.IntegrationActionContext) error {
 	case gcpcommon.ActionNameEnsurePubSubOnMessage:
 		return g.handleEnsurePubSubOnMessage(ctx)
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) error {
+func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationHookContext) error {
 	var params struct {
 		Topic      string `mapstructure:"topic"`
 		GCPSubName string `mapstructure:"gcpSubName"`
@@ -839,7 +839,7 @@ func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) err
 	return nil
 }
 
-func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationActionContext) error {
+func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationHookContext) error {
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create GCP client: %w", err)
@@ -858,7 +858,7 @@ func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
-func (g *GCP) handleEnsureArtifactRegistry(ctx core.IntegrationActionContext) error {
+func (g *GCP) handleEnsureArtifactRegistry(ctx core.IntegrationHookContext) error {
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create GCP client: %w", err)

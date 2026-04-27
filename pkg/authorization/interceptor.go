@@ -9,10 +9,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
-	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -145,8 +145,8 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		// Discovery rules
 		pbTriggers.Triggers_ListTriggers_FullMethodName:             {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbTriggers.Triggers_DescribeTrigger_FullMethodName:          {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbComponents.Components_ListComponents_FullMethodName:       {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbComponents.Components_DescribeComponent_FullMethodName:    {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbActions.Actions_ListActions_FullMethodName:                {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbActions.Actions_DescribeAction_FullMethodName:             {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbIntegrations.Integrations_ListIntegrations_FullMethodName: {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Agent rules
@@ -322,13 +322,13 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_InvokeNodeExecutionAction_FullMethodName: {
+		pbCanvases.Canvases_InvokeNodeExecutionHook_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName: {
+		pbCanvases.Canvases_InvokeNodeTriggerHook_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,

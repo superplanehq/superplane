@@ -6,7 +6,7 @@ import { getExecutionDetails } from "./index";
 function makeNode(name: string): ComponentsNode {
   return makeComponentsNode({
     id: "node-1",
-    component: { name },
+    component: name,
   });
 }
 

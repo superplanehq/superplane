@@ -96,8 +96,8 @@ func (h *Honeycomb) Configuration() []configuration.Field {
 	}
 }
 
-func (h *Honeycomb) Components() []core.Component {
-	return []core.Component{
+func (h *Honeycomb) Actions() []core.Action {
+	return []core.Action{
 		&CreateEvent{},
 	}
 }
@@ -106,14 +106,6 @@ func (h *Honeycomb) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAlertFired{},
 	}
-}
-
-func (h *Honeycomb) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (h *Honeycomb) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
 }
 
 func (h *Honeycomb) Cleanup(ctx core.IntegrationCleanupContext) error {
@@ -166,4 +158,12 @@ func (h *Honeycomb) Sync(ctx core.SyncContext) error {
 func (h *Honeycomb) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(404)
 	_, _ = ctx.Response.Write([]byte("not found"))
+}
+
+func (h *Honeycomb) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (h *Honeycomb) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

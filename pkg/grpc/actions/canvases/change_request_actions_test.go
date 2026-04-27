@@ -259,12 +259,9 @@ func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.Reso
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
 				{
-					Id:   "node-1",
-					Name: "Initial Name",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
-						Name: "noop",
-					},
+					Id:        "node-1",
+					Name:      "Initial Name",
+					Component: "noop",
 				},
 			},
 			Edges: []*componentpb.Edge{},
@@ -293,12 +290,9 @@ func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRe
 			Spec: &pb.Canvas_Spec{
 				Nodes: []*componentpb.Node{
 					{
-						Id:   "node-1",
-						Name: nodeName,
-						Type: componentpb.Node_TYPE_COMPONENT,
-						Component: &componentpb.Node_ComponentRef{
-							Name: "noop",
-						},
+						Id:        "node-1",
+						Name:      nodeName,
+						Component: "noop",
 					},
 				},
 				Edges: []*componentpb.Edge{},

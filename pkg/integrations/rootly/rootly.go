@@ -59,8 +59,8 @@ func (r *Rootly) Configuration() []configuration.Field {
 	}
 }
 
-func (r *Rootly) Components() []core.Component {
-	return []core.Component{
+func (r *Rootly) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 		&CreateEvent{},
 		&UpdateIncident{},
@@ -107,14 +107,6 @@ func (r *Rootly) Sync(ctx core.SyncContext) error {
 
 func (r *Rootly) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
-}
-
-func (r *Rootly) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (r *Rootly) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
 }
 
 // verifyWebhookSignature verifies the Rootly webhook signature.
@@ -170,4 +162,12 @@ func hmacEqual(a, b []byte) bool {
 		result |= a[i] ^ b[i]
 	}
 	return result == 0
+}
+
+func (r *Rootly) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (r *Rootly) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

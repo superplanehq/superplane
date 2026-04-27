@@ -61,8 +61,8 @@ func (j *JFrogArtifactory) Configuration() []configuration.Field {
 	}
 }
 
-func (j *JFrogArtifactory) Components() []core.Component {
-	return []core.Component{
+func (j *JFrogArtifactory) Actions() []core.Action {
+	return []core.Action{
 		&GetArtifactInfo{},
 		&DeleteArtifact{},
 	}
@@ -111,14 +111,6 @@ func (j *JFrogArtifactory) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (j *JFrogArtifactory) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
-func (j *JFrogArtifactory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (j *JFrogArtifactory) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (j *JFrogArtifactory) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "repository" {
 		return []core.IntegrationResource{}, nil
@@ -148,4 +140,12 @@ func (j *JFrogArtifactory) ListResources(resourceType string, ctx core.ListResou
 	}
 
 	return resources, nil
+}
+
+func (j *JFrogArtifactory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (j *JFrogArtifactory) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

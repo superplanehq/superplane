@@ -26,7 +26,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("merge", &Merge{})
+	registry.RegisterAction("merge", &Merge{})
 }
 
 /*
@@ -225,9 +225,12 @@ func (m *Merge) Configuration() []configuration.Field {
 	}
 }
 
-func (m *Merge) Actions() []core.Action {
-	return []core.Action{
-		{Name: "timeoutReached"},
+func (m *Merge) Hooks() []core.Hook {
+	return []core.Hook{
+		{
+			Name: "timeoutReached",
+			Type: core.HookTypeInternal,
+		},
 	}
 }
 
@@ -416,16 +419,16 @@ func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *c
 	return md, nil
 }
 
-func (m *Merge) HandleAction(ctx core.ActionContext) error {
+func (m *Merge) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "timeoutReached":
 		return m.HandleTimeout(ctx)
 	default:
-		return fmt.Errorf("merge does not support action: %s", ctx.Name)
+		return fmt.Errorf("merge does not support hook: %s", ctx.Name)
 	}
 }
 
-func (m *Merge) HandleTimeout(ctx core.ActionContext) error {
+func (m *Merge) HandleTimeout(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

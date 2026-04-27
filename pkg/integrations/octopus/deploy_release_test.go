@@ -629,7 +629,7 @@ func Test__Octopus_DeployRelease__Poll(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{
@@ -677,7 +677,7 @@ func Test__Octopus_DeployRelease__Poll(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{
@@ -731,7 +731,7 @@ func Test__Octopus_DeployRelease__Poll(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{
@@ -770,7 +770,7 @@ func Test__Octopus_DeployRelease__Poll(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			ExecutionState: executionState,
 			Metadata:       metadataCtx,
@@ -779,14 +779,6 @@ func Test__Octopus_DeployRelease__Poll(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, requestCtx.Action)
-	})
-
-	t.Run("unknown action -> error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
-			Name: "unknown",
-		})
-
-		require.ErrorContains(t, err, "unknown action: unknown")
 	})
 }
 

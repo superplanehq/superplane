@@ -231,8 +231,6 @@ func (c *DisposePackageVersions) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DisposePackageVersions) Actions() []core.Action                    { return nil }
-func (c *DisposePackageVersions) HandleAction(ctx core.ActionContext) error { return nil }
 func (c *DisposePackageVersions) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -249,4 +247,12 @@ func (c *DisposePackageVersions) normalizeConfig(config DisposePackageVersionsCo
 	config.Versions = strings.TrimSpace(config.Versions)
 	config.ExpectedStatus = strings.TrimSpace(config.ExpectedStatus)
 	return config
+}
+
+func (c *DisposePackageVersions) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DisposePackageVersions) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

@@ -83,8 +83,8 @@ func (s *SendGrid) Configuration() []configuration.Field {
 	}
 }
 
-func (s *SendGrid) Components() []core.Component {
-	return []core.Component{
+func (s *SendGrid) Actions() []core.Action {
+	return []core.Action{
 		&SendEmail{},
 		&CreateOrUpdateContact{},
 	}
@@ -135,10 +135,10 @@ func (s *SendGrid) ListResources(resourceType string, ctx core.ListResourcesCont
 	return []core.IntegrationResource{}, nil
 }
 
-func (s *SendGrid) Actions() []core.Action {
-	return []core.Action{}
+func (s *SendGrid) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (s *SendGrid) HandleAction(ctx core.IntegrationActionContext) error {
+func (s *SendGrid) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

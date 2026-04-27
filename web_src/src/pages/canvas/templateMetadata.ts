@@ -29,7 +29,7 @@ export function extractIntegrations(nodes: SuperplaneComponentsNode[] | undefine
   const integrations = new Set<string>();
 
   for (const node of nodes) {
-    const blockName = node.component?.name || node.trigger?.name;
+    const blockName = node.component;
     if (!blockName) continue;
 
     const rawPrefix = blockName.split(".")[0];
@@ -54,7 +54,7 @@ export function countNodesByType(nodes: SuperplaneComponentsNode[] | undefined):
   let triggers = 0;
 
   for (const node of nodes) {
-    if (node.type === "TYPE_COMPONENT") components++;
+    if (node.type === "TYPE_ACTION") components++;
     else if (node.type === "TYPE_TRIGGER") triggers++;
   }
 

@@ -18,7 +18,7 @@ const ChannelNameFound = "found"
 const ChannelNameNotFound = "notFound"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &UpdateMemory{})
+	registry.RegisterAction(ComponentName, &UpdateMemory{})
 }
 
 type UpdateMemory struct{}
@@ -288,14 +288,6 @@ func (c *UpdateMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("updateMemory does not support actions")
-}
-
 func (c *UpdateMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -305,5 +297,13 @@ func (c *UpdateMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 }
 
 func (c *UpdateMemory) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpdateMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateMemory) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

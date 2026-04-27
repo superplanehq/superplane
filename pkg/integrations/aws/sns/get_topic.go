@@ -114,14 +114,6 @@ func (c *GetTopic) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *GetTopic) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetTopic) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -131,5 +123,13 @@ func (c *GetTopic) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *GetTopic) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetTopic) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetTopic) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

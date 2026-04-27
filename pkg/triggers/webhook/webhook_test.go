@@ -79,7 +79,7 @@ func Test__Webhook__Setup(t *testing.T) {
 	})
 }
 
-func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
+func Test__Webhook__HandleHook__ResetAuthentication(t *testing.T) {
 	t.Run("resets signature authentication", func(t *testing.T) {
 		webhook := &Webhook{}
 		webhookCtx := &contexts.NodeWebhookContext{Secret: "secret-key"}
@@ -87,7 +87,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "signature"},
 		}
 
-		result, err := webhook.HandleAction(core.TriggerActionContext{
+		result, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "signature"},
 			Metadata:      metadataCtx,
@@ -105,7 +105,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "bearer"},
 		}
 
-		result, err := webhook.HandleAction(core.TriggerActionContext{
+		result, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "bearer"},
 			Metadata:      metadataCtx,
@@ -123,7 +123,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "header_token"},
 		}
 
-		result, err := webhook.HandleAction(core.TriggerActionContext{
+		result, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "header_token"},
 			Metadata:      metadataCtx,
@@ -140,7 +140,7 @@ func Test__Webhook__HandleAction__ResetAuthentication(t *testing.T) {
 			Metadata: Metadata{Authentication: "none"},
 		}
 
-		_, err := webhook.HandleAction(core.TriggerActionContext{
+		_, err := webhook.HandleHook(core.TriggerHookContext{
 			Name:          "resetAuthentication",
 			Configuration: Configuration{Authentication: "none"},
 			Metadata:      metadataCtx,
@@ -219,6 +219,23 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.True(t, ok)
 		require.Contains(t, data, "body")
 		require.Contains(t, data, "headers")
+	})
+
+	t.Run("accepts valid signature on configured header e.g. GitHub", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"foo":"bar"}`)
+		ctx, eventCtx := webhookRequestContextWithConfig(
+			body,
+			map[string]any{"authentication": "signature", "signatureHeader": "X-Hub-Signature-256"},
+			"secret",
+		)
+		signature := computeSignature("secret", body)
+		ctx.Headers.Set("X-Hub-Signature-256", "sha256="+signature)
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventCtx.Count())
 	})
 
 	t.Run("rejects missing bearer token", func(t *testing.T) {
@@ -333,13 +350,17 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 }
 
 func webhookRequestContext(body []byte, authentication string, secret string) (core.WebhookRequestContext, *contexts.EventContext) {
+	return webhookRequestContextWithConfig(body, map[string]any{"authentication": authentication}, secret)
+}
+
+func webhookRequestContextWithConfig(body []byte, configuration map[string]any, secret string) (core.WebhookRequestContext, *contexts.EventContext) {
 	eventCtx := &contexts.EventContext{}
 	webhookCtx := &contexts.NodeWebhookContext{Secret: secret}
 
 	return core.WebhookRequestContext{
 		Body:          body,
 		Headers:       http.Header{},
-		Configuration: map[string]any{"authentication": authentication},
+		Configuration: configuration,
 		Webhook:       webhookCtx,
 		Events:        eventCtx,
 	}, eventCtx

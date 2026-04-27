@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -424,18 +424,18 @@ func (c *CreateRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return 200, nil, nil
 }
 
-func (c *CreateRelease) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateRelease) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *CreateRelease) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateRelease) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

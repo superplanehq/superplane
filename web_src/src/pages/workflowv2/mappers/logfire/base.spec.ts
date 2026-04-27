@@ -76,7 +76,7 @@ function buildComponentBaseContext(overrides?: {
       roles: ["admin"],
       groups: ["developers"],
     },
-    actions: { invokeNodeExecutionAction: async () => {} },
+    actions: { invokeNodeExecutionHook: async () => {} },
   };
 }
 

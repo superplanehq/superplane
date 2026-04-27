@@ -23,6 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
@@ -159,7 +160,7 @@ The Webhook trigger starts a new workflow execution when an HTTP request is rece
 
 ### Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the `X-Signature-256` header
+- **Signature (HMAC)**: Verify requests using an HMAC-SHA256 signature
 - **Bearer Token**: Require a Bearer token in the `Authorization` header
 - **Header Token**: Require a raw token in a custom header (default: `X-Webhook-Token`)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -395,6 +396,50 @@ The expression has access to:
 }
 ```
 
+<a id="graph-ql-request"></a>
+
+## GraphQL Request
+
+The GraphQL component runs a GraphQL document against a URL using the standard **GraphQL over HTTP** JSON body shape.
+
+### Request
+
+- **URL** — GraphQL HTTP endpoint (supports expressions)
+- **Query** — Multi-line GraphQL document (no JSON escaping in the canvas)
+- **Variables** — Key/value pairs merged into the request variables object
+- **Headers** — Request headers
+- **Authorization** — Optional bearer token stored in an organization Secret
+
+### Response
+
+- **status** - Response status code
+- **headers** - Response headers
+- **body** - Response body converted to JSON
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": {
+      "data": {
+        "viewer": {
+          "login": "octocat"
+        }
+      }
+    },
+    "headers": {
+      "Content-Type": [
+        "application/json"
+      ]
+    },
+    "status": 200
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "graphql.request.finished"
+}
+```
+
 <a id="http-request"></a>
 
 ## HTTP Request
@@ -418,6 +463,7 @@ The HTTP component allows you to make HTTP requests to external APIs and service
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
+- **Authorization** (optional): Bearer Token, Basic Auth password, or custom header value
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data

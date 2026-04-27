@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package Superplane.Actions;
+
+import "configuration.proto";
+import "google/protobuf/struct.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/actions";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Actions API";
+    version: "1.0";
+    description: "API for Superplane Actions";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Actions {
+  rpc ListActions(ListActionsRequest) returns (ListActionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/actions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List actions";
+      description: "Returns a list of all actions";
+      tags: "Action";
+    };
+  }
+
+  rpc DescribeAction(DescribeActionRequest) returns (DescribeActionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/actions/{name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe action";
+      description: "Returns an action by its name";
+      tags: "Action";
+    };
+  }
+}
+
+message ListActionsRequest {}
+
+message ListActionsResponse {
+  repeated Action actions = 1;
+}
+
+message DescribeActionRequest {
+  string name = 1;
+}
+
+message DescribeActionResponse {
+  Action action = 1;
+}
+
+message Action {
+  string name = 1;
+  string label = 2;
+  string description = 3;
+  repeated Configuration.Field configuration = 4;
+  repeated OutputChannel output_channels = 5;
+  string icon = 6;
+  string color = 7;
+  google.protobuf.Struct example_output = 8;
+}
+
+message OutputChannel {
+  string name = 1;
+  string label = 2;
+  string description = 3;
+}
