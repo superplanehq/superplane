@@ -6,8 +6,11 @@ import { createSilenceMapper } from "./create_silence";
 import { deleteAlertRuleMapper } from "./delete_alert_rule";
 import { deleteAnnotationMapper } from "./delete_annotation";
 import { deleteSilenceMapper } from "./delete_silence";
+import { addIncidentActivityMapper } from "./add_incident_activity";
+import { declareDrillMapper, declareIncidentMapper } from "./declare_incident";
 import { getAlertRuleMapper } from "./get_alert_rule";
 import { getDashboardMapper } from "./get_dashboard";
+import { getIncidentMapper } from "./get_incident";
 import { getSilenceMapper } from "./get_silence";
 import { getSilenceEventStateRegistry } from "./get_silence_state";
 import { listAlertRulesMapper } from "./list_alert_rules";
@@ -18,7 +21,9 @@ import { queryDataSourceMapper } from "./query_data_source";
 import { queryLogsMapper } from "./query_logs";
 import { queryTracesMapper } from "./query_traces";
 import { renderPanelMapper } from "./render_panel";
+import { resolveIncidentMapper } from "./resolve_incident";
 import { updateAlertRuleMapper } from "./update_alert_rule";
+import { updateIncidentMapper } from "./update_incident";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createAlertRule: createAlertRuleMapper,
@@ -38,6 +43,12 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteSilence: deleteSilenceMapper,
   getSilence: getSilenceMapper,
   listSilences: listSilencesMapper,
+  declareIncident: declareIncidentMapper,
+  declareDrill: declareDrillMapper,
+  getIncident: getIncidentMapper,
+  updateIncident: updateIncidentMapper,
+  resolveIncident: resolveIncidentMapper,
+  addIncidentActivity: addIncidentActivityMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -64,4 +75,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteSilence: buildActionStateRegistry("deleted"),
   getSilence: getSilenceEventStateRegistry,
   listSilences: buildActionStateRegistry("listed"),
+  declareIncident: buildActionStateRegistry("declared"),
+  declareDrill: buildActionStateRegistry("declared"),
+  getIncident: buildActionStateRegistry("fetched"),
+  updateIncident: buildActionStateRegistry("updated"),
+  resolveIncident: buildActionStateRegistry("resolved"),
+  addIncidentActivity: buildActionStateRegistry("added"),
 };
