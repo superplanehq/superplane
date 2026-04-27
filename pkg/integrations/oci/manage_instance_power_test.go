@@ -73,7 +73,7 @@ func Test__ManageInstancePower__PollReschedulesUntilTargetState(t *testing.T) {
 	requests := &contexts.RequestContext{}
 	executionState := &contexts.ExecutionStateContext{}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           "poll",
 		HTTP:           httpCtx,
 		Integration:    ociIntegrationContext(),
@@ -97,7 +97,7 @@ func Test__ManageInstancePower__PollEmitsAtTargetState(t *testing.T) {
 	}
 	executionState := &contexts.ExecutionStateContext{}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:        "poll",
 		HTTP:        httpCtx,
 		Integration: ociIntegrationContext(),
@@ -134,7 +134,7 @@ func Test__ManageInstancePower__PollHandlesConsecutiveErrors(t *testing.T) {
 		},
 	}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           "poll",
 		HTTP:           httpCtx,
 		Integration:    ociIntegrationContext(),
@@ -146,4 +146,33 @@ func Test__ManageInstancePower__PollHandlesConsecutiveErrors(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "giving up polling instance")
+}
+
+func Test__ManageInstancePower__PollStopsAfterMaxAttempts(t *testing.T) {
+	component := &ManageInstancePower{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			ociMockResponse(http.StatusOK, ociInstanceBody("STOPPING")),
+		},
+	}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name:        "poll",
+		HTTP:        httpCtx,
+		Integration: ociIntegrationContext(),
+		Metadata: &contexts.MetadataContext{
+			Metadata: ManageInstancePowerMetadata{
+				InstanceID:   testInstanceID,
+				Action:       "STOP",
+				TargetState:  instanceStateStopped,
+				PollAttempts: maxPollAttempts - 1,
+			},
+		},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Logger:         ociLogger(),
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "timed out waiting for instance")
 }
