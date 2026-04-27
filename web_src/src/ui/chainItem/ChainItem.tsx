@@ -10,8 +10,40 @@ import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
+import { MultilineDetail } from "./MultilineDetail";
 import { ChainItemIcon } from "./ChainItemIcon";
 import type { ChainItemData } from "./types";
+
+export interface ChildExecution {
+  name: string;
+  state: string;
+  nodeId: string;
+  executionId: string;
+  badgeColor?: string;
+  backgroundColor?: string;
+  componentIcon?: string;
+}
+
+export interface ChainItemData {
+  id: string;
+  nodeId: string;
+  componentName: string;
+  nodeName?: string;
+  nodeDisplayName?: string; // The actual display name from workflow node
+  nodeIcon?: string;
+  nodeIconSlug?: string; // Icon slug from component/trigger/blueprint metadata
+  state?: string; // Make state optional since it will be calculated
+  executionId?: string;
+  originalExecution?: CanvasesCanvasNodeExecution; // Add execution data
+  originalEvent?: CanvasesCanvasEvent; // Add event data for trigger events
+  childExecutions?: ChildExecution[]; // Add child executions for composite components
+  workflowNode?: SuperplaneComponentsNode; // Add workflow node for subtitle generation
+  tabData?: {
+    current?: Record<string, any>;
+    payload?: any;
+    configuration?: any;
+  };
+}
 
 interface ChainItemProps {
   item: ChainItemData;
@@ -299,6 +331,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 {Object.entries(item.tabData.current).map(([key, value]) => {
                   const stringValue = String(value);
                   const isUrlValue = isUrl(stringValue);
+
+                  if (stringValue.includes("\n")) {
+                    return <MultilineDetail key={key} label={key} value={stringValue} />;
+                  }
 
                   return (
                     <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
