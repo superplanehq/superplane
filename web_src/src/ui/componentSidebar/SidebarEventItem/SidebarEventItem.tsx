@@ -491,19 +491,23 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                 <div className="flex items-center gap-1 absolute right-2 top-4">
                   <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                     <button
+                      type="button"
                       onClick={() => copyPayloadToClipboard(tabData.payload)}
                       className="p-1 text-gray-500 hover:text-gray-800"
+                      aria-label="Copy payload"
                     >
                       {React.createElement(resolveIcon("copy"), { size: 16 })}
                     </button>
                   </SimpleTooltip>
                   <SimpleTooltip content="Payload">
                     <button
+                      type="button"
                       onClick={() => {
                         setModalPayload(tabData.payload);
                         setIsPayloadModalOpen(true);
                       }}
                       className="p-1 text-gray-500 hover:text-gray-800"
+                      aria-label="Expand payload"
                     >
                       {React.createElement(resolveIcon("maximize-2"), { size: 16 })}
                     </button>
