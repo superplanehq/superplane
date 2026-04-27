@@ -188,6 +188,12 @@ We welcome your bug reports, ideas for improvement, and focused PRs.
 - Read the **[Contributing Guide](CONTRIBUTING.md)** to get started.
 - Issues: use GitHub issues for bugs and feature requests.
 
+### Consistency Note (Organization Membership)
+
+When removing a user from an organization, SuperPlane removes the user's organization roles and then soft-deletes the user. If role removal fails, user deletion is not performed, and any roles removed earlier in the same operation are restored.
+
+Traduccion al espanol: Al remover un usuario de una organizacion, SuperPlane elimina primero los roles de organizacion del usuario y luego aplica un borrado logico del usuario. Si la eliminacion de roles falla, el borrado del usuario no se ejecuta y cualquier rol eliminado previamente en la misma operacion se restaura.
+
 ## License
 
 Apache License 2.0. See `LICENSE`.

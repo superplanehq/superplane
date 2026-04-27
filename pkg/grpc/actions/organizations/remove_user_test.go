@@ -2,12 +2,14 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -68,4 +70,54 @@ func Test_RemoveUser(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, roles, 0)
 	})
+
+	t.Run("role removal failure -> user remains active with original roles", func(t *testing.T) {
+		newUser := support.CreateUser(t, r, r.Organization.ID)
+
+		rolesBefore, err := r.AuthService.GetUserRolesForOrg(newUser.ID.String(), orgID)
+		require.NoError(t, err)
+		require.NotEmpty(t, rolesBefore)
+
+		failingRole := rolesBefore[0].Name
+		mockAuth := &removeUserAuthService{
+			Authorization:   r.AuthService,
+			failOnRoleName:  failingRole,
+			removeRoleError: errors.New("forced remove role error"),
+		}
+
+		_, err = RemoveUser(ctx, mockAuth, orgID, newUser.ID.String())
+		require.Error(t, err)
+
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, s.Code())
+		assert.Equal(t, "error removing role", s.Message())
+
+		_, err = models.FindActiveUserByID(orgID, newUser.ID.String())
+		require.NoError(t, err)
+
+		rolesAfter, err := r.AuthService.GetUserRolesForOrg(newUser.ID.String(), orgID)
+		require.NoError(t, err)
+		require.NotEmpty(t, rolesAfter)
+
+		roleNamesAfter := make([]string, 0, len(rolesAfter))
+		for _, role := range rolesAfter {
+			roleNamesAfter = append(roleNamesAfter, role.Name)
+		}
+		assert.Contains(t, roleNamesAfter, failingRole)
+	})
+}
+
+type removeUserAuthService struct {
+	authorization.Authorization
+	failOnRoleName  string
+	removeRoleError error
+}
+
+func (m *removeUserAuthService) RemoveRole(userID, role, domainID string, domainType string) error {
+	if m.removeRoleError != nil && role == m.failOnRoleName {
+		return m.removeRoleError
+	}
+
+	return m.Authorization.RemoveRole(userID, role, domainID, domainType)
 }

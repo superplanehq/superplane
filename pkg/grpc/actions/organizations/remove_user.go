@@ -28,28 +28,38 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, status.Error(codes.FailedPrecondition, "cannot remove the last organization owner")
 	}
 
-	//
-	// TODO: this should all be inside of a transaction
-	// Remove organization roles
-	//
 	roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
 	if err != nil {
-		log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
-		return nil, status.Error(codes.Internal, "error determing user roles")
+		log.Errorf("Error determining user roles for %s: %v", user.ID.String(), err)
+		return nil, status.Error(codes.Internal, "error determining user roles")
 	}
 
+	removedRoles := make([]string, 0, len(roles))
 	for _, role := range roles {
 		err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
 		if err != nil {
 			log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
+			restoreRoles(authService, user.ID.String(), orgID, removedRoles)
 			return nil, status.Error(codes.Internal, "error removing role")
 		}
+
+		removedRoles = append(removedRoles, role.Name)
 	}
 
 	err = user.Delete()
 	if err != nil {
+		restoreRoles(authService, user.ID.String(), orgID, removedRoles)
 		return nil, status.Error(codes.Internal, "error deleting user")
 	}
 
 	return &pb.RemoveUserResponse{}, nil
+}
+
+func restoreRoles(authService authorization.Authorization, userID, orgID string, roles []string) {
+	for _, roleName := range roles {
+		err := authService.AssignRole(userID, roleName, orgID, models.DomainTypeOrganization)
+		if err != nil {
+			log.Errorf("Error restoring role %s for %s after rollback attempt: %v", roleName, userID, err)
+		}
+	}
 }
