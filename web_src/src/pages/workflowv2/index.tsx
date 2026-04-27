@@ -1366,7 +1366,7 @@ export function WorkflowPageV2() {
 
     try {
       const response = await createCanvasVersionMutation.mutateAsync();
-      let version = response?.data?.version;
+      const version = response?.data?.version;
       if (!version) {
         showErrorToast("Failed to create canvas version");
         return;
@@ -1415,7 +1415,6 @@ export function WorkflowPageV2() {
     hasEditableVersion,
     hasUnsavedChanges,
     createCanvasVersionMutation,
-    liveCanvas,
     queryClient,
     setSearchParams,
     setLastSavedWorkflowSnapshot,
