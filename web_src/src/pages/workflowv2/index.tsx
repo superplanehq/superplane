@@ -505,8 +505,8 @@ export function WorkflowPageV2() {
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
   const isChangeManagementDisabled = !(
-    liveCanvasVersion?.spec?.changeManagement?.enabled ??
     liveCanvas?.spec?.changeManagement?.enabled ??
+    liveCanvasVersion?.spec?.changeManagement?.enabled ??
     false
   );
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
