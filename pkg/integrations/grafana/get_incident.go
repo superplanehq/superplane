@@ -51,10 +51,6 @@ func (g *GetIncident) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (g *GetIncident) ExampleOutput() map[string]any {
-	return exampleIncidentOutput("grafana.incident", false)
-}
-
 func (g *GetIncident) Configuration() []configuration.Field {
 	return []configuration.Field{incidentResourceField("incident", "Incident", "The incident to retrieve")}
 }

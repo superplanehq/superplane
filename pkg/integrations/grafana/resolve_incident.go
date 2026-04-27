@@ -54,10 +54,6 @@ func (r *ResolveIncident) OutputChannels(configuration any) []core.OutputChannel
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (r *ResolveIncident) ExampleOutput() map[string]any {
-	return exampleIncidentOutput("grafana.incident.resolved", false)
-}
-
 func (r *ResolveIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		incidentResourceField("incident", "Incident", "The incident to resolve"),

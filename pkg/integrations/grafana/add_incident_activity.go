@@ -53,20 +53,6 @@ func (a *AddIncidentActivity) OutputChannels(configuration any) []core.OutputCha
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (a *AddIncidentActivity) ExampleOutput() map[string]any {
-	return map[string]any{
-		"type":      "grafana.incident.activityAdded",
-		"timestamp": "2026-04-20T10:05:00Z",
-		"data": map[string]any{
-			"activityItemID": "activity-123",
-			"incidentID":     "incident-123",
-			"activityKind":   "userNote",
-			"body":           "Root cause identified and mitigation is in progress.",
-			"createdTime":    "2026-04-20T10:00:00Z",
-		},
-	}
-}
-
 func (a *AddIncidentActivity) Configuration() []configuration.Field {
 	return []configuration.Field{
 		incidentResourceField("incident", "Incident", "The incident to update"),

@@ -135,34 +135,3 @@ func validateAddIncidentActivitySpec(spec AddIncidentActivitySpec) error {
 	}
 	return nil
 }
-
-func exampleIncidentOutput(payloadType string, isDrill bool) map[string]any {
-	status := "active"
-	closedTime := ""
-	if payloadType == "grafana.incident.resolved" {
-		status = "resolved"
-		closedTime = "2026-04-20T10:10:00Z"
-	}
-
-	data := map[string]any{
-		"incidentID":   "incident-123",
-		"incidentUrl":  "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
-		"title":        "High latency in web requests",
-		"severity":     "minor",
-		"status":       status,
-		"summary":      "Database connection pool exhaustion identified as root cause.",
-		"labels":       []any{map[string]any{"label": "api"}, map[string]any{"label": "production"}},
-		"isDrill":      isDrill,
-		"createdTime":  "2026-04-20T10:00:00Z",
-		"modifiedTime": "2026-04-20T10:05:00Z",
-	}
-	if closedTime != "" {
-		data["closedTime"] = closedTime
-	}
-
-	return map[string]any{
-		"type":      payloadType,
-		"timestamp": "2026-04-20T10:05:00Z",
-		"data":      data,
-	}
-}

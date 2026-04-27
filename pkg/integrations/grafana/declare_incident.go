@@ -55,10 +55,6 @@ func (d *DeclareIncident) OutputChannels(configuration any) []core.OutputChannel
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (d *DeclareIncident) ExampleOutput() map[string]any {
-	return exampleIncidentOutput("grafana.incident.declared", false)
-}
-
 func (d *DeclareIncident) Configuration() []configuration.Field {
 	return declareIncidentConfiguration(false)
 }

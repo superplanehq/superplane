@@ -59,10 +59,6 @@ func (u *UpdateIncident) OutputChannels(configuration any) []core.OutputChannel 
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (u *UpdateIncident) ExampleOutput() map[string]any {
-	return exampleIncidentOutput("grafana.incident.updated", false)
-}
-
 func (u *UpdateIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		incidentResourceField("incident", "Incident", "The incident to update"),
