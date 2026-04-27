@@ -106,7 +106,10 @@ func (c *UpdateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("error configuring synthetic check alerts: %w", err)
 		}
 	} else if existing != nil {
-		alerts = existing.Alerts
+		alerts, err = client.ListCheckAlerts(id)
+		if err != nil {
+			return fmt.Errorf("error loading synthetic check alerts: %w", err)
+		}
 	}
 	updated.Alerts = alerts
 
