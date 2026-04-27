@@ -6,13 +6,21 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
-export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
+export const TextFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  autocompleteExampleObj,
+  size = "md",
+}) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
     languageId: "plaintext",
   });
+
+  const editorHeight = size === "xs" ? "56px" : size === "sm" ? "100px" : "200px";
 
   const copyToClipboard = () => {
     const textToCopy = (value as string) || "";
@@ -60,7 +68,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
   return (
     <>
       <div className="flex flex-col gap-2 relative">
-        <div className="border rounded-md border-gray-300 dark:border-gray-700 p-1" style={{ height: "200px" }}>
+        <div className="border rounded-md border-gray-300 dark:border-gray-700 p-1" style={{ height: editorHeight }}>
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
               <button onClick={copyToClipboard} className="p-1 rounded text-gray-500 hover:text-gray-800">

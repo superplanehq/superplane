@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TextFieldRenderer } from "@/ui/configurationFieldRenderer/TextFieldRenderer";
+import { parseCurlCommand } from "@/lib/curlParser";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,6 +41,7 @@ interface SettingsTabProps {
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+  componentType?: string;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
@@ -64,9 +67,9 @@ function buildAutosaveSnapshot(
     nodeName,
     integrationRef: integrationRef
       ? {
-          id: integrationRef.id || "",
-          name: integrationRef.name || "",
-        }
+        id: integrationRef.id || "",
+        name: integrationRef.name || "",
+      }
       : null,
   });
 }
@@ -82,6 +85,7 @@ export function SettingsTab({
   domainId,
   domainType,
   customField,
+  componentType,
   integrationName,
   integrationRef,
   integrations = [],
@@ -107,6 +111,13 @@ export function SettingsTab({
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
+  const [curlInput, setCurlInput] = useState("");
+  const [curlParseFeedback, setCurlParseFeedback] = useState<{
+    type: "error" | "warning" | "success";
+    message: string;
+    method?: string;
+    url?: string;
+  } | null>(null);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
@@ -252,6 +263,8 @@ export function SettingsTab({
     setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
+    setCurlInput("");
+    setCurlParseFeedback(null);
   }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
 
   // Auto-select the first installation if none is selected or selection is invalid
@@ -285,6 +298,7 @@ export function SettingsTab({
   }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
+  const isHttpComponent = componentType === "http";
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
     // Text-like editors save on blur; discrete/destructive controls save on change.
     if (!fieldType) {
@@ -404,6 +418,115 @@ export function SettingsTab({
     }, 300);
   }, [configurationSaveMode, isReadOnly]);
 
+  const mapCurlBodyToConfig = useCallback((body: string) => {
+    const emptyBodyConfig = { json: undefined, text: undefined, xml: undefined, formData: undefined };
+    const trimmedBody = body.trim();
+
+    if (!trimmedBody) {
+      return {};
+    }
+
+    const looksLikeJson =
+      (trimmedBody.startsWith("{") && trimmedBody.endsWith("}")) ||
+      (trimmedBody.startsWith("[") && trimmedBody.endsWith("]"));
+
+    if (looksLikeJson) {
+      try {
+        return { ...emptyBodyConfig, contentType: "application/json", json: JSON.parse(trimmedBody) };
+      } catch {
+        return { ...emptyBodyConfig, contentType: "text/plain", text: body };
+      }
+    }
+
+    if (trimmedBody.startsWith("<")) {
+      return { ...emptyBodyConfig, contentType: "application/xml", xml: body };
+    }
+
+    if (trimmedBody.includes("=")) {
+      const safeDecodeURIComponent = (value: string): string => {
+        try {
+          return decodeURIComponent(value);
+        } catch {
+          return value;
+        }
+      };
+      const formData = trimmedBody
+        .split("&")
+        .map((pair) => {
+          const [rawKey, rawValue = ""] = pair.split("=", 2);
+          return { key: safeDecodeURIComponent(rawKey || ""), value: safeDecodeURIComponent(rawValue) };
+        })
+        .filter((item) => item.key);
+      return { ...emptyBodyConfig, contentType: "application/x-www-form-urlencoded", formData };
+    }
+
+    return { ...emptyBodyConfig, contentType: "text/plain", text: body };
+  }, []);
+
+  const handleParseCurl = useCallback(() => {
+    const parsed = parseCurlCommand(curlInput);
+    if (parsed.error) {
+      setCurlParseFeedback({ type: "error", message: parsed.error });
+      return;
+    }
+
+    const supportedMethods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+    const nextMethod = supportedMethods.has(parsed.method) ? parsed.method : undefined;
+
+    const contentTypeHeader = parsed.headers.find((h) => h.name.toLowerCase() === "content-type")?.value.toLowerCase();
+
+    const knownContentTypes = [
+      "application/json",
+      "application/xml",
+      "text/plain",
+      "application/x-www-form-urlencoded",
+    ];
+    const contentTypeFromHeader = knownContentTypes.find((ct) => contentTypeHeader?.includes(ct));
+
+    const bodyConfig = parsed.body ? mapCurlBodyToConfig(parsed.body) : {};
+
+    setNodeConfiguration((prev) =>
+      filterVisibleFields({
+        ...prev,
+        ...(nextMethod && { method: nextMethod }),
+        ...(parsed.url && { url: parsed.url }),
+        ...(contentTypeFromHeader && { contentType: contentTypeFromHeader }),
+        headers: parsed.headers,
+        queryParams: parsed.queryParams,
+        ...bodyConfig,
+      }),
+    );
+
+    requestAutosave();
+
+    if (!nextMethod && parsed.method) {
+      setCurlParseFeedback({
+        type: "warning",
+        message: `Parsed curl, but method "${parsed.method}" is not supported by this form. Filled remaining fields.`,
+        method: parsed.method,
+        url: parsed.url,
+      });
+      return;
+    }
+
+    const parsedParts = [
+      parsed.url && "URL",
+      nextMethod && "method",
+      parsed.headers.length > 0 && "headers",
+      parsed.queryParams.length > 0 && "query params",
+      parsed.body && "body",
+    ].filter(Boolean) as string[];
+
+    setCurlParseFeedback({
+      type: "success",
+      method: nextMethod,
+      url: parsed.url,
+      message: parsedParts.length
+        ? `Parsed and populated: ${parsedParts.join(", ")}. Please review before saving.`
+        : "Parsed curl command, but no supported fields were detected.",
+    });
+  }, [curlInput, filterVisibleFields, mapCurlBodyToConfig, requestAutosave]);
+
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
     if (configurationSaveMode !== "auto") {
@@ -516,6 +639,74 @@ export function SettingsTab({
             </div>
           );
         })()}
+        {isHttpComponent && (
+          <div
+            className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-2 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
+          >
+            {curlParseFeedback?.method || curlParseFeedback?.url ? (
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                {curlParseFeedback.method && (
+                  <>
+                    Method:{" "}
+                    <span className="rounded bg-gray-100 dark:bg-gray-800 px-1 font-mono">
+                      {curlParseFeedback.method}
+                    </span>
+                  </>
+                )}
+                {curlParseFeedback.method && curlParseFeedback.url && " | "}
+                {curlParseFeedback.url && (
+                  <>
+                    URL:{" "}
+                    <span className="rounded bg-gray-100 dark:bg-gray-800 px-1 font-mono max-w-[200px] inline-block overflow-hidden text-ellipsis whitespace-nowrap align-bottom">
+                      {curlParseFeedback.url}
+                    </span>
+                  </>
+                )}
+              </p>
+            ) : null}
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Paste a curl command to auto-populate HTTP configuration fields.
+            </p>
+            <TextFieldRenderer
+              field={{
+                name: "curlImport",
+                label: "Paste curl",
+                type: "text",
+              }}
+              value={curlInput}
+              onChange={(value) => {
+                setCurlInput(typeof value === "string" ? value : "");
+                setCurlParseFeedback(null);
+              }}
+              autocompleteExampleObj={resolvedAutocompleteExampleObj}
+              size="xs"
+            />
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleParseCurl}
+                disabled={isReadOnly || curlInput.trim().length === 0}
+              >
+                Parse curl
+              </Button>
+            </div>
+            {curlParseFeedback && (
+              <p
+                className={`text-xs ${curlParseFeedback.type === "error"
+                    ? "text-red-600"
+                    : curlParseFeedback.type === "warning"
+                      ? "text-amber-700"
+                      : "text-green-700"
+                  }`}
+              >
+                {curlParseFeedback.message}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
@@ -616,13 +807,12 @@ export function SettingsTab({
 
                       const integrationStatusCard = (
                         <div
-                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
-                            selectedIntegrationFull.status?.state === "ready"
+                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${selectedIntegrationFull.status?.state === "ready"
                               ? "bg-green-100 dark:bg-green-950/30"
                               : selectedIntegrationFull.status?.state === "error"
                                 ? "bg-red-100 dark:bg-red-950/30"
                                 : "bg-orange-100 dark:bg-orange-950/30"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <IntegrationIcon
@@ -641,17 +831,16 @@ export function SettingsTab({
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                selectedIntegrationFull.status?.state === "ready"
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${selectedIntegrationFull.status?.state === "ready"
                                   ? "border border-green-950/15 bg-green-100 text-green-800 dark:border-green-950/15 dark:bg-green-900/30 dark:text-green-400"
                                   : selectedIntegrationFull.status?.state === "error"
                                     ? "border border-red-950/15 bg-red-100 text-red-800 dark:border-red-950/15 dark:bg-red-900/30 dark:text-red-400"
                                     : "border border-orange-950/15 bg-orange-100 text-yellow-800 dark:border-orange-950/15 dark:bg-orange-950/30 dark:text-yellow-400"
-                              }`}
+                                }`}
                             >
                               {selectedIntegrationFull.status?.state
                                 ? selectedIntegrationFull.status.state.charAt(0).toUpperCase() +
-                                  selectedIntegrationFull.status.state.slice(1)
+                                selectedIntegrationFull.status.state.slice(1)
                                 : "Unknown"}
                             </span>
                             {selectedIntegrationFull.metadata?.id && onOpenConfigureIntegrationDialog && (

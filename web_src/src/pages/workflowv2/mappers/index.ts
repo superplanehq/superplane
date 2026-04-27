@@ -212,7 +212,6 @@ import {
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
-
 import {
   componentMappers as honeycombComponentMappers,
   triggerRenderers as honeycombTriggerRenderers,

@@ -21,4 +21,6 @@ export interface FieldRendererProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   allowExpressions?: boolean;
   excludedSuggestions?: string[];
+  /** Controls the editor height. "xs" = 56px, "sm" = 100px, "md" = 200px (default). */
+  size?: "xs" | "sm" | "md";
 }
