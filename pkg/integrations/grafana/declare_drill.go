@@ -89,11 +89,11 @@ func (d *DeclareDrill) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeclareDrill) Actions() []core.Action {
-	return []core.Action{}
+func (d *DeclareDrill) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *DeclareDrill) HandleAction(ctx core.ActionContext) error {
+func (d *DeclareDrill) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

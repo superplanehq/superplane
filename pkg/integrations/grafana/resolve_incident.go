@@ -114,11 +114,11 @@ func (r *ResolveIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (r *ResolveIncident) Actions() []core.Action {
-	return []core.Action{}
+func (r *ResolveIncident) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (r *ResolveIncident) HandleAction(ctx core.ActionContext) error {
+func (r *ResolveIncident) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

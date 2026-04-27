@@ -96,11 +96,11 @@ func (g *GetIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetIncident) Actions() []core.Action {
-	return []core.Action{}
+func (g *GetIncident) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (g *GetIncident) HandleAction(ctx core.ActionContext) error {
+func (g *GetIncident) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

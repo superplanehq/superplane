@@ -148,11 +148,11 @@ func (u *UpdateIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (u *UpdateIncident) Actions() []core.Action {
-	return []core.Action{}
+func (u *UpdateIncident) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (u *UpdateIncident) HandleAction(ctx core.ActionContext) error {
+func (u *UpdateIncident) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

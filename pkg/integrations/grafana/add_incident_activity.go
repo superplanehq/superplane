@@ -107,11 +107,11 @@ func (a *AddIncidentActivity) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
-func (a *AddIncidentActivity) Actions() []core.Action {
-	return []core.Action{}
+func (a *AddIncidentActivity) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (a *AddIncidentActivity) HandleAction(ctx core.ActionContext) error {
+func (a *AddIncidentActivity) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
