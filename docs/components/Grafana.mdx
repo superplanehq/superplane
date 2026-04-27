@@ -130,7 +130,7 @@ Returns the created activity item.
     "activityItemID": "activity-123",
     "activityKind": "userNote",
     "body": "Root cause identified and mitigation is in progress.",
-    "createdTime": "2026-04-20T10:00:00Z",
+    "createdTime": "2026-04-20T10:05:00Z",
     "incidentID": "incident-123"
   },
   "timestamp": "2026-04-20T10:05:00Z",
@@ -389,14 +389,14 @@ Returns the created Grafana IRM incident.
         "label": "api"
       },
       {
-        "label": "production"
+        "label": "drill"
       }
     ],
     "modifiedTime": "2026-04-20T10:05:00Z",
     "severity": "minor",
     "status": "active",
-    "summary": "Database connection pool exhaustion identified as root cause.",
-    "title": "High latency in web requests"
+    "summary": "Simulated database failover exercise for the API tier.",
+    "title": "Quarterly response drill"
   },
   "timestamp": "2026-04-20T10:05:00Z",
   "type": "grafana.incident.declared"
@@ -1296,13 +1296,13 @@ Returns the resolved Grafana IRM incident.
         "label": "production"
       }
     ],
-    "modifiedTime": "2026-04-20T10:05:00Z",
+    "modifiedTime": "2026-04-20T10:10:00Z",
     "severity": "minor",
     "status": "resolved",
     "summary": "Database connection pool exhaustion identified as root cause.",
     "title": "High latency in web requests"
   },
-  "timestamp": "2026-04-20T10:05:00Z",
+  "timestamp": "2026-04-20T10:10:00Z",
   "type": "grafana.incident.resolved"
 }
 ```
@@ -1471,15 +1471,18 @@ Returns the updated Grafana IRM incident.
       },
       {
         "label": "production"
+      },
+      {
+        "label": "customer-impacting"
       }
     ],
-    "modifiedTime": "2026-04-20T10:05:00Z",
-    "severity": "minor",
+    "modifiedTime": "2026-04-20T10:07:00Z",
+    "severity": "major",
     "status": "active",
     "summary": "Database connection pool exhaustion identified as root cause.",
     "title": "High latency in web requests"
   },
-  "timestamp": "2026-04-20T10:05:00Z",
+  "timestamp": "2026-04-20T10:07:00Z",
   "type": "grafana.incident.updated"
 }
 ```
