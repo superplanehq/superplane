@@ -1,6 +1,7 @@
 package grafana
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -105,6 +106,12 @@ func (c *CreateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 	alerts := buildSyntheticAlertDrafts(spec.Alerts)
 	if len(alerts) > 0 {
 		if err := client.UpdateCheckAlerts(created.IDString(), alerts); err != nil {
+			if _, cleanupErr := client.DeleteCheck(created.IDString()); cleanupErr != nil {
+				return errors.Join(
+					fmt.Errorf("error configuring synthetic check alerts: %w", err),
+					fmt.Errorf("error deleting synthetic check after alert configuration failure: %w", cleanupErr),
+				)
+			}
 			return fmt.Errorf("error configuring synthetic check alerts: %w", err)
 		}
 		created.Alerts = alerts

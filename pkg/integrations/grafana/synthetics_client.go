@@ -334,6 +334,10 @@ func (c *SyntheticsClient) ListCheckAlerts(id string) ([]SyntheticCheckAlert, er
 }
 
 func (c *SyntheticsClient) UpdateCheckAlerts(id string, alerts []SyntheticCheckAlert) error {
+	if alerts == nil {
+		alerts = []SyntheticCheckAlert{}
+	}
+
 	body, err := json.Marshal(map[string]any{"alerts": alerts})
 	if err != nil {
 		return fmt.Errorf("error marshaling synthetic check alerts payload: %v", err)

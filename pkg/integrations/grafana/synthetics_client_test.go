@@ -142,6 +142,34 @@ func Test__SyntheticsClient__UpdateCheckAlerts__UsesSmPathViaProxy(t *testing.T)
 	assert.Equal(t, "/api/datasources/proxy/uid/sm-ds/sm/check/101/alerts", httpContext.Requests[0].URL.Path)
 }
 
+func Test__SyntheticsClient__UpdateCheckAlerts__SendsEmptyArrayForNilAlerts(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"msg":"alerts updated, sync in process"}`)),
+			},
+		},
+	}
+
+	client := &SyntheticsClient{
+		DataSourceUID: "sm-ds",
+		GrafanaClient: &Client{
+			BaseURL:  "https://grafana.example.com",
+			APIToken: "grafana-token",
+			http:     httpContext,
+		},
+	}
+
+	err := client.UpdateCheckAlerts("101", nil)
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"alerts":[]}`, string(body))
+}
+
 func Test__SyntheticsClient__ListCheckAlerts__UsesSmPathViaProxy(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{

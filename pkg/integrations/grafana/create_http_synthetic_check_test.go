@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -121,4 +122,68 @@ func Test__CreateHTTPSyntheticCheck__Execute(t *testing.T) {
 	alerts := alertPayload["alerts"].([]any)
 	require.Len(t, alerts, 1)
 	assert.Equal(t, "HTTPRequestDurationTooHighAvg", alerts[0].(map[string]any)["name"])
+}
+
+func Test__CreateHTTPSyntheticCheck__Execute__DeletesCheckWhenAlertConfigurationFails(t *testing.T) {
+	component := &CreateHTTPSyntheticCheck{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			grafanaSyntheticDataSourceResponse(),
+			grafanaSyntheticHTTPResponse(`{
+				"id": 101,
+				"tenantId": 1,
+				"job": "API health",
+				"target": "https://api.example.com/health",
+				"frequency": 60000,
+				"timeout": 3000,
+				"enabled": true,
+				"basicMetricsOnly": true,
+				"settings": {"http": {"method": "GET"}},
+				"probes": [1]
+			}`),
+			{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`alert update failed`)),
+			},
+			grafanaSyntheticHTTPResponse(`{"deleted":true}`),
+		},
+	}
+
+	execCtx := &contexts.ExecutionStateContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"job": "API health",
+			"request": map[string]any{
+				"target": "https://api.example.com/health",
+				"method": "GET",
+			},
+			"schedule": map[string]any{
+				"probes":    []string{"1"},
+				"timeout":   3000,
+				"frequency": 60,
+			},
+			"alerts": []map[string]any{
+				{
+					"name":      "HTTPRequestDurationTooHighAvg",
+					"threshold": 500,
+					"period":    "5m",
+				},
+			},
+		},
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "grafana-token",
+			},
+		},
+		ExecutionState: execCtx,
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "error configuring synthetic check alerts")
+	require.Empty(t, execCtx.Payloads)
+	require.Len(t, httpContext.Requests, 4)
+	assert.Equal(t, http.MethodDelete, httpContext.Requests[3].Method)
+	assert.Equal(t, "/api/datasources/proxy/uid/sm-ds/sm/check/delete/101", httpContext.Requests[3].URL.Path)
 }
