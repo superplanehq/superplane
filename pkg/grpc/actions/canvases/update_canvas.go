@@ -131,6 +131,19 @@ func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*mo
 	lockedCanvas := &models.Canvas{}
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
+		// This locks workflows directly, so select only columns that physically
+		// exist on workflows; metadata fields are projected from live versions.
+		Select(
+			"id",
+			"organization_id",
+			"live_version_id",
+			"is_template",
+			"name",
+			"created_by",
+			"created_at",
+			"updated_at",
+			"deleted_at",
+		).
 		Where("organization_id = ?", organizationUUID).
 		Where("id = ?", canvasID).
 		First(lockedCanvas).
