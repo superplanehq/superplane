@@ -106,6 +106,8 @@ func syntheticCheckToSpecBase(check *SyntheticCheck) (SyntheticCheckSpecBase, er
 
 	enabled := check.Enabled
 	enabledPtr := &enabled
+	basicMetricsOnly := check.BasicMetricsOnly
+	basicMetricsOnlyPtr := &basicMetricsOnly
 
 	nfr := http.NoFollowRedirects
 	nfrPtr := &nfr
@@ -128,6 +130,8 @@ func syntheticCheckToSpecBase(check *SyntheticCheck) (SyntheticCheckSpecBase, er
 		Timeout:                      check.Timeout,
 		Probes:                       probes,
 		Labels:                       syntheticLabelsToInputs(check.Labels),
+		AlertSensitivity:             check.AlertSensitivity,
+		BasicMetricsOnly:             basicMetricsOnlyPtr,
 		Method:                       method,
 		Headers:                      parseSyntheticHeaderStringsToInputs(http.Headers),
 		IPVersion:                    http.IPVersion,
@@ -286,7 +290,7 @@ func overlaySyntheticRequest(base *SyntheticCheckSpecBase, req map[string]any) e
 		if req["body"] == nil {
 			base.Body = nil
 		} else {
-			s := strings.TrimSpace(fmt.Sprint(req["body"]))
+			s := fmt.Sprint(req["body"])
 			base.Body = &s
 		}
 	}

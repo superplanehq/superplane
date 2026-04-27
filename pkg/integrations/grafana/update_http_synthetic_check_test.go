@@ -57,7 +57,8 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 		"frequency": 30000,
 		"timeout": 5000,
 		"enabled": true,
-		"basicMetricsOnly": true,
+		"alertSensitivity": "medium",
+		"basicMetricsOnly": false,
 		"settings": {"http": {
 			"method": "GET",
 			"ipVersion": "V6",
@@ -84,6 +85,7 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 			"request": map[string]any{
 				"target": "https://api.example.com/health",
 				"method": "GET",
+				"body":   "  {\"ping\": true}\n",
 			},
 			"schedule": map[string]any{
 				"probes":    []string{"1", "2"},
@@ -116,7 +118,10 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 	require.NoError(t, err)
 	var requestPayload map[string]any
 	require.NoError(t, json.Unmarshal(body, &requestPayload))
+	assert.Equal(t, "medium", requestPayload["alertSensitivity"])
+	assert.Equal(t, false, requestPayload["basicMetricsOnly"])
 	settings := requestPayload["settings"].(map[string]any)["http"].(map[string]any)
+	assert.Equal(t, "  {\"ping\": true}\n", settings["body"])
 	assert.Equal(t, "V6", settings["ipVersion"])
 	assert.Equal(t, "gzip", settings["compression"])
 	tlsConfig := settings["tlsConfig"].(map[string]any)

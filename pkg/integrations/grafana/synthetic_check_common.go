@@ -66,6 +66,8 @@ type SyntheticCheckSpecBase struct {
 	Timeout                      int64                            `json:"timeout" mapstructure:"timeout"`
 	Probes                       []string                         `json:"probes" mapstructure:"probes"`
 	Labels                       []SyntheticCheckLabelInput       `json:"labels,omitempty" mapstructure:"labels"`
+	AlertSensitivity             string                           `json:"alertSensitivity,omitempty" mapstructure:"alertSensitivity"`
+	BasicMetricsOnly             *bool                            `json:"basicMetricsOnly,omitempty" mapstructure:"basicMetricsOnly"`
 	Method                       string                           `json:"method" mapstructure:"method"`
 	Headers                      []SyntheticCheckHeaderInput      `json:"headers,omitempty" mapstructure:"headers"`
 	Body                         *string                          `json:"body,omitempty" mapstructure:"body"`
@@ -195,14 +197,24 @@ func buildSyntheticCheckPayload(spec SyntheticCheckSpecBase) (SyntheticCheck, er
 		ipVersion = defaultSyntheticCheckIPVersion
 	}
 
+	alertSensitivity := strings.TrimSpace(spec.AlertSensitivity)
+	if alertSensitivity == "" {
+		alertSensitivity = "none"
+	}
+
+	basicMetricsOnly := true
+	if spec.BasicMetricsOnly != nil {
+		basicMetricsOnly = *spec.BasicMetricsOnly
+	}
+
 	check := SyntheticCheck{
 		Job:              strings.TrimSpace(spec.Job),
 		Target:           strings.TrimSpace(spec.Target),
 		Frequency:        syntheticFrequencyMilliseconds(spec),
 		Timeout:          spec.Timeout,
 		Enabled:          enabled,
-		AlertSensitivity: "none",
-		BasicMetricsOnly: true,
+		AlertSensitivity: alertSensitivity,
+		BasicMetricsOnly: basicMetricsOnly,
 		Labels:           make([]SyntheticCheckLabel, 0, len(spec.Labels)),
 		Probes:           probes,
 		Settings: SyntheticCheckSettings{
