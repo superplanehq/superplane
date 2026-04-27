@@ -118,7 +118,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update canvas version";
-      description: "Updates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled";
+      description: "Updates a user-owned canvas version, including metadata and flow content";
       tags: "CanvasVersion";
     };
   }
@@ -684,6 +684,8 @@ message CanvasVersion {
     google.protobuf.Timestamp published_at = 5;
     google.protobuf.Timestamp created_at = 6;
     google.protobuf.Timestamp updated_at = 7;
+    string name = 8;
+    string description = 9;
   }
 
   Metadata metadata = 1;
