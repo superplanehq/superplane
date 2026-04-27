@@ -144,10 +144,7 @@ func parseIncidentStartTime(value string) (*time.Time, error) {
 	timezoneFormats := []string{
 		time.RFC3339,
 		time.RFC3339Nano,
-		"2006-01-02T15:04Z",
-		"2006-01-02T15:04:05Z",
 		"2006-01-02T15:04Z07:00",
-		"2006-01-02T15:04:05Z07:00",
 	}
 	for _, format := range timezoneFormats {
 		if parsed, err := time.Parse(format, value); err == nil {

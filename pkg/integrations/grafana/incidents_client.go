@@ -3,6 +3,7 @@ package grafana
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -173,6 +174,7 @@ func (c *Client) GetIncident(id string) (*Incident, error) {
 
 func (c *Client) UpdateIncident(id string, title, severity *string, labels []string, isDrill *bool) (*Incident, error) {
 	var incident *Incident
+	var anyLabelSkipped bool
 	normalizedLabels := incidentLabelsFromStrings(labels)
 	if title != nil {
 		updated, err := c.updateIncidentTitle(id, *title)
@@ -198,6 +200,7 @@ func (c *Client) UpdateIncident(id string, title, severity *string, labels []str
 		updated, err := c.addIncidentLabel(id, label)
 		if err != nil {
 			if isDuplicateIncidentLabelError(err) {
+				anyLabelSkipped = true
 				continue
 			}
 			return nil, err
@@ -218,6 +221,10 @@ func (c *Client) UpdateIncident(id string, title, severity *string, labels []str
 			return c.GetIncident(id)
 		}
 		return nil, fmt.Errorf("at least one incident field must be provided")
+	}
+
+	if anyLabelSkipped {
+		return c.GetIncident(id)
 	}
 
 	return incident, nil
@@ -453,6 +460,11 @@ func dedupeIncidentLabels(labels []IncidentLabel) []IncidentLabel {
 
 func isDuplicateIncidentLabelError(err error) bool {
 	if err == nil {
+		return false
+	}
+
+	var apiErr *apiStatusError
+	if errors.As(err, &apiErr) && apiErr.StatusCode >= 500 {
 		return false
 	}
 
