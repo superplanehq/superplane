@@ -131,6 +131,11 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		canvasName = workflow.Name
 	}
 
+	var action core.Action
+	if ref := c.node.Ref.Data(); ref.Component != nil {
+		action, _ = c.registry.GetAction(ref.Component.Name)
+	}
+
 	return &core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -142,7 +147,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		HTTP:           c.registry.HTTPContext(),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
-		ExecutionState: NewExecutionStateContext(c.tx, execution, c.onNewEvents),
+		ExecutionState: NewExecutionStateContext(c.tx, action, execution, c.onNewEvents),
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,
 		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
