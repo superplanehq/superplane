@@ -46,6 +46,14 @@ export const analytics = {
   yamlExport: (canvasId: string, organizationId: string) => {
     posthog.capture("canvas:yaml_export", { canvas_id: canvasId, organization_id: organizationId });
   },
+  
+  integrationRequested: (organizationId: string) => {
+    posthog.capture("request_integration_clicked", { organization_id: organizationId });
+  },
+
+  organizationJoined: (organizationId: string) => {
+    posthog.capture("organization joined", { organization_id: organizationId });
+  },
 
   yamlImport: () => {
     posthog.capture("canvas:yaml_import", {});
