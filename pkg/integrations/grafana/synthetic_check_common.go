@@ -58,27 +58,30 @@ type SyntheticCheckAlertInput struct {
 }
 
 type SyntheticCheckSpecBase struct {
-	Job                        string                           `json:"job" mapstructure:"job"`
-	Target                     string                           `json:"target" mapstructure:"target"`
-	Enabled                    *bool                            `json:"enabled,omitempty" mapstructure:"enabled"`
-	Frequency                  int64                            `json:"frequency" mapstructure:"frequency"`
-	FrequencyMilliseconds      *int64                           `json:"-" mapstructure:"frequencyMilliseconds"`
-	Timeout                    int64                            `json:"timeout" mapstructure:"timeout"`
-	Probes                     []string                         `json:"probes" mapstructure:"probes"`
-	Labels                     []SyntheticCheckLabelInput       `json:"labels,omitempty" mapstructure:"labels"`
-	Method                     string                           `json:"method" mapstructure:"method"`
-	Headers                    []SyntheticCheckHeaderInput      `json:"headers,omitempty" mapstructure:"headers"`
-	Body                       *string                          `json:"body,omitempty" mapstructure:"body"`
-	NoFollowRedirects          *bool                            `json:"noFollowRedirects,omitempty" mapstructure:"noFollowRedirects"`
-	FailIfSSL                  *bool                            `json:"failIfSSL,omitempty" mapstructure:"failIfSSL"`
-	FailIfNotSSL               *bool                            `json:"failIfNotSSL,omitempty" mapstructure:"failIfNotSSL"`
-	ValidStatusCodes           []int                            `json:"validStatusCodes,omitempty" mapstructure:"validStatusCodes"`
-	FailIfBodyMatchesRegexp    []string                         `json:"failIfBodyMatchesRegexp,omitempty" mapstructure:"failIfBodyMatchesRegexp"`
-	FailIfBodyNotMatchesRegexp []string                         `json:"failIfBodyNotMatchesRegexp,omitempty" mapstructure:"failIfBodyNotMatchesRegexp"`
-	FailIfHeaderMatchesRegexp  []SyntheticCheckHeaderMatchInput `json:"failIfHeaderMatchesRegexp,omitempty" mapstructure:"failIfHeaderMatchesRegexp"`
-	BasicAuth                  *SyntheticCheckBasicAuthInput    `json:"basicAuth,omitempty" mapstructure:"basicAuth"`
-	BearerToken                *string                          `json:"bearerToken,omitempty" mapstructure:"bearerToken"`
-	Alerts                     []SyntheticCheckAlertInput       `json:"alerts,omitempty" mapstructure:"alerts"`
+	Job                          string                           `json:"job" mapstructure:"job"`
+	Target                       string                           `json:"target" mapstructure:"target"`
+	Enabled                      *bool                            `json:"enabled,omitempty" mapstructure:"enabled"`
+	Frequency                    int64                            `json:"frequency" mapstructure:"frequency"`
+	FrequencyMilliseconds        *int64                           `json:"-" mapstructure:"frequencyMilliseconds"`
+	Timeout                      int64                            `json:"timeout" mapstructure:"timeout"`
+	Probes                       []string                         `json:"probes" mapstructure:"probes"`
+	Labels                       []SyntheticCheckLabelInput       `json:"labels,omitempty" mapstructure:"labels"`
+	Method                       string                           `json:"method" mapstructure:"method"`
+	Headers                      []SyntheticCheckHeaderInput      `json:"headers,omitempty" mapstructure:"headers"`
+	Body                         *string                          `json:"body,omitempty" mapstructure:"body"`
+	IPVersion                    string                           `json:"ipVersion,omitempty" mapstructure:"ipVersion"`
+	Compression                  string                           `json:"compression,omitempty" mapstructure:"compression"`
+	NoFollowRedirects            *bool                            `json:"noFollowRedirects,omitempty" mapstructure:"noFollowRedirects"`
+	FailIfSSL                    *bool                            `json:"failIfSSL,omitempty" mapstructure:"failIfSSL"`
+	FailIfNotSSL                 *bool                            `json:"failIfNotSSL,omitempty" mapstructure:"failIfNotSSL"`
+	ValidStatusCodes             []int                            `json:"validStatusCodes,omitempty" mapstructure:"validStatusCodes"`
+	FailIfBodyMatchesRegexp      []string                         `json:"failIfBodyMatchesRegexp,omitempty" mapstructure:"failIfBodyMatchesRegexp"`
+	FailIfBodyNotMatchesRegexp   []string                         `json:"failIfBodyNotMatchesRegexp,omitempty" mapstructure:"failIfBodyNotMatchesRegexp"`
+	FailIfHeaderMatchesRegexp    []SyntheticCheckHeaderMatchInput `json:"failIfHeaderMatchesRegexp,omitempty" mapstructure:"failIfHeaderMatchesRegexp"`
+	FailIfHeaderNotMatchesRegexp []SyntheticCheckHeaderMatchInput `json:"failIfHeaderNotMatchesRegexp,omitempty" mapstructure:"failIfHeaderNotMatchesRegexp"`
+	BasicAuth                    *SyntheticCheckBasicAuthInput    `json:"basicAuth,omitempty" mapstructure:"basicAuth"`
+	BearerToken                  *string                          `json:"bearerToken,omitempty" mapstructure:"bearerToken"`
+	Alerts                       []SyntheticCheckAlertInput       `json:"alerts,omitempty" mapstructure:"alerts"`
 }
 
 type SyntheticCheckSelectionSpec struct {
@@ -158,6 +161,14 @@ func validateSyntheticCheckBase(spec SyntheticCheckSpecBase) error {
 			return errors.New("failIfHeaderMatchesRegexp regex is required")
 		}
 	}
+	for _, matcher := range spec.FailIfHeaderNotMatchesRegexp {
+		if strings.TrimSpace(matcher.Header) == "" {
+			return errors.New("failIfHeaderNotMatchesRegexp header is required")
+		}
+		if strings.TrimSpace(matcher.Regexp) == "" {
+			return errors.New("failIfHeaderNotMatchesRegexp regex is required")
+		}
+	}
 	return validateSyntheticCheckAlerts(spec.Alerts)
 }
 
@@ -179,6 +190,11 @@ func buildSyntheticCheckPayload(spec SyntheticCheckSpecBase) (SyntheticCheck, er
 		enabled = *spec.Enabled
 	}
 
+	ipVersion := strings.TrimSpace(spec.IPVersion)
+	if ipVersion == "" {
+		ipVersion = defaultSyntheticCheckIPVersion
+	}
+
 	check := SyntheticCheck{
 		Job:              strings.TrimSpace(spec.Job),
 		Target:           strings.TrimSpace(spec.Target),
@@ -191,16 +207,18 @@ func buildSyntheticCheckPayload(spec SyntheticCheckSpecBase) (SyntheticCheck, er
 		Probes:           probes,
 		Settings: SyntheticCheckSettings{
 			HTTP: &SyntheticCheckHTTPSettings{
-				Method:                     strings.ToUpper(strings.TrimSpace(spec.Method)),
-				Headers:                    buildSyntheticHeaderStrings(spec.Headers),
-				IPVersion:                  defaultSyntheticCheckIPVersion,
-				NoFollowRedirects:          spec.NoFollowRedirects != nil && *spec.NoFollowRedirects,
-				FailIfSSL:                  spec.FailIfSSL != nil && *spec.FailIfSSL,
-				FailIfNotSSL:               spec.FailIfNotSSL != nil && *spec.FailIfNotSSL,
-				ValidStatusCodes:           append([]int(nil), spec.ValidStatusCodes...),
-				FailIfBodyMatchesRegexp:    append([]string(nil), spec.FailIfBodyMatchesRegexp...),
-				FailIfBodyNotMatchesRegexp: append([]string(nil), spec.FailIfBodyNotMatchesRegexp...),
-				FailIfHeaderMatchesRegexp:  buildSyntheticHeaderMatches(spec.FailIfHeaderMatchesRegexp),
+				Method:                       strings.ToUpper(strings.TrimSpace(spec.Method)),
+				Headers:                      buildSyntheticHeaderStrings(spec.Headers),
+				IPVersion:                    ipVersion,
+				Compression:                  strings.TrimSpace(spec.Compression),
+				NoFollowRedirects:            spec.NoFollowRedirects != nil && *spec.NoFollowRedirects,
+				FailIfSSL:                    spec.FailIfSSL != nil && *spec.FailIfSSL,
+				FailIfNotSSL:                 spec.FailIfNotSSL != nil && *spec.FailIfNotSSL,
+				ValidStatusCodes:             append([]int(nil), spec.ValidStatusCodes...),
+				FailIfBodyMatchesRegexp:      append([]string(nil), spec.FailIfBodyMatchesRegexp...),
+				FailIfBodyNotMatchesRegexp:   append([]string(nil), spec.FailIfBodyNotMatchesRegexp...),
+				FailIfHeaderMatchesRegexp:    buildSyntheticHeaderMatches(spec.FailIfHeaderMatchesRegexp),
+				FailIfHeaderNotMatchesRegexp: buildSyntheticHeaderMatches(spec.FailIfHeaderNotMatchesRegexp),
 			},
 		},
 	}

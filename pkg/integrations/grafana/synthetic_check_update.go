@@ -120,24 +120,27 @@ func syntheticCheckToSpecBase(check *SyntheticCheck) (SyntheticCheckSpecBase, er
 	}
 
 	base := SyntheticCheckSpecBase{
-		Job:                        check.Job,
-		Target:                     check.Target,
-		Enabled:                    enabledPtr,
-		Frequency:                  freq,
-		FrequencyMilliseconds:      &freqMilliseconds,
-		Timeout:                    check.Timeout,
-		Probes:                     probes,
-		Labels:                     syntheticLabelsToInputs(check.Labels),
-		Method:                     method,
-		Headers:                    parseSyntheticHeaderStringsToInputs(http.Headers),
-		NoFollowRedirects:          nfrPtr,
-		FailIfSSL:                  failSSLPtr,
-		FailIfNotSSL:               failNotSSLPtr,
-		ValidStatusCodes:           append([]int(nil), http.ValidStatusCodes...),
-		FailIfBodyMatchesRegexp:    append([]string(nil), http.FailIfBodyMatchesRegexp...),
-		FailIfBodyNotMatchesRegexp: append([]string(nil), http.FailIfBodyNotMatchesRegexp...),
-		FailIfHeaderMatchesRegexp:  syntheticHeaderMatchesToInputs(http.FailIfHeaderMatchesRegexp),
-		Alerts:                     syntheticAlertsToInputs(check.Alerts),
+		Job:                          check.Job,
+		Target:                       check.Target,
+		Enabled:                      enabledPtr,
+		Frequency:                    freq,
+		FrequencyMilliseconds:        &freqMilliseconds,
+		Timeout:                      check.Timeout,
+		Probes:                       probes,
+		Labels:                       syntheticLabelsToInputs(check.Labels),
+		Method:                       method,
+		Headers:                      parseSyntheticHeaderStringsToInputs(http.Headers),
+		IPVersion:                    http.IPVersion,
+		Compression:                  http.Compression,
+		NoFollowRedirects:            nfrPtr,
+		FailIfSSL:                    failSSLPtr,
+		FailIfNotSSL:                 failNotSSLPtr,
+		ValidStatusCodes:             append([]int(nil), http.ValidStatusCodes...),
+		FailIfBodyMatchesRegexp:      append([]string(nil), http.FailIfBodyMatchesRegexp...),
+		FailIfBodyNotMatchesRegexp:   append([]string(nil), http.FailIfBodyNotMatchesRegexp...),
+		FailIfHeaderMatchesRegexp:    syntheticHeaderMatchesToInputs(http.FailIfHeaderMatchesRegexp),
+		FailIfHeaderNotMatchesRegexp: syntheticHeaderMatchesToInputs(http.FailIfHeaderNotMatchesRegexp),
+		Alerts:                       syntheticAlertsToInputs(check.Alerts),
 	}
 
 	if http.Body != "" {
@@ -266,6 +269,12 @@ func overlaySyntheticRequest(base *SyntheticCheckSpecBase, req map[string]any) e
 	if _, ok := req["method"]; ok {
 		base.Method = strings.TrimSpace(fmt.Sprint(req["method"]))
 	}
+	if _, ok := req["ipVersion"]; ok {
+		base.IPVersion = strings.TrimSpace(fmt.Sprint(req["ipVersion"]))
+	}
+	if _, ok := req["compression"]; ok {
+		base.Compression = strings.TrimSpace(fmt.Sprint(req["compression"]))
+	}
 	if _, ok := req["headers"]; ok {
 		var headers []SyntheticCheckHeaderInput
 		if err := mapstructure.Decode(req["headers"], &headers); err != nil {
@@ -387,6 +396,13 @@ func overlaySyntheticValidation(base *SyntheticCheckSpecBase, val map[string]any
 			return fmt.Errorf("validation.failIfHeaderMatchesRegexp: %w", err)
 		}
 		base.FailIfHeaderMatchesRegexp = xs
+	}
+	if _, ok := val["failIfHeaderNotMatchesRegexp"]; ok {
+		var xs []SyntheticCheckHeaderMatchInput
+		if err := mapstructure.Decode(val["failIfHeaderNotMatchesRegexp"], &xs); err != nil {
+			return fmt.Errorf("validation.failIfHeaderNotMatchesRegexp: %w", err)
+		}
+		base.FailIfHeaderNotMatchesRegexp = xs
 	}
 	return nil
 }

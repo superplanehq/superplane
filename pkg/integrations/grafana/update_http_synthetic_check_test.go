@@ -58,7 +58,13 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 		"timeout": 5000,
 		"enabled": true,
 		"basicMetricsOnly": true,
-		"settings": {"http": {"method": "GET", "tlsConfig": {"serverName": "api.example.com", "insecureSkipVerify": true}}},
+		"settings": {"http": {
+			"method": "GET",
+			"ipVersion": "V6",
+			"compression": "gzip",
+			"tlsConfig": {"serverName": "api.example.com", "insecureSkipVerify": true},
+			"failIfHeaderNotMatchesRegexp": [{"header": "content-type", "regexp": "application/json", "allowMissing": true}]
+		}},
 		"probes": [1,2]
 	}`
 	httpContext := &contexts.HTTPContext{
@@ -111,9 +117,17 @@ func Test__UpdateHTTPSyntheticCheck__Execute(t *testing.T) {
 	var requestPayload map[string]any
 	require.NoError(t, json.Unmarshal(body, &requestPayload))
 	settings := requestPayload["settings"].(map[string]any)["http"].(map[string]any)
+	assert.Equal(t, "V6", settings["ipVersion"])
+	assert.Equal(t, "gzip", settings["compression"])
 	tlsConfig := settings["tlsConfig"].(map[string]any)
 	assert.Equal(t, "api.example.com", tlsConfig["serverName"])
 	assert.Equal(t, true, tlsConfig["insecureSkipVerify"])
+	headerNotMatches := settings["failIfHeaderNotMatchesRegexp"].([]any)
+	require.Len(t, headerNotMatches, 1)
+	headerNotMatch := headerNotMatches[0].(map[string]any)
+	assert.Equal(t, "content-type", headerNotMatch["header"])
+	assert.Equal(t, "application/json", headerNotMatch["regexp"])
+	assert.Equal(t, true, headerNotMatch["allowMissing"])
 }
 
 func Test__UpdateHTTPSyntheticCheck__Execute__PreservesExistingAlertsWhenAlertsSectionOmitted(t *testing.T) {
