@@ -1,0 +1,66 @@
+{
+  "type": "grafana.syntheticCheck",
+  "timestamp": "2026-04-15T10:25:30Z",
+  "data": {
+    "configuration": {
+      "id": 101,
+      "job": "API health check",
+      "target": "https://api.example.com/health",
+      "frequency": 60000,
+      "timeout": 3000,
+      "enabled": true,
+      "alertSensitivity": "none",
+      "basicMetricsOnly": true,
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        }
+      ],
+      "probes": [1, 2],
+      "created": 1776248430,
+      "modified": 1776248730,
+      "settings": {
+        "http": {
+          "method": "GET",
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "noFollowRedirects": false,
+          "failIfSSL": false,
+          "failIfNotSSL": true,
+          "validStatusCodes": [200]
+        }
+      },
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "threshold": 1,
+          "period": "5m"
+        }
+      ]
+    },
+    "metrics": {
+      "lastOutcome": "Up",
+      "uptimePercent24h": 99.9,
+      "reachabilityPercent24h": 99.86,
+      "successRuns24h": 1438,
+      "failureRuns24h": 2,
+      "totalRuns24h": 1440,
+      "averageLatencySeconds24h": 0.142,
+      "sslEarliestExpiryAt": "2026-05-15T10:25:00Z",
+      "sslEarliestExpiryDays": 30.0,
+      "frequencyMilliseconds": 60000,
+      "lastExecutionAt": "2026-04-15T10:25:00Z"
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "threshold": 1,
+        "period": "5m"
+      }
+    ]
+  }
+}
