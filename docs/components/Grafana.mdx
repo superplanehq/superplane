@@ -18,14 +18,17 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Add Incident Activity" href="#add-incident-activity" description="Add a note to a Grafana IRM incident activity timeline" />
   <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
   <LinkCard title="Create Annotation" href="#create-annotation" description="Create an annotation in Grafana to mark deploys, incidents, or other operational events on timelines" />
+  <LinkCard title="Create HTTP Synthetic Check" href="#create-http-synthetic-check" description="Create a Grafana Synthetic Monitoring HTTP check" />
   <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
   <LinkCard title="Declare Drill" href="#declare-drill" description="Declare a Grafana IRM drill incident" />
   <LinkCard title="Declare Incident" href="#declare-incident" description="Declare a Grafana IRM incident" />
   <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
   <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
+  <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete a Grafana HTTP synthetic check" />
   <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
   <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
   <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
+  <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Retrieve a Grafana HTTP synthetic check configuration and best-effort operational metrics" />
   <LinkCard title="Get Incident" href="#get-incident" description="Retrieve a Grafana IRM incident" />
   <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
   <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
@@ -37,6 +40,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Render Panel" href="#render-panel" description="Construct a Grafana image render URL for a dashboard panel" />
   <LinkCard title="Resolve Incident" href="#resolve-incident" description="Resolve a Grafana IRM incident" />
   <LinkCard title="Update Alert Rule" href="#update-alert-rule" description="Update an existing Grafana-managed alert rule from structured alert settings" />
+  <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update a Grafana Synthetic Monitoring HTTP check" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update supported Grafana IRM incident fields" />
 </CardGrid>
 
@@ -313,6 +317,102 @@ Returns the ID of the newly created annotation.
 }
 ```
 
+<a id="create-http-synthetic-check"></a>
+
+## Create HTTP Synthetic Check
+
+The Create HTTP Synthetic Check component creates an HTTP synthetic check in Grafana Synthetic Monitoring.
+
+### Use Cases
+
+- **Availability monitoring**: create checks for API and website uptime
+- **Deployment verification**: validate a service immediately after deployment
+- **Operational automation**: provision consistent HTTP checks from workflows
+
+### Configuration
+
+Fields are grouped like other synthetic check components:
+
+- **Job** and **Labels**: Check display name and optional key/value labels
+- **Request**: URL, HTTP method, headers, body, redirects, basic auth, and bearer token
+- **Schedule**: Whether the check is enabled, frequency (seconds), timeout (ms), and probe locations
+- **Response validation**: SSL expectations, accepted status codes, and body/header regex rules (optional)
+- **Per-Check Alerts**: Optional Grafana synthetic monitoring alerts configured after check creation
+
+### Output
+
+Returns the created Grafana synthetic check, including its ID and HTTP configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "HTTPRequestDurationTooHighAvg",
+        "period": "5m",
+        "threshold": 500
+      }
+    ],
+    "check": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "HTTPRequestDurationTooHighAvg",
+          "period": "5m",
+          "threshold": 500
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 60000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        }
+      ],
+      "modified": 1776248430,
+      "probes": [
+        1,
+        2
+      ],
+      "settings": {
+        "http": {
+          "failIfHeaderMatchesRegexp": [
+            {
+              "allowMissing": true,
+              "header": "X-Canary",
+              "regexp": "failed"
+            }
+          ],
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 3000
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101"
+  },
+  "timestamp": "2026-04-15T10:20:30Z",
+  "type": "grafana.syntheticCheck.created"
+}
+```
+
 <a id="create-silence"></a>
 
 ## Create Silence
@@ -518,6 +618,35 @@ Returns the annotation ID and a confirmation that the annotation was deleted.
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.annotation.deleted"
+}
+```
+
+<a id="delete-http-synthetic-check"></a>
+
+## Delete HTTP Synthetic Check
+
+The Delete HTTP Synthetic Check component deletes an existing Grafana synthetic check.
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to delete
+
+### Output
+
+Returns a compact confirmation payload for the deleted check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "job": "API health check",
+    "syntheticCheck": "101",
+    "target": "https://api.example.com/health"
+  },
+  "timestamp": "2026-04-15T10:35:30Z",
+  "type": "grafana.syntheticCheck.deleted"
 }
 ```
 
@@ -733,6 +862,112 @@ Returns the Grafana dashboard object, including title, slug, URL, folder, tags, 
   },
   "timestamp": "2026-03-31T10:24:30Z",
   "type": "grafana.dashboard"
+}
+```
+
+<a id="get-http-synthetic-check"></a>
+
+## Get HTTP Synthetic Check
+
+The Get HTTP Synthetic Check component fetches a Grafana synthetic check and enriches it with best-effort operational metrics.
+
+### Use Cases
+
+- **Operational inspection**: fetch the current HTTP check configuration
+- **Workflow enrichment**: branch using recent synthetic check health data
+- **Troubleshooting**: pull current latency and run totals into incident workflows
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to retrieve
+
+### Output Channels
+
+- **Up**: All probe locations are passing
+- **Partial**: Some probe locations are passing and some are failing
+- **Down**: All probe locations are failing
+
+### Output
+
+Returns a combined payload containing:
+
+- **configuration**: the Grafana synthetic check definition
+- **alerts**: the configured per-check synthetic alerts when available
+- **metrics**: best-effort operational metrics derived from Grafana synthetic monitoring metrics; when present, **lastOutcome** is one of **Up**, **Partial**, or **Down**, matching the output channels
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "period": "5m",
+        "threshold": 1
+      }
+    ],
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",
+    "configuration": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "period": "5m",
+          "threshold": 1
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 60000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        }
+      ],
+      "modified": 1776248730,
+      "probes": [
+        1,
+        2
+      ],
+      "settings": {
+        "http": {
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 3000
+    },
+    "metrics": {
+      "averageLatencySeconds24h": 0.142,
+      "failureRuns24h": 2,
+      "frequencyMilliseconds": 60000,
+      "lastExecutionAt": "2026-04-15T10:25:00Z",
+      "lastOutcome": "Up",
+      "reachabilityPercent24h": 99.86,
+      "sslEarliestExpiryAt": "2026-05-15T10:25:00Z",
+      "sslEarliestExpiryDays": 30,
+      "successRuns24h": 1438,
+      "totalRuns24h": 1440,
+      "uptimePercent24h": 99.9
+    }
+  },
+  "timestamp": "2026-04-15T10:25:30Z",
+  "type": "grafana.syntheticCheck"
 }
 ```
 
@@ -1435,6 +1670,89 @@ Returns the updated Grafana alert rule object after the provisioning API applies
   },
   "timestamp": "2026-03-31T10:20:30Z",
   "type": "grafana.alertRule"
+}
+```
+
+<a id="update-http-synthetic-check"></a>
+
+## Update HTTP Synthetic Check
+
+The Update HTTP Synthetic Check component updates an existing Grafana Synthetic Monitoring HTTP check.
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to update (required)
+- **Job**, **Labels**, **Request**, **Schedule**, **Response validation**, and **Per-Check Alerts** are **togglable**. Enable a section only when you want to change it; disabled sections keep the values currently stored in Grafana.
+
+### Output
+
+Returns the updated Grafana synthetic check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "period": "5m",
+        "threshold": 2
+      }
+    ],
+    "check": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "period": "5m",
+          "threshold": 2
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 30000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        },
+        {
+          "name": "environment",
+          "value": "prod"
+        }
+      ],
+      "modified": 1776249030,
+      "probes": [
+        1,
+        2,
+        3
+      ],
+      "settings": {
+        "http": {
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 5000
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101"
+  },
+  "timestamp": "2026-04-15T10:30:30Z",
+  "type": "grafana.syntheticCheck.updated"
 }
 ```
 
