@@ -32,7 +32,7 @@ const OrganizationCreate: React.FC = () => {
 
       if (response.ok) {
         const org = await response.json();
-        analytics.organizationCreated(org.id);
+        analytics.orgCreate(org.id);
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {

@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useRef, useState } from "react";
+import { analytics } from "@/lib/analytics";
 import { AlertCircle, FileText, Upload } from "lucide-react";
 import * as yaml from "js-yaml";
 import { Button } from "@/components/ui/button";
@@ -178,6 +179,7 @@ export function ImportYamlIntoCanvasDialog({ open, onOpenChange, onImport, isImp
     }
     try {
       await onImport(result.data);
+      analytics.yamlImport();
       handleOpenChange(false);
     } catch (err) {
       setParseError(err instanceof Error ? err.message : "Import failed. Please try again.");

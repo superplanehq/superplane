@@ -145,7 +145,7 @@ export const useCreateIntegration = (organizationId: string) => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
-      analytics.integrationConnected(variables.integrationName, organizationId);
+      analytics.integrationCreate(variables.integrationName, organizationId);
     },
   });
 };
