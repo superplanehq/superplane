@@ -49,7 +49,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 		return nil, status.Error(codes.InvalidArgument, "current step is not set, cannot revert")
 	}
 
-	if setupState.PreviousSteps == nil || len(setupState.PreviousSteps) == 0 {
+	if len(setupState.PreviousSteps) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "no previous steps, cannot revert")
 	}
 
@@ -69,14 +69,15 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 
 		stepToRevert := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
 
+		capabilityCtx := contexts.NewCapabilityContext(setupProvider.Capabilities(), integration.Capabilities)
 		ctx := core.SetupStepContext{
 			Step:           stepToRevert.Name,
 			IntegrationID:  integration.ID,
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),
 			Parameters:     contexts.NewIntegrationParameterStorage(integration),
-			Capabilities:   contexts.NewIntegrationCapabilityRegistry(integration),
 			Secrets:        secretStorage,
+			Capabilities:   capabilityCtx,
 		}
 
 		err = setupProvider.OnStepRevert(ctx)
@@ -93,6 +94,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 		newState.PreviousSteps = setupState.PreviousSteps[:len(setupState.PreviousSteps)-1]
 		newStateWrapper := datatypes.NewJSONType(newState)
 		integration.SetupState = &newStateWrapper
+		integration.Capabilities = capabilityCtx.States()
 		return tx.Save(integration).Error
 	})
 

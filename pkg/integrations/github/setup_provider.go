@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	gh "github.com/google/go-github/v74/github"
+	gh "github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"golang.org/x/oauth2"
@@ -158,6 +158,11 @@ var patPermissionLinesByResourceType = map[string][]string{
 	ResourceRepositoryPermissions: {
 		"- Administration: Read-only",
 	},
+}
+
+// TODO
+func (g *SetupProvider) Capabilities() []core.Capability {
+	return []core.Capability{}
 }
 
 func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
@@ -527,12 +532,12 @@ func registerCapabilities(ctx core.SetupStepContext) error {
 		return err
 	}
 
-	componentsByName := map[string]core.Component{}
+	actionsByName := map[string]core.Action{}
 	triggersByName := map[string]core.Trigger{}
 
 	for _, resourceType := range resources {
-		for _, component := range componentsByResourceType(resourceType) {
-			componentsByName[component.Name()] = component
+		for _, action := range actionsByResourceType(resourceType) {
+			actionsByName[action.Name()] = action
 		}
 
 		for _, trigger := range triggersByResourceType(resourceType) {
@@ -540,9 +545,9 @@ func registerCapabilities(ctx core.SetupStepContext) error {
 		}
 	}
 
-	components := make([]core.Component, 0, len(componentsByName))
-	for _, component := range componentsByName {
-		components = append(components, component)
+	actions := make([]core.Action, 0, len(actionsByName))
+	for _, action := range actionsByName {
+		actions = append(actions, action)
 	}
 
 	triggers := make([]core.Trigger, 0, len(triggersByName))
@@ -550,21 +555,15 @@ func registerCapabilities(ctx core.SetupStepContext) error {
 		triggers = append(triggers, trigger)
 	}
 
-	if err := ctx.Capabilities.RegisterComponents(components); err != nil {
-		return fmt.Errorf("error registering components: %v", err)
-	}
-
-	if err := ctx.Capabilities.RegisterTriggers(triggers); err != nil {
-		return fmt.Errorf("error registering triggers: %v", err)
-	}
+	// TODO: enable capabilities
 
 	return nil
 }
 
-func componentsByResourceType(resourceType string) []core.Component {
+func actionsByResourceType(resourceType string) []core.Action {
 	switch resourceType {
 	case ResourceIssues:
-		return []core.Component{
+		return []core.Action{
 			&GetIssue{},
 			&CreateIssue{},
 			&UpdateIssue{},
@@ -575,33 +574,33 @@ func componentsByResourceType(resourceType string) []core.Component {
 			&CreateIssueComment{},
 		}
 	case ResourcePullRequests:
-		return []core.Component{
+		return []core.Action{
 			&CreateReview{},
 			&AddReaction{},
 			&CreateIssueComment{},
 		}
 	case ResourceWorkflows:
-		return []core.Component{
+		return []core.Action{
 			&RunWorkflow{},
 			&GetWorkflowUsage{},
 		}
 	case ResourceReleases:
-		return []core.Component{
+		return []core.Action{
 			&CreateRelease{},
 			&GetRelease{},
 			&UpdateRelease{},
 			&DeleteRelease{},
 		}
 	case ResourceCode:
-		return []core.Component{
+		return []core.Action{
 			&PublishCommitStatus{},
 		}
 	case ResourceRepositoryPermissions:
-		return []core.Component{
+		return []core.Action{
 			&GetRepositoryPermission{},
 		}
 	default:
-		return []core.Component{}
+		return []core.Action{}
 	}
 }
 

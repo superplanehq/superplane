@@ -28,7 +28,7 @@ import (
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig)
+	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig, nil)
 }
 
 func CreateIntegrationWithUsage(
@@ -41,6 +41,7 @@ func CreateIntegrationWithUsage(
 	orgID string,
 	integrationName, name string,
 	appConfig *structpb.Struct,
+	capabilities []string,
 ) (*pb.CreateIntegrationResponse, error) {
 	integration, err := registry.GetIntegration(integrationName)
 	if err != nil {
@@ -101,10 +102,10 @@ func CreateIntegrationWithUsage(
 		return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
 	}
 
-	return setupIntegration(registry, newIntegration, setupProvider, orgID)
+	return setupIntegration(registry, newIntegration, setupProvider, orgID, capabilities)
 }
 
-func setupIntegration(registry *registry.Registry, newIntegration *models.Integration, setupProvider core.IntegrationSetupProvider, orgID string) (*pb.CreateIntegrationResponse, error) {
+func setupIntegration(registry *registry.Registry, newIntegration *models.Integration, setupProvider core.IntegrationSetupProvider, orgID string, capabilities []string) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -113,13 +114,14 @@ func setupIntegration(registry *registry.Registry, newIntegration *models.Integr
 			return err
 		}
 
+		capabilityCtx := contexts.NewCapabilityContext(setupProvider.Capabilities(), newIntegration.Capabilities)
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),
 			Parameters:     contexts.NewIntegrationParameterStorage(newIntegration),
+			Capabilities:   capabilityCtx,
 			Secrets:        secretStorage,
-			Capabilities:   contexts.NewIntegrationCapabilityRegistry(newIntegration),
 		})
 
 		setupState := datatypes.NewJSONType(models.SetupState{
@@ -128,6 +130,7 @@ func setupIntegration(registry *registry.Registry, newIntegration *models.Integr
 		})
 
 		newIntegration.SetupState = &setupState
+		newIntegration.Capabilities = capabilityCtx.States()
 		return tx.Save(newIntegration).Error
 	})
 
@@ -235,6 +238,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			StateDescription: instance.StateDescription,
 			Metadata:         metadata,
 			UsedIn:           []*pb.Integration_NodeRef{},
+			Capabilities:     serializeCapabilities(instance.Capabilities),
 		},
 	}
 
@@ -272,20 +276,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		}
 	}
 
-	if instance.Parameters != nil {
-		for _, parameter := range instance.Parameters {
-			proto.Status.Parameters = append(proto.Status.Parameters, &pb.Integration_Parameter{
-				Name:        parameter.Name,
-				Label:       parameter.Label,
-				Description: parameter.Description,
-				Type:        parameter.Type,
-				Editable:    parameter.Editable,
-				// Value:       parameter.Value,
-			})
-		}
-	}
-
-	// TODO: serialize capabilities
+	// TODO: serialize parameters
 	// TODO: serialize secrets
 
 	return proto, nil
@@ -324,6 +315,41 @@ func serializeNextStepType(stepType core.SetupStepType) pb.Integration_SetupStep
 	default:
 		return pb.Integration_SetupStepDefinition_UNKNOWN
 	}
+}
+
+func serializeCapabilities(capabilities []models.CapabilityState) []*pb.Integration_CapabilityState {
+	protos := make([]*pb.Integration_CapabilityState, len(capabilities))
+	for i, capability := range capabilities {
+		protos[i] = &pb.Integration_CapabilityState{
+			Name:  capability.Name,
+			State: CapabilityStateToProto(capability.State),
+		}
+	}
+	return protos
+}
+
+func ProtoToCapabilityState(s pb.Integration_CapabilityState_State) string {
+	switch s {
+	case pb.Integration_CapabilityState_STATE_ENABLED:
+		return models.IntegrationCapabilityStateEnabled
+	case pb.Integration_CapabilityState_STATE_DISABLED:
+		return models.IntegrationCapabilityStateDisabled
+	case pb.Integration_CapabilityState_STATE_REQUESTED:
+		return models.IntegrationCapabilityStateRequested
+	}
+	return models.IntegrationCapabilityStateUnavailable
+}
+
+func CapabilityStateToProto(t string) pb.Integration_CapabilityState_State {
+	switch t {
+	case models.IntegrationCapabilityStateEnabled:
+		return pb.Integration_CapabilityState_STATE_ENABLED
+	case models.IntegrationCapabilityStateDisabled:
+		return pb.Integration_CapabilityState_STATE_DISABLED
+	case models.IntegrationCapabilityStateUnavailable:
+		return pb.Integration_CapabilityState_STATE_UNAVAILABLE
+	}
+	return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 }
 
 func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, integration core.Integration, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {

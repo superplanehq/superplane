@@ -6,8 +6,26 @@ import (
 )
 
 type IntegrationSetupProvider interface {
+
+	//
+	// The list of available capabilities the integration provides.
+	//
+	Capabilities() []Capability
+
+	//
+	// First step of the setup flow.
+	//
 	FirstStep(ctx SetupStepContext) SetupStep
+
+	//
+	// Called when the user submits the current step.
+	//
 	OnStepSubmit(ctx SetupStepContext) (*SetupStep, error)
+
+	//
+	// Called when the user reverts the current step.
+	// It should revert the changes made by the step.
+	//
 	OnStepRevert(ctx SetupStepContext) error
 }
 
@@ -41,7 +59,7 @@ type SetupStepContext struct {
 	HTTP           HTTPContext
 	Secrets        IntegrationSecretStorage
 	Parameters     IntegrationParameterStorage
-	Capabilities   CapabilityRegistry
+	Capabilities   CapabilityContext
 }
 
 type IntegrationSecretStorage interface {
@@ -73,29 +91,25 @@ type IntegrationParameterDefinition struct {
 type IntegrationCapabilityType string
 
 const (
-	IntegrationCapabilityTypeComponent IntegrationCapabilityType = "component"
-	IntegrationCapabilityTypeTrigger   IntegrationCapabilityType = "trigger"
+	IntegrationCapabilityTypeAction  IntegrationCapabilityType = "action"
+	IntegrationCapabilityTypeTrigger IntegrationCapabilityType = "trigger"
+
+	IntegrationCapabilityStateRequested = "requested"
+	IntegrationCapabilityStateEnabled   = "enabled"
+	IntegrationCapabilityStateDisabled  = "disabled"
 )
 
-type CapabilityRegistry interface {
-	RegisterComponents(components []Component) error
-	RegisterTriggers(triggers []Trigger) error
+type CapabilityContext interface {
+	Enable(capabilities ...string) error
+	Disable(capabilities ...string) error
+	IsRequested(capabilities ...string) (bool, error)
 }
 
-type CapabilityDefinition struct {
-	Type      IntegrationCapabilityType
-	Component *ComponentDefinition
-	Trigger   *TriggerDefinition
-}
-
-type ComponentDefinition struct {
-	Name        string
-	Label       string
-	Description string
-}
-
-type TriggerDefinition struct {
-	Name        string
-	Label       string
-	Description string
+type Capability struct {
+	Type           IntegrationCapabilityType `json:"type"`
+	Name           string                    `json:"name"`
+	Label          string                    `json:"label"`
+	Description    string                    `json:"description"`
+	Configuration  []configuration.Field     `json:"configuration"`
+	OutputChannels []OutputChannel           `json:"outputChannels"`
 }

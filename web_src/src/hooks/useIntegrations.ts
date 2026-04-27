@@ -9,8 +9,13 @@ import {
   organizationsPreviousIntegrationSetupStep,
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
+  organizationsUpdateIntegrationCapabilities,
 } from "@/api-client/sdk.gen";
-import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client/types.gen";
+import type {
+  IntegrationCapabilityState,
+  IntegrationsIntegrationDefinition,
+  OrganizationsIntegration,
+} from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { analytics } from "@/lib/analytics";
@@ -268,6 +273,35 @@ export const useDeleteIntegration = (organizationId: string, integrationId: stri
         queryKey: integrationKeys.connected(organizationId),
       });
       queryClient.removeQueries({
+        queryKey: integrationKeys.integration(organizationId, integrationId),
+      });
+    },
+  });
+};
+
+export const useUpdateIntegrationCapabilities = (organizationId: string, integrationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (capabilities: IntegrationCapabilityState[]) => {
+      return await organizationsUpdateIntegrationCapabilities(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId },
+          body: { capabilities },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(organizationId),
+      });
+      const integration = response.data?.integration;
+      if (integration) {
+        queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
+        return;
+      }
+
+      queryClient.invalidateQueries({
         queryKey: integrationKeys.integration(organizationId, integrationId),
       });
     },

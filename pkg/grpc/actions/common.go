@@ -12,6 +12,7 @@ import (
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
+	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -1109,4 +1110,25 @@ func SerializeActions(in []core.Action) []*actionpb.Action {
 		}
 	}
 	return out
+}
+
+func CapabilityTypeToProto(t string) integrationpb.CapabilityDefinition_Type {
+	switch t {
+	case models.IntegrationCapabilityTypeAction:
+		return integrationpb.CapabilityDefinition_TYPE_ACTION
+	case models.IntegrationCapabilityTypeTrigger:
+		return integrationpb.CapabilityDefinition_TYPE_TRIGGER
+	}
+	return integrationpb.CapabilityDefinition_TYPE_UNKNOWN
+}
+
+func ProtoToCapabilityType(t integrationpb.CapabilityDefinition_Type) string {
+	switch t {
+	case integrationpb.CapabilityDefinition_TYPE_ACTION:
+		return models.IntegrationCapabilityTypeAction
+	case integrationpb.CapabilityDefinition_TYPE_TRIGGER:
+		return models.IntegrationCapabilityTypeTrigger
+	}
+
+	return ""
 }

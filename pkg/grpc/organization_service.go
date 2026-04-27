@@ -195,6 +195,7 @@ func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.Cre
 		req.IntegrationName,
 		req.Name,
 		req.Configuration,
+		req.Capabilities,
 	)
 }
 
@@ -221,6 +222,11 @@ func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.Upd
 func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.DeleteIntegrationRequest) (*pb.DeleteIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.DeleteIntegration(ctx, orgID, req.IntegrationId)
+}
+
+func (s *OrganizationService) UpdateIntegrationCapabilities(ctx context.Context, req *pb.UpdateIntegrationCapabilitiesRequest) (*pb.UpdateIntegrationCapabilitiesResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateIntegrationCapabilities(ctx, s.registry, orgID, req.IntegrationId, req.Capabilities)
 }
 
 func accountIDFromContext(ctx context.Context) (string, error) {

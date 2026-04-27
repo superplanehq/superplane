@@ -16,6 +16,14 @@ const (
 	IntegrationStatePending = "pending"
 	IntegrationStateReady   = "ready"
 	IntegrationStateError   = "error"
+
+	IntegrationCapabilityStateRequested   = "requested"
+	IntegrationCapabilityStateEnabled     = "enabled"
+	IntegrationCapabilityStateDisabled    = "disabled"
+	IntegrationCapabilityStateUnavailable = "unavailable"
+
+	IntegrationCapabilityTypeAction  = "action"
+	IntegrationCapabilityTypeTrigger = "trigger"
 )
 
 type Integration struct {
@@ -44,7 +52,7 @@ type Integration struct {
 	//
 	SetupState   *datatypes.JSONType[SetupState]
 	Parameters   datatypes.JSONSlice[core.IntegrationParameterDefinition]
-	Capabilities datatypes.JSONSlice[core.CapabilityDefinition]
+	Capabilities datatypes.JSONSlice[CapabilityState]
 }
 
 func (a *Integration) TableName() string {
@@ -54,6 +62,11 @@ func (a *Integration) TableName() string {
 type SetupState struct {
 	CurrentStep   *core.SetupStep  `json:"current_step,omitempty"`
 	PreviousSteps []core.SetupStep `json:"previous_steps,omitempty"`
+}
+
+type CapabilityState struct {
+	Name  string `json:"name"`
+	State string `json:"state"`
 }
 
 type IntegrationSecret struct {

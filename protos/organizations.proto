@@ -3,8 +3,6 @@ syntax = "proto3";
 package Superplane.Organizations;
 
 import "configuration.proto";
-import "components.proto";
-import "triggers.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -302,6 +300,17 @@ service Organizations {
     };
   }
 
+  rpc UpdateIntegrationCapabilities(UpdateIntegrationCapabilitiesRequest) returns (UpdateIntegrationCapabilitiesResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/capabilities"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration capabilities";
+      description: "Update integration capabilities";
+      tags: "Organization";
+    };
+  }
 }
 
 message Organization {
@@ -515,6 +524,7 @@ message CreateIntegrationRequest {
   string name = 2;
   string integration_name = 3;
   google.protobuf.Struct configuration = 4;
+  repeated string capabilities = 5;
 }
 
 message CreateIntegrationResponse {
@@ -583,6 +593,16 @@ message PreviousIntegrationSetupStepResponse {
   Integration integration = 1;
 }
 
+message UpdateIntegrationCapabilitiesRequest {
+  string id = 1;
+  string integration_id = 2;
+  repeated Integration.CapabilityState capabilities = 3;
+}
+
+message UpdateIntegrationCapabilitiesResponse {
+  Integration integration = 1;
+}
+
 message Integration {
   //
   // Parameters are how integration implementations expose things to the user
@@ -607,21 +627,6 @@ message Integration {
     string description = 3;
   }
 
-  //
-  // Capabilities are abilities exposed by the integration.
-  //
-  message Capability {
-    enum Type {
-      UNKNOWN = 0;
-      COMPONENT = 1;
-      TRIGGER = 2;
-    }
-
-    Type type = 1;
-    Components.Component component = 2;
-    Triggers.Trigger trigger = 3;
-  }
-
   message Metadata {
     string id = 1;
     string name = 2;
@@ -642,12 +647,12 @@ message Integration {
     repeated NodeRef used_in = 5;
 
     //
-    // Used by new SetupProvider model.
+    // New fields used for new setup flow.
     //
-    repeated Parameter parameters = 6;
-    repeated Secret secrets = 7;
-    repeated Capability capabilities = 8;
-    SetupState setup_state = 9;
+    repeated CapabilityState capabilities = 6;
+    SetupState setup_state = 7;
+    repeated Parameter parameters = 8;
+    repeated Secret secrets = 9;
   }
 
   message SetupState {
@@ -691,6 +696,36 @@ message Integration {
     //
     repeated Configuration.Field inputs = 5;
     RedirectPrompt redirect_prompt = 6;
+  }
+
+  message CapabilityState {
+    enum State {
+      //
+      // The integration itself has the capability available,
+      // but the capability was not requested as part of the setup flow.
+      //
+      STATE_UNAVAILABLE = 0;
+
+      //
+      // The capability was requested,
+      // but the setup flow did not yet exposed the capability requested.
+      //
+      STATE_REQUESTED = 1;
+
+      //
+      // The capability is fully available for use.
+      //
+      STATE_ENABLED = 2;
+
+      //
+      // The capability was made available during the setup flow,
+      // but has been manually disabled by the user.
+      //
+      STATE_DISABLED = 3;
+    }
+
+    string name = 1;
+    State state = 2;
   }
 
   message NodeRef {

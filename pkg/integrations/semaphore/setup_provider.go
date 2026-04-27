@@ -50,6 +50,38 @@ If you don't have access to your personal access token anymore, you can reset it
 > This will revoke the current token and generate a new one, so any existing workflows that use this token will stop working.
 `
 
+func (s *SetupProvider) Capabilities() []core.Capability {
+	runWorkflow := &RunWorkflow{}
+	getPipeline := &GetPipeline{}
+	onPipelineDone := &OnPipelineDone{}
+
+	return []core.Capability{
+		{
+			Type:           core.IntegrationCapabilityTypeAction,
+			Name:           runWorkflow.Name(),
+			Label:          runWorkflow.Label(),
+			Description:    runWorkflow.Description(),
+			Configuration:  runWorkflow.Configuration(),
+			OutputChannels: runWorkflow.OutputChannels(nil),
+		},
+		{
+			Type:           core.IntegrationCapabilityTypeAction,
+			Name:           getPipeline.Name(),
+			Label:          getPipeline.Label(),
+			Description:    getPipeline.Description(),
+			Configuration:  getPipeline.Configuration(),
+			OutputChannels: getPipeline.OutputChannels(nil),
+		},
+		{
+			Type:          core.IntegrationCapabilityTypeTrigger,
+			Name:          onPipelineDone.Name(),
+			Label:         onPipelineDone.Label(),
+			Description:   onPipelineDone.Description(),
+			Configuration: onPipelineDone.Configuration(),
+		},
+	}
+}
+
 func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	return core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
@@ -192,25 +224,22 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error listing projects: %v", err)
 	}
 
-	//
-	// Register capabilities
-	//
-	err = ctx.Capabilities.RegisterComponents([]core.Component{
-		&RunWorkflow{},
-		&GetPipeline{},
-	})
-
+	err = s.enableCapabilities(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error registering components: %v", err)
-	}
-
-	err = ctx.Capabilities.RegisterTriggers([]core.Trigger{
-		&OnPipelineDone{},
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("error registering triggers: %v", err)
+		return nil, fmt.Errorf("error enabling capability group: %v", err)
 	}
 
 	return nil, nil
+}
+
+func (s *SetupProvider) enableCapabilities(ctx core.SetupStepContext) error {
+	runWorkflow := &RunWorkflow{}
+	getPipeline := &GetPipeline{}
+	onPipelineDone := &OnPipelineDone{}
+
+	return ctx.Capabilities.Enable(
+		runWorkflow.Name(),
+		getPipeline.Name(),
+		onPipelineDone.Name(),
+	)
 }

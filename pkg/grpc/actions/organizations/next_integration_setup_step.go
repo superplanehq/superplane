@@ -58,6 +58,7 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 			return err
 		}
 
+		capabilityCtx := contexts.NewCapabilityContext(setupProvider.Capabilities(), integration.Capabilities)
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
 			Step:           setupState.CurrentStep.Name,
 			Inputs:         getStepInputs(inputs),
@@ -65,8 +66,8 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),
 			Parameters:     contexts.NewIntegrationParameterStorage(integration),
-			Capabilities:   contexts.NewIntegrationCapabilityRegistry(integration),
 			Secrets:        secretStorage,
+			Capabilities:   capabilityCtx,
 		})
 
 		if err != nil {
@@ -79,6 +80,7 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 		if nextStep == nil {
 			integration.SetupState = nil
 			integration.State = models.IntegrationStateReady
+			integration.Capabilities = capabilityCtx.States()
 			return tx.Save(integration).Error
 		}
 
