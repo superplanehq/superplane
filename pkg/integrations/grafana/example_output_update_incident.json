@@ -1,0 +1,26 @@
+{
+  "type": "grafana.incident.updated",
+  "timestamp": "2026-04-20T10:07:00Z",
+  "data": {
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "title": "High latency in web requests",
+    "severity": "major",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      },
+      {
+        "label": "customer-impacting"
+      }
+    ],
+    "isDrill": false,
+    "createdTime": "2026-04-20T10:00:00Z",
+    "modifiedTime": "2026-04-20T10:07:00Z"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "type": "grafana.incident.activityAdded",
+  "timestamp": "2026-04-20T10:05:00Z",
+  "data": {
+    "activityItemID": "activity-123",
+    "incidentID": "incident-123",
+    "activityKind": "userNote",
+    "body": "Root cause identified and mitigation is in progress.",
+    "createdTime": "2026-04-20T10:05:00Z"
+  }
+}
