@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -13,6 +14,8 @@ import (
 )
 
 var ErrCanvasNameAlreadyExists = errors.New("canvas name already exists")
+
+const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
 
 type Canvas struct {
 	ID             uuid.UUID
@@ -43,6 +46,19 @@ func (c *Canvas) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover
 
 func (c *Canvas) TableName() string {
 	return "workflows"
+}
+
+func MapCanvasNameUniqueConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == canvasNameUniqueConstraint {
+		return ErrCanvasNameAlreadyExists
+	}
+
+	return err
 }
 
 func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {

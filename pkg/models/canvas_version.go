@@ -242,7 +242,7 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	canvas.LiveVersionID = &version.ID
 	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
-	return tx.Save(canvas).Error
+	return MapCanvasNameUniqueConstraintError(tx.Save(canvas).Error)
 }
 
 func SaveCanvasDraftInTransaction(
@@ -367,7 +367,7 @@ func PublishCanvasDraftInTransaction(
 	canvas.UpdatedAt = &now
 
 	if err := tx.Save(canvas).Error; err != nil {
-		return nil, err
+		return nil, MapCanvasNameUniqueConstraintError(err)
 	}
 
 	return version, nil

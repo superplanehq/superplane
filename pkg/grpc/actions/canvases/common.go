@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -17,7 +16,6 @@ import (
 )
 
 const canvasNameAlreadyExistsMessage = "Canvas with the same name already exists"
-const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
 
 func validateCanvasChangeRequestApprovers(
 	authService authorization.Authorization,
@@ -110,18 +108,12 @@ func mapCanvasNameUniqueConstraintError(err error) error {
 		return nil
 	}
 
-	if isCanvasNameUniqueConstraintError(err) {
+	err = models.MapCanvasNameUniqueConstraintError(err)
+	if errors.Is(err, models.ErrCanvasNameAlreadyExists) {
 		return status.Error(codes.AlreadyExists, canvasNameAlreadyExistsMessage)
 	}
 
 	return err
-}
-
-func isCanvasNameUniqueConstraintError(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) &&
-		pgErr.Code == "23505" &&
-		pgErr.ConstraintName == canvasNameUniqueConstraint
 }
 
 func publishCanvasVersionInTransaction(
@@ -142,7 +134,9 @@ func publishCanvasVersionInTransaction(
 	}
 
 	if len(changeset.GetChanges()) == 0 {
-		return models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges)
+		return mapCanvasNameUniqueConstraintError(
+			models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges),
+		)
 	}
 
 	publisher, err := changesets.NewCanvasPublisher(tx, nextVersion, liveVersion, options)
@@ -150,5 +144,5 @@ func publishCanvasVersionInTransaction(
 		return err
 	}
 
-	return publisher.Publish(ctx)
+	return mapCanvasNameUniqueConstraintError(publisher.Publish(ctx))
 }
