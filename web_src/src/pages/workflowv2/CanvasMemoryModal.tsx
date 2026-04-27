@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+import { isUrl } from "@/lib/utils";
+import type { ReactNode } from "react";
 import { Trash2 } from "lucide-react";
 
 export type CanvasMemoryModalProps = {
@@ -132,6 +134,24 @@ function collectColumns(items: Record<string, unknown>[]): string[] {
   return Array.from(set);
 }
 
+function renderValue(value: unknown): ReactNode {
+  const formattedValue = formatValue(value);
+  if (typeof value !== "string" || !isUrl(value)) {
+    return formattedValue;
+  }
+
+  return (
+    <a
+      href={value}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+    >
+      {formattedValue}
+    </a>
+  );
+}
+
 function renderNamespaceTable(
   values: CanvasMemoryEntry[],
   onDeleteEntry?: (memoryId: string) => void,
@@ -164,7 +184,7 @@ function renderNamespaceTable(
                 <tr key={entry.id || index} className="border-b border-slate-950/15">
                   {columns.map((column) => (
                     <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
-                      {formatValue(item[column])}
+                      {renderValue(item[column])}
                     </td>
                   ))}
                   <td className="px-3 py-2 text-right align-middle">
@@ -192,7 +212,7 @@ function renderNamespaceTable(
   }
 
   return (
-    <div className="overflow-x-auto bg-red-500">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-950/15 bg-slate-50">
@@ -203,7 +223,7 @@ function renderNamespaceTable(
         <tbody>
           {values.map((entry, index) => (
             <tr key={entry.id || index} className="border-b border-slate-950/15">
-              <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700">{formatValue(entry.values)}</td>
+              <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700">{renderValue(entry.values)}</td>
               <td className="px-3 py-2 text-right align-middle">
                 <Button
                   type="button"
