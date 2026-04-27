@@ -1,0 +1,8 @@
+{
+  "data": {
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "TERMINATED"
+  },
+  "timestamp": "2026-04-22T20:40:00.000Z",
+  "type": "oci.deleteInstance"
+}

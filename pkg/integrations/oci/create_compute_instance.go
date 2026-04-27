@@ -532,40 +532,13 @@ func (c *CreateComputeInstance) poll(ctx core.ActionHookContext) error {
 func (c *CreateComputeInstance) emitInstance(ctx core.ActionHookContext, client *Client, instance *Instance, metadata CreateInstanceExecutionMetadata) error {
 	payload := instanceToMap(instance)
 
-	c.enrichWithVNICIPs(ctx, client, instance, payload)
+	enrichInstanceWithVNICIPs(ctx.Logger, client, instance, payload)
 
 	if err := c.ensureBlockVolumeAttached(ctx, client, instance, &metadata, payload); err != nil {
 		return err
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, ComputeInstancePayloadType, []any{payload})
-}
-
-// enrichWithVNICIPs looks up the primary VNIC for the instance and adds publicIp / privateIp
-// to payload. Errors are logged as warnings so a transient VNIC-lookup failure does not block
-// the execution from completing.
-func (c *CreateComputeInstance) enrichWithVNICIPs(ctx core.ActionHookContext, client *Client, instance *Instance, payload map[string]any) {
-	attachments, err := client.ListVNICAttachments(instance.CompartmentID, instance.ID)
-	if err != nil {
-		ctx.Logger.Warnf("failed to list VNIC attachments for instance %s: %v", instance.ID, err)
-		return
-	}
-
-	for _, att := range attachments {
-		if att.LifecycleState != "ATTACHED" || att.VNICID == "" {
-			continue
-		}
-
-		vnic, err := client.GetVNIC(att.VNICID)
-		if err != nil {
-			ctx.Logger.Warnf("failed to get VNIC %s for instance %s: %v", att.VNICID, instance.ID, err)
-			return
-		}
-
-		payload["publicIp"] = vnic.PublicIP
-		payload["privateIp"] = vnic.PrivateIP
-		return
-	}
 }
 
 // ensureBlockVolumeAttached attaches the configured block volume (if any) to the instance and
