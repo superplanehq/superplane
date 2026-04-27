@@ -2,149 +2,29 @@ syntax = "proto3";
 
 package Superplane.Components;
 
-import "configuration.proto";
 import "google/protobuf/struct.proto";
-import "google/protobuf/timestamp.proto";
-import "google/api/annotations.proto";
-import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/components";
 
-option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
-  info: {
-    title: "Superplane Components API";
-    version: "1.0";
-    description: "API for Superplane Components";
-    contact: {
-      name: "API Support";
-      email: "support@superplane.com";
-    };
-  };
-  schemes: HTTPS;
-  schemes: HTTP;
-  consumes: "application/json";
-  produces: "application/json";
-};
-
-service Components {
-  rpc ListComponents(ListComponentsRequest) returns (ListComponentsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/components"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List components";
-      description: "Returns a list of all components";
-      tags: "Component";
-    };
-  }
-
-  rpc DescribeComponent(DescribeComponentRequest) returns (DescribeComponentResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/components/{name}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe component";
-      description: "Returns a component by its name";
-      tags: "Component";
-    };
-  }
-
-  rpc ListComponentActions(ListComponentActionsRequest) returns (ListComponentActionsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/components/{name}/actions"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List component actions";
-      description: "Returns available actions for a component";
-      tags: "Component";
-    };
-  }
-}
-
-message ListComponentsRequest {}
-
-message ListComponentsResponse {
-  repeated Component components = 1;
-}
-
-message DescribeComponentRequest {
-  string name = 1;
-}
-
-message DescribeComponentResponse {
-  Component component = 1;
-}
-
-message Component {
-  string name = 1;
-  string label = 2;
-  string description = 3;
-  repeated Configuration.Field configuration = 4;
-  repeated OutputChannel output_channels = 5;
-  string icon = 6;
-  string color = 7;
-  google.protobuf.Struct example_output = 8;
-}
-
-message OutputChannel {
-  string name = 1;
-  string label = 2;
-  string description = 3;
-}
-
-message ListComponentActionsRequest {
-  string name = 1;
-}
-
-message ComponentAction {
-  string name = 1;
-  string description = 2;
-  repeated Configuration.Field parameters = 3;
-}
-
-message ListComponentActionsResponse {
-  repeated ComponentAction actions = 1;
-}
-
 message Node {
   enum Type {
-    TYPE_COMPONENT = 0;
-    TYPE_BLUEPRINT = 1;
-    TYPE_TRIGGER = 2;
-    TYPE_WIDGET = 3;
-  }
-
-  message ComponentRef {
-    string name = 1;
-  }
-
-  message TriggerRef {
-    string name = 1;
-  }
-
-  message WidgetRef {
-    string name = 1;
-  }
-
-  message BlueprintRef {
-    string id = 1;
+    TYPE_ACTION = 0;
+    TYPE_TRIGGER = 1;
+    TYPE_WIDGET = 2;
   }
 
   string id = 1;
   string name = 2;
   Type type = 3;
-  google.protobuf.Struct configuration = 4;
-  google.protobuf.Struct metadata = 5;
-  Position position = 6;
-  ComponentRef component = 7;
-  BlueprintRef blueprint = 8;
-  TriggerRef trigger = 9;
-  WidgetRef widget = 10;
-  bool is_collapsed = 11;
-  IntegrationRef integration = 12;
-  string error_message = 13;
-  string warning_message = 14;
-  bool paused = 15;
+  string component = 4;
+  google.protobuf.Struct configuration = 5;
+  optional google.protobuf.Struct metadata = 6;
+  Position position = 7;
+  bool is_collapsed = 8;
+  optional IntegrationRef integration = 9;
+  optional string error_message = 10;
+  optional string warning_message = 11;
+  bool paused = 12;
 }
 
 message Position {
@@ -159,19 +39,6 @@ message Edge {
 }
 
 message IntegrationRef {
-  string id = 1;
-  string name = 2;
-}
-
-// Event message for component-triggered notifications.
-message NotificationEmailRequested {
-  string organization_id = 1;
-  string title = 2;
-  string body = 3;
-  string url = 4;
-  string url_label = 5;
-  repeated string emails = 6;
-  repeated string groups = 7;
-  repeated string roles = 8;
-  google.protobuf.Timestamp timestamp = 9;
+  optional string id = 1;
+  optional string name = 2;
 }

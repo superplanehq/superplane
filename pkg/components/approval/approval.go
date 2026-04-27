@@ -30,7 +30,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("approval", &Approval{})
+	registry.RegisterAction("approval", &Approval{})
 }
 
 /*
@@ -125,7 +125,7 @@ func (m *Metadata) hasGivenInputInAnyRecord(user *core.User) bool {
 	})
 }
 
-func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) error {
+func (m *Metadata) Approve(record *Record, index int, ctx core.ActionHookContext) error {
 	user := ctx.Auth.AuthenticatedUser()
 	if m.hasGivenInputInAnyRecord(user) {
 		return fmt.Errorf("user has already approved/rejected another requirement")
@@ -148,7 +148,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 	return nil
 }
 
-func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) error {
+func (m *Metadata) Reject(record *Record, index int, ctx core.ActionHookContext) error {
 	user := ctx.Auth.AuthenticatedUser()
 	if m.hasGivenInputInAnyRecord(user) {
 		return fmt.Errorf("user has already approved/rejected another requirement")
@@ -180,7 +180,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 	return nil
 }
 
-func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error {
+func (m *Metadata) validateAction(record *Record, ctx core.ActionHookContext) error {
 	authenticatedUser := ctx.Auth.AuthenticatedUser()
 	switch record.Type {
 	case ItemTypeAnyone:
@@ -525,12 +525,11 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (a *Approval) Actions() []core.Action {
-	return []core.Action{
+func (a *Approval) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "approve",
-			Description:    "Approve this execution",
-			UserAccessible: true,
+			Name: "approve",
+			Type: core.HookTypeUser,
 			Parameters: []configuration.Field{
 				{
 					Name:        "index",
@@ -549,9 +548,8 @@ func (a *Approval) Actions() []core.Action {
 			},
 		},
 		{
-			Name:           "reject",
-			Description:    "Reject this approval requirement",
-			UserAccessible: true,
+			Name: "reject",
+			Type: core.HookTypeUser,
 			Parameters: []configuration.Field{
 				{
 					Name:        "index",
@@ -572,7 +570,7 @@ func (a *Approval) Actions() []core.Action {
 	}
 }
 
-func (a *Approval) HandleAction(ctx core.ActionContext) error {
+func (a *Approval) HandleHook(ctx core.ActionHookContext) error {
 	var err error
 	var metadata *Metadata
 	switch ctx.Name {
@@ -635,7 +633,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	)
 }
 
-func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
+func (a *Approval) handleApprove(ctx core.ActionHookContext) (*Metadata, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
@@ -683,7 +681,7 @@ func getActionIndex(parameters map[string]any, max int) (int, error) {
 	return index, nil
 }
 
-func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
+func (a *Approval) handleReject(ctx core.ActionHookContext) (*Metadata, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {

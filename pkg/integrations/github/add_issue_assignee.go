@@ -175,18 +175,18 @@ func (c *AddIssueAssignee) HandleWebhook(ctx core.WebhookRequestContext) (int, *
 	return 200, nil, nil
 }
 
-func (c *AddIssueAssignee) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *AddIssueAssignee) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *AddIssueAssignee) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *AddIssueAssignee) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *AddIssueAssignee) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddIssueAssignee) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

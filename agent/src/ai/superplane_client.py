@@ -27,16 +27,22 @@ from ai.models import (
     NodeEvent,
     NodeExecution,
 )
+from superplaneapi.api.action_api import ActionApi
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_node_api import CanvasNodeApi
 from superplaneapi.api.canvas_version_api import CanvasVersionApi
-from superplaneapi.api.component_api import ComponentApi
 from superplaneapi.api.integration_api import IntegrationApi
 from superplaneapi.api.organization_api import OrganizationApi
 from superplaneapi.api.trigger_api import TriggerApi
 from superplaneapi.api_client import ApiClient
 from superplaneapi.configuration import Configuration
 from superplaneapi.exceptions import ApiException
+from superplaneapi.models.actions_describe_action_response import (
+    ActionsDescribeActionResponse,
+)
+from superplaneapi.models.actions_list_actions_response import (
+    ActionsListActionsResponse,
+)
 from superplaneapi.models.canvases_canvas_version import CanvasesCanvasVersion
 from superplaneapi.models.canvases_create_canvas_version_response import (
     CanvasesCreateCanvasVersionResponse,
@@ -55,19 +61,13 @@ from superplaneapi.models.canvases_validate_canvas_version_changeset_body import
 from superplaneapi.models.canvases_validate_canvas_version_changeset_response import (
     CanvasesValidateCanvasVersionChangesetResponse,
 )
-from superplaneapi.models.components_component import ComponentsComponent
-from superplaneapi.models.components_describe_component_response import (
-    ComponentsDescribeComponentResponse,
-)
-from superplaneapi.models.components_list_components_response import (
-    ComponentsListComponentsResponse,
-)
 from superplaneapi.models.components_node_type import ComponentsNodeType
 from superplaneapi.models.configuration_field import ConfigurationField
 from superplaneapi.models.organizations_integration import OrganizationsIntegration
 from superplaneapi.models.organizations_list_integration_resources_response import (
     OrganizationsListIntegrationResourcesResponse,
 )
+from superplaneapi.models.superplane_actions_action import SuperplaneActionsAction
 from superplaneapi.models.superplane_components_node import (
     SuperplaneComponentsNode as ComponentsNode,
 )
@@ -114,7 +114,7 @@ class SuperplaneClient:
         self._canvas_api = CanvasApi(self._api_client)
         self._canvas_node_api = CanvasNodeApi(self._api_client)
         self._canvas_version_api = CanvasVersionApi(self._api_client)
-        self._component_api = ComponentApi(self._api_client)
+        self._action_api = ActionApi(self._api_client)
         self._trigger_api = TriggerApi(self._api_client)
         self._integration_api = IntegrationApi(self._api_client)
         self._organization_api = OrganizationApi(self._api_client)
@@ -180,11 +180,7 @@ class SuperplaneClient:
         if not isinstance(node_id, str) or not node_id:
             return None
 
-        block_name: str | None = None
-        if item.trigger is not None and isinstance(item.trigger.name, str):
-            block_name = item.trigger.name
-        elif item.component is not None and isinstance(item.component.name, str):
-            block_name = item.component.name
+        block_name = item.component if isinstance(item.component, str) and item.component else None
 
         return CanvasNode(
             id=node_id,
@@ -489,7 +485,7 @@ class SuperplaneClient:
         return serialized
 
     @staticmethod
-    def _serialize_component_list_item(component: ComponentsComponent) -> dict[str, Any]:
+    def _serialize_component_list_item(component: SuperplaneActionsAction) -> dict[str, Any]:
         """Compact shape for list_components only; use describe_component for full schema."""
         output_channels = component.output_channels or []
         names: list[str] = []
@@ -519,7 +515,7 @@ class SuperplaneClient:
         }
 
     @staticmethod
-    def _serialize_component(component: ComponentsComponent) -> dict[str, Any]:
+    def _serialize_component(component: SuperplaneActionsAction) -> dict[str, Any]:
         output_channels = component.output_channels or []
         configuration_fields = SuperplaneClient._serialize_configuration_fields(
             component.configuration
@@ -584,7 +580,7 @@ class SuperplaneClient:
 
     @staticmethod
     def _serialize_available_integration(integration: Any) -> dict[str, Any]:
-        components = integration.components if isinstance(integration.components, list) else []
+        components = integration.actions if isinstance(integration.actions, list) else []
         triggers = integration.triggers if isinstance(integration.triggers, list) else []
         return {
             "name": integration.name,
@@ -613,34 +609,32 @@ class SuperplaneClient:
         query: str | None = None,
     ) -> list[dict[str, Any]]:
         response = self._api_request(
-            lambda: self._component_api.components_list_components(
+            lambda: self._action_api.actions_list_actions(
                 _request_timeout=self._config.timeout_seconds,
             ),
-            operation="components_list_components",
+            operation="actions_list_actions",
         )
-        if not isinstance(response, ComponentsListComponentsResponse):
+        if not isinstance(response, ActionsListActionsResponse):
             return []
-        root_components = response.components if isinstance(response.components, list) else []
-        components_by_name: dict[str, ComponentsComponent] = {}
+        root_components = response.actions if isinstance(response.actions, list) else []
+        components_by_name: dict[str, SuperplaneActionsAction] = {}
         for component in root_components:
-            if not isinstance(component, ComponentsComponent):
+            if not isinstance(component, SuperplaneActionsAction):
                 continue
             if isinstance(component.name, str) and component.name:
                 components_by_name[component.name] = component
 
-        # Integration-scoped components are exposed under /api/v1/integrations.
+        # Integration-scoped actions are exposed under /api/v1/integrations.
         try:
             integration_definitions = self._list_available_integrations_raw()
         except Exception as error:
-            _debug_log(f"integration_components_unavailable reason={error}")
+            _debug_log(f"integration_actions_unavailable reason={error}")
             integration_definitions = []
 
         for integration in integration_definitions:
-            scoped_components = (
-                integration.components if isinstance(integration.components, list) else []
-            )
+            scoped_components = integration.actions if isinstance(integration.actions, list) else []
             for component in scoped_components:
-                if not isinstance(component, ComponentsComponent):
+                if not isinstance(component, SuperplaneActionsAction):
                     continue
                 if isinstance(component.name, str) and component.name:
                     components_by_name[component.name] = component
@@ -663,17 +657,17 @@ class SuperplaneClient:
 
     def describe_component(self, name: str) -> dict[str, Any]:
         response = self._api_request(
-            lambda: self._component_api.components_describe_component(
+            lambda: self._action_api.actions_describe_action(
                 name,
                 _request_timeout=self._config.timeout_seconds,
             ),
-            operation="components_describe_component",
+            operation="actions_describe_action",
         )
-        if not isinstance(response, ComponentsDescribeComponentResponse) or not isinstance(
-            response.component, ComponentsComponent
+        if not isinstance(response, ActionsDescribeActionResponse) or not isinstance(
+            response.action, SuperplaneActionsAction
         ):
-            raise ValueError(f"Component '{name}' was not found or response shape was invalid.")
-        return self._serialize_component(response.component)
+            raise ValueError(f"Action '{name}' was not found or response shape was invalid.")
+        return self._serialize_component(response.action)
 
     def list_triggers(
         self,
@@ -828,7 +822,7 @@ class SuperplaneClient:
         summary = self.describe_editing_canvas(canvas_id, canvas_version_id)
         node_kind_by_type = {
             "TYPE_TRIGGER": "trigger",
-            "TYPE_COMPONENT": "component",
+            "TYPE_ACTION": "action",
             "TYPE_BLUEPRINT": "blueprint",
             "TYPE_WIDGET": "widget",
         }

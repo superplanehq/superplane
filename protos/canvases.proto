@@ -307,26 +307,26 @@ service Canvases {
     };
   }
 
-  rpc InvokeNodeExecutionAction(InvokeNodeExecutionActionRequest) returns (InvokeNodeExecutionActionResponse) {
+  rpc InvokeNodeExecutionHook(InvokeNodeExecutionHookRequest) returns (InvokeNodeExecutionHookResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"
+      post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/hooks/{hook_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Invoke execution action";
-      description: "Invokes a custom action on a canvas node execution";
+      summary: "Invoke execution hook";
+      description: "Invokes a custom hook on a canvas node execution";
       tags: "CanvasNodeExecution";
     };
   }
 
-  rpc InvokeNodeTriggerAction(InvokeNodeTriggerActionRequest) returns (InvokeNodeTriggerActionResponse) {
+  rpc InvokeNodeTriggerHook(InvokeNodeTriggerHookRequest) returns (InvokeNodeTriggerHookResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}"
+      post: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/hooks/{hook_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Invoke trigger action";
-      description: "Invokes a custom action on a canvas node trigger";
+      summary: "Invoke trigger hook";
+      description: "Invokes a custom hook on a canvas node trigger";
       tags: "CanvasNode";
     };
   }
@@ -891,23 +891,23 @@ message CanvasNodeQueueItem {
   google.protobuf.Timestamp created_at = 6;
 }
 
-message InvokeNodeExecutionActionRequest {
+message InvokeNodeExecutionHookRequest {
   string canvas_id = 1;
   string execution_id = 2;
-  string action_name = 3;
+  string hook_name = 3;
   google.protobuf.Struct parameters = 4;
 }
 
-message InvokeNodeExecutionActionResponse {}
+message InvokeNodeExecutionHookResponse {}
 
-message InvokeNodeTriggerActionRequest {
+message InvokeNodeTriggerHookRequest {
   string canvas_id = 1;
   string node_id = 2;
-  string action_name = 3;
+  string hook_name = 3;
   google.protobuf.Struct parameters = 4;
 }
 
-message InvokeNodeTriggerActionResponse {
+message InvokeNodeTriggerHookResponse {
   google.protobuf.Struct result = 1;
 }
 
@@ -1073,4 +1073,16 @@ message CanvasVersionMessage {
   string canvas_id = 1;
   string version_id = 2;
   google.protobuf.Timestamp timestamp = 3;
+}
+
+message NotificationEmailRequested {
+  string organization_id = 1;
+  string title = 2;
+  string body = 3;
+  string url = 4;
+  string url_label = 5;
+  repeated string emails = 6;
+  repeated string groups = 7;
+  repeated string roles = 8;
+  google.protobuf.Timestamp timestamp = 9;
 }

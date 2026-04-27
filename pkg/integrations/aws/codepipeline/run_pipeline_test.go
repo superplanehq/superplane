@@ -431,7 +431,7 @@ func Test__RunPipeline__Poll(t *testing.T) {
 	component := &RunPipeline{}
 
 	t.Run("already finished -> no-op", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -463,7 +463,7 @@ func Test__RunPipeline__Poll(t *testing.T) {
 		}
 
 		requestCtx := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -505,7 +505,7 @@ func Test__RunPipeline__Poll(t *testing.T) {
 		}
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -561,7 +561,7 @@ func Test__RunPipeline__Poll(t *testing.T) {
 		}
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -591,7 +591,7 @@ func Test__RunPipeline__Finish(t *testing.T) {
 	component := &RunPipeline{}
 
 	t.Run("already finished execution -> no-op", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "finish",
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunPipelineExecutionMetadata{
@@ -611,7 +611,7 @@ func Test__RunPipeline__Finish(t *testing.T) {
 
 	t.Run("with data -> emits to passed channel with data", func(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "finish",
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunPipelineExecutionMetadata{
@@ -633,7 +633,7 @@ func Test__RunPipeline__Finish(t *testing.T) {
 
 	t.Run("without data -> emits to passed channel", func(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "finish",
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunPipelineExecutionMetadata{
@@ -651,7 +651,7 @@ func Test__RunPipeline__Finish(t *testing.T) {
 	})
 
 	t.Run("pipeline already completed -> error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "finish",
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunPipelineExecutionMetadata{

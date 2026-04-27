@@ -630,18 +630,18 @@ func indexJobState(status string) string {
 	return lower
 }
 
-func (c *CreateKnowledgeBase) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateKnowledgeBase) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateKnowledgeBase) HandleAction(ctx core.ActionContext) error {
+func (c *CreateKnowledgeBase) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {

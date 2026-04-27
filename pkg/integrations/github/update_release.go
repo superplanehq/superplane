@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -307,18 +307,18 @@ func (c *UpdateRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return 200, nil, nil
 }
 
-func (c *UpdateRelease) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateRelease) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *UpdateRelease) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpdateRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateRelease) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

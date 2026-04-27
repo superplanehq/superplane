@@ -111,7 +111,7 @@ func renderIntegrationText(stdout io.Writer, integration openapi_client.Integrat
 		return err
 	}
 
-	err = renderIntegrationComponentsText(stdout, integration.GetComponents())
+	err = renderIntegrationActionsText(stdout, integration.GetActions())
 	if err != nil {
 		return err
 	}
@@ -124,21 +124,21 @@ func renderIntegrationText(stdout io.Writer, integration openapi_client.Integrat
 	return renderIntegrationTriggersText(stdout, integration.GetTriggers())
 }
 
-func renderIntegrationComponentsText(stdout io.Writer, components []openapi_client.ComponentsComponent) error {
-	_, err := fmt.Fprintln(stdout, "Components:")
+func renderIntegrationActionsText(stdout io.Writer, actions []openapi_client.SuperplaneActionsAction) error {
+	_, err := fmt.Fprintln(stdout, "Actions:")
 	if err != nil {
 		return err
 	}
 
-	if len(components) == 0 {
+	if len(actions) == 0 {
 		_, err = fmt.Fprintln(stdout, "  (none)")
 		return err
 	}
 
 	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 	_, _ = fmt.Fprintln(writer, "  NAME\tLABEL\tDESCRIPTION")
-	for _, component := range components {
-		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\n", component.GetName(), component.GetLabel(), component.GetDescription())
+	for _, action := range actions {
+		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\n", action.GetName(), action.GetLabel(), action.GetDescription())
 	}
 	return writer.Flush()
 }

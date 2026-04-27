@@ -117,12 +117,12 @@ func validateOutputChannelReference(registry *registry.Registry, nodes []*compon
 	//
 	// Check if the node has the output channel referenced
 	//
-	component, err := registry.GetComponent(node.Component.Name)
+	action, err := registry.GetAction(node.Component)
 	if err != nil {
 		return err
 	}
 
-	for _, c := range component.OutputChannels(nil) {
+	for _, c := range action.OutputChannels(nil) {
 		if c.Name == outputChannel.NodeOutputChannel {
 			return nil
 		}

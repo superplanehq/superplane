@@ -325,18 +325,18 @@ func (c *CreateLoadBalancer) ProcessQueueItem(ctx core.ProcessQueueContext) (*uu
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateLoadBalancer) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateLoadBalancer) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateLoadBalancer) HandleAction(ctx core.ActionContext) error {
+func (c *CreateLoadBalancer) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {

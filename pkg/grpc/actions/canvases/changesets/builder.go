@@ -6,7 +6,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	componentspb "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -205,22 +205,16 @@ func blockNameFromNode(node models.Node) string {
 
 func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_Node, error) {
 	n := &pb.CanvasChangeset_Change_Node{
-		Id:   proposedNode.ID,
-		Name: proposedNode.Name,
-		// Keep explicit presence for add-node changes.
+		Id:          proposedNode.ID,
+		Name:        proposedNode.Name,
+		Block:       blockNameFromNode(proposedNode),
 		IsCollapsed: proto.Bool(proposedNode.IsCollapsed),
-		Position: &componentspb.Position{
+		Position: &componentpb.Position{
 			X: int32(proposedNode.Position.X),
 			Y: int32(proposedNode.Position.Y),
 		},
 	}
 
-	blockName := blockNameFromNode(proposedNode)
-	if blockName == "" {
-		return nil, fmt.Errorf("block name is required for node %s", proposedNode.ID)
-	}
-
-	n.Block = blockName
 	if proposedNode.IntegrationID != nil {
 		n.IntegrationId = *proposedNode.IntegrationID
 	}
@@ -239,16 +233,10 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 
 func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (*pb.CanvasChangeset_Change_Node, error) {
 	n := &pb.CanvasChangeset_Change_Node{
-		Id:   proposedNode.ID,
-		Name: proposedNode.Name,
+		Id:    proposedNode.ID,
+		Name:  proposedNode.Name,
+		Block: blockNameFromNode(proposedNode),
 	}
-
-	blockName := blockNameFromNode(proposedNode)
-	if blockName == "" {
-		return nil, fmt.Errorf("block name is required for node %s", proposedNode.ID)
-	}
-
-	n.Block = blockName
 
 	//
 	// If the configuration is different, we set configuration in the change.
@@ -266,7 +254,7 @@ func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (
 	// If the position is different, we set position in the change.
 	//
 	if proposedNode.Position.X != currentNode.Position.X || proposedNode.Position.Y != currentNode.Position.Y {
-		n.Position = &componentspb.Position{
+		n.Position = &componentpb.Position{
 			X: int32(proposedNode.Position.X),
 			Y: int32(proposedNode.Position.Y),
 		}

@@ -119,8 +119,8 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 	}
 }
 
-func (b *Bitbucket) Components() []core.Component {
-	return []core.Component{}
+func (b *Bitbucket) Actions() []core.Action {
+	return []core.Action{}
 }
 
 func (b *Bitbucket) Triggers() []core.Trigger {
@@ -179,10 +179,10 @@ func (b *Bitbucket) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (b *Bitbucket) Actions() []core.Action {
-	return []core.Action{}
+func (b *Bitbucket) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (b *Bitbucket) HandleAction(ctx core.IntegrationActionContext) error {
+func (b *Bitbucket) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

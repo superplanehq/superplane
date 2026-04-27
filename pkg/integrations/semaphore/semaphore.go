@@ -105,15 +105,7 @@ func (s *Semaphore) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (s *Semaphore) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Semaphore) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
-func (s *Semaphore) Components() []core.Component {
-	return []core.Component{
+	return []core.Action{
 		&RunWorkflow{},
 		&GetPipeline{},
 	}
@@ -123,4 +115,12 @@ func (s *Semaphore) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnPipelineDone{},
 	}
+}
+
+func (s *Semaphore) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Semaphore) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

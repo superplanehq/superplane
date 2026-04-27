@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	MaxEventSize           = 64 * 1024
-	DefaultHeaderTokenName = "X-Webhook-Token"
+	MaxEventSize             = 64 * 1024
+	DefaultHeaderTokenName   = "X-Webhook-Token"
+	DefaultSignatureHeader   = "X-Signature-256"
+	MinSignatureHeaderLength = 1
 )
 
 func init() {
@@ -30,8 +32,9 @@ type Metadata struct {
 }
 
 type Configuration struct {
-	Authentication string `json:"authentication"`
-	HeaderName     string `json:"headerName" mapstructure:"headerName"`
+	Authentication  string `json:"authentication"`
+	HeaderName      string `json:"headerName" mapstructure:"headerName"`
+	SignatureHeader string `json:"signatureHeader" mapstructure:"signatureHeader"`
 }
 
 func (w *Webhook) Name() string {
@@ -65,7 +68,7 @@ func (w *Webhook) Documentation() string {
 
 ## Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header
+- **Signature (HMAC)**: Verify requests using an HMAC-SHA256 signature
 - **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
 - **Header Token**: Require a raw token in a custom header (default: ` + "`X-Webhook-Token`" + `)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -113,6 +116,20 @@ func (w *Webhook) Configuration() []configuration.Field {
 						{Label: "None (unsafe)", Value: "none"},
 					},
 				},
+			},
+		},
+		{
+			Name:        "signatureHeader",
+			Label:       "Header",
+			Type:        configuration.FieldTypeString,
+			Default:     DefaultSignatureHeader,
+			Placeholder: DefaultSignatureHeader,
+			Description: "HTTP header that contains the HMAC signature",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authentication", Values: []string{"signature"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "authentication", Values: []string{"signature"}},
 			},
 		},
 		{
@@ -169,18 +186,17 @@ func (w *Webhook) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (w *Webhook) Actions() []core.Action {
-	return []core.Action{
+func (w *Webhook) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "resetAuthentication",
-			Description:    "Reset/regenerate authentication key",
-			UserAccessible: true,
-			Parameters:     []configuration.Field{},
+			Name:       "resetAuthentication",
+			Type:       core.HookTypeUser,
+			Parameters: []configuration.Field{},
 		},
 	}
 }
 
-func (w *Webhook) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (w *Webhook) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "resetAuthentication":
 		return w.resetAuthentication(ctx)
@@ -188,7 +204,7 @@ func (w *Webhook) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, fmt.Errorf("action %s not supported", ctx.Name)
 }
 
-func (w *Webhook) resetAuthentication(ctx core.TriggerActionContext) (map[string]any, error) {
+func (w *Webhook) resetAuthentication(ctx core.TriggerHookContext) (map[string]any, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
@@ -242,7 +258,8 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 	switch config.Authentication {
 	case "signature":
-		signature := ctx.Headers.Get("X-Signature-256")
+		headerName := config.SignatureHeaderName()
+		signature := ctx.Headers.Get(headerName)
 		if signature == "" {
 			return http.StatusForbidden, nil, fmt.Errorf("missing signature header")
 		}
@@ -310,4 +327,12 @@ func (c Configuration) HeaderTokenName() string {
 	}
 
 	return DefaultHeaderTokenName
+}
+
+func (c Configuration) SignatureHeaderName() string {
+	if strings.TrimSpace(c.SignatureHeader) == "" {
+		return DefaultSignatureHeader
+	}
+
+	return strings.TrimSpace(c.SignatureHeader)
 }

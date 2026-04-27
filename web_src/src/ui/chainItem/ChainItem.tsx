@@ -3,44 +3,15 @@ import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode, CanvasesCanvasEvent } from "@/api-client";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
-
-export interface ChildExecution {
-  name: string;
-  state: string;
-  nodeId: string;
-  executionId: string;
-  badgeColor?: string;
-  backgroundColor?: string;
-  componentIcon?: string;
-}
-
-export interface ChainItemData {
-  id: string;
-  nodeId: string;
-  componentName: string;
-  nodeName?: string;
-  nodeDisplayName?: string; // The actual display name from workflow node
-  nodeIcon?: string;
-  nodeIconSlug?: string; // Icon slug from component/trigger/blueprint metadata
-  state?: string; // Make state optional since it will be calculated
-  executionId?: string;
-  originalExecution?: CanvasesCanvasNodeExecution; // Add execution data
-  originalEvent?: CanvasesCanvasEvent; // Add event data for trigger events
-  childExecutions?: ChildExecution[]; // Add child executions for composite components
-  workflowNode?: SuperplaneComponentsNode; // Add workflow node for subtitle generation
-  tabData?: {
-    current?: Record<string, any>;
-    payload?: any;
-    configuration?: any;
-  };
-}
+import { ChainItemIcon } from "./ChainItemIcon";
+import type { ChainItemData } from "./types";
 
 interface ChainItemProps {
   item: ChainItemData;
@@ -136,11 +107,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   }, [item.nodeId, item.originalExecution, getExecutionState, item.state]);
 
   const componentSubtitle = useMemo(() => {
-    if (!item.workflowNode?.component?.name || !item.originalExecution) {
+    if (!item.workflowNode?.component || !item.originalExecution) {
       return undefined;
     }
 
-    const mapper = getComponentBaseMapper(item.workflowNode.component.name);
+    const mapper = getComponentBaseMapper(item.workflowNode.component);
 
     // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
     const subtitle = mapper.subtitle?.({
@@ -178,8 +149,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
   const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
   const showConnectingLine = totalItems && index < totalItems - 1;
-  const isError =
-    item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && item.originalExecution?.resultMessage;
+  const errorMessage =
+    typeof item.originalExecution?.resultMessage === "string" ? item.originalExecution.resultMessage : "";
+  const isError = item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && errorMessage !== "";
 
   return (
     <div className="relative">
@@ -198,15 +170,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* First row: Component icon/name and state badge */}
         <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {/* Component Icon */}
-            {(item.nodeIconSlug || item.nodeIcon) && (
-              <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                {React.createElement(resolveIcon(item.nodeIconSlug || item.nodeIcon), {
-                  size: 16,
-                  className: "text-gray-800",
-                })}
-              </div>
-            )}
+            <ChainItemIcon item={item} />
             <span className="text-sm text-gray-800 truncate min-w-0 font-semibold">
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
@@ -263,15 +227,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                       className: "text-gray-400",
                     })}
                   </div>
-                  {/* Component Icon */}
-                  {child.componentIcon && (
-                    <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                      {React.createElement(resolveIcon(child.componentIcon), {
-                        size: 14,
-                        className: "text-gray-500",
-                      })}
-                    </div>
-                  )}
+                  <ChainItemIcon item={child} size={14} className="text-gray-500" />
                   <span className="text-sm text-gray-500 truncate flex-1">{child.name}</span>
                 </div>
                 <div
@@ -295,7 +251,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {/* Tab Navigation */}
             <div className="flex items-center h-8 border-b-1 border-gray-300">
               <div className="flex">
-                {item.tabData.current && (
+                {!!item.tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
                     className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1  ${
@@ -309,7 +265,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   </button>
                 )}
               </div>
-              {item.tabData.payload && (
+              {!!item.tabData.payload && (
                 <button
                   onClick={() => setActiveTab("payload")}
                   className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
@@ -322,7 +278,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   Payload
                 </button>
               )}
-              {item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
+              {!!item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
                 <button
                   onClick={() => setActiveTab("configuration")}
                   className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
@@ -338,7 +294,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             </div>
 
             {/* Tab Content */}
-            {activeTab === "current" && item.tabData.current && (
+            {activeTab === "current" && !!item.tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
                 {Object.entries(item.tabData.current).map(([key, value]) => {
                   const stringValue = String(value);
@@ -379,16 +335,16 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     </span>
                     <span
                       className="text-[13px] flex-1 text-left w-[70%] text-red-600 break-words whitespace-normal"
-                      title={item.originalExecution?.resultMessage}
+                      title={errorMessage}
                     >
-                      {item.originalExecution?.resultMessage}
+                      {errorMessage}
                     </span>
                   </div>
                 )}
               </div>
             )}
 
-            {activeTab === "payload" && item.tabData.payload && (
+            {activeTab === "payload" && !!item.tabData.payload && (
               <div className="w-full">
                 <div className="flex items-center justify-between mb-2 relative">
                   <div className="flex items-center gap-1 absolute right-1.5 top-1.5">
@@ -432,7 +388,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               </div>
             )}
 
-            {activeTab === "configuration" && configurationPreview && (
+            {activeTab === "configuration" && !!configurationPreview && (
               <div className="w-full">
                 <div className="flex items-center justify-between mb-2 relative">
                   <div className="flex items-center gap-1 absolute right-1.5 top-1.5">

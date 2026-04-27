@@ -224,16 +224,16 @@ func (c *ScanImage) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *ScanImage) Actions() []core.Action {
-	return []core.Action{
+func (c *ScanImage) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "pollFindings",
-			Description: "Poll for scan findings",
+			Name: "pollFindings",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *ScanImage) HandleAction(ctx core.ActionContext) error {
+func (c *ScanImage) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "pollFindings":
 		return c.pollFindings(ctx)
@@ -243,7 +243,7 @@ func (c *ScanImage) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *ScanImage) pollFindings(ctx core.ActionContext) error {
+func (c *ScanImage) pollFindings(ctx core.ActionHookContext) error {
 	metadata := ScanImageMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {

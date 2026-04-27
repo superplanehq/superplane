@@ -220,13 +220,13 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		brokenNode := findCanvasNode(t, activeNodes, "node-broken")
 		require.Equal(t, models.CanvasNodeStateError, brokenNode.State)
 		require.NotNil(t, brokenNode.StateReason)
-		require.Contains(t, *brokenNode.StateReason, "component missingcomponent not registered")
+		require.Contains(t, *brokenNode.StateReason, "action missingcomponent not registered")
 
 		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
 		require.NoError(t, err)
 		brokenVersionNode := findVersionNode(t, publishedVersion.Nodes, "node-broken")
 		require.NotNil(t, brokenVersionNode.ErrorMessage)
-		require.Contains(t, *brokenVersionNode.ErrorMessage, "component missingcomponent not registered")
+		require.Contains(t, *brokenVersionNode.ErrorMessage, "action missingcomponent not registered")
 	})
 
 	t.Run("add node preserves metadata from draft version", func(t *testing.T) {
@@ -606,7 +606,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NotEqual(t, conflictingID, addedNode.NodeID)
 		require.Equal(t, models.CanvasNodeStateError, addedNode.State)
 		require.NotNil(t, addedNode.StateReason)
-		require.Contains(t, *addedNode.StateReason, "component missingcomponent not registered")
+		require.Contains(t, *addedNode.StateReason, "action missingcomponent not registered")
 
 		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
 		require.NoError(t, err)
@@ -622,7 +622,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 				newIDCount++
 				require.Equal(t, "Node Conflict Broken", node.Name)
 				require.NotNil(t, node.ErrorMessage)
-				require.Contains(t, *node.ErrorMessage, "component missingcomponent not registered")
+				require.Contains(t, *node.ErrorMessage, "action missingcomponent not registered")
 			}
 		}
 

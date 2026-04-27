@@ -287,12 +287,12 @@ func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.C
 			return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 		}
 
-		comp, err := w.registry.GetComponent(ref.Component.Name)
+		action, err := w.registry.GetAction(ref.Component.Name)
 		if err != nil {
-			return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+			return nil, fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 		}
 
-		return comp.Configuration(), nil
+		return action.Configuration(), nil
 	case models.NodeTypeBlueprint:
 		if ref.Blueprint == nil || ref.Blueprint.ID == "" {
 			return nil, fmt.Errorf("node %s has no blueprint reference", node.NodeID)
@@ -316,12 +316,12 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 	}
 
-	comp, err := w.registry.GetComponent(ref.Component.Name)
+	action, err := w.registry.GetAction(ref.Component.Name)
 	if err != nil {
-		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+		return nil, fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 	}
 
-	return comp.ProcessQueueItem(*ctx)
+	return action.ProcessQueueItem(*ctx)
 }
 
 func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {

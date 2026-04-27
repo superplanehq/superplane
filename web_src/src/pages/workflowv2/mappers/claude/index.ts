@@ -4,10 +4,12 @@ import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   textPrompt: baseMapper,
+  runAgent: baseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   textPrompt: buildActionStateRegistry("completed"),
+  runAgent: buildActionStateRegistry("completed"),
 };

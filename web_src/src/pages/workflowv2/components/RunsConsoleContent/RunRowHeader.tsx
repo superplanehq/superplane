@@ -33,7 +33,7 @@ export function RunRowHeader({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
+  const triggerRenderer = getTriggerRenderer(triggerNode?.component || "");
   const eventInfo = buildEventInfo(event);
   const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "Run" };
   const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions) : "queued";
@@ -64,9 +64,9 @@ export function RunRowHeader({
     } as CanvasesCanvasNodeExecution);
   }, [event.createdAt, executions]);
 
-  const triggerIconSrc = getHeaderIconSrc(triggerNode?.trigger?.name);
+  const triggerIconSrc = getHeaderIconSrc(triggerNode?.component);
   const triggerIconSlug = resolveNodeIconSlug(triggerNode, componentIconMap);
-  const triggerName = triggerNode?.name || triggerNode?.trigger?.name || "Trigger";
+  const triggerName = triggerNode?.name || triggerNode?.component || "Trigger";
 
   return (
     <button

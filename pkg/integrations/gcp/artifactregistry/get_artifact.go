@@ -275,8 +275,6 @@ func (c *GetArtifact) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(getArtifactOutputChannel, getArtifactPayloadType, []any{result})
 }
 
-func (c *GetArtifact) Actions() []core.Action                  { return nil }
-func (c *GetArtifact) HandleAction(_ core.ActionContext) error { return nil }
 func (c *GetArtifact) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -284,4 +282,12 @@ func (c *GetArtifact) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *GetArtifact) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *GetArtifact) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *GetArtifact) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetArtifact) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }
