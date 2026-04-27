@@ -173,6 +173,7 @@ func (c *Client) GetIncident(id string) (*Incident, error) {
 
 func (c *Client) UpdateIncident(id string, title, severity *string, labels []string, isDrill *bool) (*Incident, error) {
 	var incident *Incident
+	normalizedLabels := incidentLabelsFromStrings(labels)
 	if title != nil {
 		updated, err := c.updateIncidentTitle(id, *title)
 		if err != nil {
@@ -189,7 +190,7 @@ func (c *Client) UpdateIncident(id string, title, severity *string, labels []str
 		incident = updated
 	}
 
-	for _, label := range incidentLabelsFromStrings(labels) {
+	for _, label := range normalizedLabels {
 		if err := c.ensureIncidentLabelValue(label); err != nil {
 			return nil, err
 		}
@@ -197,10 +198,6 @@ func (c *Client) UpdateIncident(id string, title, severity *string, labels []str
 		updated, err := c.addIncidentLabel(id, label)
 		if err != nil {
 			if isDuplicateIncidentLabelError(err) {
-				if incident == nil {
-					incident = &Incident{IncidentID: strings.TrimSpace(id)}
-					c.decorateIncident(incident)
-				}
 				continue
 			}
 			return nil, err
@@ -217,6 +214,9 @@ func (c *Client) UpdateIncident(id string, title, severity *string, labels []str
 	}
 
 	if incident == nil {
+		if len(normalizedLabels) > 0 {
+			return c.GetIncident(id)
+		}
 		return nil, fmt.Errorf("at least one incident field must be provided")
 	}
 

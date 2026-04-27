@@ -10,10 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const (
-	legacyDefaultRoomPrefix = "incident"
-)
-
 var grafanaIncidentStatusOptions = []configuration.FieldOption{
 	{Label: "Active", Value: incidentStatusActive},
 	{Label: "Resolved", Value: incidentStatusResolved},
@@ -189,7 +185,7 @@ func executeDeclareIncident(ctx core.ExecutionContext, spec declareIncidentSpec,
 		Title:               spec.Title,
 		Severity:            spec.Severity,
 		Labels:              spec.Labels,
-		RoomPrefix:          legacyDefaultRoomPrefix,
+		RoomPrefix:          incidentDefaultRoomPrefix,
 		IsDrill:             isDrill,
 		Status:              spec.Status,
 		InitialStatusUpdate: spec.Description,

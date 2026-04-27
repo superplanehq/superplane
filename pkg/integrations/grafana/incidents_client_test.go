@@ -221,6 +221,19 @@ func Test__Client__UpdateIncident__IgnoresDuplicateLabelErrors(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{"error":"label already exists"}`)),
 			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"incident": {
+						"incidentID": "incident-123",
+						"title": "API latency",
+						"severity": "minor",
+						"status": "active",
+						"labels": [{"label": "prod"}],
+						"isDrill": true
+					}
+				}`)),
+			},
 		},
 	}
 	client := &Client{BaseURL: "https://grafana.example.com", APIToken: "token", http: httpContext}
@@ -228,10 +241,17 @@ func Test__Client__UpdateIncident__IgnoresDuplicateLabelErrors(t *testing.T) {
 	incident, err := client.UpdateIncident("incident-123", nil, nil, []string{"prod"}, nil)
 	require.NoError(t, err)
 	require.Equal(t, "incident-123", incident.IncidentID)
+	require.Equal(t, "API latency", incident.Title)
+	require.Equal(t, "minor", incident.Severity)
+	require.Equal(t, "active", incident.Status)
+	require.True(t, incident.IsDrill)
+	require.Len(t, incident.Labels, 1)
+	require.Equal(t, "prod", incident.Labels[0].Label)
 
-	require.Len(t, httpContext.Requests, 2)
+	require.Len(t, httpContext.Requests, 3)
 	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/FieldsService.AddLabelValue", httpContext.Requests[0].URL.Path)
 	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.AddLabel", httpContext.Requests[1].URL.Path)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.GetIncident", httpContext.Requests[2].URL.Path)
 }
 
 func Test__Client__AddIncidentActivity__UsesUserNote(t *testing.T) {

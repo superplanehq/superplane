@@ -157,6 +157,64 @@ func Test__UpdateIncident__Execute__AddsLabels(t *testing.T) {
 	require.Equal(t, map[string]any{"key": "tags", "label": "prod"}, payload["label"])
 }
 
+func Test__UpdateIncident__Execute__EmitsFullIncidentWhenLabelsAlreadyExist(t *testing.T) {
+	component := &UpdateIncident{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"duplicate field option"}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"label already exists"}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"incident":{
+						"incidentID":"incident-123",
+						"title":"API latency",
+						"severity":"minor",
+						"status":"active",
+						"labels":[{"label":"prod"}],
+						"isDrill":true
+					}
+				}`)),
+			},
+		},
+	}
+	execCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"incident": "incident-123",
+			"labels":   []any{"prod"},
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.True(t, execCtx.Passed)
+	require.Equal(t, "grafana.incident.updated", execCtx.Type)
+	require.Len(t, httpCtx.Requests, 3)
+	require.Equal(t, "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.GetIncident", httpCtx.Requests[2].URL.Path)
+
+	require.Len(t, execCtx.Payloads, 1)
+	emitted := execCtx.Payloads[0].(map[string]any)
+	out := emitted["data"].(*Incident)
+	require.Equal(t, "incident-123", out.IncidentID)
+	require.Equal(t, "API latency", out.Title)
+	require.Equal(t, "minor", out.Severity)
+	require.Equal(t, "active", out.Status)
+	require.True(t, out.IsDrill)
+	require.Len(t, out.Labels, 1)
+	require.Equal(t, "prod", out.Labels[0].Label)
+	require.Equal(t, "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123", out.IncidentURL)
+}
+
 func Test__UpdateIncident__Setup__RejectsEmptyLabels(t *testing.T) {
 	err := (&UpdateIncident{}).Setup(core.SetupContext{
 		Configuration: map[string]any{
