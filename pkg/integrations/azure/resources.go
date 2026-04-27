@@ -20,6 +20,8 @@ const (
 	ResourceTypeSubnetDropdown            = "azure.subnet"
 	ResourceTypeStorageAccountDropdown    = "azure.storageAccount"
 	ResourceTypeContainerRegistryDropdown = "azure.containerRegistry"
+	ResourceTypeFunctionAppDropdown       = "azure.functionApp"
+	ResourceTypeFunctionDropdown          = "azure.function"
 )
 
 type armResourceGroup struct {
@@ -429,6 +431,141 @@ func listContainerRegistries(provider *AzureProvider, resourceGroup string) ([]c
 
 	sort.Slice(resources, func(i, j int) bool {
 		return resources[i].Name < resources[j].Name
+	})
+
+	return resources, nil
+}
+
+type armFunctionAppProperties struct {
+	DefaultHostName string `json:"defaultHostName"`
+}
+
+type armFunctionApp struct {
+	Name       string                    `json:"name"`
+	ID         string                    `json:"id"`
+	Kind       string                    `json:"kind"`
+	Properties *armFunctionAppProperties `json:"properties"`
+}
+
+func getFunctionAppHostname(ctx context.Context, provider *AzureProvider, resourceGroup, functionApp string) (string, error) {
+	getURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Web/sites/%s?api-version=2024-04-01",
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, functionApp)
+
+	var app armFunctionApp
+	if err := provider.getClient().get(ctx, getURL, &app); err != nil {
+		return "", fmt.Errorf("failed to get function app: %w", err)
+	}
+
+	if app.Properties == nil || app.Properties.DefaultHostName == "" {
+		return "", fmt.Errorf("defaultHostName not found for function app %s", functionApp)
+	}
+
+	return app.Properties.DefaultHostName, nil
+}
+
+func (a *AzureIntegration) ListFunctionApps(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure function apps for resourceGroup=%s", resourceGroup)
+	provider, err := newProvider(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+	return listFunctionApps(provider, resourceGroup)
+}
+
+func listFunctionApps(provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
+	var listURL string
+	if resourceGroup != "" {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Web/sites?api-version=2024-04-01",
+			provider.getClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup)
+	} else {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Web/sites?api-version=2024-04-01",
+			provider.getClient().getBaseURL(), provider.GetSubscriptionID())
+	}
+
+	items, err := provider.getClient().listAll(context.Background(), listURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list function apps: %w", err)
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, raw := range items {
+		var app armFunctionApp
+		if err := json.Unmarshal(raw, &app); err != nil || app.Name == "" {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(app.Kind), "functionapp") {
+			continue
+		}
+
+		id := app.Name
+		if app.ID != "" {
+			id = app.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeFunctionAppDropdown,
+			Name: app.Name,
+			ID:   id,
+		})
+	}
+
+	sort.Slice(resources, func(i, j int) bool {
+		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+	})
+
+	return resources, nil
+}
+
+type armFunction struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+func (a *AzureIntegration) ListFunctions(ctx core.ListResourcesContext, resourceGroup, functionApp string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure functions for resourceGroup=%s functionApp=%s", resourceGroup, functionApp)
+	if resourceGroup == "" || functionApp == "" {
+		return []core.IntegrationResource{}, nil
+	}
+	provider, err := newProvider(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+	return listFunctions(provider, resourceGroup, functionApp)
+}
+
+func listFunctions(provider *AzureProvider, resourceGroup, functionApp string) ([]core.IntegrationResource, error) {
+	resourceGroup = azureResourceName(resourceGroup)
+	functionApp = azureResourceName(functionApp)
+
+	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Web/sites/%s/functions?api-version=2024-04-01",
+		provider.getClient().getBaseURL(), provider.GetSubscriptionID(), resourceGroup, functionApp)
+
+	items, err := provider.getClient().listAll(context.Background(), listURL)
+	if err != nil {
+		if isARMNotFound(err) {
+			return []core.IntegrationResource{}, nil
+		}
+		return nil, fmt.Errorf("failed to list functions: %w", err)
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, raw := range items {
+		var fn armFunction
+		if err := json.Unmarshal(raw, &fn); err != nil || fn.Name == "" {
+			continue
+		}
+
+		name := path.Base(fn.Name)
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeFunctionDropdown,
+			Name: name,
+			ID:   fn.ID,
+		})
+	}
+
+	sort.Slice(resources, func(i, j int) bool {
+		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
 	})
 
 	return resources, nil
