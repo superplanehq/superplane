@@ -122,38 +122,17 @@ func (c *GetInstance) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payload := instanceToMap(instance)
-	addInstanceIPAddresses(client, instance, payload)
+	enrichInstanceWithVNICIPs(ctx.Logger, client, instance, payload)
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, GetInstancePayloadType, []any{payload})
 }
 
-func addInstanceIPAddresses(client *Client, instance *Instance, payload map[string]any) {
-	attachments, err := client.ListVNICAttachments(instance.CompartmentID, instance.ID)
-	if err != nil || len(attachments) == 0 {
-		return
-	}
-
-	for _, att := range attachments {
-		if att.LifecycleState != "ATTACHED" || att.VNICID == "" {
-			continue
-		}
-
-		vnic, err := client.GetVNIC(att.VNICID)
-		if err != nil {
-			return
-		}
-		payload["publicIp"] = vnic.PublicIP
-		payload["privateIp"] = vnic.PrivateIP
-		return
-	}
+func (c *GetInstance) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (c *GetInstance) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetInstance) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+func (c *GetInstance) HandleHook(ctx core.ActionHookContext) error {
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (c *GetInstance) Cancel(ctx core.ExecutionContext) error {

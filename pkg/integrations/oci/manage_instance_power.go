@@ -33,10 +33,11 @@ type ManageInstancePowerSpec struct {
 }
 
 type ManageInstancePowerMetadata struct {
-	InstanceID  string `json:"instanceId" mapstructure:"instanceId"`
-	Action      string `json:"action" mapstructure:"action"`
-	TargetState string `json:"targetState" mapstructure:"targetState"`
-	PollErrors  int    `json:"pollErrors" mapstructure:"pollErrors"`
+	InstanceID   string `json:"instanceId" mapstructure:"instanceId"`
+	Action       string `json:"action" mapstructure:"action"`
+	TargetState  string `json:"targetState" mapstructure:"targetState"`
+	PollErrors   int    `json:"pollErrors" mapstructure:"pollErrors"`
+	PollAttempts int    `json:"pollAttempts" mapstructure:"pollAttempts"`
 }
 
 func (c *ManageInstancePower) Name() string {
@@ -174,20 +175,20 @@ func (c *ManageInstancePower) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)
 }
 
-func (c *ManageInstancePower) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *ManageInstancePower) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *ManageInstancePower) HandleAction(ctx core.ActionContext) error {
+func (c *ManageInstancePower) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (c *ManageInstancePower) poll(ctx core.ActionContext) error {
+func (c *ManageInstancePower) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -219,12 +220,16 @@ func (c *ManageInstancePower) poll(ctx core.ActionContext) error {
 	}
 
 	metadata.PollErrors = 0
+	metadata.PollAttempts++
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
 
 	if instance.LifecycleState == metadata.TargetState {
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, ManageInstancePowerPayloadType, []any{instanceToMap(instance)})
+	}
+	if metadata.PollAttempts >= maxPollAttempts {
+		return fmt.Errorf("timed out waiting for instance %s to reach %s after %d poll attempts (state: %s)", metadata.InstanceID, metadata.TargetState, metadata.PollAttempts, instance.LifecycleState)
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)

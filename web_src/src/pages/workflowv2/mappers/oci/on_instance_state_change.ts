@@ -4,6 +4,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import type { TriggerProps } from "@/ui/trigger";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import ociIcon from "@/assets/icons/integrations/oci.svg";
+import { compactDetails } from "./base";
 
 interface OciInstanceStateChangeEvent {
   eventType?: string;
@@ -104,16 +105,4 @@ function getTimeDetail(
   }
 
   return ["Triggered At", undefined];
-}
-
-function compactDetails(entries: Array<[string, string | undefined]>): Record<string, string> {
-  const details: Record<string, string> = {};
-
-  for (const [key, value] of entries) {
-    if (value) {
-      details[key] = value;
-    }
-  }
-
-  return details;
 }

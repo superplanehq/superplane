@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -144,7 +143,11 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to set up webhook URL: %w", err)
 	}
-	ruleName := fmt.Sprintf("superplane-instance-state-change-%s", path.Base(webhookURL))
+	webhookID, err := extractWebhookID(webhookURL)
+	if err != nil {
+		return err
+	}
+	ruleName := fmt.Sprintf("superplane-instance-state-change-%s", webhookID)
 	rule, err := client.CreateEventsRule(
 		config.CompartmentID,
 		ruleName,
@@ -168,12 +171,12 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnInstanceStateChange) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnInstanceStateChange) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnInstanceStateChange) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+func (t *OnInstanceStateChange) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (t *OnInstanceStateChange) Cleanup(ctx core.TriggerContext) error {
@@ -205,28 +208,13 @@ func (t *OnInstanceStateChange) HandleWebhook(ctx core.WebhookRequestContext) (i
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if confirmURL := ctx.Headers.Get("X-OCI-NS-ConfirmationURL"); confirmURL != "" {
+		return confirmONSSubscription(ctx, confirmURL)
+	}
+
 	var envelope map[string]any
 	if err := json.Unmarshal(ctx.Body, &envelope); err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("failed to parse webhook body: %w", err)
-	}
-
-	if confirmURL := ctx.Headers.Get("X-OCI-NS-ConfirmationURL"); confirmURL != "" {
-		if err := validateONSConfirmationURL(confirmURL); err != nil {
-			return http.StatusBadRequest, nil, fmt.Errorf("refusing ONS confirmation URL: %w", err)
-		}
-		req, err := http.NewRequest(http.MethodGet, confirmURL, nil)
-		if err != nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("failed to build ONS confirmation request: %w", err)
-		}
-		resp, err := ctx.HTTP.Do(req)
-		if err != nil {
-			return http.StatusInternalServerError, nil, fmt.Errorf("failed to confirm ONS subscription: %w", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return http.StatusInternalServerError, nil, fmt.Errorf("ONS confirmation returned %d", resp.StatusCode)
-		}
-		return http.StatusOK, nil, nil
 	}
 
 	eventType, _ := envelope["eventType"].(string)

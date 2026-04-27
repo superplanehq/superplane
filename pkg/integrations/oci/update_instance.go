@@ -174,12 +174,12 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, UpdateInstancePayloadType, []any{instanceToMap(instance)})
 }
 
-func (c *UpdateInstance) Actions() []core.Action {
-	return []core.Action{}
+func (c *UpdateInstance) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (c *UpdateInstance) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+func (c *UpdateInstance) HandleHook(ctx core.ActionHookContext) error {
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (c *UpdateInstance) Cancel(ctx core.ExecutionContext) error {

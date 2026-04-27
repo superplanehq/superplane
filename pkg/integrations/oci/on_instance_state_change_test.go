@@ -2,6 +2,7 @@ package oci
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 
@@ -22,7 +23,7 @@ func Test__OnInstanceStateChange__HandleWebhook_ConfirmsSubscription(t *testing.
 	headers.Set("X-OCI-NS-ConfirmationURL", "https://notification.eu-frankfurt-1.oraclecloud.com/confirm")
 
 	status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-		Body:    []byte(`{}`),
+		Body:    []byte(`not-json`),
 		HTTP:    httpCtx,
 		Events:  &contexts.EventContext{},
 		Headers: headers,
@@ -32,6 +33,32 @@ func Test__OnInstanceStateChange__HandleWebhook_ConfirmsSubscription(t *testing.
 	assert.Equal(t, http.StatusOK, status)
 	require.Len(t, httpCtx.Requests, 1)
 	assert.Equal(t, "https://notification.eu-frankfurt-1.oraclecloud.com/confirm", httpCtx.Requests[0].URL.String())
+}
+
+func Test__OnInstanceStateChange__Setup_UsesWebhookPathIDForRuleName(t *testing.T) {
+	trigger := &OnInstanceStateChange{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			ociMockResponse(http.StatusOK, `{"id":"ocid1.eventsrule.oc1.test"}`),
+		},
+	}
+
+	err := trigger.Setup(core.TriggerContext{
+		Configuration: map[string]any{"compartmentId": testCompartmentID},
+		HTTP:          httpCtx,
+		Integration:   ociIntegrationContext(),
+		Metadata:      &contexts.MetadataContext{},
+		Webhook:       fixedNodeWebhookContext{url: "https://example.com/api/v1/webhooks/webhook-id?token=abc#frag"},
+		Logger:        ociLogger(),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Contains(t, httpCtx.Requests[0].URL.String(), "/20181201/rules")
+	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `"displayName":"superplane-instance-state-change-webhook-id"`)
+	assert.NotContains(t, string(body), "token=abc")
 }
 
 func Test__OnInstanceStateChange__HandleWebhook_IgnoresUnknownEventTypes(t *testing.T) {
@@ -121,4 +148,28 @@ func instanceStateChangeEventBody(t *testing.T, eventType, compartmentID string)
 	})
 	require.NoError(t, err)
 	return body
+}
+
+type fixedNodeWebhookContext struct {
+	url string
+}
+
+func (w fixedNodeWebhookContext) Setup() (string, error) {
+	return w.url, nil
+}
+
+func (w fixedNodeWebhookContext) GetSecret() ([]byte, error) {
+	return nil, nil
+}
+
+func (w fixedNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+
+func (w fixedNodeWebhookContext) SetSecret(secret []byte) error {
+	return nil
+}
+
+func (w fixedNodeWebhookContext) GetBaseURL() string {
+	return "http://localhost:3000/api/v1"
 }

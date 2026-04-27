@@ -56,7 +56,7 @@ func Test__DeleteInstance__PollEmitsWhenTerminated(t *testing.T) {
 	}
 	executionState := &contexts.ExecutionStateContext{}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:        "poll",
 		HTTP:        httpCtx,
 		Integration: ociIntegrationContext(),
@@ -86,7 +86,7 @@ func Test__DeleteInstance__PollTreats404AsTerminated(t *testing.T) {
 	}
 	executionState := &contexts.ExecutionStateContext{}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:        "poll",
 		HTTP:        httpCtx,
 		Integration: ociIntegrationContext(),
@@ -115,7 +115,7 @@ func Test__DeleteInstance__PollHandlesTransientErrors(t *testing.T) {
 	}
 	requests := &contexts.RequestContext{}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           "poll",
 		HTTP:           httpCtx,
 		Integration:    ociIntegrationContext(),
@@ -138,7 +138,7 @@ func Test__DeleteInstance__PollStopsAfterMaxErrors(t *testing.T) {
 		},
 	}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:        "poll",
 		HTTP:        httpCtx,
 		Integration: ociIntegrationContext(),
@@ -152,4 +152,28 @@ func Test__DeleteInstance__PollStopsAfterMaxErrors(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "giving up polling instance")
+}
+
+func Test__DeleteInstance__PollStopsAfterMaxAttempts(t *testing.T) {
+	component := &DeleteInstance{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			ociMockResponse(http.StatusOK, ociInstanceBody(instanceStateTerminating)),
+		},
+	}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name:        "poll",
+		HTTP:        httpCtx,
+		Integration: ociIntegrationContext(),
+		Metadata: &contexts.MetadataContext{
+			Metadata: DeleteInstanceMetadata{InstanceID: testInstanceID, PollAttempts: maxPollAttempts - 1},
+		},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Logger:         ociLogger(),
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "timed out waiting for instance")
 }

@@ -22,8 +22,9 @@ type DeleteInstanceSpec struct {
 }
 
 type DeleteInstanceMetadata struct {
-	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
-	PollErrors int    `json:"pollErrors" mapstructure:"pollErrors"`
+	InstanceID   string `json:"instanceId" mapstructure:"instanceId"`
+	PollErrors   int    `json:"pollErrors" mapstructure:"pollErrors"`
+	PollAttempts int    `json:"pollAttempts" mapstructure:"pollAttempts"`
 }
 
 func (c *DeleteInstance) Name() string {
@@ -135,20 +136,20 @@ func (c *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)
 }
 
-func (c *DeleteInstance) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *DeleteInstance) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *DeleteInstance) HandleAction(ctx core.ActionContext) error {
+func (c *DeleteInstance) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (c *DeleteInstance) poll(ctx core.ActionContext) error {
+func (c *DeleteInstance) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -184,6 +185,7 @@ func (c *DeleteInstance) poll(ctx core.ActionContext) error {
 	}
 
 	metadata.PollErrors = 0
+	metadata.PollAttempts++
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
@@ -191,11 +193,14 @@ func (c *DeleteInstance) poll(ctx core.ActionContext) error {
 	if instance.LifecycleState == instanceStateTerminated {
 		return c.emitTerminated(ctx, metadata.InstanceID)
 	}
+	if metadata.PollAttempts >= maxPollAttempts {
+		return fmt.Errorf("timed out waiting for instance %s to terminate after %d poll attempts (state: %s)", metadata.InstanceID, metadata.PollAttempts, instance.LifecycleState)
+	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, createInstancePollInterval)
 }
 
-func (c *DeleteInstance) emitTerminated(ctx core.ActionContext, instanceID string) error {
+func (c *DeleteInstance) emitTerminated(ctx core.ActionHookContext, instanceID string) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteInstancePayloadType, []any{
 		map[string]any{
 			"instanceId":     instanceID,
