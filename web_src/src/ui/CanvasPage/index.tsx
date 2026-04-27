@@ -35,12 +35,11 @@ import {
 } from "react";
 
 import type {
-  BlueprintsBlueprint,
   CanvasChangesetChange,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  ComponentsComponent,
+  SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
@@ -312,9 +311,8 @@ export interface CanvasPageProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
+  components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
 
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -670,7 +668,7 @@ function CanvasPage(props: CanvasPageProps) {
     (nodeId: string) => {
       // Check if this is a placeholder - if so, open building blocks sidebar instead
       const workflowNode = props.workflowNodes?.find((n) => n.id === nodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isPlaceholder) {
         // For placeholders, open building blocks sidebar
@@ -814,7 +812,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Check if templateNodeId is a placeholder (persisted node) or legacy pending connection (local-only)
       const workflowNode = props.workflowNodes?.find((n) => n.id === templateNodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isPlaceholder && props.onPlaceholderConfigure) {
         // Handle placeholder node (persisted)
@@ -1256,7 +1254,6 @@ function CanvasPage(props: CanvasPageProps) {
             workflowNodes={props.workflowNodes}
             components={props.components}
             triggers={props.triggers}
-            blueprints={props.blueprints}
             onHighlightedNodesChange={setHighlightedNodeIds}
             focusRequest={props.focusRequest}
             onExecutionChainHandled={props.onExecutionChainHandled}
@@ -1320,7 +1317,6 @@ function Sidebar({
   workflowNodes,
   components,
   triggers,
-  blueprints,
   onHighlightedNodesChange,
   focusRequest,
   onExecutionChainHandled,
@@ -1369,9 +1365,8 @@ function Sidebar({
   ) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
+  components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
@@ -1392,7 +1387,7 @@ function Sidebar({
       return false;
     }
     const selectedNode = workflowNodes.find((node) => node.id === state.componentSidebar.selectedNodeId);
-    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.widget?.name === "annotation";
+    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.component === "annotation";
   }, [state.componentSidebar.selectedNodeId, workflowNodes]);
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
@@ -1545,9 +1540,8 @@ function Sidebar({
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
-      components={components}
+      actions={components}
       triggers={triggers}
-      blueprints={blueprints}
       onHighlightedNodesChange={onHighlightedNodesChange}
       executionChainEventId={focusRequest?.executionChain?.eventId || null}
       executionChainExecutionId={focusRequest?.executionChain?.executionId || null}
@@ -1969,7 +1963,7 @@ function CanvasContent({
       const isAnnotationNode = clickedNode?.data?.type === "annotation";
 
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isAnnotationNode) {
         return;

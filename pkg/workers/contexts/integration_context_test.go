@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
@@ -82,8 +83,8 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		CompareConfigFunc: func(a, b any) (bool, error) {
 			return reflect.DeepEqual(a, b), nil
 		},
@@ -158,8 +159,8 @@ func Test__IntegrationContext_RequestWebhook_ReuseWebhookOnResave(t *testing.T) 
 
 	// CompareConfig always returns true — this is the Elastic/Prometheus/SendGrid model
 	// where all triggers for the integration share one webhook.
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		CompareConfigFunc: func(a, b any) (bool, error) {
 			return true, nil
 		},
@@ -233,8 +234,8 @@ func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *test
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		CompareConfigFunc: func(a, b any) (bool, error) {
 			return true, nil
 		},
@@ -337,9 +338,9 @@ func Test__IntegrationContext_ListSubscriptions_UsesOnEventsCallback(t *testing.
 	defer r.Close()
 
 	triggerName := "dummy.subscription-trigger"
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		Triggers: []core.Trigger{
-			support.NewDummyIntegrationTrigger(support.DummyIntegrationTriggerOptions{
+			impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{
 				Name: triggerName,
 				OnIntegrationMessage: func(ctx core.IntegrationMessageContext) error {
 					return ctx.Events.Emit("test.payload", map[string]any{"message": ctx.Message})

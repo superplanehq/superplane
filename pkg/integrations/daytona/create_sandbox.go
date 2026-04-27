@@ -271,20 +271,20 @@ func (c *CreateSandbox) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateSandbox) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *CreateSandbox) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *CreateSandbox) HandleAction(ctx core.ActionContext) error {
+func (c *CreateSandbox) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *CreateSandbox) poll(ctx core.ActionContext) error {
+func (c *CreateSandbox) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

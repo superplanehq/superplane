@@ -162,24 +162,23 @@ func (t *OnDocumentIndexed) Setup(ctx core.TriggerContext) error {
 	return ctx.Requests.ScheduleActionCall(checkConnectorAction, map[string]any{}, checkConnectorRetryInterval)
 }
 
-func (t *OnDocumentIndexed) Actions() []core.Action {
-	return []core.Action{
+func (t *OnDocumentIndexed) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           checkConnectorAction,
-			Description:    "Find the Kibana connector and create the Elasticsearch query rule",
-			UserAccessible: false,
+			Name: checkConnectorAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (t *OnDocumentIndexed) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnDocumentIndexed) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	if ctx.Name == checkConnectorAction {
 		return nil, t.checkConnectorAndCreateRule(ctx)
 	}
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+	return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (t *OnDocumentIndexed) checkConnectorAndCreateRule(ctx core.TriggerActionContext) error {
+func (t *OnDocumentIndexed) checkConnectorAndCreateRule(ctx core.TriggerHookContext) error {
 	var config OnDocumentIndexedConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)

@@ -202,12 +202,12 @@ func requestWebhook(ctx core.TriggerContext, compartmentID, topicID string) erro
 	})
 }
 
-func (t *OnComputeInstanceCreated) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnComputeInstanceCreated) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnComputeInstanceCreated) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+func (t *OnComputeInstanceCreated) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnComputeInstanceCreated) Cleanup(ctx core.TriggerContext) error {

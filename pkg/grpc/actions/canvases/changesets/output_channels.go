@@ -74,12 +74,12 @@ func listComponentOutputChannels(registry *registry.Registry, sourceNode models.
 		return nil, fmt.Errorf("%w: component reference is required", errUnresolvableSourceNodeOutputChannels)
 	}
 
-	component, err := registry.GetComponent(sourceNode.Ref.Component.Name)
+	action, err := registry.GetAction(sourceNode.Ref.Component.Name)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", errUnresolvableSourceNodeOutputChannels, err)
 	}
 
-	outputChannels := component.OutputChannels(sourceNode.Configuration)
+	outputChannels := action.OutputChannels(sourceNode.Configuration)
 	if len(outputChannels) > 0 {
 		return outputChannels, nil
 	}

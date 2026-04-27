@@ -162,14 +162,6 @@ func (c *GetAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetAlert) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetAlert) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetAlert) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -182,4 +174,12 @@ func sanitizeGetAlertConfiguration(config GetAlertConfiguration) GetAlertConfigu
 	config.AlertName = strings.TrimSpace(config.AlertName)
 	config.State = strings.ToLower(strings.TrimSpace(config.State))
 	return config
+}
+
+func (c *GetAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetAlert) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

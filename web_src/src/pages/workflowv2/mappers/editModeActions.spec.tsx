@@ -70,7 +70,7 @@ function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): Co
       groups: [],
     },
     actions: {
-      invokeNodeExecutionAction: vi.fn(),
+      invokeNodeExecutionHook: vi.fn(),
     },
     ...overrides,
   };

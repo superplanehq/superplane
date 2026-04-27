@@ -20,7 +20,7 @@ type appDeploymentMetadata struct {
 }
 
 // pollDeployment polls a deployment's phase and emits, fails, or reschedules accordingly.
-func pollDeployment(ctx core.ActionContext, eventType string) error {
+func pollDeployment(ctx core.ActionHookContext, eventType string) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

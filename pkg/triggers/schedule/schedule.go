@@ -400,25 +400,25 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (s *Schedule) Actions() []core.Action {
-	return []core.Action{
+func (s *Schedule) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "emitEvent",
-			UserAccessible: false,
+			Name: "emitEvent",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (s *Schedule) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (s *Schedule) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "emitEvent":
 		return nil, s.emitEvent(ctx)
 	}
 
-	return nil, fmt.Errorf("action %s not supported", ctx.Name)
+	return nil, fmt.Errorf("hook %s not supported", ctx.Name)
 }
 
-func (s *Schedule) emitEvent(ctx core.TriggerActionContext) error {
+func (s *Schedule) emitEvent(ctx core.TriggerHookContext) error {
 	spec := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {

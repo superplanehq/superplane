@@ -129,18 +129,18 @@ func (l *ListNotes) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 	return ctx.DefaultProcessing()
 }
 
-func (l *ListNotes) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *ListNotes) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (l *ListNotes) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (l *ListNotes) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (l *ListNotes) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListNotes) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

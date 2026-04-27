@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func InvokeNodeExecutionAction(
+func InvokeNodeExecutionHook(
 	ctx context.Context,
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
@@ -29,9 +29,9 @@ func InvokeNodeExecutionAction(
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
 	executionID uuid.UUID,
-	actionName string,
+	hookName string,
 	parameters map[string]any,
-) (*pb.InvokeNodeExecutionActionResponse, error) {
+) (*pb.InvokeNodeExecutionHookResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -60,18 +60,17 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("node is not a component node")
 	}
 
-	component, err := registry.GetComponent(node.Ref.Data().Component.Name)
+	hookProvider, hookDef, err := registry.FindActionHook(node.Ref.Data().Component.Name, hookName)
 	if err != nil {
-		return nil, fmt.Errorf("component not found: %w", err)
+		return nil, fmt.Errorf("hook not found: %w", err)
 	}
 
-	actionDef := findAction(component, actionName)
-	if actionDef == nil {
-		return nil, fmt.Errorf("action '%s' not found for component '%s'", actionName, node.Ref.Data().Component.Name)
+	if hookDef.Type != core.HookTypeUser {
+		return nil, fmt.Errorf("hook '%s' cannot be invoked", hookName)
 	}
 
-	if err := configuration.ValidateConfiguration(actionDef.Parameters, parameters); err != nil {
-		return nil, fmt.Errorf("action parameter validation failed: %w", err)
+	if err := configuration.ValidateConfiguration(hookDef.Parameters, parameters); err != nil {
+		return nil, fmt.Errorf("hook parameters validation failed: %w", err)
 	}
 
 	user, err := models.FindActiveUserByID(orgID.String(), userID)
@@ -86,8 +85,8 @@ func InvokeNodeExecutionAction(
 
 	tx := database.Conn()
 	logger := logging.ForExecution(execution, nil)
-	actionCtx := core.ActionContext{
-		Name:           actionName,
+	actionCtx := core.ActionHookContext{
+		Name:           hookName,
 		Parameters:     parameters,
 		Configuration:  node.Configuration.Data(),
 		HTTP:           registry.HTTPContext(),
@@ -110,7 +109,7 @@ func InvokeNodeExecutionAction(
 	}
 
 	actionCtx.Logger = logger
-	err = component.HandleAction(actionCtx)
+	err = hookProvider.HandleHook(actionCtx)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
 	}
@@ -125,15 +124,5 @@ func InvokeNodeExecutionAction(
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
-	return &pb.InvokeNodeExecutionActionResponse{}, nil
-}
-
-func findAction(component core.Component, actionName string) *core.Action {
-	for _, action := range component.Actions() {
-		if action.Name == actionName {
-			return &action
-		}
-	}
-
-	return nil
+	return &pb.InvokeNodeExecutionHookResponse{}, nil
 }

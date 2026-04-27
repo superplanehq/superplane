@@ -124,11 +124,11 @@ func (r *OnRelease) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (r *OnRelease) Actions() []core.Action {
-	return []core.Action{}
+func (r *OnRelease) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (r *OnRelease) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (r *OnRelease) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

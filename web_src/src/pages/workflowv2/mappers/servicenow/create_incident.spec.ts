@@ -24,7 +24,7 @@ function makeContext(overrides: Partial<NodeInfo> = {}): ComponentBaseContext {
     componentDefinition: DEFINITION,
     lastExecutions: [],
     currentUser: undefined,
-    actions: { invokeNodeExecutionAction: async () => {} },
+    actions: { invokeNodeExecutionHook: async () => {} },
   };
 }
 

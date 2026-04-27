@@ -7,13 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Test__DescribeTrigger(t *testing.T) {
 	r := support.Setup(t)
-	r.Registry.Triggers["test"] = support.NewDummyTrigger(support.DummyTriggerOptions{})
+	r.Registry.Triggers["test"] = impl.NewDummyTrigger(impl.DummyTriggerOptions{})
 
 	t.Run("trigger does not exist -> error", func(t *testing.T) {
 		_, err := DescribeTrigger(context.Background(), r.Registry, "nope")

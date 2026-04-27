@@ -77,8 +77,8 @@ func (t *Telegram) Configuration() []configuration.Field {
 	}
 }
 
-func (t *Telegram) Components() []core.Component {
-	return []core.Component{
+func (t *Telegram) Actions() []core.Action {
+	return []core.Action{
 		&SendMessage{},
 		&WaitForButtonClick{},
 	}
@@ -271,14 +271,6 @@ func (t *Telegram) ListResources(resourceType string, ctx core.ListResourcesCont
 	return []core.IntegrationResource{}, nil
 }
 
-func (t *Telegram) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (t *Telegram) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (t *Telegram) handleCallbackQuery(ctx core.HTTPRequestContext, update Update) {
 	query := update.CallbackQuery
 	if query.Message == nil {
@@ -427,4 +419,12 @@ type MessageEntity struct {
 	Type   string `json:"type"`
 	Offset int    `json:"offset"`
 	Length int    `json:"length"`
+}
+
+func (t *Telegram) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (t *Telegram) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

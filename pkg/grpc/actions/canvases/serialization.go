@@ -6,13 +6,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -192,7 +191,7 @@ func canvasChangeRequestApproverTypeToProto(value string) pb.Canvas_ChangeManage
 	}
 }
 
-func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*compb.Node, error) {
+func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*componentpb.Node, error) {
 	serialized := actions.NodesToProto(nodes)
 	if len(serialized) == 0 {
 		return serialized, nil
@@ -236,7 +235,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	}
 
 	nodeIDs := make(map[string]bool)
-	nodeTypeByID := make(map[string]compb.Node_Type)
+	nodeTypeByID := make(map[string]componentpb.Node_Type)
 	nodeValidationErrors := make(map[string]string)
 
 	for i, node := range canvas.Spec.Nodes {
@@ -254,15 +253,14 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 		nodeIDs[node.Id] = true
 		nodeTypeByID[node.Id] = node.Type
-
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
 	// Find shadowed names within connected components
-	nodeWarnings := actions.FindShadowedNameWarnings(canvas.Spec.Nodes, canvas.Spec.Edges)
 	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
+	nodeWarnings := actions.FindShadowedNameWarnings(registry, canvas.Spec.Nodes, canvas.Spec.Edges)
 	nodesByID := make(map[string]models.Node, len(nodes))
 	for _, node := range nodes {
 		nodesByID[node.ID] = node
@@ -281,11 +279,11 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if nodeTypeByID[edge.SourceId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.SourceId] == componentpb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
-		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.TargetId] == componentpb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 
@@ -324,127 +322,37 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	return nodes, edges, nil
 }
 
-func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {
-	switch node.Type {
-	case compb.Node_TYPE_COMPONENT:
-		if node.Component == nil {
-			return fmt.Errorf("component reference is required for component ref type")
-		}
-
-		if node.Component.Name == "" {
-			return fmt.Errorf("component name is required")
-		}
-
-		component, err := findAndValidateComponent(registry, organizationID, node)
-		if err != nil {
-			return err
-		}
-
-		return configuration.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
-
-	case compb.Node_TYPE_BLUEPRINT:
-		if node.Blueprint == nil {
-			return fmt.Errorf("blueprint reference is required for blueprint ref type")
-		}
-
-		if node.Blueprint.Id == "" {
-			return fmt.Errorf("blueprint ID is required")
-		}
-
-		blueprint, err := models.FindBlueprint(organizationID, node.Blueprint.Id)
-		if err != nil {
-			return fmt.Errorf("blueprint %s not found", node.Blueprint.Id)
-		}
-
-		return configuration.ValidateConfiguration(blueprint.Configuration, node.Configuration.AsMap())
-
-	case compb.Node_TYPE_TRIGGER:
-		if node.Trigger == nil {
-			return fmt.Errorf("trigger reference is required for trigger ref type")
-		}
-
-		if node.Trigger.Name == "" {
-			return fmt.Errorf("trigger name is required")
-		}
-
-		trigger, err := findAndValidateTrigger(registry, organizationID, node)
-		if err != nil {
-			return err
-		}
-
-		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
-
-	case compb.Node_TYPE_WIDGET:
-		if node.Widget == nil {
-			return fmt.Errorf("widget reference is required for widget ref type")
-		}
-
-		if node.Widget.Name == "" {
-			return fmt.Errorf("widget name is required")
-		}
-
-		widget, err := findAndValidateWidget(registry, organizationID, node)
-		if err != nil {
-			return err
-		}
-
-		return configuration.ValidateConfiguration(widget.Configuration(), node.Configuration.AsMap())
-
-	default:
-		return fmt.Errorf("invalid node type: %s", node.Type)
+func validateNodeRef(registry *registry.Registry, organizationID string, node *componentpb.Node) error {
+	if node.Component == "" {
+		return fmt.Errorf("component name is required")
 	}
-}
 
-func findAndValidateTrigger(registry *registry.Registry, organizationID string, node *compb.Node) (core.Trigger, error) {
-	parts := strings.SplitN(node.Trigger.Name, ".", 2)
+	parts := strings.SplitN(node.Component, ".", 2)
 	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid trigger name: %s", node.Trigger.Name)
+		return fmt.Errorf("invalid component name: %s", node.Component)
 	}
 
-	if len(parts) == 1 {
-		return registry.GetTrigger(parts[0])
-	}
-
-	err := validateIntegration(organizationID, node.Integration)
+	configurable, err := registry.FindConfigurableComponent(node.Component)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return registry.GetIntegrationTrigger(parts[0], node.Trigger.Name)
+	if len(parts) > 1 {
+		err := validateIntegration(organizationID, node.Integration)
+		if err != nil {
+			return err
+		}
+	}
+
+	return configuration.ValidateConfiguration(configurable.Configuration(), node.Configuration.AsMap())
 }
 
-func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
-	if node.Widget != nil && node.Widget.Name == "" {
-		return nil, fmt.Errorf("widget name is required")
-	}
-
-	return registry.GetWidget(node.Widget.Name)
-}
-
-func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (core.Component, error) {
-	parts := strings.SplitN(node.Component.Name, ".", 2)
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid component name: %s", node.Component.Name)
-	}
-
-	if len(parts) == 1 {
-		return registry.GetComponent(parts[0])
-	}
-
-	err := validateIntegration(organizationID, node.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	return registry.GetIntegrationComponent(parts[0], node.Component.Name)
-}
-
-func validateIntegration(organizationID string, ref *compb.IntegrationRef) error {
-	if ref == nil || ref.Id == "" {
+func validateIntegration(organizationID string, ref *componentpb.IntegrationRef) error {
+	if ref == nil || ref.Id == nil {
 		return fmt.Errorf("integration is required")
 	}
 
-	integrationID, err := uuid.Parse(ref.Id)
+	integrationID, err := uuid.Parse(*ref.Id)
 	if err != nil {
 		return fmt.Errorf("invalid integration ID: %v", err)
 	}

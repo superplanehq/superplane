@@ -126,11 +126,11 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnPullRequest) Actions() []core.Action {
-	return []core.Action{}
+func (p *OnPullRequest) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *OnPullRequest) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPullRequest) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

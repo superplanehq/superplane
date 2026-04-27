@@ -240,18 +240,18 @@ func (c *DeleteRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return 200, nil, nil
 }
 
-func (c *DeleteRelease) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteRelease) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *DeleteRelease) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteRelease) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

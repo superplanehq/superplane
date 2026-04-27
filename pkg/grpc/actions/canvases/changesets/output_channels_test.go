@@ -36,6 +36,10 @@ func (c *testOutputChannelComponent) OutputChannels(any) []core.OutputChannel { 
 
 func (c *testOutputChannelComponent) Configuration() []configuration.Field { return nil }
 
+func (c *testOutputChannelComponent) Hooks() []core.Hook { return nil }
+
+func (c *testOutputChannelComponent) HandleHook(core.ActionHookContext) error { return nil }
+
 func (c *testOutputChannelComponent) Setup(core.SetupContext) error { return nil }
 
 func (c *testOutputChannelComponent) ProcessQueueItem(core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -43,10 +47,6 @@ func (c *testOutputChannelComponent) ProcessQueueItem(core.ProcessQueueContext) 
 }
 
 func (c *testOutputChannelComponent) Execute(core.ExecutionContext) error { return nil }
-
-func (c *testOutputChannelComponent) Actions() []core.Action { return nil }
-
-func (c *testOutputChannelComponent) HandleAction(core.ActionContext) error { return nil }
 
 func (c *testOutputChannelComponent) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
@@ -77,7 +77,7 @@ func TestValidateSourceNodeOutputChannel(t *testing.T) {
 	})
 
 	t.Run("wrong channel on resolvable component returns error", func(t *testing.T) {
-		reg.Components["test-component"] = &testOutputChannelComponent{
+		reg.Actions["test-action"] = &testOutputChannelComponent{
 			channels: []core.OutputChannel{
 				{Name: "success"},
 				{Name: "failure"},
@@ -90,7 +90,7 @@ func TestValidateSourceNodeOutputChannel(t *testing.T) {
 				ID:   "node-a",
 				Type: models.NodeTypeComponent,
 				Ref: models.NodeRef{
-					Component: &models.ComponentRef{Name: "test-component"},
+					Component: &models.ComponentRef{Name: "test-action"},
 				},
 			},
 			"default",

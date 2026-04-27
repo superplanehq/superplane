@@ -5,7 +5,6 @@ export type TypeFilter = "all" | "trigger" | "component";
 const TYPE_SORT_ORDER: Record<BuildingBlock["type"], number> = {
   trigger: 0,
   component: 1,
-  blueprint: 2,
 };
 
 /**

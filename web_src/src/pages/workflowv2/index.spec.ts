@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComponentsComponent, SuperplaneComponentsNode } from "@/api-client";
+import type { SuperplaneActionsAction, SuperplaneComponentsNode } from "@/api-client";
 import { makeCanvas, makeComponentsNode } from "@/test/factories";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
@@ -27,17 +27,15 @@ function makeNode(overrides: Partial<SuperplaneComponentsNode> = {}): Superplane
   return makeComponentsNode({
     id: "node-1",
     name: "Broken Component",
-    type: "TYPE_COMPONENT",
+    type: "TYPE_ACTION",
     position: { x: 10, y: 20 },
-    component: {
-      name: "approval",
-    },
+    component: "approval",
     configuration: {},
     ...overrides,
   });
 }
 
-function makeComponent(overrides: Partial<ComponentsComponent> = {}): ComponentsComponent {
+function makeComponent(overrides: Partial<SuperplaneActionsAction> = {}): SuperplaneActionsAction {
   return {
     name: "approval",
     label: "Approval",
@@ -45,7 +43,7 @@ function makeComponent(overrides: Partial<ComponentsComponent> = {}): Components
     color: "orange",
     outputChannels: [{ name: "default" }],
     ...overrides,
-  } as ComponentsComponent;
+  } as SuperplaneActionsAction;
 }
 
 function makeTriggerNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {
@@ -54,9 +52,7 @@ function makeTriggerNode(overrides: Partial<SuperplaneComponentsNode> = {}): Sup
     name: "Incoming Event",
     type: "TYPE_TRIGGER",
     position: { x: 0, y: 0 },
-    trigger: {
-      name: "webhook",
-    },
+    component: "webhook",
     configuration: {},
     ...overrides,
   });

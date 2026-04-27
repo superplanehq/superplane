@@ -134,8 +134,8 @@ func (a *AWS) Configuration() []configuration.Field {
 	}
 }
 
-func (a *AWS) Components() []core.Component {
-	return []core.Component{
+func (a *AWS) Actions() []core.Action {
+	return []core.Action{
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},
@@ -760,11 +760,11 @@ func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 	return true
 }
 
-func (a *AWS) Actions() []core.Action {
-	return []core.Action{
+func (a *AWS) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "provisionRule",
-			Description: "Provision an EventBridge rule",
+			Name: "provisionRule",
+			Type: core.HookTypeInternal,
 			Parameters: []configuration.Field{
 				{
 					Name:        "region",
@@ -792,17 +792,17 @@ func (a *AWS) Actions() []core.Action {
 	}
 }
 
-func (a *AWS) HandleAction(ctx core.IntegrationActionContext) error {
+func (a *AWS) HandleHook(ctx core.IntegrationHookContext) error {
 	switch ctx.Name {
 	case "provisionRule":
 		return a.handleProvisionRule(ctx)
 
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (a *AWS) handleProvisionRule(ctx core.IntegrationActionContext) error {
+func (a *AWS) handleProvisionRule(ctx core.IntegrationHookContext) error {
 	config := common.ProvisionRuleParameters{}
 	if err := mapstructure.Decode(ctx.Parameters, &config); err != nil {
 		return fmt.Errorf("failed to decode parameters: %v", err)

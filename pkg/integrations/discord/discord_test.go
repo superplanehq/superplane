@@ -158,7 +158,7 @@ func Test__Discord__ComponentsAndTriggers(t *testing.T) {
 	d := &Discord{}
 
 	componentNames := []string{}
-	for _, component := range d.Components() {
+	for _, component := range d.Actions() {
 		componentNames = append(componentNames, component.Name())
 	}
 

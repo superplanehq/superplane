@@ -22,7 +22,7 @@ const ChannelNameFound = "found"
 const ChannelNameNotFound = "notFound"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &ReadMemory{})
+	registry.RegisterAction(ComponentName, &ReadMemory{})
 }
 
 type ReadMemory struct{}
@@ -344,14 +344,6 @@ func (c *ReadMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (c *ReadMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ReadMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("readMemory does not support actions")
-}
-
 func (c *ReadMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -361,5 +353,13 @@ func (c *ReadMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 }
 
 func (c *ReadMemory) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *ReadMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ReadMemory) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

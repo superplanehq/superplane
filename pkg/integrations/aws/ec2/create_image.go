@@ -331,17 +331,16 @@ func (c *CreateImage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *CreateImage) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateImage) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "checkRuleAvailability",
-			Description:    "Check if the EventBridge rule is available",
-			UserAccessible: false,
+			Name: "checkRuleAvailability",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateImage) HandleAction(ctx core.ActionContext) error {
+func (c *CreateImage) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "checkRuleAvailability":
 		return c.checkRuleAvailability(ctx)
@@ -350,7 +349,7 @@ func (c *CreateImage) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CreateImage) checkRuleAvailability(ctx core.ActionContext) error {
+func (c *CreateImage) checkRuleAvailability(ctx core.ActionHookContext) error {
 	nodeMetadata := CreateImageNodeMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)

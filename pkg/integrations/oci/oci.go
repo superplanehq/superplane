@@ -114,8 +114,8 @@ func (o *OCI) Configuration() []configuration.Field {
 	}
 }
 
-func (o *OCI) Components() []core.Component {
-	return []core.Component{
+func (o *OCI) Actions() []core.Action {
+	return []core.Action{
 		&CreateComputeInstance{},
 	}
 }
@@ -192,14 +192,6 @@ func (o *OCI) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (o *OCI) HandleRequest(ctx core.HTTPRequestContext) {}
 
-func (o *OCI) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (o *OCI) HandleAction(ctx core.IntegrationActionContext) error {
-	return fmt.Errorf("unknown action: %s", ctx.Name)
-}
-
 func validateConfig(cfg Configuration) error {
 	if strings.TrimSpace(cfg.TenancyOCID) == "" {
 		return fmt.Errorf("tenancyOcid is required")
@@ -252,4 +244,12 @@ var allRegions = []configuration.FieldOption{
 	{Label: "me-abudhabi-1", Value: "me-abudhabi-1"},
 	{Label: "me-jeddah-1", Value: "me-jeddah-1"},
 	{Label: "af-johannesburg-1", Value: "af-johannesburg-1"},
+}
+
+func (o *OCI) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (o *OCI) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

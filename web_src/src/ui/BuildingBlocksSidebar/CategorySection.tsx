@@ -21,11 +21,9 @@ const TYPE_BADGE_COLOR: Record<string, string> = {
 const TYPE_LABEL: Record<string, string> = {
   trigger: "Trigger",
   component: "Action",
-  blueprint: "Blueprint",
 };
 
 function resolveIconSlug(block: BuildingBlock): string {
-  if (block.type === "blueprint") return "component";
   const firstPart = block.name?.split(".")[0];
   if (firstPart === "smtp") return "mail";
   return block.icon || "zap";

@@ -126,7 +126,7 @@ func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testin
 
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "action 'non-existent-action' not found for component 'noop'")
+	assert.Contains(t, err.Error(), "hook non-existent-action not found for action noop")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
@@ -391,7 +391,7 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	//
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "trigger not found")
+	assert.Contains(t, err.Error(), "trigger non-existent-trigger not registered")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
@@ -453,7 +453,7 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	//
 	err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "action 'non-existent-action' not found")
+	assert.Contains(t, err.Error(), "hook non-existent-action not found for trigger schedule")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }

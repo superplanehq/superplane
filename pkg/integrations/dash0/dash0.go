@@ -69,8 +69,8 @@ func (d *Dash0) Configuration() []configuration.Field {
 	}
 }
 
-func (d *Dash0) Components() []core.Component {
-	return []core.Component{
+func (d *Dash0) Actions() []core.Action {
+	return []core.Action{
 		&QueryPrometheus{},
 		&ListIssues{},
 		&CreateHTTPSyntheticCheck{},
@@ -274,10 +274,10 @@ func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(http.StatusOK)
 }
 
-func (d *Dash0) Actions() []core.Action {
-	return []core.Action{}
+func (d *Dash0) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *Dash0) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *Dash0) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

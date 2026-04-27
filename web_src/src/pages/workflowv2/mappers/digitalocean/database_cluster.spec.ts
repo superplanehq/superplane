@@ -77,7 +77,7 @@ function buildPropsContext(overrides?: Partial<ComponentBaseContext>): Component
       groups: [],
     },
     actions: {
-      invokeNodeExecutionAction: async () => {},
+      invokeNodeExecutionHook: async () => {},
     },
     ...overrides,
   };

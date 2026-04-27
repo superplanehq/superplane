@@ -57,7 +57,7 @@ function buildComponentCtx(nodeOverrides?: Partial<NodeInfo>): ComponentBaseCont
     },
     lastExecutions: [],
     currentUser: undefined,
-    actions: { invokeNodeExecutionAction: async () => {} },
+    actions: { invokeNodeExecutionHook: async () => {} },
   };
 }
 

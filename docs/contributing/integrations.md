@@ -271,11 +271,11 @@ func (t *OnEvent) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnEvent) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnEvent) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnEvent) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

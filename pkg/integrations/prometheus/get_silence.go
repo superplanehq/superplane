@@ -147,14 +147,6 @@ func (c *GetSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	return 200, nil, nil
 }
 
-func (c *GetSilence) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetSilence) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetSilence) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -170,4 +162,12 @@ func sanitizeGetSilenceConfiguration(config GetSilenceConfiguration) GetSilenceC
 		config.Silence = config.LegacySilenceID
 	}
 	return config
+}
+
+func (c *GetSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }
