@@ -62,7 +62,7 @@ export interface Release {
 
 export interface PullRequest {
   title?: string;
-  id?: number;
+  id?: string;
   number?: number;
   state?: string;
   draft?: boolean;
@@ -76,7 +76,7 @@ export interface PullRequest {
     ref: string;
   };
   user?: {
-    id: number;
+    id: string;
     login: string;
   };
   _links?: {
