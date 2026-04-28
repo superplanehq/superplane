@@ -108,7 +108,16 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(version)
+		if err := ctx.Renderer.Render(version); err != nil {
+			return err
+		}
+		spec := version.GetSpec()
+		for _, node := range spec.GetNodes() {
+			if node.GetErrorMessage() != "" {
+				return fmt.Errorf("canvas has node errors")
+			}
+		}
+		return nil
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -128,8 +137,22 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 				}
 			}
 		}
-		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
-		return err
+		_, _ = fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
+
+		hasErrors := false
+		for _, node := range spec.GetNodes() {
+			if msg := node.GetErrorMessage(); msg != "" {
+				_, _ = fmt.Fprintf(stdout, "Node %q error: %s\n", node.GetId(), msg)
+				hasErrors = true
+			}
+			if msg := node.GetWarningMessage(); msg != "" {
+				_, _ = fmt.Fprintf(stdout, "Node %q warning: %s\n", node.GetId(), msg)
+			}
+		}
+		if hasErrors {
+			return fmt.Errorf("canvas has node errors")
+		}
+		return nil
 	})
 }
 
