@@ -45,7 +45,9 @@ func dbPoolSize() int {
 	return size
 }
 
-func buildPostgresDSN(c DSNConfig, statementTimeoutMS, idleInTransactionMS string) string {
+func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Duration) string {
+	stmtMs := strconv.FormatInt(statementTimeout.Milliseconds(), 10)
+	idleMs := strconv.FormatInt(idleInTxTimeout.Milliseconds(), 10)
 	u := url.URL{
 		Scheme: "postgres",
 		Host:   net.JoinHostPort(c.Host, c.Port),
@@ -62,8 +64,8 @@ func buildPostgresDSN(c DSNConfig, statementTimeoutMS, idleInTransactionMS strin
 	// Applies to every pooled connection: aborts stuck statements and idle-in-transaction sessions.
 	options := fmt.Sprintf(
 		"-c statement_timeout=%s -c idle_in_transaction_session_timeout=%s",
-		statementTimeoutMS,
-		idleInTransactionMS,
+		stmtMs,
+		idleMs,
 	)
 	q.Set("options", options)
 	u.RawQuery = q.Encode()
@@ -87,8 +89,8 @@ func connect() *gorm.DB {
 		ApplicationName: os.Getenv("APPLICATION_NAME"),
 	}
 
-	dbCfg := Load().Database
-	dsn := buildPostgresDSN(c, dbCfg.StatementTimeoutMS, dbCfg.IdleInTransactionSessionTimeoutMS)
+	cfg := LoadConfig()
+	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 
 	baseLogger := gormLogger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), gormLogger.Config{
 		SlowThreshold:             200 * time.Millisecond,
@@ -113,10 +115,10 @@ func connect() *gorm.DB {
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
 
 	log.Printf(
-		"[database] enforced timeouts: max_open=%d DB_STATEMENT_TIMEOUT_MS=%s DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS=%s host=%s dbname=%s",
+		"[database] enforced timeouts: max_open=%d DB_STATEMENT_TIMEOUT=%s DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT=%s host=%s dbname=%s",
 		dbPoolSize(),
-		dbCfg.StatementTimeoutMS,
-		dbCfg.IdleInTransactionSessionTimeoutMS,
+		cfg.StatementTimeout,
+		cfg.IdleInTransactionSessionTimeout,
 		c.Host,
 		c.Name,
 	)

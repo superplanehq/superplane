@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestBuildPostgresDSN_sessionTimeouts(t *testing.T) {
 		Pass:            "p",
 		Ssl:             "disable",
 		ApplicationName: "testapp",
-	}, "60000", "30000")
+	}, 60*time.Second, 30*time.Second)
 	u, err := url.Parse(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -70,8 +71,8 @@ func TestPostgres_statementTimeoutEnforced(t *testing.T) {
 		t.Skip("DB_HOST not set (run with make test in Docker)")
 	}
 
-	t.Setenv("DB_STATEMENT_TIMEOUT_MS", "100")
-	t.Setenv("DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS", "10000")
+	t.Setenv("DB_STATEMENT_TIMEOUT", "100ms")
+	t.Setenv("DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT", "10s")
 
 	sslMode := "disable"
 	if os.Getenv("POSTGRES_DB_SSL") == "true" {
@@ -88,8 +89,8 @@ func TestPostgres_statementTimeoutEnforced(t *testing.T) {
 		ApplicationName: os.Getenv("APPLICATION_NAME"),
 	}
 
-	poolCfg := Load().Database
-	dsn := buildPostgresDSN(c, poolCfg.StatementTimeoutMS, poolCfg.IdleInTransactionSessionTimeoutMS)
+	cfg := LoadConfig()
+	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 
 	db, err := gorm.Open(postgresdrv.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
