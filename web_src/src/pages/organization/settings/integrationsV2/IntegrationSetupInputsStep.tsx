@@ -2,6 +2,7 @@ import type { IntegrationSetupStepDefinition } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructionsV2 } from "@/ui/IntegrationInstructionsV2";
+import { ArrowLeft, MoveRight } from "lucide-react";
 
 interface IntegrationSetupInputsStepProps {
   organizationId: string;
@@ -31,45 +32,53 @@ export function IntegrationSetupInputsStep({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{step.label}</h2>
-        <IntegrationInstructionsV2 description={step.instructions} className="mt-3" />
+      {fields.map((field) => {
+        const fieldName = field.name!;
+        return (
+          <ConfigurationFieldRenderer
+            key={fieldName}
+            field={field}
+            value={values[fieldName]}
+            onChange={(value) => onChange(fieldName, value)}
+            allValues={values}
+            domainId={organizationId}
+            domainType="DOMAIN_TYPE_ORGANIZATION"
+            organizationId={organizationId}
+            validationErrors={validationErrors}
+          />
+        );
+      })}
+
+      <div className="flex w-fit max-w-full items-center gap-4 pt-2">
+        <Button
+          type="button"
+          variant="link"
+          onClick={onBack}
+          disabled={Boolean(isSubmitting || isReverting || !onBack)}
+          className="group h-auto shrink-0 gap-1.5 px-0 py-1 font-normal hover:!no-underline"
+        >
+          <ArrowLeft
+            aria-hidden
+            className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+          />
+          {isReverting ? "Going back..." : "Previous"}
+        </Button>
+        <Button
+          onClick={onSubmit}
+          disabled={Boolean(isSubmitting || isReverting)}
+          className="group justify-center gap-2 text-sm !px-7 hover:!bg-primary"
+        >
+          {isSubmitting ? "Saving..." : "Next"}
+          <MoveRight
+            aria-hidden
+            className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+          />
+        </Button>
       </div>
 
       {hasInstructions ? <hr className="my-8 border-0 border-t border-gray-300 dark:border-gray-600" /> : null}
 
-      <div className="space-y-4">
-        {fields.map((field) => {
-          const fieldName = field.name!;
-          return (
-            <ConfigurationFieldRenderer
-              key={fieldName}
-              field={field}
-              value={values[fieldName]}
-              onChange={(value) => onChange(fieldName, value)}
-              allValues={values}
-              domainId={organizationId}
-              domainType="DOMAIN_TYPE_ORGANIZATION"
-              organizationId={organizationId}
-              validationErrors={validationErrors}
-            />
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          disabled={Boolean(isSubmitting || isReverting || !onBack)}
-        >
-          {isReverting ? "Going back..." : "Previous"}
-        </Button>
-        <Button onClick={onSubmit} disabled={Boolean(isSubmitting || isReverting)}>
-          {isSubmitting ? "Saving..." : "Next"}
-        </Button>
-      </div>
+      <IntegrationInstructionsV2 description={step.instructions} />
     </div>
   );
 }

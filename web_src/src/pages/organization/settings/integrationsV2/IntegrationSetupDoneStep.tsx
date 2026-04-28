@@ -1,42 +1,31 @@
 import type { IntegrationSetupStepDefinition } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { IntegrationInstructionsV2 } from "@/ui/IntegrationInstructionsV2";
+import { Check, CheckCheck } from "lucide-react";
 
 interface IntegrationSetupDoneStepProps {
   step: IntegrationSetupStepDefinition;
-  onBack?: () => void;
   onFinish: () => void;
-  isReverting?: boolean;
   isSubmitting?: boolean;
 }
 
-export function IntegrationSetupDoneStep({
-  step,
-  onBack,
-  onFinish,
-  isReverting,
-  isSubmitting,
-}: IntegrationSetupDoneStepProps) {
+export function IntegrationSetupDoneStep({ step, onFinish, isSubmitting }: IntegrationSetupDoneStepProps) {
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {step.label?.trim() || "Setup complete"}
-        </h2>
-        <IntegrationInstructionsV2 description={step.instructions} className="mt-3" />
-      </div>
+      <IntegrationInstructionsV2 description={step.instructions} />
 
-      <div className="flex flex-wrap items-center gap-3 pt-2">
+      <div className="flex w-fit max-w-full items-center gap-4 pt-2">
         <Button
           type="button"
-          variant="outline"
-          onClick={onBack}
-          disabled={Boolean(isSubmitting || isReverting || !onBack)}
+          onClick={onFinish}
+          disabled={Boolean(isSubmitting)}
+          className="group justify-center gap-2 text-sm !px-7 hover:!bg-primary"
         >
-          {isReverting ? "Going back..." : "Previous"}
-        </Button>
-        <Button type="button" onClick={onFinish} disabled={Boolean(isSubmitting || isReverting)}>
           {isSubmitting ? "Finishing..." : "Finish"}
+          <span className="relative inline-flex size-4 shrink-0 items-center justify-center" aria-hidden>
+            <Check className="absolute size-4 transition-opacity duration-200 ease-out group-hover:opacity-0 motion-reduce:transition-none motion-reduce:opacity-100 motion-reduce:group-hover:opacity-100" />
+            <CheckCheck className="absolute size-4 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 motion-reduce:transition-none motion-reduce:opacity-0 motion-reduce:group-hover:opacity-0" />
+          </span>
         </Button>
       </div>
     </div>

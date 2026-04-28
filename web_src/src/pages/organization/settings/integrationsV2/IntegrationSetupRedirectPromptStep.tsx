@@ -23,10 +23,7 @@ export function IntegrationSetupRedirectPromptStep({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Step: {step.label}</h2>
-        <IntegrationInstructionsV2 description={step.instructions} className="mt-3" />
-      </div>
+      <IntegrationInstructionsV2 description={step.instructions} />
 
       <div className="rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
         <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Redirect URL</p>

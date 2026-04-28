@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, matchPath } from "react-router-dom";
 import { Sidebar, SidebarBody, SidebarSection } from "../../../components/Sidebar/sidebar";
 import { General } from "./General";
 import { Groups } from "./Groups";
@@ -46,6 +46,9 @@ export function OrganizationSettings() {
   const location = useLocation();
   const { account: user, loading: userLoading } = useAccount();
   const { organizationId } = useParams<{ organizationId: string }>();
+  const isIntegrationV2SetupRoute = Boolean(
+    matchPath({ path: "/:organizationId/settings/integrations/:integrationName/setup", end: true }, location.pathname),
+  );
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canReadOrg = permissionsLoading || canAct("org", "read");
 
@@ -433,7 +436,7 @@ export function OrganizationSettings() {
       </Sidebar>
 
       <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900">
-        <div className="px-8 pb-8 w-full max-w-3xl mx-auto">
+        <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationV2SetupRoute ? "max-w-6xl" : "max-w-3xl")}>
           <div className="pt-10 pb-8">
             <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>
             <p className="text-sm mt-2 text-gray-800 dark:text-gray-300">{activeMeta.description}</p>
