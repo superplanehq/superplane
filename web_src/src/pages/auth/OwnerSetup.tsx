@@ -5,6 +5,8 @@ import { Text } from "../../components/Text/text";
 import { Button } from "../../components/ui/button";
 import { Switch } from "@/ui/switch";
 import superplaneLogo from "../../assets/superplane.svg";
+import { posthog } from "@/posthog";
+import OwnerSetupSurvey, { type PostHogSurvey } from "./OwnerSetupSurvey";
 
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -20,7 +22,9 @@ const OwnerSetup: React.FC = () => {
   const [smtpFromEmail, setSmtpFromEmail] = useState("");
   const [smtpUseTLS, setSmtpUseTLS] = useState(true);
   const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(false);
-  const [step, setStep] = useState<"owner" | "privateNetwork" | "smtpPrompt" | "smtpConfig">("owner");
+  const [step, setStep] = useState<"owner" | "privateNetwork" | "smtpPrompt" | "smtpConfig" | "survey">("owner");
+  const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null);
+  const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -141,7 +145,17 @@ const OwnerSetup: React.FC = () => {
       }
 
       const data: { organization_id: string } = await response.json();
-      window.location.href = `/${data.organization_id}`;
+      const orgId = data.organization_id;
+      setPendingOrganizationId(orgId);
+      posthog.getActiveMatchingSurveys((surveys) => {
+        const survey = surveys[0] as PostHogSurvey | undefined;
+        if (!survey || !survey.questions[0]?.choices?.length) {
+          window.location.href = `/${orgId}`;
+          return;
+        }
+        setActiveSurvey(survey);
+        setStep("survey");
+      });
     } catch {
       setError("Network error occurred");
     } finally {
@@ -180,7 +194,7 @@ const OwnerSetup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8">
       <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
         {step === "owner" && (
           <div className="text-center mb-8">
@@ -366,6 +380,10 @@ const OwnerSetup: React.FC = () => {
               </Button>
             </div>
           </div>
+        )}
+
+        {step === "survey" && activeSurvey && pendingOrganizationId && (
+          <OwnerSetupSurvey survey={activeSurvey} organizationId={pendingOrganizationId} />
         )}
 
         {step === "smtpConfig" && (

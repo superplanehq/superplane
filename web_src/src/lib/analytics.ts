@@ -42,6 +42,14 @@ export const analytics = {
     posthog.capture("canvas:yaml_export", { canvas_id: canvasId, organization_id: organizationId });
   },
 
+  integrationRequested: (organizationId: string) => {
+    posthog.capture("request_integration_clicked", { organization_id: organizationId });
+  },
+
+  organizationJoined: (organizationId: string) => {
+    posthog.capture("organization joined", { organization_id: organizationId });
+  },
+
   yamlImport: () => {
     posthog.capture("canvas:yaml_import", {});
   },
@@ -107,5 +115,18 @@ export const analytics = {
 
   orgCreate: (organizationId: string) => {
     posthog.capture("auth:org_create", { organization_id: organizationId });
+  },
+
+  surveySent: (surveyId: string, surveyName: string, responseProps: Record<string, string>) => {
+    posthog.capture("survey sent", {
+      $survey_id: surveyId,
+      $survey_name: surveyName,
+      ...responseProps,
+      $survey_completed: true,
+    });
+  },
+
+  surveyDismissed: (surveyId: string) => {
+    posthog.capture("survey dismissed", { $survey_id: surveyId });
   },
 };
