@@ -99,15 +99,6 @@ func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create OCI client: %w", err)
-	}
-
-	if err := ensureSharedEventsRule(ctx, client, config.CompartmentID, &integrationMetadata); err != nil {
-		return err
-	}
-
 	if err := ctx.Metadata.Set(OnComputeInstanceCreatedMetadata{
 		CompartmentID: config.CompartmentID,
 	}); err != nil {
@@ -136,30 +127,6 @@ func decodeSetupInputs(ctx core.TriggerContext) (OnComputeInstanceCreatedConfigu
 	}
 
 	return config, integrationMetadata, nil
-}
-
-// ensureSharedEventsRule ensures one OCI Events rule exists for the given compartment,
-// shared across all triggers that use the same integration+compartment pair.
-// The rule OCID is stored in integration metadata (keyed by compartmentID) so that
-// subsequent trigger setups are idempotent and do not create duplicate rules.
-func ensureSharedEventsRule(ctx core.TriggerContext, client *Client, compartmentID string, integrationMetadata *IntegrationMetadata) error {
-	if _, exists := integrationMetadata.CompartmentRules[compartmentID]; exists {
-		return nil
-	}
-
-	ruleName := fmt.Sprintf("superplane-%s", ctx.Integration.ID())
-	condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
-	rule, err := client.CreateEventsRule(compartmentID, ruleName, condition, integrationMetadata.TopicID)
-	if err != nil {
-		return fmt.Errorf("failed to create shared Events rule: %w", err)
-	}
-
-	if integrationMetadata.CompartmentRules == nil {
-		integrationMetadata.CompartmentRules = make(map[string]string)
-	}
-	integrationMetadata.CompartmentRules[compartmentID] = rule.ID
-	ctx.Integration.SetMetadata(*integrationMetadata)
-	return nil
 }
 
 // requestWebhook asks the integration to provision a per-trigger HTTPS
