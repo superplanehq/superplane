@@ -33,6 +33,7 @@ import {
 import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
+  CanvasChangeManagement,
   SuperplaneComponentsNode,
   ComponentsPosition,
 } from "../api-client/types.gen";
@@ -544,6 +545,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       description?: string;
       nodes?: unknown[];
       edges?: unknown[];
+      changeManagement?: CanvasChangeManagement;
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
       preserveLocalCanvasState?: boolean;
       invalidateRelatedQueries?: boolean;
@@ -557,6 +559,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
           spec: {
             nodes: data.nodes || [],
             edges: data.edges || [],
+            changeManagement: data.changeManagement,
           },
         },
         autoLayout: data.autoLayout,
