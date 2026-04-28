@@ -105,7 +105,7 @@ func (c *CancelDeploy) Configuration() []configuration.Field {
 			Label:       "Deploy ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Placeholder: "e.g., dep-... or {{$.event.data.deployId}}",
+			Placeholder: "e.g., dep-... or {{$['Node Name'].data.deployId}}",
 			Description: "Render deploy ID to cancel",
 		},
 	}
