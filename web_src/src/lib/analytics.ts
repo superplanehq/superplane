@@ -155,7 +155,7 @@ export const analytics = {
       integration,
       source,
       status,
-      duration_ms: durationS,
+      duration_s: durationS,
       organization_id: organizationId,
     });
   },
