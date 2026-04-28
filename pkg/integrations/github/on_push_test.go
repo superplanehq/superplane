@@ -505,6 +505,27 @@ func Test__OnPush__PathFilter(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 0, eventContext.Count())
 	})
+
+	t.Run("path notEquals excludes pushes touching forbidden file", func(t *testing.T) {
+		body, sig := makeBody(`{"ref":"refs/heads/main","commits":[{"added":[],"modified":["README.md","go.mod"],"removed":[]}]}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: makeHeaders(sig),
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs":       []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"}},
+				"paths":      []configuration.Predicate{{Type: configuration.PredicateTypeNotEquals, Value: "README.md"}},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
 }
 
 func Test__ExtractChangedFiles(t *testing.T) {
