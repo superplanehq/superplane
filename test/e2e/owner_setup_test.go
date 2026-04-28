@@ -21,6 +21,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
+		steps.skipSurvey()
 		steps.assertRedirectedToOrganizationHome()
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
@@ -36,6 +37,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.fillInSMTPDetails("smtp.example.com", "587", "smtp-user", "smtp-pass", "SuperPlane", "noreply@example.com", true)
 		steps.submitSMTPSetup()
 		steps.assertOwnerAndOrganizationCreated()
+		steps.skipSurvey()
 		steps.assertRedirectedToOrganizationHome()
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
@@ -52,6 +54,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.goToSetupOptions()
 		steps.finishOwnerSetupWithoutSMTP()
 		steps.assertOwnerAndOrganizationCreated()
+		steps.skipSurvey()
 		steps.assertPrivateNetworkAccessEnabled()
 		steps.assertRedirectedToOrganizationHome()
 	})
@@ -64,6 +67,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
+		steps.skipSurvey()
 		steps.assertRedirectedToOrganizationHome()
 		steps.clearCookies()
 		steps.visitLoginPage()
@@ -228,6 +232,15 @@ func (s *ownerSetupSteps) assertPrivateNetworkAccessEnabled() {
 	metadata, err := models.GetInstallationMetadata()
 	assert.NoError(s.t, err, "load installation metadata")
 	assert.True(s.t, metadata.AllowPrivateNetworkAccess, "expected private network access to be enabled")
+}
+
+func (s *ownerSetupSteps) skipSurvey() {
+	// If a PostHog survey is configured, the intro screen is shown after setup.
+	// Click "Skip for now" to dismiss it. If no survey is configured, the redirect
+	// already happened and this is a no-op.
+	if strings.Contains(s.session.Page().URL(), "/setup") {
+		s.session.Click(q.Text("Skip for now"))
+	}
 }
 
 func (s *ownerSetupSteps) clearCookies() {
