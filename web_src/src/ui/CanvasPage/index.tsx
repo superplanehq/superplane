@@ -344,6 +344,8 @@ export interface CanvasPageProps {
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
+export const COMPONENT_SIDEBAR_SHOW_SETUP_STATUS_STORAGE_KEY = "componentSidebarShowSetupStatus";
+export const COMPONENT_SIDEBAR_CONNECTED_ON_TOP_STORAGE_KEY = "componentSidebarConnectedOnTop";
 export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
 export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
 

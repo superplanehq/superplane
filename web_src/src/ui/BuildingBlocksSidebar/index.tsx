@@ -7,7 +7,11 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
+import {
+  COMPONENT_SIDEBAR_CONNECTED_ON_TOP_STORAGE_KEY,
+  COMPONENT_SIDEBAR_SHOW_SETUP_STATUS_STORAGE_KEY,
+  COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY,
+} from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { CategorySection } from "./CategorySection";
 import { findFirstVisibleBlock, type TypeFilter } from "./filter";
@@ -102,12 +106,34 @@ function OpenBuildingBlocksSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
-  const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
-  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    const saved = window.localStorage.getItem(COMPONENT_SIDEBAR_SHOW_SETUP_STATUS_STORAGE_KEY);
+    return saved === null ? true : saved === "true";
+  });
+  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    const saved = window.localStorage.getItem(COMPONENT_SIDEBAR_CONNECTED_ON_TOP_STORAGE_KEY);
+    return saved === "true";
+  });
 
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem(COMPONENT_SIDEBAR_SHOW_SETUP_STATUS_STORAGE_KEY, String(showIntegrationSetupStatus));
+  }, [showIntegrationSetupStatus]);
+
+  useEffect(() => {
+    localStorage.setItem(COMPONENT_SIDEBAR_CONNECTED_ON_TOP_STORAGE_KEY, String(showConnectedIntegrationsOnTop));
+  }, [showConnectedIntegrationsOnTop]);
 
   useEffect(() => {
     if (!searchInputRef.current) {
