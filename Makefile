@@ -64,6 +64,7 @@ test.e2e.setup:
 	$(MAKE) test.setup
 
 test.e2e.ui.setup:
+	$(MAKE) dev.setup.web
 	$(MAKE) openapi.web.client.gen
 
 test.e2e:
