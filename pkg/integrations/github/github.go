@@ -116,6 +116,7 @@ func (g *GitHub) Actions() []core.Action {
 		&AddIssueAssignee{},
 		&RemoveIssueAssignee{},
 		&CreateReview{},
+		&CreatePullRequest{},
 		&RunWorkflow{},
 		&PublishCommitStatus{},
 		&CreateRelease{},
