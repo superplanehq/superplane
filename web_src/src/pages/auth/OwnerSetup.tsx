@@ -147,8 +147,6 @@ const OwnerSetup: React.FC = () => {
       const data: { organization_id: string } = await response.json();
       const orgId = data.organization_id;
       setPendingOrganizationId(orgId);
-      posthog.capture("owner registered");
-
       posthog.getActiveMatchingSurveys((surveys) => {
         const survey = surveys[0] as PostHogSurvey | undefined;
         if (!survey || !survey.questions[0]?.choices?.length) {

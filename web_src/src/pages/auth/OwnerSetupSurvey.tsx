@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { posthog } from "@/posthog";
+import { analytics } from "@/lib/analytics";
 import superplaneLogo from "../../assets/superplane.svg";
 import { Button } from "@/components/ui/button";
 import {
@@ -158,13 +158,13 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   const [surveyResponses, setSurveyResponses] = useState<Record<number, string>>({});
 
   const handleSkipAll = () => {
-    posthog.capture("survey dismissed", { $survey_id: survey.id });
+    analytics.surveyDismissed(survey.id);
     window.location.href = `/${organizationId}`;
   };
 
   const finishSurvey = (responses: Record<number, string>) => {
     if (Object.keys(responses).length === 0) {
-      posthog.capture("survey dismissed", { $survey_id: survey.id });
+      analytics.surveyDismissed(survey.id);
     } else {
       const responseProps: Record<string, string> = {};
       survey.questions.forEach((question, index) => {
@@ -178,12 +178,7 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
           responseProps[`$survey_response_${index}`] = answer;
         }
       });
-      posthog.capture("survey sent", {
-        $survey_id: survey.id,
-        $survey_name: survey.name,
-        ...responseProps,
-        $survey_completed: true,
-      });
+      analytics.surveySent(survey.id, survey.name, responseProps);
     }
     window.location.href = `/${organizationId}`;
   };

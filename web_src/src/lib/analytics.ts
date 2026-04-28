@@ -190,6 +190,19 @@ export const analytics = {
       organization_id: organizationId,
     });
   },
+
+  surveySent: (surveyId: string, surveyName: string, responseProps: Record<string, string>) => {
+    posthog.capture("survey sent", {
+      $survey_id: surveyId,
+      $survey_name: surveyName,
+      ...responseProps,
+      $survey_completed: true,
+    });
+  },
+
+  surveyDismissed: (surveyId: string) => {
+    posthog.capture("survey dismissed", { $survey_id: surveyId });
+  },
 };
 
 export function useIntegrationConfigureOpen(
