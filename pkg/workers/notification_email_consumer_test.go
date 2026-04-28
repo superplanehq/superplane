@@ -59,7 +59,7 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 			Title:          "Approval needed",
 			Body:           "Please review the pending approval.",
 			Url:            "https://app.superplane.com/approvals/123",
-			UrlLabel:       "Review approval",
+			UrlLabel:       "Open approval",
 			Emails:         []string{groupUser.GetEmail(), "external@example.com"},
 			Groups:         []string{groupName},
 			Roles:          []string{models.RoleOrgAdmin},
@@ -82,6 +82,6 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 		assert.Equal(t, "Approval needed", sentEmails[0].Title)
 		assert.Equal(t, "Please review the pending approval.", sentEmails[0].Body)
 		assert.Equal(t, "https://app.superplane.com/approvals/123", sentEmails[0].URL)
-		assert.Equal(t, "Review approval", sentEmails[0].URLLabel)
+		assert.Equal(t, "Open approval", sentEmails[0].URLLabel)
 	})
 }

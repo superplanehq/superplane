@@ -69,7 +69,7 @@
             font-size: 0.95rem;
             line-height: 1.5;
             color: #1f2937;
-            margin: 0 0 24px;
+            margin: 0 0 20px;
             white-space: pre-line;
         }
         @media (prefers-color-scheme: dark) {
@@ -86,24 +86,41 @@
                 color: #93c5fd;
             }
         }
+        .cta-wrap {
+            margin: 4px 0 0;
+        }
         .action-btn {
             display: inline-block;
-            padding: 8px 16px;
-            border-radius: 5px;
-            background: #1f2937;
-            color: #f3f4f6;
+            padding: 14px 28px;
+            border-radius: 8px;
+            background: #2563eb;
+            color: #ffffff;
             text-decoration: none;
             font-weight: 600;
             font-size: 0.95rem;
+            line-height: 1.35;
+            border: 1px solid #1d4ed8;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
         }
         @media (prefers-color-scheme: dark) {
             .action-btn {
-                background: #f3f4f6;
-                color: #1f2937;
+                background: #3b82f6;
+                color: #0f172a;
+                border-color: #60a5fa;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
             }
         }
         .action-btn:hover {
-            opacity: 0.9;
+            filter: brightness(1.05);
+        }
+        .action-btn:focus-visible {
+            outline: 2px solid #93c5fd;
+            outline-offset: 3px;
+        }
+        @media (prefers-color-scheme: dark) {
+            .action-btn:focus-visible {
+                outline-color: #bfdbfe;
+            }
         }
         .footer {
             margin-top: 20px;
@@ -121,13 +138,15 @@
         </div>
         <h1 class="title">{{.Title}}</h1>
         <p class="body">{{.Body}}
-            {{if .URL}}
+            {{if and .URL (not .URLLabel)}}
             <br><br>
             <a href="{{.URL}}">{{.URL}}</a>
             {{end}}
         </p>
         {{if .URL}}
-        <a class="action-btn" href="{{.URL}}">{{if .URLLabel}}{{.URLLabel}}{{else}}Open in SuperPlane{{end}}</a>
+        <div class="cta-wrap">
+            <a class="action-btn" href="{{.URL}}">{{if .URLLabel}}{{.URLLabel}}{{else}}Open in SuperPlane{{end}}</a>
+        </div>
         {{end}}
         <div class="footer">This notification was sent by SuperPlane.</div>
     </div>
