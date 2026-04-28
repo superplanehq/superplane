@@ -2632,7 +2632,7 @@ export function WorkflowPageV2() {
     [canvas, allComponents, allTriggers, availableIntegrations, widgets],
   );
 
-  const createIntegrationMutation = useCreateIntegration(organizationId ?? "");
+  const createIntegrationMutation = useCreateIntegration(organizationId ?? "", "node_configuration");
   const [integrationDialogName, setIntegrationDialogName] = useState<string | null>(null);
   const [justConnectedIntegrations, setJustConnectedIntegrations] = useState<Set<string>>(new Set());
 

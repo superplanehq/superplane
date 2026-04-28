@@ -1,4 +1,7 @@
 import { posthog } from "@/posthog";
+// Tracks when a connect form was opened so duration_s can be computed on submit.
+// Keyed by integration name; last-write-wins for the same integration.
+const integrationConnectStartTimes = new Map<string, number>();
 
 export const analytics = {
   memberAccept: (organizationId: string) => {
@@ -98,9 +101,15 @@ export const analytics = {
     posthog.capture("canvas:version_publish", { canvas_id: canvasId, organization_id: organizationId });
   },
 
-  integrationCreate: (integrationType: string, organizationId: string) => {
-    posthog.capture("integration:integration_create", {
-      integration_type: integrationType,
+  integrationConnectStart: (
+    integration: string,
+    source: "node_configuration" | "integrations_page",
+    organizationId: string,
+  ) => {
+    integrationConnectStartTimes.set(integration, Date.now());
+    posthog.capture("integration:connect_start", {
+      integration,
+      source,
       organization_id: organizationId,
     });
   },
@@ -131,5 +140,44 @@ export const analytics = {
 
   canvasLogView: (organizationId: string) => {
     posthog.capture("canvas:log_view", { organization_id: organizationId });
+  },
+
+  integrationConnectSubmit: (
+    integration: string,
+    source: "node_configuration" | "integrations_page",
+    status: "ready" | "error" | "pending",
+    organizationId: string,
+  ) => {
+    const startTime = integrationConnectStartTimes.get(integration);
+    const durationS = startTime !== undefined ? (Date.now() - startTime) / 1000 : undefined;
+    integrationConnectStartTimes.delete(integration);
+    posthog.capture("integration:connect_submit", {
+      integration,
+      source,
+      status,
+      duration_ms: durationS,
+      organization_id: organizationId,
+    });
+  },
+
+  integrationConfigureOpen: (
+    integration: string,
+    source: "node_configuration" | "integrations_page",
+    previousStatus: "ready" | "error" | "pending",
+    organizationId: string,
+  ) => {
+    posthog.capture("integration:configure_open", {
+      integration,
+      source,
+      previous_status: previousStatus,
+      organization_id: organizationId,
+    });
+  },
+
+  integrationDelete: (integration: string, organizationId: string) => {
+    posthog.capture("integration:integration_delete", {
+      integration,
+      organization_id: organizationId,
+    });
   },
 };
