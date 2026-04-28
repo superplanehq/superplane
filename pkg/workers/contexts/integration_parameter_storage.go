@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -25,14 +26,31 @@ func (s *IntegrationParameterStorage) Get(name string) (any, error) {
 	return nil, fmt.Errorf("parameter %s not found", name)
 }
 
-func (s *IntegrationParameterStorage) Delete(name string) error {
+func (s *IntegrationParameterStorage) GetString(name string) (string, error) {
+	value, err := s.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	v, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("parameter %s is not a string", name)
+	}
+
+	return v, nil
+}
+
+func (s *IntegrationParameterStorage) Delete(names ...string) error {
+	newParameters := slices.Clone(s.integration.Parameters)
+
 	for i, param := range s.integration.Parameters {
-		if param.Name == name {
-			s.integration.Parameters = append(s.integration.Parameters[:i], s.integration.Parameters[i+1:]...)
-			return nil
+		if slices.Contains(names, param.Name) {
+			newParameters = append(newParameters[:i], newParameters[i+1:]...)
 		}
 	}
-	return fmt.Errorf("parameter %s not found", name)
+
+	s.integration.Parameters = newParameters
+	return nil
 }
 
 func (s *IntegrationParameterStorage) Create(def core.IntegrationParameterDefinition) error {

@@ -29,18 +29,42 @@ func serializeIntegrations(registry *registry.Registry, in []core.Integration) [
 		}
 
 		out[i] = &pb.IntegrationDefinition{
-			Name:          integration.Name(),
-			Label:         integration.Label(),
-			Icon:          integration.Icon(),
-			Description:   integration.Description(),
-			Instructions:  integration.Instructions(),
-			Configuration: configuration,
-			Actions:       actions.SerializeActions(integration.Actions()),
-			Triggers:      actions.SerializeTriggers(integration.Triggers()),
-			Capabilities:  serializeCapabilities(registry, integration),
+			Name:             integration.Name(),
+			Label:            integration.Label(),
+			Icon:             integration.Icon(),
+			Description:      integration.Description(),
+			Instructions:     integration.Instructions(),
+			Configuration:    configuration,
+			Actions:          actions.SerializeActions(integration.Actions()),
+			Triggers:         actions.SerializeTriggers(integration.Triggers()),
+			Capabilities:     serializeCapabilities(registry, integration),
+			CapabilityGroups: serializeCapabilityGroups(registry, integration),
 		}
 	}
 	return out
+}
+
+func serializeCapabilityGroups(registry *registry.Registry, integration core.Integration) []*pb.CapabilityGroup {
+	setupProvider, err := registry.GetSetupProvider(integration.Name())
+	if err != nil {
+		return []*pb.CapabilityGroup{}
+	}
+
+	groups := []*pb.CapabilityGroup{}
+	for _, group := range setupProvider.CapabilityGroups() {
+		g := &pb.CapabilityGroup{
+			Label:        group.Label,
+			Capabilities: []string{},
+		}
+
+		for _, capability := range group.Capabilities {
+			g.Capabilities = append(g.Capabilities, capability.Name)
+		}
+
+		groups = append(groups, g)
+	}
+
+	return groups
 }
 
 func serializeCapabilities(registry *registry.Registry, integration core.Integration) []*pb.CapabilityDefinition {
@@ -49,28 +73,33 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 		return []*pb.CapabilityDefinition{}
 	}
 
-	capabilities := setupProvider.Capabilities()
-	out := make([]*pb.CapabilityDefinition, len(capabilities))
-	for i, capability := range capabilities {
-		out[i] = &pb.CapabilityDefinition{
-			Type:           actions.CapabilityTypeToProto(string(capability.Type)),
-			Name:           capability.Name,
-			Label:          capability.Label,
-			Description:    capability.Description,
-			Configuration:  []*configpb.Field{},
-			OutputChannels: []*actionpb.OutputChannel{},
-		}
+	capabilityGroups := setupProvider.CapabilityGroups()
 
-		for _, field := range capability.Configuration {
-			out[i].Configuration = append(out[i].Configuration, actions.ConfigurationFieldToProto(field))
-		}
+	out := []*pb.CapabilityDefinition{}
+	for _, group := range capabilityGroups {
+		for _, capability := range group.Capabilities {
+			capabilityDef := &pb.CapabilityDefinition{
+				Type:           actions.CapabilityTypeToProto(string(capability.Type)),
+				Name:           capability.Name,
+				Label:          capability.Label,
+				Description:    capability.Description,
+				Configuration:  []*configpb.Field{},
+				OutputChannels: []*actionpb.OutputChannel{},
+			}
 
-		for _, channel := range capability.OutputChannels {
-			out[i].OutputChannels = append(out[i].OutputChannels, &actionpb.OutputChannel{
-				Name:        channel.Name,
-				Label:       channel.Label,
-				Description: channel.Description,
-			})
+			for _, field := range capability.Configuration {
+				capabilityDef.Configuration = append(capabilityDef.Configuration, actions.ConfigurationFieldToProto(field))
+			}
+
+			for _, channel := range capability.OutputChannels {
+				capabilityDef.OutputChannels = append(capabilityDef.OutputChannels, &actionpb.OutputChannel{
+					Name:        channel.Name,
+					Label:       channel.Label,
+					Description: channel.Description,
+				})
+			}
+
+			out = append(out, capabilityDef)
 		}
 	}
 

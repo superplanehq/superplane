@@ -75,8 +75,8 @@ export function IntegrationInstructionsV2({ description, onContinue, className =
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
-              h1: ({ children }) => <h1 className="text-base font-semibold mt-2 mb-2">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-base font-semibold mt-2 mb-2">{children}</h2>,
+              h1: ({ children }) => <h1 className="text-base font-semibold mt-4 mb-4">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-base font-semibold mt-3 mb-3">{children}</h2>,
               h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
               h4: ({ children }) => <h4 className="text-sm font-medium mt-2 mb-1">{children}</h4>,
               p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,

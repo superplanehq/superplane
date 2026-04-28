@@ -103,7 +103,7 @@ func CreateIntegrationWithUsage(
 		return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
 	}
 
-	initialCapabilities, err := initialCapabilityStates(setupProvider.Capabilities(), capabilities)
+	initialCapabilities, err := initialCapabilityStates(allCapabilities(setupProvider), capabilities)
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +117,14 @@ func CreateIntegrationWithUsage(
 	return setupIntegration(registry, newIntegration, setupProvider, orgID, initialCapabilities)
 }
 
+func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
+	capabilities := []core.Capability{}
+	for _, group := range setupProvider.CapabilityGroups() {
+		capabilities = append(capabilities, group.Capabilities...)
+	}
+	return capabilities
+}
+
 func setupIntegration(registry *registry.Registry, newIntegration *models.Integration, setupProvider core.IntegrationSetupProvider, orgID string, initialCapabilities []models.CapabilityState) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
@@ -127,7 +135,7 @@ func setupIntegration(registry *registry.Registry, newIntegration *models.Integr
 		}
 
 		newIntegration.Capabilities = initialCapabilities
-		capabilityCtx := contexts.NewCapabilityContext(setupProvider.Capabilities(), newIntegration.Capabilities)
+		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: orgID,

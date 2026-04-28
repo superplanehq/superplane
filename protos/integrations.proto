@@ -57,6 +57,7 @@ message IntegrationDefinition {
   repeated Triggers.Trigger triggers = 7;
   string instructions = 8;
   repeated CapabilityDefinition capabilities = 9;
+  repeated CapabilityGroup capability_groups = 10;
 }
 
 message CapabilityDefinition {
@@ -72,4 +73,9 @@ message CapabilityDefinition {
   string description = 4;
   repeated Configuration.Field configuration = 5;
   repeated Actions.OutputChannel output_channels = 6;
+}
+
+message CapabilityGroup {
+  string label = 1;
+  repeated string capabilities = 2;
 }

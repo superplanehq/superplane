@@ -13,8 +13,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func NewClientV2(parameters core.IntegrationParameterStorage, secrets core.IntegrationSecretStorage) (*github.Client, error) {
-	authMethod, err := getStringParameter(parameters, ParameterAuthMethod)
+func NewClientFromStorageContexts(parameters core.IntegrationParameterStorage, secrets core.IntegrationSecretStorage) (*github.Client, error) {
+	authMethod, err := parameters.GetString(ParameterAuthMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get authentication method: %v", err)
 	}
@@ -49,7 +49,7 @@ func NewPATClient(parameters core.IntegrationParameterStorage, secrets core.Inte
 }
 
 func NewGitHubAppClient(parameters core.IntegrationParameterStorage, secrets core.IntegrationSecretStorage) (*github.Client, error) {
-	appID, err := getStringParameter(parameters, ParameterGitHubAppID)
+	appID, err := parameters.GetString(ParameterGitHubAppID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub app ID: %v", err)
 	}
@@ -59,7 +59,7 @@ func NewGitHubAppClient(parameters core.IntegrationParameterStorage, secrets cor
 		return nil, fmt.Errorf("failed to parse GitHub app ID: %v", err)
 	}
 
-	installationID, err := getStringParameter(parameters, ParameterGitHubAppInstallationID)
+	installationID, err := parameters.GetString(ParameterGitHubAppInstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get installation ID: %v", err)
 	}

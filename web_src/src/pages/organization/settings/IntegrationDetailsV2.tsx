@@ -20,6 +20,10 @@ import {
 import { Alert, AlertDescription } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { CopyButton } from "@/ui/CopyButton";
+import {
+  buildIntegrationCapabilityGroupSections,
+  capabilityDefinitionDisplayName,
+} from "@/lib/integrationCapabilityGroups";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { cn } from "@/lib/utils";
@@ -189,6 +193,39 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
       getCapabilityLabel(left).localeCompare(getCapabilityLabel(right)),
     );
   }, [integration?.status?.capabilities, integrationDef?.capabilities]);
+
+  const definitionCapabilitiesSortedForGroups = useMemo(() => {
+    return [...(integrationDef?.capabilities || [])]
+      .filter((definition) => Boolean(definition.name))
+      .sort((left, right) =>
+        capabilityDefinitionDisplayName(left).localeCompare(capabilityDefinitionDisplayName(right)),
+      );
+  }, [integrationDef?.capabilities]);
+
+  const capabilityGroupSections = useMemo(() => {
+    const sections = buildIntegrationCapabilityGroupSections(integrationDef, definitionCapabilitiesSortedForGroups);
+    const totalNames = sections.reduce((count, section) => count + section.names.length, 0);
+    if (totalNames > 0 || capabilities.length === 0) {
+      return sections;
+    }
+    return [
+      {
+        key: "all-status-only",
+        label: "",
+        names: [...capabilities]
+          .sort((left, right) => getCapabilityLabel(left).localeCompare(getCapabilityLabel(right)))
+          .map((capability) => capability.name),
+      },
+    ];
+  }, [integrationDef, definitionCapabilitiesSortedForGroups, capabilities]);
+
+  const capabilityByName = useMemo(() => {
+    const map = new Map<string, DisplayCapability>();
+    for (const capability of capabilities) {
+      map.set(capability.name, capability);
+    }
+    return map;
+  }, [capabilities]);
 
   const stagedCapabilityUpdates = useMemo(() => {
     return capabilities.reduce<IntegrationCapabilityState[]>((updates, capability) => {
@@ -585,88 +622,112 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
           <TabsContent value="capabilities" className="mt-4">
             {capabilities.length > 0 ? (
               <>
-                <div className="overflow-x-auto rounded-md border border-gray-300 dark:border-gray-700">
-                  <table className="w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
-                    <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
-                      {capabilities.map((capability, index) => {
-                        const serverState = capability.state || defaultCapabilityState;
-                        const effectiveState = capabilityStates[capability.name] ?? serverState;
-                        const statusDotClass = getCapabilityStatusDotClass(effectiveState);
-                        const actionDisabled = !canUpdateIntegrations || updateCapabilitiesMutation.isPending;
-                        const isDirty = effectiveState !== serverState;
-                        const description = getCapabilityDescription(capability);
+                <div className="space-y-4">
+                  {capabilityGroupSections.map((section) => (
+                    <div
+                      key={section.key}
+                      className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
+                      role={section.label ? "group" : undefined}
+                      aria-label={section.label ? `${section.label} capabilities` : undefined}
+                    >
+                      {section.label ? (
+                        <div className="border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-900 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-100">
+                          {section.label}
+                        </div>
+                      ) : null}
+                      <div className={cn(section.label && "-mt-px", "overflow-x-auto")}>
+                        <table className="w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
+                          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
+                            {section.names.map((capabilityName, rowIndex) => {
+                              const capability = capabilityByName.get(capabilityName);
+                              if (!capability) {
+                                return null;
+                              }
 
-                        return (
-                          <tr
-                            key={capability.name || `capability-${index}`}
-                            className={cn(isDirty && "bg-amber-50 dark:bg-amber-950/25")}
-                          >
-                            <td className="px-4 py-3 align-middle">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)} aria-hidden />
-                                <span className="font-mono text-sm text-gray-800 dark:text-gray-100">
-                                  {capability.name}
-                                </span>
-                                <CopyButton text={capability.name} />
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 align-middle">
-                              {description ? (
-                                <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div>
-                              ) : null}
-                            </td>
-                            <td className="px-4 py-3 align-middle text-right">
-                              <PermissionTooltip
-                                allowed={canUpdateIntegrations || permissionsLoading}
-                                message="You don't have permission to update integrations."
-                              >
-                                <span className="flex justify-end">
-                                  {effectiveState === "STATE_ENABLED" ? (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={actionDisabled}
-                                      onClick={() => queueCapabilityStateChange(capability, "STATE_DISABLED")}
+                              const serverState = capability.state || defaultCapabilityState;
+                              const effectiveState = capabilityStates[capability.name] ?? serverState;
+                              const statusDotClass = getCapabilityStatusDotClass(effectiveState);
+                              const actionDisabled = !canUpdateIntegrations || updateCapabilitiesMutation.isPending;
+                              const isDirty = effectiveState !== serverState;
+                              const description = getCapabilityDescription(capability);
+
+                              return (
+                                <tr
+                                  key={`${section.key}-${capability.name || rowIndex}`}
+                                  className={cn(isDirty && "bg-amber-50 dark:bg-amber-950/25")}
+                                >
+                                  <td className="px-4 py-3 align-middle">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span
+                                        className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)}
+                                        aria-hidden
+                                      />
+                                      <span className="font-mono text-sm text-gray-800 dark:text-gray-100">
+                                        {capability.name}
+                                      </span>
+                                      <CopyButton text={capability.name} />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 align-middle">
+                                    {description ? (
+                                      <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div>
+                                    ) : null}
+                                  </td>
+                                  <td className="px-4 py-3 align-middle text-right">
+                                    <PermissionTooltip
+                                      allowed={canUpdateIntegrations || permissionsLoading}
+                                      message="You don't have permission to update integrations."
                                     >
-                                      Disable
-                                    </Button>
-                                  ) : null}
-                                  {effectiveState === "STATE_DISABLED" ? (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={actionDisabled}
-                                      onClick={() => queueCapabilityStateChange(capability, "STATE_ENABLED")}
-                                    >
-                                      Enable
-                                    </Button>
-                                  ) : null}
-                                  {effectiveState === "STATE_UNAVAILABLE" ? (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={actionDisabled}
-                                      onClick={() => queueCapabilityStateChange(capability, "STATE_REQUESTED")}
-                                    >
-                                      Request
-                                    </Button>
-                                  ) : null}
-                                  {effectiveState === "STATE_REQUESTED" ? (
-                                    <Button type="button" variant="outline" size="sm" disabled>
-                                      Requested
-                                    </Button>
-                                  ) : null}
-                                </span>
-                              </PermissionTooltip>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                                      <span className="flex justify-end">
+                                        {effectiveState === "STATE_ENABLED" ? (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={actionDisabled}
+                                            onClick={() => queueCapabilityStateChange(capability, "STATE_DISABLED")}
+                                          >
+                                            Disable
+                                          </Button>
+                                        ) : null}
+                                        {effectiveState === "STATE_DISABLED" ? (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={actionDisabled}
+                                            onClick={() => queueCapabilityStateChange(capability, "STATE_ENABLED")}
+                                          >
+                                            Enable
+                                          </Button>
+                                        ) : null}
+                                        {effectiveState === "STATE_UNAVAILABLE" ? (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={actionDisabled}
+                                            onClick={() => queueCapabilityStateChange(capability, "STATE_REQUESTED")}
+                                          >
+                                            Request
+                                          </Button>
+                                        ) : null}
+                                        {effectiveState === "STATE_REQUESTED" ? (
+                                          <Button type="button" variant="outline" size="sm" disabled>
+                                            Requested
+                                          </Button>
+                                        ) : null}
+                                      </span>
+                                    </PermissionTooltip>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 {stagedCapabilityUpdates.length > 0 ? (
                   <div className="mt-4 flex justify-end">

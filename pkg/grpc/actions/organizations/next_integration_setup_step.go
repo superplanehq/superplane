@@ -96,7 +96,7 @@ func submitStep(registry *registry.Registry, integration *models.Integration, se
 			return err
 		}
 
-		capabilityCtx := contexts.NewCapabilityContext(setupProvider.Capabilities(), integration.Capabilities)
+		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
 			Step:           setupState.CurrentStep.Name,
 			Inputs:         getStepInputs(inputs),

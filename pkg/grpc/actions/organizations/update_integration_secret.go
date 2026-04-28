@@ -64,7 +64,7 @@ func UpdateIntegrationSecret(
 			HTTP:         registry.HTTPContext(),
 			Secrets:      secretStorage,
 			Parameters:   contexts.NewIntegrationParameterStorage(integration),
-			Capabilities: contexts.NewCapabilityContext(setupProvider.Capabilities(), integration.Capabilities),
+			Capabilities: contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities),
 		})
 
 		if err != nil {

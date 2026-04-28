@@ -6,7 +6,7 @@ import type {
 } from "@/api-client";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { ArrowLeft, Check, CircleOff, MoveLeft, MoveRight } from "lucide-react";
+import { ArrowLeft, Check, CircleOff, Info, Minus, MoveLeft, MoveRight } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -20,6 +20,10 @@ import {
 } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import {
+  buildIntegrationCapabilityGroupSections,
+  capabilityDefinitionDisplayName,
+} from "@/lib/integrationCapabilityGroups";
 import { isIntegrationV2SetupEnabled } from "@/lib/integrationV2";
 import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
@@ -133,12 +137,29 @@ function canRevertSetupStep(integration: OrganizationsIntegration | null): boole
   return previousSteps.length > 0;
 }
 
-function getCapabilityDisplayName(capability: IntegrationsCapabilityDefinition): string {
-  return capability.label || capability.name || "Unnamed capability";
-}
-
 function getCapabilitySelectionDotClass(selected: boolean) {
   return selected ? "bg-green-500" : "bg-gray-400 dark:bg-gray-500";
+}
+
+function getGroupToggleState(capabilityNames: string[], selected: ReadonlySet<string>): "all" | "some" | "none" {
+  if (capabilityNames.length === 0) {
+    return "none";
+  }
+
+  let count = 0;
+  for (const name of capabilityNames) {
+    if (selected.has(name)) {
+      count++;
+    }
+  }
+
+  if (count === 0) {
+    return "none";
+  }
+  if (count === capabilityNames.length) {
+    return "all";
+  }
+  return "some";
 }
 
 export function IntegrationSetupPage({ organizationId }: IntegrationSetupPageProps) {
@@ -161,7 +182,6 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
   const [createdIntegration, setCreatedIntegration] = useState<OrganizationsIntegration | null>(null);
   const [stepInputs, setStepInputs] = useState<Record<string, unknown>>({});
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
-  const [introStep, setIntroStep] = useState<"name" | "capabilities">("name");
   const [selectedCapabilities, setSelectedCapabilities] = useState<Set<string>>(new Set());
 
   const deleteIntegrationMutation = useDeleteIntegration(organizationId, createdIntegration?.metadata?.id ?? "");
@@ -178,12 +198,29 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
   const integrationCapabilities = useMemo(() => {
     return [...(integrationDefinition?.capabilities || [])]
       .filter((capability) => Boolean(capability.name))
-      .sort((left, right) => getCapabilityDisplayName(left).localeCompare(getCapabilityDisplayName(right)));
+      .sort((left, right) =>
+        capabilityDefinitionDisplayName(left).localeCompare(capabilityDefinitionDisplayName(right)),
+      );
   }, [integrationDefinition?.capabilities]);
+
+  const capabilitySections = useMemo(
+    () => buildIntegrationCapabilityGroupSections(integrationDefinition, integrationCapabilities),
+    [integrationDefinition, integrationCapabilities],
+  );
+
+  const capabilityByName = useMemo(() => {
+    const map = new Map<string, IntegrationsCapabilityDefinition>();
+    for (const capability of integrationCapabilities) {
+      if (capability.name) {
+        map.set(capability.name, capability);
+      }
+    }
+    return map;
+  }, [integrationCapabilities]);
 
   const setupPageTitle = useMemo(() => {
     if (!createdIntegration) {
-      return introStep === "name" ? "Name your integration" : "Choose integration capabilities";
+      return `Set up ${integrationLabel}`;
     }
 
     if (currentStep) {
@@ -197,7 +234,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     }
 
     return `Setup ${integrationLabel}`;
-  }, [createdIntegration, currentStep, integrationLabel, introStep]);
+  }, [createdIntegration, currentStep, integrationLabel]);
 
   usePageTitle(["Integrations", setupPageTitle]);
 
@@ -214,12 +251,11 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     setStepInputs({});
     setValidationErrors(new Set());
     setInstanceName("");
-    setIntroStep("name");
     setSelectedCapabilities(new Set());
   }, [integrationName]);
 
   useEffect(() => {
-    if (introStep !== "capabilities") {
+    if (createdIntegration) {
       return;
     }
 
@@ -230,7 +266,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
 
       return new Set(integrationCapabilities.map((capability) => capability.name).filter(Boolean) as string[]);
     });
-  }, [integrationCapabilities, introStep]);
+  }, [integrationCapabilities, createdIntegration]);
 
   useEffect(() => {
     if (instanceName || !integrationName) {
@@ -259,7 +295,6 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     setCreatedIntegration(integration);
     setStepInputs({});
     setValidationErrors(new Set());
-    setIntroStep("name");
     setSelectedCapabilities(new Set());
     setInstanceName(integration.metadata?.name || integration.metadata?.integrationName || "");
   }, [connectedIntegrations, createdIntegration?.metadata?.id, setupIntegrationId]);
@@ -300,21 +335,6 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     }
   }
 
-  async function handleNameStepContinue() {
-    const trimmedName = instanceName.trim();
-    if (!trimmedName) {
-      showErrorToast("Integration name is required");
-      return;
-    }
-
-    if (integrationCapabilities.length === 0) {
-      await handleCreateIntegration();
-      return;
-    }
-
-    setIntroStep("capabilities");
-  }
-
   function toggleCapabilitySelection(capabilityName: string) {
     if (createMutation.isPending) {
       return;
@@ -326,6 +346,23 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
         next.delete(capabilityName);
       } else {
         next.add(capabilityName);
+      }
+      return next;
+    });
+  }
+
+  function toggleCapabilityGroup(capabilityNames: string[]) {
+    if (createMutation.isPending || capabilityNames.length === 0) {
+      return;
+    }
+
+    setSelectedCapabilities((previous) => {
+      const state = getGroupToggleState(capabilityNames, previous);
+      const next = new Set(previous);
+      if (state === "all") {
+        capabilityNames.forEach((name) => next.delete(name));
+      } else {
+        capabilityNames.forEach((name) => next.add(name));
       }
       return next;
     });
@@ -403,6 +440,32 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     }
   };
 
+  async function handleSetupStepBack() {
+    if (!currentStep || !createdIntegration?.metadata?.id) {
+      return;
+    }
+
+    if (canRevertCurrentStep) {
+      await handleRevertCurrentStep();
+      return;
+    }
+
+    if (
+      !window.confirm("Remove this partially configured integration? You'll return to naming and capability selection.")
+    ) {
+      return;
+    }
+
+    try {
+      await deleteIntegrationMutation.mutateAsync();
+      setCreatedIntegration(null);
+      setStepInputs({});
+      setValidationErrors(new Set());
+    } catch {
+      showErrorToast("Failed to remove integration");
+    }
+  }
+
   if (!isIntegrationV2SetupEnabled(integrationName)) {
     return (
       <div className="pt-6 space-y-4">
@@ -461,111 +524,190 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
         </Alert>
       ) : null}
 
-      {!createdIntegration && introStep === "name" ? (
-        <div className="space-y-4">
-          <div>
-            <Label className="mb-2">Integration Name</Label>
-            <Input
-              value={instanceName}
-              onChange={(event) => setInstanceName(event.target.value)}
-              placeholder={`${integrationName}-integration`}
-            />
-          </div>
-          <div className="flex w-fit max-w-full items-center gap-4 pt-2">
-            <Button
-              onClick={() => void handleNameStepContinue()}
-              disabled={createMutation.isPending || !instanceName.trim()}
-              className="group justify-center gap-2 text-sm !px-7 hover:!bg-primary"
-            >
-              {createMutation.isPending ? "Creating..." : "Next"}
-              <MoveRight
-                aria-hidden
-                className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+      {!createdIntegration ? (
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Label htmlFor="integration-instance-name" className="mb-0 shrink-0">
+                Name
+              </Label>
+              <Input
+                id="integration-instance-name"
+                value={instanceName}
+                onChange={(event) => setInstanceName(event.target.value)}
+                placeholder={`${integrationName}-integration`}
+                autoComplete="off"
+                className="h-9 w-72 max-w-full"
               />
-            </Button>
+            </div>
+            <div className="flex gap-3 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+              <Info className="mt-0.5 size-4 shrink-0 text-gray-500 dark:text-gray-500" aria-hidden />
+              <p className="min-w-0">
+                You can connect the same integration type more than once—for different environments, namespaces, or
+                organizations. Use a name that identifies this connection.
+              </p>
+            </div>
           </div>
-        </div>
-      ) : !createdIntegration && introStep === "capabilities" ? (
-        <div className="space-y-5">
-          <div className="overflow-x-auto rounded-md border border-gray-300 dark:border-gray-700">
-            <table className="w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
-              <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
-                {integrationCapabilities.map((capability) => {
-                  const capabilityName = capability.name || "";
-                  const checked = selectedCapabilities.has(capabilityName);
-                  const statusDotClass = getCapabilitySelectionDotClass(checked);
+
+          {integrationCapabilities.length > 0 ? (
+            <div className="space-y-3">
+              <hr className="border-gray-200 dark:border-gray-800" />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose which capabilities to enable for this integration. You need at least one. Use a group row to
+                select or clear every capability in that group at once.
+              </p>
+              <div className="space-y-4">
+                {capabilitySections.map((section) => {
+                  const groupState = section.label
+                    ? getGroupToggleState(section.names, selectedCapabilities)
+                    : undefined;
+                  const selectedInSection = section.names.filter((name) => selectedCapabilities.has(name)).length;
+                  const groupIcon =
+                    groupState === undefined ? null : groupState === "all" ? (
+                      <Check className="size-4 shrink-0 text-green-600 dark:text-green-400" aria-hidden />
+                    ) : groupState === "some" ? (
+                      <Minus className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                    ) : (
+                      <CircleOff className="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+                    );
 
                   return (
-                    <tr
-                      key={capabilityName}
-                      className={cn(
-                        "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-gray-900",
-                        createMutation.isPending
-                          ? "cursor-not-allowed opacity-70"
-                          : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60",
-                      )}
-                      onClick={() => toggleCapabilitySelection(capabilityName)}
-                      onKeyDown={(event) => {
-                        if (createMutation.isPending) {
-                          return;
-                        }
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          toggleCapabilitySelection(capabilityName);
-                        }
-                      }}
-                      tabIndex={createMutation.isPending ? -1 : 0}
-                      aria-selected={checked}
-                      aria-label={`${checked ? "Selected" : "Not selected"}: ${capabilityName}. Press Enter or Space to toggle.`}
+                    <div
+                      key={section.key}
+                      className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
+                      role={section.label ? "group" : undefined}
+                      aria-label={section.label ? `${section.label} capabilities` : undefined}
                     >
-                      <td className="px-4 py-3 align-middle">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)} aria-hidden />
-                          <span className="font-mono text-sm text-gray-800 dark:text-gray-100">{capabilityName}</span>
-                          <CopyButton text={capabilityName} />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        {capability.description ? (
-                          <div className="text-sm text-gray-600 dark:text-gray-400">{capability.description}</div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 align-middle">
-                        <div className="flex justify-end">
-                          {checked ? (
-                            <Check className="size-3 shrink-0 text-green-600 dark:text-green-400" aria-hidden />
-                          ) : (
-                            <CircleOff className="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+                      {section.label ? (
+                        <button
+                          type="button"
+                          disabled={createMutation.isPending}
+                          aria-label={
+                            groupState === "all"
+                              ? `Remove all selections from ${section.label}`
+                              : `Select all capabilities in ${section.label}`
+                          }
+                          className={cn(
+                            "flex w-full cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800/50 dark:hover:bg-gray-800",
+                            createMutation.isPending &&
+                              "!cursor-not-allowed opacity-70 hover:bg-gray-50 dark:hover:bg-gray-800/50",
                           )}
-                        </div>
-                      </td>
-                    </tr>
+                          onClick={() => toggleCapabilityGroup(section.names)}
+                          onKeyDown={(event) => {
+                            if (createMutation.isPending) {
+                              return;
+                            }
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              toggleCapabilityGroup(section.names);
+                            }
+                          }}
+                        >
+                          <div className="min-w-0">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {section.label}
+                            </span>
+                            <span className="ml-2 text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                              {selectedInSection}/{section.names.length}
+                            </span>
+                          </div>
+                          <div className="flex shrink-0 items-center">{groupIcon}</div>
+                        </button>
+                      ) : null}
+                      <div className={cn(section.label && "-mt-px", "overflow-x-auto")}>
+                        <table className="w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
+                          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
+                            {section.names.map((capabilityName) => {
+                              const capability = capabilityByName.get(capabilityName);
+                              if (!capability) {
+                                return null;
+                              }
+
+                              const checked = selectedCapabilities.has(capabilityName);
+                              const statusDotClass = getCapabilitySelectionDotClass(checked);
+
+                              return (
+                                <tr
+                                  key={capabilityName}
+                                  className={cn(
+                                    "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-gray-900",
+                                    createMutation.isPending
+                                      ? "cursor-not-allowed opacity-70"
+                                      : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60",
+                                  )}
+                                  onClick={() => toggleCapabilitySelection(capabilityName)}
+                                  onKeyDown={(event) => {
+                                    if (createMutation.isPending) {
+                                      return;
+                                    }
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.preventDefault();
+                                      toggleCapabilitySelection(capabilityName);
+                                    }
+                                  }}
+                                  tabIndex={createMutation.isPending ? -1 : 0}
+                                  aria-selected={checked}
+                                  aria-label={`${checked ? "Selected" : "Not selected"}: ${capabilityName}. Press Enter or Space to toggle.`}
+                                >
+                                  <td className="px-4 py-3 align-middle">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span
+                                        className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)}
+                                        aria-hidden
+                                      />
+                                      <span className="font-mono text-sm text-gray-800 dark:text-gray-100">
+                                        {capabilityName}
+                                      </span>
+                                      <CopyButton text={capabilityName} />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 align-middle">
+                                    {capability.description ? (
+                                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                                        {capability.description}
+                                      </div>
+                                    ) : null}
+                                  </td>
+                                  <td className="px-4 py-3 align-middle">
+                                    <div className="flex justify-end">
+                                      {checked ? (
+                                        <Check
+                                          className="size-3 shrink-0 text-green-600 dark:text-green-400"
+                                          aria-hidden
+                                        />
+                                      ) : (
+                                        <CircleOff
+                                          className="size-3 shrink-0 text-gray-400 dark:text-gray-500"
+                                          aria-hidden
+                                        />
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex w-fit max-w-full items-center gap-4 pt-2">
-            <Button
-              type="button"
-              variant="link"
-              onClick={() => setIntroStep("name")}
-              disabled={createMutation.isPending}
-              className="group h-auto shrink-0 gap-1.5 px-0 py-1 font-normal hover:!no-underline"
-            >
-              <ArrowLeft
-                aria-hidden
-                className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
-              />
-              Previous
-            </Button>
             <Button
               type="button"
               onClick={() => void handleCreateIntegration()}
-              disabled={createMutation.isPending || selectedCapabilities.size === 0}
+              disabled={
+                createMutation.isPending ||
+                !instanceName.trim() ||
+                (integrationCapabilities.length > 0 && selectedCapabilities.size === 0)
+              }
               className="group justify-center gap-2 text-sm !px-7 hover:!bg-primary"
             >
-              {createMutation.isPending ? "Saving..." : "Next"}
+              {createMutation.isPending ? "Creating..." : "Next"}
               <MoveRight
                 aria-hidden
                 className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
@@ -592,18 +734,18 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
             setStepInputs((currentValues) => ({ ...currentValues, [fieldName]: value }));
           }}
           onSubmit={handleSubmitCurrentStep}
-          onBack={canRevertCurrentStep ? handleRevertCurrentStep : undefined}
+          onBack={() => void handleSetupStepBack()}
           isSubmitting={submitStepMutation.isPending}
-          isReverting={revertStepMutation.isPending}
+          isReverting={revertStepMutation.isPending || deleteIntegrationMutation.isPending}
         />
       ) : currentStep?.type === "REDIRECT_PROMPT" ? (
         <IntegrationSetupRedirectPromptStep
           step={currentStep}
-          onBack={canRevertCurrentStep ? handleRevertCurrentStep : undefined}
+          onBack={() => void handleSetupStepBack()}
           onOpenRedirect={() => openRedirectPrompt(currentStep)}
           onSubmit={handleSubmitCurrentStep}
           isSubmitting={submitStepMutation.isPending}
-          isReverting={revertStepMutation.isPending}
+          isReverting={revertStepMutation.isPending || deleteIntegrationMutation.isPending}
         />
       ) : currentStep?.type === "DONE" ? (
         <IntegrationSetupDoneStep

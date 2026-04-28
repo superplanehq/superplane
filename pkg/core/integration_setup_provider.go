@@ -9,9 +9,9 @@ import (
 type IntegrationSetupProvider interface {
 
 	//
-	// The list of available capabilities the integration provides.
+	// The list of available capability groups the integration provides.
 	//
-	Capabilities() []Capability
+	CapabilityGroups() []CapabilityGroup
 
 	//
 	// First step of the setup flow.
@@ -112,7 +112,8 @@ type IntegrationSecretDefinition struct {
 
 type IntegrationParameterStorage interface {
 	Get(name string) (any, error)
-	Delete(name string) error
+	GetString(name string) (string, error)
+	Delete(names ...string) error
 	Create(def IntegrationParameterDefinition) error
 }
 
@@ -140,6 +141,12 @@ type CapabilityContext interface {
 	Enable(capabilities ...string) error
 	Disable(capabilities ...string) error
 	IsRequested(capabilities ...string) (bool, error)
+	Requested() []string
+}
+
+type CapabilityGroup struct {
+	Label        string
+	Capabilities []Capability
 }
 
 type Capability struct {

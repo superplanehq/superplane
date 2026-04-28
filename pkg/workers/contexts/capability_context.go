@@ -77,3 +77,13 @@ func (c *CapabilityContext) IsRequested(capabilities ...string) (bool, error) {
 
 	return true, nil
 }
+
+func (c *CapabilityContext) Requested() []string {
+	requested := []string{}
+	for _, capability := range c.states {
+		if capability.State == core.IntegrationCapabilityStateRequested {
+			requested = append(requested, capability.Name)
+		}
+	}
+	return requested
+}

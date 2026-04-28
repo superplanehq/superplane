@@ -68,34 +68,44 @@ You can now start using the following projects:
 {{- end }}
 `
 
-func (s *SetupProvider) Capabilities() []core.Capability {
-	runWorkflow := &RunWorkflow{}
-	getPipeline := &GetPipeline{}
-	onPipelineDone := &OnPipelineDone{}
-
-	return []core.Capability{
-		{
+func (g *SetupProvider) genCapabilities(actions []core.Action, triggers []core.Trigger) []core.Capability {
+	capabilities := []core.Capability{}
+	for _, action := range actions {
+		capabilities = append(capabilities, core.Capability{
 			Type:           core.IntegrationCapabilityTypeAction,
-			Name:           runWorkflow.Name(),
-			Label:          runWorkflow.Label(),
-			Description:    runWorkflow.Description(),
-			Configuration:  runWorkflow.Configuration(),
-			OutputChannels: runWorkflow.OutputChannels(nil),
-		},
-		{
-			Type:           core.IntegrationCapabilityTypeAction,
-			Name:           getPipeline.Name(),
-			Label:          getPipeline.Label(),
-			Description:    getPipeline.Description(),
-			Configuration:  getPipeline.Configuration(),
-			OutputChannels: getPipeline.OutputChannels(nil),
-		},
-		{
+			Name:           action.Name(),
+			Label:          action.Label(),
+			Description:    action.Description(),
+			Configuration:  action.Configuration(),
+			OutputChannels: action.OutputChannels(nil),
+		})
+	}
+	for _, trigger := range triggers {
+		capabilities = append(capabilities, core.Capability{
 			Type:          core.IntegrationCapabilityTypeTrigger,
-			Name:          onPipelineDone.Name(),
-			Label:         onPipelineDone.Label(),
-			Description:   onPipelineDone.Description(),
-			Configuration: onPipelineDone.Configuration(),
+			Name:          trigger.Name(),
+			Label:         trigger.Label(),
+			Description:   trigger.Description(),
+			Configuration: trigger.Configuration(),
+		})
+	}
+
+	return capabilities
+}
+
+func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
+	return []core.CapabilityGroup{
+		{
+			Label: "All",
+			Capabilities: s.genCapabilities(
+				[]core.Action{
+					&RunWorkflow{},
+					&GetPipeline{},
+				},
+				[]core.Trigger{
+					&OnPipelineDone{},
+				},
+			),
 		},
 	}
 }

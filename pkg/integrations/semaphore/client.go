@@ -18,32 +18,22 @@ type Client struct {
 }
 
 func NewClientWithAPIToken(http core.HTTPContext, parameters core.IntegrationParameterStorage, apiToken string) (*Client, error) {
-	url, err := parameters.Get("organizationUrl")
-	if err != nil || url == nil {
+	url, err := parameters.GetString("organizationUrl")
+	if err != nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)
 	}
 
-	orgURL, ok := url.(string)
-	if !ok {
-		return nil, fmt.Errorf("organization URL is not a string")
-	}
-
 	return &Client{
-		OrgURL:   string(orgURL),
+		OrgURL:   url,
 		APIToken: string(apiToken),
 		http:     http,
 	}, nil
 }
 
 func NewClientWithStorageContexts(http core.HTTPContext, parameters core.IntegrationParameterStorage, secrets core.IntegrationSecretStorage) (*Client, error) {
-	url, err := parameters.Get("organizationUrl")
-	if err != nil || url == nil {
+	url, err := parameters.GetString("organizationUrl")
+	if err != nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)
-	}
-
-	orgURL, ok := url.(string)
-	if !ok {
-		return nil, fmt.Errorf("organization URL is not a string")
 	}
 
 	apiToken, err := secrets.Get("apiToken")
@@ -52,7 +42,7 @@ func NewClientWithStorageContexts(http core.HTTPContext, parameters core.Integra
 	}
 
 	return &Client{
-		OrgURL:   string(orgURL),
+		OrgURL:   url,
 		APIToken: string(apiToken),
 		http:     http,
 	}, nil
