@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 
 export type CanvasMemoryModalProps = {
   open: boolean;
@@ -120,6 +121,34 @@ function formatValue(value: unknown): string {
   }
 }
 
+function getHttpUrl(value: string): string | undefined {
+  if (value.trim() !== value) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function renderValue(value: unknown): ReactNode {
+  const formattedValue = formatValue(value);
+  const url = typeof value === "string" ? getHttpUrl(formattedValue) : undefined;
+
+  if (!url) {
+    return formattedValue;
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">
+      {formattedValue}
+    </a>
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -164,7 +193,7 @@ function renderNamespaceTable(
                 <tr key={entry.id || index} className="border-b border-slate-950/15">
                   {columns.map((column) => (
                     <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
-                      {formatValue(item[column])}
+                      {renderValue(item[column])}
                     </td>
                   ))}
                   <td className="px-3 py-2 text-right align-middle">
@@ -203,7 +232,7 @@ function renderNamespaceTable(
         <tbody>
           {values.map((entry, index) => (
             <tr key={entry.id || index} className="border-b border-slate-950/15">
-              <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700">{formatValue(entry.values)}</td>
+              <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700">{renderValue(entry.values)}</td>
               <td className="px-3 py-2 text-right align-middle">
                 <Button
                   type="button"
