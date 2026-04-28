@@ -14,55 +14,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// TestOnVMDeallocated_Metadata verifies the trigger's metadata methods
-func TestOnVMDeallocated_Metadata(t *testing.T) {
-	trigger := &OnVMDeallocated{}
-
-	assert.Equal(t, "azure.onVirtualMachineDeallocated", trigger.Name())
-	assert.Equal(t, "On VM Deallocated", trigger.Label())
-	assert.Equal(t, "azure", trigger.Icon())
-	assert.Equal(t, "blue", trigger.Color())
-	assert.NotEmpty(t, trigger.Description())
-	assert.NotEmpty(t, trigger.Documentation())
-}
-
-// TestOnVMDeallocated_Configuration verifies the trigger's configuration fields
-func TestOnVMDeallocated_Configuration(t *testing.T) {
-	trigger := &OnVMDeallocated{}
-	config := trigger.Configuration()
-
-	require.Len(t, config, 2)
-	assert.Equal(t, "resourceGroup", config[0].Name)
-	assert.Equal(t, "Resource Group", config[0].Label)
-	assert.False(t, config[0].Required)
-	assert.Equal(t, "nameFilter", config[1].Name)
-	assert.Equal(t, "VM Name Filter", config[1].Label)
-	assert.False(t, config[1].Required)
-}
-
-// TestOnVMDeallocated_ExampleData verifies the trigger's example output
-func TestOnVMDeallocated_ExampleData(t *testing.T) {
-	trigger := &OnVMDeallocated{}
-	example := trigger.ExampleData()
-
-	require.NotNil(t, example)
-	assert.Contains(t, example, "type")
-	assert.Contains(t, example, "timestamp")
-	assert.Contains(t, example, "data")
-
-	envelope, ok := example["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, envelope, "id")
-	assert.Contains(t, envelope, "eventType")
-	assert.Equal(t, "Microsoft.Resources.ResourceActionSuccess", envelope["eventType"])
-	assert.Contains(t, envelope, "subject")
-
-	data, ok := envelope["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "Microsoft.Compute/virtualMachines/deallocate/action", data["operationName"])
-}
-
-// TestOnVMDeallocated_Setup verifies the trigger setup method
 func TestOnVMDeallocated_Setup(t *testing.T) {
 	trigger := &OnVMDeallocated{}
 
@@ -99,7 +50,6 @@ func TestOnVMDeallocated_Setup(t *testing.T) {
 	})
 }
 
-// TestOnVMDeallocated_Cleanup verifies the trigger cleanup method
 func TestOnVMDeallocated_Cleanup(t *testing.T) {
 	trigger := &OnVMDeallocated{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -115,31 +65,6 @@ func TestOnVMDeallocated_Cleanup(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestOnVMDeallocated_Actions verifies the trigger has no actions
-func TestOnVMDeallocated_Actions(t *testing.T) {
-	trigger := &OnVMDeallocated{}
-	actions := trigger.Actions()
-	assert.Empty(t, actions)
-}
-
-// TestOnVMDeallocated_HandleAction verifies the trigger's action handler
-func TestOnVMDeallocated_HandleAction(t *testing.T) {
-	trigger := &OnVMDeallocated{}
-	logger := logrus.NewEntry(logrus.New())
-
-	ctx := core.TriggerActionContext{
-		Name:          "test",
-		Parameters:    map[string]any{},
-		Configuration: map[string]any{},
-		Logger:        logger,
-	}
-
-	result, err := trigger.HandleAction(ctx)
-	assert.NoError(t, err)
-	assert.Nil(t, result)
-}
-
-// TestOnVMDeallocated_HandleWebhook_SubscriptionValidation verifies subscription validation handling
 func TestOnVMDeallocated_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	trigger := &OnVMDeallocated{}
 

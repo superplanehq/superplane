@@ -114,7 +114,7 @@ func (c *DeleteRelease) Configuration() []configuration.Field {
 			Name:        "tagName",
 			Label:       "Tag Name",
 			Type:        configuration.FieldTypeString,
-			Placeholder: "e.g., v1.0.0 or {{$.data.tag_name}}",
+			Placeholder: "e.g., v1.0.0 or {{ root().data.tag_name }}",
 			Description: "Git tag identifying the release to delete. Supports template variables from previous steps.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
@@ -240,18 +240,18 @@ func (c *DeleteRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return 200, nil, nil
 }
 
-func (c *DeleteRelease) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteRelease) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *DeleteRelease) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteRelease) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

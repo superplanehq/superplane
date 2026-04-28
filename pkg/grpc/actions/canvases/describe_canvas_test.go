@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -104,7 +104,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Equal(t, "node-2", response.Canvas.Spec.Nodes[1].Id)
 		assert.Equal(t, "Second Node", response.Canvas.Spec.Nodes[1].Name)
 
-		var pausedNode *compb.Node
+		var pausedNode *componentpb.Node
 		for _, node := range response.Canvas.Spec.Nodes {
 			if node.Id == "node-1" {
 				pausedNode = node

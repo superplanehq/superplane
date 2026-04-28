@@ -24,8 +24,8 @@ import (
 type nodeKind string
 
 const (
-	nodeKindComponent nodeKind = "component"
-	nodeKindTrigger   nodeKind = "trigger"
+	nodeKindAction  nodeKind = "action"
+	nodeKindTrigger nodeKind = "trigger"
 )
 
 type schemaKind string
@@ -194,8 +194,8 @@ func loadExamples() (map[string]exampleRecord, error) {
 		}
 	}
 
-	for _, component := range reg.ListComponents() {
-		add(nodeKindComponent, component.Name(), cloneMap(component.ExampleOutput()))
+	for _, action := range reg.ListActions() {
+		add(nodeKindAction, action.Name(), cloneMap(action.ExampleOutput()))
 	}
 
 	for _, trigger := range reg.ListTriggers() {
@@ -203,8 +203,8 @@ func loadExamples() (map[string]exampleRecord, error) {
 	}
 
 	for _, integration := range reg.ListIntegrations() {
-		for _, component := range integration.Components() {
-			add(nodeKindComponent, component.Name(), cloneMap(component.ExampleOutput()))
+		for _, action := range integration.Actions() {
+			add(nodeKindAction, action.Name(), cloneMap(action.ExampleOutput()))
 		}
 		for _, trigger := range integration.Triggers() {
 			add(nodeKindTrigger, trigger.Name(), cloneMap(trigger.ExampleData()))
@@ -325,7 +325,7 @@ func newPackageAnalyzer(pkg *loadedPackage) *packageAnalyzer {
 			switch fn.Name.Name {
 			case "ExampleOutput":
 				meta := analyzer.typeMetas[recvType]
-				meta.Kind = nodeKindComponent
+				meta.Kind = nodeKindAction
 				meta.RecvType = recvType
 				analyzer.typeMetas[recvType] = meta
 			case "ExampleData":

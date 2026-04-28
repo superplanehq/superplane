@@ -1,0 +1,9 @@
+{
+  "data": {
+    "status": "idle",
+    "sessionId": "sess_01ExampleManagedSession",
+    "lastMessage": "Finished the requested task."
+  },
+  "timestamp": "2026-04-26T12:00:00Z",
+  "type": "claude.runAgent.finished"
+}

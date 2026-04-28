@@ -7,4 +7,4 @@ count() {
 echo "Bugs:             $(count bug)"
 echo "Papercut:         $(count papercut)"
 echo "Stability:        $(count stability)"
-echo "Dev Productivity: $(count dev-productivity)"
+echo "Productivity:     $(count productivity)"

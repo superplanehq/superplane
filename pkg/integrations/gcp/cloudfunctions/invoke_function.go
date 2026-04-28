@@ -233,8 +233,6 @@ type callFunctionResponse struct {
 	Error       string `json:"error"`
 }
 
-func (c *InvokeFunction) Actions() []core.Action                  { return nil }
-func (c *InvokeFunction) HandleAction(_ core.ActionContext) error { return nil }
 func (c *InvokeFunction) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -242,4 +240,12 @@ func (c *InvokeFunction) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *InvokeFunction) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *InvokeFunction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *InvokeFunction) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *InvokeFunction) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

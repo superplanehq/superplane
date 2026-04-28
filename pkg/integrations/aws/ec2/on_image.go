@@ -185,25 +185,25 @@ func (p *OnImage) subscriptionPattern(region string) *common.EventBridgeEvent {
 	}
 }
 
-func (p *OnImage) Actions() []core.Action {
-	return []core.Action{
+func (p *OnImage) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "checkRuleAvailability",
-			Description: "Check if the EventBridge rule is available",
+			Name: "checkRuleAvailability",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (p *OnImage) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnImage) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "checkRuleAvailability":
 		return p.checkRuleAvailability(ctx)
 	default:
-		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (p *OnImage) checkRuleAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnImage) checkRuleAvailability(ctx core.TriggerHookContext) (map[string]any, error) {
 	metadata := OnImageMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)

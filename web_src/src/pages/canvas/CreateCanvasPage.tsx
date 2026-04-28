@@ -90,6 +90,7 @@ export function CreateCanvasPage() {
       const result = await createMutation.mutateAsync({
         name: name.trim(),
         description: description.trim() || undefined,
+        method: "ui",
       });
 
       if (result?.data?.canvas?.metadata?.id) {

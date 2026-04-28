@@ -97,8 +97,8 @@ func (s *ServiceNow) Configuration() []configuration.Field {
 	}
 }
 
-func (s *ServiceNow) Components() []core.Component {
-	return []core.Component{
+func (s *ServiceNow) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 		&GetIncident{},
 	}
@@ -228,10 +228,10 @@ func (r *TokenResponse) GetExpiration() time.Duration {
 
 func (s *ServiceNow) HandleRequest(ctx core.HTTPRequestContext) {}
 
-func (s *ServiceNow) Actions() []core.Action {
-	return []core.Action{}
+func (s *ServiceNow) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (s *ServiceNow) HandleAction(ctx core.IntegrationActionContext) error {
+func (s *ServiceNow) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

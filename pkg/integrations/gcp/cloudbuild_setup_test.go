@@ -75,7 +75,7 @@ func TestHandleEnsureCloudBuildCreatesTopicAndSubscription(t *testing.T) {
 		},
 	}
 
-	err = (&GCP{}).HandleAction(core.IntegrationActionContext{
+	err = (&GCP{}).HandleHook(core.IntegrationHookContext{
 		Name:            gcpcommon.ActionNameEnsureCloudBuild,
 		WebhooksBaseURL: "https://superplane.example",
 		HTTP: &rewriteHTTPContext{

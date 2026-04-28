@@ -157,12 +157,12 @@ func Test__CreateImage__Execute(t *testing.T) {
 	})
 }
 
-func Test__CreateImage__HandleAction(t *testing.T) {
+func Test__CreateImage__HandleHook(t *testing.T) {
 	component := &CreateImage{}
 
 	t.Run("rule unavailable -> reschedules check", func(t *testing.T) {
 		requests := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:     "checkRuleAvailability",
 			Logger:   logrus.NewEntry(logrus.New()),
 			Requests: requests,
@@ -191,7 +191,7 @@ func Test__CreateImage__HandleAction(t *testing.T) {
 				},
 			},
 		}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        "checkRuleAvailability",
 			Logger:      logrus.NewEntry(logrus.New()),
 			Requests:    &contexts.RequestContext{},

@@ -85,9 +85,12 @@ describe("CreateCanvasPage analytics", () => {
     await user.click(screen.getByTestId("create-canvas-button"));
 
     await waitFor(() => {
-      expect(capture).toHaveBeenCalledWith("canvas created", {
+      expect(capture).toHaveBeenCalledWith("canvas:canvas_create", {
         canvas_id: "canvas-123",
         organization_id: "org-123",
+        method: "ui",
+        template_id: undefined,
+        has_description: false,
       });
     });
   });

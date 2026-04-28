@@ -20,4 +20,5 @@ export interface FieldRendererProps {
   fieldPath?: string;
   autocompleteExampleObj?: Record<string, unknown> | null;
   allowExpressions?: boolean;
+  excludedSuggestions?: string[];
 }
