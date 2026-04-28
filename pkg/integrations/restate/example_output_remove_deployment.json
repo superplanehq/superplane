@@ -1,0 +1,9 @@
+{
+    "type": "restate.deployment.removed",
+    "data": {
+        "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+        "force": false,
+        "status": "removed"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

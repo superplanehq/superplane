@@ -1,0 +1,17 @@
+{
+    "type": "restate.invocation.response",
+    "data": {
+        "service": "CartService",
+        "handler": "addItem",
+        "status_code": 200,
+        "response": {
+            "cart_id": "cart-12345",
+            "items": [
+                {"product_id": "SKU-001", "quantity": 2, "price": 29.99}
+            ],
+            "total": 59.98
+        },
+        "idempotency_key": "order-abc-123"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

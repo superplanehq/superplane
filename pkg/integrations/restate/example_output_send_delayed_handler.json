@@ -1,0 +1,11 @@
+{
+    "type": "restate.invocation.delayed",
+    "data": {
+        "invocation_id": "inv_19maBAlEOOH8VBKFpLRFIlposACCTAv2u3",
+        "status": "Accepted",
+        "service": "ReminderService",
+        "handler": "sendReminder",
+        "delay": "30m"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
