@@ -317,12 +317,48 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-gen.setup:
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-	$(MAKE) openapi.web.client.gen
-	$(MAKE) openapi.python.client.gen
+gen.setup: compose.setup
+	$(MAKE) pb.gen-no-setup
+	$(MAKE) openapi.spec.gen-no-setup
+	$(MAKE) openapi.client.gen-no-setup
+	$(MAKE) openapi.web.client.gen-no-setup
+	$(MAKE) openapi.python.client.gen-no-setup
+
+# Optimized targets that assume compose is already set up
+pb.gen-no-setup:
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+
+openapi.spec.gen-no-setup:
+	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+
+openapi.client.gen-no-setup:
+	rm -rf pkg/openapi_client
+	$(DOCKER_RUN_AS_CURRENT_USER) \
+	-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+	-i /local/api/swagger/superplane.swagger.json \
+	-g go \
+	-o /local/pkg/openapi_client \
+	--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
+	rm -rf pkg/openapi_client/test
+	rm -rf pkg/openapi_client/docs
+
+openapi.web.client.gen-no-setup:
+	rm -rf web_src/src/api-client
+	$(DOCKER_RUN_AS_CURRENT_USER) \
+	-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+	-i /local/api/swagger/superplane.swagger.json \
+	-g typescript-fetch \
+	-o /local/web_src/src/api-client \
+	--additional-properties=modelPropertyNaming=original,withSeparateModelsAndApi=true,typescriptThreePlus=true
+	rm -rf web_src/src/api-client/.openapi-generator
+	rm -rf web_src/src/api-client/docs
+
+openapi.python.client.gen-no-setup:
+	rm -rf agent/src/superplaneapi
+	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && ./scripts/generate_openapi_client.sh"
 
 gen.setup.backend:
 	$(MAKE) pb.gen
@@ -338,8 +374,13 @@ gen.setup.agent:
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.python.client.gen
 
-gen:
-	$(MAKE) gen.setup
+gen: gen.setup
+	$(MAKE) format.go
+	$(MAKE) format.js
+	$(MAKE) gen.components.docs
+
+# Fast gen that skips compose.setup if already set up
+gen.fast: pb.gen-no-setup openapi.spec.gen-no-setup openapi.client.gen-no-setup openapi.web.client.gen-no-setup openapi.python.client.gen-no-setup
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
