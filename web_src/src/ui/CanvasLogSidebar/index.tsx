@@ -285,7 +285,7 @@ export function CanvasLogSidebar({
     activeTab === "runs" ? "Search runs…" : activeTab === "errors" ? "Search errors…" : "Search warnings…";
 
   return (
-    <aside className="absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
+    <aside className="ph-no-capture absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
       <div
         className="bg-white outline outline-1 outline-offset-0 outline-slate-950/10 flex flex-col"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
