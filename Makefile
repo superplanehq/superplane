@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent check.generated.artifacts check.templates compose.setup
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui gen.setup.agent dev.setup.web check.generated.artifacts check.templates compose.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -64,6 +64,7 @@ test.e2e.setup:
 	$(MAKE) test.setup
 
 test.e2e.ui.setup:
+	$(MAKE) dev.setup.web
 	$(MAKE) openapi.web.client.gen
 
 test.e2e:
@@ -137,31 +138,27 @@ format.js.check:
 #
 
 dev.setup:
+	$(MAKE) dev.setup.docker
+	$(MAKE) dev.setup.web
+	$(MAKE) dev.setup.app
+	$(MAKE) dev.setup.agent
+	$(MAKE) gen.setup
+
+dev.setup.docker:
 	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
-	$(MAKE) gen.setup
-	$(MAKE) dev.setup.app
-	$(MAKE) dev.setup.agent
-	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
-	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
-	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+
+dev.setup.web:
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -c 'cd web_src && npm install'
 
 dev.setup.app:
 	$(COMPOSE) run --rm app go mod download
-	$(COMPOSE) run --rm app go build cmd/server/main.go
+	$(MAKE) db.create DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_dev
 
 dev.setup.agent:
 	$(COMPOSE) run --rm agent uv sync --frozen || $(COMPOSE) run --rm agent uv sync
-
-dev.setup.no.cache:
-	rm -rf tmp
-	$(COMPOSE) down -v --remove-orphans
-	$(COMPOSE) build --no-cache
-	$(MAKE) gen.setup
-	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
@@ -386,9 +383,8 @@ openapi.client.gen:
 	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/openapi_client -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
 openapi.web.client.gen:
-	$(MAKE) compose.setup
 	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm ci && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -c "cd web_src && npm run generate:api"
 
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi
