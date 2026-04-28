@@ -161,14 +161,6 @@ func (c *EnableImage) Execute(ctx core.ExecutionContext) error {
 	}})
 }
 
-func (c *EnableImage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *EnableImage) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *EnableImage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -178,5 +170,13 @@ func (c *EnableImage) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *EnableImage) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *EnableImage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *EnableImage) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

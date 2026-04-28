@@ -1,5 +1,5 @@
 import type {
-  ComponentsComponent,
+  SuperplaneActionsAction,
   SuperplaneComponentsNode as ComponentsNode,
   IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
@@ -11,16 +11,16 @@ export function getNodeIntegrationName(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
 ): string | undefined {
-  if (node.type === "TYPE_COMPONENT") {
+  if (node.type === "TYPE_ACTION") {
     const match = availableIntegrations.find((integration) =>
-      integration.components?.some((component: ComponentsComponent) => component.name === node.component?.name),
+      integration.actions?.some((component: SuperplaneActionsAction) => component.name === node.component),
     );
     return match?.name;
   }
 
   if (node.type === "TYPE_TRIGGER") {
     const match = availableIntegrations.find((integration) =>
-      integration.triggers?.some((trigger: TriggersTrigger) => trigger.name === node.trigger?.name),
+      integration.triggers?.some((trigger: TriggersTrigger) => trigger.name === node.component),
     );
     return match?.name;
   }

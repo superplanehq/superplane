@@ -100,11 +100,11 @@ func (t *OnDeploy) Setup(ctx core.TriggerContext) error {
 	)
 }
 
-func (t *OnDeploy) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnDeploy) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnDeploy) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnDeploy) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

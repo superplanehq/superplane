@@ -22,8 +22,7 @@ spec:
     - id: trigger-1
       name: Trigger
       type: TYPE_TRIGGER
-      trigger:
-        name: start
+      component: start
       metadata:
         repository:
           id: 123

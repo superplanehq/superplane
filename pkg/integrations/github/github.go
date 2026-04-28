@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -103,8 +103,8 @@ func (g *GitHub) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GitHub) Components() []core.Component {
-	return []core.Component{
+func (g *GitHub) Actions() []core.Action {
+	return []core.Action{
 		&GetIssue{},
 		&GetRepositoryPermission{},
 		&CreateIssue{},
@@ -555,14 +555,6 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	return &appData, nil
 }
 
-func (g *GitHub) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GitHub) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func listInstallationRepositories(ctx context.Context, client *github.Client) ([]Repository, error) {
 	var allRepos []*github.Repository
 	opts := &github.ListOptions{
@@ -596,4 +588,12 @@ func listInstallationRepositories(ctx context.Context, client *github.Client) ([
 	}
 
 	return out, nil
+}
+
+func (g *GitHub) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GitHub) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

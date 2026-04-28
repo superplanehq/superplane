@@ -36,10 +36,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
-	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -176,11 +176,7 @@ func NewServer(
 		registry:              registry,
 		authService:           authorizationService,
 		upgrader: &websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				// Allow all connections - you may want to restrict this in production
-				// TODO: implement origin checking
-				return true
-			},
+			CheckOrigin:     makeOriginChecker(getAllowedOrigins()),
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
@@ -297,7 +293,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbComponents.RegisterComponentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbActions.RegisterActionsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -353,7 +349,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/actions").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
@@ -1093,7 +1089,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
 
-	return s.executeComponentNode(ctx, body, headers, node, onNewEvents)
+	return s.executeActionNode(ctx, body, headers, node, onNewEvents)
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
@@ -1131,11 +1127,11 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
-	component, err := s.registry.GetComponent(ref.Component.Name)
+	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("component not found: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("action not found: %w", err)
 	}
 
 	logger := logging.ForNode(node)
@@ -1151,7 +1147,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
-	return component.HandleWebhook(core.WebhookRequestContext{
+	return action.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),
@@ -1304,4 +1300,48 @@ func getBaseURL() string {
 		baseURL = fmt.Sprintf("http://localhost:%s", port)
 	}
 	return baseURL
+}
+
+// getAllowedOrigins returns the list of origins permitted to establish
+// WebSocket connections. It reads a comma-separated list from
+// ALLOWED_WS_ORIGINS and falls back to BASE_URL for single-tenant
+// deployments.
+func getAllowedOrigins() []string {
+	if raw := os.Getenv("ALLOWED_WS_ORIGINS"); raw != "" {
+		parts := strings.Split(raw, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	}
+	return []string{getBaseURL()}
+}
+
+// makeOriginChecker returns a CheckOrigin function that validates the
+// WebSocket handshake Origin header against the allowed list per RFC 6454.
+// Requests without an Origin header (non-browser clients such as CLI or
+// server-to-server) are permitted, since those rely on Authorization-header
+// auth which is not susceptible to cross-site WebSocket hijacking.
+func makeOriginChecker(allowed []string) func(*http.Request) bool {
+	set := make(map[string]struct{}, len(allowed))
+	for _, o := range allowed {
+		if u, err := url.Parse(strings.TrimRight(o, "/")); err == nil && u.Host != "" {
+			set[strings.ToLower(u.Scheme+"://"+u.Host)] = struct{}{}
+		}
+	}
+	return func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		u, err := url.Parse(origin)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return false
+		}
+		_, ok := set[strings.ToLower(u.Scheme+"://"+u.Host)]
+		return ok
+	}
 }

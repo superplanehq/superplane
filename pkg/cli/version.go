@@ -1,10 +1,9 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -18,8 +17,8 @@ var Version = "dev"
 var updateCheckResult <-chan *updateInfo
 
 type updateInfo struct {
-	latest string
-	err    error
+	release *releaseInfo
+	err     error
 }
 
 func isDevBuild() bool {
@@ -56,8 +55,8 @@ func StartUpdateCheck() {
 	ch := make(chan *updateInfo, 1)
 	updateCheckResult = ch
 	go func() {
-		latest, err := fetchLatestRelease()
-		ch <- &updateInfo{latest: latest, err: err}
+		release, err := fetchLatestRelease()
+		ch <- &updateInfo{release: release, err: err}
 	}()
 }
 
@@ -83,7 +82,7 @@ func ShouldStartUpdateCheck(args []string) bool {
 		case "--config", "--output", "-o":
 			skipValue = true
 			continue
-		case "-h", "--help", "help", "--version", "version", "completion":
+		case "-h", "--help", "help", "--version", "version", "completion", "upgrade", "self-update":
 			return false
 		}
 
@@ -115,47 +114,33 @@ func PrintUpdateNotice() {
 		return
 	}
 
-	if info.err != nil || info.latest == "" {
+	if info.err != nil || info.release == nil {
 		return
 	}
 
-	if isNewerVersion(Version, info.latest) {
-		fmt.Fprintf(os.Stderr, "\nA new version of superplane CLI is available: %s -> %s\n", Version, info.latest)
-		fmt.Fprintf(os.Stderr, "Download from: https://github.com/superplanehq/superplane/releases/tag/%s\n", info.latest)
+	notice := buildUpdateNotice(Version, info.release, runtime.GOOS, runtime.GOARCH)
+	if notice != "" {
+		fmt.Fprint(os.Stderr, notice)
 	}
 }
 
-const latestReleaseURL = "https://api.github.com/repos/superplanehq/superplane/releases/latest"
-
-func fetchLatestRelease() (string, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
-
-	req, err := http.NewRequest("GET", latestReleaseURL, nil)
-	if err != nil {
-		return "", err
+func buildUpdateNotice(currentVersion string, release *releaseInfo, goos, goarch string) string {
+	if release == nil || !isNewerVersion(currentVersion, release.TagName) {
+		return ""
 	}
 
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+	downloadURL := cliDownloadURL(release.TagName, goos, goarch)
+	asset, err := release.assetForPlatform(goos, goarch)
+	if err == nil && asset.BrowserDownloadURL != "" {
+		downloadURL = asset.BrowserDownloadURL
 	}
 
-	var release struct {
-		TagName string `json:"tag_name"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return "", err
-	}
-
-	return release.TagName, nil
+	return fmt.Sprintf(
+		"\nA new version of superplane CLI is available: %s -> %s\nRun: superplane upgrade\nDirect download: %s\n",
+		currentVersion,
+		release.TagName,
+		downloadURL,
+	)
 }
 
 // isNewerVersion returns true if latest is a newer semver than current.

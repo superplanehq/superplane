@@ -195,11 +195,11 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnPipelineDone) Actions() []core.Action {
-	return []core.Action{}
+func (p *OnPipelineDone) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *OnPipelineDone) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPipelineDone) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

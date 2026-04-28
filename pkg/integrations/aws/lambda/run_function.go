@@ -203,14 +203,6 @@ func (c *RunFunction) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *RunFunction) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *RunFunction) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *RunFunction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -324,5 +316,13 @@ func parseLambdaReportValue(value string) (string, bool) {
 }
 
 func (c *RunFunction) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *RunFunction) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *RunFunction) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

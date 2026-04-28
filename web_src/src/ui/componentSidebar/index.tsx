@@ -32,9 +32,8 @@ import type {
   ConfigurationField,
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
-  ComponentsComponent,
+  SuperplaneActionsAction,
   TriggersTrigger,
-  BlueprintsBlueprint,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
@@ -146,9 +145,8 @@ interface ComponentSidebarProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
+  actions?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
 
   // Highlighting callback for execution chain nodes
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
@@ -221,9 +219,8 @@ export const ComponentSidebar = ({
   componentPayloadLabel,
   componentDocumentationUrl,
   workflowNodes = [],
-  components = [],
+  actions = [],
   triggers = [],
-  blueprints = [],
   onHighlightedNodesChange,
   executionChainEventId,
   executionChainExecutionId,
@@ -606,7 +603,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
+      className="ph-no-capture border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -739,7 +736,7 @@ export const ComponentSidebar = ({
                   loadExecutionChain={loadExecutionChain}
                   getExecutionState={getExecutionState}
                   workflowNodes={workflowNodes}
-                  components={components}
+                  actions={actions}
                 />
               </TabsContent>
             )}
@@ -866,9 +863,8 @@ export const ComponentSidebar = ({
                       getTabData={getTabData}
                       onEventClick={onEventClick}
                       workflowNodes={workflowNodes}
-                      components={components}
+                      actions={actions}
                       triggers={triggers}
-                      blueprints={blueprints}
                       onHighlightedNodesChange={onHighlightedNodesChange}
                     />
                   )}

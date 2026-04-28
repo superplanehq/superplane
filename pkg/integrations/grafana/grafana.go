@@ -11,14 +11,18 @@ import (
 )
 
 const (
-	resourceTypeDataSource   = "data-source"
-	resourceTypeSilence      = "silence"
-	resourceTypeAlertRule    = "alert-rule"
-	resourceTypeContactPoint = "contact-point"
-	resourceTypeRuleGroup    = "rule-group"
-	resourceTypeDashboard    = "dashboard"
-	resourceTypePanel        = "panel"
-	resourceTypeAnnotation   = "annotation"
+	resourceTypeDataSource       = "data-source"
+	resourceTypeSilence          = "silence"
+	resourceTypeAlertRule        = "alert-rule"
+	resourceTypeContactPoint     = "contact-point"
+	resourceTypeRuleGroup        = "rule-group"
+	resourceTypeDashboard        = "dashboard"
+	resourceTypePanel            = "panel"
+	resourceTypeAnnotation       = "annotation"
+	resourceTypeIncident         = "incident"
+	resourceTypeIncidentSeverity = "incident-severity"
+	resourceTypeSyntheticCheck   = "synthetic-check"
+	resourceTypeSyntheticProbe   = "synthetic-probe"
 )
 
 func init() {
@@ -80,15 +84,7 @@ func (g *Grafana) Configuration() []configuration.Field {
 }
 
 func (g *Grafana) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
-func (g *Grafana) Components() []core.Component {
-	return []core.Component{
+	return []core.Action{
 		&CreateAlertRule{},
 		&DeleteAlertRule{},
 		&GetAlertRule{},
@@ -99,11 +95,21 @@ func (g *Grafana) Components() []core.Component {
 		&QueryTraces{},
 		&RenderPanel{},
 		&UpdateAlertRule{},
+		&CreateHTTPSyntheticCheck{},
+		&GetHTTPSyntheticCheck{},
+		&UpdateHTTPSyntheticCheck{},
+		&DeleteHTTPSyntheticCheck{},
 		&CreateAnnotation{},
 		&ListAnnotations{},
 		&DeleteAnnotation{},
 		&CreateSilence{},
 		&DeleteSilence{},
+		&DeclareIncident{},
+		&DeclareDrill{},
+		&GetIncident{},
+		&UpdateIncident{},
+		&ResolveIncident{},
+		&AddIncidentActivity{},
 		&GetSilence{},
 		&ListSilences{},
 	}
@@ -133,11 +139,87 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if resourceType == resourceTypeIncidentSeverity {
+		return grafanaIncidentSeverityResources(), nil
+	}
+
 	switch resourceType {
 	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule, resourceTypeContactPoint, resourceTypeRuleGroup,
-		resourceTypeDashboard, resourceTypePanel, resourceTypeAnnotation, resourceTypeSilence:
+		resourceTypeDashboard, resourceTypePanel, resourceTypeAnnotation, resourceTypeIncident, resourceTypeSilence,
+		resourceTypeSyntheticCheck, resourceTypeSyntheticProbe:
 	default:
 		return []core.IntegrationResource{}, nil
+	}
+
+	switch resourceType {
+	case resourceTypeSyntheticCheck:
+		syntheticsClient, err := NewSyntheticsClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating grafana synthetics client: %w", err)
+		}
+
+		checks, err := syntheticsClient.ListChecks()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(checks))
+		for _, check := range checks {
+			id := check.IDString()
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(check.Job)
+			target := strings.TrimSpace(check.Target)
+			if name == "" {
+				name = target
+			} else if target != "" {
+				name = fmt.Sprintf("%s (%s)", name, target)
+			}
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeSyntheticCheck,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+	case resourceTypeSyntheticProbe:
+		syntheticsClient, err := NewSyntheticsClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating grafana synthetics client: %w", err)
+		}
+
+		probes, err := syntheticsClient.ListProbes()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(probes))
+		for _, probe := range probes {
+			id := probe.IDString()
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(probe.Name)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeSyntheticProbe,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
@@ -235,6 +317,32 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 				Type: resourceTypeAnnotation,
 				Name: formatAnnotationResourceName(annotation),
 				ID:   strconv.FormatInt(annotation.ID, 10),
+			})
+		}
+
+		return resources, nil
+	case resourceTypeIncident:
+		incidents, err := client.ListIncidents(100)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(incidents))
+		for _, incident := range incidents {
+			id := strings.TrimSpace(incident.IncidentID)
+			if id == "" {
+				continue
+			}
+
+			label := formatIncidentResourceLabel(id, incident.Title, incident.Status)
+			if label == "" {
+				label = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeIncident,
+				Name: label,
+				ID:   id,
 			})
 		}
 
@@ -338,4 +446,12 @@ func formatSilenceResourceLabel(s Silence) string {
 		return fmt.Sprintf("%s (%s)", comment, idShort)
 	}
 	return fmt.Sprintf("%s [%s] (%s)", comment, state, idShort)
+}
+
+func (g *Grafana) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *Grafana) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

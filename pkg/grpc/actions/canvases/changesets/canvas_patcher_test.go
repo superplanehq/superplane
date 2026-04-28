@@ -42,7 +42,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					},
 				},
 			},
-			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
+			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "true"}},
 		)
 
 		steps.whenHandling(&pb.CanvasChangeset{
@@ -69,7 +69,7 @@ func Test__CanvasPatcher(t *testing.T) {
 					Edge: &pb.CanvasChangeset_Change_Edge{
 						SourceId: "node-a",
 						TargetId: "node-c",
-						Channel:  "default",
+						Channel:  "true",
 					},
 				},
 				{
@@ -85,7 +85,7 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertHasNodeBlock("node-c", "noop")
 		steps.assertHasNoNodeIntegrationID("node-c")
 		steps.assertNodeCount(2)
-		steps.assertHasEdge("node-a", "node-c", "default")
+		steps.assertHasEdge("node-a", "node-c", "true")
 		steps.assertEdgeCount(1)
 		steps.assertGraphIsValid()
 	})
@@ -203,6 +203,54 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertNoError()
 		steps.assertNodePosition("node-a", 125, 240)
 		steps.assertNodePosition("node-b", 780, 95)
+	})
+
+	t.Run("rejects edges that reference an undefined source output channel", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(
+			[]models.Node{
+				{
+					ID:   "http-1",
+					Name: "HTTP Request",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "http"},
+					},
+					Configuration: map[string]any{
+						"method": "GET",
+						"url":    "https://example.com",
+					},
+				},
+				{
+					ID:   "if-1",
+					Name: "If",
+					Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{
+						Component: &models.ComponentRef{Name: "if"},
+					},
+					Configuration: map[string]any{
+						"expression": "true",
+					},
+				},
+			},
+			nil,
+		)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_EDGE,
+					Edge: &pb.CanvasChangeset_Change_Edge{
+						SourceId: "http-1",
+						TargetId: "if-1",
+						Channel:  "default",
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertHasError()
+		steps.assertErrorContains(`source node http-1 does not have output channel "default"`)
 	})
 
 	t.Run("returns error when change object is misconfigured", func(t *testing.T) {

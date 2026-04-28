@@ -21,6 +21,8 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   showValuePreview?: boolean;
   quickTip?: string;
   expressionMode?: "wrapped" | "raw";
+  /** Labels of suggestions to hide (e.g., ["$", "previous"] to restrict to root() only). */
+  excludedSuggestions?: string[];
 }
 
 const suggestionSortPriority = {
@@ -48,6 +50,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       showValuePreview = false,
       quickTip,
       expressionMode = "wrapped",
+      excludedSuggestions,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -911,21 +914,23 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
       const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {}, {
         limit: 150,
-      }).sort((a, b) => {
-        const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
-        const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
+      })
+        .filter((s) => !excludedSuggestions?.includes(s.label))
+        .sort((a, b) => {
+          const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
+          const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
 
-        if (aPriority !== undefined && bPriority !== undefined) {
-          return aPriority - bPriority;
-        }
-        if (aPriority !== undefined) {
-          return -1;
-        }
-        if (bPriority !== undefined) {
-          return 1;
-        }
-        return a.label.localeCompare(b.label);
-      });
+          if (aPriority !== undefined && bPriority !== undefined) {
+            return aPriority - bPriority;
+          }
+          if (aPriority !== undefined) {
+            return -1;
+          }
+          if (bPriority !== undefined) {
+            return 1;
+          }
+          return a.label.localeCompare(b.label);
+        });
       setSuggestions(newSuggestions);
       setIsOpen(newSuggestions.length > 0);
       const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;
@@ -948,6 +953,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       onChange,
       showValuePreview,
       exampleObj,
+      excludedSuggestions,
       computeHighlightedValue,
     ]);
 

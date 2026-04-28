@@ -68,8 +68,8 @@ func (d *Discord) Configuration() []configuration.Field {
 	}
 }
 
-func (d *Discord) Components() []core.Component {
-	return []core.Component{
+func (d *Discord) Actions() []core.Action {
+	return []core.Action{
 		&SendTextMessage{},
 		&GetLastMention{},
 	}
@@ -177,10 +177,10 @@ func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesConte
 	return resources, nil
 }
 
-func (d *Discord) Actions() []core.Action {
-	return []core.Action{}
+func (d *Discord) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *Discord) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *Discord) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

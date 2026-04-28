@@ -183,7 +183,7 @@ func Test__AddDataSource__Execute(t *testing.T) {
 	})
 }
 
-func Test__AddDataSource__HandleAction(t *testing.T) {
+func Test__AddDataSource__HandleHook(t *testing.T) {
 	component := &AddDataSource{}
 
 	meta := map[string]any{
@@ -219,7 +219,7 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -261,7 +261,7 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -294,7 +294,7 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{

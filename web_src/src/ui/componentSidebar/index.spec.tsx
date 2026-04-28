@@ -136,9 +136,8 @@ function renderSidebar(props?: Partial<React.ComponentProps<typeof ComponentSide
       nodeConfiguration={{}}
       nodeConfigurationFields={[]}
       workflowNodes={[]}
-      components={[]}
+      actions={[]}
       triggers={[]}
-      blueprints={[]}
       {...props}
     />,
   );

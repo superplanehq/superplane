@@ -138,12 +138,11 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnIncident) Actions() []core.Action {
-	return []core.Action{
+func (t *OnIncident) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "setSecret",
-			Description:    "Set or clear the webhook signing secret from your incident.io endpoint",
-			UserAccessible: true,
+			Name: "setSecret",
+			Type: core.HookTypeUser,
 			Parameters: []configuration.Field{
 				{
 					Name:        "webhookSigningSecret",
@@ -159,14 +158,14 @@ func (t *OnIncident) Actions() []core.Action {
 	}
 }
 
-func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnIncident) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	if ctx.Name != "setSecret" {
-		return nil, fmt.Errorf("action %s not supported", ctx.Name)
+		return nil, fmt.Errorf("hook %s not supported", ctx.Name)
 	}
 	return t.setSecret(ctx)
 }
 
-func (t *OnIncident) setSecret(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnIncident) setSecret(ctx core.TriggerHookContext) (map[string]any, error) {
 	if ctx.Webhook == nil {
 		return nil, fmt.Errorf("webhook is not available")
 	}

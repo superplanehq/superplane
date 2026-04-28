@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -179,18 +179,18 @@ func (c *CreateIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return 200, nil, nil
 }
 
-func (c *CreateIssueComment) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateIssueComment) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateIssueComment) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *CreateIssueComment) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateIssueComment) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateIssueComment) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

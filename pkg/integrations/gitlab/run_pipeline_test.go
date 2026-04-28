@@ -158,7 +158,7 @@ func Test__RunPipeline__Poll__SchedulesNextWhenRunning(t *testing.T) {
 		KVs: map[string]string{},
 	}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name: RunPipelinePollAction,
 		Configuration: map[string]any{
 			"project": "123",

@@ -47,6 +47,9 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
 
 type ConfigurationField = FieldRendererProps["field"];
 
+/** Stable reference for trigger run-title fields — hides node/previous sources that don't apply. */
+const RUN_TITLE_EXCLUDED_SUGGESTIONS = ["$", "previous"];
+
 function getInitialSelectValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown {
   const selectOptions = field.typeOptions?.select?.options;
   if (!selectOptions) {
@@ -272,6 +275,7 @@ export const ConfigurationFieldRenderer = ({
       integrationId,
       organizationId,
       allowExpressions,
+      excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
     };
 
     switch (field.type) {

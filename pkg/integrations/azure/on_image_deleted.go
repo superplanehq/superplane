@@ -290,11 +290,11 @@ func (t *OnImageDeleted) authenticateWebhook(ctx core.WebhookRequestContext) err
 	return fmt.Errorf("webhook secret required but not provided in Authorization or X-Webhook-Secret header")
 }
 
-func (t *OnImageDeleted) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnImageDeleted) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnImageDeleted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnImageDeleted) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

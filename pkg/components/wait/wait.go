@@ -18,7 +18,7 @@ import (
 const PayloadType = "wait.finished"
 
 func init() {
-	registry.RegisterComponent("wait", &Wait{})
+	registry.RegisterAction("wait", &Wait{})
 }
 
 type Wait struct{}
@@ -353,20 +353,20 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("timeReached", map[string]any{}, interval)
 }
 
-func (w *Wait) Actions() []core.Action {
-	return []core.Action{
+func (w *Wait) Hooks() []core.Hook {
+	return []core.Hook{
 		{
 			Name: "timeReached",
+			Type: core.HookTypeInternal,
 		},
 		{
-			Name:           "pushThrough",
-			Description:    "Push Through",
-			UserAccessible: true,
+			Name: "pushThrough",
+			Type: core.HookTypeUser,
 		},
 	}
 }
 
-func (w *Wait) HandleAction(ctx core.ActionContext) error {
+func (w *Wait) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "timeReached":
 		return w.HandleTimeReached(ctx)
@@ -374,11 +374,11 @@ func (w *Wait) HandleAction(ctx core.ActionContext) error {
 		return w.HandlePushThrough(ctx)
 
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
+func (w *Wait) HandleTimeReached(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -398,7 +398,7 @@ func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 	)
 }
 
-func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
+func (w *Wait) HandlePushThrough(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

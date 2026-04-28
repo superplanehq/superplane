@@ -5,7 +5,7 @@ describe("hasDraftVersusLiveGraphDiff", () => {
   const node = (id: string, integrationId?: string | null) => ({
     id,
     name: "N",
-    type: "TYPE_COMPONENT",
+    type: "TYPE_ACTION",
     ref: "r",
     configuration: {},
     position: { x: 0, y: 0 },

@@ -20,7 +20,7 @@ export function QueueItemRow({
   onNodeSelect?: (nodeId: string) => void;
 }) {
   const nodeName = node?.name || item.nodeId || "Unknown";
-  const iconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
+  const iconSrc = getHeaderIconSrc(node?.component);
   const iconSlug = resolveNodeIconSlug(node, componentIconMap);
 
   return (

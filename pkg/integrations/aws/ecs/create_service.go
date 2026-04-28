@@ -167,14 +167,6 @@ func (c *CreateService) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateService) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateService) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -228,4 +220,12 @@ func (c *CreateService) normalizeConfig(config CreateServiceConfiguration) Creat
 	}
 
 	return config
+}
+
+func (c *CreateService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateService) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }
