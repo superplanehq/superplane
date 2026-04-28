@@ -14,19 +14,15 @@ import (
 )
 
 func TestBuildPostgresDSN_sessionTimeouts(t *testing.T) {
-	dsn := buildPostgresDSN(
-		DSNConfig{
-			Host:            "db.example",
-			Port:            "5432",
-			Name:            "appdb",
-			User:            "u",
-			Pass:            "p",
-			ApplicationName: "testapp",
-		},
-		"disable",
-		"60000",
-		"30000",
-	)
+	dsn := buildPostgresDSN(DSNConfig{
+		Host:            "db.example",
+		Port:            "5432",
+		Name:            "appdb",
+		User:            "u",
+		Pass:            "p",
+		Ssl:             "disable",
+		ApplicationName: "testapp",
+	}, "60000", "30000")
 	u, err := url.Parse(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -88,11 +84,12 @@ func TestPostgres_statementTimeoutEnforced(t *testing.T) {
 		Name:            os.Getenv("DB_NAME"),
 		User:            os.Getenv("DB_USERNAME"),
 		Pass:            os.Getenv("DB_PASSWORD"),
+		Ssl:             sslMode,
 		ApplicationName: os.Getenv("APPLICATION_NAME"),
 	}
 
 	poolCfg := Load().Database
-	dsn := buildPostgresDSN(c, sslMode, poolCfg.StatementTimeoutMS, poolCfg.IdleInTransactionSessionTimeoutMS)
+	dsn := buildPostgresDSN(c, poolCfg.StatementTimeoutMS, poolCfg.IdleInTransactionSessionTimeoutMS)
 
 	db, err := gorm.Open(postgresdrv.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)

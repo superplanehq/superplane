@@ -20,7 +20,7 @@ type DSNConfig struct {
 	Name            string
 	User            string
 	Pass            string
-	Ssl             string
+	Ssl             string // libpq sslmode (disable, require, …); wired to the DSN sslmode query parameter
 	ApplicationName string
 }
 
@@ -45,7 +45,7 @@ func dbPoolSize() int {
 	return size
 }
 
-func buildPostgresDSN(c DSNConfig, sslMode, statementTimeoutMS, idleInTransactionMS string) string {
+func buildPostgresDSN(c DSNConfig, statementTimeoutMS, idleInTransactionMS string) string {
 	u := url.URL{
 		Scheme: "postgres",
 		Host:   net.JoinHostPort(c.Host, c.Port),
@@ -54,7 +54,7 @@ func buildPostgresDSN(c DSNConfig, sslMode, statementTimeoutMS, idleInTransactio
 	u.User = url.UserPassword(c.User, c.Pass)
 
 	q := url.Values{}
-	q.Set("sslmode", sslMode)
+	q.Set("sslmode", c.Ssl)
 	if c.ApplicationName != "" {
 		q.Set("application_name", c.ApplicationName)
 	}
@@ -88,7 +88,7 @@ func connect() *gorm.DB {
 	}
 
 	dbCfg := Load().Database
-	dsn := buildPostgresDSN(c, sslMode, dbCfg.StatementTimeoutMS, dbCfg.IdleInTransactionSessionTimeoutMS)
+	dsn := buildPostgresDSN(c, dbCfg.StatementTimeoutMS, dbCfg.IdleInTransactionSessionTimeoutMS)
 
 	baseLogger := gormLogger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), gormLogger.Config{
 		SlowThreshold:             200 * time.Millisecond,
