@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Run Bash" href="#run-bash" description="Run Bash commands in an ephemeral build environment backed by AWS CodeBuild." />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -677,6 +678,58 @@ The Read Memory component looks up values from canvas-level memory storage.
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
+}
+```
+
+<a id="run-bash"></a>
+
+## Run Bash
+
+Run Bash commands in a managed ephemeral build environment.
+
+### Use Cases
+
+- Clone a repository and run project scripts
+- Build and push Docker images
+- Run Terraform plan/apply/destroy commands
+- Execute release, deployment, migration, diagnostic, or remediation scripts
+
+### Backend
+
+This component uses SuperPlane-managed AWS CodeBuild projects. Users configure the job they want to run, not CodeBuild itself.
+
+### Output
+
+- **success**: Command exits with code 0
+- **failed**: Command runs and exits with a non-zero code
+
+Backend submission, checkout, credential injection, or infrastructure errors are shown as execution errors.
+
+### Example Output
+
+```json
+{
+  "command": {
+    "artifacts": [
+      {
+        "name": "image-digest.txt",
+        "path": "dist/image-digest.txt"
+      }
+    ],
+    "buildArn": "arn:aws:codebuild:...",
+    "buildId": "superplane-run-bash:example",
+    "durationSeconds": 42,
+    "exitCode": 0,
+    "logUrl": "https://console.aws.amazon.com/...",
+    "source": {
+      "commitSha": "abc123",
+      "ref": "main",
+      "repository": "github.com/example/app"
+    },
+    "status": "SUCCEEDED",
+    "stderr": "",
+    "stdout": "Successfully built image\n"
+  }
 }
 ```
 
