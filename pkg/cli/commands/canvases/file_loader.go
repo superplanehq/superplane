@@ -42,6 +42,15 @@ func loadCanvasForCreateFromFile(filePath string) (openapi_client.CanvasesCanvas
 	return models.CanvasFromCanvas(*resource), resource.AutoLayout, nil
 }
 
+func loadCanvasForValidateFromFile(filePath string) (openapi_client.CanvasesCanvas, error) {
+	resource, err := parseCanvasResourceFromFile(filePath, "validate")
+	if err != nil {
+		return openapi_client.CanvasesCanvas{}, err
+	}
+
+	return models.CanvasFromCanvas(*resource), nil
+}
+
 func loadCanvasFromFile(filePath string) (string, openapi_client.CanvasesCanvas, error) {
 	resource, err := parseCanvasResourceFromFile(filePath, "update")
 	if err != nil {

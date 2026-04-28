@@ -50,6 +50,18 @@ service Canvases {
     };
   }
 
+  rpc ValidateCanvas(ValidateCanvasRequest) returns (ValidateCanvasResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/validate"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Validate canvas";
+      description: "Validates a canvas spec without persisting any changes";
+      tags: "Canvas";
+    };
+  }
+
   rpc DescribeCanvas(DescribeCanvasRequest) returns (DescribeCanvasResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{id}"
@@ -447,6 +459,14 @@ message CreateCanvasRequest {
 
 message CreateCanvasResponse {
   Canvas canvas = 1;
+}
+
+message ValidateCanvasRequest {
+  Canvas canvas = 1;
+}
+
+message ValidateCanvasResponse {
+  CanvasVersion version = 1;
 }
 
 message CanvasAutoLayout {
