@@ -149,6 +149,15 @@ func (c *RunBash) Documentation() string {
 
 This component uses SuperPlane-managed AWS CodeBuild projects. Users configure the job they want to run, not CodeBuild itself.
 
+The SuperPlane server must be configured with dedicated environment variables (prefixed with RUN_BASH_) so it never accidentally reuses generic AWS credentials from the host:
+
+- RUN_BASH_CODEBUILD_REGION
+- RUN_BASH_CODEBUILD_PROJECT
+- RUN_BASH_AWS_ACCESS_KEY_ID
+- RUN_BASH_AWS_SECRET_ACCESS_KEY
+- RUN_BASH_AWS_SESSION_TOKEN (optional; required for temporary credentials)
+- RUN_BASH_CODEBUILD_DOCKER_PROJECT (optional; used when Docker support is enabled on the node)
+
 ## Output
 
 - **success**: Command exits with code 0
@@ -529,9 +538,9 @@ func validateEnvironmentName(name string) error {
 }
 
 func loadBackendConfig(spec Spec) (backendConfig, error) {
-	region := firstNonEmpty(os.Getenv("RUN_BASH_CODEBUILD_REGION"), os.Getenv("AWS_REGION"), os.Getenv("AWS_DEFAULT_REGION"))
+	region := strings.TrimSpace(os.Getenv("RUN_BASH_CODEBUILD_REGION"))
 	if region == "" {
-		return backendConfig{}, errors.New("RUN_BASH_CODEBUILD_REGION or AWS_REGION is required")
+		return backendConfig{}, errors.New("RUN_BASH_CODEBUILD_REGION is required")
 	}
 
 	project := os.Getenv("RUN_BASH_CODEBUILD_PROJECT")
@@ -539,20 +548,11 @@ func loadBackendConfig(spec Spec) (backendConfig, error) {
 		return backendConfig{}, errors.New("RUN_BASH_CODEBUILD_PROJECT is required")
 	}
 
-	accessKey := os.Getenv("RUN_BASH_AWS_ACCESS_KEY_ID")
-	if accessKey == "" {
-		accessKey = os.Getenv("AWS_ACCESS_KEY_ID")
-	}
-	secretKey := os.Getenv("RUN_BASH_AWS_SECRET_ACCESS_KEY")
-	if secretKey == "" {
-		secretKey = os.Getenv("AWS_SECRET_ACCESS_KEY")
-	}
-	sessionToken := os.Getenv("RUN_BASH_AWS_SESSION_TOKEN")
-	if sessionToken == "" {
-		sessionToken = os.Getenv("AWS_SESSION_TOKEN")
-	}
+	accessKey := strings.TrimSpace(os.Getenv("RUN_BASH_AWS_ACCESS_KEY_ID"))
+	secretKey := strings.TrimSpace(os.Getenv("RUN_BASH_AWS_SECRET_ACCESS_KEY"))
+	sessionToken := strings.TrimSpace(os.Getenv("RUN_BASH_AWS_SESSION_TOKEN"))
 	if accessKey == "" || secretKey == "" {
-		return backendConfig{}, errors.New("AWS credentials are required for Run Bash CodeBuild backend")
+		return backendConfig{}, errors.New("RUN_BASH_AWS_ACCESS_KEY_ID and RUN_BASH_AWS_SECRET_ACCESS_KEY are required")
 	}
 
 	return backendConfig{

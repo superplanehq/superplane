@@ -698,6 +698,15 @@ Run Bash commands in a managed ephemeral build environment.
 
 This component uses SuperPlane-managed AWS CodeBuild projects. Users configure the job they want to run, not CodeBuild itself.
 
+The SuperPlane server must be configured with dedicated environment variables (prefixed with RUN_BASH_) so it never accidentally reuses generic AWS credentials from the host:
+
+- RUN_BASH_CODEBUILD_REGION
+- RUN_BASH_CODEBUILD_PROJECT
+- RUN_BASH_AWS_ACCESS_KEY_ID
+- RUN_BASH_AWS_SECRET_ACCESS_KEY
+- RUN_BASH_AWS_SESSION_TOKEN (optional; required for temporary credentials)
+- RUN_BASH_CODEBUILD_DOCKER_PROJECT (optional; used when Docker support is enabled on the node)
+
 ### Output
 
 - **success**: Command exits with code 0
