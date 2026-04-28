@@ -20,7 +20,7 @@ type DSNConfig struct {
 	Name            string
 	User            string
 	Pass            string
-	Ssl             string // libpq sslmode (disable, require, …); wired to the DSN sslmode query parameter
+	Ssl             string
 	ApplicationName string
 }
 
@@ -61,7 +61,6 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 		q.Set("application_name", c.ApplicationName)
 	}
 
-	// Applies to every pooled connection: aborts stuck statements and idle-in-transaction sessions.
 	options := fmt.Sprintf(
 		"-c statement_timeout=%s -c idle_in_transaction_session_timeout=%s",
 		stmtMs,

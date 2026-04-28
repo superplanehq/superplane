@@ -12,8 +12,6 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// gormTimeoutLogger wraps GORM's logger and logs a clear line when PostgreSQL
-// reports statement_timeout or idle_in_transaction_session_timeout on a query.
 type gormTimeoutLogger struct {
 	base gormlogger.Interface
 }
@@ -50,7 +48,6 @@ func (w *gormTimeoutLogger) Trace(
 	w.base.Trace(ctx, begin, fc, err)
 }
 
-// postgresTimeoutKind is non-empty when err is a PostgreSQL session timeout.
 type postgresTimeoutKind string
 
 const (

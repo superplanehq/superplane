@@ -18,15 +18,11 @@ var (
 	DefaultIdleInTransactionSessionTimeout = 30 * time.Second
 )
 
-// Config holds Postgres client pool session timeouts parsed from the environment.
 type Config struct {
 	StatementTimeout                time.Duration
 	IdleInTransactionSessionTimeout time.Duration
 }
 
-// LoadConfig reads DB_STATEMENT_TIMEOUT and DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
-// using Go duration syntax (e.g. 60s, 500ms, 2m). A bare integer is interpreted as
-// milliseconds for compatibility with older millisecond-only env values.
 func LoadConfig() Config {
 	return Config{
 		StatementTimeout:                durationFromEnv(envStatementTimeout, DefaultStatementTimeout),
