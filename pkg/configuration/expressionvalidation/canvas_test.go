@@ -192,7 +192,7 @@ func TestValidateNodeExpressions_NestedPaths(t *testing.T) {
 }
 
 func TestValidateNodeExpressions_Aggregation(t *testing.T) {
-	t.Run("multiple errors single node deterministic order", func(t *testing.T) {
+	t.Run("multiple errors single node all reported", func(t *testing.T) {
 		fields := []configuration.Field{
 			{Name: "a", Type: configuration.FieldTypeString},
 			{Name: "b", Type: configuration.FieldTypeString},

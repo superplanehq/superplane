@@ -1,6 +1,7 @@
 package canvases
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -96,7 +97,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	version := response.GetVersion()
 	if errText := formatNodeSpecErrorsForCLI(version); errText != "" {
-		return fmt.Errorf("%s", errText)
+		return errors.New(errText)
 	}
 
 	// When not in draft mode, auto-publish the updated draft version.
@@ -111,16 +112,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		if err := ctx.Renderer.Render(version); err != nil {
-			return err
-		}
-		spec := version.GetSpec()
-		for _, node := range spec.GetNodes() {
-			if node.GetErrorMessage() != "" {
-				return fmt.Errorf("canvas has node errors")
-			}
-		}
-		return nil
+		return ctx.Renderer.Render(version)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
