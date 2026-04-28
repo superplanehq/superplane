@@ -26,7 +26,7 @@ const (
 	payloadType    = "run-bash.result"
 
 	defaultTimeoutSeconds = 600
-	defaultPollInterval   = 10 * time.Second
+	defaultPollInterval   = 1 * time.Second
 	maxCapturedLogBytes   = 64 * 1024
 )
 
