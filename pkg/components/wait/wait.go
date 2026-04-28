@@ -66,12 +66,12 @@ func (w *Wait) Documentation() string {
 
 - **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
   - Supports expressions for dynamic wait times
-  - Example: ` + "`{{$.retry_delay}}`" + ` or ` + "`{{$.status == \"urgent\" ? 0 : 30}}`" + `
+  - Example: ` + "`{{$['Node Name'].data.retry_delay}}`" + ` or ` + "`{{$['Node Name'].data.status == \"urgent\" ? 0 : 30}}`" + `
   
 - **Countdown**: Wait until a specific date/time is reached
   - Supports ISO 8601 date formats
   - Supports expressions for dynamic target times
-  - Example: ` + "`{{$.release_date}}`" + ` or ` + "`{{$.run_time + duration(\"48h\")}}`" + `
+  - Example: ` + "`{{$['Node Name'].data.release_date}}`" + ` or ` + "`{{$['Node Name'].data.run_time + duration(\"48h\")}}`" + `
 
 ## Behavior
 
@@ -128,7 +128,7 @@ func (w *Wait) Configuration() []configuration.Field {
 			Name:        "waitFor",
 			Label:       "Wait for...",
 			Type:        configuration.FieldTypeString,
-			Description: "Component will wait for a fixed amount of time before emitting the event forward.\n\nSupports expressions and expects integer.\n\nExample expressions:\n{{$.wait_time}}\n{{$.wait_time + 5}}\n{{$.status == \"urgent\" ? 0 : 30}}",
+			Description: "Component will wait for a fixed amount of time before emitting the event forward.\n\nSupports expressions and expects integer.\n\nExample expressions:\n{{$['Node Name'].data.wait_time}}\n{{$['Node Name'].data.wait_time + 5}}\n{{$['Node Name'].data.status == \"urgent\" ? 0 : 30}}",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "mode", Values: []string{ModeInterval}},
 			},
@@ -172,7 +172,7 @@ func (w *Wait) Configuration() []configuration.Field {
 			Name:        "waitUntil",
 			Label:       "Wait until",
 			Type:        configuration.FieldTypeString,
-			Description: "Component will countdown until the provided date/time before emitting an event forward.\n\nSupports expressions and expects date in [ISO 8601](https://www.timestamp-converter.com/) format.\n\nExample expressions:\n{{$.run_time}}\n{{$.run_time.In(timezone(\"UTC\"))}}\n{{$.run_time + duration(\"48h\")}}",
+			Description: "Component will countdown until the provided date/time before emitting an event forward.\n\nSupports expressions and expects date in [ISO 8601](https://www.timestamp-converter.com/) format.\n\nExample expressions:\n{{$['Node Name'].data.run_time}}\n{{$['Node Name'].data.run_time.In(timezone(\"UTC\"))}}\n{{$['Node Name'].data.run_time + duration(\"48h\")}}",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "mode", Values: []string{ModeCountdown}},
 			},

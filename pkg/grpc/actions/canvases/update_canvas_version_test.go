@@ -168,6 +168,55 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Contains(t, s.Message(), `source node http-1 does not have output channel "default"`)
 	})
+
+	t.Run("invalid node field type -> serialized node carries error_message", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		response, err := UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			&pb.Canvas{
+				Metadata: &pb.Canvas_Metadata{
+					Name: canvas.Name,
+				},
+				Spec: &pb.Canvas_Spec{
+					Nodes: []*componentpb.Node{
+						{
+							Id:        "wait-1",
+							Name:      "Wait",
+							Component: "wait",
+							Configuration: structFromAnyMap(t, map[string]any{
+								"mode":    "interval",
+								"waitFor": 30,
+								"unit":    "seconds",
+							}),
+						},
+					},
+					Edges: []*componentpb.Edge{},
+				},
+			},
+			nil,
+			"",
+			r.AuthService,
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Version)
+		require.NotNil(t, response.Version.Spec)
+		require.Len(t, response.Version.Spec.Nodes, 1)
+		errMsg := response.Version.Spec.Nodes[0].GetErrorMessage()
+		require.NotEmpty(t, errMsg)
+		assert.Contains(t, errMsg, "waitFor")
+	})
 }
 
 func testPbCanvas(name string) *pb.Canvas {
