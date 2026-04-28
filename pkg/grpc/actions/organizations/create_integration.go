@@ -86,12 +86,6 @@ func CreateIntegrationWithUsage(
 		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
 	}
 
-	newIntegration, err := models.CreateIntegration(installationID, org, integrationName, name, configuration)
-	if err != nil {
-		integrationLogger.WithError(err).Error("failed to create integration")
-		return nil, status.Error(codes.Internal, "failed to create integration")
-	}
-
 	//
 	// If the integration implementation does not provide a setup provider,
 	// we fallback to the old sync model. This should be removed once all integrations
@@ -99,13 +93,30 @@ func CreateIntegrationWithUsage(
 	//
 	setupProvider, err := registry.GetSetupProvider(integrationName)
 	if err != nil {
+		newIntegration, err := models.CreateIntegration(installationID, org, integrationName, name, configuration)
+		if err != nil {
+			integrationLogger.WithError(err).Error("failed to create integration")
+			return nil, status.Error(codes.Internal, "failed to create integration")
+		}
+
 		return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
 	}
 
-	return setupIntegration(registry, newIntegration, setupProvider, orgID, capabilities)
+	initialCapabilities, err := initialCapabilityStates(setupProvider.Capabilities(), capabilities)
+	if err != nil {
+		return nil, err
+	}
+
+	newIntegration, err := models.CreateIntegration(installationID, org, integrationName, name, configuration)
+	if err != nil {
+		integrationLogger.WithError(err).Error("failed to create integration")
+		return nil, status.Error(codes.Internal, "failed to create integration")
+	}
+
+	return setupIntegration(registry, newIntegration, setupProvider, orgID, initialCapabilities)
 }
 
-func setupIntegration(registry *registry.Registry, newIntegration *models.Integration, setupProvider core.IntegrationSetupProvider, orgID string, capabilities []string) (*pb.CreateIntegrationResponse, error) {
+func setupIntegration(registry *registry.Registry, newIntegration *models.Integration, setupProvider core.IntegrationSetupProvider, orgID string, initialCapabilities []models.CapabilityState) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -114,6 +125,7 @@ func setupIntegration(registry *registry.Registry, newIntegration *models.Integr
 			return err
 		}
 
+		newIntegration.Capabilities = initialCapabilities
 		capabilityCtx := contexts.NewCapabilityContext(setupProvider.Capabilities(), newIntegration.Capabilities)
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
@@ -144,6 +156,36 @@ func setupIntegration(registry *registry.Registry, newIntegration *models.Integr
 	}
 
 	return &pb.CreateIntegrationResponse{Integration: proto}, nil
+}
+
+func initialCapabilityStates(definitions []core.Capability, requestedCapabilities []string) ([]models.CapabilityState, error) {
+	definitionsByName := map[string]core.Capability{}
+	for _, definition := range definitions {
+		definitionsByName[definition.Name] = definition
+	}
+
+	requested := map[string]bool{}
+	for _, capability := range requestedCapabilities {
+		if _, ok := definitionsByName[capability]; !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "capability %s not found", capability)
+		}
+		requested[capability] = true
+	}
+
+	states := make([]models.CapabilityState, 0, len(definitions))
+	for _, definition := range definitions {
+		state := models.IntegrationCapabilityStateUnavailable
+		if requested[definition.Name] {
+			state = models.IntegrationCapabilityStateRequested
+		}
+
+		states = append(states, models.CapabilityState{
+			Name:  definition.Name,
+			State: state,
+		})
+	}
+
+	return states, nil
 }
 
 func syncIntegration(
@@ -346,6 +388,8 @@ func CapabilityStateToProto(t string) pb.Integration_CapabilityState_State {
 		return pb.Integration_CapabilityState_STATE_ENABLED
 	case models.IntegrationCapabilityStateDisabled:
 		return pb.Integration_CapabilityState_STATE_DISABLED
+	case models.IntegrationCapabilityStateRequested:
+		return pb.Integration_CapabilityState_STATE_REQUESTED
 	case models.IntegrationCapabilityStateUnavailable:
 		return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 	}

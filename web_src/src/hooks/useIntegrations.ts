@@ -140,7 +140,12 @@ export const useCreateIntegration = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { integrationName: string; name: string; configuration?: Record<string, unknown> }) => {
+    mutationFn: async (data: {
+      integrationName: string;
+      name: string;
+      configuration?: Record<string, unknown>;
+      capabilities?: string[];
+    }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -148,6 +153,7 @@ export const useCreateIntegration = (organizationId: string) => {
             integrationName: data.integrationName,
             name: data.name,
             configuration: data.configuration,
+            capabilities: data.capabilities,
           },
         }),
       );

@@ -343,6 +343,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                                 size="sm"
                                 onClick={() => {
                                   if (!canUpdateIntegrations) return;
+                                  const providerName = integration.metadata?.integrationName;
+                                  if (providerName && integration.status?.setupState?.currentStep) {
+                                    navigate(getIntegrationV2SetupPath(organizationId, providerName), {
+                                      state: { integrationId: integration.metadata?.id },
+                                    });
+                                    return;
+                                  }
+
                                   navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
                                     state: { tab: "configuration" },
                                   });

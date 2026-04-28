@@ -1,8 +1,13 @@
-import type { ConfigurationField, IntegrationSetupStepDefinition, OrganizationsIntegration } from "@/api-client";
+import type {
+  ConfigurationField,
+  IntegrationsCapabilityDefinition,
+  IntegrationSetupStepDefinition,
+  OrganizationsIntegration,
+} from "@/api-client";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ArrowLeft } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
@@ -19,12 +24,17 @@ import { showErrorToast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/ui/checkbox";
 import { IntegrationSetupInputsStep } from "./IntegrationSetupInputsStep";
 import { IntegrationSetupRedirectPromptStep } from "./IntegrationSetupRedirectPromptStep";
 
 interface IntegrationSetupPageProps {
   organizationId: string;
 }
+
+type IntegrationSetupRouteState = {
+  integrationId?: string;
+};
 
 function isMissingValue(value: unknown): boolean {
   if (value === null || value === undefined) {
@@ -119,11 +129,24 @@ function canRevertSetupStep(integration: OrganizationsIntegration | null): boole
   return previousSteps.length > 0;
 }
 
+function getCapabilityDisplayName(capability: IntegrationsCapabilityDefinition): string {
+  return capability.label || capability.name || "Unnamed capability";
+}
+
+function getCapabilityTypeLabel(capability: IntegrationsCapabilityDefinition): string {
+  if (capability.type === "TYPE_ACTION") return "Action";
+  if (capability.type === "TYPE_TRIGGER") return "Trigger";
+  return "Unknown";
+}
+
 export function IntegrationSetupPage({ organizationId }: IntegrationSetupPageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { integrationName: routeIntegrationName } = useParams<{ integrationName: string }>();
   const integrationName = routeIntegrationName || "";
   const integrationsHref = `/${organizationId}/settings/integrations`;
+  const routeState = location.state as IntegrationSetupRouteState | null;
+  const setupIntegrationId = routeState?.integrationId;
 
   const { data: availableIntegrations = [], isLoading: isAvailableIntegrationsLoading } = useAvailableIntegrations();
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId);
@@ -136,6 +159,8 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
   const [createdIntegration, setCreatedIntegration] = useState<OrganizationsIntegration | null>(null);
   const [stepInputs, setStepInputs] = useState<Record<string, unknown>>({});
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
+  const [introStep, setIntroStep] = useState<"name" | "capabilities">("name");
+  const [selectedCapabilities, setSelectedCapabilities] = useState<Set<string>>(new Set());
 
   const integrationDefinition = useMemo(
     () => availableIntegrations.find((integration) => integration.name === integrationName),
@@ -146,6 +171,11 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     integrationDefinition?.label || getIntegrationTypeDisplayName(undefined, integrationName) || integrationName;
   const currentStep = getCurrentSetupStep(createdIntegration);
   const canRevertCurrentStep = canRevertSetupStep(createdIntegration);
+  const integrationCapabilities = useMemo(() => {
+    return [...(integrationDefinition?.capabilities || [])]
+      .filter((capability) => Boolean(capability.name))
+      .sort((left, right) => getCapabilityDisplayName(left).localeCompare(getCapabilityDisplayName(right)));
+  }, [integrationDefinition?.capabilities]);
 
   usePageTitle(["Integrations", integrationLabel, "Setup"]);
 
@@ -162,7 +192,23 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     setStepInputs({});
     setValidationErrors(new Set());
     setInstanceName("");
+    setIntroStep("name");
+    setSelectedCapabilities(new Set());
   }, [integrationName]);
+
+  useEffect(() => {
+    if (introStep !== "capabilities") {
+      return;
+    }
+
+    setSelectedCapabilities((current) => {
+      if (current.size > 0) {
+        return current;
+      }
+
+      return new Set(integrationCapabilities.map((capability) => capability.name).filter(Boolean) as string[]);
+    });
+  }, [integrationCapabilities, introStep]);
 
   useEffect(() => {
     if (instanceName || !integrationName) {
@@ -172,10 +218,39 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     setInstanceName(getNextIntegrationName(integrationName, existingIntegrationNames));
   }, [instanceName, integrationName, existingIntegrationNames]);
 
-  const handleCreateIntegration = async () => {
+  useEffect(() => {
+    if (!setupIntegrationId) {
+      return;
+    }
+
+    if (createdIntegration?.metadata?.id === setupIntegrationId) {
+      return;
+    }
+
+    const integration = connectedIntegrations.find(
+      (connectedIntegration) => connectedIntegration.metadata?.id === setupIntegrationId,
+    );
+    if (!integration) {
+      return;
+    }
+
+    setCreatedIntegration(integration);
+    setStepInputs({});
+    setValidationErrors(new Set());
+    setIntroStep("name");
+    setSelectedCapabilities(new Set());
+    setInstanceName(integration.metadata?.name || integration.metadata?.integrationName || "");
+  }, [connectedIntegrations, createdIntegration?.metadata?.id, setupIntegrationId]);
+
+  async function handleCreateIntegration() {
     const trimmedName = instanceName.trim();
     if (!trimmedName) {
       showErrorToast("Integration name is required");
+      return;
+    }
+
+    if (integrationCapabilities.length > 0 && selectedCapabilities.size === 0) {
+      showErrorToast("Select at least one capability");
       return;
     }
 
@@ -183,6 +258,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
       const response = await createMutation.mutateAsync({
         integrationName,
         name: trimmedName,
+        capabilities: Array.from(selectedCapabilities),
       });
       const integration = response.data?.integration || null;
       setCreatedIntegration(integration);
@@ -191,7 +267,22 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     } catch {
       // Error is shown by inline alert.
     }
-  };
+  }
+
+  async function handleNameStepContinue() {
+    const trimmedName = instanceName.trim();
+    if (!trimmedName) {
+      showErrorToast("Integration name is required");
+      return;
+    }
+
+    if (integrationCapabilities.length === 0) {
+      await handleCreateIntegration();
+      return;
+    }
+
+    setIntroStep("capabilities");
+  }
 
   const handleSubmitCurrentStep = async () => {
     const integrationId = createdIntegration?.metadata?.id;
@@ -297,7 +388,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
           </Alert>
         ) : null}
 
-        {!createdIntegration ? (
+        {!createdIntegration && introStep === "name" ? (
           <div className="space-y-4">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Step: Name your integration</h2>
@@ -314,8 +405,87 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
               />
             </div>
             <div className="flex items-center gap-3">
-              <Button onClick={handleCreateIntegration} disabled={createMutation.isPending || !instanceName.trim()}>
+              <Button
+                onClick={() => void handleNameStepContinue()}
+                disabled={createMutation.isPending || !instanceName.trim()}
+              >
                 {createMutation.isPending ? "Creating..." : "Next"}
+              </Button>
+            </div>
+          </div>
+        ) : !createdIntegration && introStep === "capabilities" ? (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Step: Choose integration capabilities
+              </h2>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Select the capabilities this integration should provide.
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
+              <div className="divide-y divide-gray-200 dark:divide-gray-800">
+                {integrationCapabilities.map((capability) => {
+                  const capabilityName = capability.name || "";
+                  const capabilityId = `capability-${capabilityName}`;
+                  const checked = selectedCapabilities.has(capabilityName);
+
+                  return (
+                    <label
+                      key={capabilityName}
+                      htmlFor={capabilityId}
+                      className="flex cursor-pointer items-start gap-3 bg-white p-4 transition-colors hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800/70"
+                    >
+                      <Checkbox
+                        id={capabilityId}
+                        checked={checked}
+                        onCheckedChange={(nextChecked) => {
+                          setSelectedCapabilities((current) => {
+                            const next = new Set(current);
+                            if (nextChecked === true) {
+                              next.add(capabilityName);
+                              return next;
+                            }
+
+                            next.delete(capabilityName);
+                            return next;
+                          });
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span className="flex min-w-0 flex-1 flex-col gap-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {getCapabilityDisplayName(capability)}
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            {getCapabilityTypeLabel(capability)}
+                          </span>
+                        </span>
+                        {capability.description && (
+                          <span className="text-sm text-gray-600 dark:text-gray-400">{capability.description}</span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIntroStep("name")}
+                disabled={createMutation.isPending}
+              >
+                Previous
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleCreateIntegration()}
+                disabled={createMutation.isPending || selectedCapabilities.size === 0}
+              >
+                {createMutation.isPending ? "Saving..." : "Next"}
               </Button>
             </div>
           </div>
@@ -361,16 +531,6 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
             </div>
             <div className="flex items-center gap-3">
               <Button onClick={() => navigate(integrationsHref)}>Back to integrations</Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setCreatedIntegration(null);
-                  setStepInputs({});
-                  setValidationErrors(new Set());
-                }}
-              >
-                Restart setup
-              </Button>
             </div>
           </div>
         )}
