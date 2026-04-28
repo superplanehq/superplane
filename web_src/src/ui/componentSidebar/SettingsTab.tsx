@@ -39,6 +39,12 @@ interface SettingsTabProps {
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+  preConfigurationField?: (context: {
+    configuration: Record<string, unknown>;
+    onConfigurationPatch: (patch: Record<string, unknown>) => void;
+    requestAutosave: () => void;
+    readOnly: boolean;
+  }) => ReactNode;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
@@ -82,6 +88,7 @@ export function SettingsTab({
   domainId,
   domainType,
   customField,
+  preConfigurationField,
   integrationName,
   integrationRef,
   integrations = [],
@@ -404,6 +411,20 @@ export function SettingsTab({
     }, 300);
   }, [configurationSaveMode, isReadOnly]);
 
+  const applyConfigurationPatch = useCallback(
+    (patch: Record<string, unknown>) => {
+      setNodeConfiguration((previousConfiguration) => {
+        const merged = {
+          ...previousConfiguration,
+          ...patch,
+        };
+        return filterVisibleFields(merged);
+      });
+      requestAutosave();
+    },
+    [filterVisibleFields, requestAutosave],
+  );
+
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
     if (configurationSaveMode !== "auto") {
@@ -694,6 +715,16 @@ export function SettingsTab({
           <div
             className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
           >
+            {preConfigurationField && (
+              <div className="pb-2">
+                {preConfigurationField({
+                  configuration: nodeConfiguration,
+                  onConfigurationPatch: applyConfigurationPatch,
+                  requestAutosave,
+                  readOnly: isReadOnly,
+                })}
+              </div>
+            )}
             {configurationFields.map((field) => {
               if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;

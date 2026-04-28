@@ -55,6 +55,7 @@ import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-pos
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
+import { CurlImportField } from "@/ui/CurlImportField";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
@@ -1451,6 +1452,59 @@ function Sidebar({
     triggers,
   ]);
 
+  const preConfigurationField = useMemo(() => {
+    if (editingNodeData?.blockName !== "http") {
+      return undefined;
+    }
+
+    return ({
+      onConfigurationPatch,
+      readOnly,
+    }: {
+      configuration: Record<string, unknown>;
+      onConfigurationPatch: (patch: Record<string, unknown>) => void;
+      requestAutosave: () => void;
+      readOnly: boolean;
+    }) => (
+      <CurlImportField
+        disabled={readOnly}
+        onApply={(parsedConfig) => {
+          const patch: Record<string, unknown> = {};
+
+          if (parsedConfig.method !== undefined) {
+            patch.method = parsedConfig.method;
+          }
+          if (parsedConfig.url !== undefined) {
+            patch.url = parsedConfig.url;
+          }
+          if (parsedConfig.headers !== undefined) {
+            patch.headers = parsedConfig.headers;
+          }
+          if (parsedConfig.queryParams !== undefined) {
+            patch.queryParams = parsedConfig.queryParams;
+          }
+          if (parsedConfig.contentType !== undefined) {
+            patch.contentType = parsedConfig.contentType;
+            patch.json = undefined;
+            patch.formData = undefined;
+            patch.text = undefined;
+            patch.xml = undefined;
+
+            if (parsedConfig.contentType === "application/json") {
+              patch.json = parsedConfig.json ?? {};
+            } else if (parsedConfig.contentType === "application/x-www-form-urlencoded") {
+              patch.formData = parsedConfig.formData ?? [];
+            } else if (parsedConfig.contentType === "text/plain") {
+              patch.text = parsedConfig.text ?? "";
+            }
+          }
+
+          onConfigurationPatch(patch);
+        }}
+      />
+    );
+  }, [editingNodeData?.blockName]);
+
   if (!sidebarData) {
     return null;
   }
@@ -1526,6 +1580,7 @@ function Sidebar({
             ) || undefined
           : undefined
       }
+      preConfigurationField={preConfigurationField}
       integrationName={editingNodeData?.integrationName}
       integrationRef={editingNodeData?.integrationRef}
       integrations={integrations}
