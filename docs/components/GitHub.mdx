@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add a reaction to a GitHub comment" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
+  <LinkCard title="Create Pull Request" href="#create-pull-request" description="Create a new pull request in a GitHub repository" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
@@ -1865,6 +1866,66 @@ Returns the created comment object including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issueComment"
+}
+```
+
+<a id="create-pull-request"></a>
+
+## Create Pull Request
+
+The Create Pull Request component creates a new pull request in a specified GitHub repository.
+
+### Use Cases
+
+- **Automated PR creation**: Open pull requests automatically as part of CI/CD pipelines
+- **Branch promotion**: Create PRs to promote changes between branches
+- **Workflow automation**: Generate PRs from external triggers or scheduled workflows
+
+### Configuration
+
+- **Repository**: Select the GitHub repository where the pull request will be created
+- **Head**: The branch containing the changes (source branch)
+- **Base**: The branch you want the changes pulled into (target branch, defaults to "main")
+- **Title**: The pull request title (supports expressions)
+- **Body**: Optional pull request description (supports markdown and expressions)
+- **Draft**: Whether to create the pull request as a draft
+
+### Output
+
+Returns the created pull request object with details including:
+- Pull request number
+- URL
+- State
+- Head and base branch information
+- Created timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "label": "acme:main",
+      "ref": "main"
+    },
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "number": 42,
+    "state": "open",
+    "title": "Add new feature",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
 }
 ```
 
