@@ -128,7 +128,9 @@ CREATE TABLE public.app_installation_secrets (
     value bytea NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    editable boolean DEFAULT false NOT NULL
+    editable boolean DEFAULT false NOT NULL,
+    label text,
+    description text
 );
 
 

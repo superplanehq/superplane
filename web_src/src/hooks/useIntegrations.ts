@@ -10,6 +10,8 @@ import {
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
   organizationsUpdateIntegrationCapabilities,
+  organizationsUpdateIntegrationParameter,
+  organizationsUpdateIntegrationSecret,
 } from "@/api-client/sdk.gen";
 import type {
   IntegrationCapabilityState,
@@ -310,6 +312,63 @@ export const useUpdateIntegrationCapabilities = (organizationId: string, integra
       queryClient.invalidateQueries({
         queryKey: integrationKeys.integration(organizationId, integrationId),
       });
+    },
+  });
+};
+
+function applyIntegrationDescribeCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  organizationId: string,
+  integrationId: string,
+  integration: OrganizationsIntegration | null,
+) {
+  queryClient.invalidateQueries({
+    queryKey: integrationKeys.connected(organizationId),
+  });
+  if (integration?.metadata?.id) {
+    queryClient.setQueryData(integrationKeys.integration(organizationId, integration.metadata.id), integration);
+    return;
+  }
+
+  queryClient.invalidateQueries({
+    queryKey: integrationKeys.integration(organizationId, integrationId),
+  });
+}
+
+export const useUpdateIntegrationParameter = (organizationId: string, integrationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: { parameterName: string; value: string }) => {
+      const response = await organizationsUpdateIntegrationParameter(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId },
+          body: { parameterName: body.parameterName, value: body.value },
+        }),
+      );
+      return response.data?.integration ?? null;
+    },
+    onSuccess: (integration) => {
+      applyIntegrationDescribeCache(queryClient, organizationId, integrationId, integration);
+    },
+  });
+};
+
+export const useUpdateIntegrationSecret = (organizationId: string, integrationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: { secretName: string; value: string }) => {
+      const response = await organizationsUpdateIntegrationSecret(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId },
+          body: { secretName: body.secretName, value: body.value },
+        }),
+      );
+      return response.data?.integration ?? null;
+    },
+    onSuccess: (integration) => {
+      applyIntegrationDescribeCache(queryClient, organizationId, integrationId, integration);
     },
   });
 };

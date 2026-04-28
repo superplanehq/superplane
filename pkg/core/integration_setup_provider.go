@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
@@ -27,6 +28,18 @@ type IntegrationSetupProvider interface {
 	// It should revert the changes made by the step.
 	//
 	OnStepRevert(ctx SetupStepContext) error
+
+	//
+	// Called when the user updates a parameter.
+	// A parameter update might trigger a new setup flow.
+	//
+	OnParameterUpdate(ctx ParameterUpdateContext) (*SetupStep, error)
+
+	//
+	// Called when the user updates a secret.
+	// A secret update might trigger a new setup flow.
+	//
+	OnSecretUpdate(ctx SecretUpdateContext) (*SetupStep, error)
 }
 
 type SetupStepType string
@@ -43,6 +56,26 @@ type SetupStep struct {
 	Instructions   string
 	Inputs         []configuration.Field
 	RedirectPrompt *RedirectPrompt
+}
+
+type ParameterUpdateContext struct {
+	ParameterName string
+	Value         string
+	Logger        *log.Entry
+	HTTP          HTTPContext
+	Secrets       IntegrationSecretStorage
+	Parameters    IntegrationParameterStorage
+	Capabilities  CapabilityContext
+}
+
+type SecretUpdateContext struct {
+	SecretName   string
+	Value        string
+	Logger       *log.Entry
+	HTTP         HTTPContext
+	Secrets      IntegrationSecretStorage
+	Parameters   IntegrationParameterStorage
+	Capabilities CapabilityContext
 }
 
 type RedirectPrompt struct {
@@ -66,11 +99,14 @@ type IntegrationSecretStorage interface {
 	Get(name string) (string, error)
 	Delete(name string) error
 	Create(name string, def IntegrationSecretDefinition) error
+	Update(name string, value string) error
 }
 
 type IntegrationSecretDefinition struct {
-	Value    []byte
-	Editable bool
+	Label       string
+	Description string
+	Value       []byte
+	Editable    bool
 }
 
 type IntegrationParameterStorage interface {

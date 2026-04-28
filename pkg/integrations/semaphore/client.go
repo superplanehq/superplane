@@ -17,7 +17,25 @@ type Client struct {
 	http     core.HTTPContext
 }
 
-func NewClientV2(http core.HTTPContext, parameters core.IntegrationParameterStorage, secrets core.IntegrationSecretStorage) (*Client, error) {
+func NewClientWithAPIToken(http core.HTTPContext, parameters core.IntegrationParameterStorage, apiToken string) (*Client, error) {
+	url, err := parameters.Get("organizationUrl")
+	if err != nil || url == nil {
+		return nil, fmt.Errorf("error getting organization URL: %v", err)
+	}
+
+	orgURL, ok := url.(string)
+	if !ok {
+		return nil, fmt.Errorf("organization URL is not a string")
+	}
+
+	return &Client{
+		OrgURL:   string(orgURL),
+		APIToken: string(apiToken),
+		http:     http,
+	}, nil
+}
+
+func NewClientWithStorageContexts(http core.HTTPContext, parameters core.IntegrationParameterStorage, secrets core.IntegrationSecretStorage) (*Client, error) {
 	url, err := parameters.Get("organizationUrl")
 	if err != nil || url == nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)

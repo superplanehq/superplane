@@ -14,6 +14,8 @@ import {
   useDeleteIntegration,
   useIntegration,
   useUpdateIntegrationCapabilities,
+  useUpdateIntegrationParameter,
+  useUpdateIntegrationSecret,
 } from "@/hooks/useIntegrations";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -70,7 +72,7 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
   const { data: integration, isLoading, error } = useIntegration(organizationId, integrationId || "");
   usePageTitle(["Integrations", integration?.metadata?.name]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [activeTab, setActiveTab] = useState("capabilities");
+  const [activeTab, setActiveTab] = useState("parameters");
   const canUpdateIntegrations = canAct("integrations", "update");
   const canDeleteIntegrations = canAct("integrations", "delete");
 
@@ -81,6 +83,8 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
 
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
   const updateCapabilitiesMutation = useUpdateIntegrationCapabilities(organizationId, integrationId || "");
+  const updateParameterMutation = useUpdateIntegrationParameter(organizationId, integrationId || "");
+  const updateSecretMutation = useUpdateIntegrationSecret(organizationId, integrationId || "");
   const integrationsHref = `/${organizationId}/settings/integrations`;
   const [capabilityStates, setCapabilityStates] = useState<Record<string, IntegrationCapabilityStateState>>({});
 
@@ -108,9 +112,30 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
     );
   }, [integration?.status?.metadata?.webhookSigningSecretConfigured]);
 
+  const integrationParameters = useMemo(() => integration?.status?.parameters ?? [], [integration?.status?.parameters]);
+  const integrationSecrets = useMemo(() => integration?.status?.secrets ?? [], [integration?.status?.secrets]);
+
+  const [parameterDrafts, setParameterDrafts] = useState<Record<string, string>>({});
+  const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    integrationParameters.forEach((param, index) => {
+      const key = param.name?.trim() || `__param_${index}`;
+      next[key] = param.value ?? "";
+    });
+    setParameterDrafts(next);
+  }, [integration?.metadata?.id, integration?.metadata?.updatedAt, integrationParameters]);
+
+  useEffect(() => {
+    setSecretDrafts({});
+  }, [integration?.metadata?.id, integration?.metadata?.updatedAt, integrationSecrets]);
+
+  const settingsMutationBusy = updateParameterMutation.isPending || updateSecretMutation.isPending;
+
   useEffect(() => {
     if (!webhookUrl && activeTab === "webhook") {
-      setActiveTab("capabilities");
+      setActiveTab("parameters");
     }
   }, [webhookUrl, activeTab]);
 
@@ -208,6 +233,27 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
       showSuccessToast("Integration capabilities updated");
     } catch (_error) {
       showErrorToast(`Failed to update capabilities: ${getApiErrorMessage(_error)}`);
+    }
+  };
+
+  const saveParameter = async (parameterName: string, value: string) => {
+    if (!canUpdateIntegrations || settingsMutationBusy) return;
+    try {
+      await updateParameterMutation.mutateAsync({ parameterName, value });
+      showSuccessToast("Parameter saved");
+    } catch (_error) {
+      showErrorToast(`Failed to save parameter: ${getApiErrorMessage(_error)}`);
+    }
+  };
+
+  const saveSecret = async (secretName: string, value: string, draftFieldKey: string) => {
+    if (!canUpdateIntegrations || settingsMutationBusy || value.trim() === "") return;
+    try {
+      await updateSecretMutation.mutateAsync({ secretName, value });
+      setSecretDrafts((previous) => ({ ...previous, [draftFieldKey]: "" }));
+      showSuccessToast("Secret saved");
+    } catch (_error) {
+      showErrorToast(`Failed to save secret: ${getApiErrorMessage(_error)}`);
     }
   };
 
@@ -337,6 +383,26 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
             <div className="flex flex-wrap px-4">
               <button
                 type="button"
+                onClick={() => setActiveTab("parameters")}
+                className={cn(
+                  sidebarTabButtonClass,
+                  activeTab === "parameters" ? sidebarTabActiveClass : sidebarTabInactiveClass,
+                )}
+              >
+                Parameters
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("secrets")}
+                className={cn(
+                  sidebarTabButtonClass,
+                  activeTab === "secrets" ? sidebarTabActiveClass : sidebarTabInactiveClass,
+                )}
+              >
+                Secrets
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab("capabilities")}
                 className={cn(
                   sidebarTabButtonClass,
@@ -369,6 +435,153 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
               </button>
             </div>
           </div>
+
+          <TabsContent value="parameters" className="mt-4">
+            {integrationParameters.length > 0 ? (
+              <div className="space-y-6 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                {integrationParameters.map((param, index) => {
+                  const fieldKey = param.name?.trim() || `__param_${index}`;
+                  const title = param.label?.trim() || "Parameter";
+                  const isEditable = param.editable === true;
+                  const draft = parameterDrafts[fieldKey] ?? "";
+                  const serverValue = param.value ?? "";
+                  const paramDirty = Boolean(isEditable && param.name?.trim() && draft !== serverValue);
+                  const savingThisParameter =
+                    updateParameterMutation.isPending &&
+                    updateParameterMutation.variables?.parameterName === param.name?.trim();
+                  return (
+                    <div
+                      key={fieldKey}
+                      className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0 dark:border-gray-800"
+                    >
+                      <div className="text-sm font-medium text-gray-800 dark:text-gray-100">{title}</div>
+                      {param.description ? (
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{param.description}</p>
+                      ) : null}
+                      <div className="mt-3">
+                        {isEditable ? (
+                          <PermissionTooltip
+                            allowed={canUpdateIntegrations || permissionsLoading}
+                            message="You don't have permission to update integrations."
+                          >
+                            <div className="flex max-w-xl flex-col gap-2 sm:max-w-none sm:flex-row sm:items-center sm:gap-3">
+                              <Input
+                                value={draft}
+                                onChange={(event) =>
+                                  setParameterDrafts((previous) => ({
+                                    ...previous,
+                                    [fieldKey]: event.target.value,
+                                  }))
+                                }
+                                disabled={!canUpdateIntegrations || settingsMutationBusy}
+                                className="w-full sm:max-w-xl sm:flex-1"
+                              />
+                              {param.name?.trim() ? (
+                                <LoadingButton
+                                  type="button"
+                                  color="blue"
+                                  size="sm"
+                                  className="shrink-0"
+                                  disabled={!canUpdateIntegrations || !paramDirty || settingsMutationBusy}
+                                  loading={Boolean(savingThisParameter)}
+                                  loadingText="Saving…"
+                                  onClick={() => void saveParameter(param.name!.trim(), draft)}
+                                >
+                                  Save
+                                </LoadingButton>
+                              ) : null}
+                            </div>
+                          </PermissionTooltip>
+                        ) : (
+                          <p className="text-sm text-gray-800 dark:text-gray-100">
+                            {draft.trim() ? draft : <span className="text-gray-400 dark:text-gray-500">No value</span>}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No parameters for this integration.</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="secrets" className="mt-4">
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Stored values are never shown. You can enter a replacement only when a secret is editable.
+            </p>
+            {integrationSecrets.length > 0 ? (
+              <div className="space-y-6 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                {integrationSecrets.map((secret, index) => {
+                  const fieldKey = secret.name?.trim() || `__secret_${index}`;
+                  const title = secret.label?.trim() || "Secret";
+                  const isEditable = secret.editable === true;
+                  const draft = secretDrafts[fieldKey] ?? "";
+                  const secretHasNewValue = draft.trim() !== "";
+                  const savingThisSecret =
+                    updateSecretMutation.isPending &&
+                    updateSecretMutation.variables?.secretName === secret.name?.trim();
+                  return (
+                    <div
+                      key={fieldKey}
+                      className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0 dark:border-gray-800"
+                    >
+                      <div className="text-sm font-medium text-gray-800 dark:text-gray-100">{title}</div>
+                      {secret.description ? (
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{secret.description}</p>
+                      ) : null}
+                      <div className="mt-3">
+                        {isEditable ? (
+                          <PermissionTooltip
+                            allowed={canUpdateIntegrations || permissionsLoading}
+                            message="You don't have permission to update integrations."
+                          >
+                            <div className="flex max-w-xl flex-col gap-2 sm:max-w-none sm:flex-row sm:items-center sm:gap-3">
+                              <Input
+                                type="password"
+                                autoComplete="new-password"
+                                value={draft}
+                                placeholder="New secret value"
+                                onChange={(event) =>
+                                  setSecretDrafts((previous) => ({
+                                    ...previous,
+                                    [fieldKey]: event.target.value,
+                                  }))
+                                }
+                                disabled={!canUpdateIntegrations || settingsMutationBusy}
+                                className="w-full sm:max-w-xl sm:flex-1"
+                              />
+                              {secret.name?.trim() ? (
+                                <LoadingButton
+                                  type="button"
+                                  color="blue"
+                                  size="sm"
+                                  className="shrink-0"
+                                  disabled={!canUpdateIntegrations || !secretHasNewValue || settingsMutationBusy}
+                                  loading={Boolean(savingThisSecret)}
+                                  loadingText="Saving…"
+                                  onClick={() => void saveSecret(secret.name!.trim(), draft, fieldKey)}
+                                >
+                                  Save
+                                </LoadingButton>
+                              ) : null}
+                            </div>
+                          </PermissionTooltip>
+                        ) : (
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            This secret cannot be changed here.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No secrets stored for this integration.</p>
+            )}
+          </TabsContent>
 
           <TabsContent value="capabilities" className="mt-4">
             {capabilities.length > 0 ? (

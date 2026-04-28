@@ -33,24 +33,33 @@ func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integr
 	}, nil
 }
 
-func (s *IntegrationSecretStorage) Get(name string) (string, error) {
+func (s *IntegrationSecretStorage) findSecret(name string) (*models.IntegrationSecret, error) {
 	for _, secret := range s.secrets {
 		if secret.Name == name {
-			decryptedValue, err := s.encryptor.Decrypt(
-				context.Background(),
-				secret.Value,
-				[]byte(s.integration.ID.String()),
-			)
-
-			if err != nil {
-				return "", err
-			}
-
-			return string(decryptedValue), nil
+			return &secret, nil
 		}
 	}
 
-	return "", fmt.Errorf("secret %s not found", name)
+	return nil, fmt.Errorf("secret %s not found", name)
+}
+
+func (s *IntegrationSecretStorage) Get(name string) (string, error) {
+	secret, err := s.findSecret(name)
+	if err != nil {
+		return "", err
+	}
+
+	decryptedValue, err := s.encryptor.Decrypt(
+		context.Background(),
+		secret.Value,
+		[]byte(s.integration.ID.String()),
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(decryptedValue), nil
 }
 
 func (s *IntegrationSecretStorage) Delete(name string) error {
@@ -93,6 +102,8 @@ func (s *IntegrationSecretStorage) Create(name string, def core.IntegrationSecre
 		OrganizationID: s.integration.OrganizationID,
 		InstallationID: s.integration.ID,
 		Name:           name,
+		Label:          def.Label,
+		Description:    def.Description,
 		Value:          encryptedValue,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
@@ -106,4 +117,25 @@ func (s *IntegrationSecretStorage) Create(name string, def core.IntegrationSecre
 
 	s.secrets = append(s.secrets, secret)
 	return nil
+}
+
+func (s *IntegrationSecretStorage) Update(name string, value string) error {
+	secret, err := s.findSecret(name)
+	if err != nil {
+		return err
+	}
+
+	encryptedValue, err := s.encryptor.Encrypt(
+		context.Background(),
+		[]byte(value),
+		[]byte(s.integration.ID.String()),
+	)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	secret.Value = encryptedValue
+	secret.UpdatedAt = &now
+	return s.tx.Save(secret).Error
 }

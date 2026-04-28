@@ -160,9 +160,17 @@ var patPermissionLinesByResourceType = map[string][]string{
 	},
 }
 
-// TODO
 func (g *SetupProvider) Capabilities() []core.Capability {
+	// TODO
 	return []core.Capability{}
+}
+
+func (g *SetupProvider) OnParameterUpdate(ctx core.ParameterUpdateContext) (*core.SetupStep, error) {
+	return nil, fmt.Errorf("TODO")
+}
+
+func (g *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
+	return nil, fmt.Errorf("TODO")
 }
 
 func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {

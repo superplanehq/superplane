@@ -3,6 +3,7 @@ package semaphore
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -130,6 +131,42 @@ func (s *SetupProvider) onEnterAPITokenRevert(ctx core.SetupStepContext) error {
 	return ctx.Secrets.Delete("apiToken")
 }
 
+func (s *SetupProvider) OnParameterUpdate(ctx core.ParameterUpdateContext) (*core.SetupStep, error) {
+	return nil, fmt.Errorf("parameter updates are not supported for Semaphore")
+}
+
+func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
+	switch ctx.SecretName {
+	case "apiToken":
+		v := strings.TrimSpace(ctx.Value)
+		if v == "" {
+			return nil, fmt.Errorf("value is required")
+		}
+
+		//
+		// Validate the connection to Semaphore
+		//
+		client, err := NewClientWithAPIToken(ctx.HTTP, ctx.Parameters, v)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %v", err)
+		}
+
+		//
+		// Semaphore doesn't have a whoami endpoint, so
+		// we list projects just to verify that the connection is working.
+		//
+		_, err = client.listProjects()
+		if err != nil {
+			return nil, fmt.Errorf("error listing projects: %v", err)
+		}
+
+		return nil, ctx.Secrets.Update("apiToken", v)
+
+	default:
+		return nil, fmt.Errorf("unknown secret: %s", ctx.SecretName)
+	}
+}
+
 func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupStepContext) (*core.SetupStep, error) {
 	m, ok := inputs.(map[string]any)
 	if !ok {
@@ -199,8 +236,10 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	// so we store it as an editable secret.
 	//
 	err := ctx.Secrets.Create("apiToken", core.IntegrationSecretDefinition{
-		Value:    []byte(apiToken),
-		Editable: true,
+		Label:       "API Token",
+		Description: "The API token for the Semaphore organization",
+		Value:       []byte(apiToken),
+		Editable:    true,
 	})
 
 	if err != nil {
@@ -210,7 +249,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	//
 	// Validate the connection to Semaphore
 	//
-	client, err := NewClientV2(ctx.HTTP, ctx.Parameters, ctx.Secrets)
+	client, err := NewClientWithStorageContexts(ctx.HTTP, ctx.Parameters, ctx.Secrets)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}

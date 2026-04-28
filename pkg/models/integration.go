@@ -74,6 +74,8 @@ type IntegrationSecret struct {
 	OrganizationID uuid.UUID
 	InstallationID uuid.UUID
 	Name           string
+	Label          string
+	Description    string
 	Value          []byte
 	Editable       bool
 	CreatedAt      *time.Time
@@ -82,6 +84,19 @@ type IntegrationSecret struct {
 
 func (a *IntegrationSecret) TableName() string {
 	return "app_installation_secrets"
+}
+
+func ListIntegrationSecrets(installationID uuid.UUID) ([]IntegrationSecret, error) {
+	return ListIntegrationSecretsInTransaction(database.Conn(), installationID)
+}
+
+func ListIntegrationSecretsInTransaction(tx *gorm.DB, installationID uuid.UUID) ([]IntegrationSecret, error) {
+	var secrets []IntegrationSecret
+	err := tx.Where("installation_id = ?", installationID).Find(&secrets).Error
+	if err != nil {
+		return nil, err
+	}
+	return secrets, nil
 }
 
 type BrowserAction struct {

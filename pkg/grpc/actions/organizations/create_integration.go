@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"maps"
 
@@ -318,10 +319,45 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		}
 	}
 
-	// TODO: serialize parameters
-	// TODO: serialize secrets
+	for _, param := range instance.Parameters {
+		proto.Status.Parameters = append(proto.Status.Parameters, &pb.Integration_Parameter{
+			Name:        param.Name,
+			Label:       param.Label,
+			Description: param.Description,
+			Type:        param.Type,
+			Value:       integrationParameterValueToString(param.Value),
+			Editable:    param.Editable,
+		})
+	}
+
+	secrets, err := models.ListIntegrationSecrets(instance.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, secret := range secrets {
+		proto.Status.Secrets = append(proto.Status.Secrets, &pb.Integration_Secret{
+			Name:        secret.Name,
+			Label:       secret.Label,
+			Description: secret.Description,
+			Editable:    secret.Editable,
+		})
+	}
 
 	return proto, nil
+}
+
+func integrationParameterValueToString(value any) string {
+	if value == nil {
+		return ""
+	}
+	if s, ok := value.(string); ok {
+		return s
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("%v", value)
+	}
+	return string(encoded)
 }
 
 func serializeNextStep(step core.SetupStep) *pb.Integration_SetupStepDefinition {

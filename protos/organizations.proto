@@ -311,6 +311,30 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc UpdateIntegrationParameter(UpdateIntegrationParameterRequest) returns (UpdateIntegrationParameterResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/parameters"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration parameter";
+      description: "Update integration parameter";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateIntegrationSecret(UpdateIntegrationSecretRequest) returns (UpdateIntegrationSecretResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/secrets"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration secret";
+      description: "Update integration secret";
+      tags: "Organization";
+    };
+  }
 }
 
 message Organization {
@@ -603,7 +627,30 @@ message UpdateIntegrationCapabilitiesResponse {
   Integration integration = 1;
 }
 
+message UpdateIntegrationParameterRequest {
+  string id = 1;
+  string integration_id = 2;
+  string parameter_name = 3;
+  string value = 4;
+}
+
+message UpdateIntegrationParameterResponse {
+  Integration integration = 1;
+}
+
+message UpdateIntegrationSecretRequest {
+  string id = 1;
+  string integration_id = 2;
+  string secret_name = 3;
+  string value = 4;
+}
+
+message UpdateIntegrationSecretResponse {
+  Integration integration = 1;
+}
+
 message Integration {
+
   //
   // Parameters are how integration implementations expose things to the user
   // after an integration has been setup. They can be editable or not.
@@ -625,6 +672,7 @@ message Integration {
     string name = 1;
     string label = 2;
     string description = 3;
+    bool editable = 4;
   }
 
   message Metadata {
