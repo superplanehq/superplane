@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -267,9 +268,15 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		nodesByID[node.ID] = node
 	}
 
-	for nodeID, errs := range expressionvalidation.ValidateCanvasExpressions(registry, canvas.Spec.Nodes) {
-		msgs := make([]string, 0, len(errs))
-		for _, e := range errs {
+	exprErrors := expressionvalidation.ValidateCanvasExpressions(registry, canvas.Spec.Nodes)
+	exprNodeIDs := make([]string, 0, len(exprErrors))
+	for nodeID := range exprErrors {
+		exprNodeIDs = append(exprNodeIDs, nodeID)
+	}
+	sort.Strings(exprNodeIDs)
+	for _, nodeID := range exprNodeIDs {
+		msgs := make([]string, 0, len(exprErrors[nodeID]))
+		for _, e := range exprErrors[nodeID] {
 			msgs = append(msgs, e.Error())
 		}
 		joined := strings.Join(msgs, "\n")

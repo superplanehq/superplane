@@ -1,6 +1,7 @@
 package canvases
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -96,7 +97,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	version := response.GetVersion()
 	if errText := formatNodeSpecErrorsForCLI(version); errText != "" {
-		return fmt.Errorf("%s", errText)
+		return errors.New(errText)
 	}
 
 	// When not in draft mode, auto-publish the updated draft version.

@@ -2,6 +2,7 @@ package expressionvalidation
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -73,6 +74,9 @@ func validateNodeExpressions(nodeID, nodeName string, config map[string]any, fie
 			e.NodeName = nodeName
 			errs = append(errs, e)
 		}
+	})
+	sort.Slice(errs, func(i, j int) bool {
+		return errs[i].FieldPath < errs[j].FieldPath
 	})
 	return errs
 }
