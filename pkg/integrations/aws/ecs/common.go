@@ -51,7 +51,7 @@ func taskStateChangeSubscriptionPattern(region string, detail map[string]any) *c
 }
 
 func subscribeWhenTaskStateChangeRuleAvailable(
-	ctx core.ActionContext,
+	ctx core.ActionHookContext,
 	checkActionName string,
 	retryInterval time.Duration,
 	subscriptionPattern *common.EventBridgeEvent,

@@ -262,7 +262,7 @@ const OwnerSetup: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
-                  className={fieldErrors.password ? "border-red-500" : ""}
+                  className={fieldErrors.password ? "border-red-500 ph-no-capture" : "ph-no-capture"}
                 />
               </InputGroup>
               {fieldErrors.password ? (
@@ -284,7 +284,7 @@ const OwnerSetup: React.FC = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm password"
-                  className={fieldErrors.confirmPassword ? "border-red-500" : ""}
+                  className={fieldErrors.confirmPassword ? "border-red-500 ph-no-capture" : "ph-no-capture"}
                 />
               </InputGroup>
               {fieldErrors.confirmPassword && (
@@ -437,7 +437,7 @@ const OwnerSetup: React.FC = () => {
                   value={smtpPassword}
                   onChange={(e) => setSmtpPassword(e.target.value)}
                   placeholder="SMTP password"
-                  className={fieldErrors.smtpPassword ? "border-red-500" : ""}
+                  className={fieldErrors.smtpPassword ? "border-red-500 ph-no-capture" : "ph-no-capture"}
                 />
               </InputGroup>
               {fieldErrors.smtpPassword && (

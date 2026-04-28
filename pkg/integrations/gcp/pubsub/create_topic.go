@@ -97,13 +97,19 @@ func (c *CreateTopicComponent) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (c *CreateTopicComponent) Actions() []core.Action                  { return nil }
-func (c *CreateTopicComponent) HandleAction(_ core.ActionContext) error { return nil }
-func (c *CreateTopicComponent) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *CreateTopicComponent) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *CreateTopicComponent) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *CreateTopicComponent) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *CreateTopicComponent) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 func (c *CreateTopicComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *CreateTopicComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateTopicComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

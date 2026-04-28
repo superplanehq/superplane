@@ -8,12 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/retry"
 )
 
 const (
@@ -230,14 +229,15 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	// or just the path accepted by the API.
 	//
 	workflowFile := strings.Replace(spec.WorkflowFile, ".github/workflows/", "", 1)
-	_, err = client.Actions.CreateWorkflowDispatchEventByFileName(
+	dispatchDetails, _, err := client.Actions.CreateWorkflowDispatchEventByFileName(
 		context.Background(),
 		appMetadata.Owner,
 		spec.Repository,
 		workflowFile,
 		github.CreateWorkflowDispatchEventRequest{
-			Ref:    spec.Ref,
-			Inputs: r.buildInputs(ctx, spec.Inputs),
+			Ref:              spec.Ref,
+			Inputs:           r.buildInputs(spec.Inputs),
+			ReturnRunDetails: github.Ptr(true),
 		},
 	)
 
@@ -245,36 +245,29 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to dispatch workflow: %w", err)
 	}
 
-	ctx.Logger.Infof("Workflow dispatched - repository=%s, workflow=%s, ref=%s", spec.Repository, spec.WorkflowFile, spec.Ref)
-
-	//
-	// The GitHub API does not return a run ID, so we need to find it.
-	// See: https://github.com/orgs/community/discussions/9752
-	//
-	var run *github.WorkflowRun
-	err = retry.WithConstantWait(func() error {
-		var findErr error
-		run, findErr = r.findWorkflowRun(client, appMetadata.Owner, spec.Repository, ctx.ID.String())
-		return findErr
-	}, retry.Options{
-		Task:         "find workflow run",
-		MaxAttempts:  15,
-		Wait:         2 * time.Second,
-		InitialDelay: time.Second,
-		Verbose:      true,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to find workflow run: %w", err)
+	workflowRunID := dispatchDetails.GetWorkflowRunID()
+	if workflowRunID == 0 {
+		return fmt.Errorf("workflow dispatched but no workflow run ID was returned")
 	}
+
+	runURL := dispatchDetails.GetHTMLURL()
+	if runURL == "" {
+		runURL = dispatchDetails.GetRunURL()
+	}
+
+	ctx.Logger.Infof(
+		"Workflow dispatched - repository=%s, workflow=%s, ref=%s, run_id=%d",
+		spec.Repository,
+		spec.WorkflowFile,
+		spec.Ref,
+		workflowRunID,
+	)
 
 	// Save workflow run to metadata
 	err = ctx.Metadata.Set(RunWorkflowExecutionMetadata{
 		WorkflowRun: &WorkflowRunMetadata{
-			ID:         run.GetID(),
-			Status:     run.GetStatus(),
-			Conclusion: run.GetConclusion(),
-			URL:        run.GetHTMLURL(),
+			ID:  workflowRunID,
+			URL: runURL,
 		},
 	})
 
@@ -283,12 +276,12 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Store workflow run ID in KV for webhook matching
-	err = ctx.ExecutionState.SetKV("workflow_run_id", fmt.Sprintf("%d", run.GetID()))
+	err = ctx.ExecutionState.SetKV("workflow_run_id", fmt.Sprintf("%d", workflowRunID))
 	if err != nil {
 		return err
 	}
 
-	ctx.Logger.Infof("Started workflow run %d", run.GetID())
+	ctx.Logger.Infof("Started workflow run %d", workflowRunID)
 
 	// Schedule poll to check workflow status updates (in case webhook doesn't arrive)
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, WorkflowPollInterval)
@@ -478,16 +471,16 @@ func metadataFromPayload(payload map[string]any) (*RunWorkflowExecutionMetadata,
 	}, workflowRun, nil
 }
 
-func (r *RunWorkflow) Actions() []core.Action {
-	return []core.Action{
+func (r *RunWorkflow) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (r *RunWorkflow) HandleAction(ctx core.ActionContext) error {
+func (r *RunWorkflow) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return r.poll(ctx)
@@ -496,7 +489,7 @@ func (r *RunWorkflow) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (r *RunWorkflow) poll(ctx core.ActionContext) error {
+func (r *RunWorkflow) poll(ctx core.ActionHookContext) error {
 	spec := RunWorkflowSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -560,43 +553,11 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	return ctx.ExecutionState.Emit(WorkflowFailedOutputChannel, WorkflowPayloadType, []any{run})
 }
 
-func (r *RunWorkflow) findWorkflowRun(client *github.Client, owner, repo, executionID string) (*github.WorkflowRun, error) {
-	// List recent workflow runs
-	runs, _, err := client.Actions.ListRepositoryWorkflowRuns(
-		context.Background(),
-		owner,
-		repo,
-		&github.ListWorkflowRunsOptions{
-			ListOptions: github.ListOptions{
-				PerPage: 100,
-			},
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Find the run with our execution ID in the name
-	for _, run := range runs.WorkflowRuns {
-		if strings.Contains(run.GetName(), executionID) {
-			return run, nil
-		}
-	}
-
-	return nil, fmt.Errorf("workflow run with execution ID %s not found", executionID)
-}
-
-func (r *RunWorkflow) buildInputs(ctx core.ExecutionContext, inputs []Input) map[string]any {
+func (r *RunWorkflow) buildInputs(inputs []Input) map[string]any {
 	result := make(map[string]any)
-
-	// Copy user-provided inputs
 	for _, input := range inputs {
 		result[input.Name] = input.Value
 	}
-
-	// Add SuperPlane metadata
-	result["superplane_canvas_id"] = ctx.WorkflowID
-	result["superplane_execution_id"] = ctx.ID
 
 	return result
 }

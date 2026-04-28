@@ -47,29 +47,26 @@ blocks:
         - name: Lint
           commands:
             - make lint
+
         - name: Unit Tests
           commands:
             - make test.coverage.check
+
         - name: E2E Tests
           parallelism: 10
           commands:
             - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
-        - name: "Check: DB structure"
+
+        - name: Checks
           commands:
             - make check.db.structure
             - make check.db.migrations
-        - name: "Check: Components Docs"
-          commands:
             - make check.components.docs
-        - name: "Check: Go Format"
-          commands:
             - make check.format.go
-        - name: "Check: Example Payloads"
-          commands:
             - make check.example.payloads
-        - name: "Check: Generated Artifacts"
-          commands:
-            - make check.generated.artifacts
+            - make check.templates
+            - make check.generated.artifacts 
+
       epilogue:
         always:
           commands:

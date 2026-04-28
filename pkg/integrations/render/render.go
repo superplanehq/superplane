@@ -97,8 +97,8 @@ func (r *Render) Configuration() []configuration.Field {
 	}
 }
 
-func (r *Render) Components() []core.Component {
-	return []core.Component{
+func (r *Render) Actions() []core.Action {
+	return []core.Action{
 		&Deploy{},
 		&GetService{},
 		&GetDeploy{},
@@ -185,14 +185,6 @@ func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContex
 	return resources, nil
 }
 
-func (r *Render) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (r *Render) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func workspaceIDForIntegration(client *Client, integration core.IntegrationContext) (string, error) {
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err == nil && metadata.Workspace != nil && metadata.Workspace.ID != "" {
@@ -271,4 +263,12 @@ func buildMetadata(workspaceID string, workspacePlan string) Metadata {
 			Plan: resolvedPlan,
 		},
 	}
+}
+
+func (r *Render) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (r *Render) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

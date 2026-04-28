@@ -1,6 +1,10 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestIsNewerVersion(t *testing.T) {
 	tests := []struct {
@@ -70,6 +74,8 @@ func TestShouldStartUpdateCheck(t *testing.T) {
 		{name: "version subcommand", args: []string{"version"}, expected: false},
 		{name: "version flag", args: []string{"--version"}, expected: false},
 		{name: "completion command", args: []string{"completion", "zsh"}, expected: false},
+		{name: "upgrade command", args: []string{"upgrade"}, expected: false},
+		{name: "self-update alias", args: []string{"self-update"}, expected: false},
 		{name: "networked command", args: []string{"whoami"}, expected: true},
 		{name: "networked subcommand with flags", args: []string{"canvases", "list", "-o", "json"}, expected: true},
 		{name: "flag before local subcommand", args: []string{"-o", "json", "version"}, expected: false},
@@ -83,4 +89,34 @@ func TestShouldStartUpdateCheck(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildUpdateNotice(t *testing.T) {
+	release := &releaseInfo{
+		TagName: "v0.17.0",
+		Assets: []releaseAsset{
+			{
+				Name:               "superplane-cli-linux-amd64",
+				BrowserDownloadURL: "https://github.com/superplanehq/superplane/releases/download/v0.17.0/superplane-cli-linux-amd64",
+			},
+		},
+	}
+
+	notice := buildUpdateNotice("v0.16.0", release, "linux", "amd64")
+	require.Contains(t, notice, "A new version of superplane CLI is available: v0.16.0 -> v0.17.0")
+	require.Contains(t, notice, "Run: superplane upgrade")
+	require.Contains(t, notice, "Direct download: https://github.com/superplanehq/superplane/releases/download/v0.17.0/superplane-cli-linux-amd64")
+}
+
+func TestBuildUpdateNoticeFallsBackToDeterministicURL(t *testing.T) {
+	release := &releaseInfo{TagName: "v0.17.0"}
+
+	notice := buildUpdateNotice("v0.16.0", release, "darwin", "arm64")
+	require.Contains(t, notice, "Direct download: https://github.com/superplanehq/superplane/releases/download/v0.17.0/superplane-cli-darwin-arm64")
+}
+
+func TestBuildUpdateNoticeEmptyWhenAlreadyCurrent(t *testing.T) {
+	release := &releaseInfo{TagName: "v0.17.0"}
+
+	require.Empty(t, buildUpdateNotice("v0.17.0", release, "linux", "amd64"))
 }

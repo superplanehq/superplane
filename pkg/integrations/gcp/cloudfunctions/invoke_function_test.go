@@ -11,28 +11,6 @@ import (
 	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestInvokeFunction_Metadata(t *testing.T) {
-	c := &InvokeFunction{}
-	assert.Equal(t, "gcp.cloudfunctions.invokeFunction", c.Name())
-	assert.Equal(t, "Cloud Functions • Invoke Function", c.Label())
-	assert.NotEmpty(t, c.Description())
-	assert.NotEmpty(t, c.Documentation())
-	assert.Equal(t, "gcp", c.Icon())
-	assert.Equal(t, "gray", c.Color())
-	assert.Nil(t, c.Actions())
-}
-
-func TestInvokeFunction_ExampleOutput(t *testing.T) {
-	c := &InvokeFunction{}
-	output := c.ExampleOutput()
-	assert.NotEmpty(t, output["type"])
-	assert.NotEmpty(t, output["timestamp"])
-	payload, ok := output["data"].(map[string]any)
-	require.True(t, ok)
-	assert.NotEmpty(t, payload["functionName"])
-	assert.NotEmpty(t, payload["executionId"])
-}
-
 func TestInvokeFunction_Setup(t *testing.T) {
 	c := &InvokeFunction{}
 

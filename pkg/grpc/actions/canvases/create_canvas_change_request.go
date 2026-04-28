@@ -108,6 +108,7 @@ func CreateCanvasChangeRequestWithMetadata(
 
 		version, err = models.CreateCanvasSnapshotVersionInTransaction(
 			tx,
+			draftVersion,
 			canvasUUID,
 			userUUID,
 			draftVersion.Nodes,

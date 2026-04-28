@@ -153,18 +153,18 @@ func (c *CreateRecord) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall(pollChangeActionName, map[string]any{}, pollInterval)
 }
 
-func (c *CreateRecord) Actions() []core.Action {
-	return []core.Action{
-		{Name: pollChangeActionName, Description: "Poll for change status"},
+func (c *CreateRecord) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: pollChangeActionName, Type: core.HookTypeInternal},
 	}
 }
 
-func (c *CreateRecord) HandleAction(ctx core.ActionContext) error {
+func (c *CreateRecord) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case pollChangeActionName:
 		return pollChangeUntilDone(ctx)
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 

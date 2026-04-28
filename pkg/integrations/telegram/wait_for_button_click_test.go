@@ -177,7 +177,7 @@ func Test__WaitForButtonClick__Execute(t *testing.T) {
 	})
 }
 
-func Test__WaitForButtonClick__HandleAction(t *testing.T) {
+func Test__WaitForButtonClick__HandleHook(t *testing.T) {
 	component := &WaitForButtonClick{}
 
 	t.Run("button click -> emits received event", func(t *testing.T) {
@@ -195,7 +195,7 @@ func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        ActionButtonClick,
 			Metadata:    metadata,
 			Integration: integrationCtx,
@@ -230,7 +230,7 @@ func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           ActionTimeout,
 			Metadata:       metadata,
 			Integration:    integrationCtx,
@@ -256,7 +256,7 @@ func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 			Metadata: WaitForButtonClickMetadata{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:     ActionButtonClick,
 			Metadata: metadata,
 			Parameters: map[string]any{

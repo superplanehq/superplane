@@ -277,14 +277,6 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "sentry.release", []any{release})
 }
 
-func (c *CreateRelease) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateRelease) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -387,4 +379,12 @@ func buildReleaseRefPayload(refs []CreateReleaseRefConfiguration) []ReleaseRef {
 	}
 
 	return payload
+}
+
+func (c *CreateRelease) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateRelease) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

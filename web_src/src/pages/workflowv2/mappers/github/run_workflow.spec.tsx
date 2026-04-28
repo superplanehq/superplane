@@ -33,7 +33,7 @@ function makeContext(configuration: unknown): ComponentBaseContext {
       groups: ["developers"],
     },
     actions: {
-      invokeNodeExecutionAction: async () => {},
+      invokeNodeExecutionHook: async () => {},
     },
   };
 }

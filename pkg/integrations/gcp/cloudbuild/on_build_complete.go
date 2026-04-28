@@ -151,12 +151,12 @@ func (t *OnBuildComplete) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnBuildComplete) Actions() []core.Action {
-	return nil
+func (t *OnBuildComplete) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnBuildComplete) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+func (t *OnBuildComplete) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnBuildComplete) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {

@@ -142,18 +142,18 @@ func (d *DeleteApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteApp) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteApp) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined")
-}
-
 func (d *DeleteApp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
 
 func (d *DeleteApp) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (d *DeleteApp) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteApp) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

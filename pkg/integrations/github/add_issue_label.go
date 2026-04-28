@@ -174,18 +174,18 @@ func (c *AddIssueLabel) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return 200, nil, nil
 }
 
-func (c *AddIssueLabel) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *AddIssueLabel) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *AddIssueLabel) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *AddIssueLabel) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *AddIssueLabel) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddIssueLabel) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

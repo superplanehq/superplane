@@ -133,11 +133,11 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (i *OnIssue) Actions() []core.Action {
-	return []core.Action{}
+func (i *OnIssue) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (i *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (i *OnIssue) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

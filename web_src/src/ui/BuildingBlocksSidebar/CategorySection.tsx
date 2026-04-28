@@ -5,6 +5,7 @@ import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
 import { useState } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
+import { filterBlocksInCategory, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const TYPE_HOVER_BG: Record<string, string> = {
@@ -20,11 +21,9 @@ const TYPE_BADGE_COLOR: Record<string, string> = {
 const TYPE_LABEL: Record<string, string> = {
   trigger: "Trigger",
   component: "Action",
-  blueprint: "Blueprint",
 };
 
 function resolveIconSlug(block: BuildingBlock): string {
-  if (block.type === "blueprint") return "component";
   const firstPart = block.name?.split(".")[0];
   if (firstPart === "smtp") return "mail";
   return block.icon || "zap";
@@ -134,7 +133,7 @@ export interface CategorySectionProps {
   showIntegrationSetupStatus: boolean;
   canvasZoom: number;
   searchTerm?: string;
-  typeFilter?: "all" | "trigger" | "component";
+  typeFilter?: TypeFilter;
   isDraggingRef: React.RefObject<boolean>;
   setHoveredBlock: (block: BuildingBlock | null) => void;
   dragPreviewRef: React.RefObject<HTMLDivElement | null>;
@@ -155,35 +154,18 @@ export function CategorySection({
 }: CategorySectionProps) {
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-  const query = searchTerm.trim().toLowerCase();
-  const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
-
-  const baseBlocks = categoryMatches
-    ? category.blocks || []
-    : (category.blocks || []).filter((block) => {
-        const name = (block.name || "").toLowerCase();
-        const label = (block.label || "").toLowerCase();
-        return name.includes(query) || label.includes(query);
-      });
-
-  let allBlocks = baseBlocks;
-
-  if (typeFilter !== "all") {
-    allBlocks = allBlocks.filter((block) => {
-      return block.type === typeFilter;
-    });
-  }
+  const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
   const isCoreCategory = category.name === "Core";
-  const hasSearchTerm = query.length > 0;
+  const hasSearchTerm = searchTerm.trim().length > 0;
   const [isManuallyOpen, setIsManuallyOpen] = useState<boolean | null>(null);
   const isOpen = hasSearchTerm || (isManuallyOpen ?? isCoreCategory);
 
-  if (allBlocks.length === 0) {
+  if (sortedBlocks.length === 0) {
     return null;
   }
 
-  const firstBlock = allBlocks[0];
+  const firstBlock = sortedBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
 
@@ -227,28 +209,6 @@ export function CategorySection({
     // Integration category - will use img tag
   } else {
     CategoryIcon = resolveIcon("puzzle");
-  }
-
-  let sortedBlocks: BuildingBlock[] = [];
-  if (isOpen) {
-    const typeOrder: Record<"trigger" | "component" | "blueprint", number> = {
-      trigger: 0,
-      component: 1,
-      blueprint: 2,
-    };
-
-    sortedBlocks = [...allBlocks].sort((a, b) => {
-      const aType = a.type;
-      const bType = b.type;
-      const typeComparison = typeOrder[aType] - typeOrder[bType];
-      if (typeComparison !== 0) {
-        return typeComparison;
-      }
-
-      const aName = (a.label || a.name || "").toLowerCase();
-      const bName = (b.label || b.name || "").toLowerCase();
-      return aName.localeCompare(bName);
-    });
   }
 
   return (

@@ -341,11 +341,11 @@ func (t *OnVMRestarted) authenticateWebhook(ctx core.WebhookRequestContext) erro
 	return fmt.Errorf("webhook secret required but not provided in Authorization or X-Webhook-Secret header")
 }
 
-func (t *OnVMRestarted) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnVMRestarted) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnVMRestarted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMRestarted) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

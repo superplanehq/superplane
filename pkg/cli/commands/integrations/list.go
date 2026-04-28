@@ -3,6 +3,7 @@ package integrations
 import (
 	"fmt"
 	"io"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -37,6 +38,14 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	connected := connectedResponse.GetIntegrations()
+	sort.SliceStable(connected, func(i, j int) bool {
+		specI, specJ := connected[i].GetSpec(), connected[j].GetSpec()
+		if a, b := specI.GetIntegrationName(), specJ.GetIntegrationName(); a != b {
+			return a < b
+		}
+		metaI, metaJ := connected[i].GetMetadata(), connected[j].GetMetadata()
+		return metaI.GetName() < metaJ.GetName()
+	})
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(connected)
 	}

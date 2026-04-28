@@ -275,7 +275,7 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 	})
 }
 
-func Test__ExecuteCommand__HandleAction(t *testing.T) {
+func Test__ExecuteCommand__HandleHook(t *testing.T) {
 	component := ExecuteCommand{}
 
 	t.Run("poll reschedules when command is still running", func(t *testing.T) {
@@ -293,7 +293,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		}
 
 		requestCtx := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Configuration: map[string]any{
 				"apiKey": "test-api-key",
@@ -338,7 +338,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		}
 
 		execCtx := &contexts.ExecutionStateContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Metadata: &contexts.MetadataContext{
@@ -387,7 +387,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		}
 
 		execCtx := &contexts.ExecutionStateContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Metadata: &contexts.MetadataContext{
@@ -427,7 +427,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		}
 
 		execCtx := &contexts.ExecutionStateContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{},
 			Metadata: &contexts.MetadataContext{
@@ -474,7 +474,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		}
 
 		requestCtx := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Metadata: &contexts.MetadataContext{
@@ -496,7 +496,7 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 	})
 
 	t.Run("skips when execution already finished", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			ExecutionState: &contexts.ExecutionStateContext{Finished: true},
 		})
@@ -504,13 +504,13 @@ func Test__ExecuteCommand__HandleAction(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("unknown action -> error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+	t.Run("unknown hook -> error", func(t *testing.T) {
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "unknown",
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
+		assert.Contains(t, err.Error(), "unknown hook")
 	})
 }
 

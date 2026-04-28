@@ -73,6 +73,7 @@ message SelectTypeOptions {
 
 message MultiSelectTypeOptions {
   repeated SelectOption options = 1;
+  bool use_checkboxes = 2;
 }
 
 message ResourceTypeOptions {
@@ -105,6 +106,7 @@ message ObjectTypeOptions {
 message SelectOption {
   string label = 1;
   string value = 2;
+  string description = 3;
 }
 
 message VisibilityCondition {
