@@ -110,11 +110,11 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
 
   const sidebarTitle = useMemo(() => {
     if (!currentChatId) {
-      return "Agent";
+      return "SuperPlane Agent";
     }
 
     const session = chatSessions.find((s) => s.id === currentChatId);
-    return session?.title ?? "Agent";
+    return session?.title ?? "SuperPlane Agent";
   }, [chatSessions, currentChatId]);
 
   return (
@@ -178,10 +178,10 @@ function AgentSidebarContainer({
       style={sidebarStyle}
       data-testid="agent-sidebar"
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border shrink-0 min-w-0">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 shrink-0 min-w-0">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           {showBack ? <BackButton onBack={onBack} /> : null}
-          <h2 className="text-base font-medium min-w-0 flex-1 truncate" title={title}>
+          <h2 className="text-sm font-medium min-w-0 flex-1 truncate" title={title}>
             {title}
           </h2>
         </div>

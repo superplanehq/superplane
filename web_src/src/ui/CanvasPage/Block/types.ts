@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import type { MouseEvent, MutableRefObject } from "react";
 import type { ComponentActionsProps } from "../../types/componentActions";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
@@ -45,6 +45,9 @@ export interface BlockInternalData {
   _allEdges?: BlockEdgeState[];
   _isHighlighted?: boolean;
   _hasHighlightedNodes?: boolean;
+  _callbacksRef?: MutableRefObject<{
+    onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
+  }>;
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }

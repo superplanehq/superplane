@@ -1,13 +1,11 @@
 import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, Ellipsis, GitBranch, X } from "lucide-react";
+import { ChevronDown, ChevronRight, History } from "lucide-react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
-import { formatVersionLabel, formatVersionTimestamp } from "./lib/canvas-versions";
+import { formatVersionLabel, formatVersionTimestamp, isDraftVersion, isPublishedVersion } from "./lib/canvas-versions";
 
 const CANVAS_VERSION_CONTROL_WIDTH_STORAGE_KEY = "canvasVersionControlSidebarWidth";
 const DEFAULT_CANVAS_VERSION_CONTROL_WIDTH = 460;
@@ -19,9 +17,7 @@ const LOAD_OLDER_LIVE_VERSIONS_STEP = 5;
 
 interface CanvasVersionControlSidebarProps {
   isOpen: boolean;
-  onToggle: (open: boolean) => void;
-  liveCanvasVersionId?: string;
-  selectedCanvasVersion?: CanvasesCanvasVersion | null;
+  selectedVersionId: string;
   pendingApprovalVersions?: Array<{
     version: CanvasesCanvasVersion;
     changeRequest: CanvasesCanvasChangeRequest;
@@ -36,7 +32,6 @@ interface CanvasVersionControlSidebarProps {
   isTemplate: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
-  onVersionNodeDiffContextChange: (context: CanvasVersionNodeDiffContext | null) => void;
   onLoadMoreLiveVersions?: () => void;
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
@@ -45,9 +40,7 @@ interface CanvasVersionControlSidebarProps {
 
 export function CanvasVersionControlSidebar({
   isOpen,
-  onToggle,
-  liveCanvasVersionId,
-  selectedCanvasVersion,
+  selectedVersionId,
   pendingApprovalVersions,
   rejectedVersions,
   liveVersions,
@@ -56,14 +49,12 @@ export function CanvasVersionControlSidebar({
   isTemplate,
   canvasDeletedRemotely,
   onUseVersion,
-  onVersionNodeDiffContextChange,
   onLoadMoreLiveVersions,
   loadMoreLiveVersionsDisabled,
   loadMoreLiveVersionsPending,
   changeRequestApprovalConfig,
 }: CanvasVersionControlSidebarProps) {
   const rejectedList = rejectedVersions ?? [];
-  const selectedVersionId = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "";
 
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") {
@@ -88,12 +79,19 @@ export function CanvasVersionControlSidebar({
   const [visibleLiveVersionCount, setVisibleLiveVersionCount] = useState(INITIAL_VISIBLE_LIVE_VERSIONS);
   const sidebarRef = useRef<HTMLElement>(null);
 
-  const headLiveVersionId = liveVersions[0]?.metadata?.id ?? "";
+  const hasSelectedVersion = !!selectedVersionId;
   useEffect(() => {
     setVisibleLiveVersionCount(INITIAL_VISIBLE_LIVE_VERSIONS);
-  }, [headLiveVersionId]);
+  }, [liveVersions[0]?.metadata?.id]);
 
   const displayedLiveVersions = liveVersions.slice(0, visibleLiveVersionCount);
+  const hasVisiblePendingSelection = hasSelectedVersion
+    ? (pendingApprovalVersions || []).some((item) => item.version.metadata?.id === selectedVersionId)
+    : false;
+  const hasVisibleLiveSelection = hasSelectedVersion
+    ? displayedLiveVersions.some((version) => version.metadata?.id === selectedVersionId)
+    : false;
+  const hasVisibleSelection = hasVisiblePendingSelection || hasVisibleLiveSelection;
   const canExpandLocal = visibleLiveVersionCount < liveVersions.length;
   const showLoadOlderVersions = canExpandLocal || !!onLoadMoreLiveVersions;
 
@@ -181,20 +179,11 @@ export function CanvasVersionControlSidebar({
         style={{ marginRight: "-8px" }}
       />
       <div className="flex h-full flex-col">
-        <div className="flex h-12 items-center justify-between px-3">
+        <div className="flex h-12 items-center px-4">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
-            <GitBranch className="h-4 w-4" />
-            Versions
+            <History className="h-4 w-4" />
+            Version History
           </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="h-7 w-7"
-            onClick={() => onToggle(false)}
-            aria-label="Collapse version control"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="flex-1 overflow-auto p-3">
@@ -226,29 +215,16 @@ export function CanvasVersionControlSidebar({
                         changeRequest={item.changeRequest}
                         changeRequestApprovalConfig={changeRequestApprovalConfig}
                         isActive={isActive}
-                        isCurrentLive={false}
-                        previousVersion={liveVersions[0]}
+                        isLatestPublished={false}
                         onUseVersion={onUseVersion}
-                        onViewDiff={(selectedVersion, selectedPreviousVersion, selectedChangeRequest) =>
-                          onVersionNodeDiffContextChange({
-                            version: selectedVersion,
-                            previousVersion: selectedPreviousVersion,
-                            changeRequest: selectedChangeRequest,
-                          })
-                        }
                       />
                     );
                   })}
                   {displayedLiveVersions.map((version, index) => {
                     const versionID = version.metadata?.id || "";
-                    const isActive = versionID === selectedVersionId;
-                    const isCurrentLive = liveCanvasVersionId === versionID;
-                    const previousVersion = liveVersions[index + 1];
+                    const isLatestPublished = index === 0;
+                    const isActive = versionID === selectedVersionId || (isLatestPublished && !hasVisibleSelection);
                     const changeRequest = versionID ? liveVersionChangeRequestsByVersionId?.get(versionID) : undefined;
-                    const isFirstCanvasVersion =
-                      index === liveVersions.length - 1 &&
-                      (onLoadMoreLiveVersions ? !!loadMoreLiveVersionsDisabled : true);
-
                     return (
                       <VersionRow
                         key={versionID}
@@ -256,17 +232,8 @@ export function CanvasVersionControlSidebar({
                         changeRequest={changeRequest}
                         changeRequestApprovalConfig={changeRequestApprovalConfig}
                         isActive={isActive}
-                        isCurrentLive={isCurrentLive}
-                        isFirstCanvasVersion={isFirstCanvasVersion}
-                        previousVersion={previousVersion}
+                        isLatestPublished={isLatestPublished}
                         onUseVersion={onUseVersion}
-                        onViewDiff={(selectedVersion, selectedPreviousVersion, selectedChangeRequest) =>
-                          onVersionNodeDiffContextChange({
-                            version: selectedVersion,
-                            previousVersion: selectedPreviousVersion,
-                            changeRequest: selectedChangeRequest,
-                          })
-                        }
                       />
                     );
                   })}
@@ -313,16 +280,8 @@ export function CanvasVersionControlSidebar({
                           changeRequestApprovalConfig={changeRequestApprovalConfig}
                           variant="rejected"
                           isActive={isActive}
-                          isCurrentLive={false}
-                          previousVersion={liveVersions[0]}
+                          isLatestPublished={false}
                           onUseVersion={onUseVersion}
-                          onViewDiff={(selectedVersion, selectedPreviousVersion, selectedChangeRequest) =>
-                            onVersionNodeDiffContextChange({
-                              version: selectedVersion,
-                              previousVersion: selectedPreviousVersion,
-                              changeRequest: selectedChangeRequest,
-                            })
-                          }
                         />
                       );
                     })}
@@ -341,38 +300,33 @@ function VersionRow({
   version,
   changeRequest,
   changeRequestApprovalConfig,
-  previousVersion,
   variant = "default",
   isActive = false,
-  isCurrentLive = false,
-  isFirstCanvasVersion = false,
+  isLatestPublished = false,
   rowTestId,
   onUseVersion,
-  onViewDiff,
 }: {
   version: CanvasesCanvasVersion;
   changeRequest?: CanvasesCanvasChangeRequest;
   changeRequestApprovalConfig?: CanvasChangeManagement;
-  previousVersion?: CanvasesCanvasVersion;
   variant?: "default" | "rejected";
   isActive?: boolean;
-  isCurrentLive?: boolean;
-  isFirstCanvasVersion?: boolean;
+  isLatestPublished?: boolean;
   /** Stable hook for E2E: pending approval rows only. */
   rowTestId?: string;
   onUseVersion: (versionID: string) => void;
-  onViewDiff: (
-    version: CanvasesCanvasVersion,
-    previousVersion: CanvasesCanvasVersion,
-    changeRequest?: CanvasesCanvasChangeRequest,
-  ) => void;
 }) {
   const versionID = version.metadata?.id;
   const ownerName = version.metadata?.owner?.name || "Unknown owner";
   const changeRequestTitle = changeRequest?.metadata?.title?.trim();
-  const versionLabel = isFirstCanvasVersion ? "v1" : changeRequestTitle || formatVersionLabel(version);
+  const versionLabel = isDraftVersion(version) ? "Draft" : changeRequestTitle || formatVersionLabel(version);
   const versionTimestamp = formatVersionTimestamp(version);
-  const versionSubtitle = versionTimestamp ? `${ownerName} on ${versionTimestamp}` : ownerName;
+  const versionSubtitle =
+    isPublishedVersion(version) && !changeRequestTitle
+      ? ownerName
+      : versionTimestamp
+        ? `${ownerName} on ${versionTimestamp}`
+        : ownerName;
   const reviewPhase = getChangeRequestReviewPhase(changeRequest, changeRequestApprovalConfig);
   const activeReviewPhase = variant === "rejected" ? null : reviewPhase.kind === "none" ? null : reviewPhase;
 
@@ -397,13 +351,11 @@ function VersionRow({
       className={cn(
         "w-full rounded-md px-2.5 py-2 text-left transition cursor-pointer",
         isActive
-          ? isCurrentLive
-            ? "bg-green-100"
-            : variant === "rejected"
-              ? "bg-red-50"
-              : activeReviewPhase
-                ? activeReviewPhase.sidebarRowActiveClassName
-                : "bg-sky-100"
+          ? variant === "rejected"
+            ? "bg-red-50"
+            : activeReviewPhase
+              ? activeReviewPhase.sidebarRowActiveClassName
+              : "bg-sky-100"
           : "bg-white hover:bg-slate-100",
       )}
       role="button"
@@ -416,9 +368,9 @@ function VersionRow({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-slate-900">{versionLabel}</p>
           <p className="mt-0.5 text-xs text-slate-600 truncate">
-            {isCurrentLive ? (
+            {isLatestPublished ? (
               <>
-                <span className="font-medium text-green-600">Live</span> {"\u00b7"}{" "}
+                <span className="font-medium text-sky-600">Current Version</span> {"\u00b7"}{" "}
               </>
             ) : null}
             {variant === "rejected" ? (
@@ -434,30 +386,6 @@ function VersionRow({
             {versionSubtitle}
           </p>
         </div>
-        {previousVersion ? (
-          <div className="flex items-center gap-1.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-7 w-7 hover:bg-black/5 dark:hover:bg-black/5"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onViewDiff(version, previousVersion, changeRequest);
-                    }}
-                    aria-label="View details"
-                  >
-                    <Ellipsis className="h-4 w-4" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">View details</TooltipContent>
-            </Tooltip>
-          </div>
-        ) : null}
       </div>
     </div>
   );

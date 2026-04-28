@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Play, Trash2, TriangleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Play, Plus, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -39,6 +39,7 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  IntegrationsIntegrationDefinition,
   SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -179,6 +180,7 @@ export interface CanvasPageProps {
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  onCloseVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
@@ -187,6 +189,7 @@ export interface CanvasPageProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  integrationDialogOpen?: boolean;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   // Disable running nodes when there are unsaved changes (with tooltip)
@@ -216,6 +219,7 @@ export interface CanvasPageProps {
   ) => (() => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   integrations?: OrganizationsIntegration[];
+  availableIntegrationDefinitions?: IntegrationsIntegrationDefinition[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
@@ -261,8 +265,8 @@ export interface CanvasPageProps {
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
-    sourceNodeId: string;
-    sourceHandleId: string | null;
+    sourceNodeId?: string;
+    sourceHandleId?: string | null;
   }) => Promise<string>;
   onPlaceholderConfigure?: (data: {
     placeholderId: string;
@@ -271,6 +275,8 @@ export interface CanvasPageProps {
     configuration: Record<string, unknown>;
     integrationName?: string;
   }) => Promise<void>;
+  autoOpenStarterPlaceholder?: boolean;
+  onStarterPlaceholderHandled?: () => void;
 
   // Refs to persist state across re-renders
   hasFitToViewRef?: React.MutableRefObject<boolean>;
@@ -318,8 +324,6 @@ export interface CanvasPageProps {
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
 
-  /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
-  onPreviewPreviousVersionViewDetails?: () => void;
   /** Change request being previewed while awaiting approval (floating bar + versioning sidebar). */
   awaitingApprovalBanner?: {
     title: string;
@@ -354,6 +358,9 @@ const EDGE_STYLE = {
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
+const DEFAULT_COMPONENT_SIDEBAR_WIDTH = 380;
+const MIN_COMPONENT_SIDEBAR_WIDTH = 300;
+const MAX_COMPONENT_SIDEBAR_WIDTH = 800;
 
 type CanvasAnnotationUpdate = {
   text?: string;
@@ -371,6 +378,7 @@ type PendingRunData = {
 
 type CanvasNodeRendererCallbacks = {
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
+  onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
@@ -391,6 +399,18 @@ type CanvasBlockNodeData = CanvasBlockData & {
   _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
   nodeName?: string;
 };
+
+function getPersistedSidebarWidth(): number {
+  if (typeof window === "undefined") {
+    return DEFAULT_COMPONENT_SIDEBAR_WIDTH;
+  }
+  const raw = window.localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_COMPONENT_SIDEBAR_WIDTH;
+  }
+  return Math.max(MIN_COMPONENT_SIDEBAR_WIDTH, Math.min(MAX_COMPONENT_SIDEBAR_WIDTH, parsed));
+}
 
 declare global {
   interface Window {
@@ -589,7 +609,7 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
 
   return (
     <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
-      <Block {...blockProps} data={blockData} />
+      <Block {...blockProps} data={nodeProps.data} />
     </CanvasNodeErrorBoundary>
   );
 });
@@ -605,6 +625,8 @@ function CanvasPage(props: CanvasPageProps) {
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const hasHandledStarterPlaceholderRef = useRef(false);
+  const pendingSelectionNodeIdRef = useRef<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
@@ -648,7 +670,8 @@ function CanvasPage(props: CanvasPageProps) {
     onApplyAiOperations: props.onApplyAiOperations,
   });
 
-  const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
+  // New/empty canvases should start at 100% unless a later fit-to-view is needed.
+  const initialCanvasZoom = 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
     nodeId: string;
@@ -695,6 +718,88 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [props, state.componentSidebar, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, setCurrentTab],
   );
+
+  useEffect(() => {
+    if (!props.autoOpenStarterPlaceholder || readOnly || !props.isEditing || !props.activeCanvasVersionId) {
+      return;
+    }
+
+    if (hasHandledStarterPlaceholderRef.current) {
+      return;
+    }
+
+    const starterPlaceholder = props.workflowNodes?.find((node) => node.name === "New Component" && !node.component);
+    if (starterPlaceholder?.id) {
+      hasHandledStarterPlaceholderRef.current = true;
+      setTemplateNodeId(starterPlaceholder.id);
+      setIsBuildingBlocksSidebarOpen(true);
+      state.componentSidebar.close();
+      props.onStarterPlaceholderHandled?.();
+      return;
+    }
+
+    if ((props.workflowNodes?.length ?? 0) > 0 || (state.nodes?.length ?? 0) > 0) {
+      return;
+    }
+
+    hasHandledStarterPlaceholderRef.current = true;
+    const viewport = props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+    const canvasRect = canvasWrapperRef.current?.getBoundingClientRect();
+    const zoom = viewport.zoom || DEFAULT_CANVAS_ZOOM;
+    const visibleWidth = canvasRect?.width ?? window.innerWidth;
+    const visibleHeight = canvasRect?.height ?? window.innerHeight;
+    const savedSidebarWidth = getPersistedSidebarWidth();
+    const centerPosition = {
+      x: ((visibleWidth - savedSidebarWidth) / 2 - viewport.x) / zoom - 120,
+      y: (visibleHeight / 2 - viewport.y) / zoom - 45,
+    };
+
+    const starterNodeId = `starter-placeholder-${Date.now()}`;
+    state.setNodes((nodes) => [
+      ...nodes,
+      {
+        id: starterNodeId,
+        type: "default",
+        position: centerPosition,
+        selected: true,
+        data: {
+          type: "component",
+          label: "New Component",
+          state: "pending",
+          outputChannels: ["default"],
+          component: {
+            iconSlug: "puzzle",
+            title: "New Component",
+            includeEmptyState: true,
+            emptyStateProps: {
+              icon: Plus,
+              title: "Select the component",
+              purpose: "setup",
+            },
+            error: "Select the component",
+            parameters: [],
+          },
+          isPendingConnection: true,
+          sourceConnection: undefined,
+        } as unknown as Record<string, unknown>,
+      } as CanvasNode,
+    ]);
+    setTemplateNodeId(starterNodeId);
+    setIsBuildingBlocksSidebarOpen(true);
+    state.componentSidebar.close();
+    props.onStarterPlaceholderHandled?.();
+  }, [
+    props.activeCanvasVersionId,
+    props.autoOpenStarterPlaceholder,
+    props.isEditing,
+    props.workflowNodes,
+    props.onStarterPlaceholderHandled,
+    props.viewportRef,
+    readOnly,
+    state.nodes,
+    state.componentSidebar,
+    state.setNodes,
+  ]);
 
   // Get editing data for the currently selected node
   const { getNodeEditData } = props;
@@ -756,24 +861,98 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
+  const findAvailablePlaceholderPosition = useCallback(
+    (preferredPosition: { x: number; y: number }) => {
+      const PLACEHOLDER_WIDTH = 368;
+      const PLACEHOLDER_HEIGHT = 96;
+      const COLLISION_PADDING = 24;
+      const STEP_X = 140;
+      const STEP_Y = 110;
+      const MAX_RING = 8;
+      const nodes = state.nodes || [];
+
+      const intersectsExistingNode = (candidate: { x: number; y: number }) => {
+        const candidateLeft = candidate.x - COLLISION_PADDING;
+        const candidateTop = candidate.y - COLLISION_PADDING;
+        const candidateRight = candidate.x + PLACEHOLDER_WIDTH + COLLISION_PADDING;
+        const candidateBottom = candidate.y + PLACEHOLDER_HEIGHT + COLLISION_PADDING;
+
+        return nodes.some((node) => {
+          const nodeWidth = node.width ?? PLACEHOLDER_WIDTH;
+          const nodeHeight = node.height ?? PLACEHOLDER_HEIGHT;
+          const nodeLeft = node.position.x;
+          const nodeTop = node.position.y;
+          const nodeRight = nodeLeft + nodeWidth;
+          const nodeBottom = nodeTop + nodeHeight;
+
+          return !(
+            candidateRight <= nodeLeft ||
+            candidateLeft >= nodeRight ||
+            candidateBottom <= nodeTop ||
+            candidateTop >= nodeBottom
+          );
+        });
+      };
+
+      if (!intersectsExistingNode(preferredPosition)) {
+        return preferredPosition;
+      }
+
+      for (let ring = 1; ring <= MAX_RING; ring += 1) {
+        const candidates: Array<{ x: number; y: number; distance: number }> = [];
+
+        for (let dx = -ring; dx <= ring; dx += 1) {
+          for (let dy = -ring; dy <= ring; dy += 1) {
+            if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) {
+              continue;
+            }
+
+            const x = preferredPosition.x + dx * STEP_X;
+            const y = preferredPosition.y + dy * STEP_Y;
+            candidates.push({ x, y, distance: dx * dx + dy * dy });
+          }
+        }
+
+        candidates.sort((a, b) => a.distance - b.distance);
+        const available = candidates.find((candidate) => !intersectsExistingNode(candidate));
+        if (available) {
+          return { x: available.x, y: available.y };
+        }
+      }
+
+      return preferredPosition;
+    },
+    [state.nodes],
+  );
+
   const handleConnectionDropInEmptySpace = useCallback(
     async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
       if (readOnly) return;
       if (!sourceConnection || !props.onPlaceholderAdd) return;
 
+      const requestedPosition = { x: position.x, y: position.y - 30 };
+      const resolvedPosition = findAvailablePlaceholderPosition(requestedPosition);
+
       // Save placeholder immediately to backend
       const placeholderId = await props.onPlaceholderAdd({
-        position: { x: position.x, y: position.y - 30 },
+        position: resolvedPosition,
         sourceNodeId: sourceConnection.nodeId,
         sourceHandleId: sourceConnection.handleId,
       });
 
       // Set as template node and open building blocks sidebar
       setTemplateNodeId(placeholderId);
+      state.setNodes((nodes) =>
+        nodes.map((node) => ({
+          ...node,
+          selected: node.id === placeholderId,
+        })),
+      );
+      pendingSelectionNodeIdRef.current = placeholderId;
       setIsBuildingBlocksSidebarOpen(true);
       state.componentSidebar.close();
     },
-    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, readOnly],
+    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, readOnly, findAvailablePlaceholderPosition],
   );
 
   const handlePendingConnectionNodeClick = useCallback(
@@ -785,6 +964,12 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Open the BuildingBlocksSidebar so user can select a component
       setIsBuildingBlocksSidebarOpen(true);
+      state.setNodes((nodes) =>
+        nodes.map((node) => ({
+          ...node,
+          selected: node.id === nodeId,
+        })),
+      );
 
       // Close ComponentSidebar since we're selecting a building block first
       state.componentSidebar.close();
@@ -826,6 +1011,12 @@ function CanvasPage(props: CanvasPageProps) {
 
         setTemplateNodeId(null);
         setIsBuildingBlocksSidebarOpen(false);
+        state.setNodes((nodes) =>
+          nodes.map((node) => ({
+            ...node,
+            selected: node.id === templateNodeId,
+          })),
+        );
         state.componentSidebar.open(templateNodeId);
         setCurrentTab("settings");
         return;
@@ -858,6 +1049,12 @@ function CanvasPage(props: CanvasPageProps) {
           setIsBuildingBlocksSidebarOpen(false);
 
           // Open component sidebar for the new node
+          state.setNodes((nodes) =>
+            nodes.map((node) => ({
+              ...node,
+              selected: node.id === newNodeId,
+            })),
+          );
           state.componentSidebar.open(newNodeId);
           setCurrentTab("settings");
         }
@@ -938,6 +1135,62 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
+
+  const handleAddComponentButtonClick = useCallback(async () => {
+    if (readOnly) {
+      return;
+    }
+
+    if (!props.onPlaceholderAdd) {
+      handleSidebarToggle(true);
+      return;
+    }
+
+    const viewport = props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+    const canvasRect = canvasWrapperRef.current?.getBoundingClientRect();
+    const zoom = viewport.zoom || DEFAULT_CANVAS_ZOOM;
+    const visibleWidth = canvasRect?.width ?? window.innerWidth;
+    const visibleHeight = canvasRect?.height ?? window.innerHeight;
+    const savedSidebarWidth = getPersistedSidebarWidth();
+    const preferredPlaceholderPosition = {
+      x: ((visibleWidth - savedSidebarWidth) / 2 - viewport.x) / zoom - 120,
+      y: (visibleHeight / 2 - viewport.y) / zoom - 45,
+    };
+    const placeholderPosition = findAvailablePlaceholderPosition(preferredPlaceholderPosition);
+
+    const placeholderId = await props.onPlaceholderAdd({
+      position: placeholderPosition,
+    });
+    setTemplateNodeId(placeholderId);
+    state.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: node.id === placeholderId,
+      })),
+    );
+    pendingSelectionNodeIdRef.current = placeholderId;
+    handleSidebarToggle(true);
+    state.componentSidebar.close();
+  }, [readOnly, props, handleSidebarToggle, state.componentSidebar, findAvailablePlaceholderPosition]);
+
+  useEffect(() => {
+    const pendingNodeId = pendingSelectionNodeIdRef.current;
+    if (!pendingNodeId) {
+      return;
+    }
+
+    if (!state.nodes.some((node) => node.id === pendingNodeId)) {
+      return;
+    }
+
+    pendingSelectionNodeIdRef.current = null;
+    state.setNodes((nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        selected: node.id === pendingNodeId,
+      })),
+    );
+  }, [state.nodes, state.setNodes]);
 
   /**
    * Keyboard equivalent of dropping a block onto the canvas via drag-and-drop.
@@ -1046,9 +1299,21 @@ function CanvasPage(props: CanvasPageProps) {
     );
   }, [props.canvasStateMode, state, templateNodeId]);
 
+  useEffect(() => {
+    if (!templateNodeId || !isBuildingBlocksSidebarOpen) {
+      return;
+    }
+
+    const templateNodeStillExists = state.nodes.some((node) => node.id === templateNodeId);
+    if (templateNodeStillExists) {
+      return;
+    }
+
+    setTemplateNodeId(null);
+    setIsBuildingBlocksSidebarOpen(false);
+  }, [isBuildingBlocksSidebarOpen, state.nodes, templateNodeId]);
+
   const canvasStateMode = props.canvasStateMode || "default";
-  const showPreviewFloatingBar =
-    canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
@@ -1056,7 +1321,7 @@ function CanvasPage(props: CanvasPageProps) {
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        props.headerMode === "version-live" && "sp-canvas-live",
+        props.headerMode === "version-live" && !props.isVersionControlOpen && "sp-canvas-live",
       )}
     >
       {/* Header at the top spanning full width */}
@@ -1088,6 +1353,7 @@ function CanvasPage(props: CanvasPageProps) {
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           isVersionControlOpen={props.isVersionControlOpen}
           onOpenVersionControl={props.onOpenVersionControl}
+          onCloseVersionControl={props.onCloseVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
           agentState={agentState}
@@ -1101,13 +1367,17 @@ function CanvasPage(props: CanvasPageProps) {
 
         <AgentSidebar agentState={agentState} />
 
-        <RightSideControls
-          mode={readOnly ? "live" : "edit"}
-          onSidebarOpen={() => handleSidebarToggle(true)}
-          onAddNote={handleAddNote}
-          onMemoryOpen={props.onMemoryOpen}
-          onYamlOpen={props.onYamlOpen}
-        />
+        {props.isVersionControlOpen ? null : (
+          <RightSideControls
+            mode={readOnly ? "live" : "edit"}
+            onSidebarOpen={() => {
+              void handleAddComponentButtonClick();
+            }}
+            onAddNote={handleAddNote}
+            onMemoryOpen={props.onMemoryOpen}
+            onYamlOpen={props.onYamlOpen}
+          />
+        )}
 
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
@@ -1115,52 +1385,38 @@ function CanvasPage(props: CanvasPageProps) {
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
+            availableIntegrations={props.availableIntegrationDefinitions || []}
+            integrationDialogOpen={props.integrationDialogOpen ?? false}
             canvasZoom={canvasZoom}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockClick}
+            onConnectIntegration={props.onConnectIntegration}
             onEnterSubmit={handleBuildingBlockEnter}
           />
         )}
 
         <div className="flex-1 relative">
-          {showPreviewFloatingBar || showAwaitingFloatingBar ? (
+          {showAwaitingFloatingBar ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
                 className={cn(
                   "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
-                  showAwaitingFloatingBar ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName : "bg-sky-50",
+                  props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName,
                 )}
               >
-                <span
-                  className={cn(
-                    "flex min-w-0 max-w-full items-center gap-1 text-sm",
-                    showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
-                  )}
-                >
-                  {showAwaitingFloatingBar ? (
-                    <>
-                      <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
-                      <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
-                        {props.awaitingApprovalBanner?.reviewUi.label}
-                      </span>
-                    </>
-                  ) : (
-                    "Previewing previous version"
-                  )}
+                <span className="flex min-w-0 max-w-full items-center gap-1 text-sm">
+                  <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
+                  <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
+                    {props.awaitingApprovalBanner?.reviewUi.label}
+                  </span>
                 </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="shrink-0"
-                  onClick={() => {
-                    if (showAwaitingFloatingBar) {
-                      props.awaitingApprovalBanner?.onViewNodeDiff?.();
-                    } else {
-                      props.onPreviewPreviousVersionViewDetails?.();
-                    }
-                  }}
+                  onClick={() => props.awaitingApprovalBanner?.onViewNodeDiff?.()}
                 >
                   View details
                 </Button>
@@ -1189,14 +1445,16 @@ function CanvasPage(props: CanvasPageProps) {
               onBuildingBlocksSidebarToggle={handleSidebarToggle}
               onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
               onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
+              initialCanvasZoom={initialCanvasZoom}
+              onZoomChange={setCanvasZoom}
               highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
               setCurrentTab={setCurrentTab}
               showBottomStatusControls={props.showBottomStatusControls}
               headerMode={props.headerMode}
+              isVersionControlOpen={props.isVersionControlOpen}
               isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
               onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
               autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1247,7 +1505,7 @@ function CanvasPage(props: CanvasPageProps) {
             configurationSaveMode={props.configurationSaveMode}
             currentTab={currentTab}
             onTabChange={setCurrentTab}
-            canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
+            canvasMode={props.headerMode === "version-live" && !props.isVersionControlOpen ? "live" : "edit"}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
             integrations={props.integrations}
@@ -1458,7 +1716,8 @@ function Sidebar({
   // Show loading state when data is being fetched (skip for annotation nodes)
   if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    const sidebarWidth = saved ? parseInt(saved, 10) : 450;
+    const parsedWidth = saved ? Number.parseInt(saved, 10) : NaN;
+    const sidebarWidth = Number.isFinite(parsedWidth) && parsedWidth >= 300 && parsedWidth <= 800 ? parsedWidth : 380;
 
     return (
       <div
@@ -1583,6 +1842,7 @@ function CanvasContentHeader({
   showCanvasSettingsMenu,
   isVersionControlOpen,
   onOpenVersionControl,
+  onCloseVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
   agentState,
@@ -1613,6 +1873,7 @@ function CanvasContentHeader({
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  onCloseVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
   agentState: AgentState;
@@ -1653,6 +1914,7 @@ function CanvasContentHeader({
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       isVersionControlOpen={isVersionControlOpen}
       onOpenVersionControl={onOpenVersionControl}
+      onCloseVersionControl={onCloseVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
       agentState={agentState}
@@ -1715,6 +1977,7 @@ function CanvasContent({
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
+  initialCanvasZoom = DEFAULT_CANVAS_ZOOM,
   runDisabled,
   runDisabledTooltip,
   onPendingConnectionNodeClick,
@@ -1723,6 +1986,7 @@ function CanvasContent({
   setCurrentTab,
   showBottomStatusControls = true,
   headerMode,
+  isVersionControlOpen,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -1772,6 +2036,7 @@ function CanvasContent({
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
+  initialCanvasZoom?: number;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
@@ -1780,6 +2045,7 @@ function CanvasContent({
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
   headerMode?: CanvasPageProps["headerMode"];
+  isVersionControlOpen?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1808,7 +2074,7 @@ function CanvasContent({
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
 }) {
-  const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
@@ -1828,7 +2094,7 @@ function CanvasContent({
   const viewportRef = viewportRefProp ?? localViewportRef;
 
   if (!viewportRef.current && (stateRef.current.nodes?.length ?? 0) === 0) {
-    viewportRef.current = { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+    viewportRef.current = { x: 0, y: 0, zoom: initialCanvasZoom };
   }
 
   // Use viewport from ref as the state value
@@ -1863,7 +2129,7 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const isLiveMode = headerMode === "version-live";
+  const isLiveMode = headerMode === "version-live" && !isVersionControlOpen;
   const isEditMode = !isLiveMode;
 
   useEffect(() => {
@@ -2147,54 +2413,120 @@ function CanvasContent({
     }
   }, [onBuildingBlocksSidebarToggle]);
 
+  const applyInitialFit = useCallback(() => {
+    const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
+    if (!hasNodes) {
+      return false;
+    }
+
+    const focusNodeId = initialFocusNodeId;
+    const focusNode = focusNodeId ? stateRef.current.nodes?.find((node) => node.id === focusNodeId) : null;
+
+    if (focusNode) {
+      fitView({ nodes: [focusNode], maxZoom: 1.2, minZoom: 0.5 });
+    } else {
+      // Prefer 100% when possible; otherwise fit all nodes but never below 50%.
+      fitView({ maxZoom: 1.0, minZoom: 0.5, padding: 0.5 });
+    }
+
+    const initialViewport = getViewport();
+    viewportRef.current = initialViewport;
+    reportZoom(initialViewport.zoom);
+    hasFitToViewRef.current = true;
+    return true;
+  }, [fitView, getViewport, hasFitToViewRef, initialFocusNodeId, reportZoom, viewportRef]);
+
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
     (reactFlowInstance: { setViewport: (viewport: Viewport) => void }) => {
       if (!hasFitToViewRef.current) {
-        const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
-
-        const focusNodeId = initialFocusNodeId;
-        const focusNode = focusNodeId ? stateRef.current.nodes?.find((node) => node.id === focusNodeId) : null;
-
-        if (focusNode) {
-          fitView({ nodes: [focusNode], duration: 500, maxZoom: 1.2 });
-        } else if (hasNodes) {
-          // Fit to view but don't zoom in too much (max zoom of 1.0)
-          fitView({ maxZoom: 1.0, padding: 0.5 });
-        }
-
-        if (hasNodes) {
-          // Store the initial viewport after fit
-          const initialViewport = getViewport();
-          viewportRef.current = initialViewport;
-          reportZoom(initialViewport.zoom);
-        } else {
-          const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+        const fitted = applyInitialFit();
+        if (!fitted) {
+          const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: initialCanvasZoom };
           viewportRef.current = defaultViewport;
           reactFlowInstance.setViewport(defaultViewport);
           reportZoom(defaultViewport.zoom);
         }
-
-        hasFitToViewRef.current = true;
         setIsInitialized(true);
-      } else {
-        // If we've already fit to view once and have a stored viewport, restore it
-        if (viewportRef.current) {
-          reactFlowInstance.setViewport(viewportRef.current);
-        }
-        setIsInitialized(true);
+        return;
       }
+
+      // If we've already fit to view once and have a stored viewport, restore it
+      if (viewportRef.current) {
+        reactFlowInstance.setViewport(viewportRef.current);
+      }
+      setIsInitialized(true);
     },
-    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
+    [applyInitialFit, hasFitToViewRef, initialCanvasZoom, reportZoom, viewportRef],
   );
+
+  useEffect(() => {
+    if (!isInitialized || hasFitToViewRef.current) {
+      return;
+    }
+
+    // If nodes arrive after initial mount, apply initial fit once.
+    if (applyInitialFit()) {
+      setIsInitialized(true);
+    }
+  }, [applyInitialFit, hasFitToViewRef, isInitialized, state.nodes.length]);
 
   const showHeader = !isReadOnly;
 
   const hasMultiSelection = multiSelectedNodes.length >= 2;
 
+  const handleAppendFromNode = useCallback(
+    async (sourceNodeId: string, sourceHandleId?: string | null) => {
+      if (isReadOnly || !onConnectionDropInEmptySpace) {
+        return;
+      }
+
+      const sourceNode = stateRef.current.nodes?.find((node) => node.id === sourceNodeId);
+      if (!sourceNode) {
+        return;
+      }
+
+      const sourceWidth = sourceNode.width ?? 240;
+      // Keep enough horizontal space so the appended placeholder does not
+      // visually collide with the source block in normal layouts.
+      const APPEND_PLACEHOLDER_GAP_X = 300;
+      // Placeholder creation applies a -30px Y offset internally, so we feed
+      // source top + 30px to keep the new node aligned on the same row.
+      const APPEND_PLACEHOLDER_ALIGNMENT_Y = 30;
+      const placeholderPosition = {
+        x: sourceNode.position.x + sourceWidth + APPEND_PLACEHOLDER_GAP_X,
+        y: sourceNode.position.y + APPEND_PLACEHOLDER_ALIGNMENT_Y,
+      };
+
+      const currentViewport = getViewport();
+      const canvasWidth = document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth;
+      const RIGHT_SIDEBAR_SAFE_AREA_PX = 560;
+      const PLACEHOLDER_ESTIMATED_WIDTH_PX = 420;
+      const APPEND_VIEWPORT_BUFFER_PX = 48;
+      const targetRightScreenX =
+        (placeholderPosition.x + PLACEHOLDER_ESTIMATED_WIDTH_PX) * currentViewport.zoom + currentViewport.x;
+      const maxVisibleScreenX = canvasWidth - RIGHT_SIDEBAR_SAFE_AREA_PX - APPEND_VIEWPORT_BUFFER_PX;
+
+      // Keep newly-added placeholders visible even when the right sidebar is open.
+      if (targetRightScreenX > maxVisibleScreenX) {
+        const overflowPx = targetRightScreenX - maxVisibleScreenX;
+        const nextViewport = { ...currentViewport, x: currentViewport.x - overflowPx };
+        setViewport(nextViewport, { duration: 180 });
+        viewportRef.current = nextViewport;
+      }
+
+      onConnectionDropInEmptySpace(placeholderPosition, {
+        nodeId: sourceNodeId,
+        handleId: sourceHandleId ?? "default",
+      });
+    },
+    [getViewport, isReadOnly, onConnectionDropInEmptySpace, setViewport, viewportRef],
+  );
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeClick,
+    onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
@@ -2212,6 +2544,7 @@ function CanvasContent({
   });
   callbacksRef.current = {
     handleNodeClick,
+    onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
@@ -2495,10 +2828,12 @@ function CanvasContent({
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
-                  isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
-                  onSnapToGridToggle={isEditMode ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined}
+                  isSnapToGridEnabled={isEditMode && !isVersionControlOpen ? isSnapToGridEnabled : undefined}
+                  onSnapToGridToggle={
+                    isEditMode && !isVersionControlOpen ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined
+                  }
                 >
-                  {isEditMode ? (
+                  {isEditMode && !isVersionControlOpen ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="inline-flex">

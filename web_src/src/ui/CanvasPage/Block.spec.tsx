@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@xyflow/react", () => ({
@@ -166,11 +166,68 @@ describe("Block fallback rendering", () => {
             iconSlug: "box",
             collapsed: false,
           },
+          _allEdges: [
+            {
+              source: "component-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+            {
+              source: "prev-node",
+              sourceHandle: "default",
+              target: "component-node",
+            },
+          ],
         }}
       />,
     );
 
     expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
+  });
+
+  it("shows append connector button for end nodes in edit mode", () => {
+    const onAppendFromNode = vi.fn();
+    const callbacksRef = {
+      current: {
+        handleNodeClick: vi.fn(),
+        onAppendFromNode,
+        onNodeEdit: { current: undefined },
+        onNodeDelete: { current: undefined },
+        onRun: { current: undefined },
+        onDuplicate: { current: undefined },
+        onDeactivate: { current: undefined },
+        onTogglePause: { current: undefined },
+        onToggleView: { current: undefined },
+        onAnnotationUpdate: { current: undefined },
+        onAnnotationBlur: { current: undefined },
+        showHeader: true,
+        hasMultiSelection: false,
+        canvasMode: "edit" as const,
+      },
+    };
+
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="end-node"
+        data={{
+          label: "End node",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "End node",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _callbacksRef: callbacksRef as any,
+          _allEdges: [{ source: "prev-node", sourceHandle: "default", target: "end-node" }],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add next component" }));
+    expect(onAppendFromNode).toHaveBeenCalledWith("end-node", "default");
   });
 });

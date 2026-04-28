@@ -25,7 +25,11 @@ export function sortDraftVersionsDesc(versions: CanvasesCanvasVersion[]): Canvas
 }
 
 export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): string | undefined {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
+  const meta = version?.metadata;
+  const raw =
+    meta?.state === "STATE_PUBLISHED"
+      ? meta?.publishedAt || meta?.updatedAt || meta?.createdAt
+      : meta?.updatedAt || meta?.createdAt;
   if (!raw) {
     return undefined;
   }
@@ -40,13 +44,17 @@ export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): 
 
 export function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
   if (version?.metadata?.state === "STATE_PUBLISHED") {
-    return "Published version";
+    return formatVersionTimestamp(version) ?? "Published version";
   }
 
   return "Draft version";
 }
 
 export function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion | null): string {
+  if (version?.metadata?.state === "STATE_PUBLISHED") {
+    return formatVersionTimestamp(version) ?? "Published version";
+  }
+
   const label = formatVersionLabel(version);
   const timestamp = formatVersionTimestamp(version);
   if (!timestamp) {

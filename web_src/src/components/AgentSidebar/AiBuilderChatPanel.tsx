@@ -96,7 +96,7 @@ export function AiBuilderChatPanel({
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
       <div className="h-full min-h-0 flex flex-col">
         {isNewChatView ? (
-          <div className="m-3">
+          <div className="mx-3 mb-3 mt-1">
             <InputForm
               aiInputRef={aiInputRef}
               aiInput={aiInput}
@@ -116,12 +116,12 @@ export function AiBuilderChatPanel({
               isGeneratingResponse={isGeneratingResponse}
               onSelectChat={onSelectChat}
               onDeleteChat={handleDeleteChatSession}
-              className="flex-1 min-h-0 px-2 py-2 space-y-2"
+              className="flex-1 min-h-0 px-2 py-2 space-y-3"
               fillAvailable
             />
           </div>
         ) : (
-          <div className="mx-2 mb-2 h-full flex flex-col">
+          <div className="mx-2 mb-2 mt-0.5 h-full flex flex-col">
             <ConversationContent
               aiMessagesContainerRef={aiMessagesContainerRef}
               isLoadingChatMessages={isLoadingChatMessages}
@@ -187,7 +187,7 @@ function ConversationContent({
   });
 
   return (
-    <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
+    <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 pt-2 pb-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
       <AiBuilderConversationMessageList messages={aiMessages} isGeneratingResponse={isGeneratingResponse} />
 

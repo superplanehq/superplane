@@ -471,7 +471,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                         value={spec.value}
                         contentType={spec.contentType || "json"}
                       >
-                        <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                        <span className="text-sm bg-gray-400 px-2 py-0.5 rounded-md text-white font-mono font-medium cursor-help">
                           {spec.title}
                         </span>
                       </PayloadTooltip>

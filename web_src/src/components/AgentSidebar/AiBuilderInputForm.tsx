@@ -56,7 +56,7 @@ export function InputForm({
   };
 
   return (
-    <div className={cn("m-1.5", expanded && "mb-3")}>
+    <div className={cn(expanded ? "mx-1.5 mb-3 mt-0" : "m-1.5")}>
       <form
         onSubmit={submitHandler}
         className={cn("rounded-md border border-slate-300 bg-white p-1.5", expanded && "p-3 shadow-sm")}

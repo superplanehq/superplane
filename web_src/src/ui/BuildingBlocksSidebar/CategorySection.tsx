@@ -2,7 +2,7 @@ import type { OrganizationsIntegration } from "@/api-client";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
 import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { filterBlocksInCategory, type TypeFilter } from "./filter";
@@ -129,22 +129,22 @@ function BlockItem({
 
 export interface CategorySectionProps {
   category: BuildingBlockCategory;
-  integrations: OrganizationsIntegration[];
-  showIntegrationSetupStatus: boolean;
-  canvasZoom: number;
+  integrations?: OrganizationsIntegration[];
+  showIntegrationSetupStatus?: boolean;
+  canvasZoom?: number;
   searchTerm?: string;
   typeFilter?: TypeFilter;
-  isDraggingRef: React.RefObject<boolean>;
-  setHoveredBlock: (block: BuildingBlock | null) => void;
-  dragPreviewRef: React.RefObject<HTMLDivElement | null>;
+  isDraggingRef?: React.RefObject<boolean>;
+  setHoveredBlock?: (block: BuildingBlock | null) => void;
+  dragPreviewRef?: React.RefObject<HTMLDivElement | null>;
   onBlockClick?: (block: BuildingBlock) => void;
 }
 
 export function CategorySection({
   category,
-  integrations,
-  showIntegrationSetupStatus,
-  canvasZoom,
+  integrations = [],
+  showIntegrationSetupStatus = false,
+  canvasZoom = 1,
   searchTerm = "",
   typeFilter = "all",
   isDraggingRef,
@@ -153,6 +153,8 @@ export function CategorySection({
   onBlockClick,
 }: CategorySectionProps) {
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fallbackDraggingRef = useRef(false);
+  const fallbackDragPreviewRef = useRef<HTMLDivElement>(null);
 
   const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
@@ -247,9 +249,9 @@ export function CategorySection({
               key={`${block.type}-${block.name}`}
               block={block}
               canvasZoom={canvasZoom}
-              isDraggingRef={isDraggingRef}
-              setHoveredBlock={setHoveredBlock}
-              dragPreviewRef={dragPreviewRef}
+              isDraggingRef={isDraggingRef ?? fallbackDraggingRef}
+              setHoveredBlock={setHoveredBlock ?? (() => {})}
+              dragPreviewRef={dragPreviewRef ?? fallbackDragPreviewRef}
               onBlockClick={onBlockClick}
             />
           ))}

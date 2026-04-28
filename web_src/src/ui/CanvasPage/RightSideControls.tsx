@@ -15,7 +15,7 @@ export type RightSideControlsProps = {
 
 export function RightSideControls(props: RightSideControlsProps) {
   return (
-    <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
+    <div className="absolute top-4 right-4 z-10 flex flex-col gap-2.5">
       {props.mode === "live" ? <LiveCanvasButtons {...props} /> : <EditCanvasButtons {...props} />}
     </div>
   );

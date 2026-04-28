@@ -1,14 +1,17 @@
-import type { OrganizationsIntegration } from "@/api-client";
+import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getBackgroundColorClass } from "@/lib/colors";
+import { resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import { getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { CategorySection } from "./CategorySection";
 import { findFirstVisibleBlock, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
@@ -21,10 +24,13 @@ export interface BuildingBlocksSidebarProps {
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
   integrations?: OrganizationsIntegration[];
+  availableIntegrations?: IntegrationsIntegrationDefinition[];
+  integrationDialogOpen?: boolean;
   canvasZoom?: number;
   disabled?: boolean;
   disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
+  onConnectIntegration?: (integrationName: string) => void;
   /**
    * Called when the user submits the filter input (presses Enter) and at least
    * one block matches the current filter. Receives the first visible block in
@@ -39,10 +45,13 @@ export function BuildingBlocksSidebar({
   onToggle,
   blocks,
   integrations = [],
+  availableIntegrations = [],
+  integrationDialogOpen = false,
   canvasZoom = 1,
   disabled = false,
   disabledMessage,
   onBlockClick,
+  onConnectIntegration,
   onEnterSubmit,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
@@ -56,10 +65,13 @@ export function BuildingBlocksSidebar({
       onToggle={onToggle}
       blocks={blocks}
       integrations={integrations}
+      availableIntegrations={availableIntegrations}
+      integrationDialogOpen={integrationDialogOpen}
       canvasZoom={canvasZoom}
       disabled={disabled}
       disabledTooltip={disabledTooltip}
       onBlockClick={onBlockClick}
+      onConnectIntegration={onConnectIntegration}
       onEnterSubmit={onEnterSubmit}
     />
   );
@@ -69,10 +81,13 @@ interface OpenBuildingBlocksSidebarProps {
   onToggle: (open: boolean) => void;
   blocks: BuildingBlockCategory[];
   integrations: OrganizationsIntegration[];
+  availableIntegrations: IntegrationsIntegrationDefinition[];
+  integrationDialogOpen: boolean;
   canvasZoom: number;
   disabled: boolean;
   disabledTooltip: string;
   onBlockClick?: (block: BuildingBlock) => void;
+  onConnectIntegration?: (integrationName: string) => void;
   onEnterSubmit?: (block: BuildingBlock) => void;
 }
 
@@ -80,10 +95,13 @@ function OpenBuildingBlocksSidebar({
   onToggle,
   blocks,
   integrations,
+  availableIntegrations,
+  integrationDialogOpen,
   canvasZoom,
   disabled,
   disabledTooltip,
   onBlockClick,
+  onConnectIntegration,
   onEnterSubmit,
 }: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -104,6 +122,9 @@ function OpenBuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const [isIntegrationsModalOpen, setIsIntegrationsModalOpen] = useState(false);
+  const shouldReopenModalAfterIntegrationDialogRef = useRef(false);
+  const previousIntegrationDialogOpenRef = useRef(integrationDialogOpen);
 
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
@@ -161,6 +182,43 @@ function OpenBuildingBlocksSidebar({
 
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
+  const connectedIntegrationNames = useMemo(() => {
+    const connected = new Set<string>();
+    integrations.forEach((integration) => {
+      if (integration.status?.state === "ready") {
+        connected.add(normalizeIntegrationName(integration.spec?.integrationName));
+      }
+    });
+    return connected;
+  }, [integrations]);
+
+  const integrationConnectionStateByName = useMemo(() => {
+    const map = new Map<string, "ready" | "pending" | "error">();
+    integrations.forEach((integration) => {
+      const normalizedName = normalizeIntegrationName(integration.spec?.integrationName);
+      if (!normalizedName) {
+        return;
+      }
+
+      const state = integration.status?.state;
+      const nextState = state === "ready" ? "ready" : state === "error" ? "error" : "pending";
+      const current = map.get(normalizedName);
+
+      if (!current) {
+        map.set(normalizedName, nextState);
+        return;
+      }
+      if (current === "ready") {
+        return;
+      }
+      if (current === "pending" && nextState === "error") {
+        return;
+      }
+      map.set(normalizedName, nextState);
+    });
+    return map;
+  }, [integrations]);
+
   const sortedCategories = useMemo(() => {
     const categoryOrder: Record<string, number> = {
       Core: 0,
@@ -203,6 +261,25 @@ function OpenBuildingBlocksSidebar({
       return a.name.localeCompare(b.name);
     });
   }, [blocks, integrations, showConnectedIntegrationsOnTop]);
+
+  const integrationsModalItems = useMemo(() => {
+    return [...availableIntegrations].sort((a, b) => (a.label || a.name || "").localeCompare(b.label || b.name || ""));
+  }, [availableIntegrations]);
+
+  const connectedIntegrationItems = useMemo(() => {
+    return integrationsModalItems.filter((integration) =>
+      integrationConnectionStateByName.has(normalizeIntegrationName(integration.name)),
+    );
+  }, [integrationsModalItems, integrationConnectionStateByName]);
+
+  useEffect(() => {
+    const previous = previousIntegrationDialogOpenRef.current;
+    if (previous && !integrationDialogOpen && shouldReopenModalAfterIntegrationDialogRef.current) {
+      setIsIntegrationsModalOpen(true);
+      shouldReopenModalAfterIntegrationDialogRef.current = false;
+    }
+    previousIntegrationDialogOpenRef.current = integrationDialogOpen;
+  }, [integrationDialogOpen]);
 
   return (
     <div
@@ -298,6 +375,15 @@ function OpenBuildingBlocksSidebar({
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 border border-transparent bg-white px-3 text-slate-700 [background:linear-gradient(white,white)_padding-box,linear-gradient(90deg,#f97316,#eab308,#22c55e,#06b6d4,#3b82f6,#a855f7,#ec4899)_border-box]"
+            onClick={() => setIsIntegrationsModalOpen(true)}
+          >
+            + Integrations
+          </Button>
         </div>
 
         <div className="relative flex-1 min-h-0 gap-2 py-6">
@@ -350,6 +436,126 @@ function OpenBuildingBlocksSidebar({
           />
         )}
       </div>
+      <Dialog open={isIntegrationsModalOpen} onOpenChange={setIsIntegrationsModalOpen}>
+        <DialogContent className="w-full max-w-[calc(100%-2rem)] pb-0 sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-medium">Connect Integrations</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[68vh] overflow-y-auto space-y-6 pr-1">
+            {connectedIntegrationItems.length > 0 ? (
+              <IntegrationGridSection
+                title="Connected"
+                items={connectedIntegrationItems}
+                connectedIntegrationNames={connectedIntegrationNames}
+                integrationConnectionStateByName={integrationConnectionStateByName}
+                normalizeIntegrationName={normalizeIntegrationName}
+                onSelect={(integrationName) => {
+                  if (!onConnectIntegration) {
+                    return;
+                  }
+                  shouldReopenModalAfterIntegrationDialogRef.current = true;
+                  onConnectIntegration(integrationName);
+                  setIsIntegrationsModalOpen(false);
+                }}
+              />
+            ) : null}
+
+            <IntegrationGridSection
+              title="All Integrations"
+              items={integrationsModalItems}
+              connectedIntegrationNames={connectedIntegrationNames}
+              integrationConnectionStateByName={integrationConnectionStateByName}
+              normalizeIntegrationName={normalizeIntegrationName}
+              onSelect={(integrationName) => {
+                if (!onConnectIntegration) {
+                  return;
+                }
+                shouldReopenModalAfterIntegrationDialogRef.current = true;
+                onConnectIntegration(integrationName);
+                setIsIntegrationsModalOpen(false);
+              }}
+            />
+
+            {integrationsModalItems.length === 0 ? (
+              <div className="rounded-md border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
+                No integrations available.
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function IntegrationGridSection({
+  title,
+  items,
+  connectedIntegrationNames,
+  integrationConnectionStateByName,
+  normalizeIntegrationName,
+  onSelect,
+}: {
+  title: string;
+  items: IntegrationsIntegrationDefinition[];
+  connectedIntegrationNames: Set<string>;
+  integrationConnectionStateByName: Map<string, "ready" | "pending" | "error">;
+  normalizeIntegrationName: (value?: string) => string;
+  onSelect: (integrationName: string) => void;
+}) {
+  const FallbackIcon = resolveIcon("puzzle");
+
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-medium text-slate-500">{title}</h3>
+      <div className="grid grid-cols-2 gap-3 pb-6 sm:grid-cols-3 lg:grid-cols-4">
+        {items.map((integration) => {
+          const normalizedName = normalizeIntegrationName(integration.name);
+          const isConnected = connectedIntegrationNames.has(normalizedName);
+          const connectionState = integrationConnectionStateByName.get(normalizedName);
+          const iconSrc = getIntegrationIconSrc(integration.name);
+
+          return (
+            <button
+              key={`${title}-${integration.name}`}
+              type="button"
+              onClick={() => {
+                if (!integration.name) {
+                  return;
+                }
+                onSelect(integration.name);
+              }}
+              className="relative flex h-28 flex-col items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-center transition-colors hover:bg-slate-50"
+            >
+              {iconSrc ? (
+                <img src={iconSrc} alt={integration.label || integration.name} className="size-7" />
+              ) : (
+                <FallbackIcon className="size-7 text-slate-500" />
+              )}
+              <span className="line-clamp-2 text-xs font-medium text-slate-700">
+                {integration.label || integration.name}
+              </span>
+              {connectionState ? (
+                <span
+                  className={`absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    connectionState === "ready"
+                      ? "bg-green-100 text-green-700"
+                      : connectionState === "pending"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {connectionState === "ready" ? "Connected" : connectionState === "pending" ? "Pending" : "Error"}
+                </span>
+              ) : isConnected ? (
+                <span className="absolute right-2 top-2 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                  Connected
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
