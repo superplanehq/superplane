@@ -26,10 +26,11 @@ type Configuration struct {
 
 // IntegrationMetadata holds resources created during integration setup.
 type IntegrationMetadata struct {
-	TopicID string `json:"topicId" mapstructure:"topicId"`
-	// CompartmentRules maps compartment OCID → Events rule OCID.
-	// One shared rule is created per compartment, reused across all triggers.
-	CompartmentRules map[string]string `json:"compartmentRules" mapstructure:"compartmentRules"`
+	TopicID      string `json:"topicId" mapstructure:"topicId"`
+	EventsRuleID string `json:"eventsRuleId" mapstructure:"eventsRuleId"`
+	// Deprecated: CompartmentRules was used in older versions to track per-compartment rules.
+	// It is kept only for cleanup of legacy resources.
+	CompartmentRules map[string]string `json:"compartmentRules,omitempty" mapstructure:"compartmentRules"`
 }
 
 func (o *OCI) Name() string {
@@ -56,45 +57,54 @@ SuperPlane authenticates to OCI using API Key authentication tied to a dedicated
 ### Part 1 — Create a Dedicated Group and Service User
 
 1. Open the [OCI Console](https://cloud.oracle.com/) and sign in.
-2. Go to **Identity & Security → Domains → Default → Groups**.
+2. Go to **Menu** → **Identity & Security → Domains → Default → User Management → Groups**.
 3. Click **Create Group**.
 4. Set the name to ` + "`SuperPlaneIntegration`" + ` and add a description, then click **Create**.
-5. In the same Domain, go to **Users → Create User**.
+5. In the same **User Management** tab, go to **Users → Create User**.
 6. Fill in the details:
-   - **Username:** ` + "`superplane-integration`" + `
-   - **Email:** use integrations@superplane.com or any valid email (not used for authentication)
-   - **Description:** SuperPlane integration user
-7. In the **Groups** section, assign them to the ` + "`SuperPlaneIntegration`" + ` group
+   - **Lastname:** ` + "`superplane-integration`" + `
+   - **Email:** use any valid email (not used for authentication)
+7. In the **Groups** section, assign the user to the ` + "`SuperPlaneIntegration`" + ` group
 8. Click **Create**.
 
 ### Part 2 — Create an IAM Policy
 
 1. Go to **Identity & Security → Policies**.
 2. Make sure you are in the **root compartment** (check the Compartment selector on the left).
-3. Click **Create Policy**, name it ` + "`SuperPlanePolicies`" + `, and enable the **manual editor**.
-4. Paste in the following statements, replacing ` + "`<your-compartment>`" + ` with your target compartment name and Click **Create**.:
+3. Click **Create Policy**, name it ` + "`SuperPlanePolicies`" + `, add a description and enable the **manual editor**.
+4. Paste in the following statements, replacing ` + "`<your-compartment>`" + ` with your target compartment name, and then Click **Create**.:
 ` + "```" + `
-Allow group SuperPlaneIntegration to manage instances
-  in compartment <your-compartment>
-
-Allow group SuperPlaneIntegration to manage compute-images
-  in compartment <your-compartment>
-
-Allow group SuperPlaneIntegration to use virtual-network-family
-  in compartment <your-compartment>
+Allow group SuperPlaneIntegration to manage instances in tenancy
+Allow group SuperPlaneIntegration to manage volumes in tenancy
+Allow group SuperPlaneIntegration to manage volume-attachments in tenancy
+Allow group SuperPlaneIntegration to manage virtual-network-family in tenancy
+Allow group SuperPlaneIntegration to manage buckets in tenancy
+Allow group SuperPlaneIntegration to manage objects in tenancy
+Allow group SuperPlaneIntegration to manage objectstorage-namespaces in tenancy   
+Allow group SuperPlaneIntegration to manage fn-app in tenancy
+Allow group SuperPlaneIntegration to manage fn-function in tenancy
+Allow group SuperPlaneIntegration to manage fn-invocation in tenancy
+Allow group SuperPlaneIntegration to manage ons-topics in tenancy
+Allow group SuperPlaneIntegration to manage ons-subscriptions in tenancy
+Allow group SuperPlaneIntegration to inspect compartments in tenancy
+Allow group SuperPlaneIntegration to inspect all-resources in tenancy
+Allow group SuperPlaneIntegration to manage cloudevents-rules in tenancy
+Allow group SuperPlaneIntegration to manage autonomous-database-family in tenancy
+Allow service cloudEvents to use ons-topics in tenancy
 ` + "```" + `
  
-### Part 3 — Generate API Keys for the Service User and Connect to Superplane
+### Part 3 — Generate API Keys for the Service User and Connect to SuperPlane
 
-1. While still on the service user's page, go to **API keys → Add API key**.
-2. Choose **Generate API Key Pair**, download the private key, and click **Add**.
-3. Copy the **Configuration File Preview** values that appear to the UI:
+1. Go to **Menu** → **Identity & Security → Domains → Default → User Management → Users**.
+2. Choose the service user you created, then go to **API Keys → Add API Key**.
+3. Select **Generate API key pair**, download the private key file and then click **Add**.
+4. Copy the **Configuration File Preview** values that appear to the UI:
     - **User OCID** (begins with ` + "`ocid1.user.`" + `)
     - **Fingerprint** (e.g. ` + "`12:34:56:…`" + `)
     - **Tenancy OCID** (begins with ` + "`ocid1.tenancy.`" + `)
-4. Select the **Region** that matches your OCI tenancy's home region.
-5. Open the downloaded private key file and paste its full contents into the **Private Key** field.
-6. Click **Connect** to validate the credentials and save the integration.`
+5. Select the **Region** that matches your OCI tenancy's home region.
+6. Open the downloaded private key file and paste its full contents into the **Private Key** field.
+7. Click **Connect** to validate the credentials and save the integration.`
 }
 
 func (o *OCI) Configuration() []configuration.Field {
@@ -196,6 +206,21 @@ func (o *OCI) Sync(ctx core.SyncContext) error {
 		ctx.Integration.SetMetadata(metadata)
 	}
 
+	// Create a single shared Events rule in the tenancy compartment, co-located with the topic.
+	// The rule captures all compute launch events tenancy-wide; per-compartment filtering is
+	// done server-side in the webhook handler. Creating the rule here (in the tenancy compartment)
+	// avoids cross-compartment IAM issues that arise when the rule and topic are in different compartments.
+	if metadata.EventsRuleID == "" {
+		ruleName := fmt.Sprintf("superplane-%s", ctx.Integration.ID())
+		condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
+		rule, err := client.CreateEventsRule(cfg.TenancyOCID, ruleName, condition, metadata.TopicID)
+		if err != nil {
+			return fmt.Errorf("failed to create Events rule: %w", err)
+		}
+		metadata.EventsRuleID = rule.ID
+		ctx.Integration.SetMetadata(metadata)
+	}
+
 	ctx.Integration.Ready()
 	return nil
 }
@@ -207,7 +232,7 @@ func (o *OCI) Cleanup(ctx core.IntegrationCleanupContext) error {
 		return nil
 	}
 
-	if metadata.TopicID == "" && len(metadata.CompartmentRules) == 0 {
+	if metadata.TopicID == "" && metadata.EventsRuleID == "" && len(metadata.CompartmentRules) == 0 {
 		return nil
 	}
 
@@ -216,9 +241,17 @@ func (o *OCI) Cleanup(ctx core.IntegrationCleanupContext) error {
 		return fmt.Errorf("failed to create OCI client during cleanup: %w", err)
 	}
 
+	// Delete the single shared Events rule (current style).
+	if metadata.EventsRuleID != "" {
+		if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
+			ctx.Logger.Warnf("failed to delete Events rule %q during cleanup: %v", metadata.EventsRuleID, err)
+		}
+	}
+
+	// Delete any legacy per-compartment rules created by older versions.
 	for compartmentID, ruleID := range metadata.CompartmentRules {
 		if err := client.DeleteEventsRule(ruleID); err != nil {
-			ctx.Logger.Warnf("failed to delete Events rule %q (compartment %q) during cleanup: %v", ruleID, compartmentID, err)
+			ctx.Logger.Warnf("failed to delete legacy Events rule %q (compartment %q) during cleanup: %v", ruleID, compartmentID, err)
 		}
 	}
 
