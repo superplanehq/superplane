@@ -72,10 +72,14 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
 		Use:   "update [name-or-id]",
-		Short: "Update a canvas from a file",
-		Args:  cobra.MaximumNArgs(1),
+		Short: "Update a canvas from a YAML file",
+		Long: "Updates the canvas using --file. If metadata.id is omitted in the YAML, pass the canvas name or id, " +
+			"or set an active canvas with `superplane canvases active`. When the file includes metadata.id and a " +
+			"name-or-id argument is given, they must refer to the same canvas.",
+		Args: cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
+	_ = updateCmd.MarkFlagRequired("file")
 	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
@@ -148,7 +152,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsApproveCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
 	}, options)
 
 	changeRequestsUnapproveCmd := &cobra.Command{
@@ -157,7 +161,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsUnapproveCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
 	}, options)
 
 	changeRequestsRejectCmd := &cobra.Command{
@@ -166,7 +170,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsRejectCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
 	}, options)
 
 	changeRequestsReopenCmd := &cobra.Command{
@@ -175,7 +179,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsReopenCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
 	}, options)
 
 	changeRequestsPublishCmd := &cobra.Command{
@@ -184,7 +188,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsPublishCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
 	}, options)
 
 	var changeRequestsResolveFile string

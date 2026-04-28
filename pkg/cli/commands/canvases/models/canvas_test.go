@@ -19,7 +19,8 @@ spec:
     - id: manual-plan-start
       name: manual_plan_start
       type: TYPE_TRIGGER
-      component: start
+      component:
+        name: start
       configuration:
         templates:
           - name: Incident Report
@@ -79,8 +80,9 @@ spec:
   nodes:
     - id: wait-1
       name: wait
-      type: TYPE_ACTION
-      component: wait
+      type: TYPE_COMPONENT
+      component:
+        name: wait
       hello: what
 `)
 
