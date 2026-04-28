@@ -1,0 +1,25 @@
+{
+  "cloudEventsVersion": "0.1",
+  "contentType": "application/json",
+  "data": {
+    "additionalDetails": {
+      "X-Content-Sha256": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+      "X-Oracle-Oci-Request-Id": "B1234567890ABCDEF1234567890ABCDE"
+    },
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+    "compartmentName": "mytenancy",
+    "freeFormTags": {},
+    "definedTags": {},
+    "resourceId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "resourceName": "my-function"
+  },
+  "eventID": "e1a2b3c4-1234-5678-abcd-ef1234567890",
+  "eventTime": "2026-04-22T20:34:05Z",
+  "eventType": "com.oraclecloud.functions.invokefunction",
+  "eventTypeVersion": "2.0",
+  "extensions": {
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890"
+  },
+  "source": "functions"
+}

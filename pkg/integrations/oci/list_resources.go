@@ -7,12 +7,14 @@ import (
 )
 
 const (
-	ResourceTypeCompartment        = "compartment"
-	ResourceTypeAvailabilityDomain = "availabilityDomain"
-	ResourceTypeShape              = "shape"
-	ResourceTypeImage              = "image"
-	ResourceTypeSubnet             = "subnet"
-	ResourceTypeBlockVolume        = "blockVolume"
+	ResourceTypeCompartment         = "compartment"
+	ResourceTypeAvailabilityDomain  = "availabilityDomain"
+	ResourceTypeShape               = "shape"
+	ResourceTypeImage               = "image"
+	ResourceTypeSubnet              = "subnet"
+	ResourceTypeBlockVolume         = "blockVolume"
+	ResourceTypeFunctionApplication = "functionApplication"
+	ResourceTypeFunction            = "function"
 )
 
 func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -29,6 +31,10 @@ func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return listSubnets(ctx)
 	case ResourceTypeBlockVolume:
 		return listBlockVolumes(ctx)
+	case ResourceTypeFunctionApplication:
+		return listFunctionApplications(ctx)
+	case ResourceTypeFunction:
+		return listFunctions(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
@@ -213,6 +219,68 @@ func listBlockVolumes(ctx core.ListResourcesContext) ([]core.IntegrationResource
 			Type: ResourceTypeBlockVolume,
 			Name: v.DisplayName,
 			ID:   v.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listFunctionApplications(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+
+	apps, err := client.ListApplications(compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list function applications: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(apps))
+	for _, app := range apps {
+		if app.LifecycleState != "ACTIVE" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeFunctionApplication,
+			Name: app.DisplayName,
+			ID:   app.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listFunctions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	applicationID := ctx.Parameters["applicationId"]
+	if applicationID == "" {
+		return nil, fmt.Errorf("applicationId parameter is required to list functions")
+	}
+
+	fns, err := client.ListFunctions(applicationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list functions: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(fns))
+	for _, fn := range fns {
+		if fn.LifecycleState != "ACTIVE" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeFunction,
+			Name: fn.DisplayName,
+			ID:   fn.ID,
 		})
 	}
 
