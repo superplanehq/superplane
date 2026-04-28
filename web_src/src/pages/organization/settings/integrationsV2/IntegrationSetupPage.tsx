@@ -20,11 +20,13 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { isIntegrationV2SetupEnabled } from "@/lib/integrationV2";
+import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/ui/checkbox";
+import { CopyButton } from "@/ui/CopyButton";
 import { IntegrationSetupInputsStep } from "./IntegrationSetupInputsStep";
 import { IntegrationSetupRedirectPromptStep } from "./IntegrationSetupRedirectPromptStep";
 
@@ -133,10 +135,8 @@ function getCapabilityDisplayName(capability: IntegrationsCapabilityDefinition):
   return capability.label || capability.name || "Unnamed capability";
 }
 
-function getCapabilityTypeLabel(capability: IntegrationsCapabilityDefinition): string {
-  if (capability.type === "TYPE_ACTION") return "Action";
-  if (capability.type === "TYPE_TRIGGER") return "Trigger";
-  return "Unknown";
+function getCapabilitySelectionDotClass(selected: boolean) {
+  return selected ? "bg-green-500" : "bg-gray-400 dark:bg-gray-500";
 }
 
 export function IntegrationSetupPage({ organizationId }: IntegrationSetupPageProps) {
@@ -423,53 +423,55 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
                 Select the capabilities this integration should provide.
               </p>
             </div>
-            <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
-              <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                {integrationCapabilities.map((capability) => {
-                  const capabilityName = capability.name || "";
-                  const capabilityId = `capability-${capabilityName}`;
-                  const checked = selectedCapabilities.has(capabilityName);
+            <div className="overflow-x-auto rounded-md border border-gray-300 dark:border-gray-700">
+              <table className="w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
+                <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
+                  {integrationCapabilities.map((capability) => {
+                    const capabilityName = capability.name || "";
+                    const capabilityId = `capability-${capabilityName}`;
+                    const checked = selectedCapabilities.has(capabilityName);
+                    const statusDotClass = getCapabilitySelectionDotClass(checked);
 
-                  return (
-                    <label
-                      key={capabilityName}
-                      htmlFor={capabilityId}
-                      className="flex cursor-pointer items-start gap-3 bg-white p-4 transition-colors hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800/70"
-                    >
-                      <Checkbox
-                        id={capabilityId}
-                        checked={checked}
-                        onCheckedChange={(nextChecked) => {
-                          setSelectedCapabilities((current) => {
-                            const next = new Set(current);
-                            if (nextChecked === true) {
-                              next.add(capabilityName);
-                              return next;
-                            }
+                    return (
+                      <tr key={capabilityName}>
+                        <td className="px-4 py-3 align-middle">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)} aria-hidden />
+                            <span className="font-mono text-sm text-gray-800 dark:text-gray-100">{capabilityName}</span>
+                            <CopyButton text={capabilityName} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          {capability.description ? (
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{capability.description}</div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 align-middle text-right">
+                          <div className="flex justify-end">
+                            <Checkbox
+                              id={capabilityId}
+                              checked={checked}
+                              onCheckedChange={(nextChecked) => {
+                                setSelectedCapabilities((current) => {
+                                  const next = new Set(current);
+                                  if (nextChecked === true) {
+                                    next.add(capabilityName);
+                                    return next;
+                                  }
 
-                            next.delete(capabilityName);
-                            return next;
-                          });
-                        }}
-                        className="mt-0.5"
-                      />
-                      <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {getCapabilityDisplayName(capability)}
-                          </span>
-                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                            {getCapabilityTypeLabel(capability)}
-                          </span>
-                        </span>
-                        {capability.description && (
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{capability.description}</span>
-                        )}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
+                                  next.delete(capabilityName);
+                                  return next;
+                                });
+                              }}
+                              aria-label={`Include capability ${capabilityName}`}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
             <div className="flex items-center gap-3">
               <Button

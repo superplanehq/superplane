@@ -12,7 +12,7 @@ import { useAccount } from "../../../contexts/AccountContext";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
-import { IntegrationDetails } from "./IntegrationDetails";
+import { IntegrationDetailsRoute } from "./IntegrationDetailsRoute";
 import { IntegrationSetupPage } from "./integrationsV2/IntegrationSetupPage";
 import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
@@ -498,7 +498,7 @@ export function OrganizationSettings() {
               path="integrations/:integrationId"
               element={
                 <RequirePermission resource="integrations" action="read">
-                  <IntegrationDetails organizationId={organizationId || ""} />
+                  <IntegrationDetailsRoute organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />
