@@ -908,23 +908,16 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Save immediately with defaults
       if (props.onNodeAdd) {
-        const newNodeId = await props.onNodeAdd({
+        void await props.onNodeAdd({
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
           position,
           integrationName: block.integrationName,
         });
-
-        // Close building blocks sidebar
-        setIsBuildingBlocksSidebarOpen(false);
-
-        // Open component sidebar for the new node
-        state.componentSidebar.open(newNodeId);
-        setCurrentTab("settings");
       }
     },
-    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, readOnly],
+    [props, readOnly],
   );
 
   const handleSidebarToggle = useCallback(
