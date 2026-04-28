@@ -9,6 +9,13 @@ import { CopyButton } from "@/ui/CopyButton";
 const INSTRUCTIONS_V2_CLASSES =
   "text-sm text-gray-800 dark:text-gray-200 [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
 
+/** Matches horizontal rules inside markdown; reuse for external separators that should align with them. */
+export const INTEGRATION_INSTRUCTIONS_HR_CLASS = "my-4 border-0 border-t border-gray-300 dark:border-gray-600";
+
+/** Subtle scrollbar for markdown table overflow (Firefox + WebKit); horizontal bar uses height. */
+const MARKDOWN_TABLE_SCROLL_CLASSES =
+  "[scrollbar-width:thin] [scrollbar-color:rgb(156_163_175)_rgb(243_244_246)] dark:[scrollbar-color:rgb(107_114_128)_rgb(31_41_55)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-400/85 dark:[&::-webkit-scrollbar-thumb]:bg-gray-500/85 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-800/90";
+
 export interface IntegrationInstructionsV2Props {
   description?: string | null;
   onContinue?: () => void;
@@ -89,6 +96,7 @@ export function IntegrationInstructionsV2({ description, onContinue, className =
                   {children}
                 </blockquote>
               ),
+              hr: () => <hr className={INTEGRATION_INSTRUCTIONS_HR_CLASS} />,
               ul: ({ children }) => <ul className="list-disc ml-5 space-y-1 mb-2">{children}</ul>,
               ol: ({ children }) => <ol className="list-decimal ml-5 space-y-1 mb-2">{children}</ol>,
               li: ({ children }) => <li>{children}</li>,
@@ -108,10 +116,44 @@ export function IntegrationInstructionsV2({ description, onContinue, className =
                   return <code className={codeClassName}>{children}</code>;
                 }
 
-                return <code className="rounded bg-black/10 px-1 py-0.5 text-xs">{children}</code>;
+                const inlineText = extractTextFromNode(children).trim();
+                const codeEl = <code className="rounded bg-black/10 px-1.5 py-0.5 font-mono text-xs">{children}</code>;
+
+                if (!inlineText) {
+                  return codeEl;
+                }
+
+                return (
+                  <span className="inline-flex max-w-full items-center gap-0.5 align-middle">
+                    {codeEl}
+                    <CopyButton text={inlineText} />
+                  </span>
+                );
               },
               strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
               em: ({ children }) => <em className="italic">{children}</em>,
+              table: ({ children }) => (
+                <div
+                  className={`my-3 overflow-x-auto rounded-md border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900/50 ${MARKDOWN_TABLE_SCROLL_CLASSES}`}
+                >
+                  <table className="w-full min-w-max border-collapse text-left text-sm">{children}</table>
+                </div>
+              ),
+              thead: ({ children }) => (
+                <thead className="border-b border-gray-200 dark:border-gray-700">{children}</thead>
+              ),
+              tbody: ({ children }) => (
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">{children}</tbody>
+              ),
+              tr: ({ children }) => <tr>{children}</tr>,
+              th: ({ children }) => (
+                <th className="whitespace-nowrap bg-gray-50 px-3 py-2.5 font-semibold text-gray-900 dark:bg-gray-800/80 dark:text-gray-100">
+                  {children}
+                </th>
+              ),
+              td: ({ children }) => (
+                <td className="px-3 py-2.5 align-top text-gray-800 dark:text-gray-200">{children}</td>
+              ),
             }}
           >
             {normalizedDescription}

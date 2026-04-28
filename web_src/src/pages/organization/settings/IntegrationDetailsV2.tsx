@@ -313,25 +313,14 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
           className="w-6 h-6"
         />
         <div className="flex-1 min-w-[200px]">
-          <h4 className="flex items-center gap-2 text-2xl font-medium">
+          <h4 className="flex items-center text-2xl font-medium">
             <span
               className="inline-flex shrink-0"
               title={
                 (integration.status?.state || "unknown").charAt(0).toUpperCase() +
                 (integration.status?.state || "unknown").slice(1)
               }
-            >
-              <Plug
-                className={`h-5 w-5 ${
-                  integration.status?.state === "ready"
-                    ? "text-green-500"
-                    : integration.status?.state === "error"
-                      ? "text-red-600"
-                      : "text-amber-600"
-                }`}
-                aria-label={`Integration status: ${integration.status?.state || "unknown"}`}
-              />
-            </span>
+            ></span>
             <span>
               {integration.metadata?.name ||
                 getIntegrationTypeDisplayName(undefined, integration.metadata?.integrationName) ||
@@ -348,6 +337,16 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
           ) : null}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <Plug
+            className={`h-5 w-5 ${
+              integration.status?.state === "ready"
+                ? "text-green-500"
+                : integration.status?.state === "error"
+                  ? "text-red-600"
+                  : "text-amber-600"
+            }`}
+            aria-label={`Integration status: ${integration.status?.state || "unknown"}`}
+          />
           <PermissionTooltip
             allowed={canDeleteIntegrations || permissionsLoading}
             message="You don't have permission to delete integrations."

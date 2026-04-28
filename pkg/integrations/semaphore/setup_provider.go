@@ -1,8 +1,10 @@
 package semaphore
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"html/template"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -23,32 +25,47 @@ For example, if your organization name is **superplane**, the URL would be:
 https://superplane.semaphoreci.com
 ~~~`
 
-const apiTokenInstructions = `
+const apiTokenTemplate = `
 There are two ways to provide a Semaphore API token:
-1. Use a service account (recommended)
+1. Use a service account - **recommended**
 2. Use a personal API token
 
-## 1. Use a service account (recommended)
+---
+
+## 1. Use a service account
 
 If your organization has access to service accounts, you can use one of them to connect to SuperPlane.
 
-1. Go to [%s/people](%s/people)
-2. Create Service Account
-   - Give it a name and a description
-   - Give it an **Admin** role
-3. Copy its API token and paste below
+- Go to {{ .OrganizationURL }}/people
+- Create a service account, with the **Admin** role
+- Copy its API token and paste below
+
+---
 
 ## 2. Use a personal API token
 
-If your organization does not have access to service accounts, you can use a personal API token to connect to SuperPlane.
+If your organization does not have access to service accounts, you can use a personal API token to connect to SuperPlane:
+- Go to {{ .OrganizationURL }}
+- On the top right corner, click on your avatar and select **Profile Settings**
+- Reset the API token, copy it and paste below
 
-If you don't have access to your personal access token anymore, you can reset it:
-1. Go to [%s](%s)
-2. On the top right corner, click on your avatar and select **Profile Settings**
-2. Reset API token, copy it and paste below
-
-> **Important:**
+> **Warning:**
 > This will revoke the current token and generate a new one, so any existing workflows that use this token will stop working.
+`
+
+const setupCompletedTemplate = `
+{{- $organizationURL := .OrganizationURL }}
+You are now connected to {{ $organizationURL }}
+
+---
+
+You can now start using the following projects:
+
+| Project | Repository |
+|---------|------------|
+{{- range .Projects }}
+| [{{ .Metadata.ProjectName }}]({{ $organizationURL }}/projects/{{ .Metadata.ProjectName }}) | ` + "`{{ .Spec.Repository.URL }}`" + ` |
+{{- end }}
 `
 
 func (s *SetupProvider) Capabilities() []core.Capability {
@@ -199,6 +216,20 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 		return nil, fmt.Errorf("error creating configuration: %v", err)
 	}
 
+	tmpl, err := template.New("apiToken").Parse(apiTokenTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing template: %v", err)
+	}
+
+	data := map[string]any{
+		"OrganizationURL": organizationURL,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("error executing template: %v", err)
+	}
+
 	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
 		Name:  "enterAPIToken",
@@ -212,7 +243,7 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 				Sensitive: true,
 			},
 		},
-		Instructions: fmt.Sprintf(apiTokenInstructions, organizationURL, organizationURL, organizationURL, organizationURL),
+		Instructions: buf.String(),
 	}, nil
 }
 
@@ -258,7 +289,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	// Semaphore doesn't have a whoami endpoint, so
 	// we list projects just to verify that the connection is working.
 	//
-	_, err = client.listProjects()
+	projects, err := client.listProjects()
 	if err != nil {
 		return nil, fmt.Errorf("error listing projects: %v", err)
 	}
@@ -268,7 +299,37 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error enabling capability group: %v", err)
 	}
 
-	return nil, nil
+	url, err := ctx.Parameters.Get("organizationUrl")
+	if err != nil {
+		return nil, fmt.Errorf("error getting organization URL: %v", err)
+	}
+
+	organizationURL, ok := url.(string)
+	if !ok {
+		return nil, errors.New("organization URL is not a string")
+	}
+
+	tmpl, err := template.New("setupCompleted").Parse(setupCompletedTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing template: %v", err)
+	}
+
+	data := map[string]any{
+		"OrganizationURL": organizationURL,
+		"Projects":        projects,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("error executing template: %v", err)
+	}
+
+	return &core.SetupStep{
+		Type:         core.SetupStepTypeDone,
+		Name:         "done",
+		Label:        "Setup complete",
+		Instructions: buf.String(),
+	}, nil
 }
 
 func (s *SetupProvider) enableCapabilities(ctx core.SetupStepContext) error {

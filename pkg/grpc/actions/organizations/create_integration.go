@@ -390,6 +390,8 @@ func serializeNextStepType(stepType core.SetupStepType) pb.Integration_SetupStep
 		return pb.Integration_SetupStepDefinition_INPUTS
 	case core.SetupStepTypeRedirectPrompt:
 		return pb.Integration_SetupStepDefinition_REDIRECT_PROMPT
+	case core.SetupStepTypeDone:
+		return pb.Integration_SetupStepDefinition_DONE
 	default:
 		return pb.Integration_SetupStepDefinition_UNKNOWN
 	}

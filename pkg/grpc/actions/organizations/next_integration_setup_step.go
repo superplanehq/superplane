@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -47,6 +48,43 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 		return nil, status.Error(codes.InvalidArgument, "current step is not set, cannot submit")
 	}
 
+	//
+	// If we submitting a "done" step, we just clear the setup state and return.
+	//
+	if setupState.CurrentStep.Type == core.SetupStepTypeDone {
+		return clearIntegrationSetupState(registry, integration)
+	}
+
+	return submitStep(registry, integration, &setupState, inputs)
+}
+
+func getStepInputs(inputs *structpb.Struct) map[string]any {
+	if inputs == nil {
+		return map[string]any{}
+	}
+
+	return inputs.AsMap()
+}
+
+func clearIntegrationSetupState(registry *registry.Registry, integration *models.Integration) (*pb.NextIntegrationSetupStepResponse, error) {
+	integration.SetupState = nil
+	integration.State = models.IntegrationStateReady
+	err := database.Conn().Save(integration).Error
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to clear integration setup state")
+	}
+
+	proto, err := serializeIntegration(registry, integration, []models.CanvasNodeReference{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to serialize integration")
+	}
+
+	return &pb.NextIntegrationSetupStepResponse{
+		Integration: proto,
+	}, nil
+}
+
+func submitStep(registry *registry.Registry, integration *models.Integration, setupState *models.SetupState, inputs *structpb.Struct) (*pb.NextIntegrationSetupStepResponse, error) {
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get setup provider")
@@ -63,7 +101,7 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 			Step:           setupState.CurrentStep.Name,
 			Inputs:         getStepInputs(inputs),
 			IntegrationID:  integration.ID,
-			OrganizationID: orgID,
+			OrganizationID: integration.OrganizationID.String(),
 			HTTP:           registry.HTTPContext(),
 			Parameters:     contexts.NewIntegrationParameterStorage(integration),
 			Secrets:        secretStorage,
@@ -78,10 +116,7 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 		// If no next step, make integration ready
 		//
 		if nextStep == nil {
-			integration.SetupState = nil
-			integration.State = models.IntegrationStateReady
-			integration.Capabilities = capabilityCtx.States()
-			return tx.Save(integration).Error
+			return fmt.Errorf("no next step")
 		}
 
 		//
@@ -99,6 +134,7 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 		newState.PreviousSteps = append(newState.PreviousSteps, *setupState.CurrentStep)
 		nextSetupState := datatypes.NewJSONType(newState)
 		integration.SetupState = &nextSetupState
+		integration.Capabilities = capabilityCtx.States()
 		return tx.Save(integration).Error
 	})
 
@@ -116,12 +152,4 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 	return &pb.NextIntegrationSetupStepResponse{
 		Integration: proto,
 	}, nil
-}
-
-func getStepInputs(inputs *structpb.Struct) map[string]any {
-	if inputs == nil {
-		return map[string]any{}
-	}
-
-	return inputs.AsMap()
 }

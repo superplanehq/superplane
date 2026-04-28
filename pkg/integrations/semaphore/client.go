@@ -82,11 +82,18 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 
 type ProjectResponse struct {
 	Metadata *ProjectMetadata `json:"metadata"`
+	Spec     *ProjectSpec     `json:"spec"`
 }
 
 type ProjectMetadata struct {
 	ProjectName string `json:"name"`
 	ProjectID   string `json:"id"`
+}
+
+type ProjectSpec struct {
+	Repository struct {
+		URL string `json:"url"`
+	} `json:"repository"`
 }
 
 func (c *Client) GetProject(idOrName string) (*ProjectResponse, error) {

@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/ui/checkbox";
 import { CopyButton } from "@/ui/CopyButton";
+import { IntegrationSetupDoneStep } from "./IntegrationSetupDoneStep";
 import { IntegrationSetupInputsStep } from "./IntegrationSetupInputsStep";
 import { IntegrationSetupRedirectPromptStep } from "./IntegrationSetupRedirectPromptStep";
 
@@ -242,6 +243,15 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     setInstanceName(integration.metadata?.name || integration.metadata?.integrationName || "");
   }, [connectedIntegrations, createdIntegration?.metadata?.id, setupIntegrationId]);
 
+  useEffect(() => {
+    const id = createdIntegration?.metadata?.id;
+    if (!id || getCurrentSetupStep(createdIntegration)) {
+      return;
+    }
+
+    navigate(`/${organizationId}/settings/integrations/${id}`, { replace: true });
+  }, [createdIntegration, organizationId, navigate]);
+
   async function handleCreateIntegration() {
     const trimmedName = instanceName.trim();
     if (!trimmedName) {
@@ -286,7 +296,11 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
 
   const handleSubmitCurrentStep = async () => {
     const integrationId = createdIntegration?.metadata?.id;
-    if (!integrationId || !currentStep?.name) {
+    if (!integrationId || !currentStep) {
+      return;
+    }
+
+    if (currentStep.type !== "DONE" && !currentStep.name) {
       return;
     }
 
@@ -314,7 +328,11 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
 
   const handleRevertCurrentStep = async () => {
     const integrationId = createdIntegration?.metadata?.id;
-    if (!integrationId || !currentStep?.name) {
+    if (!integrationId || !currentStep) {
+      return;
+    }
+
+    if (currentStep.type !== "DONE" && !currentStep.name) {
       return;
     }
 
@@ -523,19 +541,15 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
             isSubmitting={submitStepMutation.isPending}
             isReverting={revertStepMutation.isPending}
           />
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Setup complete</h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                This integration is ready to use. You can return to the integrations list.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button onClick={() => navigate(integrationsHref)}>Back to integrations</Button>
-            </div>
-          </div>
-        )}
+        ) : currentStep?.type === "DONE" ? (
+          <IntegrationSetupDoneStep
+            step={currentStep}
+            onBack={canRevertCurrentStep ? handleRevertCurrentStep : undefined}
+            onFinish={() => void handleSubmitCurrentStep()}
+            isSubmitting={submitStepMutation.isPending}
+            isReverting={revertStepMutation.isPending}
+          />
+        ) : null}
 
         {isAvailableIntegrationsLoading ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading integration metadata...</p>

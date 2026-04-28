@@ -36,7 +36,7 @@ export function IntegrationSetupInputsStep({
         <IntegrationInstructionsV2 description={step.instructions} className="mt-3" />
       </div>
 
-      {hasInstructions && <div className="border-t border-gray-200 dark:border-gray-700" />}
+      {hasInstructions ? <hr className="my-8 border-0 border-t border-gray-300 dark:border-gray-600" /> : null}
 
       <div className="space-y-4">
         {fields.map((field) => {

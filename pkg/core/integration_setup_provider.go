@@ -47,6 +47,7 @@ type SetupStepType string
 const (
 	SetupStepTypeInputs         SetupStepType = "inputs"
 	SetupStepTypeRedirectPrompt SetupStepType = "redirectPrompt"
+	SetupStepTypeDone           SetupStepType = "done"
 )
 
 type SetupStep struct {

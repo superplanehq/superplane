@@ -713,6 +713,7 @@ message Integration {
       UNKNOWN = 0;
       INPUTS = 1;
       REDIRECT_PROMPT = 2;
+      DONE = 3;
     }
 
     message RedirectPrompt {
