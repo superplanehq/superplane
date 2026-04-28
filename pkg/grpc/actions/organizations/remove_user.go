@@ -6,10 +6,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func RemoveUser(ctx context.Context, authService authorization.Authorization, orgID, userID string) (*pb.RemoveUserResponse, error) {
@@ -28,27 +30,24 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, status.Error(codes.FailedPrecondition, "cannot remove the last organization owner")
 	}
 
-	//
-	// TODO: this should all be inside of a transaction
-	// Remove organization roles
-	//
 	roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
 	if err != nil {
-		log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
-		return nil, status.Error(codes.Internal, "error determing user roles")
+		log.Errorf("Error determining user roles for %s: %v", user.ID.String(), err)
+		return nil, status.Error(codes.Internal, "error determining user roles")
 	}
 
-	for _, role := range roles {
-		err = authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization)
-		if err != nil {
-			log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
-			return nil, status.Error(codes.Internal, "error removing role")
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		for _, role := range roles {
+			if err := authService.RemoveRole(user.ID.String(), role.Name, orgID, models.DomainTypeOrganization); err != nil {
+				log.Errorf("Error removing role %s for %s: %v", role.Name, user.ID.String(), err)
+				return err
+			}
 		}
-	}
 
-	err = user.Delete()
+		return user.DeleteInTransaction(tx)
+	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "error deleting user")
+		return nil, status.Error(codes.Internal, "error removing user")
 	}
 
 	return &pb.RemoveUserResponse{}, nil

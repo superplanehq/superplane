@@ -23,6 +23,19 @@ func Test_RemoveUser(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
+	t.Run("last owner cannot be removed", func(t *testing.T) {
+		_, err := RemoveUser(ctx, r.AuthService, orgID, r.User.String())
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, s.Code())
+		assert.Equal(t, "cannot remove the last organization owner", s.Message())
+
+		// user must still be active after the failed attempt
+		_, err = models.FindActiveUserByID(orgID, r.User.String())
+		require.NoError(t, err)
+	})
+
 	t.Run("user not found -> error", func(t *testing.T) {
 		_, err := RemoveUser(ctx, r.AuthService, orgID, uuid.NewString())
 		require.Error(t, err)

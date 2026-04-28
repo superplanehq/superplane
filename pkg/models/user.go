@@ -36,8 +36,12 @@ func (u *User) GetEmail() string {
 }
 
 func (u *User) Delete() error {
+	return u.DeleteInTransaction(database.Conn())
+}
+
+func (u *User) DeleteInTransaction(tx *gorm.DB) error {
 	now := time.Now()
-	return database.Conn().Unscoped().
+	return tx.Unscoped().
 		Model(u).
 		Update("deleted_at", now).
 		Update("updated_at", now).
