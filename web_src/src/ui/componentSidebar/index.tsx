@@ -866,6 +866,7 @@ export const ComponentSidebar = ({
                       actions={actions}
                       triggers={triggers}
                       onHighlightedNodesChange={onHighlightedNodesChange}
+                      organizationId={domainId}
                     />
                   )}
                 </div>

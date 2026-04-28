@@ -108,4 +108,24 @@ export const analytics = {
   orgCreate: (organizationId: string) => {
     posthog.capture("auth:org_create", { organization_id: organizationId });
   },
+
+  canvasRunItemOpen: (nodeRef: string | undefined, executionStatus: string, organizationId: string) => {
+    posthog.capture("canvas:run_item_open", {
+      node_ref: nodeRef,
+      execution_status: executionStatus,
+      organization_id: organizationId,
+    });
+  },
+
+  canvasRunItemTabView: (tab: "details" | "payload" | "config", organizationId: string) => {
+    posthog.capture("canvas:run_item_tab_view", { tab, organization_id: organizationId });
+  },
+
+  canvasComponentError: (nodeRef: string | undefined, errorMessage: string, organizationId: string) => {
+    posthog.capture("canvas:component_error", { node_ref: nodeRef, error_message: errorMessage, organization_id: organizationId });
+  },
+
+  canvasLogView: (organizationId: string) => {
+    posthog.capture("canvas:log_view", { organization_id: organizationId });
+  },
 };

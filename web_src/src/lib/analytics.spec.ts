@@ -172,4 +172,43 @@ describe("analytics", () => {
       organization_id: "org-123",
     });
   });
+  describe("run item and error events", () => {
+    it("captures canvas run item open", () => {
+      analytics.canvasRunItemOpen("digitalocean.detachKnowledgeBase", "success", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_open", {
+        node_ref: "digitalocean.detachKnowledgeBase",
+        execution_status: "success",
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures canvas run item tab view - details", () => {
+      analytics.canvasRunItemTabView("details", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_tab_view", { tab: "details", organization_id: "org-123" });
+    });
+
+    it("captures canvas run item tab view - payload", () => {
+      analytics.canvasRunItemTabView("payload", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_tab_view", { tab: "payload", organization_id: "org-123" });
+    });
+
+    it("captures canvas run item tab view - config", () => {
+      analytics.canvasRunItemTabView("config", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_tab_view", { tab: "config", organization_id: "org-123" });
+    });
+
+    it("captures canvas component error", () => {
+      analytics.canvasComponentError("http.request", "timeout after 30s", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:component_error", {
+        node_ref: "http.request",
+        error_message: "timeout after 30s",
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures canvas log view", () => {
+      analytics.canvasLogView("org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:log_view", { organization_id: "org-123" });
+    });
+  });
 });
