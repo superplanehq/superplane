@@ -122,7 +122,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
     setIsLaunchingQuickStart(true);
     try {
       const nodes = (template.spec?.nodes || []).map((node: any) => {
-        if (node.component?.name === "sendEmail" && me?.id) {
+        if (node.action?.name === "sendEmail" && me?.id) {
           return {
             ...node,
             configuration: {
@@ -131,7 +131,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
             },
           };
         }
-        if (node.component?.name === "http") {
+        if (node.action?.name === "http") {
           return {
             ...node,
             configuration: {
@@ -143,7 +143,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         return node;
       });
       const nodesWithServer2Url = nodes.map((node: any) =>
-        node.component?.name === "http"
+        node.action?.name === "http"
           ? {
               ...node,
               configuration: {
@@ -183,7 +183,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       );
 
       const triggerNode = nodes.find((n: any) => n.trigger?.name === "schedule");
-      const httpNode = nodes.find((n: any) => n.component?.name === "http");
+      const httpNode = nodes.find((n: any) => n.action?.name === "http");
       let emittedEventId: string | undefined;
 
       if (triggerNode) {

@@ -29,6 +29,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a secret",
+		Long:  core.AgentSkillsHelp(),
 		Args:  cobra.NoArgs,
 	}
 	var createFile string

@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import type {
-  BlueprintsBlueprint,
   CanvasChangesetChange,
   CanvasesCanvas,
   CanvasesCanvasChangeRequest,
@@ -22,7 +21,7 @@ import type {
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasVersion,
   CanvasesListEventExecutionsResponse,
-  ComponentsComponent,
+  SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -35,7 +34,7 @@ import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizat
 
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
+import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
   eventExecutionsQueryOptions,
@@ -89,13 +88,7 @@ import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
-import {
-  CANVAS_BUNDLE_COLOR,
-  CANVAS_BUNDLE_ICON_SLUG,
-  prepareComponentNode,
-  prepareCompositeNode,
-  prepareTriggerNode,
-} from "./lib/canvas-node-preparation";
+import { prepareComponentNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import {
   isDraftVersion,
   isPublishedVersion,
@@ -128,6 +121,7 @@ import {
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
+  getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
@@ -158,19 +152,6 @@ type QueuedCanvasSaveRequest = {
 };
 
 type CanvasEchoRelease = () => void;
-
-function getWorkflowSaveSignature(workflow: CanvasesCanvas | null | undefined): string {
-  if (!workflow) {
-    return "";
-  }
-
-  return JSON.stringify({
-    name: workflow.metadata?.name ?? "",
-    description: workflow.metadata?.description ?? "",
-    nodes: workflow.spec?.nodes ?? [],
-    edges: workflow.spec?.edges ?? [],
-  });
-}
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
@@ -203,7 +184,6 @@ export function WorkflowPageV2() {
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
-  const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
@@ -1470,10 +1450,9 @@ export function WorkflowPageV2() {
         scope: "connected-component",
         nodeIds: [nodeID],
         components,
-        blueprints,
       });
     },
-    [isAutoLayoutOnUpdateEnabled, components, blueprints],
+    [isAutoLayoutOnUpdateEnabled, components],
   );
 
   /**
@@ -1705,8 +1684,8 @@ export function WorkflowPageV2() {
   const allComponents = useMemo(() => {
     const merged = [...components];
     availableIntegrations.forEach((integration) => {
-      if (integration.components) {
-        merged.push(...integration.components);
+      if (integration.actions) {
+        merged.push(...integration.actions);
       }
     });
     return merged;
@@ -1719,14 +1698,13 @@ export function WorkflowPageV2() {
   const canvasMode = hasEditableVersion || isVersionControlOpen ? "edit" : "live";
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
-    if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
+    if (!canvas || canvasLoading || triggersLoading || componentsLoading || integrationsLoading) {
       return { nodes: [], edges: [] };
     }
 
     return prepareData(
       canvas,
       allTriggers,
-      blueprints,
       allComponents,
       visibleNodeEventsMap,
       visibleNodeExecutionsMap,
@@ -1739,7 +1717,6 @@ export function WorkflowPageV2() {
   }, [
     canvas,
     allTriggers,
-    blueprints,
     allComponents,
     visibleNodeEventsMap,
     visibleNodeExecutionsMap,
@@ -1748,7 +1725,6 @@ export function WorkflowPageV2() {
     queryClient,
     canvasLoading,
     triggersLoading,
-    blueprintsLoading,
     componentsLoading,
     integrationsLoading,
     organizationId,
@@ -1786,7 +1762,6 @@ export function WorkflowPageV2() {
       const sidebarData = prepareSidebarData(
         node,
         canvas?.spec?.nodes || [],
-        blueprints,
         allComponents,
         allTriggers,
         executionsMap,
@@ -1802,7 +1777,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [canvas, blueprints, allComponents, allTriggers, visibleNodeEventsMap, isLiveExecutionSurface, getNodeData],
+    [canvas, allComponents, allTriggers, visibleNodeEventsMap, isLiveExecutionSurface, getNodeData],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -2256,7 +2231,7 @@ export function WorkflowPageV2() {
         }
 
         if (chainNode.type === "TYPE_TRIGGER") {
-          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
+          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.component);
 
           // Store node metadata with trigger info
           nodeMetadata[chainNodeId] = {
@@ -2283,7 +2258,7 @@ export function WorkflowPageV2() {
         }
 
         // For components (non-triggers)
-        const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
+        const componentMetadata = allComponents.find((component) => component.name === chainNode.component);
 
         // Store node metadata with component info
         nodeMetadata[chainNodeId] = {
@@ -2323,7 +2298,7 @@ export function WorkflowPageV2() {
       // Inject config key into component nodes' example objects for autocomplete
       chainNodeIds.forEach((chainNodeId) => {
         const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
-        if (!chainNode || chainNode.type !== "TYPE_COMPONENT") return;
+        if (!chainNode || chainNode.type !== "TYPE_ACTION") return;
 
         const obj = exampleObj[chainNodeId];
         if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
@@ -2565,36 +2540,32 @@ export function WorkflowPageV2() {
       if (!node) return null;
 
       // Get configuration fields from metadata based on node type
-      let configurationFields: ComponentsComponent["configuration"] = [];
+      let configurationFields: SuperplaneActionsAction["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
       let integrationName: string | undefined;
       let integrationLabel: string | undefined;
       let blockName: string | undefined;
 
-      if (node.type === "TYPE_BLUEPRINT") {
-        const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
-        configurationFields = blueprintMetadata?.configuration || [];
-        displayLabel = blueprintMetadata?.name || displayLabel;
-      } else if (node.type === "TYPE_COMPONENT") {
-        const componentMetadata = allComponents.find((c) => c.name === node.component?.name);
+      if (node.type === "TYPE_ACTION") {
+        const componentMetadata = allComponents.find((c) => c.name === node.component);
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
-        blockName = node.component?.name;
+        blockName = node.component;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
         integrationLabel = integrationName
           ? availableIntegrations.find((i) => i.name === integrationName)?.label
           : undefined;
       } else if (node.type === "TYPE_TRIGGER") {
-        const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
+        const triggerMetadata = allTriggers.find((t) => t.name === node.component);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
-        blockName = node.trigger?.name;
+        blockName = node.component;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
         integrationLabel = integrationName
           ? availableIntegrations.find((i) => i.name === integrationName)?.label
           : undefined;
       } else if (node.type === "TYPE_WIDGET") {
-        const widget = widgets.find((w) => w.name === node.widget?.name);
+        const widget = widgets.find((w) => w.name === node.component);
         if (widget) {
           configurationFields = widget.configuration || [];
           displayLabel = widget.label || "Widget";
@@ -2628,7 +2599,7 @@ export function WorkflowPageV2() {
         integrationRef: node.integration,
       };
     },
-    [canvas, blueprints, allComponents, allTriggers, availableIntegrations, widgets],
+    [canvas, allComponents, allTriggers, availableIntegrations, widgets],
   );
 
   const createIntegrationMutation = useCreateIntegration(organizationId ?? "");
@@ -3093,11 +3064,9 @@ export function WorkflowPageV2() {
         type:
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
-            : buildingBlock.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : buildingBlock.name === "annotation"
-                ? "TYPE_WIDGET"
-                : "TYPE_COMPONENT",
+            : buildingBlock.name === "annotation"
+              ? "TYPE_WIDGET"
+              : "TYPE_ACTION",
         configuration: filteredConfiguration,
         integration: integrationRef,
         position: position
@@ -3111,17 +3080,15 @@ export function WorkflowPageV2() {
             },
       };
 
-      // Add type-specific reference
+      // Add type-specific component reference
       if (buildingBlock.name === "annotation") {
         // Annotation nodes are now widgets
-        newNode.widget = { name: "annotation" };
+        newNode.component = "annotation";
         newNode.configuration = { text: "", color: "yellow" };
       } else if (buildingBlock.type === "component") {
-        newNode.component = { name: buildingBlock.name };
+        newNode.component = buildingBlock.name;
       } else if (buildingBlock.type === "trigger") {
-        newNode.trigger = { name: buildingBlock.name };
-      } else if (buildingBlock.type === "blueprint") {
-        newNode.blueprint = { id: buildingBlock.id };
+        newNode.component = buildingBlock.name;
       }
 
       // Add the new node to the workflow
@@ -3304,8 +3271,8 @@ export function WorkflowPageV2() {
       const newNode: ComponentsNode = {
         id: newNodeId,
         name: placeholderName,
-        type: "TYPE_COMPONENT",
-        // NO component/blueprint/trigger reference - causes validation error
+        type: "TYPE_ACTION",
+        // NO component/trigger reference - causes validation error
         configuration: {},
         metadata: {},
         position: {
@@ -3388,22 +3355,15 @@ export function WorkflowPageV2() {
       const updatedNode: ComponentsNode = {
         ...canvas.spec!.nodes![nodeIndex],
         name: uniqueNodeName,
-        type:
-          data.buildingBlock.type === "trigger"
-            ? "TYPE_TRIGGER"
-            : data.buildingBlock.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : "TYPE_COMPONENT",
+        type: data.buildingBlock.type === "trigger" ? "TYPE_TRIGGER" : "TYPE_ACTION",
         configuration: filteredConfiguration,
       };
 
-      // Add the reference that was missing
+      // Add the component reference that was missing
       if (data.buildingBlock.type === "component") {
-        updatedNode.component = { name: data.buildingBlock.name };
+        updatedNode.component = data.buildingBlock.name;
       } else if (data.buildingBlock.type === "trigger") {
-        updatedNode.trigger = { name: data.buildingBlock.name };
-      } else if (data.buildingBlock.type === "blueprint") {
-        updatedNode.blueprint = { id: data.buildingBlock.id };
+        updatedNode.component = data.buildingBlock.name;
       }
 
       const updatedNodes = [...(canvas.spec?.nodes || [])];
@@ -3562,7 +3522,6 @@ export function WorkflowPageV2() {
         nodeIds,
         scope: "connected-component",
         components,
-        blueprints,
       });
 
       applyLocalWorkflowUpdate(updatedWorkflow);
@@ -3571,16 +3530,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [
-      canvas,
-      components,
-      blueprints,
-      organizationId,
-      canvasId,
-      handleSaveWorkflow,
-      isReadOnly,
-      applyLocalWorkflowUpdate,
-    ],
+    [canvas, components, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleNodesDuplicate = useCallback(
@@ -3599,13 +3549,10 @@ export function WorkflowPageV2() {
 
         let baseName = nodeToDuplicate.name?.trim() || "";
         if (!baseName) {
-          if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-            baseName = nodeToDuplicate.trigger.name;
-          } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
-            baseName = nodeToDuplicate.component.name;
-          } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
-            const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
-            baseName = blueprintMetadata?.name || "blueprint";
+          if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.component) {
+            baseName = nodeToDuplicate.component;
+          } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.component) {
+            baseName = nodeToDuplicate.component;
           } else {
             baseName = "node";
           }
@@ -3661,7 +3608,7 @@ export function WorkflowPageV2() {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       }
     },
-    [canvas, organizationId, canvasId, blueprints, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
   const handleEdgeDelete = useCallback(
@@ -3942,14 +3889,10 @@ export function WorkflowPageV2() {
 
       let baseName = nodeToDuplicate.name?.trim() || "";
       if (!baseName) {
-        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-          baseName = nodeToDuplicate.trigger.name;
-        } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
-          baseName = nodeToDuplicate.component.name;
-        } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
-          // For blueprints, we need to find the blueprint metadata to get the name
-          const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
-          baseName = blueprintMetadata?.name || "blueprint";
+        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.component) {
+          baseName = nodeToDuplicate.component;
+        } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.component) {
+          baseName = nodeToDuplicate.component;
         } else {
           baseName = "node";
         }
@@ -3998,7 +3941,6 @@ export function WorkflowPageV2() {
       canvas,
       organizationId,
       canvasId,
-      blueprints,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       isReadOnly,
@@ -4928,12 +4870,10 @@ export function WorkflowPageV2() {
       }
 
       let componentName = "default";
-      if (node.type === "TYPE_COMPONENT" && node.component?.name) {
-        componentName = node.component.name;
-      } else if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
-        componentName = node.trigger.name;
-      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
-        componentName = "default";
+      if (node.type === "TYPE_ACTION" && node.component) {
+        componentName = node.component;
+      } else if (node.type === "TYPE_TRIGGER" && node.component) {
+        componentName = node.component;
       }
 
       return {
@@ -4950,12 +4890,10 @@ export function WorkflowPageV2() {
       if (!node) return null;
 
       let componentName = "";
-      if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
-        componentName = node.trigger.name;
-      } else if (node.type === "TYPE_COMPONENT" && node.component?.name) {
-        componentName = node.component.name;
-      } else if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id) {
-        componentName = "default";
+      if (node.type === "TYPE_TRIGGER" && node.component) {
+        componentName = node.component;
+      } else if (node.type === "TYPE_ACTION" && node.component) {
+        componentName = node.component;
       }
 
       const renderer = getCustomFieldRenderer(componentName);
@@ -5042,8 +4980,7 @@ export function WorkflowPageV2() {
   );
 
   const isInitialCanvasBootstrapLoading =
-    !canvas &&
-    (canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || widgetsLoading || usersLoading);
+    !canvas && (canvasLoading || triggersLoading || componentsLoading || widgetsLoading || usersLoading);
   const isDraftCanvasLoading =
     isViewingDraftVersion &&
     !!activeCanvasVersionId &&
@@ -5396,7 +5333,6 @@ export function WorkflowPageV2() {
           workflowNodes={canvas?.spec?.nodes}
           components={allComponents}
           triggers={allTriggers}
-          blueprints={blueprints}
           logEntries={logEntries}
           runsEvents={isLiveExecutionSurface ? runsEventsData.events : []}
           runsTotalCount={isLiveExecutionSurface ? runsEventsData.totalCount : 0}
@@ -5666,8 +5602,7 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
 function prepareData(
   workflow: CanvasesCanvas,
   triggers: TriggersTrigger[],
-  blueprints: BlueprintsBlueprint[],
-  components: ComponentsComponent[],
+  components: SuperplaneActionsAction[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -5690,7 +5625,6 @@ function prepareData(
           workflowNodes,
           node,
           triggers,
-          blueprints,
           components,
           nodeEventsMap,
           nodeExecutionsMap,
@@ -5714,8 +5648,7 @@ function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   triggers: TriggersTrigger[],
-  blueprints: BlueprintsBlueprint[],
-  components: ComponentsComponent[],
+  components: SuperplaneActionsAction[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -5728,23 +5661,6 @@ function prepareNode(
   switch (node.type) {
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode);
-    case "TYPE_BLUEPRINT": {
-      const componentMetadata = components.find((c) => c.name === node.component?.name);
-      const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
-
-      // Override outputChannels with component metadata if available
-      if (componentMetadata?.outputChannels) {
-        return {
-          ...compositeNode,
-          data: {
-            ...compositeNode.data,
-            outputChannels: componentMetadata.outputChannels.map((c) => c.name!),
-          },
-        };
-      }
-
-      return compositeNode;
-    }
     case "TYPE_WIDGET":
       return prepareAnnotationNode(node);
 
@@ -5778,8 +5694,7 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
 function prepareSidebarData(
   node: ComponentsNode,
   nodes: ComponentsNode[],
-  blueprints: BlueprintsBlueprint[],
-  components: ComponentsComponent[],
+  components: SuperplaneActionsAction[],
   triggers: TriggersTrigger[],
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -5792,22 +5707,14 @@ function prepareSidebarData(
   const events = nodeEventsMap[node.id!] || [];
 
   // Get metadata based on node type
-  const blueprintMetadata =
-    node.type === "TYPE_BLUEPRINT" ? blueprints.find((b) => b.id === node.blueprint?.id) : undefined;
-  const componentMetadata =
-    node.type === "TYPE_COMPONENT" ? components.find((c) => c.name === node.component?.name) : undefined;
-  const triggerMetadata =
-    node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.trigger?.name) : undefined;
+  const componentMetadata = node.type === "TYPE_ACTION" ? components.find((c) => c.name === node.component) : undefined;
+  const triggerMetadata = node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.component) : undefined;
 
-  const nodeTitle =
-    componentMetadata?.label || blueprintMetadata?.name || triggerMetadata?.label || node.name || "Unknown";
+  const nodeTitle = componentMetadata?.label || triggerMetadata?.label || node.name || "Unknown";
   let iconSlug = "boxes";
   let color = "indigo";
 
-  if (blueprintMetadata) {
-    iconSlug = CANVAS_BUNDLE_ICON_SLUG;
-    color = CANVAS_BUNDLE_COLOR;
-  } else if (componentMetadata) {
+  if (componentMetadata) {
     iconSlug = componentMetadata.icon || iconSlug;
     color = componentMetadata.color || color;
   } else if (triggerMetadata) {
@@ -5833,6 +5740,6 @@ function prepareSidebarData(
     totalInHistoryCount: totalHistoryCount ? totalHistoryCount : 0,
     totalInQueueCount: totalQueueCount ? totalQueueCount : 0,
     hideQueueEvents,
-    isComposite: node.type === "TYPE_BLUEPRINT",
+    isComposite: false,
   };
 }

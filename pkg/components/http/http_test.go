@@ -104,6 +104,18 @@ func (c *contextBoundHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
+type fakeSecretsContext struct {
+	value []byte
+	err   error
+}
+
+func (f *fakeSecretsContext) GetKey(_, _ string) ([]byte, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.value, nil
+}
+
 type sequenceHTTPClient struct {
 	errors    []error
 	responses []*http.Response
@@ -174,6 +186,50 @@ func TestHTTP__Setup__ValidConfigurations(t *testing.T) {
 				"method":       "GET",
 				"url":          "https://api.example.com",
 				"successCodes": "200,404",
+			},
+		},
+		{
+			name: "GET with bearer authorization from secret",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type": AuthorizationTypeBearer,
+					"credential": map[string]any{
+						"secret": "api-creds",
+						"key":    "token",
+					},
+				},
+			},
+		},
+		{
+			name: "GET with basic auth from secret",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type":     AuthorizationTypeBasicAuth,
+					"username": "deploy",
+					"password": map[string]any{
+						"secret": "api-creds",
+						"key":    "password",
+					},
+				},
+			},
+		},
+		{
+			name: "GET with custom header authorization from secret",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type":       AuthorizationTypeCustomHeader,
+					"headerName": "X-API-Key",
+					"value": map[string]any{
+						"secret": "api-creds",
+						"key":    "api-key",
+					},
+				},
 			},
 		},
 	}
@@ -277,6 +333,65 @@ func TestHTTP__Setup__ValidationErrors(t *testing.T) {
 			},
 			expectErr: "interval seconds must be less than or equal to 300",
 		},
+		{
+			name: "authorization without full credential",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type": AuthorizationTypeBearer,
+					"credential": map[string]any{
+						"secret": "s",
+						"key":    "",
+					},
+				},
+			},
+			expectErr: "authorization bearer credential: both organization secret and key name are required",
+		},
+		{
+			name: "authorization without type",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"credential": map[string]any{
+						"secret": "s",
+						"key":    "k",
+					},
+				},
+			},
+			expectErr: "authorization: type is required",
+		},
+		{
+			name: "basic auth without username",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type": AuthorizationTypeBasicAuth,
+					"password": map[string]any{
+						"secret": "s",
+						"key":    "k",
+					},
+				},
+			},
+			expectErr: "authorization basic auth: username is required",
+		},
+		{
+			name: "custom header without header name",
+			config: map[string]any{
+				"method": "GET",
+				"url":    "https://api.example.com",
+				"authorization": map[string]any{
+					"type": AuthorizationTypeCustomHeader,
+					"value": map[string]any{
+						"secret": "s",
+						"key":    "k",
+					},
+				},
+			},
+			expectErr: "authorization custom header: header name is required",
+		},
 	}
 
 	for _, tt := range tests {
@@ -321,6 +436,129 @@ func TestHTTP__Execute__GET(t *testing.T) {
 
 	body := response["body"].(map[string]any)
 	assert.Equal(t, "world", body["hello"])
+}
+
+func TestHTTP__Execute__SetsAuthorizationFromSecret(t *testing.T) {
+	h := &HTTP{}
+	var gotAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"headers": []map[string]any{
+			{"name": "Authorization", "value": "should-be-overridden"},
+		},
+		"authorization": map[string]any{
+			"type": AuthorizationTypeBearer,
+			"credential": map[string]any{
+				"secret": "org-secret",
+				"key":    "token",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{value: []byte("tok-123")}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "Bearer tok-123", gotAuth)
+}
+
+func TestHTTP__Execute__SetsBasicAuthFromSecret(t *testing.T) {
+	h := &HTTP{}
+	var gotAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"type":     AuthorizationTypeBasicAuth,
+			"username": "deploy",
+			"password": map[string]any{
+				"secret": "s",
+				"key":    "k",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{value: []byte("abc")}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "Basic ZGVwbG95OmFiYw==", gotAuth)
+}
+
+func TestHTTP__Execute__SetsCustomHeaderFromSecret(t *testing.T) {
+	h := &HTTP{}
+	var gotHeader string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Get("X-API-Key")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"type":       AuthorizationTypeCustomHeader,
+			"headerName": "X-API-Key",
+			"value": map[string]any{
+				"secret": "s",
+				"key":    "k",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{value: []byte("abc")}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.Equal(t, "abc", gotHeader)
+}
+
+func TestHTTP__Execute__AuthorizationSecretMissing(t *testing.T) {
+	h := &HTTP{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "GET",
+		"url":    server.URL,
+		"authorization": map[string]any{
+			"type": AuthorizationTypeBearer,
+			"credential": map[string]any{
+				"secret": "s",
+				"key":    "k",
+			},
+		},
+	})
+	ctx.Secrets = &fakeSecretsContext{err: core.ErrSecretKeyNotFound}
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	errStr := responsePayload(t, stateCtx)["error"].(string)
+	assert.Contains(t, errStr, "authorization")
 }
 
 func TestHTTP__Execute__ReadsResponseBodyBeforeContextCancellation(t *testing.T) {
@@ -625,7 +863,7 @@ func TestHTTP__Execute__NetworkErrorWithRetrySchedulesAction(t *testing.T) {
 	assert.Contains(t, metadata.Retry.LastError, "connection refused")
 }
 
-func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
+func TestHTTP__HandleHook__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	h := &HTTP{}
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -651,7 +889,7 @@ func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	require.NoError(t, err)
 
 	actionRequestCtx := &contexts.RequestContext{}
-	actionCtx := core.ActionContext{
+	actionCtx := core.ActionHookContext{
 		Logger:         log.NewEntry(log.StandardLogger()),
 		Name:           "retryRequest",
 		Configuration:  execCtx.Configuration,
@@ -661,7 +899,7 @@ func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 		HTTP:           httpCtx,
 	}
 
-	err = h.HandleAction(actionCtx)
+	err = h.HandleHook(actionCtx)
 	require.NoError(t, err)
 
 	assert.False(t, stateCtx.Finished)
@@ -674,7 +912,7 @@ func TestHTTP__HandleAction__RetryRequest_SchedulesNextAttempt(t *testing.T) {
 	assert.Contains(t, metadata.Retry.LastError, "temporary outage")
 }
 
-func TestHTTP__HandleAction__RetryRequest_SuccessAfterNetworkError(t *testing.T) {
+func TestHTTP__HandleHook__RetryRequest_SuccessAfterNetworkError(t *testing.T) {
 	h := &HTTP{}
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -705,7 +943,7 @@ func TestHTTP__HandleAction__RetryRequest_SuccessAfterNetworkError(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, "retryRequest", requestCtx.Action)
 
-	actionCtx := core.ActionContext{
+	actionCtx := core.ActionHookContext{
 		Logger:         log.NewEntry(log.StandardLogger()),
 		Name:           "retryRequest",
 		Configuration:  execCtx.Configuration,
@@ -715,7 +953,7 @@ func TestHTTP__HandleAction__RetryRequest_SuccessAfterNetworkError(t *testing.T)
 		HTTP:           httpCtx,
 	}
 
-	err = h.HandleAction(actionCtx)
+	err = h.HandleHook(actionCtx)
 	require.NoError(t, err)
 
 	assert.True(t, stateCtx.Passed)

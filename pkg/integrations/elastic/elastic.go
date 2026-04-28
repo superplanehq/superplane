@@ -76,8 +76,8 @@ func (e *Elastic) Configuration() []configuration.Field {
 	}
 }
 
-func (e *Elastic) Components() []core.Component {
-	return []core.Component{
+func (e *Elastic) Actions() []core.Action {
+	return []core.Action{
 		&IndexDocument{},
 		&CreateCase{},
 		&GetCase{},
@@ -287,10 +287,10 @@ func (e *Elastic) ListResources(resourceType string, ctx core.ListResourcesConte
 	return nil, fmt.Errorf("unsupported resourceType %q", resourceType)
 }
 
-func (e *Elastic) Actions() []core.Action {
-	return []core.Action{}
+func (e *Elastic) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (e *Elastic) HandleAction(_ core.IntegrationActionContext) error {
+func (e *Elastic) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

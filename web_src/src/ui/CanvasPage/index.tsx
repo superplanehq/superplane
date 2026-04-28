@@ -35,13 +35,12 @@ import {
 } from "react";
 
 import type {
-  BlueprintsBlueprint,
   CanvasChangesetChange,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  ComponentsComponent,
   IntegrationsIntegrationDefinition,
+  SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
@@ -53,6 +52,7 @@ import { useAgentState, type AgentState } from "@/components/AgentSidebar/useAge
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
+import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -70,6 +70,7 @@ import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
+import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 
@@ -316,9 +317,8 @@ export interface CanvasPageProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
+  components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
 
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -672,6 +672,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   // New/empty canvases should start at 100% unless a later fit-to-view is needed.
   const initialCanvasZoom = 1;
+  const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
     nodeId: string;
     nodeName: string;
@@ -690,7 +691,7 @@ function CanvasPage(props: CanvasPageProps) {
     (nodeId: string) => {
       // Check if this is a placeholder - if so, open building blocks sidebar instead
       const workflowNode = props.workflowNodes?.find((n) => n.id === nodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isPlaceholder) {
         // For placeholders, open building blocks sidebar
@@ -727,9 +728,7 @@ function CanvasPage(props: CanvasPageProps) {
       return;
     }
 
-    const starterPlaceholder = props.workflowNodes?.find(
-      (node) => node.name === "New Component" && !node.component?.name,
-    );
+    const starterPlaceholder = props.workflowNodes?.find((node) => node.name === "New Component" && !node.component);
     if (starterPlaceholder?.id) {
       hasHandledStarterPlaceholderRef.current = true;
       setTemplateNodeId(starterPlaceholder.id);
@@ -998,7 +997,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       // Check if templateNodeId is a placeholder (persisted node) or legacy pending connection (local-only)
       const workflowNode = props.workflowNodes?.find((n) => n.id === templateNodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isPlaceholder && props.onPlaceholderConfigure) {
         // Handle placeholder node (persisted)
@@ -1068,83 +1067,13 @@ function CanvasPage(props: CanvasPageProps) {
     if (readOnly) return;
     if (!props.onNodeAdd) return;
 
-    const viewport = props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
-    const canvasRect = canvasWrapperRef.current?.getBoundingClientRect();
-    const zoom = viewport.zoom || DEFAULT_CANVAS_ZOOM;
-    const visibleWidth = canvasRect?.width ?? window.innerWidth;
-    const visibleHeight = canvasRect?.height ?? window.innerHeight;
-    const visibleBounds = {
-      minX: (0 - viewport.x) / zoom,
-      minY: (0 - viewport.y) / zoom,
-      maxX: (visibleWidth - viewport.x) / zoom,
-      maxY: (visibleHeight - viewport.y) / zoom,
-    };
-
-    const noteSize = { width: 320, height: 160 };
-    const basePosition = {
-      x: (visibleWidth / 2 - viewport.x) / zoom - noteSize.width / 2,
-      y: (visibleHeight / 2 - viewport.y) / zoom - noteSize.height / 2,
-    };
-
-    const nodes = state.nodes || [];
-    const padding = 16;
-    const intersects = (pos: { x: number; y: number }) => {
-      const bounds = {
-        minX: pos.x - padding,
-        minY: pos.y - padding,
-        maxX: pos.x + noteSize.width + padding,
-        maxY: pos.y + noteSize.height + padding,
-      };
-      return nodes.some((node) => {
-        const width = node.width ?? 240;
-        const height = node.height ?? 120;
-        const nodeBounds = {
-          minX: node.position.x,
-          minY: node.position.y,
-          maxX: node.position.x + width,
-          maxY: node.position.y + height,
-        };
-        return !(
-          bounds.maxX < nodeBounds.minX ||
-          bounds.minX > nodeBounds.maxX ||
-          bounds.maxY < nodeBounds.minY ||
-          bounds.minY > nodeBounds.maxY
-        );
-      });
-    };
-
-    const clampToVisible = (pos: { x: number; y: number }) => {
-      const minX = visibleBounds.minX + padding;
-      const minY = visibleBounds.minY + padding;
-      const maxX = visibleBounds.maxX - noteSize.width - padding;
-      const maxY = visibleBounds.maxY - noteSize.height - padding;
-      return {
-        x: Math.min(Math.max(pos.x, minX), maxX),
-        y: Math.min(Math.max(pos.y, minY), maxY),
-      };
-    };
-
-    let position = clampToVisible(basePosition);
-    const step = 40;
-    const maxRings = 8;
-    if (intersects(position)) {
-      let found = false;
-      for (let ring = 1; ring <= maxRings && !found; ring += 1) {
-        for (let dx = -ring; dx <= ring && !found; dx += 1) {
-          for (let dy = -ring; dy <= ring && !found; dy += 1) {
-            if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
-            const candidate = clampToVisible({
-              x: basePosition.x + dx * step,
-              y: basePosition.y + dy * step,
-            });
-            if (!intersects(candidate)) {
-              position = candidate;
-              found = true;
-            }
-          }
-        }
-      }
-    }
+    const position = findFreePositionInViewport({
+      viewport: props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
+      canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
+      nodes: state.nodes || [],
+      nodeSize: { width: 320, height: 160 },
+      fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
+    });
 
     const annotationBlock: BuildingBlock = {
       name: "annotation",
@@ -1262,6 +1191,49 @@ function CanvasPage(props: CanvasPageProps) {
       })),
     );
   }, [state.nodes, state.setNodes]);
+
+  /**
+   * Keyboard equivalent of dropping a block onto the canvas via drag-and-drop.
+   * When a placeholder / pending-connection is active we route through the
+   * existing click path so the block fills the placeholder instead of spawning
+   * a free-floating node. Otherwise we place the new node at the viewport
+   * center using the same algorithm as "Add Note".
+   */
+  const handleBuildingBlockEnter = useCallback(
+    (block: BuildingBlock) => {
+      if (readOnly) return;
+
+      if (templateNodeId) {
+        void handleBuildingBlockClick(block);
+        return;
+      }
+
+      const position = findFreePositionInViewport({
+        viewport: props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
+        canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
+        nodes: state.nodes || [],
+        nodeSize: { width: 420, height: 200 },
+        fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
+      });
+
+      void handleBuildingBlockDrop(block, position);
+    },
+    [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
+  );
+
+  const handleBuildingBlocksShortcutOpen = useCallback(() => {
+    handleSidebarToggle(true);
+  }, [handleSidebarToggle]);
+
+  useBuildingBlocksShortcut({
+    disabled:
+      readOnly ||
+      Boolean(props.hideAddControls) ||
+      props.headerMode === "version-live" ||
+      state.componentSidebar.isOpen,
+    isSidebarOpen: isBuildingBlocksSidebarOpen,
+    onOpen: handleBuildingBlocksShortcutOpen,
+  });
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
@@ -1415,10 +1387,12 @@ function CanvasPage(props: CanvasPageProps) {
             integrations={props.integrations}
             availableIntegrations={props.availableIntegrationDefinitions || []}
             integrationDialogOpen={props.integrationDialogOpen ?? false}
+            canvasZoom={canvasZoom}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockClick}
             onConnectIntegration={props.onConnectIntegration}
+            onEnterSubmit={handleBuildingBlockEnter}
           />
         )}
 
@@ -1474,6 +1448,7 @@ function CanvasPage(props: CanvasPageProps) {
               hasFitToViewRef={hasFitToViewRef}
               viewportRefProp={props.viewportRef}
               initialCanvasZoom={initialCanvasZoom}
+              onZoomChange={setCanvasZoom}
               highlightedNodeIds={highlightedNodeIds}
               workflowNodes={props.workflowNodes}
               setCurrentTab={setCurrentTab}
@@ -1537,7 +1512,6 @@ function CanvasPage(props: CanvasPageProps) {
             workflowNodes={props.workflowNodes}
             components={props.components}
             triggers={props.triggers}
-            blueprints={props.blueprints}
             onHighlightedNodesChange={setHighlightedNodeIds}
             focusRequest={props.focusRequest}
             onExecutionChainHandled={props.onExecutionChainHandled}
@@ -1601,7 +1575,6 @@ function Sidebar({
   workflowNodes,
   components,
   triggers,
-  blueprints,
   onHighlightedNodesChange,
   focusRequest,
   onExecutionChainHandled,
@@ -1650,9 +1623,8 @@ function Sidebar({
   ) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
+  components?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
@@ -1673,7 +1645,7 @@ function Sidebar({
       return false;
     }
     const selectedNode = workflowNodes.find((node) => node.id === state.componentSidebar.selectedNodeId);
-    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.widget?.name === "annotation";
+    return selectedNode?.type === "TYPE_WIDGET" && selectedNode?.component === "annotation";
   }, [state.componentSidebar.selectedNodeId, workflowNodes]);
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
@@ -1827,9 +1799,8 @@ function Sidebar({
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
-      components={components}
+      actions={components}
       triggers={triggers}
-      blueprints={blueprints}
       onHighlightedNodesChange={onHighlightedNodesChange}
       executionChainEventId={focusRequest?.executionChain?.eventId || null}
       executionChainExecutionId={focusRequest?.executionChain?.executionId || null}
@@ -1916,17 +1887,10 @@ function CanvasContentHeader({
     }
   }, [onSave]);
 
-  const handleLogoClick = useCallback(() => {
-    if (organizationId) {
-      window.location.href = `/${organizationId}`;
-    }
-  }, [organizationId]);
-
   return (
     <Header
       canvasName={canvasName}
       onSave={onSave ? handleSave : undefined}
-      onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
       saveIsPrimary={saveIsPrimary}
       saveButtonHidden={saveButtonHidden}
@@ -2265,7 +2229,7 @@ function CanvasContent({
       const isAnnotationNode = clickedNode?.data?.type === "annotation";
 
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
-      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
+      const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component;
 
       if (isAnnotationNode) {
         return;

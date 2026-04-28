@@ -255,16 +255,13 @@ func (c *DeployRelease) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeployReleasePollInterval)
 }
 
-func (c *DeployRelease) Actions() []core.Action {
-	return []core.Action{
-		{
-			Name:           "poll",
-			UserAccessible: false,
-		},
+func (c *DeployRelease) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *DeployRelease) HandleAction(ctx core.ActionContext) error {
+func (c *DeployRelease) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return c.poll(ctx)
@@ -272,7 +269,7 @@ func (c *DeployRelease) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *DeployRelease) poll(ctx core.ActionContext) error {
+func (c *DeployRelease) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

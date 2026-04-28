@@ -390,13 +390,13 @@ func (c *CreateRepositorySandbox) ProcessQueueItem(ctx core.ProcessQueueContext)
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateRepositorySandbox) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *CreateRepositorySandbox) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *CreateRepositorySandbox) HandleAction(ctx core.ActionContext) error {
+func (c *CreateRepositorySandbox) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return c.poll(ctx)
@@ -405,7 +405,7 @@ func (c *CreateRepositorySandbox) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CreateRepositorySandbox) poll(ctx core.ActionContext) error {
+func (c *CreateRepositorySandbox) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -438,7 +438,7 @@ func (c *CreateRepositorySandbox) poll(ctx core.ActionContext) error {
 	}
 }
 
-func (c *CreateRepositorySandbox) pollWaitingSandbox(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
+func (c *CreateRepositorySandbox) pollWaitingSandbox(ctx core.ActionHookContext, metadata *CreateRepositorySandboxMetadata) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
@@ -464,7 +464,7 @@ func (c *CreateRepositorySandbox) pollWaitingSandbox(ctx core.ActionContext, met
 	}
 }
 
-func (c *CreateRepositorySandbox) startClone(ctx core.ActionContext, client *Client, metadata *CreateRepositorySandboxMetadata) error {
+func (c *CreateRepositorySandbox) startClone(ctx core.ActionHookContext, client *Client, metadata *CreateRepositorySandboxMetadata) error {
 	cloneRequest, err := c.cloneRepositoryRequest(ctx.Secrets, metadata)
 	if err != nil {
 		return err
@@ -610,7 +610,7 @@ func (c *CreateRepositorySandbox) prepareInlineBootstrapScript(client *Client, m
 	return nil
 }
 
-func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
+func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionHookContext, metadata *CreateRepositorySandboxMetadata) error {
 	result, err := c.getCommandResult(ctx, metadata, metadata.Bootstrap.CmdID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to get bootstrap command result for %s: %v", metadata.Bootstrap.CmdID, err)
@@ -634,7 +634,7 @@ func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionContext, meta
 	return c.finish(ctx, metadata)
 }
 
-func (c *CreateRepositorySandbox) finish(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata) error {
+func (c *CreateRepositorySandbox) finish(ctx core.ActionHookContext, metadata *CreateRepositorySandboxMetadata) error {
 	metadata.Stage = repositorySandboxStageDone
 	err := ctx.Metadata.Set(*metadata)
 	if err != nil {
@@ -648,7 +648,7 @@ func (c *CreateRepositorySandbox) finish(ctx core.ActionContext, metadata *Creat
 	)
 }
 
-func (c *CreateRepositorySandbox) getCommandResult(ctx core.ActionContext, metadata *CreateRepositorySandboxMetadata, cmdID string) (*ExecuteCommandResponse, error) {
+func (c *CreateRepositorySandbox) getCommandResult(ctx core.ActionHookContext, metadata *CreateRepositorySandboxMetadata, cmdID string) (*ExecuteCommandResponse, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err

@@ -21,7 +21,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent(ComponentName, &SendEmail{})
+	registry.RegisterAction(ComponentName, &SendEmail{})
 }
 
 type SendEmail struct{}
@@ -262,14 +262,6 @@ func (c *SendEmail) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *SendEmail) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *SendEmail) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("sendEmail does not support actions")
-}
-
 func (c *SendEmail) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -341,4 +333,12 @@ func mapKeys(input map[string]struct{}) []string {
 		result = append(result, key)
 	}
 	return result
+}
+
+func (c *SendEmail) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendEmail) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

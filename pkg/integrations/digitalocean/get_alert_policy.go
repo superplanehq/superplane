@@ -136,18 +136,18 @@ func (g *GetAlertPolicy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetAlertPolicy) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GetAlertPolicy) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (g *GetAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (g *GetAlertPolicy) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (g *GetAlertPolicy) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetAlertPolicy) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

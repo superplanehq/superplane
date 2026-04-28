@@ -22,36 +22,21 @@ spec:
       position:
         x: 408
         "y": 425
-      component: null
-      blueprint: null
-      trigger:
-        name: "pagerduty.onIncident"
-      widget: null
+      component: "pagerduty.onIncident"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-1xyxrf"
       name: "Is it P1 or P2"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         expression: "$[\"Listen for new incidents\"].data.incident.priority.summary == \"P1\" || $[\"Listen for new incidents\"].data.incident.priority.summary == \"P2\""
-      metadata: null
       position:
         x: 933
         "y": 426
-      component:
-        name: "filter"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "filter"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-wa0ctm"
       name: "Get all failing checks"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration: {}
       metadata:
         checkRules:
@@ -64,77 +49,46 @@ spec:
       position:
         x: 1458
         "y": 427
-      component:
-        name: "dash0.listIssues"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "dash0.listIssues"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-4pjwv9"
       name: "Get DB Memory Usage"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         dataset: "default"
         query: "avg_over_time(\n  {otel_metric_name=\"cloudsql.googleapis.com/database/memory/utilization\", otel_metric_type=\"gauge\", service_name=\"superplane-staging\"}[5m]\n)[60m:5m]\n"
         type: "instant"
-      metadata: null
       position:
         x: 1458
         "y": 683
-      component:
-        name: "dash0.queryPrometheus"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "dash0.queryPrometheus"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-hbriwb"
       name: "Get DB CPU Usage"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         dataset: "default"
         query: "max_over_time(\n  {otel_metric_name=\"cloudsql.googleapis.com/database/cpu/utilization\", otel_metric_type=\"gauge\", service_name=\"superplane-staging\"}[5m]\n)[60m:5m]\n"
         type: "instant"
-      metadata: null
       position:
         x: 1458
         "y": 983
-      component:
-        name: "dash0.queryPrometheus"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "dash0.queryPrometheus"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-rxe22i"
       name: "Create a Summary"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         input: "You are generating the BODY text for a GitHub issue. Output MUST be valid GitHub-flavored Markdown.\n\nGoal:\n- Review Dash0 failing checks and Prometheus DB CPU and DB Memory metrics (last 60 minutes).\n- Describe what is happening and what is impacted, based strictly on the data.\n\nHard rules:\n- Output Markdown ONLY.\n- Use real line breaks (press Enter). Do NOT output \"\\n\".\n- Be factual and concise. No speculation unless explicitly labeled.\n- DO NOT suggest fixes, mitigations, or next steps.\n- DO NOT include recommendations, advice, or action items.\n- If data is missing or unclear, state \"Unknown\".\n- Do not invent values.\n- Do not mention internal node/component names.\n\nOutput format (use these exact headings):\n\n## Summary\n- 2 to 4 short bullets, high-signal only\n- Describe symptoms and impact, not causes or solutions\n\n## Dash0 failing checks\n- Bullet list\n- Include: check name, severity/state (if present), short description\n\n## Database metrics (last 60 minutes)\n\n### CPU usage\n- Peak:\n- Overall trend:\n- Notable spikes:\n\n### Memory usage\n- Peak:\n- Overall trend:\n- Notable spikes:\n\nData:\n\nDash0 failing checks:\n{{$['Get all failing checks'].data}}\n\nDB CPU usage time series:\n{{ $[\"Get DB CPU Usage\"].data }}\n\nDB Memory usage time series:\n{{ $[\"Get DB Memory Usage\"].data }}\n"
         model: "gpt-5.2"
-      metadata: null
       position:
         x: 2687
         "y": 435
-      component:
-        name: "openai.textPrompt"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "openai.textPrompt"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "component-node-n6s8ec"
       name: "Open an Issue"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         body: "{{$['Create a Summary'].data.text}}"
         repository: "puppy-describer"
@@ -147,15 +101,8 @@ spec:
       position:
         x: 3206
         "y": 435
-      component:
-        name: "github.createIssue"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "github.createIssue"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation-4a9uck"
       name: "annotation"
       type: "TYPE_WIDGET"
@@ -164,41 +111,25 @@ spec:
         height: 282
         text: "### 1. Listen to external resources\n\nTrigger components listen for events from external systems, in this case, we are listening to new triggered incidents on PagerDuty\n___\nTo use this example, connect your Pager Duty accounts:\n\n- Click each node\n- Follow the connection instructions for connecting PagerDuty\n- Go back to the node settings to configure Services you want to listen to, and set up other filters\n"
         width: 460
-      metadata: null
       position:
         x: 353
         "y": 78
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "merge-merge-1fzi6q"
       name: "merge"
-      type: "TYPE_COMPONENT"
+      type: "TYPE_ACTION"
       configuration:
         enableStopIf: false
         enableTimeout: true
         executionTimeout:
           unit: "minutes"
           value: 2
-      metadata: null
       position:
         x: 2079
         "y": 430
-      component:
-        name: "merge"
-      blueprint: null
-      trigger: null
-      widget: null
+      component: "merge"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation2-hrxq4u"
       name: "annotation2"
       type: "TYPE_WIDGET"
@@ -207,19 +138,11 @@ spec:
         height: 279
         text: "### 2. Filter out incidents based on priority\n\nThe Filter component subscribes to events from external resources and forwards only those that contain \"P1\" or \"P2\" as the priority.\n\n___\nSuperPlane is an event-driven workflow engine that supports expressive, flexible conditions.\n\n- Click the Filter node to see how expressions are defined\n- Explore the [Data Flow](https://docs.superplane.com/concepts/data-flow/) documentation for more details\n"
         width: 429
-      metadata: null
       position:
         x: 894
         "y": 79
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation3-7m2g95"
       name: "annotation3"
       type: "TYPE_WIDGET"
@@ -228,19 +151,11 @@ spec:
         height: 265
         text: "### 3. Collect metrics and health data\n\nThis step uses Dash0 to collect health signals from multiple sources and prepare data for a summary. The Dash0 List Issues component retrieves all failing checks, while Prometheus Query components fetch database memory and CPU usage metrics.\n\nA Merge component waits for all three data collection nodes to complete before the workflow continues.\n\n___\n\n**To use this with your dash0 instance:**   \n- Ensure check rules are configured in Dash0\n- Review the queries used for database memory and CPU usage\n- Update the queries to match your environment\n"
         width: 977
-      metadata: null
       position:
         x: 1459
         "y": 80
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
     - id: "annotation-annotation4-31cjr5"
       name: "annotation4"
       type: "TYPE_WIDGET"
@@ -249,19 +164,11 @@ spec:
         height: 256
         text: "### 4. Use AI to summarize data and create a GitHub issue\n\nRaw data emitted by upstream nodes is passed to the OpenAI component. The agent reviews this data and generates a summary in `markdown`, which is then used to create a GitHub issue with all relevant details.\n\n___\n- Connect your OpenAI account\n- Review how the prompt is configured and how upstream data is shared with the agent\n- After the issue is created, explore the payloads to see how data flows through the workflow\n- Learn how to select and manipulate payload data in the [Expressions](https://docs.superplane.com/concepts/expressions/) documentation\n"
         width: 750
-      metadata: null
       position:
         x: 2719
         "y": 81
-      component: null
-      blueprint: null
-      trigger: null
-      widget:
-        name: "annotation"
+      component: "annotation"
       isCollapsed: false
-      integration: null
-      errorMessage: ""
-      warningMessage: ""
   edges:
     - sourceId: "pagerduty-onincident-pagerduty-onincident-7ar72t"
       targetId: "component-node-1xyxrf"

@@ -48,12 +48,12 @@ func ValidateNodeConfiguration(node models.Node, registry *registry.Registry) er
 			return fmt.Errorf("node %s: component is required", node.ID)
 		}
 
-		component, err := registry.GetComponent(node.Ref.Component.Name)
+		action, err := registry.GetAction(node.Ref.Component.Name)
 		if err != nil {
 			return fmt.Errorf("node %s: unknown component %s", node.ID, node.Ref.Component.Name)
 		}
 
-		return validateConfiguration(node.ID, node.Configuration, component)
+		return validateConfiguration(node.ID, node.Configuration, action)
 
 	default:
 		return fmt.Errorf("node %s: unknown node type %s", node.ID, node.Type)
@@ -61,8 +61,8 @@ func ValidateNodeConfiguration(node models.Node, registry *registry.Registry) er
 
 }
 
-func validateConfiguration(nodeID string, config any, component core.Component) error {
-	configFields := component.Configuration()
+func validateConfiguration(nodeID string, config any, action core.Action) error {
+	configFields := action.Configuration()
 
 	// Convert config to map for easier validation
 	var configMap map[string]any

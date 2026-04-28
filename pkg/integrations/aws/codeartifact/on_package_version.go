@@ -246,26 +246,26 @@ func (p *OnPackageVersion) subscriptionPattern(region string) *common.EventBridg
 	}
 }
 
-func (p *OnPackageVersion) Actions() []core.Action {
-	return []core.Action{
+func (p *OnPackageVersion) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "checkRuleAvailability",
-			Description: "Check if the EventBridge rule is available",
+			Name: "checkRuleAvailability",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (p *OnPackageVersion) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPackageVersion) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "checkRuleAvailability":
 		return p.checkRuleAvailability(ctx)
 
 	default:
-		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (p *OnPackageVersion) checkRuleAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPackageVersion) checkRuleAvailability(ctx core.TriggerHookContext) (map[string]any, error) {
 	metadata := OnPackageVersionMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)

@@ -59,7 +59,7 @@ func (e *ExecuteCode) Documentation() string {
 
 ## Configuration
 
-- **Sandbox**: The sandbox ID to execute code in (from createSandbox output). Supports expressions, e.g. ` + "`" + `{{ $["daytona.createSandbox"].data.id }}` + "`" + `
+- **Sandbox**: The sandbox ID to execute code in (from Create Sandbox or Create Repository Sandbox output). Supports expressions, e.g. ` + "`" + `{{ previous().data.id }}` + "`" + ` or ` + "`" + `{{ $["Create Repository Sandbox"].data.sandboxId }}` + "`" + `
 - **Code**: The code to execute (supports expressions)
 - **Language**: The programming language (python, typescript, javascript)
 - **Timeout**: Optional execution timeout in milliseconds
@@ -224,20 +224,20 @@ func (e *ExecuteCode) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (e *ExecuteCode) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (e *ExecuteCode) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (e *ExecuteCode) HandleAction(ctx core.ActionContext) error {
+func (e *ExecuteCode) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return e.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (e *ExecuteCode) poll(ctx core.ActionContext) error {
+func (e *ExecuteCode) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

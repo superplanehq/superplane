@@ -117,11 +117,11 @@ func (p *OnPush) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnPush) Actions() []core.Action {
-	return []core.Action{}
+func (p *OnPush) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *OnPush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPush) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

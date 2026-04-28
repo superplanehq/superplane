@@ -241,14 +241,6 @@ func (c *CreateSilence) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateSilence) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateSilence) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -524,4 +516,12 @@ func formatSilenceInstant(value any) string {
 		return fmt.Sprintf("%q", s)
 	}
 	return fmt.Sprintf("%v", value)
+}
+
+func (c *CreateSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

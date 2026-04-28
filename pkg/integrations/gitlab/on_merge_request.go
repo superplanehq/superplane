@@ -106,11 +106,11 @@ func (m *OnMergeRequest) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (m *OnMergeRequest) Actions() []core.Action {
-	return []core.Action{}
+func (m *OnMergeRequest) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (m *OnMergeRequest) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (m *OnMergeRequest) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

@@ -47,7 +47,7 @@ function makeComponentContext(node: NodeInfo, lastExecutions: ExecutionInfo[] = 
     lastExecutions,
     currentUser: undefined,
     actions: {
-      invokeNodeExecutionAction: async () => {},
+      invokeNodeExecutionHook: async () => {},
     },
   };
 }

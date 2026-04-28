@@ -133,12 +133,12 @@ func (t *OnAlertFiring) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnAlertFiring) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnAlertFiring) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnAlertFiring) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("action %s not supported", ctx.Name)
+func (t *OnAlertFiring) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnAlertFiring) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

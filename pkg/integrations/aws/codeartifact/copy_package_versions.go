@@ -271,14 +271,6 @@ func (c *CopyPackageVersions) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CopyPackageVersions) Actions() []core.Action {
-	return nil
-}
-
-func (c *CopyPackageVersions) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CopyPackageVersions) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -301,4 +293,12 @@ func (c *CopyPackageVersions) normalizeConfig(config CopyPackageVersionsConfigur
 	config.Namespace = strings.TrimSpace(config.Namespace)
 	config.Versions = strings.TrimSpace(config.Versions)
 	return config
+}
+
+func (c *CopyPackageVersions) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CopyPackageVersions) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

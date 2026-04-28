@@ -47,7 +47,7 @@ func (d *DeleteSandbox) Documentation() string {
 
 ## Configuration
 
-- **Sandbox**: The ID or name of the sandbox to delete (from createSandbox output)
+- **Sandbox**: The ID or name of the sandbox to delete. If this node runs immediately after **Create Sandbox**, use ` + "`" + `{{ previous().data.id }}` + "`" + `. If it runs after one or more command nodes, use ` + "`" + `{{ $["Create Sandbox"].data.id }}` + "`" + ` so the cleanup step still points to the original sandbox.
 - **Force**: Optional flag to force deletion even if sandbox is running
 
 ## Output
@@ -148,18 +148,18 @@ func (d *DeleteSandbox) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteSandbox) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteSandbox) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteSandbox) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (d *DeleteSandbox) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (d *DeleteSandbox) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteSandbox) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

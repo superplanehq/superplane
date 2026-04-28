@@ -324,18 +324,18 @@ func (c *UpdateRedirectRule) ProcessQueueItem(ctx core.ProcessQueueContext) (*uu
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateRedirectRule) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateRedirectRule) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateRedirectRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *UpdateRedirectRule) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpdateRedirectRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateRedirectRule) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

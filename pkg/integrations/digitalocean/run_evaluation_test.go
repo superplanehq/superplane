@@ -301,14 +301,14 @@ func Test__RunEvaluation__Execute(t *testing.T) {
 	})
 }
 
-func Test__RunEvaluation__HandleAction(t *testing.T) {
+func Test__RunEvaluation__HandleHook(t *testing.T) {
 	component := &RunEvaluation{}
 
 	t.Run("running status -> reschedules poll", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -349,7 +349,7 @@ func Test__RunEvaluation__HandleAction(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -412,7 +412,7 @@ func Test__RunEvaluation__HandleAction(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -469,7 +469,7 @@ func Test__RunEvaluation__HandleAction(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{

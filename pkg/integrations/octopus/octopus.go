@@ -86,8 +86,8 @@ func (o *Octopus) Configuration() []configuration.Field {
 	}
 }
 
-func (o *Octopus) Components() []core.Component {
-	return []core.Component{
+func (o *Octopus) Actions() []core.Action {
+	return []core.Action{
 		&DeployRelease{},
 	}
 }
@@ -162,14 +162,6 @@ func (o *Octopus) ListResources(resourceType string, ctx core.ListResourcesConte
 	default:
 		return []core.IntegrationResource{}, nil
 	}
-}
-
-func (o *Octopus) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (o *Octopus) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
 }
 
 func listSpaceResources(client *Client) ([]core.IntegrationResource, error) {
@@ -318,4 +310,12 @@ func spaceIDForIntegration(client *Client, integration core.IntegrationContext) 
 	})
 
 	return space.ID, nil
+}
+
+func (o *Octopus) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (o *Octopus) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

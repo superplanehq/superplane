@@ -486,6 +486,37 @@ export function SettingsTab({
           />
         </div>
 
+        {/* Run title field — rendered right after name, before the separator */}
+        {(() => {
+          const runTitleField = configurationFields?.find((f) => f.name === "customName");
+          if (!runTitleField || !shouldShowConfiguration) return null;
+          return (
+            <div className={isReadOnly ? "pointer-events-none opacity-60" : ""}>
+              <ConfigurationFieldRenderer
+                allowExpressions={true}
+                field={runTitleField}
+                value={nodeConfiguration[runTitleField.name!]}
+                onChange={(value) => {
+                  setNodeConfiguration((prev) => ({
+                    ...prev,
+                    [runTitleField.name!]: value,
+                  }));
+                  if (value === undefined || value === null || value === "") {
+                    requestAutosave();
+                  }
+                }}
+                allValues={nodeConfiguration}
+                domainId={domainId}
+                domainType={domainType}
+                organizationId={domainId}
+                autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                realtimeValidationErrors={realtimeValidationErrors}
+                enableRealtimeValidation={true}
+              />
+            </div>
+          );
+        })()}
+
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
           <div
@@ -664,7 +695,7 @@ export function SettingsTab({
             className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
           >
             {configurationFields.map((field) => {
-              if (!field.name) return null;
+              if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;
               return (
                 <ConfigurationFieldRenderer

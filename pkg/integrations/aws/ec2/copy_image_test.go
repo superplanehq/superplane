@@ -161,12 +161,12 @@ func Test__CopyImage__Execute(t *testing.T) {
 	assert.Contains(t, requestBody, "Name=my-copy")
 }
 
-func Test__CopyImage__HandleAction(t *testing.T) {
+func Test__CopyImage__HandleHook(t *testing.T) {
 	component := &CopyImage{}
 
 	t.Run("rule unavailable -> reschedules check", func(t *testing.T) {
 		requests := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:     "checkRuleAvailability",
 			Logger:   logrus.NewEntry(logrus.New()),
 			Requests: requests,
@@ -199,7 +199,7 @@ func Test__CopyImage__HandleAction(t *testing.T) {
 				},
 			},
 		}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        "checkRuleAvailability",
 			Logger:      logrus.NewEntry(logrus.New()),
 			Requests:    &contexts.RequestContext{},

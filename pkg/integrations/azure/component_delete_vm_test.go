@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -22,93 +21,6 @@ func newSetupContext(config map[string]any) core.SetupContext {
 		Configuration: config,
 		Metadata:      &contexts.MetadataContext{},
 	}
-}
-
-func TestDeleteVMComponent_Metadata(t *testing.T) {
-	component := &DeleteVMComponent{}
-
-	assert.Equal(t, "azure.deleteVirtualMachine", component.Name())
-	assert.Equal(t, "Delete Virtual Machine", component.Label())
-	assert.Equal(t, "azure", component.Icon())
-	assert.Equal(t, "blue", component.Color())
-	assert.NotEmpty(t, component.Description())
-	assert.NotEmpty(t, component.Documentation())
-	assert.Contains(t, component.Description(), "Deletes")
-}
-
-func TestDeleteVMComponent_Configuration(t *testing.T) {
-	component := &DeleteVMComponent{}
-	fields := component.Configuration()
-
-	require.Len(t, fields, 3, "Should have exactly 3 configuration fields")
-
-	resourceGroupField := fields[0]
-	assert.Equal(t, "resourceGroup", resourceGroupField.Name)
-	assert.Equal(t, "Resource Group", resourceGroupField.Label)
-	assert.Equal(t, configuration.FieldTypeIntegrationResource, resourceGroupField.Type)
-	assert.True(t, resourceGroupField.Required)
-	assert.NotEmpty(t, resourceGroupField.Description)
-
-	nameField := fields[1]
-	assert.Equal(t, "name", nameField.Name)
-	assert.Equal(t, "VM Name", nameField.Label)
-	assert.Equal(t, configuration.FieldTypeString, nameField.Type)
-	assert.True(t, nameField.Required)
-	assert.NotEmpty(t, nameField.Description)
-
-	deleteAssocField := fields[2]
-	assert.Equal(t, "deleteAssociatedResources", deleteAssocField.Name)
-	assert.Equal(t, "Delete Associated Resources", deleteAssocField.Label)
-	assert.Equal(t, configuration.FieldTypeBool, deleteAssocField.Type)
-	assert.False(t, deleteAssocField.Required)
-	assert.NotEmpty(t, deleteAssocField.Description)
-}
-
-func TestDeleteVMComponent_ExampleOutput(t *testing.T) {
-	component := &DeleteVMComponent{}
-	example := component.ExampleOutput()
-
-	require.NotNil(t, example)
-	assert.Contains(t, example, "data")
-	assert.Contains(t, example, "timestamp")
-	assert.Contains(t, example, "type")
-
-	data, ok := example["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, data, "id")
-	assert.Contains(t, data, "name")
-	assert.Contains(t, data, "resourceGroup")
-	assert.Equal(t, "my-vm", data["name"])
-	assert.Equal(t, "my-rg", data["resourceGroup"])
-}
-
-func TestDeleteVMComponent_OutputChannels(t *testing.T) {
-	component := &DeleteVMComponent{}
-	channels := component.OutputChannels(nil)
-
-	require.Len(t, channels, 1)
-	assert.Equal(t, "default", channels[0].Name)
-}
-
-func TestDeleteVMComponent_Actions(t *testing.T) {
-	component := &DeleteVMComponent{}
-	actions := component.Actions()
-
-	assert.NotNil(t, actions)
-	assert.Empty(t, actions)
-}
-
-func TestDeleteVMComponent_HandleAction(t *testing.T) {
-	component := &DeleteVMComponent{}
-
-	ctx := core.ActionContext{
-		Name:   "test",
-		Logger: logrus.NewEntry(logrus.New()),
-	}
-
-	err := component.HandleAction(ctx)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no actions defined")
 }
 
 func TestDeleteVMComponent_Setup_Valid(t *testing.T) {

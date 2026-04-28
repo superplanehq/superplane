@@ -279,17 +279,16 @@ func (t *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnPipelineCompleted) Actions() []core.Action {
-	return []core.Action{
+func (t *OnPipelineCompleted) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           OnPipelineCompletedPollAction,
-			Description:    "Poll Harness executions as fallback for webhook delivery",
-			UserAccessible: false,
+			Name: OnPipelineCompletedPollAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (t *OnPipelineCompleted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnPipelineCompleted) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case OnPipelineCompletedPollAction:
 		return nil, t.poll(ctx)
@@ -370,7 +369,7 @@ func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 	return http.StatusOK, nil, nil
 }
 
-func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
+func (t *OnPipelineCompleted) poll(ctx core.TriggerHookContext) error {
 	config, err := decodeOnPipelineCompletedConfiguration(ctx.Configuration)
 	if err != nil {
 		return err
@@ -506,7 +505,7 @@ func (t *OnPipelineCompleted) collectExecutionsSinceCheckpoint(
 }
 
 func (t *OnPipelineCompleted) processPolledExecution(
-	ctx core.TriggerActionContext,
+	ctx core.TriggerHookContext,
 	config OnPipelineCompletedConfiguration,
 	execution ExecutionSummary,
 ) error {

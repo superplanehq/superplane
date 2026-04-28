@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
   canvasesDescribeCanvasVersion,
-  canvasesInvokeNodeTriggerAction,
+  canvasesInvokeNodeTriggerHook,
   canvasesUpdateCanvasVersion,
   type CanvasesCanvas,
   type CanvasesCanvasVersion,
@@ -84,9 +84,9 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
     setIsSubmitting(true);
     setSuccess(false);
     try {
-      const invokeResponse = await canvasesInvokeNodeTriggerAction(
+      const invokeResponse = await canvasesInvokeNodeTriggerHook(
         withOrganizationHeader({
-          path: { canvasId, nodeId, actionName: "setSecret" },
+          path: { canvasId, nodeId, hookName: "setSecret" },
           body: { parameters: { webhookSigningSecret: secret } },
         }),
       );

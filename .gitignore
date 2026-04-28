@@ -18,6 +18,7 @@ CLAUDE.local.md
 .idea/
 .agents/
 .worktrees/
+coverage-go.out
 
 # Generated protobuf and OpenAPI artifacts
 /pkg/protos/

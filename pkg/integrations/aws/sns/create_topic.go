@@ -118,14 +118,6 @@ func (c *CreateTopic) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *CreateTopic) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateTopic) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -135,5 +127,13 @@ func (c *CreateTopic) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *CreateTopic) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateTopic) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateTopic) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

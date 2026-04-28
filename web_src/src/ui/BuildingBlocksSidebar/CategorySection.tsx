@@ -1,9 +1,11 @@
+import type { OrganizationsIntegration } from "@/api-client";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
+import { useRef, useState } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
+import { filterBlocksInCategory, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const TYPE_HOVER_BG: Record<string, string> = {
@@ -19,22 +21,55 @@ const TYPE_BADGE_COLOR: Record<string, string> = {
 const TYPE_LABEL: Record<string, string> = {
   trigger: "Trigger",
   component: "Action",
-  blueprint: "Blueprint",
 };
 
 function resolveIconSlug(block: BuildingBlock): string {
-  if (block.type === "blueprint") return "component";
   const firstPart = block.name?.split(".")[0];
   if (firstPart === "smtp") return "mail";
   return block.icon || "zap";
 }
 
+function setupDragPreview(
+  e: React.DragEvent,
+  dragPreviewRef: React.RefObject<HTMLDivElement | null>,
+  canvasZoom: number,
+) {
+  const previewElement = dragPreviewRef.current?.firstChild as HTMLElement;
+  if (!previewElement) return;
+
+  const clone = previewElement.cloneNode(true) as HTMLElement;
+  const container = document.createElement("div");
+  container.style.cssText = `position: absolute; top: -10000px; left: -10000px; pointer-events: none;`;
+  clone.style.transform = `scale(${canvasZoom})`;
+  clone.style.transformOrigin = "top left";
+  clone.style.opacity = "0.85";
+  container.appendChild(clone);
+  document.body.appendChild(container);
+
+  const rect = previewElement.getBoundingClientRect();
+  e.dataTransfer.setDragImage(container, (rect.width / 2) * canvasZoom, 30 * canvasZoom);
+  setTimeout(() => {
+    if (document.body.contains(container)) document.body.removeChild(container);
+  }, 0);
+}
+
 interface BlockItemProps {
   block: BuildingBlock;
+  canvasZoom: number;
+  isDraggingRef: React.RefObject<boolean>;
+  setHoveredBlock: (block: BuildingBlock | null) => void;
+  dragPreviewRef: React.RefObject<HTMLDivElement | null>;
   onBlockClick?: (block: BuildingBlock) => void;
 }
 
-function BlockItem({ block, onBlockClick }: BlockItemProps) {
+function BlockItem({
+  block,
+  canvasZoom,
+  isDraggingRef,
+  setHoveredBlock,
+  dragPreviewRef,
+  onBlockClick,
+}: BlockItemProps) {
   const appIconSrc = getHeaderIconSrc(block.name);
   const IconComponent = resolveIcon(resolveIconSlug(block));
   const hoverBg = TYPE_HOVER_BG[block.type] || TYPE_HOVER_BG.component;
@@ -43,10 +78,27 @@ function BlockItem({ block, onBlockClick }: BlockItemProps) {
   return (
     <Item
       data-testid={toTestId(`building-block-${block.name}`)}
+      draggable
       onClick={() => {
         if (onBlockClick) onBlockClick(block);
       }}
-      className={`ml-3 px-2 py-1 flex items-center gap-2 ${hoverBg}`}
+      onMouseEnter={() => {
+        setHoveredBlock(block);
+      }}
+      onMouseLeave={() => {
+        setHoveredBlock(null);
+      }}
+      onDragStart={(e) => {
+        isDraggingRef.current = true;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
+        setupDragPreview(e, dragPreviewRef, canvasZoom);
+      }}
+      onDragEnd={() => {
+        isDraggingRef.current = false;
+        setHoveredBlock(null);
+      }}
+      className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${hoverBg}`}
       size="sm"
     >
       <ItemMedia>
@@ -69,42 +121,84 @@ function BlockItem({ block, onBlockClick }: BlockItemProps) {
           </span>
         </div>
       </ItemContent>
+
+      <GripVerticalIcon className="text-gray-500 hover:text-gray-800" size={14} />
     </Item>
   );
 }
 
 export interface CategorySectionProps {
   category: BuildingBlockCategory;
+  integrations?: OrganizationsIntegration[];
+  showIntegrationSetupStatus?: boolean;
+  canvasZoom?: number;
   searchTerm?: string;
+  typeFilter?: TypeFilter;
+  isDraggingRef?: React.RefObject<boolean>;
+  setHoveredBlock?: (block: BuildingBlock | null) => void;
+  dragPreviewRef?: React.RefObject<HTMLDivElement | null>;
   onBlockClick?: (block: BuildingBlock) => void;
 }
 
-export function CategorySection({ category, searchTerm = "", onBlockClick }: CategorySectionProps) {
-  const query = searchTerm.trim().toLowerCase();
-  const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
+export function CategorySection({
+  category,
+  integrations = [],
+  showIntegrationSetupStatus = false,
+  canvasZoom = 1,
+  searchTerm = "",
+  typeFilter = "all",
+  isDraggingRef,
+  setHoveredBlock,
+  dragPreviewRef,
+  onBlockClick,
+}: CategorySectionProps) {
+  const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fallbackDraggingRef = useRef(false);
+  const fallbackDragPreviewRef = useRef<HTMLDivElement>(null);
 
-  const baseBlocks = categoryMatches
-    ? category.blocks || []
-    : (category.blocks || []).filter((block) => {
-        const name = (block.name || "").toLowerCase();
-        const label = (block.label || "").toLowerCase();
-        return name.includes(query) || label.includes(query);
-      });
-
-  const allBlocks = baseBlocks;
+  const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
   const isCoreCategory = category.name === "Core";
-  const hasSearchTerm = query.length > 0;
+  const hasSearchTerm = searchTerm.trim().length > 0;
   const [isManuallyOpen, setIsManuallyOpen] = useState<boolean | null>(null);
   const isOpen = hasSearchTerm || (isManuallyOpen ?? isCoreCategory);
 
-  if (allBlocks.length === 0) {
+  if (sortedBlocks.length === 0) {
     return null;
   }
 
-  const firstBlock = allBlocks[0];
+  const firstBlock = sortedBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
+
+  const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
+  const matchingIntegrationStates = normalizedIntegrationName
+    ? integrations
+        .filter(
+          (integration) => normalizeIntegrationName(integration.spec?.integrationName) === normalizedIntegrationName,
+        )
+        .map((integration) => integration.status?.state)
+    : [];
+
+  const integrationState =
+    category.name === "Core" || category.name === "Memory"
+      ? "ready"
+      : matchingIntegrationStates.includes("ready")
+        ? "ready"
+        : matchingIntegrationStates.includes("error")
+          ? "error"
+          : matchingIntegrationStates.includes("pending")
+            ? "pending"
+            : undefined;
+
+  const integrationStatusColorClass =
+    integrationState === "ready"
+      ? "text-green-500"
+      : integrationState === "error"
+        ? "text-red-500"
+        : integrationState === "pending"
+          ? "text-amber-600"
+          : "text-gray-500";
 
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
@@ -117,28 +211,6 @@ export function CategorySection({ category, searchTerm = "", onBlockClick }: Cat
     // Integration category - will use img tag
   } else {
     CategoryIcon = resolveIcon("puzzle");
-  }
-
-  let sortedBlocks: BuildingBlock[] = [];
-  if (isOpen) {
-    const typeOrder: Record<"trigger" | "component" | "blueprint", number> = {
-      trigger: 0,
-      component: 1,
-      blueprint: 2,
-    };
-
-    sortedBlocks = [...allBlocks].sort((a, b) => {
-      const aType = a.type;
-      const bType = b.type;
-      const typeComparison = typeOrder[aType] - typeOrder[bType];
-      if (typeComparison !== 0) {
-        return typeComparison;
-      }
-
-      const aName = (a.label || a.name || "").toLowerCase();
-      const bName = (b.label || b.name || "").toLowerCase();
-      return aName.localeCompare(bName);
-    });
   }
 
   return (
@@ -163,12 +235,25 @@ export function CategorySection({ category, searchTerm = "", onBlockClick }: Cat
           ) : null}
           <span className="text-[13px] text-gray-800 font-medium pl-1">{category.name}</span>
         </span>
+        {showIntegrationSetupStatus && (
+          <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">
+            <Plug size={14} className={integrationStatusColorClass} />
+          </span>
+        )}
       </summary>
 
       {isOpen && (
         <ItemGroup>
           {sortedBlocks.map((block) => (
-            <BlockItem key={`${block.type}-${block.name}`} block={block} onBlockClick={onBlockClick} />
+            <BlockItem
+              key={`${block.type}-${block.name}`}
+              block={block}
+              canvasZoom={canvasZoom}
+              isDraggingRef={isDraggingRef ?? fallbackDraggingRef}
+              setHoveredBlock={setHoveredBlock ?? (() => {})}
+              dragPreviewRef={dragPreviewRef ?? fallbackDragPreviewRef}
+              onBlockClick={onBlockClick}
+            />
           ))}
         </ItemGroup>
       )}

@@ -137,18 +137,18 @@ func (c *CreateEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return http.StatusOK, nil, nil
 }
 
-func (c *CreateEvent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateEvent) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateEvent) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *CreateEvent) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateEvent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateEvent) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
