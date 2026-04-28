@@ -128,6 +128,81 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
+func Test__EventRouter_ProcessExecutionEvent_TargetNodeErrorCreatesFailedExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	triggerNodeID := "trigger-1"
+	sourceNodeID := "component-1"
+	brokenNodeID := "component-2"
+	downstreamNodeID := "component-3"
+	stateReason := "field 'timeoutSeconds': must be a number"
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNodeID, Type: models.NodeTypeTrigger},
+			{NodeID: sourceNodeID, Type: models.NodeTypeComponent},
+			{
+				NodeID:      brokenNodeID,
+				Type:        models.NodeTypeComponent,
+				State:       models.CanvasNodeStateError,
+				StateReason: &stateReason,
+			},
+			{NodeID: downstreamNodeID, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: triggerNodeID, TargetID: sourceNodeID, Channel: "default"},
+			{SourceID: sourceNodeID, TargetID: brokenNodeID, Channel: "default"},
+			{SourceID: brokenNodeID, TargetID: downstreamNodeID, Channel: "failed"},
+		},
+	)
+
+	triggerEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNodeID, "default", nil)
+	sourceExecution := support.CreateCanvasNodeExecution(t, canvas.ID, sourceNodeID, triggerEvent.ID, triggerEvent.ID, nil)
+	_, err := sourceExecution.Pass(map[string][]any{"default": {map[string]any{"ok": true}}})
+	require.NoError(t, err)
+
+	events, err := models.ListCanvasEvents(canvas.ID, sourceNodeID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	sourceOutputEvent := events[0]
+
+	err = router.LockAndProcessEvent(logger, sourceOutputEvent)
+	require.NoError(t, err)
+
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, brokenNodeID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, queueItems, 0)
+
+	executions, err := models.ListNodeExecutions(canvas.ID, brokenNodeID, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, executions[0].State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, executions[0].Result)
+	assert.Equal(t, stateReason, executions[0].ResultMessage)
+
+	failureEvents, err := models.ListCanvasEvents(canvas.ID, brokenNodeID, 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, filterEventsByChannel(failureEvents, "failed"), 1)
+	assert.Len(t, filterEventsByChannel(failureEvents, "failure"), 1)
+
+	failedEvents := filterEventsByChannel(failureEvents, "failed")
+	require.Len(t, failedEvents, 1)
+	err = router.LockAndProcessEvent(logger, failedEvents[0])
+	require.NoError(t, err)
+
+	downstreamQueueItems, err := models.ListNodeQueueItems(canvas.ID, downstreamNodeID, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, downstreamQueueItems, 1)
+	assert.Equal(t, failedEvents[0].ID, downstreamQueueItems[0].EventID)
+}
+
 func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 	router := NewEventRouter(amqpURL)

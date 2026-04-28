@@ -2,11 +2,13 @@ package workers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
@@ -26,6 +28,8 @@ type EventRouter struct {
 	rabbitMQURL string
 	consumer    *tackle.Consumer
 }
+
+var failedEventChannels = []string{"failed", "failure"}
 
 func NewEventRouter(rabbitMQURL string) *EventRouter {
 	return &EventRouter{
@@ -139,7 +143,8 @@ func (w *EventRouter) Consume(delivery tackle.Delivery) error {
 
 func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
 	var createdQueueItems []models.CanvasNodeQueueItem
-	var execution *models.CanvasNodeExecution
+	var createdExecutions []models.CanvasNodeExecution
+	var createdEvents []models.CanvasEvent
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		event, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
@@ -147,7 +152,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 			return nil
 		}
 
-		createdQueueItems, execution, err = w.processEvent(tx, logger, event)
+		createdQueueItems, createdExecutions, createdEvents, err = w.processEvent(tx, logger, event)
 		if err != nil {
 			return err
 		}
@@ -169,7 +174,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		}
 	}
 
-	if execution != nil {
+	for _, execution := range createdExecutions {
 		messages.NewCanvasExecutionMessage(
 			event.WorkflowID.String(),
 			execution.ID.String(),
@@ -177,36 +182,38 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		).Publish()
 	}
 
+	for _, createdEvent := range createdEvents {
+		messages.PublishCanvasEventCreatedMessage(&createdEvent)
+	}
+
 	return nil
 }
 
-func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, error) {
+func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, []models.CanvasNodeExecution, []models.CanvasEvent, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, canvas.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	if event.ExecutionID == nil {
-		queueItems, err := w.processRootEvent(tx, canvas, liveEdges, event)
-		return queueItems, nil, err
+		return w.processRootEvent(tx, canvas, liveEdges, event)
 	}
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	if execution.ParentExecutionID != nil {
 		return w.processChildExecutionEvent(tx, logger, canvas, execution, event)
 	}
 
-	queueItems, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
-	return queueItems, execution, err
+	return w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
 }
 
 func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []models.Edge {
@@ -220,20 +227,29 @@ func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []m
 	return matches
 }
 
-func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
+func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, []models.CanvasNodeExecution, []models.CanvasEvent, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
 
 	outgoingEdges := findOutgoingEdges(edges, event.NodeID, event.Channel)
 	var queueItems []models.CanvasNodeQueueItem
+	var createdExecutions []models.CanvasNodeExecution
+	var createdEvents []models.CanvasEvent
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
+			failedExecution, failureEvents, err := w.createFailedExecutionForErrorNode(tx, targetNode, event.ID, event.ID, nil)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			createdExecutions = append(createdExecutions, *failedExecution)
+			createdEvents = append(createdEvents, failureEvents...)
 			continue
 		}
 
@@ -246,7 +262,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		}
 
 		if err := tx.Create(&queueItem).Error; err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		queueItems = append(queueItems, queueItem)
@@ -254,10 +270,10 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 
 	err := event.RoutedInTransaction(tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
-	return queueItems, nil
+	return queueItems, createdExecutions, createdEvents, nil
 }
 
 func (w *EventRouter) processExecutionEvent(
@@ -267,21 +283,36 @@ func (w *EventRouter) processExecutionEvent(
 	edges []models.Edge,
 	execution *models.CanvasNodeExecution,
 	event *models.CanvasEvent,
-) ([]models.CanvasNodeQueueItem, error) {
+) ([]models.CanvasNodeQueueItem, []models.CanvasNodeExecution, []models.CanvasEvent, error) {
 	now := time.Now()
 
 	logger = logging.WithExecution(logger, execution, nil)
 	w.logger.Infof("Processing event")
 
 	var createdQueueItems []models.CanvasNodeQueueItem
+	var createdExecutions []models.CanvasNodeExecution
+	var createdEvents []models.CanvasEvent
 	outgoingEdges := findOutgoingEdges(edges, execution.NodeID, event.Channel)
 	for _, edge := range outgoingEdges {
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, edge.TargetID)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
+			failedExecution, failureEvents, err := w.createFailedExecutionForErrorNode(
+				tx,
+				targetNode,
+				execution.RootEventID,
+				event.ID,
+				&execution.ID,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			createdExecutions = append(createdExecutions, *failedExecution)
+			createdEvents = append(createdEvents, failureEvents...)
 			continue
 		}
 
@@ -294,26 +325,30 @@ func (w *EventRouter) processExecutionEvent(
 		}
 
 		if err := tx.Create(&queueItem).Error; err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		createdQueueItems = append(createdQueueItems, queueItem)
 	}
 
-	return createdQueueItems, event.RoutedInTransaction(tx)
+	if err := event.RoutedInTransaction(tx); err != nil {
+		return nil, nil, nil, err
+	}
+
+	return createdQueueItems, createdExecutions, createdEvents, nil
 }
 
-func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry, canvas *models.Canvas, execution *models.CanvasNodeExecution, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, error) {
+func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry, canvas *models.Canvas, execution *models.CanvasNodeExecution, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, []models.CanvasNodeExecution, []models.CanvasEvent, error) {
 	parentExecution, err := models.FindNodeExecutionInTransaction(tx, canvas.ID, *execution.ParentExecutionID)
 	if err != nil {
 		logger.Errorf("Error finding parent execution: %v", err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	parentNode, err := models.FindCanvasNode(tx, canvas.ID, parentExecution.NodeID)
 	if err != nil {
 		logger.Errorf("Error finding parent node: %v", err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	logger = logging.WithExecution(logger, execution, parentExecution)
@@ -323,13 +358,15 @@ func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry,
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
 	if err != nil {
 		logger.Errorf("Error finding blueprint: %v", err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	childNodeID := execution.NodeID[len(parentNode.NodeID)+1:]
 	edges := blueprint.FindEdges(childNodeID, event.Channel)
 
 	var createdQueueItems []models.CanvasNodeQueueItem
+	var createdExecutions []models.CanvasNodeExecution
+	var createdEvents []models.CanvasEvent
 	//
 	// If there are no edges, it means the child node is a terminal node.
 	// We should update the parent execution, if needed.
@@ -342,11 +379,11 @@ func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry,
 		parentExecution, err := models.LockCanvasNodeExecution(tx, *execution.ParentExecutionID)
 		if err != nil {
 			logger.Info("Child node is a terminal node, but parent is locked - skipping")
-			return createdQueueItems, nil, nil
+			return createdQueueItems, nil, nil, nil
 		}
 
 		logger.Info("Child node is a terminal node - checking parent execution")
-		return createdQueueItems, parentExecution, w.completeParentExecutionIfNeeded(
+		err = w.completeParentExecutionIfNeeded(
 			tx,
 			logger,
 			parentNode,
@@ -355,6 +392,10 @@ func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry,
 			event,
 			blueprint,
 		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return createdQueueItems, []models.CanvasNodeExecution{*parentExecution}, nil, nil
 	}
 
 	logger.Infof("Child node %s is not a terminal node - creating next executions: %v", childNodeID, edges)
@@ -370,10 +411,23 @@ func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry,
 		targetNode, err := models.FindCanvasNode(tx, canvas.ID, targetNodeID)
 		if err != nil {
 			logger.Errorf("Error finding target node: %v", err)
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
+			failedExecution, failureEvents, err := w.createFailedExecutionForErrorNode(
+				tx,
+				targetNode,
+				execution.RootEventID,
+				event.ID,
+				&execution.ID,
+			)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			createdExecutions = append(createdExecutions, *failedExecution)
+			createdEvents = append(createdEvents, failureEvents...)
 			continue
 		}
 
@@ -387,13 +441,17 @@ func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry,
 
 		if err := tx.Create(&queueItem).Error; err != nil {
 			logger.Errorf("Error creating queue item: %v", err)
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		createdQueueItems = append(createdQueueItems, queueItem)
 	}
 
-	return createdQueueItems, nil, event.RoutedInTransaction(tx)
+	if err := event.RoutedInTransaction(tx); err != nil {
+		return nil, nil, nil, err
+	}
+
+	return createdQueueItems, createdExecutions, createdEvents, nil
 }
 
 func (w *EventRouter) completeParentExecutionIfNeeded(
@@ -479,6 +537,73 @@ func (w *EventRouter) completeParentExecutionIfNeeded(
 
 	logger.Infof("Parent execution completed")
 	return event.RoutedInTransaction(tx)
+}
+
+func (w *EventRouter) createFailedExecutionForErrorNode(
+	tx *gorm.DB,
+	targetNode *models.CanvasNode,
+	rootEventID uuid.UUID,
+	eventID uuid.UUID,
+	previousExecutionID *uuid.UUID,
+) (*models.CanvasNodeExecution, []models.CanvasEvent, error) {
+	now := time.Now()
+	resultMessage := "node is in error state"
+	if targetNode.StateReason != nil && *targetNode.StateReason != "" {
+		resultMessage = *targetNode.StateReason
+	}
+
+	failedExecution := models.CanvasNodeExecution{
+		WorkflowID:          targetNode.WorkflowID,
+		NodeID:              targetNode.NodeID,
+		RootEventID:         rootEventID,
+		EventID:             eventID,
+		PreviousExecutionID: previousExecutionID,
+		State:               models.CanvasNodeExecutionStateFinished,
+		Configuration:       targetNode.Configuration,
+		Result:              models.CanvasNodeExecutionResultFailed,
+		ResultReason:        models.CanvasNodeExecutionResultReasonError,
+		ResultMessage:       resultMessage,
+		CreatedAt:           &now,
+		UpdatedAt:           &now,
+	}
+
+	if previousExecutionID != nil {
+		prevExecution, err := models.FindNodeExecutionInTransaction(tx, targetNode.WorkflowID, *previousExecutionID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		failedExecution.ParentExecutionID = prevExecution.ParentExecutionID
+	}
+
+	if err := tx.Create(&failedExecution).Error; err != nil {
+		return nil, nil, err
+	}
+
+	payload := map[string]any{"error": resultMessage}
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	events := make([]models.CanvasEvent, 0, len(failedEventChannels))
+	for _, channel := range failedEventChannels {
+		events = append(events, models.CanvasEvent{
+			WorkflowID:  targetNode.WorkflowID,
+			NodeID:      targetNode.NodeID,
+			Channel:     channel,
+			Data:        datatypes.NewJSONType(json.RawMessage(payloadJSON)),
+			ExecutionID: &failedExecution.ID,
+			State:       models.CanvasEventStatePending,
+			CreatedAt:   &now,
+		})
+	}
+
+	if err := tx.Create(&events).Error; err != nil {
+		return nil, nil, err
+	}
+
+	return &failedExecution, events, nil
 }
 
 func (w *EventRouter) findChildrenForNode(allChildren []models.CanvasNodeExecution, nodeID string) []models.CanvasNodeExecution {
