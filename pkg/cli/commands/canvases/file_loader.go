@@ -41,4 +41,3 @@ func loadCanvasForCreateFromFile(filePath string) (openapi_client.CanvasesCanvas
 
 	return models.CanvasFromCanvas(*resource), resource.AutoLayout, nil
 }
-
