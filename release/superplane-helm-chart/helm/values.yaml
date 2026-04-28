@@ -172,6 +172,8 @@ database:
   username: postgres
   password: postgres
   ssl: false
+  statementTimeoutMs: 60000
+  idleInTransactionSessionTimeoutMs: 30000
   local:
     enabled: true
     version: 14.15-alpine3.21
