@@ -612,7 +612,7 @@ phases:
       - |
         cat > /tmp/superplane-run.sh <<'SUPERPLANE_SCRIPT'
 %s
-SUPERPLANE_SCRIPT
+        SUPERPLANE_SCRIPT
         chmod +x /tmp/superplane-run.sh
         /tmp/superplane-run.sh
 `, indent(script, 8))

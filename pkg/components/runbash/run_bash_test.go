@@ -11,7 +11,24 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	"gopkg.in/yaml.v3"
 )
+
+func TestBuildspecValidYAML(t *testing.T) {
+	spec := Spec{
+		Commands: "echo hello\necho world",
+		Source: &SourceSpec{
+			Repository: "https://github.com/example/app.git",
+			Ref:        "main",
+			Depth:      1,
+		},
+		WorkingDirectory: "subdir",
+	}
+	out := buildspec(spec)
+	var parsed any
+	err := yaml.Unmarshal([]byte(out), &parsed)
+	require.NoError(t, err, "buildspec must be valid YAML (CodeBuild parses it before running commands)")
+}
 
 func TestRunBashSetup(t *testing.T) {
 	component := &RunBash{}
