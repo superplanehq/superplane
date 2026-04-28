@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -114,5 +115,42 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		assert.Equal(t, "slack.message.sent", payload["type"])
 		assert.Equal(t, expectedMessage, payload["data"])
 		assert.NotNil(t, payload["timestamp"])
+	})
+
+	t.Run("transient 503 -> retried and succeeds", func(t *testing.T) {
+		withFastRetries(t, 3)
+
+		var attempts int32
+		var sentBodies []string
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			if req.URL.String() != "https://slack.com/api/chat.postMessage" {
+				return jsonResponse(http.StatusNotFound, `{"ok": false}`), nil
+			}
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			sentBodies = append(sentBodies, string(body))
+			n := atomic.AddInt32(&attempts, 1)
+			if n < 3 {
+				return jsonResponse(http.StatusServiceUnavailable, `{"ok": false}`), nil
+			}
+			return jsonResponse(http.StatusOK, `{"ok": true, "message": {"text": "hi"}}`), nil
+		})
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"botToken": "token-123"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+			Configuration:  map[string]any{"channel": "C123", "text": "hi"},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, int32(3), atomic.LoadInt32(&attempts), "expected 3 attempts (2 retries)")
+		require.Len(t, sentBodies, 3, "request body must be replayable across retries")
+		assert.Equal(t, sentBodies[0], sentBodies[1])
+		assert.Equal(t, sentBodies[1], sentBodies[2])
 	})
 }

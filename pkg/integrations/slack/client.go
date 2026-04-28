@@ -2,14 +2,27 @@ package slack
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/httpx"
 )
+
+// slackHTTPClient is a package-level shared client. Transport is
+// left nil so it falls back to http.DefaultTransport, which keeps
+// the existing test helper (withDefaultTransport) working.
+var slackHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
+// slackRetryConfig governs retry behavior for outbound Slack API
+// calls. Tests may override this via the package-internal helpers
+// in test_helpers_test.go.
+var slackRetryConfig = httpx.DefaultConfig()
 
 type Client struct {
 	BotToken string
@@ -147,7 +160,7 @@ func (c *Client) PostMessage(req ChatPostMessageRequest) (*ChatPostMessageRespon
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, "https://slack.com/api/chat.postMessage", bytes.NewReader(body))
+	responseBody, err := c.execRequest(http.MethodPost, "https://slack.com/api/chat.postMessage", body)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +180,21 @@ func (c *Client) PostMessage(req ChatPostMessageRequest) (*ChatPostMessageRespon
 	return &result, nil
 }
 
-func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequest(method, URL, body)
+// execRequest sends an authenticated request to the Slack API with
+// retries on transient failures (5xx / 429 / network errors). The
+// body argument is a marshaled payload; pass nil for GET requests.
+//
+// Callers do not currently have a context.Context to thread through
+// (Slack-side callers are component Setup/Execute/etc., which do
+// not expose one). Once the integration framework propagates ctx,
+// switch this to take it as an argument.
+func (c *Client) execRequest(method, URL string, body []byte) ([]byte, error) {
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, URL, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
@@ -176,8 +202,7 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.BotToken))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpx.Do(context.Background(), slackHTTPClient, req, slackRetryConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %v", err)
 	}

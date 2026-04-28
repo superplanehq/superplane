@@ -5,6 +5,9 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/superplanehq/superplane/pkg/integrations/httpx"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -19,6 +22,21 @@ func withDefaultTransport(t *testing.T, rt roundTripFunc) {
 	http.DefaultTransport = rt
 	t.Cleanup(func() {
 		http.DefaultTransport = original
+	})
+}
+
+// withFastRetries swaps slackRetryConfig to delays small enough
+// that retry tests stay sub-second. Restored on test cleanup.
+func withFastRetries(t *testing.T, attempts int) {
+	t.Helper()
+	original := slackRetryConfig
+	slackRetryConfig = httpx.Config{
+		MaxAttempts: attempts,
+		BaseDelay:   1 * time.Millisecond,
+		MaxDelay:    5 * time.Millisecond,
+	}
+	t.Cleanup(func() {
+		slackRetryConfig = original
 	})
 }
 
