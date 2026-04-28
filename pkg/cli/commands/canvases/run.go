@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -11,9 +12,9 @@ import (
 )
 
 type runCommand struct {
-	node        *string
-	template    *string
-	payloadJSON *string
+	node     *string
+	template *string
+	payload  *string
 }
 
 func (c *runCommand) Execute(ctx core.CommandContext) error {
@@ -37,9 +38,16 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("--template is required")
 	}
 
-	payloadOverride := ""
-	if c.payloadJSON != nil {
-		payloadOverride = strings.TrimSpace(*c.payloadJSON)
+	params := map[string]any{"template": templateName}
+	if c.payload != nil {
+		raw := strings.TrimSpace(*c.payload)
+		if raw != "" {
+			parsed, err := loadPayload(raw)
+			if err != nil {
+				return err
+			}
+			params["payload"] = parsed
+		}
 	}
 
 	canvasID, err := findCanvasID(ctx, ctx.API, ctx.Args[0])
@@ -58,15 +66,6 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 	_, err = findStartTriggerNode(*describeResp.Canvas, nodeID)
 	if err != nil {
 		return err
-	}
-
-	params := map[string]any{"template": templateName}
-	if payloadOverride != "" {
-		parsed := map[string]any{}
-		if err := json.Unmarshal([]byte(payloadOverride), &parsed); err != nil {
-			return fmt.Errorf("invalid --payload-json: %w", err)
-		}
-		params["payload"] = parsed
 	}
 
 	body := openapi_client.NewCanvasesInvokeNodeTriggerHookBody()
@@ -90,6 +89,31 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 	})
 }
 
+// loadPayload accepts either an inline JSON object/array or a path to a file
+// containing JSON. Inline JSON is detected by a leading '{' or '['; anything
+// else is treated as a file path.
+func loadPayload(raw string) (map[string]any, error) {
+	trimmed := strings.TrimLeftFunc(raw, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' })
+	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+		parsed := map[string]any{}
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return nil, fmt.Errorf("invalid --payload (inline JSON): %w", err)
+		}
+		return parsed, nil
+	}
+
+	data, err := os.ReadFile(raw)
+	if err != nil {
+		return nil, fmt.Errorf("--payload: cannot read file %q: %w", raw, err)
+	}
+
+	parsed := map[string]any{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil, fmt.Errorf("--payload: %s does not contain a valid JSON object: %w", raw, err)
+	}
+	return parsed, nil
+}
+
 func findStartTriggerNode(
 	canvas openapi_client.CanvasesCanvas,
 	nodeID string,
@@ -107,11 +131,11 @@ func findStartTriggerNode(
 			)
 		}
 
-		trigger := node.GetTrigger()
-		if trigger.GetName() != "start" {
+		triggerName := node.GetComponent()
+		if triggerName != "start" {
 			return openapi_client.SuperplaneComponentsNode{}, fmt.Errorf(
 				"node %q is a %q trigger, not a Manual Run (start) trigger",
-				nodeID, trigger.GetName(),
+				nodeID, triggerName,
 			)
 		}
 

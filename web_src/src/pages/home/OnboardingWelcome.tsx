@@ -160,9 +160,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         for (let i = 0; i < 15; i++) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           try {
-            const execResp = await canvasesListEventExecutions(
-              withOrganizationHeader({ path: { canvasId, eventId } }),
-            );
+            const execResp = await canvasesListEventExecutions(withOrganizationHeader({ path: { canvasId, eventId } }));
             const httpDone = (execResp.data?.executions ?? []).some(
               (e) => e.nodeId === httpNode.id && e.state === "STATE_FINISHED",
             );
