@@ -28,6 +28,10 @@ func resolveCanvasForFileUpdate(ctx core.CommandContext, filePath string) (strin
 		return "", openapi_client.CanvasesCanvas{}, err
 	}
 
+	if resource.Metadata == nil {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata is required")
+	}
+
 	if len(ctx.Args) > 1 {
 		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one optional canvas name or id")
 	}
@@ -38,7 +42,7 @@ func resolveCanvasForFileUpdate(ctx core.CommandContext, filePath string) (strin
 	}
 
 	fileID := ""
-	if resource.Metadata != nil && resource.Metadata.Id != nil {
+	if resource.Metadata.Id != nil {
 		fileID = strings.TrimSpace(resource.Metadata.GetId())
 	}
 
@@ -84,9 +88,6 @@ func resolveCanvasForFileUpdate(ctx core.CommandContext, filePath string) (strin
 		}
 	}
 
-	if resource.Metadata == nil {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata is required")
-	}
 	resource.Metadata.SetId(canvasID)
 	canvas := models.CanvasFromCanvas(*resource)
 	return canvasID, canvas, nil

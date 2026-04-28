@@ -1,120 +1,12 @@
 package canvases
 
 import (
-	"context"
-	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
-
-func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {
-	if len(ctx.Args) > 1 {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one positional argument")
-	}
-
-	var canvasID string
-	var err error
-
-	if len(ctx.Args) == 1 {
-		canvasID, err = findCanvasID(ctx, ctx.API, ctx.Args[0])
-		if err != nil {
-			return "", openapi_client.CanvasesCanvas{}, err
-		}
-	} else {
-		if ctx.Config == nil {
-			return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("no canvas specified: pass a canvas name or id, or set an active canvas with `superplane canvases active`")
-		}
-		active := strings.TrimSpace(ctx.Config.GetActiveCanvas())
-		if active == "" {
-			return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("no canvas specified: pass a canvas name or id, or set an active canvas with `superplane canvases active`")
-		}
-		canvasID, err = findCanvasID(ctx, ctx.API, active)
-		if err != nil {
-			return "", openapi_client.CanvasesCanvas{}, err
-		}
-	}
-
-	canvas, err := describeCanvasByID(ctx, canvasID)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	return canvasID, canvas, nil
-}
-
-func describeCanvasByID(ctx core.CommandContext, canvasID string) (openapi_client.CanvasesCanvas, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
-	if err != nil {
-		return openapi_client.CanvasesCanvas{}, err
-	}
-	if response.Canvas == nil {
-		return openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas %q not found", canvasID)
-	}
-	return *response.Canvas, nil
-}
-
-type testConfigContext struct {
-	activeCanvas string
-}
-
-func (c *testConfigContext) GetActiveCanvas() string {
-	return c.activeCanvas
-}
-
-func (c *testConfigContext) SetActiveCanvas(canvasID string) error {
-	c.activeCanvas = canvasID
-	return nil
-}
-
-func TestLoadCanvasFromExistingUsesConfiguredActiveCanvas(t *testing.T) {
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"canvas-123","name":"active-canvas"}}]}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/canvas-123",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"canvas-123","name":"active-canvas"},"spec":{"nodes":[],"edges":[]}}}`))
-			},
-		},
-	)
-
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Config = &testConfigContext{activeCanvas: "active-canvas"}
-
-	canvasID, canvas, err := loadCanvasFromExisting(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "canvas-123", canvasID)
-	require.NotNil(t, canvas.Metadata)
-	require.Equal(t, "active-canvas", canvas.Metadata.GetName())
-
-	server.AssertCalls(t, []string{
-		http.MethodGet + " /api/v1/canvases",
-		http.MethodGet + " /api/v1/canvases/canvas-123",
-	})
-}
-
-func TestLoadCanvasFromExistingRejectsMultipleArgs(t *testing.T) {
-	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
-	ctx.Args = []string{"one", "two"}
-
-	_, _, err := loadCanvasFromExisting(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "update accepts at most one positional argument")
-}
 
 func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 	server := newAPITestServer(
@@ -202,16 +94,4 @@ func TestCanvasFromVersionCopiesSpec(t *testing.T) {
 	require.Len(t, canvas.Spec.GetNodes(), 1)
 	require.Len(t, canvas.Spec.GetEdges(), 1)
 	require.Equal(t, "first", canvas.Spec.GetNodes()[0].GetName())
-}
-
-func TestDescribeCanvasByIDReturnsErrorWhenCanvasMissing(t *testing.T) {
-	config := openapi_client.NewConfiguration()
-	client := openapi_client.NewAPIClient(config)
-	ctx := core.CommandContext{
-		Context: context.Background(),
-		API:     client,
-	}
-
-	_, err := describeCanvasByID(ctx, "canvas-123")
-	require.Error(t, err)
 }
