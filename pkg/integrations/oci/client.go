@@ -496,6 +496,230 @@ type VolumeAttachment struct {
 	Device         string `json:"device"`
 }
 
+// --- OCI Functions Management API ---
+// Functions management host: functions.<region>.oci.oraclecloud.com
+// Functions API version: 20181201
+
+const functionsAPIVersion = "20181201"
+
+func (c *Client) functionsHost() string {
+	return fmt.Sprintf("functions.%s.oci.oraclecloud.com", c.region)
+}
+
+// FunctionApplication represents an OCI Functions application.
+type FunctionApplication struct {
+	ID             string   `json:"id"`
+	DisplayName    string   `json:"displayName"`
+	CompartmentID  string   `json:"compartmentId"`
+	SubnetIDs      []string `json:"subnetIds"`
+	LifecycleState string   `json:"lifecycleState"`
+	TimeCreated    string   `json:"timeCreated"`
+}
+
+// FunctionResource represents an OCI Function within an application.
+type FunctionResource struct {
+	ID               string `json:"id"`
+	DisplayName      string `json:"displayName"`
+	ApplicationID    string `json:"applicationId"`
+	Image            string `json:"image"`
+	MemoryInMBs      int64  `json:"memoryInMBs"`
+	TimeoutInSeconds int    `json:"timeoutInSeconds"`
+	LifecycleState   string `json:"lifecycleState"`
+	InvokeEndpoint   string `json:"invokeEndpoint"`
+	TimeCreated      string `json:"timeCreated"`
+}
+
+// ListApplications lists Functions applications in a compartment.
+func (c *Client) ListApplications(compartmentID string) ([]FunctionApplication, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/applications?compartmentId=%s&limit=100",
+		host, functionsAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var items []FunctionApplication
+	if err := json.Unmarshal(respBody, &items); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal applications: %w", err)
+	}
+
+	return items, nil
+}
+
+// CreateApplication creates a new Functions application.
+func (c *Client) CreateApplication(compartmentID, displayName string, subnetIDs []string) (*FunctionApplication, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/applications", host, functionsAPIVersion)
+
+	body := map[string]any{
+		"compartmentId": compartmentID,
+		"displayName":   displayName,
+		"subnetIds":     subnetIDs,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create application request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var app FunctionApplication
+	if err := json.Unmarshal(respBody, &app); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal application response: %w", err)
+	}
+
+	return &app, nil
+}
+
+// DeleteApplication deletes a Functions application by OCID.
+func (c *Client) DeleteApplication(applicationID string) error {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/applications/%s", host, functionsAPIVersion, applicationID)
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// ListFunctions lists functions within an application.
+func (c *Client) ListFunctions(applicationID string) ([]FunctionResource, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions?applicationId=%s&limit=100",
+		host, functionsAPIVersion, neturl.QueryEscape(applicationID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var items []FunctionResource
+	if err := json.Unmarshal(respBody, &items); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal functions: %w", err)
+	}
+
+	return items, nil
+}
+
+// GetFunction retrieves a function by OCID.
+func (c *Client) GetFunction(functionID string) (*FunctionResource, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions/%s", host, functionsAPIVersion, functionID)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var fn FunctionResource
+	if err := json.Unmarshal(respBody, &fn); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal function: %w", err)
+	}
+
+	return &fn, nil
+}
+
+// CreateFunction deploys a new function within an application.
+func (c *Client) CreateFunction(applicationID, displayName, image string, memoryInMBs int64, timeoutInSeconds *int) (*FunctionResource, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions", host, functionsAPIVersion)
+
+	body := map[string]any{
+		"applicationId": applicationID,
+		"displayName":   displayName,
+		"image":         image,
+		"memoryInMBs":   memoryInMBs,
+	}
+	if timeoutInSeconds != nil {
+		body["timeoutInSeconds"] = *timeoutInSeconds
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create function request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var fn FunctionResource
+	if err := json.Unmarshal(respBody, &fn); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal function response: %w", err)
+	}
+
+	return &fn, nil
+}
+
+// DeleteFunction removes a function by OCID.
+func (c *Client) DeleteFunction(functionID string) error {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions/%s", host, functionsAPIVersion, functionID)
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// InvokeFunction calls the function's invoke endpoint with an optional payload.
+// The invokeEndpoint is retrieved from GetFunction and has the form
+// https://<hash>.call.<region>.oci.oraclecloud.com. The host for request
+// signing must match the URL's host.
+func (c *Client) InvokeFunction(functionID string, payload []byte) ([]byte, int, error) {
+	fn, err := c.GetFunction(functionID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get function invoke endpoint: %w", err)
+	}
+	if fn.InvokeEndpoint == "" {
+		return nil, 0, fmt.Errorf("function %s has no invoke endpoint", functionID)
+	}
+
+	invokeURL := fn.InvokeEndpoint
+	parsed, err := neturl.Parse(invokeURL)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse invoke endpoint: %w", err)
+	}
+	host := parsed.Host
+
+	var bodyReader io.Reader
+	if len(payload) > 0 {
+		bodyReader = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, invokeURL, bodyReader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build invoke request: %w", err)
+	}
+
+	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	req.Header.Set("Host", host)
+	if len(payload) > 0 {
+		hash := sha256.Sum256(payload)
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("Content-Length", fmt.Sprintf("%d", len(payload)))
+		req.Header.Set("x-content-sha256", base64.StdEncoding.EncodeToString(hash[:]))
+	}
+
+	if err := c.signRequest(req, len(payload) > 0); err != nil {
+		return nil, 0, fmt.Errorf("failed to sign invoke request: %w", err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invoke HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("failed to read invoke response body: %w", err)
+	}
+
+	return respBody, resp.StatusCode, nil
+}
+
 // AttachVolume attaches an existing block volume to a running instance using paravirtualised attachment.
 func (c *Client) AttachVolume(instanceID, volumeID string) (*VolumeAttachment, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
