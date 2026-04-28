@@ -1,6 +1,12 @@
 package core
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -135,4 +141,108 @@ func TestFormatGoogleRPCStatusErrorUsageLimitTakesPrecedence(t *testing.T) {
 	err := formatGoogleRPCStatusError(&status)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "usage limit reached")
+}
+
+func TestFormatCommandErrorPassesThroughNonAPIErrors(t *testing.T) {
+	plain := fmt.Errorf("boom")
+	require.Equal(t, plain, FormatCommandError(plain))
+	require.NoError(t, FormatCommandError(nil))
+}
+
+func TestFormatCommandErrorDecodesValidationBody(t *testing.T) {
+	body := map[string]any{
+		"code":    3,
+		"message": "canvas name is required",
+	}
+	err := runAPICallWithResponse(t, http.StatusBadRequest, "application/json", mustJSON(t, body))
+
+	require.Equal(t, "invalid request: canvas name is required", FormatCommandError(err).Error())
+}
+
+func TestFormatCommandErrorAppendsFieldViolations(t *testing.T) {
+	body := map[string]any{
+		"code":    3,
+		"message": "canvas is invalid",
+		"details": []any{
+			map[string]any{
+				"@type": "type.googleapis.com/google.rpc.BadRequest",
+				"fieldViolations": []any{
+					map[string]any{"field": "canvas.name", "description": "must not be empty"},
+					map[string]any{"field": "canvas.description", "description": "must be under 200 chars"},
+				},
+			},
+		},
+	}
+	err := runAPICallWithResponse(t, http.StatusBadRequest, "application/json", mustJSON(t, body))
+
+	formatted := FormatCommandError(err)
+	require.Error(t, formatted)
+	require.Equal(t,
+		"invalid request: canvas is invalid\n  - canvas.name: must not be empty\n  - canvas.description: must be under 200 chars",
+		formatted.Error(),
+	)
+}
+
+func TestFormatCommandErrorFallsBackToBodyForNonJSONResponse(t *testing.T) {
+	err := runAPICallWithResponse(t, http.StatusBadRequest, "text/plain", []byte("upstream validation failed: name must not be empty"))
+
+	formatted := FormatCommandError(err)
+	require.Error(t, formatted)
+	require.Contains(t, formatted.Error(), "upstream validation failed: name must not be empty")
+}
+
+func TestFormatCommandErrorHandlesEmptyBody(t *testing.T) {
+	err := runAPICallWithResponse(t, http.StatusBadRequest, "", nil)
+
+	formatted := FormatCommandError(err)
+	require.Error(t, formatted)
+	require.Contains(t, formatted.Error(), "400 Bad Request")
+}
+
+func TestFormatCommandErrorHandlesZeroCodeBody(t *testing.T) {
+	body := map[string]any{
+		"message": "something broke",
+	}
+	err := runAPICallWithResponse(t, http.StatusBadRequest, "application/json", mustJSON(t, body))
+
+	require.Equal(t, "something broke", FormatCommandError(err).Error())
+}
+
+func TestFormatCommandErrorTruncatesLargeBodies(t *testing.T) {
+	big := strings.Repeat("x", maxErrorBodyBytes+500)
+	err := runAPICallWithResponse(t, http.StatusBadRequest, "text/plain", []byte(big))
+
+	formatted := FormatCommandError(err).Error()
+	require.Contains(t, formatted, "... [truncated]")
+	require.Less(t, len(formatted), maxErrorBodyBytes+200)
+}
+
+func runAPICallWithResponse(t *testing.T, statusCode int, contentType string, body []byte) error {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if contentType != "" {
+			w.Header().Set("Content-Type", contentType)
+		}
+		w.WriteHeader(statusCode)
+		if len(body) > 0 {
+			_, _ = w.Write(body)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := openapi_client.NewConfiguration()
+	cfg.Servers = openapi_client.ServerConfigurations{{URL: server.URL}}
+	client := openapi_client.NewAPIClient(cfg)
+
+	_, _, err := client.CanvasAPI.CanvasesDescribeCanvas(context.Background(), "canvas-id").Execute()
+	require.Error(t, err)
+	return err
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return b
 }

@@ -218,20 +218,20 @@ func (c *CreateServer) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateServerPollInterval)
 }
 
-func (c *CreateServer) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *CreateServer) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *CreateServer) HandleAction(ctx core.ActionContext) error {
+func (c *CreateServer) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *CreateServer) poll(ctx core.ActionContext) error {
+func (c *CreateServer) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

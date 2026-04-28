@@ -328,7 +328,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                             onChange={(e) => setEditingValue(e.target.value)}
                             placeholder="Value"
                             rows={8}
-                            className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
+                            className="font-mono text-sm resize-y bg-white dark:bg-gray-900 ph-no-capture"
                             autoFocus
                             data-testid="secret-detail-edit-value"
                           />
@@ -403,7 +403,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                       onChange={(e) => setNewValue(e.target.value)}
                       placeholder="Value"
                       rows={8}
-                      className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
+                      className="font-mono text-sm resize-y bg-white dark:bg-gray-900 ph-no-capture"
                       data-testid="secret-detail-add-value"
                     />
                     <div className="flex gap-2 mt-2">

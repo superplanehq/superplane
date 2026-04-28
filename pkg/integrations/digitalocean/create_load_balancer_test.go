@@ -462,7 +462,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 	})
 }
 
-func Test__CreateLoadBalancer__HandleAction(t *testing.T) {
+func Test__CreateLoadBalancer__HandleHook(t *testing.T) {
 	component := &CreateLoadBalancer{}
 
 	t.Run("poll: status new -> reschedules poll", func(t *testing.T) {
@@ -488,7 +488,7 @@ func Test__CreateLoadBalancer__HandleAction(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{"lbID": "4de7ac8b-495b-4884-9a69-1050c6793cd6"},
@@ -529,7 +529,7 @@ func Test__CreateLoadBalancer__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{"lbID": "4de7ac8b-495b-4884-9a69-1050c6793cd6"},
@@ -569,7 +569,7 @@ func Test__CreateLoadBalancer__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			Metadata: &contexts.MetadataContext{
 				Metadata: map[string]any{"lbID": "4de7ac8b-495b-4884-9a69-1050c6793cd6"},
@@ -584,14 +584,14 @@ func Test__CreateLoadBalancer__HandleAction(t *testing.T) {
 		assert.Contains(t, err.Error(), "error status")
 	})
 
-	t.Run("unknown action -> returns error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+	t.Run("unknown hook -> returns error", func(t *testing.T) {
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "unknown",
 			ExecutionState: &contexts.ExecutionStateContext{},
 			Metadata:       &contexts.MetadataContext{},
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
+		assert.Contains(t, err.Error(), "unknown hook")
 	})
 }

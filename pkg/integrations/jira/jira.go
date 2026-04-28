@@ -72,8 +72,8 @@ func (j *Jira) Configuration() []configuration.Field {
 	}
 }
 
-func (j *Jira) Components() []core.Component {
-	return []core.Component{
+func (j *Jira) Actions() []core.Action {
+	return []core.Action{
 		&CreateIssue{},
 	}
 }
@@ -129,10 +129,10 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (j *Jira) Actions() []core.Action {
-	return []core.Action{}
+func (j *Jira) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (j *Jira) HandleAction(ctx core.IntegrationActionContext) error {
+func (j *Jira) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

@@ -3,6 +3,7 @@ package manual
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -10,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const ActionRun = "run"
+const HookRun = "run"
 
 func init() {
 	registry.RegisterTrigger("start", &Start{})
@@ -31,7 +32,7 @@ func (s *Start) Description() string {
 }
 
 func (s *Start) Documentation() string {
-	return `The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI.
+	return `The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI or CLI.
 
 ## Use Cases
 
@@ -43,16 +44,20 @@ func (s *Start) Documentation() string {
 ## How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Click the "Run" button in the workflow UI to start an execution
-3. The workflow begins immediately with empty event data
+2. Configure one or more templates, each with a name and a default payload
+3. Click the "Run" button in the workflow UI, or invoke the ` + "`run`" + ` hook via the API/CLI to start an execution
+4. The workflow begins immediately with either the configured payload or an override supplied at run time
 
 ## Configuration
 
-The Manual Run trigger requires no configuration. It's ready to use immediately after being added to a workflow.
+Each Manual Run trigger exposes a list of templates. A template has:
+
+- ` + "`name`" + ` (required): a label used as the run target (and the event channel)
+- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used
 
 ## Event Data
 
-Manual runs start with an empty event payload. You can use this as a starting point and add data through subsequent components.`
+Manual runs emit an event with type ` + "`manual.run`" + `. The data is either the template's saved payload or the override passed in the run request.`
 }
 
 func (s *Start) Icon() string {
@@ -109,12 +114,11 @@ func (s *Start) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (s *Start) Actions() []core.Action {
-	return []core.Action{
+func (s *Start) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           ActionRun,
-			Description:    "Start a manual run using a configured template",
-			UserAccessible: true,
+			Type: core.HookTypeUser,
+			Name: HookRun,
 			Parameters: []configuration.Field{
 				{
 					Name:     "template",
@@ -132,16 +136,16 @@ func (s *Start) Actions() []core.Action {
 	}
 }
 
-func (s *Start) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (s *Start) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
-	case ActionRun:
+	case HookRun:
 		return s.run(ctx)
 	default:
-		return nil, fmt.Errorf("action %s not supported", ctx.Name)
+		return nil, fmt.Errorf("hook %s not supported", ctx.Name)
 	}
 }
 
-func (s *Start) run(ctx core.TriggerActionContext) (map[string]any, error) {
+func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 	templateName, _ := ctx.Parameters["template"].(string)
 	if templateName == "" {
 		return nil, fmt.Errorf("template parameter is required")
@@ -168,7 +172,7 @@ func (s *Start) run(ctx core.TriggerActionContext) (map[string]any, error) {
 		}
 	}
 
-	if payload == nil && !containsName(names, templateName) {
+	if payload == nil && !slices.Contains(names, templateName) {
 		return nil, fmt.Errorf("template %q not found; available: %s", templateName, strings.Join(names, ", "))
 	}
 
@@ -181,15 +185,6 @@ func (s *Start) run(ctx core.TriggerActionContext) (map[string]any, error) {
 	}
 
 	return map[string]any{"template": templateName}, nil
-}
-
-func containsName(names []string, target string) bool {
-	for _, n := range names {
-		if n == target {
-			return true
-		}
-	}
-	return false
 }
 
 func (s *Start) Cleanup(ctx core.TriggerContext) error {

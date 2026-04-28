@@ -25,6 +25,7 @@ type NodeConfigurationBuilder struct {
 	nodeID              string
 	previousExecutionID *uuid.UUID
 	rootEventID         *uuid.UUID
+	rootPayload         any
 	input               any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
@@ -49,6 +50,11 @@ func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationB
 
 func (b *NodeConfigurationBuilder) WithRootEvent(rootEventID *uuid.UUID) *NodeConfigurationBuilder {
 	b.rootEventID = rootEventID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurationBuilder {
+	b.rootPayload = payload
 	return b
 }
 
@@ -491,7 +497,11 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if rootEvent == nil {
+		if b.rootPayload != nil {
+			return b.rootPayload, nil
+		}
 		return nil, fmt.Errorf("no root event found")
 	}
 

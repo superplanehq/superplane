@@ -1,6 +1,9 @@
 from typing import Any
 
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from superplaneapi.models.actions_list_actions_response import (
+    ActionsListActionsResponse,
+)
 from superplaneapi.models.canvases_canvas_changeset import CanvasesCanvasChangeset
 from superplaneapi.models.canvases_create_canvas_version_response import (
     CanvasesCreateCanvasVersionResponse,
@@ -18,9 +21,6 @@ from superplaneapi.models.canvases_validate_canvas_version_changeset_body import
 )
 from superplaneapi.models.canvases_validate_canvas_version_changeset_response import (
     CanvasesValidateCanvasVersionChangesetResponse,
-)
-from superplaneapi.models.components_list_components_response import (
-    ComponentsListComponentsResponse,
 )
 from superplaneapi.models.organizations_list_integration_resources_response import (
     OrganizationsListIntegrationResourcesResponse,
@@ -154,18 +154,18 @@ class FakeCanvasNodeApi:
         return result
 
 
-class FakeComponentApi:
+class FakeActionApi:
     def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
         self._payloads = payloads
 
-    def components_list_components(
+    def actions_list_actions(
         self, _request_timeout: int | tuple[int, int] | None = None
-    ) -> ComponentsListComponentsResponse:
+    ) -> ActionsListActionsResponse:
         _ = _request_timeout
-        payload = self._payloads.get("/api/v1/components")
+        payload = self._payloads.get("/api/v1/actions")
         if payload is None:
-            raise ValueError("Missing payload for components list.")
-        result = ComponentsListComponentsResponse.from_dict(payload)
+            raise ValueError("Missing payload for actions list.")
+        result = ActionsListActionsResponse.from_dict(payload)
         assert result is not None
         return result
 
@@ -292,7 +292,7 @@ class FakeSuperplaneClient(SuperplaneClient):
         self._canvas_api = FakeCanvasApi(payloads)  # type: ignore[assignment]
         self._canvas_version_api = FakeCanvasVersionApi(payloads)  # type: ignore[assignment]
         self._canvas_node_api = FakeCanvasNodeApi(payloads)  # type: ignore[assignment]
-        self._component_api = FakeComponentApi(payloads)  # type: ignore[assignment]
+        self._action_api = FakeActionApi(payloads)  # type: ignore[assignment]
         self._trigger_api = FakeTriggerApi(payloads)  # type: ignore[assignment]
         self._integration_api = FakeIntegrationApi(payloads)  # type: ignore[assignment]
 
@@ -309,13 +309,13 @@ def test_describe_canvas_maps_nodes_and_edges() -> None:
                                 "id": "node-trigger",
                                 "name": "On Push",
                                 "type": "TYPE_TRIGGER",
-                                "trigger": {"name": "github.onPush"},
+                                "component": "github.onPush",
                             },
                             {
                                 "id": "node-action",
                                 "name": "Notify Slack",
-                                "type": "TYPE_COMPONENT",
-                                "component": {"name": "slack.sendTextMessage"},
+                                "type": "TYPE_ACTION",
+                                "component": "slack.sendTextMessage",
                             },
                         ],
                         "edges": [
@@ -351,8 +351,8 @@ def test_describe_editing_canvas_prefers_version_nodes_and_live_metadata_name() 
                             {
                                 "id": "live-only",
                                 "name": "Live node",
-                                "type": "TYPE_COMPONENT",
-                                "component": {"name": "noop"},
+                                "type": "TYPE_ACTION",
+                                "component": "noop",
                             }
                         ],
                         "edges": [],
@@ -367,8 +367,8 @@ def test_describe_editing_canvas_prefers_version_nodes_and_live_metadata_name() 
                             {
                                 "id": "draft-only",
                                 "name": "Draft node",
-                                "type": "TYPE_COMPONENT",
-                                "component": {"name": "slack.sendTextMessage"},
+                                "type": "TYPE_ACTION",
+                                "component": "slack.sendTextMessage",
                             }
                         ],
                         "edges": [],
@@ -469,8 +469,8 @@ def test_get_node_details_includes_recent_events() -> None:
                             {
                                 "id": "node-action",
                                 "name": "Notify Slack",
-                                "type": "TYPE_COMPONENT",
-                                "component": {"name": "slack.sendTextMessage"},
+                                "type": "TYPE_ACTION",
+                                "component": "slack.sendTextMessage",
                                 "configuration": {"channel": "#alerts", "text": "hello"},
                                 "errorMessage": "missing scope",
                                 "warningMessage": "deprecated field",
@@ -514,7 +514,7 @@ def test_list_node_executions_maps_rows() -> None:
             "/api/v1/canvases/canvas-1": {
                 "canvas": {
                     "metadata": {"id": "canvas-1"},
-                    "spec": {"nodes": [{"id": "n1", "type": "TYPE_COMPONENT"}], "edges": []},
+                    "spec": {"nodes": [{"id": "n1", "type": "TYPE_ACTION"}], "edges": []},
                 }
             },
             "/api/v1/canvases/canvas-1/nodes/n1/executions": {
@@ -576,13 +576,13 @@ def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details(
                                 "id": "node-trigger",
                                 "name": "On Push",
                                 "type": "TYPE_TRIGGER",
-                                "trigger": {"name": "github.onPush"},
+                                "component": "github.onPush",
                             },
                             {
                                 "id": "node-action",
                                 "name": "Notify Slack",
-                                "type": "TYPE_COMPONENT",
-                                "component": {"name": "slack.sendTextMessage"},
+                                "type": "TYPE_ACTION",
+                                "component": "slack.sendTextMessage",
                             },
                         ],
                         "edges": [
@@ -606,6 +606,9 @@ def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details(
     assert shape.nodes[0].b == "github.onPush"
     assert shape.nodes[0].n == "On Push"
     assert shape.nodes[0].k == "trigger"
+    assert shape.nodes[1].b == "slack.sendTextMessage"
+    assert shape.nodes[1].n == "Notify Slack"
+    assert shape.nodes[1].k == "action"
     assert shape.edges[0].s == "On Push"
     assert shape.edges[0].t == "Notify Slack"
     assert not hasattr(shape.edges[0], "channel")
@@ -614,12 +617,12 @@ def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details(
 def test_list_components_includes_integration_scoped_components() -> None:
     client = FakeSuperplaneClient(
         payloads={
-            "/api/v1/components": {"components": [{"name": "noop", "label": "Noop"}]},
+            "/api/v1/actions": {"actions": [{"name": "noop", "label": "Noop"}]},
             "/api/v1/integrations": {
                 "integrations": [
                     {
                         "name": "slack",
-                        "components": [
+                        "actions": [
                             {
                                 "name": "slack.sendTextMessage",
                                 "label": "Send Text Message",

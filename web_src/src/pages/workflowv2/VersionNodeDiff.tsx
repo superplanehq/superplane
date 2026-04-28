@@ -6,6 +6,7 @@ import { Diff, Hunk, parseDiff } from "react-diff-view";
 import { useMemo } from "react";
 import * as yaml from "js-yaml";
 import "react-diff-view/style/index.css";
+import { getComparableIntegrationId } from "./utils";
 import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 
 export function buildInitials(name?: string): string {
@@ -104,7 +105,7 @@ export function summarizeNodeDiff(
     configuration: node.configuration || null,
     position: node.position || null,
     isCollapsed: node.isCollapsed || false,
-    integrationId: node.integrationId || null,
+    integrationId: getComparableIntegrationId(node),
   });
 
   const formatDiffValueLines = (value: unknown): string[] => {

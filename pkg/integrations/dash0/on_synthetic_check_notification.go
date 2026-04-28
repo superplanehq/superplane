@@ -107,11 +107,11 @@ func (t *OnSyntheticCheckNotification) Setup(ctx core.TriggerContext) error {
 	return ctx.Metadata.Set(metadata)
 }
 
-func (t *OnSyntheticCheckNotification) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnSyntheticCheckNotification) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnSyntheticCheckNotification) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnSyntheticCheckNotification) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

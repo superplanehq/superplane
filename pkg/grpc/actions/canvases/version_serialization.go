@@ -29,10 +29,12 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	}
 
 	metadata := &pb.CanvasVersion_Metadata{
-		Id:       version.ID.String(),
-		CanvasId: version.WorkflowID.String(),
-		Owner:    owner,
-		State:    state,
+		Id:          version.ID.String(),
+		CanvasId:    version.WorkflowID.String(),
+		Owner:       owner,
+		State:       state,
+		Name:        version.Name,
+		Description: version.Description,
 	}
 
 	if version.PublishedAt != nil {
@@ -48,8 +50,9 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	return &pb.CanvasVersion{
 		Metadata: metadata,
 		Spec: &pb.Canvas_Spec{
-			Nodes: actions.NodesToProto(version.Nodes),
-			Edges: actions.EdgesToProto(version.Edges),
+			Nodes:            actions.NodesToProto(version.Nodes),
+			Edges:            actions.EdgesToProto(version.Edges),
+			ChangeManagement: serializeChangeManagement(version.ChangeManagementEnabled, version.EffectiveChangeRequestApprovers()),
 		},
 	}
 }

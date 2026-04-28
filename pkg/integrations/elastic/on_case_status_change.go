@@ -198,24 +198,23 @@ func (t *OnCaseStatusChange) resolveCaseMetadata(ctx core.TriggerContext, caseID
 	return names, statuses, nil
 }
 
-func (t *OnCaseStatusChange) Actions() []core.Action {
-	return []core.Action{
+func (t *OnCaseStatusChange) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           pollCaseStatusAction,
-			Description:    "Poll the Kibana cases API for status changes and emit events",
-			UserAccessible: false,
+			Name: pollCaseStatusAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (t *OnCaseStatusChange) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnCaseStatusChange) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	if ctx.Name == pollCaseStatusAction {
 		return nil, t.pollCaseStatus(ctx)
 	}
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+	return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (t *OnCaseStatusChange) pollCaseStatus(ctx core.TriggerActionContext) error {
+func (t *OnCaseStatusChange) pollCaseStatus(ctx core.TriggerHookContext) error {
 	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
 
 	var config OnCaseStatusChangeConfiguration

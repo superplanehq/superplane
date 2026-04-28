@@ -39,7 +39,7 @@ var OutputFormat string
 var RootCmd = &cobra.Command{
 	Use:   "superplane",
 	Short: "SuperPlane command line interface",
-	Long:  `SuperPlane CLI - Command line interface for the SuperPlane API`,
+	Long:  "SuperPlane CLI - Command line interface for the SuperPlane API\n\n" + core.AgentSkillsHelp(),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if !Verbose {
 			log.SetOutput(io.Discard)

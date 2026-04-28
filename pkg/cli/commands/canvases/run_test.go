@@ -67,12 +67,12 @@ func TestRunCommandRequiresCanvasAndFlags(t *testing.T) {
 	require.ErrorContains(t, err, "--template is required")
 }
 
-func TestRunCommandEmitsEventWithSavedTemplatePayload(t *testing.T) {
+func TestRunCommandInvokesHookWithTemplate(t *testing.T) {
 	templates := []map[string]any{
 		{"name": "Hello World", "payload": map[string]any{"message": "Hello, World!"}},
 	}
 
-	var emittedBody map[string]any
+	var sentBody map[string]any
 
 	server := newAPITestServer(
 		t,
@@ -86,12 +86,12 @@ func TestRunCommandEmitsEventWithSavedTemplatePayload(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + runTestCanvasID + "/nodes/start-node/events",
+			path:   "/api/v1/canvases/" + runTestCanvasID + "/triggers/start-node/hooks/run",
 			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 				raw, _ := io.ReadAll(r.Body)
-				require.NoError(t, json.Unmarshal(raw, &emittedBody))
+				require.NoError(t, json.Unmarshal(raw, &sentBody))
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"eventId":"evt-1"}`))
+				_, _ = w.Write([]byte(`{"result":{"template":"Hello World"}}`))
 			},
 		},
 	)
@@ -107,24 +107,24 @@ func TestRunCommandEmitsEventWithSavedTemplatePayload(t *testing.T) {
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, "Hello World", emittedBody["channel"])
-	data, ok := emittedBody["data"].(map[string]any)
+	parameters, ok := sentBody["parameters"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "Hello, World!", data["message"])
-	require.Contains(t, stdout.String(), "evt-1")
+	require.Equal(t, "Hello World", parameters["template"])
+	require.NotContains(t, parameters, "payload", "payload override should not be sent when not provided")
+	require.Contains(t, stdout.String(), "Run started")
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + runTestCanvasID,
-		http.MethodPost + " /api/v1/canvases/" + runTestCanvasID + "/nodes/start-node/events",
+		http.MethodPost + " /api/v1/canvases/" + runTestCanvasID + "/triggers/start-node/hooks/run",
 	})
 }
 
-func TestRunCommandUsesPayloadOverride(t *testing.T) {
+func TestRunCommandSendsPayloadOverride(t *testing.T) {
 	templates := []map[string]any{
 		{"name": "Hello World", "payload": map[string]any{"message": "Hello, World!"}},
 	}
 
-	var emittedBody map[string]any
+	var sentBody map[string]any
 
 	server := newAPITestServer(
 		t,
@@ -138,12 +138,12 @@ func TestRunCommandUsesPayloadOverride(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + runTestCanvasID + "/nodes/start-node/events",
+			path:   "/api/v1/canvases/" + runTestCanvasID + "/triggers/start-node/hooks/run",
 			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 				raw, _ := io.ReadAll(r.Body)
-				require.NoError(t, json.Unmarshal(raw, &emittedBody))
+				require.NoError(t, json.Unmarshal(raw, &sentBody))
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"eventId":"evt-2"}`))
+				_, _ = w.Write([]byte(`{"result":{"template":"Hello World"}}`))
 			},
 		},
 	)
@@ -159,40 +159,11 @@ func TestRunCommandUsesPayloadOverride(t *testing.T) {
 	}
 	require.NoError(t, cmd.Execute(ctx))
 
-	data, ok := emittedBody["data"].(map[string]any)
+	parameters, ok := sentBody["parameters"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "Override", data["message"])
-}
-
-func TestRunCommandRejectsUnknownTemplate(t *testing.T) {
-	templates := []map[string]any{
-		{"name": "Hello World", "payload": map[string]any{"message": "Hello, World!"}},
-	}
-
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + runTestCanvasID,
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
-			},
-		},
-	)
-
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Args = []string{runTestCanvasID}
-
-	cmd := &runCommand{
-		node:        strPtr("start-node"),
-		template:    strPtr("Does Not Exist"),
-		payloadJSON: strPtr(""),
-	}
-	err := cmd.Execute(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Does Not Exist")
-	require.Contains(t, err.Error(), "Hello World")
+	payload, ok := parameters["payload"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "Override", payload["message"])
 }
 
 func TestRunCommandRejectsNonTriggerNode(t *testing.T) {

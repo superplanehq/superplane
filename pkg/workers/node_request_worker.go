@@ -114,21 +114,21 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return w.invokeAction(tx, request, onNewEvents)
+		return w.invokeHook(tx, request, onNewEvents)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeHook(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	if request.ExecutionID == nil {
-		return w.invokeNodeAction(tx, request, onNewEvents)
+		return w.invokeNodeHook(tx, request, onNewEvents)
 	}
 
-	return w.invokeComponentAction(tx, request, onNewEvents)
+	return w.invokeComponentHook(tx, request, onNewEvents)
 }
 
-func (w *NodeRequestWorker) invokeNodeAction(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeNodeHook(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
@@ -136,24 +136,19 @@ func (w *NodeRequestWorker) invokeNodeAction(tx *gorm.DB, request *models.Canvas
 
 	switch node.Type {
 	case models.NodeTypeTrigger:
-		return w.invokeTriggerAction(tx, request, node, onNewEvents)
+		return w.invokeTriggerHook(tx, request, node, onNewEvents)
 
 	case models.NodeTypeComponent:
-		return w.invokeNodeComponentAction(tx, request, node, onNewEvents)
+		return w.invokeNodeComponentHook(tx, request, node, onNewEvents)
 	}
 
-	return fmt.Errorf("unsupported node type %s for node action", node.Type)
+	return fmt.Errorf("unsupported node type %s for node hook", node.Type)
 }
 
-func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	nodeRef := node.Ref.Data()
 	if nodeRef.Trigger == nil {
 		return fmt.Errorf("node %s is not a trigger", node.NodeID)
-	}
-
-	trigger, err := w.registry.GetTrigger(nodeRef.Trigger.Name)
-	if err != nil {
-		return fmt.Errorf("trigger not found: %w", err)
 	}
 
 	spec := request.Spec.Data()
@@ -161,14 +156,13 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 		return fmt.Errorf("spec is not specified")
 	}
 
-	actionName := spec.InvokeAction.ActionName
-	actionDef := findAction(trigger.Actions(), actionName)
-	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for trigger '%s'", actionName, trigger.Name())
+	hookProvider, _, err := w.registry.FindTriggerHook(nodeRef.Trigger.Name, spec.InvokeAction.ActionName)
+	if err != nil {
+		return fmt.Errorf("failed to find hook: %v", err)
 	}
 
-	actionCtx := core.TriggerActionContext{
-		Name:          actionName,
+	hookCtx := core.TriggerHookContext{
+		Name:          spec.InvokeAction.ActionName,
 		Parameters:    spec.InvokeAction.Parameters,
 		Configuration: node.Configuration.Data(),
 		Logger:        logging.ForNode(*node),
@@ -179,7 +173,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 	}
 
 	if node.WebhookID != nil {
-		actionCtx.Webhook = contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL)
+		hookCtx.Webhook = contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL)
 	}
 
 	if node.AppInstallationID != nil {
@@ -193,10 +187,10 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
+		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
-	_, err = trigger.HandleAction(actionCtx)
+	_, err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
@@ -209,15 +203,10 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models.CanvasNodeRequest, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	nodeRef := node.Ref.Data()
 	if nodeRef.Component == nil {
 		return fmt.Errorf("node %s is not a component", node.NodeID)
-	}
-
-	component, err := w.registry.GetComponent(nodeRef.Component.Name)
-	if err != nil {
-		return fmt.Errorf("component not found: %w", err)
 	}
 
 	spec := request.Spec.Data()
@@ -225,15 +214,14 @@ func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *mode
 		return fmt.Errorf("spec is not specified")
 	}
 
-	actionName := spec.InvokeAction.ActionName
-	actionDef := findAction(component.Actions(), actionName)
-	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+	hookProvider, _, err := w.registry.FindActionHook(nodeRef.Component.Name, spec.InvokeAction.ActionName)
+	if err != nil {
+		return fmt.Errorf("failed to find hook: %v", err)
 	}
 
 	logger := logging.ForNode(*node)
-	actionCtx := core.ActionContext{
-		Name:          actionName,
+	hookCtx := core.ActionHookContext{
+		Name:          spec.InvokeAction.ActionName,
 		Configuration: node.Configuration.Data(),
 		Parameters:    spec.InvokeAction.Parameters,
 		Logger:        logger,
@@ -254,11 +242,11 @@ func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *mode
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
-		actionCtx.Logger = logger
+		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
+		hookCtx.Logger = logger
 	}
 
-	err = component.HandleAction(actionCtx)
+	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
@@ -271,7 +259,7 @@ func (w *NodeRequestWorker) invokeNodeComponentAction(tx *gorm.DB, request *mode
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeRequestWorker) invokeComponentHook(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
 	execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
 	if err != nil {
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
@@ -295,20 +283,14 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	component, err := w.registry.GetComponent(node.Ref.Data().Component.Name)
-	if err != nil {
-		return fmt.Errorf("component not found: %w", err)
-	}
-
 	spec := request.Spec.Data()
 	if spec.InvokeAction == nil {
 		return fmt.Errorf("spec is not specified")
 	}
 
-	actionName := spec.InvokeAction.ActionName
-	actionDef := findAction(component.Actions(), actionName)
-	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+	hookProvider, _, err := w.registry.FindActionHook(node.Ref.Data().Component.Name, spec.InvokeAction.ActionName)
+	if err != nil {
+		return fmt.Errorf("component not found: %w", err)
 	}
 
 	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
@@ -317,8 +299,8 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 	}
 
 	logger := logging.ForExecution(execution, nil)
-	actionCtx := core.ActionContext{
-		Name:           actionName,
+	hookCtx := core.ActionHookContext{
+		Name:           spec.InvokeAction.ActionName,
 		Configuration:  node.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
 		HTTP:           w.registry.HTTPContext(),
@@ -337,11 +319,11 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
+		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
 	}
 
-	actionCtx.Logger = logger
-	err = component.HandleAction(actionCtx)
+	hookCtx.Logger = logger
+	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
@@ -381,20 +363,14 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	component, err := w.registry.GetComponent(childNode.Ref.Component.Name)
-	if err != nil {
-		return fmt.Errorf("component not found: %w", err)
-	}
-
 	spec := request.Spec.Data()
 	if spec.InvokeAction == nil {
 		return fmt.Errorf("spec is not specified")
 	}
 
-	actionName := spec.InvokeAction.ActionName
-	actionDef := findAction(component.Actions(), actionName)
-	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+	hookProvider, _, err := w.registry.FindActionHook(childNode.Ref.Component.Name, spec.InvokeAction.ActionName)
+	if err != nil {
+		return fmt.Errorf("component not found: %w", err)
 	}
 
 	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
@@ -402,8 +378,8 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		return fmt.Errorf("workflow not found: %w", err)
 	}
 
-	actionCtx := core.ActionContext{
-		Name:           actionName,
+	hookCtx := core.ActionHookContext{
+		Name:           spec.InvokeAction.ActionName,
 		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
 		Logger:         logging.ForExecution(execution, parentExecution),
@@ -416,7 +392,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 	}
 
-	err = component.HandleAction(actionCtx)
+	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return fmt.Errorf("action execution failed: %w", err)
 	}
@@ -431,14 +407,4 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 
 func (w *NodeRequestWorker) log(format string, v ...any) {
 	log.Printf("[NodeRequestWorker] "+format, v...)
-}
-
-func findAction(actions []core.Action, actionName string) *core.Action {
-	for _, action := range actions {
-		if action.Name == actionName {
-			return &action
-		}
-	}
-
-	return nil
 }

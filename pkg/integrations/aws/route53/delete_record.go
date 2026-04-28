@@ -139,21 +139,21 @@ func (c *DeleteRecord) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DeleteRecord) Actions() []core.Action {
-	return []core.Action{
+func (c *DeleteRecord) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        pollChangeActionName,
-			Description: "Poll for change status",
+			Name: pollChangeActionName,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *DeleteRecord) HandleAction(ctx core.ActionContext) error {
+func (c *DeleteRecord) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case pollChangeActionName:
 		return pollChangeUntilSynced(ctx)
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 

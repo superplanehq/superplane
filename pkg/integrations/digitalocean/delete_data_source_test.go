@@ -136,7 +136,7 @@ func Test__DeleteDataSource__Execute(t *testing.T) {
 	})
 }
 
-func Test__DeleteDataSource__HandleAction(t *testing.T) {
+func Test__DeleteDataSource__HandleHook(t *testing.T) {
 	component := &DeleteDataSource{}
 
 	meta := map[string]any{
@@ -171,7 +171,7 @@ func Test__DeleteDataSource__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -220,7 +220,7 @@ func Test__DeleteDataSource__HandleAction(t *testing.T) {
 		}
 		metaWithPrev["prevIndexingJobId"] = "job-uuid-old"
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -255,7 +255,7 @@ func Test__DeleteDataSource__HandleAction(t *testing.T) {
 
 		requests := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -289,7 +289,7 @@ func Test__DeleteDataSource__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -325,7 +325,7 @@ func Test__DeleteDataSource__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{

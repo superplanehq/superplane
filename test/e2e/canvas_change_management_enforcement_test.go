@@ -11,6 +11,7 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestCanvasChangeManagementEnforcement(t *testing.T) {
@@ -83,12 +84,7 @@ func (s *canvasChangeManagementEnforcementSteps) setOrganizationChangeManagement
 }
 
 func (s *canvasChangeManagementEnforcementSteps) setCanvasChangeManagementInDB(enabled bool) {
-	err := database.Conn().
-		Model(&models.Canvas{}).
-		Where("id = ?", s.canvas.WorkflowID).
-		Update("change_management_enabled", enabled).
-		Error
-	require.NoError(s.t, err)
+	support.SetCanvasChangeManagementEnabled(s.t, s.canvas.WorkflowID, enabled)
 }
 
 func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {

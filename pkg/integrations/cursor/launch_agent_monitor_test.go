@@ -172,40 +172,18 @@ func Test__LaunchAgent__HandleWebhook__ExecutionNotFound(t *testing.T) {
 	})
 }
 
-func Test__LaunchAgent__Actions(t *testing.T) {
-	c := &LaunchAgent{}
-
-	t.Run("returns poll action", func(t *testing.T) {
-		actions := c.Actions()
-		require.Len(t, actions, 1)
-		assert.Equal(t, "poll", actions[0].Name)
-		assert.False(t, actions[0].UserAccessible)
-	})
-}
-
-func Test__LaunchAgent__HandleAction(t *testing.T) {
-	c := &LaunchAgent{}
-
-	t.Run("unknown action -> error", func(t *testing.T) {
-		ctx := core.ActionContext{Name: "unknown"}
-		err := c.HandleAction(ctx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
-	})
-}
-
 func Test__LaunchAgent__Poll(t *testing.T) {
 	c := &LaunchAgent{}
 
 	t.Run("execution already finished -> no-op", func(t *testing.T) {
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: true}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			ExecutionState: executionStateCtx,
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 	})
 
@@ -215,14 +193,14 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			Metadata:       metadataCtx,
 			ExecutionState: executionStateCtx,
 			Parameters:     map[string]any{},
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 	})
 
@@ -234,14 +212,14 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			Metadata:       metadataCtx,
 			ExecutionState: executionStateCtx,
 			Parameters:     map[string]any{},
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 	})
 
@@ -254,7 +232,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			Metadata:       metadataCtx,
 			ExecutionState: executionStateCtx,
@@ -262,7 +240,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.True(t, executionStateCtx.Finished)
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
@@ -295,7 +273,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -305,11 +283,95 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.True(t, executionStateCtx.Finished)
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
 		assert.Equal(t, LaunchAgentPayloadType, executionStateCtx.Type)
+	})
+
+	t.Run("terminal webhook payload without summary or pr url refreshes agent status", func(t *testing.T) {
+		secret := "test-secret"
+		payload := launchAgentWebhookPayload{
+			Event:  "statusChange",
+			ID:     "agent-123",
+			Status: "FINISHED",
+			Target: &launchAgentWebhookTarget{
+				BranchName: "cursor/agent-abc123",
+			},
+		}
+		body, _ := json.Marshal(payload)
+		signature := generateSignature(body, secret)
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id": "agent-123",
+						"status": "FINISHED",
+						"summary": "Task completed",
+						"target": {
+							"branchName": "cursor/agent-abc123",
+							"prUrl": "https://github.com/org/repo/pull/42"
+						}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"launchAgentKey": "test-key",
+			},
+		}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: LaunchAgentExecutionMetadata{
+				Agent: &AgentMetadata{
+					ID:     "agent-123",
+					Status: "RUNNING",
+				},
+				Target: &TargetMetadata{
+					BranchName: "cursor/agent-abc123",
+				},
+			},
+		}
+		executionStateCtx := &contexts.ExecutionStateContext{
+			KVs: map[string]string{
+				"agent_id": "agent-123",
+			},
+		}
+
+		webhookCtx := core.WebhookRequestContext{
+			Body:        body,
+			Headers:     http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					Metadata:       metadataCtx,
+					ExecutionState: executionStateCtx,
+					Logger:         logrus.NewEntry(logrus.New()),
+					HTTP:           httpContext,
+					Integration:    integrationCtx,
+				}, nil
+			},
+		}
+
+		status, _, err := c.HandleWebhook(webhookCtx)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, status)
+
+		require.Len(t, executionStateCtx.Payloads, 1)
+		emittedPayload := executionStateCtx.Payloads[0].(map[string]any)["data"].(LaunchAgentOutputPayload)
+		assert.Equal(t, "FINISHED", emittedPayload.Status)
+		assert.Equal(t, "https://github.com/org/repo/pull/42", emittedPayload.PrURL)
+		assert.Equal(t, "Task completed", emittedPayload.Summary)
+
+		updatedMetadata := metadataCtx.Metadata.(LaunchAgentExecutionMetadata)
+		assert.Equal(t, "Task completed", updatedMetadata.Agent.Summary)
+		assert.Equal(t, "https://github.com/org/repo/pull/42", updatedMetadata.Target.PrURL)
 	})
 
 	t.Run("poll API error -> schedules next poll with error count", func(t *testing.T) {
@@ -335,7 +397,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 		requestsCtx := &contexts.RequestContext{}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -346,7 +408,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, "poll", requestsCtx.Action)
 		assert.Equal(t, 2, requestsCtx.Params["attempt"])
@@ -375,7 +437,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -385,7 +447,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.True(t, executionStateCtx.Finished)
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
@@ -398,7 +460,7 @@ func Test__LaunchAgent__ScheduleNextPoll(t *testing.T) {
 	t.Run("calculates exponential backoff", func(t *testing.T) {
 		requestsCtx := &contexts.RequestContext{}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Requests: requestsCtx,
 		}
 
@@ -414,7 +476,7 @@ func Test__LaunchAgent__ScheduleNextPoll(t *testing.T) {
 	t.Run("caps at max poll interval", func(t *testing.T) {
 		requestsCtx := &contexts.RequestContext{}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Requests: requestsCtx,
 		}
 

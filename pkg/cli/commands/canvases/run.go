@@ -69,11 +69,11 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 		params["payload"] = parsed
 	}
 
-	body := openapi_client.NewCanvasesInvokeNodeTriggerActionBody()
+	body := openapi_client.NewCanvasesInvokeNodeTriggerHookBody()
 	body.SetParameters(params)
 
 	resp, _, err := ctx.API.CanvasNodeAPI.
-		CanvasesInvokeNodeTriggerAction(ctx.Context, canvasID, nodeID, "run").
+		CanvasesInvokeNodeTriggerHook(ctx.Context, canvasID, nodeID, "run").
 		Body(*body).
 		Execute()
 	if err != nil {

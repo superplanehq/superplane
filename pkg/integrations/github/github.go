@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -34,6 +34,18 @@ To complete the GitHub app setup:
 1. **Install GitHub App**: Install the new GitHub app in the user/organization.
 `
 )
+
+var defaultGitHubAppEvents = []string{
+	"create",
+	"issue_comment",
+	"issues",
+	"pull_request",
+	"pull_request_review",
+	"pull_request_review_comment",
+	"push",
+	"release",
+	"workflow_run",
+}
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("github", &GitHub{}, &GitHubWebhookHandler{})
@@ -91,8 +103,8 @@ func (g *GitHub) Configuration() []configuration.Field {
 	}
 }
 
-func (g *GitHub) Components() []core.Component {
-	return []core.Component{
+func (g *GitHub) Actions() []core.Action {
+	return []core.Action{
 		&GetIssue{},
 		&GetRepositoryPermission{},
 		&CreateIssue{},
@@ -473,9 +485,10 @@ func (g *GitHub) browserActionURL(organization string) string {
 
 func (g *GitHub) appManifest(ctx core.SyncContext) string {
 	manifest := map[string]any{
-		"name":   `SuperPlane GH integration`,
-		"public": false,
-		"url":    "https://superplane.com",
+		"name":           `SuperPlane GH integration`,
+		"public":         false,
+		"url":            "https://superplane.com",
+		"default_events": defaultGitHubAppEvents,
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
@@ -542,14 +555,6 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	return &appData, nil
 }
 
-func (g *GitHub) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GitHub) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func listInstallationRepositories(ctx context.Context, client *github.Client) ([]Repository, error) {
 	var allRepos []*github.Repository
 	opts := &github.ListOptions{
@@ -583,4 +588,12 @@ func listInstallationRepositories(ctx context.Context, client *github.Client) ([
 	}
 
 	return out, nil
+}
+
+func (g *GitHub) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GitHub) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

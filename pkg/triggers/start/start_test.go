@@ -9,19 +9,19 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestStart_Actions_DeclaresUserAccessibleRun(t *testing.T) {
+func TestStart_Hooks_DeclaresUserAccessibleRun(t *testing.T) {
 	s := &Start{}
-	actions := s.Actions()
+	hooks := s.Hooks()
 
-	require.Len(t, actions, 1)
-	action := actions[0]
-	assert.Equal(t, ActionRun, action.Name)
-	assert.True(t, action.UserAccessible)
+	require.Len(t, hooks, 1)
+	hook := hooks[0]
+	assert.Equal(t, HookRun, hook.Name)
+	assert.Equal(t, core.HookTypeUser, hook.Type)
 
 	var paramNames []string
 	var templateRequired bool
 	var payloadRequired bool
-	for _, param := range action.Parameters {
+	for _, param := range hook.Parameters {
 		paramNames = append(paramNames, param.Name)
 		if param.Name == "template" {
 			templateRequired = param.Required
@@ -36,7 +36,7 @@ func TestStart_Actions_DeclaresUserAccessibleRun(t *testing.T) {
 	assert.False(t, payloadRequired, "payload parameter must be optional")
 }
 
-func TestStart_HandleAction_EmitsWithConfiguredPayload(t *testing.T) {
+func TestStart_HandleHook_EmitsWithConfiguredPayload(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}
 
@@ -47,8 +47,8 @@ func TestStart_HandleAction_EmitsWithConfiguredPayload(t *testing.T) {
 		},
 	}
 
-	result, err := s.HandleAction(core.TriggerActionContext{
-		Name:          ActionRun,
+	result, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
 		Parameters:    map[string]any{"template": "Hello"},
 		Configuration: config,
 		Events:        events,
@@ -64,7 +64,7 @@ func TestStart_HandleAction_EmitsWithConfiguredPayload(t *testing.T) {
 	assert.Equal(t, "Hello, World!", payload["message"])
 }
 
-func TestStart_HandleAction_PayloadOverride(t *testing.T) {
+func TestStart_HandleHook_PayloadOverride(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}
 
@@ -74,8 +74,8 @@ func TestStart_HandleAction_PayloadOverride(t *testing.T) {
 		},
 	}
 
-	_, err := s.HandleAction(core.TriggerActionContext{
-		Name: ActionRun,
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name: HookRun,
 		Parameters: map[string]any{
 			"template": "Hello",
 			"payload":  map[string]any{"message": "Override"},
@@ -90,7 +90,7 @@ func TestStart_HandleAction_PayloadOverride(t *testing.T) {
 	assert.Equal(t, "Override", payload["message"])
 }
 
-func TestStart_HandleAction_UnknownTemplateListsAvailable(t *testing.T) {
+func TestStart_HandleHook_UnknownTemplateListsAvailable(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}
 
@@ -101,8 +101,8 @@ func TestStart_HandleAction_UnknownTemplateListsAvailable(t *testing.T) {
 		},
 	}
 
-	_, err := s.HandleAction(core.TriggerActionContext{
-		Name:          ActionRun,
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
 		Parameters:    map[string]any{"template": "Missing"},
 		Configuration: config,
 		Events:        events,
@@ -115,11 +115,11 @@ func TestStart_HandleAction_UnknownTemplateListsAvailable(t *testing.T) {
 	assert.Empty(t, events.Payloads)
 }
 
-func TestStart_HandleAction_RejectsMissingTemplate(t *testing.T) {
+func TestStart_HandleHook_RejectsMissingTemplate(t *testing.T) {
 	s := &Start{}
 
-	_, err := s.HandleAction(core.TriggerActionContext{
-		Name:          ActionRun,
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
 		Parameters:    map[string]any{},
 		Configuration: map[string]any{},
 		Events:        &contexts.EventContext{},
@@ -128,11 +128,11 @@ func TestStart_HandleAction_RejectsMissingTemplate(t *testing.T) {
 	assert.Contains(t, err.Error(), "template")
 }
 
-func TestStart_HandleAction_RejectsNoTemplatesConfigured(t *testing.T) {
+func TestStart_HandleHook_RejectsNoTemplatesConfigured(t *testing.T) {
 	s := &Start{}
 
-	_, err := s.HandleAction(core.TriggerActionContext{
-		Name:          ActionRun,
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
 		Parameters:    map[string]any{"template": "Hello"},
 		Configuration: map[string]any{},
 		Events:        &contexts.EventContext{},
@@ -142,10 +142,10 @@ func TestStart_HandleAction_RejectsNoTemplatesConfigured(t *testing.T) {
 	assert.Contains(t, err.Error(), "no templates configured")
 }
 
-func TestStart_HandleAction_RejectsUnknownAction(t *testing.T) {
+func TestStart_HandleHook_RejectsUnknownHook(t *testing.T) {
 	s := &Start{}
 
-	_, err := s.HandleAction(core.TriggerActionContext{
+	_, err := s.HandleHook(core.TriggerHookContext{
 		Name:   "nope",
 		Events: &contexts.EventContext{},
 	})

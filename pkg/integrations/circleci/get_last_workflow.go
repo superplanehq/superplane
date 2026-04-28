@@ -208,18 +208,18 @@ func (c *GetLastWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetLastWorkflow) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetLastWorkflow) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetLastWorkflow) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *GetLastWorkflow) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetLastWorkflow) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetLastWorkflow) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

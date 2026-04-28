@@ -145,14 +145,6 @@ func (c *CreateQueue) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateQueue) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateQueue) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateQueue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -162,5 +154,13 @@ func (c *CreateQueue) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *CreateQueue) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateQueue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateQueue) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

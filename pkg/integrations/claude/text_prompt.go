@@ -229,14 +229,6 @@ func (c *TextPrompt) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (c *TextPrompt) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *TextPrompt) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *TextPrompt) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -260,4 +252,12 @@ func extractMessageText(response *CreateMessageResponse) string {
 		}
 	}
 	return builder.String()
+}
+
+func (c *TextPrompt) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *TextPrompt) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }
