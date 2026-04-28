@@ -11,6 +11,23 @@ import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import type { PullRequest } from "./types";
 
+function pullRequestDetailFields(pr: PullRequest | undefined): Array<[string, string]> {
+  if (!pr) return [];
+
+  const branches = pr.head?.ref && pr.base?.ref ? `${pr.head.ref} → ${pr.base.ref}` : "";
+  const state = pr.state ? (pr.draft ? `${pr.state} (draft)` : pr.state) : "";
+
+  return (
+    [
+      ["Pull Request", pr.number !== undefined ? `#${pr.number}` : ""],
+      ["Title", pr.title ?? ""],
+      ["State", state],
+      ["Branches", branches],
+      ["Pull Request URL", pr.html_url ?? ""],
+    ] as Array<[string, string]>
+  ).filter(([, value]) => value !== "");
+}
+
 export const createPullRequestMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
@@ -22,27 +39,15 @@ export const createPullRequestMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const details: Record<string, string> = {};
+    const pr = outputs?.default?.[0]?.data as PullRequest | undefined;
 
-    if (!outputs?.default || outputs.default.length === 0) {
-      return details;
-    }
+    const details: Record<string, string> = {
+      "Created At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
+    };
 
-    const pr = outputs.default[0].data as PullRequest;
-    details["Created At"] = context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-";
-    if (pr?.number !== undefined) {
-      details["Pull Request"] = `#${pr.number}`;
+    for (const [key, value] of pullRequestDetailFields(pr)) {
+      details[key] = value;
     }
-    if (pr?.title) {
-      details["Title"] = pr.title;
-    }
-    if (pr?.state) {
-      details["State"] = pr.draft ? `${pr.state} (draft)` : pr.state;
-    }
-    if (pr?.head?.ref && pr?.base?.ref) {
-      details["Branches"] = `${pr.head.ref} → ${pr.base.ref}`;
-    }
-    details["Pull Request URL"] = pr?.html_url || "";
 
     return details;
   },

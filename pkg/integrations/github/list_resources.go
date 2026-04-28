@@ -3,7 +3,6 @@ package github
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
@@ -78,12 +77,6 @@ func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.Inte
 	metadata := Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	if !slices.ContainsFunc(metadata.Repositories, func(r Repository) bool {
-		return r.Name == repository
-	}) {
-		return nil, fmt.Errorf("repository %s is not accessible to app installation", repository)
 	}
 
 	client, err := NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
