@@ -1897,10 +1897,10 @@ export function WorkflowPageV2() {
       const { nodeRef } = node ? getNodeAnalyticsProps(node, availableIntegrations) : { nodeRef: undefined };
       analytics.canvasRunItemOpen(nodeRef, executionStatus, organizationId ?? "");
       if (errorMessage) {
-        analytics.canvasComponentError(nodeRef, errorMessage,organizationId ?? "");
+        analytics.canvasComponentError(nodeRef, errorMessage, organizationId ?? "");
       }
     },
-    [canvas, availableIntegrations,organizationId],
+    [canvas, availableIntegrations, organizationId],
   );
 
   const handleLogView = useCallback(() => {

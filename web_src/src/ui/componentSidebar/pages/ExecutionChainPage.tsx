@@ -205,14 +205,17 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   }, [triggerEvent, chainItems]);
 
   // Load execution chain data function
-  const handleTabClickCapture = useCallback((e: React.MouseEvent) => {
-    const button = (e.target as HTMLElement).closest("button");
-    if (!button) return;
-    const text = button.textContent?.trim().toLowerCase();
-    if (text === "details") analytics.canvasRunItemTabView("details", organizationId ?? "");
-    else if (text === "payload") analytics.canvasRunItemTabView("payload", organizationId ?? "");
-    else if (text === "config") analytics.canvasRunItemTabView("config", organizationId ?? "");
-  }, [organizationId]);
+  const handleTabClickCapture = useCallback(
+    (e: React.MouseEvent) => {
+      const button = (e.target as HTMLElement).closest("button");
+      if (!button) return;
+      const text = button.textContent?.trim().toLowerCase();
+      if (text === "details") analytics.canvasRunItemTabView("details", organizationId ?? "");
+      else if (text === "payload") analytics.canvasRunItemTabView("payload", organizationId ?? "");
+      else if (text === "config") analytics.canvasRunItemTabView("config", organizationId ?? "");
+    },
+    [organizationId],
+  );
 
   const loadChainData = useCallback(async () => {
     if (!eventId || !loadExecutionChain) {

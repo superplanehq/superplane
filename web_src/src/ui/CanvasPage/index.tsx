@@ -2436,13 +2436,16 @@ function CanvasContent({
     );
   }, [logEntries, logSearch]);
 
-  const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
-    setConsoleTab(tab);
-    setIsLogSidebarOpen(true);
-    if (tab === "runs") {
-      onLogView?.();
-    }
-  }, [onLogView]);
+  const handleLogButtonClick = useCallback(
+    (tab: ConsoleTab) => {
+      setConsoleTab(tab);
+      setIsLogSidebarOpen(true);
+      if (tab === "runs") {
+        onLogView?.();
+      }
+    },
+    [onLogView],
+  );
 
   return (
     <div className="h-full w-full relative">

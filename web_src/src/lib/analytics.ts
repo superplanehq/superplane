@@ -122,7 +122,11 @@ export const analytics = {
   },
 
   canvasComponentError: (nodeRef: string | undefined, errorMessage: string, organizationId: string) => {
-    posthog.capture("canvas:component_error", { node_ref: nodeRef, error_message: errorMessage, organization_id: organizationId });
+    posthog.capture("canvas:component_error", {
+      node_ref: nodeRef,
+      error_message: errorMessage,
+      organization_id: organizationId,
+    });
   },
 
   canvasLogView: (organizationId: string) => {
