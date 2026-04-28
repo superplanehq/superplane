@@ -90,7 +90,7 @@ func (c *codeBuildClient) getBuild(id string) (*build, error) {
 	}
 
 	if len(response.Builds) == 0 {
-		return nil, fmt.Errorf("CodeBuild build not found: %s", id)
+		return nil, fmt.Errorf("run not found: %s", id)
 	}
 
 	return &response.Builds[0], nil

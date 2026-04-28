@@ -27,7 +27,7 @@ func TestBuildspecValidYAML(t *testing.T) {
 	out := buildspec(spec)
 	var parsed any
 	err := yaml.Unmarshal([]byte(out), &parsed)
-	require.NoError(t, err, "buildspec must be valid YAML (CodeBuild parses it before running commands)")
+	require.NoError(t, err, "buildspec must be valid YAML (the remote runner parses it before executing commands)")
 }
 
 func TestRunBashSetup(t *testing.T) {

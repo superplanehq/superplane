@@ -133,10 +133,10 @@ type backendConfig struct {
 func (c *RunBash) Name() string  { return "run-bash" }
 func (c *RunBash) Label() string { return "Run Bash" }
 func (c *RunBash) Description() string {
-	return "Run Bash commands in an ephemeral build environment backed by AWS CodeBuild."
+	return "Run Bash commands in a short-lived, isolated environment managed by your SuperPlane deployment."
 }
 func (c *RunBash) Documentation() string {
-	return `Run Bash commands in a managed ephemeral build environment.
+	return `Run Bash commands in a managed, ephemeral environment.
 
 ## Use Cases
 
@@ -145,25 +145,16 @@ func (c *RunBash) Documentation() string {
 - Run Terraform plan/apply/destroy commands
 - Execute release, deployment, migration, diagnostic, or remediation scripts
 
-## Backend
+## Server configuration
 
-This component uses SuperPlane-managed AWS CodeBuild projects. Users configure the job they want to run, not CodeBuild itself.
-
-The SuperPlane server must be configured with dedicated environment variables (prefixed with RUN_BASH_) so it never accidentally reuses generic AWS credentials from the host:
-
-- RUN_BASH_CODEBUILD_REGION
-- RUN_BASH_CODEBUILD_PROJECT
-- RUN_BASH_AWS_ACCESS_KEY_ID
-- RUN_BASH_AWS_SECRET_ACCESS_KEY
-- RUN_BASH_AWS_SESSION_TOKEN (optional; required for temporary credentials)
-- RUN_BASH_CODEBUILD_DOCKER_PROJECT (optional; used when Docker support is enabled on the node)
+Self-hosted SuperPlane must configure dedicated RUN_BASH_* environment variables for the execution backend so Run Bash does not share credentials with other services. See your installation or operations guide for the required variables and how to set them.
 
 ## Output
 
 - **success**: Command exits with code 0
 - **failed**: Command runs and exits with a non-zero code
 
-Backend submission, checkout, credential injection, or infrastructure errors are shown as execution errors.`
+Submission, checkout, credential injection, or infrastructure issues are shown as execution errors.`
 }
 func (c *RunBash) Icon() string  { return "terminal" }
 func (c *RunBash) Color() string { return "blue" }
@@ -185,8 +176,8 @@ func (c *RunBash) ExampleOutput() map[string]any {
 				{"name": "image-digest.txt", "path": "dist/image-digest.txt"},
 			},
 			"buildId":  "superplane-run-bash:example",
-			"buildArn": "arn:aws:codebuild:...",
-			"logUrl":   "https://console.aws.amazon.com/...",
+			"buildArn": "arn:example:superplane-run/abc123",
+			"logUrl":   "https://example.com/logs/...",
 		},
 	}
 }
@@ -236,7 +227,7 @@ func (c *RunBash) Configuration() []configuration.Field {
 			Label:       "Runtime image",
 			Type:        configuration.FieldTypeSelect,
 			Default:     "default",
-			Description: "Runtime image profile for the backend build environment.",
+			Description: "Runtime image profile for the execution environment.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
 				{Label: "Default build image", Value: "default"},
 				{Label: "Docker capable image", Value: "docker"},
@@ -248,7 +239,7 @@ func (c *RunBash) Configuration() []configuration.Field {
 			Label:       "Compute size",
 			Type:        configuration.FieldTypeSelect,
 			Default:     "small",
-			Description: "Backend compute size tier. Actual sizing is controlled by SuperPlane-managed CodeBuild projects.",
+			Description: "Compute size tier. Actual resources are defined by your SuperPlane deployment.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
 				{Label: "Small", Value: "small"},
 				{Label: "Medium", Value: "medium"},
@@ -347,7 +338,7 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		TimeoutInMinutesOverride:     timeoutMinutes(spec.Timeout),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start CodeBuild build: %w", err)
+		return fmt.Errorf("failed to start run: %w", err)
 	}
 
 	metadata := metadataFromBuild(build, spec, nil)
@@ -390,7 +381,7 @@ func (c *RunBash) HandleHook(ctx core.ActionHookContext) error {
 		return err
 	}
 	if metadata.BuildID == "" {
-		return errors.New("CodeBuild build ID is missing from execution metadata")
+		return errors.New("run identifier is missing from execution metadata")
 	}
 
 	client := newCodeBuildClient(ctx.HTTP, backend.Credentials, backend.Region)
@@ -438,7 +429,7 @@ func (c *RunBash) complete(
 		return state.Emit(channelFailed, payloadType, []any{payloadFromMetadata(metadata)})
 	}
 
-	return state.Fail("RESULT_REASON_ERROR", fmt.Sprintf("CodeBuild build ended with unexpected status: %s", metadata.Status))
+	return state.Fail("RESULT_REASON_ERROR", fmt.Sprintf("run ended with unexpected status: %s", metadata.Status))
 }
 
 func (c *RunBash) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

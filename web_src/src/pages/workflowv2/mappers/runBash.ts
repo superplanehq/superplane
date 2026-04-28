@@ -198,10 +198,10 @@ export const runBashMapper: ComponentBaseMapper = {
       details["Exit code"] = String(exitCode);
     }
     if (result?.status) {
-      details["CodeBuild status"] = result.status;
+      details["Status"] = result.status;
     }
     if (result?.buildId) {
-      details["Build ID"] = result.buildId;
+      details["Run ID"] = result.buildId;
     }
     if (result?.logUrl) {
       details["Logs"] = result.logUrl;

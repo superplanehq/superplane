@@ -113,8 +113,8 @@ describe("runBashMapper", () => {
       Repository: "github.com/example/app",
       Commit: "abc123",
       "Exit code": "0",
-      "CodeBuild status": "SUCCEEDED",
-      "Build ID": "build-1",
+      Status: "SUCCEEDED",
+      "Run ID": "build-1",
       Logs: "https://logs",
       Stdout: "ok",
     });

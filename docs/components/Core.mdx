@@ -29,7 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
-  <LinkCard title="Run Bash" href="#run-bash" description="Run Bash commands in an ephemeral build environment backed by AWS CodeBuild." />
+  <LinkCard title="Run Bash" href="#run-bash" description="Run Bash commands in a short-lived, isolated environment managed by your SuperPlane deployment." />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -685,7 +685,7 @@ The Read Memory component looks up values from canvas-level memory storage.
 
 ## Run Bash
 
-Run Bash commands in a managed ephemeral build environment.
+Run Bash commands in a managed, ephemeral environment.
 
 ### Use Cases
 
@@ -694,25 +694,16 @@ Run Bash commands in a managed ephemeral build environment.
 - Run Terraform plan/apply/destroy commands
 - Execute release, deployment, migration, diagnostic, or remediation scripts
 
-### Backend
+### Server configuration
 
-This component uses SuperPlane-managed AWS CodeBuild projects. Users configure the job they want to run, not CodeBuild itself.
-
-The SuperPlane server must be configured with dedicated environment variables (prefixed with RUN_BASH_) so it never accidentally reuses generic AWS credentials from the host:
-
-- RUN_BASH_CODEBUILD_REGION
-- RUN_BASH_CODEBUILD_PROJECT
-- RUN_BASH_AWS_ACCESS_KEY_ID
-- RUN_BASH_AWS_SECRET_ACCESS_KEY
-- RUN_BASH_AWS_SESSION_TOKEN (optional; required for temporary credentials)
-- RUN_BASH_CODEBUILD_DOCKER_PROJECT (optional; used when Docker support is enabled on the node)
+Self-hosted SuperPlane must configure dedicated RUN_BASH_* environment variables for the execution backend so Run Bash does not share credentials with other services. See your installation or operations guide for the required variables and how to set them.
 
 ### Output
 
 - **success**: Command exits with code 0
 - **failed**: Command runs and exits with a non-zero code
 
-Backend submission, checkout, credential injection, or infrastructure errors are shown as execution errors.
+Submission, checkout, credential injection, or infrastructure issues are shown as execution errors.
 
 ### Example Output
 
@@ -725,11 +716,11 @@ Backend submission, checkout, credential injection, or infrastructure errors are
         "path": "dist/image-digest.txt"
       }
     ],
-    "buildArn": "arn:aws:codebuild:...",
+    "buildArn": "arn:example:superplane-run/abc123",
     "buildId": "superplane-run-bash:example",
     "durationSeconds": 42,
     "exitCode": 0,
-    "logUrl": "https://console.aws.amazon.com/...",
+    "logUrl": "https://example.com/logs/...",
     "source": {
       "commitSha": "abc123",
       "ref": "main",
