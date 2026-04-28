@@ -13,6 +13,8 @@ services:
       DB_NAME: "superplane_dev"
       DB_USERNAME: "postgres"
       DB_POOL_SIZE: "2"
+      DB_STATEMENT_TIMEOUT: ${DB_STATEMENT_TIMEOUT:-60s}
+      DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT: ${DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT:-30s}
       POSTGRES_DB_SSL: "false"
       APP_ENV: development
       APPLICATION_NAME: "superplane"
