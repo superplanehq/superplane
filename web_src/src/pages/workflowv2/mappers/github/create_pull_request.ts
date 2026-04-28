@@ -30,6 +30,18 @@ export const createPullRequestMapper: ComponentBaseMapper = {
 
     const pr = outputs.default[0].data as PullRequest;
     details["Created At"] = context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-";
+    if (pr?.number !== undefined) {
+      details["Pull Request"] = `#${pr.number}`;
+    }
+    if (pr?.title) {
+      details["Title"] = pr.title;
+    }
+    if (pr?.state) {
+      details["State"] = pr.draft ? `${pr.state} (draft)` : pr.state;
+    }
+    if (pr?.head?.ref && pr?.base?.ref) {
+      details["Branches"] = `${pr.head.ref} → ${pr.base.ref}`;
+    }
     details["Pull Request URL"] = pr?.html_url || "";
 
     return details;

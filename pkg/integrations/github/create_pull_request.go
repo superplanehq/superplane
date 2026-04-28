@@ -2,9 +2,10 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -89,10 +90,11 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "head",
-			Label:    "Head Branch",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
+			Name:        "head",
+			Label:       "Head Branch",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The branch containing the changes to be merged.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           "branch",
@@ -104,11 +106,12 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "base",
-			Label:    "Base Branch",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
-			Default:  "main",
+			Name:        "base",
+			Label:       "Base Branch",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Default:     "main",
+			Description: "The branch the changes will be merged into. Must be different from the head branch.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           "branch",
@@ -120,16 +123,18 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "title",
-			Label:    "Title",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:        "title",
+			Label:       "Title",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Pull request title. Supports expressions.",
 		},
 		{
-			Name:     "body",
-			Label:    "Body",
-			Type:     configuration.FieldTypeText,
-			Required: false,
+			Name:        "body",
+			Label:       "Body",
+			Type:        configuration.FieldTypeText,
+			Required:    false,
+			Description: "Optional pull request description. Supports markdown and expressions.",
 		},
 		{
 			Name:        "draft",
@@ -157,19 +162,23 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if config.Repository == "" {
-		return fmt.Errorf("repository is required")
+		return errors.New("repository is required")
 	}
 
 	if config.Head == "" {
-		return fmt.Errorf("head branch is required")
+		return errors.New("head branch is required")
 	}
 
 	if config.Base == "" {
-		return fmt.Errorf("base branch is required")
+		return errors.New("base branch is required")
 	}
 
 	if config.Title == "" {
-		return fmt.Errorf("title is required")
+		return errors.New("title is required")
+	}
+
+	if config.Head == config.Base {
+		return errors.New("head and base branches must be different")
 	}
 
 	var appMetadata Metadata
@@ -203,7 +212,7 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 		prRequest,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create pull request: %w", err)
+		return fmt.Errorf("failed to create pull request: %w", explainGitHubError(err))
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -221,11 +230,11 @@ func (c *CreatePullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 	return 200, nil, nil
 }
 
-func (c *CreatePullRequest) Actions() []core.Action {
-	return []core.Action{}
+func (c *CreatePullRequest) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (c *CreatePullRequest) HandleAction(ctx core.ActionContext) error {
+func (c *CreatePullRequest) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
@@ -235,4 +244,32 @@ func (c *CreatePullRequest) Cancel(ctx core.ExecutionContext) error {
 
 func (c *CreatePullRequest) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+// explainGitHubError unwraps a *github.ErrorResponse into a more user-friendly
+// error so common GitHub 422 messages (e.g. "A pull request already exists",
+// "No commits between base and head") surface in the run log instead of a
+// generic transport error.
+func explainGitHubError(err error) error {
+	var ghErr *github.ErrorResponse
+	if !errors.As(err, &ghErr) {
+		return err
+	}
+
+	msg := ghErr.Message
+	for _, inner := range ghErr.Errors {
+		if inner.Message == "" {
+			continue
+		}
+		if msg == "" {
+			msg = inner.Message
+			continue
+		}
+		msg = fmt.Sprintf("%s: %s", msg, inner.Message)
+	}
+
+	if msg == "" {
+		return err
+	}
+	return errors.New(msg)
 }

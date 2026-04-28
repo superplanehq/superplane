@@ -62,16 +62,21 @@ export interface Release {
 
 export interface PullRequest {
   title?: string;
-  id?: string;
+  id?: number;
   number?: number;
+  state?: string;
+  draft?: boolean;
   url?: string;
   html_url?: string;
   head?: {
     sha: string;
     ref: string;
   };
+  base?: {
+    ref: string;
+  };
   user?: {
-    id: string;
+    id: number;
     login: string;
   };
   _links?: {

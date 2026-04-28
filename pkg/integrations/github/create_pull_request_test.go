@@ -145,4 +145,19 @@ func Test__CreatePullRequest__Execute(t *testing.T) {
 
 		require.ErrorContains(t, err, "title is required")
 	})
+
+	t.Run("head and base must differ", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Integration:    &contexts.IntegrationContext{},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository": "hello",
+				"head":       "main",
+				"base":       "main",
+				"title":      "My PR",
+			},
+		})
+
+		require.ErrorContains(t, err, "head and base branches must be different")
+	})
 }
