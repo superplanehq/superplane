@@ -161,6 +161,30 @@ func TestResolveCanvasForFileUpdateWithoutFileIDRequiresTarget(t *testing.T) {
 	require.Empty(t, server.expectations)
 }
 
+func TestResolveCanvasForFileUpdateWithFileIDAndMatchingPositionalName(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	server := newAPITestServer(t, requestExpectation{
+		method: http.MethodGet,
+		path:   "/api/v1/canvases",
+		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"` + canvasID + `","name":"my-canvas"}}]}`))
+		},
+	})
+
+	filePath := writeTestCanvasFileWithMetadataID(t, "my-canvas", canvasID)
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{"my-canvas"}
+
+	gotID, canvas, err := resolveCanvasForFileUpdate(ctx, filePath)
+	require.NoError(t, err)
+	require.Equal(t, canvasID, gotID)
+	md := canvas.GetMetadata()
+	require.Equal(t, canvasID, (&md).GetId())
+
+	server.AssertCalls(t, []string{http.MethodGet + " /api/v1/canvases"})
+}
+
 func TestResolveCanvasForFileUpdateRejectsIDMismatchWithUUIDArg(t *testing.T) {
 	server := newAPITestServer(t)
 	fileID := "11111111-1111-1111-1111-111111111111"
