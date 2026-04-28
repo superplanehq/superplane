@@ -664,9 +664,8 @@ export function SettingsTab({
                 )}
               </p>
             ) : null}
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Paste a curl command to auto-populate HTTP configuration fields.
-            </p>
+            <Label className="block text-left">Paste curl</Label>
+
             <TextFieldRenderer
               field={{
                 name: "curlImport",
@@ -681,7 +680,9 @@ export function SettingsTab({
               autocompleteExampleObj={resolvedAutocompleteExampleObj}
               size="xs"
             />
-
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Paste a curl command to auto-populate HTTP configuration fields.
+            </p>
             <div className="flex justify-end">
               <Button
                 type="button"
