@@ -134,6 +134,52 @@ func findCanvasID(ctx core.CommandContext, client *openapi_client.APIClient, nam
 	return findCanvasIDByName(ctx, client, nameOrID)
 }
 
+func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {
+	if len(ctx.Args) > 1 {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one positional argument")
+	}
+
+	var canvasID string
+	var err error
+
+	if len(ctx.Args) == 1 {
+		canvasID, err = findCanvasID(ctx, ctx.API, ctx.Args[0])
+		if err != nil {
+			return "", openapi_client.CanvasesCanvas{}, err
+		}
+	} else {
+		if ctx.Config == nil {
+			return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("no canvas specified: pass a canvas name or id, or set an active canvas with `superplane canvases active`")
+		}
+		active := strings.TrimSpace(ctx.Config.GetActiveCanvas())
+		if active == "" {
+			return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("no canvas specified: pass a canvas name or id, or set an active canvas with `superplane canvases active`")
+		}
+		canvasID, err = findCanvasID(ctx, ctx.API, active)
+		if err != nil {
+			return "", openapi_client.CanvasesCanvas{}, err
+		}
+	}
+
+	canvas, err := describeCanvasByID(ctx, canvasID)
+	if err != nil {
+		return "", openapi_client.CanvasesCanvas{}, err
+	}
+
+	return canvasID, canvas, nil
+}
+
+func describeCanvasByID(ctx core.CommandContext, canvasID string) (openapi_client.CanvasesCanvas, error) {
+	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
+	if err != nil {
+		return openapi_client.CanvasesCanvas{}, err
+	}
+	if response.Canvas == nil {
+		return openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas %q not found", canvasID)
+	}
+	return *response.Canvas, nil
+}
+
 func findCanvasIDByName(ctx core.CommandContext, client *openapi_client.APIClient, name string) (string, error) {
 	response, _, err := client.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
 	if err != nil {

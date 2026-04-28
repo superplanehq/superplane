@@ -191,7 +191,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if versionID == "" {
-			return fmt.Errorf("no draft version found; run `superplane canvases update %s --draft ...` first", canvasID)
+			return fmt.Errorf("no draft version found; run `superplane canvases update --draft -f <file>` first")
 		}
 	}
 
@@ -232,7 +232,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 }
 
 type changeRequestActionCommand struct {
-	action openapi_client.CanvasesActOnCanvasChangeRequestRequestAction
+	action openapi_client.ActOnCanvasChangeRequestRequestAction
 }
 
 func (c *changeRequestActionCommand) Execute(ctx core.CommandContext) error {
@@ -506,17 +506,17 @@ func formatTimeOrDash(value time.Time, hasValue bool) string {
 	return value.Format(time.RFC3339)
 }
 
-func eventLabelForChangeRequestAction(action openapi_client.CanvasesActOnCanvasChangeRequestRequestAction) string {
+func eventLabelForChangeRequestAction(action openapi_client.ActOnCanvasChangeRequestRequestAction) string {
 	switch action {
-	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE:
+	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE:
 		return "approved"
-	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE:
+	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE:
 		return "unapproved"
-	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT:
+	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT:
 		return "rejected"
-	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN:
+	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN:
 		return "reopened"
-	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH:
+	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH:
 		return "published"
 	default:
 		return strings.ToLower(string(action))
