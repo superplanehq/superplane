@@ -20,7 +20,7 @@
     "pkg/cli/core": 46.1,
     "pkg/config": 0,
     "pkg/configuration": 26.2,
-    "pkg/configuration/expressionvalidation": 70,
+    "pkg/configuration/expressionvalidation": 71.5,
     "pkg/crypto": 53.7,
     "pkg/database": 0,
     "pkg/exprruntime": 36.4,
@@ -29,7 +29,7 @@
     "pkg/grpc/actions/agents": 44,
     "pkg/grpc/actions/auth": 80.8,
     "pkg/grpc/actions/blueprints": 0,
-    "pkg/grpc/actions/canvases": 58,
+    "pkg/grpc/actions/canvases": 61.5,
     "pkg/grpc/actions/canvases/changesets": 84.4,
     "pkg/grpc/actions/canvases/layout": 63.4,
     "pkg/grpc/actions/integrations": 0,
@@ -62,7 +62,7 @@
     "pkg/web": 82.1,
     "pkg/widgets/annotation": 0,
     "pkg/workers": 39.5,
-    "pkg/workers/contexts": 42.5,
+    "pkg/workers/contexts": 41.5,
     "pkg/workers/eventdistributer": 0
   },
   "ignoredPackagePrefixes": [
