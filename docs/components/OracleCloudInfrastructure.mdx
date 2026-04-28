@@ -17,9 +17,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Compute Instance" href="#create-compute-instance" description="Provision a new OCI Compute instance and wait for it to reach RUNNING state" />
   <LinkCard title="Create Image" href="#create-image" description="Create an OCI boot disk image from an instance or Object Storage export" />
-  <LinkCard title="Delete Image" href="#delete-image" description="Delete an OCI image by OCID" />
-  <LinkCard title="Get Image" href="#get-image" description="Get OCI image details by OCID" />
-  <LinkCard title="Update Image" href="#update-image" description="Update an OCI image display name" />
+  <LinkCard title="Delete Image" href="#delete-image" description="Delete an OCI custom image by OCID" />
+  <LinkCard title="Get Image" href="#get-image" description="Get OCI custom image details by OCID" />
+  <LinkCard title="Update Image" href="#update-image" description="Update an OCI custom image display name" />
 </CardGrid>
 
 ## Instructions
@@ -177,6 +177,8 @@ The Create Image component creates an OCI Compute boot disk image.
 - **Display Name**: Friendly name for the image
 - **Instance OCID**: Source instance when creating from an instance
 - **Source Image Type**: Image format for imported images, such as QCOW2, VMDK, or OCI
+- **Namespace, Bucket, Object**: Object Storage location when importing from a bucket object
+- **Tags**: Optional freeform tags to apply to the image
 
 ### Completion behavior
 
@@ -210,7 +212,7 @@ The component waits for the image to reach `AVAILABLE` before emitting.
 
 ## Delete Image
 
-The Delete Image component deletes an OCI Compute image.
+The Delete Image component deletes an OCI Compute custom image. Oracle-provided platform images cannot be deleted.
 
 ### Use Cases
 
@@ -236,7 +238,7 @@ The Delete Image component deletes an OCI Compute image.
 
 ## Get Image
 
-The Get Image component retrieves metadata for an OCI Compute image.
+The Get Image component retrieves metadata for an OCI Compute custom image. Oracle-provided platform images are not returned by this component.
 
 ### Use Cases
 
@@ -272,7 +274,7 @@ The Get Image component retrieves metadata for an OCI Compute image.
 
 ## Update Image
 
-The Update Image component updates the display name of an OCI Compute image.
+The Update Image component updates the display name of an OCI Compute custom image. Oracle-provided platform images cannot be updated.
 
 ### Use Cases
 

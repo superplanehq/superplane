@@ -19,12 +19,12 @@ type GetImageConfiguration struct {
 
 func (c *GetImage) Name() string        { return "oci.getImage" }
 func (c *GetImage) Label() string       { return "Get Image" }
-func (c *GetImage) Description() string { return "Get OCI image details by OCID" }
+func (c *GetImage) Description() string { return "Get OCI custom image details by OCID" }
 func (c *GetImage) Icon() string        { return "oci" }
 func (c *GetImage) Color() string       { return "red" }
 
 func (c *GetImage) Documentation() string {
-	return `The Get Image component retrieves metadata for an OCI Compute image.
+	return `The Get Image component retrieves metadata for an OCI Compute custom image. Oracle-provided platform images are not returned by this component.
 
 ## Use Cases
 
@@ -42,7 +42,7 @@ func (c *GetImage) ExampleOutput() map[string]any {
 }
 
 func (c *GetImage) Configuration() []configuration.Field {
-	return []configuration.Field{imageIDField(true)}
+	return []configuration.Field{customImageIDField(true)}
 }
 
 func (c *GetImage) Setup(ctx core.SetupContext) error {
@@ -53,7 +53,7 @@ func (c *GetImage) Setup(ctx core.SetupContext) error {
 	if err := validateImageID(config.ImageID); err != nil {
 		return err
 	}
-	return ctx.Metadata.Set(imageNodeMetadata{ImageID: config.ImageID})
+	return ctx.Metadata.Set(resolveImageNodeMetadata(ctx, imageNodeMetadata{ImageID: config.ImageID}))
 }
 
 func (c *GetImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -74,9 +74,9 @@ func (c *GetImage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	image, err := client.GetImage(config.ImageID)
+	image, err := ensureCustomImageForOperation(client, config.ImageID, "retrieved")
 	if err != nil {
-		return fmt.Errorf("failed to get image: %w", err)
+		return err
 	}
 
 	if err := ctx.Metadata.Set(imageExecutionMetadata{

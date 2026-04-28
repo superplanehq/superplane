@@ -4,17 +4,18 @@ import { updateImageMapper } from "./update_image";
 import { buildImageComponentCtx, buildImageDetailsCtx, buildImageOutput } from "./image_mapper_test_helpers";
 
 describe("updateImageMapper", () => {
-  it("includes image ID and target display name metadata", () => {
+  it("includes image name and target display name metadata", () => {
     const props = updateImageMapper.props(
       buildImageComponentCtx({
         componentName: "oci.updateImage",
         configuration: { imageId: "ocid1.image.oc1..example", displayName: "production-image" },
+        metadata: { imageName: "golden-image" },
       }),
     );
 
     expect(props.metadata).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ icon: "disc", label: "ocid1.image.oc1..example" }),
+        expect.objectContaining({ icon: "disc", label: "golden-image" }),
         expect.objectContaining({ icon: "tag", label: "production-image" }),
       ]),
     );

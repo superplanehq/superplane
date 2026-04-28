@@ -19,12 +19,12 @@ type DeleteImageConfiguration struct {
 
 func (c *DeleteImage) Name() string        { return "oci.deleteImage" }
 func (c *DeleteImage) Label() string       { return "Delete Image" }
-func (c *DeleteImage) Description() string { return "Delete an OCI image by OCID" }
+func (c *DeleteImage) Description() string { return "Delete an OCI custom image by OCID" }
 func (c *DeleteImage) Icon() string        { return "oci" }
 func (c *DeleteImage) Color() string       { return "red" }
 
 func (c *DeleteImage) Documentation() string {
-	return `The Delete Image component deletes an OCI Compute image.
+	return `The Delete Image component deletes an OCI Compute custom image. Oracle-provided platform images cannot be deleted.
 
 ## Use Cases
 
@@ -42,7 +42,7 @@ func (c *DeleteImage) ExampleOutput() map[string]any {
 }
 
 func (c *DeleteImage) Configuration() []configuration.Field {
-	return []configuration.Field{imageIDField(true)}
+	return []configuration.Field{customImageIDField(true)}
 }
 
 func (c *DeleteImage) Setup(ctx core.SetupContext) error {
@@ -53,7 +53,7 @@ func (c *DeleteImage) Setup(ctx core.SetupContext) error {
 	if err := validateImageID(config.ImageID); err != nil {
 		return err
 	}
-	return ctx.Metadata.Set(imageNodeMetadata{ImageID: config.ImageID})
+	return ctx.Metadata.Set(resolveImageNodeMetadata(ctx, imageNodeMetadata{ImageID: config.ImageID}))
 }
 
 func (c *DeleteImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -72,6 +72,10 @@ func (c *DeleteImage) Execute(ctx core.ExecutionContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	if _, err := ensureCustomImage(client, config.ImageID); err != nil {
+		return err
 	}
 
 	startedAt := time.Now().UTC().Format(time.RFC3339)

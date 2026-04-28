@@ -27,6 +27,15 @@ interface CreateComputeInstanceConfiguration {
   enableConfidentialComputing?: boolean;
 }
 
+interface CreateComputeInstanceNodeMetadata {
+  displayName?: string;
+  shape?: string;
+  availabilityDomain?: string;
+  imageName?: string;
+  subnetName?: string;
+  blockVolumeName?: string;
+}
+
 interface CreateComputeInstanceOutputData {
   displayName?: string;
   lifecycleState?: string;
@@ -113,18 +122,34 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 
 function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateComputeInstanceConfiguration | undefined;
+  const nodeMetadata = node.metadata as CreateComputeInstanceNodeMetadata | undefined;
   const items: MetadataItem[] = [];
 
-  if (config?.displayName) {
-    items.push({ icon: "tag", label: config.displayName });
+  const displayName = nodeMetadata?.displayName ?? config?.displayName;
+  if (displayName) {
+    items.push({ icon: "tag", label: displayName });
   }
 
-  if (config?.shape) {
-    items.push({ icon: "cpu", label: config.shape });
+  const shape = nodeMetadata?.shape ?? config?.shape;
+  if (shape) {
+    items.push({ icon: "cpu", label: shape });
   }
 
-  if (config?.availabilityDomain) {
-    items.push({ icon: "map-pin", label: config.availabilityDomain });
+  const availabilityDomain = nodeMetadata?.availabilityDomain ?? config?.availabilityDomain;
+  if (availabilityDomain) {
+    items.push({ icon: "map-pin", label: availabilityDomain });
+  }
+
+  if (nodeMetadata?.imageName) {
+    items.push({ icon: "disc", label: nodeMetadata.imageName });
+  }
+
+  if (nodeMetadata?.subnetName) {
+    items.push({ icon: "network", label: nodeMetadata.subnetName });
+  }
+
+  if (nodeMetadata?.blockVolumeName) {
+    items.push({ icon: "database", label: nodeMetadata.blockVolumeName });
   }
 
   return items;

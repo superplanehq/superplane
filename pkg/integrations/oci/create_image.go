@@ -23,6 +23,7 @@ type CreateImage struct{}
 type CreateImageConfiguration struct {
 	SourceType      string `json:"sourceType" mapstructure:"sourceType"`
 	CompartmentID   string `json:"compartmentId" mapstructure:"compartmentId"`
+	Instance        string `json:"instance" mapstructure:"instance"`
 	InstanceID      string `json:"instanceId" mapstructure:"instanceId"`
 	DisplayName     string `json:"displayName" mapstructure:"displayName"`
 	SourceImageType string `json:"sourceImageType" mapstructure:"sourceImageType"`
@@ -30,6 +31,12 @@ type CreateImageConfiguration struct {
 	NamespaceName   string `json:"namespaceName" mapstructure:"namespaceName"`
 	BucketName      string `json:"bucketName" mapstructure:"bucketName"`
 	ObjectName      string `json:"objectName" mapstructure:"objectName"`
+	Tags            []Tag  `json:"tags" mapstructure:"tags"`
+}
+
+type Tag struct {
+	Key   string `json:"key" mapstructure:"key"`
+	Value string `json:"value" mapstructure:"value"`
 }
 
 func (c *CreateImage) Name() string {
@@ -60,6 +67,8 @@ func (c *CreateImage) Documentation() string {
 - **Display Name**: Friendly name for the image
 - **Instance OCID**: Source instance when creating from an instance
 - **Source Image Type**: Image format for imported images, such as QCOW2, VMDK, or OCI
+- **Namespace, Bucket, Object**: Object Storage location when importing from a bucket object
+- **Tags**: Optional freeform tags to apply to the image
 
 ## Completion behavior
 
@@ -82,41 +91,49 @@ func (c *CreateImage) Configuration() []configuration.Field {
 		{
 			Name:        "sourceType",
 			Label:       "Source Type",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Default:     createImageSourceInstance,
 			Description: "Choose whether to create from an instance or import an exported image",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Instance", Value: createImageSourceInstance},
-						{Label: "Object Storage URL", Value: createImageSourceObjectStorageURI},
-						{Label: "Object Storage Object", Value: createImageSourceObjectStorageObject},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeImageSource,
 				},
 			},
 		},
 		compartmentField(),
 		displayNameField(true),
 		{
-			Name:        "instanceId",
-			Label:       "Instance OCID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Name:        "instance",
+			Label:       "Instance",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
 			Description: "OCID of the source instance",
-			Placeholder: "ocid1.instance.oc1..",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "sourceType", Values: []string{createImageSourceInstance}},
 			},
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "sourceType", Values: []string{createImageSourceInstance}},
 			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeInstance,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "compartmentId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "compartmentId",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "sourceImageType",
 			Label:       "Source Image Type",
-			Type:        configuration.FieldTypeSelect,
-			Required:    true,
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
 			Description: "Format of the exported image in Object Storage",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageURI, createImageSourceObjectStorageObject}},
@@ -125,12 +142,8 @@ func (c *CreateImage) Configuration() []configuration.Field {
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageURI, createImageSourceObjectStorageObject}},
 			},
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "QCOW2", Value: "QCOW2"},
-						{Label: "VMDK", Value: "VMDK"},
-						{Label: "OCI", Value: "OCI"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeSourceImageType,
 				},
 			},
 		},
@@ -138,7 +151,7 @@ func (c *CreateImage) Configuration() []configuration.Field {
 			Name:        "sourceUri",
 			Label:       "Source URI",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Required:    false,
 			Description: "Object Storage URL or pre-authenticated request URL for the image",
 			Placeholder: "https://objectstorage.region.oraclecloud.com/...",
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -151,8 +164,8 @@ func (c *CreateImage) Configuration() []configuration.Field {
 		{
 			Name:        "namespaceName",
 			Label:       "Namespace",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
 			Description: "Object Storage namespace",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageObject}},
@@ -160,12 +173,17 @@ func (c *CreateImage) Configuration() []configuration.Field {
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageObject}},
 			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeObjectNamespace,
+				},
+			},
 		},
 		{
 			Name:        "bucketName",
 			Label:       "Bucket",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
 			Description: "Object Storage bucket name",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageObject}},
@@ -173,18 +191,86 @@ func (c *CreateImage) Configuration() []configuration.Field {
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageObject}},
 			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeObjectBucket,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "compartmentId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "compartmentId",
+							},
+						},
+						{
+							Name: "namespaceName",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "namespaceName",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "objectName",
 			Label:       "Object",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
 			Description: "Object name for the exported image",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageObject}},
 			},
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "sourceType", Values: []string{createImageSourceObjectStorageObject}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeObject,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "namespaceName",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "namespaceName",
+							},
+						},
+						{
+							Name: "bucketName",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "bucketName",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "tags",
+			Label:       "Tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional freeform tags to apply to the image",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "key",
+								Label:    "Key",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -200,10 +286,12 @@ func (c *CreateImage) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return ctx.Metadata.Set(imageNodeMetadata{
+	return ctx.Metadata.Set(resolveImageNodeMetadata(ctx, imageNodeMetadata{
 		CompartmentID: config.CompartmentID,
 		DisplayName:   config.DisplayName,
-	})
+		InstanceID:    config.Instance,
+		SourceType:    config.SourceType,
+	}))
 }
 
 func (c *CreateImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -328,13 +416,22 @@ func decodeCreateImageConfiguration(input any) (CreateImageConfiguration, error)
 		config.SourceType = createImageSourceInstance
 	}
 	config.CompartmentID = strings.TrimSpace(config.CompartmentID)
+	config.Instance = strings.TrimSpace(config.Instance)
 	config.InstanceID = strings.TrimSpace(config.InstanceID)
+	if config.Instance == "" {
+		config.Instance = config.InstanceID
+	}
+	config.InstanceID = config.Instance
 	config.DisplayName = strings.TrimSpace(config.DisplayName)
 	config.SourceImageType = strings.TrimSpace(config.SourceImageType)
 	config.SourceURI = strings.TrimSpace(config.SourceURI)
 	config.NamespaceName = strings.TrimSpace(config.NamespaceName)
 	config.BucketName = strings.TrimSpace(config.BucketName)
 	config.ObjectName = strings.TrimSpace(config.ObjectName)
+	for i := range config.Tags {
+		config.Tags[i].Key = strings.TrimSpace(config.Tags[i].Key)
+		config.Tags[i].Value = strings.TrimSpace(config.Tags[i].Value)
+	}
 
 	return config, nil
 }
@@ -350,7 +447,7 @@ func validateCreateImageConfiguration(config CreateImageConfiguration) error {
 	switch config.SourceType {
 	case createImageSourceInstance:
 		if config.InstanceID == "" {
-			return errors.New("instanceId is required")
+			return errors.New("instance is required")
 		}
 	case createImageSourceObjectStorageURI:
 		if config.SourceImageType == "" {
@@ -376,6 +473,18 @@ func validateCreateImageConfiguration(config CreateImageConfiguration) error {
 		return fmt.Errorf("unsupported sourceType: %s", config.SourceType)
 	}
 
+	for _, tag := range config.Tags {
+		if tag.Key == "" && tag.Value == "" {
+			continue
+		}
+		if tag.Key == "" {
+			return errors.New("tag key is required")
+		}
+		if tag.Value == "" {
+			return errors.New("tag value is required")
+		}
+	}
+
 	return nil
 }
 
@@ -383,6 +492,7 @@ func createImageRequest(config CreateImageConfiguration) CreateImageRequest {
 	req := CreateImageRequest{
 		CompartmentID: config.CompartmentID,
 		DisplayName:   config.DisplayName,
+		FreeformTags:  tagsToMap(config.Tags),
 	}
 
 	switch config.SourceType {
@@ -405,4 +515,23 @@ func createImageRequest(config CreateImageConfiguration) CreateImageRequest {
 	}
 
 	return req
+}
+
+func tagsToMap(tags []Tag) map[string]string {
+	if len(tags) == 0 {
+		return nil
+	}
+
+	out := map[string]string{}
+	for _, tag := range tags {
+		if tag.Key == "" && tag.Value == "" {
+			continue
+		}
+		out[tag.Key] = tag.Value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }

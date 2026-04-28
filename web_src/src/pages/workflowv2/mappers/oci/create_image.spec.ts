@@ -4,7 +4,7 @@ import { createImageMapper } from "./create_image";
 import { buildImageComponentCtx, buildImageDetailsCtx, buildImageOutput } from "./image_mapper_test_helpers";
 
 describe("createImageMapper.props", () => {
-  it("includes node metadata from configuration", () => {
+  it("includes human-readable node metadata", () => {
     const props = createImageMapper.props(
       buildImageComponentCtx({
         componentName: "oci.createImage",
@@ -13,14 +13,20 @@ describe("createImageMapper.props", () => {
           compartmentId: "ocid1.compartment.oc1..example",
           sourceType: "instance",
         },
+        metadata: {
+          compartmentName: "Production",
+          instanceName: "source-instance",
+          sourceType: "instance",
+        },
       }),
     );
 
     expect(props.metadata).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ icon: "tag", label: "golden-image" }),
-        expect.objectContaining({ icon: "folder", label: "ocid1.compartment.oc1..example" }),
-        expect.objectContaining({ icon: "hard-drive", label: "instance" }),
+        expect.objectContaining({ icon: "folder", label: "Production" }),
+        expect.objectContaining({ icon: "server", label: "source-instance" }),
+        expect.objectContaining({ icon: "hard-drive", label: "Instance" }),
       ]),
     );
   });

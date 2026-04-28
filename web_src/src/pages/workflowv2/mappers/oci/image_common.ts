@@ -5,7 +5,18 @@ export interface OCIImageConfiguration {
   imageId?: string;
   compartmentId?: string;
   displayName?: string;
+  instance?: string;
   instanceId?: string;
+  sourceType?: string;
+  bucketName?: string;
+  objectName?: string;
+}
+
+interface OCIImageNodeMetadata {
+  imageName?: string;
+  compartmentName?: string;
+  instanceName?: string;
+  displayName?: string;
   sourceType?: string;
 }
 
@@ -19,6 +30,7 @@ export interface OCIImage {
   launchMode?: string;
   sizeInMBs?: number;
   timeCreated?: string;
+  freeformTags?: Record<string, string>;
 }
 
 export interface OCIImageOutputData {
@@ -51,25 +63,53 @@ export function getOutputData(context: ExecutionDetailsContext): OCIImageOutputD
 
 export function imageMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as OCIImageConfiguration | undefined;
+  const nodeMetadata = node.metadata as OCIImageNodeMetadata | undefined;
   const items: MetadataItem[] = [];
 
-  if (config?.displayName) {
-    items.push({ icon: "tag", label: config.displayName });
+  const displayName = nodeMetadata?.displayName ?? config?.displayName;
+  if (displayName) {
+    items.push({ icon: "tag", label: displayName });
   }
 
-  if (config?.imageId) {
-    items.push({ icon: "disc", label: config.imageId });
+  if (nodeMetadata?.imageName) {
+    items.push({ icon: "disc", label: nodeMetadata.imageName });
   }
 
-  if (config?.compartmentId) {
-    items.push({ icon: "folder", label: config.compartmentId });
+  if (nodeMetadata?.compartmentName) {
+    items.push({ icon: "folder", label: nodeMetadata.compartmentName });
   }
 
-  if (config?.sourceType) {
-    items.push({ icon: "hard-drive", label: config.sourceType });
+  if (nodeMetadata?.instanceName) {
+    items.push({ icon: "server", label: nodeMetadata.instanceName });
+  }
+
+  if (config?.bucketName) {
+    items.push({ icon: "archive", label: config.bucketName });
+  }
+
+  if (config?.objectName) {
+    items.push({ icon: "file", label: config.objectName });
+  }
+
+  const sourceType = sourceTypeLabel(nodeMetadata?.sourceType ?? config?.sourceType);
+  if (sourceType) {
+    items.push({ icon: "hard-drive", label: sourceType });
   }
 
   return items;
+}
+
+function sourceTypeLabel(sourceType?: string): string | undefined {
+  switch (sourceType) {
+    case "instance":
+      return "Instance";
+    case "objectStorageUri":
+      return "Object Storage URL";
+    case "objectStorageObject":
+      return "Object Storage Object";
+    default:
+      return sourceType;
+  }
 }
 
 export function addExecutedAt(details: Record<string, string>, context: ExecutionDetailsContext): void {
@@ -95,6 +135,11 @@ export function imageDetails(context: ExecutionDetailsContext): Record<string, s
     details["Operating System"] = `${image.operatingSystem}${version}`;
   }
   if (image.launchMode) details["Launch Mode"] = image.launchMode;
+  if (image.freeformTags && Object.keys(image.freeformTags).length > 0) {
+    details["Tags"] = Object.entries(image.freeformTags)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(", ");
+  }
   if (image.timeCreated) details["Created At"] = new Date(image.timeCreated).toLocaleString();
 
   return details;

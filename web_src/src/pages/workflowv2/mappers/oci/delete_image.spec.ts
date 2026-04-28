@@ -4,16 +4,17 @@ import { deleteImageMapper } from "./delete_image";
 import { buildImageComponentCtx, buildImageDetailsCtx, buildImageOutput } from "./image_mapper_test_helpers";
 
 describe("deleteImageMapper", () => {
-  it("includes image ID metadata", () => {
+  it("includes image name metadata", () => {
     const props = deleteImageMapper.props(
       buildImageComponentCtx({
         componentName: "oci.deleteImage",
         configuration: { imageId: "ocid1.image.oc1..example" },
+        metadata: { imageName: "golden-image" },
       }),
     );
 
     expect(props.metadata).toEqual(
-      expect.arrayContaining([expect.objectContaining({ icon: "disc", label: "ocid1.image.oc1..example" })]),
+      expect.arrayContaining([expect.objectContaining({ icon: "disc", label: "golden-image" })]),
     );
   });
 

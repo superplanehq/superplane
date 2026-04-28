@@ -26,7 +26,7 @@ func Test__CreateImage__Setup(t *testing.T) {
 
 	t.Run("missing compartment -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"displayName": "image", "instanceId": "ocid1.instance.oc1..example"},
+			Configuration: map[string]any{"displayName": "image", "instance": "ocid1.instance.oc1..example"},
 			Metadata:      &contexts.MetadataContext{},
 		})
 		require.ErrorContains(t, err, "compartmentId is required")
@@ -37,7 +37,7 @@ func Test__CreateImage__Setup(t *testing.T) {
 			Configuration: map[string]any{"compartmentId": "ocid1.compartment.oc1..example", "displayName": "image"},
 			Metadata:      &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, "instanceId is required")
+		require.ErrorContains(t, err, "instance is required")
 	})
 
 	t.Run("valid configuration stores node metadata", func(t *testing.T) {
@@ -46,7 +46,7 @@ func Test__CreateImage__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"compartmentId": "ocid1.compartment.oc1..example",
 				"displayName":   "image",
-				"instanceId":    "ocid1.instance.oc1..example",
+				"instance":      "ocid1.instance.oc1..example",
 			},
 			Metadata: metadata,
 		})
@@ -55,6 +55,51 @@ func Test__CreateImage__Setup(t *testing.T) {
 		assert.Equal(t, "ocid1.compartment.oc1..example", stored.CompartmentID)
 		assert.Equal(t, "image", stored.DisplayName)
 	})
+}
+
+func Test__CreateImage__ConfigurationUsesConditionalRequiredFields(t *testing.T) {
+	fields := (&CreateImage{}).Configuration()
+	foundTags := false
+
+	for _, field := range fields {
+		switch field.Name {
+		case "sourceType":
+			require.NotNil(t, field.TypeOptions)
+			require.NotNil(t, field.TypeOptions.Resource)
+			assert.Equal(t, ResourceTypeImageSource, field.TypeOptions.Resource.Type)
+		case "instance", "sourceImageType", "sourceUri", "namespaceName", "bucketName", "objectName":
+			assert.False(t, field.Required, "%s should rely on requiredConditions", field.Name)
+			assert.NotEmpty(t, field.RequiredConditions)
+			switch field.Name {
+			case "instance":
+				require.NotNil(t, field.TypeOptions)
+				require.NotNil(t, field.TypeOptions.Resource)
+				assert.Equal(t, ResourceTypeInstance, field.TypeOptions.Resource.Type)
+			case "sourceImageType":
+				require.NotNil(t, field.TypeOptions)
+				require.NotNil(t, field.TypeOptions.Resource)
+				assert.Equal(t, ResourceTypeSourceImageType, field.TypeOptions.Resource.Type)
+			case "namespaceName":
+				require.NotNil(t, field.TypeOptions)
+				require.NotNil(t, field.TypeOptions.Resource)
+				assert.Equal(t, ResourceTypeObjectNamespace, field.TypeOptions.Resource.Type)
+			case "bucketName":
+				require.NotNil(t, field.TypeOptions)
+				require.NotNil(t, field.TypeOptions.Resource)
+				assert.Equal(t, ResourceTypeObjectBucket, field.TypeOptions.Resource.Type)
+			case "objectName":
+				require.NotNil(t, field.TypeOptions)
+				require.NotNil(t, field.TypeOptions.Resource)
+				assert.Equal(t, ResourceTypeObject, field.TypeOptions.Resource.Type)
+			}
+		case "tags":
+			foundTags = true
+			assert.Equal(t, "list", field.Type)
+			require.NotNil(t, field.TypeOptions)
+			require.NotNil(t, field.TypeOptions.List)
+		}
+	}
+	assert.True(t, foundTags)
 }
 
 func Test__CreateImage__ExecuteAndPoll(t *testing.T) {
@@ -82,7 +127,8 @@ func Test__CreateImage__ExecuteAndPoll(t *testing.T) {
 					"launchMode":"PARAVIRTUALIZED",
 					"sizeInMBs":51200,
 					"timeCreated":"2026-04-28T09:12:42.000Z",
-					"createImageAllowed":true
+					"createImageAllowed":true,
+					"freeformTags":{"env":"test"}
 				}`)),
 			},
 		},
@@ -96,7 +142,10 @@ func Test__CreateImage__ExecuteAndPoll(t *testing.T) {
 		Configuration: map[string]any{
 			"compartmentId": "ocid1.compartment.oc1..example",
 			"displayName":   "image",
-			"instanceId":    "ocid1.instance.oc1..source",
+			"instance":      "ocid1.instance.oc1..source",
+			"tags": []map[string]any{
+				{"key": "env", "value": "test"},
+			},
 		},
 		HTTP:           httpContext,
 		Metadata:       metadata,
@@ -113,6 +162,7 @@ func Test__CreateImage__ExecuteAndPoll(t *testing.T) {
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(body), `"instanceId":"ocid1.instance.oc1..source"`)
+	assert.Contains(t, string(body), `"freeformTags":{"env":"test"}`)
 
 	err = component.HandleHook(core.ActionHookContext{
 		Name:           "poll",
@@ -129,6 +179,7 @@ func Test__CreateImage__ExecuteAndPoll(t *testing.T) {
 	assert.Equal(t, "ocid1.image.oc1..created", image["id"])
 	assert.Equal(t, "AVAILABLE", image["lifecycleState"])
 	assert.Equal(t, "Oracle Linux", image["operatingSystem"])
+	assert.Equal(t, map[string]string{"env": "test"}, image["freeformTags"])
 
 	stored := metadata.Get().(imageExecutionMetadata)
 	assert.Equal(t, "ocid1.image.oc1..created", stored.ImageID)
@@ -143,6 +194,9 @@ func Test__CreateImage__ObjectStorageURIRequest(t *testing.T) {
 		"displayName":     "imported",
 		"sourceImageType": "QCOW2",
 		"sourceUri":       "https://objectstorage.example.com/image.qcow2",
+		"tags": []map[string]any{
+			{"key": "purpose", "value": "import"},
+		},
 	})
 	require.NoError(t, err)
 	require.NoError(t, validateCreateImageConfiguration(config))
@@ -153,6 +207,32 @@ func Test__CreateImage__ObjectStorageURIRequest(t *testing.T) {
 	assert.Equal(t, "objectStorageUri", req.ImageSourceDetails.SourceType)
 	assert.Equal(t, "QCOW2", req.ImageSourceDetails.SourceImageType)
 	assert.Equal(t, "https://objectstorage.example.com/image.qcow2", req.ImageSourceDetails.SourceURI)
+	assert.Equal(t, map[string]string{"purpose": "import"}, req.FreeformTags)
+}
+
+func Test__CreateImage__InvalidTag(t *testing.T) {
+	config, err := decodeCreateImageConfiguration(map[string]any{
+		"compartmentId": "ocid1.compartment.oc1..example",
+		"displayName":   "image",
+		"instance":      "ocid1.instance.oc1..source",
+		"tags": []map[string]any{
+			{"key": "env", "value": " "},
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorContains(t, validateCreateImageConfiguration(config), "tag value is required")
+}
+
+func Test__CreateImage__LegacyInstanceIDConfiguration(t *testing.T) {
+	config, err := decodeCreateImageConfiguration(map[string]any{
+		"compartmentId": "ocid1.compartment.oc1..example",
+		"displayName":   "image",
+		"instanceId":    "ocid1.instance.oc1..legacy",
+	})
+	require.NoError(t, err)
+	require.NoError(t, validateCreateImageConfiguration(config))
+	assert.Equal(t, "ocid1.instance.oc1..legacy", config.Instance)
+	assert.Equal(t, "ocid1.instance.oc1..legacy", config.InstanceID)
 }
 
 func testOCIIntegration(t *testing.T) *contexts.IntegrationContext {

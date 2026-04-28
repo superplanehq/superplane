@@ -21,12 +21,12 @@ type UpdateImageConfiguration struct {
 
 func (c *UpdateImage) Name() string        { return "oci.updateImage" }
 func (c *UpdateImage) Label() string       { return "Update Image" }
-func (c *UpdateImage) Description() string { return "Update an OCI image display name" }
+func (c *UpdateImage) Description() string { return "Update an OCI custom image display name" }
 func (c *UpdateImage) Icon() string        { return "oci" }
 func (c *UpdateImage) Color() string       { return "red" }
 
 func (c *UpdateImage) Documentation() string {
-	return `The Update Image component updates the display name of an OCI Compute image.
+	return `The Update Image component updates the display name of an OCI Compute custom image. Oracle-provided platform images cannot be updated.
 
 ## Use Cases
 
@@ -45,7 +45,7 @@ func (c *UpdateImage) ExampleOutput() map[string]any {
 
 func (c *UpdateImage) Configuration() []configuration.Field {
 	return []configuration.Field{
-		imageIDField(true),
+		customImageIDField(true),
 		displayNameField(true),
 	}
 }
@@ -58,7 +58,7 @@ func (c *UpdateImage) Setup(ctx core.SetupContext) error {
 	if err := validateUpdateImageConfiguration(config); err != nil {
 		return err
 	}
-	return ctx.Metadata.Set(imageNodeMetadata{ImageID: config.ImageID, DisplayName: config.DisplayName})
+	return ctx.Metadata.Set(resolveImageNodeMetadata(ctx, imageNodeMetadata{ImageID: config.ImageID, DisplayName: config.DisplayName}))
 }
 
 func (c *UpdateImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -77,6 +77,10 @@ func (c *UpdateImage) Execute(ctx core.ExecutionContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	if _, err := ensureCustomImage(client, config.ImageID); err != nil {
+		return err
 	}
 
 	image, err := client.UpdateImage(config.ImageID, config.DisplayName)
