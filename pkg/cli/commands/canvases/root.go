@@ -242,12 +242,23 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
+	var validateFile string
+	validateCmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Validate a canvas YAML file without applying changes",
+		Args:  cobra.NoArgs,
+	}
+	validateCmd.Flags().StringVarP(&validateFile, "file", "f", "", "canvas YAML file to validate")
+	_ = validateCmd.MarkFlagRequired("file")
+	core.Bind(validateCmd, &validateCommand{file: &validateFile}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
 	root.AddCommand(initCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
+	root.AddCommand(validateCmd)
 	root.AddCommand(deleteCmd)
 	root.AddCommand(changeRequestsCmd)
 

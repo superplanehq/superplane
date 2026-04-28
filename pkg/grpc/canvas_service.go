@@ -73,6 +73,11 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 	)
 }
 
+func (s *CanvasService) ValidateCanvas(ctx context.Context, req *pb.ValidateCanvasRequest) (*pb.ValidateCanvasResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ValidateCanvas(ctx, s.registry, uuid.MustParse(organizationID), req.Canvas)
+}
+
 func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId)
