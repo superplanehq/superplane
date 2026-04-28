@@ -213,7 +213,7 @@ func (m *Merge) Configuration() []configuration.Field {
 			Label:       "Stop if",
 			Type:        configuration.FieldTypeExpression,
 			Description: "When true, stop waiting and finish immediately.",
-			Placeholder: "e.g. $.result == 'fail'",
+			Placeholder: "e.g. $['Node Name'].data.result == 'fail'",
 			Required:    false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
