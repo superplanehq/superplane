@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v5/pgconn"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -84,10 +85,27 @@ func extractPostgresMessage(err error) string {
 }
 
 func logPostgresSessionTimeoutIfMatched(err error) {
-	switch classifyPostgresSessionTimeout(err) {
+	kind := classifyPostgresSessionTimeout(err)
+	if kind == "" {
+		return
+	}
+	switch kind {
 	case postgresTimeoutStatement:
 		log.Printf("[database] PostgreSQL statement_timeout exceeded: %v", err)
 	case postgresTimeoutIdleInTransaction:
 		log.Printf("[database] PostgreSQL idle_in_transaction_session_timeout exceeded: %v", err)
 	}
+	capturePostgresSessionTimeoutToSentry(err, kind)
+}
+
+func capturePostgresSessionTimeoutToSentry(err error, kind postgresTimeoutKind) {
+	hub := sentry.CurrentHub()
+	if hub == nil || hub.Client() == nil {
+		return
+	}
+	hub.WithScope(func(scope *sentry.Scope) {
+		scope.SetTag("postgres_timeout", string(kind))
+		hub.CaptureException(err)
+	})
+	hub.Flush(2 * time.Second)
 }
