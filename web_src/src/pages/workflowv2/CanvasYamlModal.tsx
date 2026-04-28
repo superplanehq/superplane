@@ -1,4 +1,4 @@
-import { Copy, Download, Upload } from "lucide-react";
+import { Copy, Download, Upload, Text, WrapText } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -43,10 +43,23 @@ export function CanvasYamlModal(props: CanvasYamlModalProps) {
 }
 
 function YamlEditor(props: CanvasYamlModalProps) {
+  const [wordWrap, setWordWrap] = useState(true);
+
   return (
     <div className="canvas-yaml-monaco h-full min-h-0 min-w-0">
+      <div className="flex items-center justify-between px-4 py-1 border-b border-gray-200">
+        <span className="text-xs text-gray-500">YAML Preview</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setWordWrap(!wordWrap)}
+          title={wordWrap ? "Disable word wrap" : "Enable word wrap"}
+        >
+          {wordWrap ? <WrapText className="h-4 w-4" /> : <Text className="h-4 w-4" />}
+        </Button>
+      </div>
       <Editor
-        height="100%"
+        height="calc(100% - 40px)"
         language="yaml"
         value={props.yamlText}
         theme="vs"
@@ -56,7 +69,7 @@ function YamlEditor(props: CanvasYamlModalProps) {
           minimap: { enabled: false },
           fontSize: 13,
           lineNumbers: "on",
-          wordWrap: "on",
+          wordWrap: wordWrap ? "on" : "off",
           folding: true,
           scrollBeyondLastLine: false,
           renderWhitespace: "boundary",
