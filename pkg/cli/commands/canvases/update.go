@@ -17,109 +17,6 @@ type updateCommand struct {
 	autoLayoutNodes *[]string
 }
 
-type changeManagementPlan struct {
-	effectiveEnabled      bool
-	enableAfterSpecUpdate bool
-}
-
-func updateCanvasChangeManagementEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
-	body := openapi_client.CanvasesUpdateCanvasBody{}
-	cm := openapi_client.CanvasChangeManagement{}
-	cm.SetEnabled(enabled)
-	body.SetChangeManagement(cm)
-
-	_, _, err := ctx.API.CanvasAPI.
-		CanvasesUpdateCanvas(ctx.Context, canvasID).
-		Body(body).
-		Execute()
-	return err
-}
-
-func resolveOrganizationChangeManagementEnabled(ctx core.CommandContext) (bool, error) {
-	organizationID, err := core.ResolveOrganizationID(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	response, _, err := ctx.API.OrganizationAPI.
-		OrganizationsDescribeOrganization(ctx.Context, organizationID).
-		Execute()
-	if err != nil {
-		return false, err
-	}
-
-	org := response.GetOrganization()
-	metadata, _ := org.GetMetadataOk()
-	if metadata == nil {
-		return false, fmt.Errorf("organization metadata not found")
-	}
-
-	spec, _ := org.GetSpecOk()
-	if spec == nil {
-		return false, nil
-	}
-
-	return spec.GetChangeManagementEnabled(), nil
-}
-
-func requestedCanvasChangeManagementEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
-	if canvas.Spec == nil {
-		return false, false
-	}
-	cm, ok := canvas.Spec.GetChangeManagementOk()
-	if !ok || cm == nil {
-		return false, false
-	}
-	value, valueOk := cm.GetEnabledOk()
-	if !valueOk || value == nil {
-		return false, false
-	}
-	return *value, true
-}
-
-func planCanvasChangeManagementUpdate(
-	ctx core.CommandContext,
-	canvasID string,
-	requestedEnabled bool,
-	requestedSet bool,
-	currentEffective bool,
-	draftMode bool,
-) (*changeManagementPlan, error) {
-	plan := &changeManagementPlan{effectiveEnabled: currentEffective}
-	if !requestedSet || requestedEnabled == currentEffective {
-		return plan, nil
-	}
-
-	if !requestedEnabled {
-		orgEnabled, err := resolveOrganizationChangeManagementEnabled(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if orgEnabled {
-			return nil, fmt.Errorf("cannot disable change management while organization change management is enabled")
-		}
-		if draftMode {
-			return nil, fmt.Errorf("--draft cannot be used when disabling change management; remove --draft to update and publish directly")
-		}
-		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, false); err != nil {
-			return nil, err
-		}
-		plan.effectiveEnabled = false
-		return plan, nil
-	}
-
-	if draftMode {
-		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, true); err != nil {
-			return nil, err
-		}
-		plan.effectiveEnabled = true
-		return plan, nil
-	}
-
-	plan.enableAfterSpecUpdate = true
-	return plan, nil
-}
-
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	filePath := ""
 	if c.file != nil {
@@ -164,13 +61,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	requestedEnabled, requestedSet := requestedCanvasChangeManagementEnabled(canvas)
-	plan, err := planCanvasChangeManagementUpdate(ctx, canvasID, requestedEnabled, requestedSet, cmContext.changeManagementEnabled, draftMode)
-	if err != nil {
-		return err
-	}
-
-	if plan.effectiveEnabled && !draftMode {
+	if cmContext.changeManagementEnabled && !draftMode {
 		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
 	}
 
@@ -213,12 +104,6 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 			Execute()
 		if publishErr != nil {
 			return fmt.Errorf("draft was updated but publish failed: %w", publishErr)
-		}
-	}
-
-	if plan.enableAfterSpecUpdate {
-		if err := updateCanvasChangeManagementEnabled(ctx, canvasID, true); err != nil {
-			return err
 		}
 	}
 
