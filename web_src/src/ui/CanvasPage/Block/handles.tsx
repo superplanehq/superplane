@@ -1,5 +1,7 @@
 import React from "react";
 import { Handle, Position } from "@xyflow/react";
+
+import { useCanvasNodeOverlay } from "../canvasNodeOverlayContext";
 import { getOutputChannels } from "./data";
 import type { BlockConnectionState, BlockEdgeState, BlockProps, CanvasBlockData } from "./types";
 
@@ -253,10 +255,12 @@ export function LeftHandle({
 }: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
   if (shouldHideLeftHandle(data)) return null;
 
-  const hoveredEdge = data._hoveredEdge;
-  const connectingFrom = data._connectingFrom;
+  const overlay = useCanvasNodeOverlay();
+  const hoveredEdge = overlay?.hoveredEdge ?? data._hoveredEdge;
+  const connectingFrom = overlay?.connectingFrom ?? data._connectingFrom;
+  const allEdges = overlay?.allEdges ?? getBlockEdges(data);
   const isAlreadyConnected = isAlreadyConnectedToNode(
-    getBlockEdges(data),
+    allEdges,
     connectingFrom,
     connectingFrom?.nodeId,
     nodeId,
@@ -293,9 +297,10 @@ export function RightHandle({
   if (shouldHideRightHandle(data)) return null;
 
   const channels = getOutputChannels(data);
-  const hoveredEdge = data._hoveredEdge;
-  const connectingFrom = data._connectingFrom;
-  const allEdges = getBlockEdges(data);
+  const overlay = useCanvasNodeOverlay();
+  const hoveredEdge = overlay?.hoveredEdge ?? data._hoveredEdge;
+  const connectingFrom = overlay?.connectingFrom ?? data._connectingFrom;
+  const allEdges = overlay?.allEdges ?? getBlockEdges(data);
 
   if (channels.length === 1) {
     return (

@@ -30,7 +30,7 @@ type BlockHandleType = "source" | "target";
 export interface BlockConnectionState {
   nodeId?: string;
   handleId?: string | null;
-  handleType?: BlockHandleType;
+  handleType?: BlockHandleType | null;
 }
 
 export interface BlockEdgeState {

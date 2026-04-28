@@ -1,4 +1,6 @@
 import React from "react";
+
+import { useCanvasNodeOverlay } from "../canvasNodeOverlayContext";
 import { BlockContent } from "./content";
 import { LeftHandle, RightHandle } from "./handles";
 import type { BlockProps } from "./types";
@@ -7,9 +9,12 @@ export type { BlockData, BlockProps } from "./types";
 export type { CanvasBlockData } from "./types";
 
 export const Block = React.memo(function Block(props: BlockProps) {
+  const overlay = useCanvasNodeOverlay();
   const data = props.data;
-  const isHighlighted = data._isHighlighted || false;
-  const hasHighlightedNodes = data._hasHighlightedNodes || false;
+  const nodeId = props.nodeId ?? "";
+  const isHighlighted =
+    (overlay && overlay.highlightedNodeIds.has(nodeId)) || data._isHighlighted || false;
+  const hasHighlightedNodes = overlay?.hasHighlightedNodes || data._hasHighlightedNodes || false;
   const shouldDim = hasHighlightedNodes && !isHighlighted;
   const isConnectionInteractive = props.canvasMode !== "live";
 

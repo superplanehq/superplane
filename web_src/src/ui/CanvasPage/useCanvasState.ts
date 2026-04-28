@@ -1,6 +1,6 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CanvasPageProps } from ".";
 
 export interface CanvasPageState {
@@ -68,16 +68,34 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     });
   }, [initialNodes]);
 
+  // Re-merge edges from the server when edges or local-only nodes change — not on every node position tick (drag).
+  const localEdgesSyncKey = useMemo(
+    () =>
+      nodes
+        .filter((n) => n.data.isTemplate || n.data.isPendingConnection)
+        .map((n) => `${n.id}:${n.data.isTemplate ? "T" : "P"}`)
+        .sort()
+        .join(","),
+    [nodes],
+  );
+
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+
+  // Depends on `localEdgesSyncKey` (template/pending node set) instead of `nodes` so drag position updates
+  // do not re-merge edges every frame. Reads latest nodes via `nodesRef` when this does run.
   useEffect(() => {
     if (!initialEdges) return;
+
+    const nodesSnapshot = nodesRef.current;
 
     setEdges((currentEdges) => {
       // Preserve edges connected to template or pending connection nodes
       const localOnlyEdges = currentEdges.filter((edge) => {
-        const sourceIsLocal = nodes.some(
+        const sourceIsLocal = nodesSnapshot.some(
           (n) => n.id === edge.source && (n.data.isTemplate || n.data.isPendingConnection),
         );
-        const targetIsLocal = nodes.some(
+        const targetIsLocal = nodesSnapshot.some(
           (n) => n.id === edge.target && (n.data.isTemplate || n.data.isPendingConnection),
         );
         return sourceIsLocal || targetIsLocal;
@@ -86,7 +104,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       // Combine synced edges with local-only edges
       return [...initialEdges, ...localOnlyEdges];
     });
-  }, [initialEdges, nodes]);
+  }, [initialEdges, localEdgesSyncKey]);
 
   // Apply initial collapsed state to nodes
   useEffect(() => {

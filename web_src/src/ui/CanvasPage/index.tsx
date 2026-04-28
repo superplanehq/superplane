@@ -65,6 +65,12 @@ import type { SidebarEvent } from "../componentSidebar/types";
 import { EmitEventModal } from "../EmitEventModal";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
+import type { BlockEdgeState } from "./Block/types";
+import {
+  CanvasNodeOverlayProvider,
+  type CanvasNodeRendererCallbacks,
+  useCanvasNodeOverlay,
+} from "./canvasNodeOverlayContext";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
@@ -369,26 +375,7 @@ type PendingRunData = {
   initialData?: string;
 };
 
-type CanvasNodeRendererCallbacks = {
-  handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
-  onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
-  onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
-  onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
-  onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
-  onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
-  onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
-  onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
-  onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
-  onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
-  showHeader: boolean;
-  hasMultiSelection: boolean;
-  canvasMode: "live" | "edit";
-};
-
 type CanvasBlockNodeData = CanvasBlockData & {
-  _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
   nodeName?: string;
 };
 
@@ -569,6 +556,11 @@ export class CanvasNodeErrorBoundary extends Component<CanvasNodeErrorBoundaryPr
   }
 }
 
+function stripCanvasOverlayFields(data: CanvasBlockNodeData): CanvasBlockData {
+  const { _hoveredEdge, _connectingFrom, _allEdges, _isHighlighted, _hasHighlightedNodes, ...rest } = data;
+  return rest;
+}
+
 /*
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
@@ -578,8 +570,9 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
   id: string;
   selected?: boolean;
 }) {
-  const { _callbacksRef, ...blockData } = nodeProps.data;
-  const callbacks = _callbacksRef?.current;
+  const overlay = useCanvasNodeOverlay();
+  const callbacks = overlay?.callbacksRef.current;
+  const blockData = stripCanvasOverlayFields(nodeProps.data);
   const blockProps = buildDefaultNodeBlockProps({
     nodeId: nodeProps.id,
     selected: nodeProps.selected,
@@ -2301,21 +2294,36 @@ function CanvasContent({
     return state.edges?.find((e) => e.id === hoveredEdgeId);
   }, [hoveredEdgeId, state.edges]);
 
-  const nodesWithCallbacks = useMemo(() => {
-    const hasHighlightedNodes = highlightedNodeIds.size > 0;
-    return state.nodes.map((node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        _callbacksRef: callbacksRef,
-        _hoveredEdge: hoveredEdge,
-        _connectingFrom: connectingFrom,
-        _allEdges: state.edges,
-        _isHighlighted: highlightedNodeIds.has(node.id),
-        _hasHighlightedNodes: hasHighlightedNodes,
-      },
-    }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
+  const blockEdgesForOverlay = useMemo(
+    () =>
+      (state.edges ?? []).map((e) => ({
+        source: e.source,
+        sourceHandle: e.sourceHandle,
+        target: e.target,
+      })),
+    [state.edges],
+  );
+
+  const hoveredBlockEdge = useMemo((): BlockEdgeState | null => {
+    if (!hoveredEdge) return null;
+    return {
+      source: hoveredEdge.source,
+      sourceHandle: hoveredEdge.sourceHandle,
+      target: hoveredEdge.target,
+    };
+  }, [hoveredEdge]);
+
+  const canvasNodeOverlayValue = useMemo(
+    () => ({
+      callbacksRef,
+      hoveredEdge: hoveredBlockEdge,
+      connectingFrom,
+      allEdges: blockEdgesForOverlay,
+      highlightedNodeIds,
+      hasHighlightedNodes: highlightedNodeIds.size > 0,
+    }),
+    [callbacksRef, hoveredBlockEdge, connectingFrom, blockEdgesForOverlay, highlightedNodeIds],
+  );
 
   const edgeTypes = useMemo(
     () => ({
@@ -2428,54 +2436,55 @@ function CanvasContent({
     <div className="h-full w-full relative">
       <div className="h-full">
         <div className="h-full w-full">
-          <ReactFlow
-            nodes={nodesWithCallbacks}
-            edges={styledEdges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            minZoom={MIN_CANVAS_ZOOM}
-            maxZoom={1.5}
-            zoomOnScroll={true}
-            zoomOnPinch={true}
-            zoomOnDoubleClick={false}
-            panOnScroll={true}
-            panOnDrag={true}
-            selectionOnDrag={true}
-            selectionKeyCode={selectionKey}
-            multiSelectionKeyCode={selectionKey}
-            snapToGrid={isSnapToGridEnabled}
-            snapGrid={[48, 48]}
-            panOnScrollSpeed={0.8}
-            nodesDraggable={!isReadOnly}
-            nodesConnectable={isConnectionEditingEnabled}
-            elementsSelectable={true}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
-            onConnectStart={isConnectionEditingEnabled ? handleConnectStart : undefined}
-            onConnectEnd={isConnectionEditingEnabled ? handleConnectEnd : undefined}
-            onDragOver={isReadOnly ? undefined : handleDragOver}
-            onDrop={isReadOnly ? undefined : handleDrop}
-            onMove={handleMove}
-            onInit={handleInit}
-            deleteKeyCode={null}
-            onPaneClick={handlePaneClick}
-            onSelectionStart={() => {
-              setIsSelecting(true);
-              const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
-              previouslySelectedRef.current = new Set(selected);
-            }}
-            onSelectionEnd={() => {
-              setIsSelecting(false);
-              previouslySelectedRef.current = new Set();
-            }}
-            onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
-            onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
-            defaultViewport={viewport}
-            fitView={false}
-            style={{ opacity: isInitialized ? 1 : 0 }}
-            className="h-full w-full"
-          >
+          <CanvasNodeOverlayProvider value={canvasNodeOverlayValue}>
+            <ReactFlow
+              nodes={state.nodes}
+              edges={styledEdges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              minZoom={MIN_CANVAS_ZOOM}
+              maxZoom={1.5}
+              zoomOnScroll={true}
+              zoomOnPinch={true}
+              zoomOnDoubleClick={false}
+              panOnScroll={true}
+              panOnDrag={true}
+              selectionOnDrag={true}
+              selectionKeyCode={selectionKey}
+              multiSelectionKeyCode={selectionKey}
+              snapToGrid={isSnapToGridEnabled}
+              snapGrid={[48, 48]}
+              panOnScrollSpeed={0.8}
+              nodesDraggable={!isReadOnly}
+              nodesConnectable={isConnectionEditingEnabled}
+              elementsSelectable={true}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
+              onConnectStart={isConnectionEditingEnabled ? handleConnectStart : undefined}
+              onConnectEnd={isConnectionEditingEnabled ? handleConnectEnd : undefined}
+              onDragOver={isReadOnly ? undefined : handleDragOver}
+              onDrop={isReadOnly ? undefined : handleDrop}
+              onMove={handleMove}
+              onInit={handleInit}
+              deleteKeyCode={null}
+              onPaneClick={handlePaneClick}
+              onSelectionStart={() => {
+                setIsSelecting(true);
+                const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
+                previouslySelectedRef.current = new Set(selected);
+              }}
+              onSelectionEnd={() => {
+                setIsSelecting(false);
+                previouslySelectedRef.current = new Set();
+              }}
+              onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
+              onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
+              defaultViewport={viewport}
+              fitView={false}
+              style={{ opacity: isInitialized ? 1 : 0 }}
+              className="h-full w-full"
+            >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
             <Panel
               position="bottom-left"
@@ -2741,7 +2750,8 @@ function CanvasContent({
                   </div>
                 </ViewportPortal>
               )}
-          </ReactFlow>
+            </ReactFlow>
+          </CanvasNodeOverlayProvider>
         </div>
       </div>
       {showBottomStatusControls ? (
