@@ -19,12 +19,7 @@ func ValidateExpression(raw string, knownNodeNames map[string]struct{}) error {
 		return err
 	}
 
-	body := strings.TrimSpace(raw)
-	if err := compileWithStubEnv(body, knownNodeNames); err != nil {
-		return err
-	}
-
-	return nil
+	return compileWithStubEnv(strings.TrimSpace(raw), knownNodeNames)
 }
 
 // ValidateBareExpression checks the same expression body but skips the strict
