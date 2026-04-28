@@ -64,10 +64,15 @@ export interface PullRequest {
   title?: string;
   id?: string;
   number?: number;
+  state?: string;
+  draft?: boolean;
   url?: string;
   html_url?: string;
   head?: {
     sha: string;
+    ref: string;
+  };
+  base?: {
     ref: string;
   };
   user?: {
