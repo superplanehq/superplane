@@ -189,7 +189,7 @@ export const SecretKeyFieldRenderer = ({
         onChange(parseSecretKeySelection(val));
       }}
     >
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-full ph-no-capture">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
