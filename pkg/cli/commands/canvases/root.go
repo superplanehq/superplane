@@ -152,7 +152,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsApproveCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
 	}, options)
 
 	changeRequestsUnapproveCmd := &cobra.Command{
@@ -161,7 +161,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsUnapproveCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
 	}, options)
 
 	changeRequestsRejectCmd := &cobra.Command{
@@ -170,7 +170,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsRejectCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
 	}, options)
 
 	changeRequestsReopenCmd := &cobra.Command{
@@ -179,7 +179,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsReopenCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
 	}, options)
 
 	changeRequestsPublishCmd := &cobra.Command{
@@ -188,7 +188,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsPublishCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
+		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
 	}, options)
 
 	var changeRequestsResolveFile string
