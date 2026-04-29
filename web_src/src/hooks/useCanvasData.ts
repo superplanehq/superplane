@@ -33,6 +33,7 @@ import {
 import type {
   CanvasesCanvas,
   CanvasesCanvasVersion,
+  CanvasChangeManagement,
   SuperplaneComponentsNode,
   ComponentsPosition,
 } from "../api-client/types.gen";
@@ -365,7 +366,14 @@ export const useCreateCanvas = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string } & CanvasGraphData) => {
+    mutationFn: async (
+      data: {
+        name: string;
+        description?: string;
+        method?: "ui" | "cli" | "yaml_import" | "template";
+        templateId?: string;
+      } & CanvasGraphData,
+    ) => {
       const payload = {
         metadata: {
           name: data.name,
@@ -385,7 +393,7 @@ export const useCreateCanvas = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
 
@@ -395,7 +403,13 @@ export const useCreateCanvas = (organizationId: string) => {
           canvasKeys.detail(organizationId, response.data.canvas.metadata.id),
           response.data.canvas,
         );
-        analytics.canvasCreated(response.data.canvas.metadata.id, organizationId);
+        analytics.canvasCreate(
+          response.data.canvas.metadata.id,
+          organizationId,
+          variables.method ?? "ui",
+          variables.templateId,
+          !!variables.description,
+        );
       }
     },
   });
@@ -476,7 +490,7 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       if (response?.data?.version?.metadata?.id) {
-        analytics.canvasPublished(canvasId, organizationId);
+        analytics.versionPublish(canvasId, organizationId);
       }
     },
   });
@@ -531,6 +545,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       description?: string;
       nodes?: unknown[];
       edges?: unknown[];
+      changeManagement?: CanvasChangeManagement;
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
       preserveLocalCanvasState?: boolean;
       invalidateRelatedQueries?: boolean;
@@ -544,6 +559,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
           spec: {
             nodes: data.nodes || [],
             edges: data.edges || [],
+            changeManagement: data.changeManagement,
           },
         },
         autoLayout: data.autoLayout,
@@ -763,21 +779,29 @@ export const useDeleteCanvas = (organizationId: string) => {
 
   return useMutation({
     mutationFn: async (canvasId: string) => {
+      // Capture node count before removing from cache.
+      // Fall back to the list cache if the detail page was never opened.
+      const cachedDetail = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+      const cachedList = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId));
+      const cachedCanvas = cachedDetail ?? cachedList?.find((c) => c.metadata?.id === canvasId);
+      const nodeCount = cachedCanvas?.spec?.nodes?.length ?? 0;
+
       // Remove from cache immediately before deletion to prevent 404 flash
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
 
-      return await canvasesDeleteCanvas(
+      const result = await canvasesDeleteCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
         }),
       );
+      return { result, nodeCount };
     },
-    onSuccess: (_, canvasId) => {
+    onSuccess: ({ nodeCount }, canvasId) => {
       // Ensure it's removed (in case it wasn't already)
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-      analytics.canvasDeleted(canvasId, organizationId);
+      analytics.canvasDelete(canvasId, organizationId, nodeCount);
     },
   });
 };

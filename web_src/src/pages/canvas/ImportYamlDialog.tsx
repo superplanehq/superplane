@@ -136,6 +136,7 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
         description: parsed.metadata?.description,
         nodes: (parsed.spec?.nodes as any[]) || [],
         edges: (parsed.spec?.edges as any[]) || [],
+        method: "yaml_import",
       });
 
       const canvasId = result?.data?.canvas?.metadata?.id;
