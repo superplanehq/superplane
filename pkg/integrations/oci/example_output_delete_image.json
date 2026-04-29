@@ -1,0 +1,9 @@
+{
+  "data": {
+    "deletedAt": "2026-04-28T09:20:00Z",
+    "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "state": "DELETED"
+  },
+  "timestamp": "2026-04-28T09:20:00Z",
+  "type": "oci.imageDeleted"
+}
