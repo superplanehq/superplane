@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import React from "react";
 
 import { deleteInstanceMapper } from "./delete_instance";
 import { eventStateRegistry } from "./index";
@@ -254,7 +255,7 @@ for (const testCase of componentCases) {
   });
 }
 
-function buildEvent(eventType: string): NonNullable<EventInfo> {
+function buildEvent(eventType: string, instanceActionType?: string): NonNullable<EventInfo> {
   return {
     id: "event-1",
     createdAt: "2026-04-22T20:34:54.000Z",
@@ -271,6 +272,7 @@ function buildEvent(eventType: string): NonNullable<EventInfo> {
         availabilityDomain: "XXXX:eu-frankfurt-1-AD-1",
         additionalDetails: {
           shape: "VM.Standard.E2.1.Micro",
+          ...(instanceActionType ? { instanceActionType } : {}),
         },
       },
     },
@@ -293,30 +295,42 @@ function buildTriggerContext(lastEvent?: EventInfo): TriggerRendererContext {
 
 describe("onInstanceStateChangeTriggerRenderer", () => {
   const labels: Record<string, string> = {
-    "com.oraclecloud.computeapi.startinstance.end": "Instance started",
-    "com.oraclecloud.computeapi.stopinstance.end": "Instance stopped",
-    "com.oraclecloud.computeapi.terminateinstance.end": "Instance terminated",
-    "com.oraclecloud.computeapi.resetinstance.end": "Instance reset",
-    "com.oraclecloud.computeapi.softstopinstance.end": "Instance soft-stopped",
-    "com.oraclecloud.computeapi.softresetinstance.end": "Instance soft-reset",
+    start: "Instance started",
+    stop: "Instance stopped",
+    reset: "Instance reset",
+    softstop: "Instance soft-stopped",
+    softreset: "Instance soft-reset",
   };
 
-  for (const [eventType, label] of Object.entries(labels)) {
-    it(`returns ${label} for ${eventType}`, () => {
-      expect(onInstanceStateChangeTriggerRenderer.getTitleAndSubtitle({ event: buildEvent(eventType) }).title).toBe(
-        label,
-      );
+  for (const [actionType, label] of Object.entries(labels)) {
+    it(`returns ${label} for ${actionType}`, () => {
+      const { title, subtitle } = onInstanceStateChangeTriggerRenderer.getTitleAndSubtitle({
+        event: buildEvent("com.oraclecloud.computeapi.instanceaction.end", actionType),
+      });
+
+      expect(title).toBe("test-instance");
+      expectReactNodeToContain(subtitle, label);
     });
   }
 
+  it("returns terminate label for terminate event", () => {
+    const { title, subtitle } = onInstanceStateChangeTriggerRenderer.getTitleAndSubtitle({
+      event: buildEvent("com.oraclecloud.computeapi.terminateinstance.end"),
+    });
+
+    expect(title).toBe("test-instance");
+    expectReactNodeToContain(subtitle, "Instance terminated");
+  });
+
   it("extracts all root event values", () => {
     const details = onInstanceStateChangeTriggerRenderer.getRootEventValues({
-      event: buildEvent("com.oraclecloud.computeapi.stopinstance.end"),
+      event: buildEvent("com.oraclecloud.computeapi.instanceaction.end", "stop"),
     });
 
     expect(details["Triggered At"]).toBeDefined();
     expect(details["Instance Name"]).toBe("test-instance");
-    expect(details["Instance ID"]).toBe("ocid1.instance.oc1.eu-frankfurt-1.example");
+    expect(details["Instance ID"]).toBeUndefined();
+    expect(details.Action).toBe("stop");
     expect(details["Shape"]).toBe("VM.Standard.E2.1.Micro");
     expect(details["Availability Domain"]).toBe("XXXX:eu-frankfurt-1-AD-1");
     expect(details["Compartment"]).toBe("root");
@@ -324,15 +338,15 @@ describe("onInstanceStateChangeTriggerRenderer", () => {
 
   it("includes lastEventData when lastEvent is provided", () => {
     const props = onInstanceStateChangeTriggerRenderer.getTriggerProps(
-      buildTriggerContext(buildEvent("com.oraclecloud.computeapi.stopinstance.end")),
+      buildTriggerContext(buildEvent("com.oraclecloud.computeapi.instanceaction.end", "stop")),
     );
 
     expect(props.lastEventData).toMatchObject({
-      title: "Instance stopped",
-      subtitle: "test-instance",
+      title: "test-instance",
       state: "triggered",
       eventId: "event-1",
     });
+    expectReactNodeToContain(props.lastEventData?.subtitle, "Instance stopped");
   });
 
   it("omits lastEventData when lastEvent is absent", () => {
@@ -340,6 +354,19 @@ describe("onInstanceStateChangeTriggerRenderer", () => {
     expect(props.lastEventData).toBeUndefined();
   });
 });
+
+function expectReactNodeToContain(node: React.ReactNode, expected: string) {
+  if (typeof node === "string") {
+    expect(node).toContain(expected);
+    return;
+  }
+
+  if (!React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    throw new Error("Expected React element subtitle");
+  }
+
+  expect(React.Children.toArray(node.props.children)).toContain(expected);
+}
 
 describe("eventStateRegistry", () => {
   it("maps finished success to fetched for getInstance", () => {
