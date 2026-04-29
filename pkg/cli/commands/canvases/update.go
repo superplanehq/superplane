@@ -95,6 +95,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	version := response.GetVersion()
+	if errText := formatNodeSpecErrorsForCLI(version); errText != "" {
+		return fmt.Errorf("%s", errText)
+	}
 
 	// When not in draft mode, auto-publish the updated draft version.
 	if !draftMode {
@@ -129,6 +132,12 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 			}
 		}
 		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
+		if err != nil {
+			return err
+		}
+		if warnText := formatNodeSpecWarningsForCLI(version); warnText != "" {
+			_, err = fmt.Fprint(stdout, warnText)
+		}
 		return err
 	})
 }
@@ -244,4 +253,77 @@ func buildDefaultAutoLayout() openapi_client.CanvasesCanvasAutoLayout {
 	autoLayout.SetAlgorithm(openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL)
 	autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS)
 	return autoLayout
+}
+
+// formatNodeSpecErrorsForCLI summarizes node error_message from the API response (blocks execution until fixed).
+func formatNodeSpecErrorsForCLI(version openapi_client.CanvasesCanvasVersion) string {
+	spec, ok := version.GetSpecOk()
+	if !ok || spec == nil {
+		return ""
+	}
+
+	var lines []string
+	for _, node := range spec.GetNodes() {
+		if !node.HasErrorMessage() {
+			continue
+		}
+		msg := strings.TrimSpace(node.GetErrorMessage())
+		if msg == "" {
+			continue
+		}
+		id := node.GetId()
+		name := strings.TrimSpace(node.GetName())
+		if name == "" {
+			name = id
+		}
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("canvas was saved but the following nodes have configuration errors (error_message on each node):\n")
+	for _, line := range lines {
+		b.WriteString("  - ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func formatNodeSpecWarningsForCLI(version openapi_client.CanvasesCanvasVersion) string {
+	spec, ok := version.GetSpecOk()
+	if !ok || spec == nil {
+		return ""
+	}
+
+	var lines []string
+	for _, node := range spec.GetNodes() {
+		if !node.HasWarningMessage() {
+			continue
+		}
+		msg := strings.TrimSpace(node.GetWarningMessage())
+		if msg == "" {
+			continue
+		}
+		id := node.GetId()
+		name := strings.TrimSpace(node.GetName())
+		if name == "" {
+			name = id
+		}
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\nNode warnings (warning_message):\n")
+	for _, line := range lines {
+		b.WriteString("  - ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
