@@ -36,9 +36,9 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	}
 
 	return &Client{
-		AdminURL:   strings.TrimRight(string(adminURL), "/"),
-		IngressURL: strings.TrimRight(string(ingressURL), "/"),
-		AuthToken:  authToken,
+		AdminURL:   strings.TrimRight(strings.TrimSpace(string(adminURL)), "/"),
+		IngressURL: strings.TrimRight(strings.TrimSpace(string(ingressURL)), "/"),
+		AuthToken:  strings.TrimSpace(authToken),
 		http:       http,
 	}, nil
 }
