@@ -27,6 +27,9 @@ type Organization struct {
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
+	if len(o.AllowedProviders) == 0 {
+		return true
+	}
 	return slices.Contains(o.AllowedProviders, provider)
 }
 
