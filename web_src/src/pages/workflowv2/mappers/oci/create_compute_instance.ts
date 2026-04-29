@@ -28,6 +28,7 @@ interface CreateComputeInstanceConfiguration {
 }
 
 interface CreateComputeInstanceOutputData {
+  instanceId?: string;
   displayName?: string;
   lifecycleState?: string;
   shape?: string;
@@ -36,6 +37,7 @@ interface CreateComputeInstanceOutputData {
   region?: string;
   timeCreated?: string;
   publicIp?: string;
+  privateIp?: string;
 }
 
 type CreateComputeInstanceOutputPayload = OutputPayload & {
@@ -83,6 +85,10 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 
     if (!data) return details;
 
+    if (data.instanceId) {
+      details["Instance ID"] = data.instanceId;
+    }
+
     if (data.displayName) {
       details["Display Name"] = data.displayName;
     }
@@ -107,6 +113,10 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
       details["Public IP"] = data.publicIp;
     }
 
+    if (data.privateIp) {
+      details["Private IP"] = data.privateIp;
+    }
+
     return details;
   },
 };
@@ -125,6 +135,15 @@ function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): 
 
   if (config?.availabilityDomain) {
     items.push({ icon: "map-pin", label: config.availabilityDomain });
+  }
+
+  if (config?.imageOs) {
+    items.push({ icon: "layers", label: config.imageOs });
+  }
+
+  if (config?.ocpus) {
+    const memory = config.memoryInGBs ? ` / ${config.memoryInGBs} GB RAM` : "";
+    items.push({ icon: "zap", label: `${config.ocpus} OCPUs${memory}` });
   }
 
   return items;
