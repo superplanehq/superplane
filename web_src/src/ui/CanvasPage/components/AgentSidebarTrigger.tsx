@@ -11,7 +11,7 @@ export function AgentSidebarTrigger({ agentState }: AgentSidebarTriggerProps) {
   const { showAgentSidebarToggle, isAgentSidebarOpen, handleAgentSidebarToggle } = agentState;
 
   return (
-    <div className="relative z-10 flex shrink-0 items-center">
+    <div className="flex shrink-0 items-center">
       {showAgentSidebarToggle && !isAgentSidebarOpen ? (
         <Tooltip>
           <TooltipTrigger asChild>

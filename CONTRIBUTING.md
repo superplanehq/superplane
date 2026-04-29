@@ -60,7 +60,7 @@ make dev.start     # Start the development server (UI at http://localhost:8000)
 
 These commands will spin up all required services in Docker containers.
 
-When the process completes, you can access the SuperPlane at [http://localhost:8000](http://localhost:8000).
+When the process completes, you can access SuperPlane at [http://localhost:8000](http://localhost:8000).
 
 ## Additional Development Resources
 
