@@ -1,4 +1,4 @@
-package runbash
+package runner
 
 import (
 	"io"
@@ -30,8 +30,8 @@ func TestBuildspecValidYAML(t *testing.T) {
 	require.NoError(t, err, "buildspec must be valid YAML (the remote runner parses it before executing commands)")
 }
 
-func TestRunBashSetup(t *testing.T) {
-	component := &RunBash{}
+func TestRunnerSetup(t *testing.T) {
+	component := &Runner{}
 
 	t.Run("commands are required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{Configuration: map[string]any{}})
@@ -56,9 +56,9 @@ func TestRunBashSetup(t *testing.T) {
 	})
 }
 
-func TestRunBashExecuteStartsCodeBuild(t *testing.T) {
+func TestRunnerExecuteStartsCodeBuild(t *testing.T) {
 	withBackendEnv(t)
-	component := &RunBash{}
+	component := &Runner{}
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		jsonResponse(`{"build":{"id":"build-1","arn":"arn:build-1","buildStatus":"IN_PROGRESS","startTime":1760000000,"logs":{"groupName":"group","streamName":"stream","deepLink":"https://logs"}}}`),
 	}}
@@ -91,9 +91,9 @@ func TestRunBashExecuteStartsCodeBuild(t *testing.T) {
 	assert.Equal(t, "github.com/example/app.git", stored.Source.Repository)
 }
 
-func TestRunBashPollCompletesSuccessfulBuild(t *testing.T) {
+func TestRunnerPollCompletesSuccessfulBuild(t *testing.T) {
 	withBackendEnv(t)
-	component := &RunBash{}
+	component := &Runner{}
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		jsonResponse(`{"builds":[{"id":"build-1","arn":"arn:build-1","buildStatus":"SUCCEEDED","startTime":1760000000,"endTime":1760000042,"logs":{"groupName":"group","streamName":"stream","deepLink":"https://logs"}}]}`),
 		jsonResponse(`{"events":[{"timestamp":1760000001,"message":"Successfully built image"},{"timestamp":1760000002,"message":"SUPERPLANE_EXIT_CODE=0"}]}`),
@@ -124,9 +124,9 @@ func TestRunBashPollCompletesSuccessfulBuild(t *testing.T) {
 	assert.Contains(t, stored.Output.Stdout, "Successfully built image")
 }
 
-func TestRunBashPollCompletesFailedBuild(t *testing.T) {
+func TestRunnerPollCompletesFailedBuild(t *testing.T) {
 	withBackendEnv(t)
-	component := &RunBash{}
+	component := &Runner{}
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		jsonResponse(`{"builds":[{"id":"build-1","arn":"arn:build-1","buildStatus":"FAILED","startTime":1760000000,"endTime":1760000042,"logs":{"groupName":"group","streamName":"stream"}}]}`),
 		jsonResponse(`{"events":[{"timestamp":1760000001,"message":"terraform failed"},{"timestamp":1760000002,"message":"SUPERPLANE_EXIT_CODE=1"}]}`),
@@ -168,12 +168,12 @@ func validConfig() map[string]any {
 }
 
 func withBackendEnv(t *testing.T) {
-	t.Setenv("RUN_BASH_CODEBUILD_REGION", "us-east-1")
-	t.Setenv("RUN_BASH_CODEBUILD_PROJECT", "superplane-run-bash")
-	t.Setenv("RUN_BASH_CODEBUILD_DOCKER_PROJECT", "superplane-run-bash-docker")
-	t.Setenv("RUN_BASH_AWS_ACCESS_KEY_ID", "AKIAEXAMPLE")
-	t.Setenv("RUN_BASH_AWS_SECRET_ACCESS_KEY", "secret")
-	t.Setenv("RUN_BASH_AWS_SESSION_TOKEN", "token")
+	t.Setenv("RUNNER_CODEBUILD_REGION", "us-east-1")
+	t.Setenv("RUNNER_CODEBUILD_PROJECT", "superplane-runner")
+	t.Setenv("RUNNER_CODEBUILD_DOCKER_PROJECT", "superplane-runner-docker")
+	t.Setenv("RUNNER_AWS_ACCESS_KEY_ID", "AKIAEXAMPLE")
+	t.Setenv("RUNNER_AWS_SECRET_ACCESS_KEY", "secret")
+	t.Setenv("RUNNER_AWS_SESSION_TOKEN", "token")
 }
 
 func jsonResponse(body string) *http.Response {

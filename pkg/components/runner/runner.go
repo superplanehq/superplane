@@ -1,4 +1,4 @@
-package runbash
+package runner
 
 import (
 	"encoding/json"
@@ -23,7 +23,7 @@ const (
 	channelSuccess = "success"
 	channelFailed  = "failed"
 	hookPoll       = "poll"
-	payloadType    = "run-bash.result"
+	payloadType    = "runner.result"
 
 	defaultTimeoutSeconds = 600
 	defaultPollInterval   = 1 * time.Second
@@ -33,10 +33,10 @@ const (
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func init() {
-	registry.RegisterAction("run-bash", &RunBash{})
+	registry.RegisterAction("runner", &Runner{})
 }
 
-type RunBash struct{}
+type Runner struct{}
 
 type Spec struct {
 	Source           *SourceSpec           `json:"source,omitempty" mapstructure:"source"`
@@ -130,13 +130,13 @@ type backendConfig struct {
 	Credentials   *aws.Credentials
 }
 
-func (c *RunBash) Name() string  { return "run-bash" }
-func (c *RunBash) Label() string { return "Run Bash" }
-func (c *RunBash) Description() string {
-	return "Run Bash commands in a short-lived, isolated environment managed by your SuperPlane deployment."
+func (c *Runner) Name() string  { return "runner" }
+func (c *Runner) Label() string { return "Runner" }
+func (c *Runner) Description() string {
+	return "Run shell commands on provisioned compute with full logs, managed by your SuperPlane deployment."
 }
-func (c *RunBash) Documentation() string {
-	return `Run Bash commands in a managed, ephemeral environment.
+func (c *Runner) Documentation() string {
+	return `Run shell commands in a managed, ephemeral environment on dedicated runners.
 
 ## Use Cases
 
@@ -147,7 +147,7 @@ func (c *RunBash) Documentation() string {
 
 ## Server configuration
 
-Self-hosted SuperPlane must configure dedicated RUN_BASH_* environment variables for the execution backend so Run Bash does not share credentials with other services. See your installation or operations guide for the required variables and how to set them.
+Self-hosted SuperPlane must configure dedicated RUNNER_* environment variables for the execution backend. See your installation or operations guide for the required variables and how to set them.
 
 ## Output
 
@@ -156,10 +156,10 @@ Self-hosted SuperPlane must configure dedicated RUN_BASH_* environment variables
 
 Submission, checkout, credential injection, or infrastructure issues are shown as execution errors.`
 }
-func (c *RunBash) Icon() string  { return "terminal" }
-func (c *RunBash) Color() string { return "blue" }
+func (c *Runner) Icon() string  { return "terminal" }
+func (c *Runner) Color() string { return "blue" }
 
-func (c *RunBash) ExampleOutput() map[string]any {
+func (c *Runner) ExampleOutput() map[string]any {
 	return map[string]any{
 		"command": map[string]any{
 			"exitCode":        0,
@@ -175,21 +175,21 @@ func (c *RunBash) ExampleOutput() map[string]any {
 			"artifacts": []map[string]any{
 				{"name": "image-digest.txt", "path": "dist/image-digest.txt"},
 			},
-			"buildId":  "superplane-run-bash:example",
+			"buildId":  "superplane-runner:example",
 			"buildArn": "arn:example:superplane-run/abc123",
 			"logUrl":   "https://example.com/logs/...",
 		},
 	}
 }
 
-func (c *RunBash) OutputChannels(configuration any) []core.OutputChannel {
+func (c *Runner) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: channelSuccess, Label: "Success"},
 		{Name: channelFailed, Label: "Failed"},
 	}
 }
 
-func (c *RunBash) Configuration() []configuration.Field {
+func (c *Runner) Configuration() []configuration.Field {
 	return []configuration.Field{
 		sourceField(),
 		{
@@ -298,7 +298,7 @@ func listField(name, label, itemLabel string, schema []configuration.Field) conf
 	}
 }
 
-func (c *RunBash) Setup(ctx core.SetupContext) error {
+func (c *Runner) Setup(ctx core.SetupContext) error {
 	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
 		return err
@@ -306,11 +306,11 @@ func (c *RunBash) Setup(ctx core.SetupContext) error {
 	return validateSpec(spec)
 }
 
-func (c *RunBash) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *Runner) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *RunBash) Execute(ctx core.ExecutionContext) error {
+func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
 		return err
@@ -358,11 +358,11 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall(hookPoll, map[string]any{}, defaultPollInterval)
 }
 
-func (c *RunBash) Hooks() []core.Hook {
+func (c *Runner) Hooks() []core.Hook {
 	return []core.Hook{{Type: core.HookTypeInternal, Name: hookPoll}}
 }
 
-func (c *RunBash) HandleHook(ctx core.ActionHookContext) error {
+func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != hookPoll {
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
@@ -402,7 +402,7 @@ func (c *RunBash) HandleHook(ctx core.ActionHookContext) error {
 	return c.complete(ctx.HTTP, ctx.ExecutionState, ctx.Metadata, client, metadata)
 }
 
-func (c *RunBash) complete(
+func (c *Runner) complete(
 	httpCtx core.HTTPContext,
 	state core.ExecutionStateContext,
 	metadataWriter core.MetadataWriter,
@@ -432,11 +432,11 @@ func (c *RunBash) complete(
 	return state.Fail("RESULT_REASON_ERROR", fmt.Sprintf("run ended with unexpected status: %s", metadata.Status))
 }
 
-func (c *RunBash) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
-func (c *RunBash) Cancel(ctx core.ExecutionContext) error {
+func (c *Runner) Cancel(ctx core.ExecutionContext) error {
 	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
 		return err
@@ -462,7 +462,7 @@ func (c *RunBash) Cancel(ctx core.ExecutionContext) error {
 	return ctx.Metadata.Set(metadataFromBuild(build, spec, &metadata))
 }
 
-func (c *RunBash) Cleanup(ctx core.SetupContext) error {
+func (c *Runner) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
@@ -529,32 +529,32 @@ func validateEnvironmentName(name string) error {
 }
 
 func loadBackendConfig(spec Spec) (backendConfig, error) {
-	region := strings.TrimSpace(os.Getenv("RUN_BASH_CODEBUILD_REGION"))
+	region := strings.TrimSpace(os.Getenv("RUNNER_CODEBUILD_REGION"))
 	if region == "" {
-		return backendConfig{}, errors.New("RUN_BASH_CODEBUILD_REGION is required")
+		return backendConfig{}, errors.New("RUNNER_CODEBUILD_REGION is required")
 	}
 
-	project := os.Getenv("RUN_BASH_CODEBUILD_PROJECT")
-	if project == "" {
-		return backendConfig{}, errors.New("RUN_BASH_CODEBUILD_PROJECT is required")
+	project := os.Getenv("RUNNER_CODEBUILD_PROJECT")
+	if strings.TrimSpace(project) == "" {
+		return backendConfig{}, errors.New("RUNNER_CODEBUILD_PROJECT is required")
 	}
 
-	accessKey := strings.TrimSpace(os.Getenv("RUN_BASH_AWS_ACCESS_KEY_ID"))
-	secretKey := strings.TrimSpace(os.Getenv("RUN_BASH_AWS_SECRET_ACCESS_KEY"))
-	sessionToken := strings.TrimSpace(os.Getenv("RUN_BASH_AWS_SESSION_TOKEN"))
+	accessKey := strings.TrimSpace(os.Getenv("RUNNER_AWS_ACCESS_KEY_ID"))
+	secretKey := strings.TrimSpace(os.Getenv("RUNNER_AWS_SECRET_ACCESS_KEY"))
+	sessionToken := strings.TrimSpace(os.Getenv("RUNNER_AWS_SESSION_TOKEN"))
 	if accessKey == "" || secretKey == "" {
-		return backendConfig{}, errors.New("RUN_BASH_AWS_ACCESS_KEY_ID and RUN_BASH_AWS_SECRET_ACCESS_KEY are required")
+		return backendConfig{}, errors.New("RUNNER_AWS_ACCESS_KEY_ID and RUNNER_AWS_SECRET_ACCESS_KEY are required")
 	}
 
 	return backendConfig{
 		Region:        region,
 		Project:       project,
-		DockerProject: os.Getenv("RUN_BASH_CODEBUILD_DOCKER_PROJECT"),
+		DockerProject: os.Getenv("RUNNER_CODEBUILD_DOCKER_PROJECT"),
 		Credentials: &aws.Credentials{
 			AccessKeyID:     accessKey,
 			SecretAccessKey: secretKey,
 			SessionToken:    sessionToken,
-			Source:          "run-bash-env",
+			Source:          "runner-env",
 		},
 	}, nil
 }

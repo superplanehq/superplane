@@ -1,4 +1,4 @@
-package runbash
+package runner
 
 import (
 	"bytes"

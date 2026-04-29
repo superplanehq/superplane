@@ -29,7 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
-  <LinkCard title="Run Bash" href="#run-bash" description="Run Bash commands in a short-lived, isolated environment managed by your SuperPlane deployment." />
+  <LinkCard title="Runner" href="#runner" description="Run shell commands on provisioned compute with full logs, managed by your SuperPlane deployment." />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -681,11 +681,11 @@ The Read Memory component looks up values from canvas-level memory storage.
 }
 ```
 
-<a id="run-bash"></a>
+<a id="runner"></a>
 
-## Run Bash
+## Runner
 
-Run Bash commands in a managed, ephemeral environment.
+Run shell commands in a managed, ephemeral environment on dedicated runners.
 
 ### Use Cases
 
@@ -696,7 +696,7 @@ Run Bash commands in a managed, ephemeral environment.
 
 ### Server configuration
 
-Self-hosted SuperPlane must configure dedicated RUN_BASH_* environment variables for the execution backend so Run Bash does not share credentials with other services. See your installation or operations guide for the required variables and how to set them.
+Self-hosted SuperPlane must configure dedicated RUNNER_* environment variables for the execution backend. See your installation or operations guide for the required variables and how to set them.
 
 ### Output
 
@@ -717,7 +717,7 @@ Submission, checkout, credential injection, or infrastructure issues are shown a
       }
     ],
     "buildArn": "arn:example:superplane-run/abc123",
-    "buildId": "superplane-run-bash:example",
+    "buildId": "superplane-runner:example",
     "durationSeconds": 42,
     "exitCode": 0,
     "logUrl": "https://example.com/logs/...",

@@ -65,8 +65,8 @@ Without a managed build execution component, users either overuse external CI sy
 ### Component Identity
 
 - The component must be a core action component.
-- Proposed component name: `run-bash`.
-- Proposed label: `Run Bash`.
+- Proposed component name: `runner`.
+- Proposed label: `Runner`.
 - Proposed icon: `terminal` from Lucide.
 - Proposed color: `blue`, matching existing command-oriented core components.
 
@@ -200,7 +200,7 @@ The emitted payload should be flat and expression-friendly:
         "path": "dist/image-digest.txt"
       }
     ],
-    "buildId": "superplane-run-bash:example",
+    "buildId": "superplane-runner:example",
     "buildArn": "arn:aws:codebuild:...",
     "logUrl": "https://console.aws.amazon.com/..."
   }
@@ -312,7 +312,7 @@ The CodeBuild service role should have only the permissions needed to run the bu
 
 ## Implementation Scope (v1)
 
-- Core `Run Bash` action component.
+- Core `Runner` action component.
 - CodeBuild-backed asynchronous execution.
 - Two output channels: `success` and `failed`.
 - Cancellation via CodeBuild stop build.
@@ -340,7 +340,7 @@ The CodeBuild service role should have only the permissions needed to run the bu
 
 ## Acceptance Criteria
 
-1. A user can add the `Run Bash` core component to a workflow and configure a multiline Bash script.
+1. A user can add the `Runner` core component to a workflow and configure a multiline Bash script.
 2. A user can configure repository checkout and run commands against the checked-out source.
 3. A user can build a Docker image in the supported Docker runtime path.
 4. A user can run Terraform commands with secret-backed provider/backend credentials.
@@ -356,7 +356,7 @@ The CodeBuild service role should have only the permissions needed to run the bu
 
 ## Success Metrics
 
-- Adoption: number of workflows using `Run Bash`.
+- Adoption: number of workflows using `Runner`.
 - Workload coverage: share of executions that use repository checkout, Docker builds, Terraform commands, and artifacts.
 - Reliability: percentage of executions that reach a terminal SuperPlane state without backend reconciliation.
 - Debuggability: reduction in support cases where users cannot determine why a command failed.

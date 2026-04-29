@@ -15,22 +15,22 @@ import type React from "react";
 import { getTriggerRenderer } from ".";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
-const RUN_BASH_STATE_MAP: EventStateMap = {
+const RUNNER_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
 };
 
-interface RunBashSource {
+interface RunnerSource {
   repository?: string;
   ref?: string;
   commitSha?: string;
 }
 
-interface RunBashArtifact {
+interface RunnerArtifact {
   name?: string;
   path?: string;
 }
 
-interface RunBashCommandPayload {
+interface RunnerCommandPayload {
   command?: {
     exitCode?: number | string | null;
     status?: string;
@@ -39,18 +39,18 @@ interface RunBashCommandPayload {
     buildId?: string;
     buildArn?: string;
     logUrl?: string;
-    source?: RunBashSource;
-    artifacts?: RunBashArtifact[];
+    source?: RunnerSource;
+    artifacts?: RunnerArtifact[];
   };
 }
 
-interface RunBashMetadata {
+interface RunnerMetadata {
   exitCode?: number | string | null;
   status?: string;
   buildId?: string;
   buildArn?: string;
-  source?: RunBashSource;
-  artifacts?: RunBashArtifact[];
+  source?: RunnerSource;
+  artifacts?: RunnerArtifact[];
   runtimeImage?: string;
   computeSize?: string;
   dockerEnabled?: boolean;
@@ -63,8 +63,8 @@ interface RunBashMetadata {
   };
 }
 
-interface RunBashConfiguration {
-  source?: RunBashSource;
+interface RunnerConfiguration {
+  source?: RunnerSource;
   runtimeImage?: string;
   computeSize?: string;
   timeout?: number;
@@ -73,17 +73,17 @@ interface RunBashConfiguration {
   };
 }
 
-function getCommandResult(execution: ExecutionInfo): RunBashCommandPayload["command"] | undefined {
+function getCommandResult(execution: ExecutionInfo): RunnerCommandPayload["command"] | undefined {
   const outputs = execution.outputs as { success?: OutputPayload[]; failed?: OutputPayload[] } | undefined;
   const payload =
-    (outputs?.failed?.[0]?.data as RunBashCommandPayload | undefined) ??
-    (outputs?.success?.[0]?.data as RunBashCommandPayload | undefined);
+    (outputs?.failed?.[0]?.data as RunnerCommandPayload | undefined) ??
+    (outputs?.success?.[0]?.data as RunnerCommandPayload | undefined);
 
   if (payload?.command) {
     return payload.command;
   }
 
-  const metadata = execution.metadata as RunBashMetadata | undefined;
+  const metadata = execution.metadata as RunnerMetadata | undefined;
   if (!metadata) {
     return undefined;
   }
@@ -113,7 +113,7 @@ function getExitCode(execution: ExecutionInfo): number | undefined {
   return undefined;
 }
 
-const runBashStateFunction = (execution: ExecutionInfo): EventState => {
+const runnerStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -148,12 +148,12 @@ const runBashStateFunction = (execution: ExecutionInfo): EventState => {
   return "failed";
 };
 
-export const RUN_BASH_STATE_REGISTRY: EventStateRegistry = {
-  stateMap: RUN_BASH_STATE_MAP,
-  getState: runBashStateFunction,
+export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: RUNNER_STATE_MAP,
+  getState: runnerStateFunction,
 };
 
-export const runBashMapper: ComponentBaseMapper = {
+export const runnerMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
       iconSlug: context.componentDefinition.icon || "terminal",
@@ -166,11 +166,11 @@ export const runBashMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       eventSections: context.lastExecutions[0]
-        ? getRunBashEventSections(context.nodes, context.lastExecutions[0], runBashStateFunction)
+        ? getRunnerEventSections(context.nodes, context.lastExecutions[0], runnerStateFunction)
         : undefined,
       includeEmptyState: !context.lastExecutions[0],
-      metadata: getRunBashMetadataList(context.node),
-      eventStateMap: RUN_BASH_STATE_MAP,
+      metadata: getRunnerMetadataList(context.node),
+      eventStateMap: RUNNER_STATE_MAP,
     };
   },
 
@@ -220,7 +220,7 @@ export const runBashMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    const state = runBashStateFunction(context.execution);
+    const state = runnerStateFunction(context.execution);
 
     if (state === "running" && context.execution.createdAt) {
       const startTime = new Date(context.execution.createdAt);
@@ -247,9 +247,9 @@ export const runBashMapper: ComponentBaseMapper = {
   },
 };
 
-function getRunBashMetadataList(node: NodeInfo): Array<{ icon: string; label: string }> {
-  const config = node.configuration as RunBashConfiguration | undefined;
-  const metadata = node.metadata as RunBashMetadata | undefined;
+function getRunnerMetadataList(node: NodeInfo): Array<{ icon: string; label: string }> {
+  const config = node.configuration as RunnerConfiguration | undefined;
+  const metadata = node.metadata as RunnerMetadata | undefined;
   const items: Array<{ icon: string; label: string }> = [];
 
   const repository = metadata?.source?.repository || config?.source?.repository;
@@ -273,7 +273,7 @@ function repositoryLabel(repository: string): string {
   return repository.replace(/^https?:\/\//, "").replace(/\.git$/, "");
 }
 
-function getRunBashEventSections(
+function getRunnerEventSections(
   nodes: NodeInfo[],
   execution: ExecutionInfo,
   getState: (execution: ExecutionInfo) => EventState,

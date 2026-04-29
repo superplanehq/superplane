@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { runBashMapper, RUN_BASH_STATE_REGISTRY } from "./runBash";
+import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "./types";
 
 function buildNode(): NodeInfo {
   return {
     id: "node-1",
-    name: "Run Bash",
-    componentName: "run-bash",
+    name: "Runner",
+    componentName: "runner",
     isCollapsed: false,
     configuration: {},
     metadata: {},
@@ -16,7 +16,7 @@ function buildNode(): NodeInfo {
 
 function buildOutput(data: unknown): OutputPayload {
   return {
-    type: "run-bash.result",
+    type: "runner.result",
     timestamp: new Date().toISOString(),
     data,
   };
@@ -54,7 +54,7 @@ function buildExecution({
   };
 }
 
-describe("RUN_BASH_STATE_REGISTRY", () => {
+describe("RUNNER_STATE_REGISTRY", () => {
   it("maps failed output payloads to failed", () => {
     const execution = buildExecution({
       outputs: {
@@ -62,7 +62,7 @@ describe("RUN_BASH_STATE_REGISTRY", () => {
       },
     });
 
-    expect(RUN_BASH_STATE_REGISTRY.getState(execution)).toBe("failed");
+    expect(RUNNER_STATE_REGISTRY.getState(execution)).toBe("failed");
   });
 
   it("maps running executions to running", () => {
@@ -71,7 +71,7 @@ describe("RUN_BASH_STATE_REGISTRY", () => {
       outputs: {},
     });
 
-    expect(RUN_BASH_STATE_REGISTRY.getState(execution)).toBe("running");
+    expect(RUNNER_STATE_REGISTRY.getState(execution)).toBe("running");
   });
 
   it("maps error results to error", () => {
@@ -81,11 +81,11 @@ describe("RUN_BASH_STATE_REGISTRY", () => {
       resultMessage: "backend failed",
     });
 
-    expect(RUN_BASH_STATE_REGISTRY.getState(execution)).toBe("error");
+    expect(RUNNER_STATE_REGISTRY.getState(execution)).toBe("error");
   });
 });
 
-describe("runBashMapper", () => {
+describe("runnerMapper", () => {
   it("renders execution details from command payload", () => {
     const node = buildNode();
     const ctx: ExecutionDetailsContext = {
@@ -109,7 +109,7 @@ describe("runBashMapper", () => {
       }),
     };
 
-    expect(runBashMapper.getExecutionDetails(ctx)).toMatchObject({
+    expect(runnerMapper.getExecutionDetails(ctx)).toMatchObject({
       Repository: "github.com/example/app",
       Commit: "abc123",
       "Exit code": "0",
@@ -131,7 +131,7 @@ describe("runBashMapper", () => {
       }),
     };
 
-    const subtitle = runBashMapper.subtitle(ctx);
+    const subtitle = runnerMapper.subtitle(ctx);
     expect(typeof subtitle).not.toBe("string");
   });
 });
