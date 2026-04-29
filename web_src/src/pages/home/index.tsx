@@ -1,12 +1,18 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Grid3x3, MoreVertical, Pencil, Plus, Palette, Rainbow, Rows3, Search, Trash2 } from "lucide-react";
-import { useState, type MouseEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, Grid3x3, MoreVertical, Plus, Palette, Rainbow, Rows3, Search, Trash2 } from "lucide-react";
+import { useEffect, useState, type MouseEvent } from "react";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/dropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../ui/dropdownMenu";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
@@ -20,15 +26,58 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { OnboardingWelcome } from "./OnboardingWelcome";
+import { formatRelativeTime } from "@/lib/timezone";
+import { canvasesListCanvasEvents } from "@/api-client";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { CanvasesCanvas, SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 
 type CanvasViewMode = "grid" | "list";
+type CanvasCardBackground = "transparent" | "red" | "orange" | "yellow" | "green" | "blue" | "violet";
+type CanvasSortMode = "a-z" | "newest" | "oldest" | "most-active";
+
+const CANVAS_CARD_BACKGROUND_STORAGE_KEY = "canvas-card-backgrounds";
+const CARD_BACKGROUND_SWATCHES: Array<{ value: CanvasCardBackground; label: string; className: string }> = [
+  {
+    value: "transparent",
+    label: "White",
+    className: "bg-white",
+  },
+  { value: "red", label: "Red", className: "bg-red-200" },
+  { value: "orange", label: "Orange", className: "bg-orange-200" },
+  { value: "yellow", label: "Yellow", className: "bg-yellow-200" },
+  { value: "green", label: "Green", className: "bg-green-200" },
+  { value: "blue", label: "Blue", className: "bg-blue-200" },
+  { value: "violet", label: "Violet", className: "bg-violet-200" },
+];
+
+function getCardBackgroundClass(background: CanvasCardBackground): string {
+  switch (background) {
+    case "red":
+      return "bg-red-100";
+    case "yellow":
+      return "bg-yellow-100";
+    case "orange":
+      return "bg-orange-100";
+    case "green":
+      return "bg-green-100";
+    case "blue":
+      return "bg-blue-100";
+    case "violet":
+      return "bg-violet-100";
+    case "transparent":
+    default:
+      return "bg-white";
+  }
+}
 
 interface CanvasCardData {
   id: string;
   name: string;
   description?: string;
   createdAt: string;
+  createdAtRaw?: string;
+  lastRunAt?: string;
+  background: CanvasCardBackground;
   type: "canvases";
   createdBy?: { id?: string; name?: string };
   nodes?: SuperplaneComponentsNode[];
@@ -40,6 +89,16 @@ const HomePage = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>("grid");
+  const [canvasSortMode, setCanvasSortMode] = useState<CanvasSortMode>("newest");
+  const [canvasBackgrounds, setCanvasBackgrounds] = useState<Record<string, CanvasCardBackground>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = window.localStorage.getItem(CANVAS_CARD_BACKGROUND_STORAGE_KEY);
+      return stored ? (JSON.parse(stored) as Record<string, CanvasCardBackground>) : {};
+    } catch {
+      return {};
+    }
+  });
   const canvasModalState = useCreateCanvasModalState();
 
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -62,11 +121,55 @@ const HomePage = () => {
     return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CANVAS_CARD_BACKGROUND_STORAGE_KEY, JSON.stringify(canvasBackgrounds));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [canvasBackgrounds]);
+
+  const canvasIds = (canvasesData || []).flatMap((canvas: CanvasesCanvas) =>
+    canvas.metadata?.id ? [canvas.metadata.id] : [],
+  );
+  const lastRunQueries = useQueries({
+    queries: canvasIds.map((canvasId) => ({
+      queryKey: ["canvas-last-run", organizationId, canvasId],
+      queryFn: async () => {
+        const response = await canvasesListCanvasEvents(
+          withOrganizationHeader({
+            path: { canvasId },
+            query: { limit: 1 },
+          }),
+        );
+        return response.data?.events?.[0]?.createdAt;
+      },
+      enabled: !!organizationId,
+      staleTime: 30 * 1000,
+      refetchOnWindowFocus: false,
+    })),
+  });
+
+  const lastRunByCanvasId = new Map<string, string | undefined>();
+  canvasIds.forEach((canvasId, index) => {
+    lastRunByCanvasId.set(canvasId, lastRunQueries[index]?.data);
+  });
+
+  const updateCanvasBackground = (canvasId: string, background: CanvasCardBackground) => {
+    setCanvasBackgrounds((prev) => ({
+      ...prev,
+      [canvasId]: background,
+    }));
+  };
+
   const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: CanvasesCanvas) => ({
     id: canvas.metadata?.id!,
     name: canvas.metadata?.name!,
     description: canvas.metadata?.description,
     createdAt: formatDate(canvas.metadata?.createdAt),
+    createdAtRaw: canvas.metadata?.createdAt,
+    lastRunAt: canvas.metadata?.id ? lastRunByCanvasId.get(canvas.metadata.id) : undefined,
+    background: canvas.metadata?.id ? canvasBackgrounds[canvas.metadata.id] || "transparent" : "transparent",
     type: "canvases" as const,
     createdBy: canvas.metadata?.createdBy,
     nodes: canvas.spec?.nodes || [],
@@ -78,6 +181,25 @@ const HomePage = () => {
       canvas.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       canvas.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
+  });
+
+  const sortedCanvases = [...filteredCanvases].sort((left, right) => {
+    const leftCreatedAt = left.createdAtRaw ? new Date(left.createdAtRaw).getTime() : 0;
+    const rightCreatedAt = right.createdAtRaw ? new Date(right.createdAtRaw).getTime() : 0;
+    const leftLastRun = left.lastRunAt ? new Date(left.lastRunAt).getTime() : 0;
+    const rightLastRun = right.lastRunAt ? new Date(right.lastRunAt).getTime() : 0;
+
+    switch (canvasSortMode) {
+      case "newest":
+        return rightCreatedAt - leftCreatedAt;
+      case "oldest":
+        return leftCreatedAt - rightCreatedAt;
+      case "most-active":
+        return rightLastRun - leftLastRun;
+      case "a-z":
+      default:
+        return left.name.localeCompare(right.name);
+    }
   });
 
   const isLoading = canvasesLoading;
@@ -129,6 +251,8 @@ const HomePage = () => {
                   setSearchQuery={setSearchQuery}
                   canvasViewMode={canvasViewMode}
                   onCanvasViewModeChange={setCanvasViewMode}
+                  canvasSortMode={canvasSortMode}
+                  onCanvasSortModeChange={setCanvasSortMode}
                 />
               </div>
             )}
@@ -143,11 +267,12 @@ const HomePage = () => {
               </div>
             ) : (
               <Content
-                filteredCanvases={filteredCanvases}
+                filteredCanvases={sortedCanvases}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
                 canvasViewMode={canvasViewMode}
                 onEditCanvas={canvasModalState.onOpenEdit}
+                onChangeBackground={updateCanvasBackground}
                 canCreateCanvases={canCreateCanvases}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
@@ -168,9 +293,27 @@ interface SearchBarProps {
   setSearchQuery: (query: string) => void;
   canvasViewMode: CanvasViewMode;
   onCanvasViewModeChange: (mode: CanvasViewMode) => void;
+  canvasSortMode: CanvasSortMode;
+  onCanvasSortModeChange: (mode: CanvasSortMode) => void;
 }
 
-function SearchBar({ searchQuery, setSearchQuery, canvasViewMode, onCanvasViewModeChange }: SearchBarProps) {
+function SearchBar({
+  searchQuery,
+  setSearchQuery,
+  canvasViewMode,
+  onCanvasViewModeChange,
+  canvasSortMode,
+  onCanvasSortModeChange,
+}: SearchBarProps) {
+  const sortLabel =
+    canvasSortMode === "a-z"
+      ? "A-Z"
+      : canvasSortMode === "newest"
+        ? "Newest"
+        : canvasSortMode === "oldest"
+          ? "Oldest"
+          : "Last Active";
+
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-4">
       <div className="min-w-0 w-full shrink-0 md:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]">
@@ -184,35 +327,55 @@ function SearchBar({ searchQuery, setSearchQuery, canvasViewMode, onCanvasViewMo
           />
         </div>
       </div>
-      <div className="ml-auto flex shrink-0 items-center">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
-            canvasViewMode === "grid" ? "opacity-100" : "opacity-50 hover:opacity-100",
-          )}
-          aria-label="Grid view"
-          aria-pressed={canvasViewMode === "grid"}
-          onClick={() => onCanvasViewModeChange("grid")}
-        >
-          <Grid3x3 className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
-            canvasViewMode === "list" ? "opacity-100" : "opacity-50 hover:opacity-100",
-          )}
-          aria-label="List view"
-          aria-pressed={canvasViewMode === "list"}
-          onClick={() => onCanvasViewModeChange("list")}
-        >
-          <Rows3 className="h-3.5 w-3.5" />
-        </Button>
+      <div className="ml-auto flex shrink-0 items-center gap-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-800"
+              aria-label="Sort canvases"
+            >
+              {sortLabel}
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onCanvasSortModeChange("a-z")}>A-Z</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCanvasSortModeChange("newest")}>Newest</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCanvasSortModeChange("oldest")}>Oldest</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCanvasSortModeChange("most-active")}>Last Active</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="flex items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
+              canvasViewMode === "grid" ? "opacity-100" : "opacity-50 hover:opacity-100",
+            )}
+            aria-label="Grid view"
+            aria-pressed={canvasViewMode === "grid"}
+            onClick={() => onCanvasViewModeChange("grid")}
+          >
+            <Grid3x3 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
+              canvasViewMode === "list" ? "opacity-100" : "opacity-50 hover:opacity-100",
+            )}
+            aria-label="List view"
+            aria-pressed={canvasViewMode === "list"}
+            onClick={() => onCanvasViewModeChange("list")}
+          >
+            <Rows3 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -224,6 +387,7 @@ function Content({
   searchQuery,
   canvasViewMode,
   onEditCanvas,
+  onChangeBackground,
   canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
@@ -234,6 +398,7 @@ function Content({
   searchQuery: string;
   canvasViewMode: CanvasViewMode;
   onEditCanvas: (canvas: CanvasCardData) => void;
+  onChangeBackground: (canvasId: string, background: CanvasCardBackground) => void;
   canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
@@ -259,6 +424,7 @@ function Content({
       view={canvasViewMode}
       searchQuery={searchQuery}
       onEditCanvas={onEditCanvas}
+      onChangeBackground={onChangeBackground}
       canCreateCanvases={canCreateCanvases}
       canUpdateCanvases={canUpdateCanvases}
       canDeleteCanvases={canDeleteCanvases}
@@ -287,6 +453,7 @@ interface CanvasGridViewProps {
   view: CanvasViewMode;
   searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
+  onChangeBackground: (canvasId: string, background: CanvasCardBackground) => void;
   canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
@@ -348,12 +515,12 @@ function NewCanvasListRow({
         to={`/${organizationId}/canvases/new`}
         aria-label="Create new canvas"
         className={cn(
-          "relative flex flex-row items-center gap-4 rounded-md border border-dashed border-green-500 bg-green-50 px-4 py-3 transition-colors dark:border-green-500 dark:bg-green-950/30",
+          "relative flex flex-row items-center gap-4 rounded-md border border-dashed border-green-500 bg-green-50 px-4 py-4 transition-colors dark:border-green-500 dark:bg-green-950/30",
           "hover:bg-green-100 dark:hover:bg-green-950/50",
           allowed && "cursor-pointer",
         )}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
         </span>
         <Heading
@@ -373,6 +540,7 @@ function CanvasGridView({
   view,
   searchQuery,
   onEditCanvas,
+  onChangeBackground,
   canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
@@ -396,6 +564,7 @@ function CanvasGridView({
             canvas={canvas}
             organizationId={organizationId}
             onEdit={onEditCanvas}
+            onChangeBackground={onChangeBackground}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
@@ -420,6 +589,7 @@ function CanvasGridView({
           canvas={canvas}
           organizationId={organizationId}
           onEdit={onEditCanvas}
+          onChangeBackground={onChangeBackground}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
@@ -433,6 +603,7 @@ interface CanvasCardProps {
   canvas: CanvasCardData;
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
+  onChangeBackground: (canvasId: string, background: CanvasCardBackground) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -442,6 +613,7 @@ function CanvasCard({
   canvas,
   organizationId,
   onEdit,
+  onChangeBackground,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -451,53 +623,59 @@ function CanvasCard({
   const previewEdges = canvas.edges || [];
 
   return (
-    <div className="relative min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer">
+    <div className="relative min-h-48 rounded-md bg-white outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer">
       <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
-      <div className="pointer-events-none relative flex flex-col h-full">
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col flex-1 min-w-0">
-              <Heading
-                level={3}
-                className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-              >
-                <span className="truncate">{canvas.name}</span>
-              </Heading>
+      <div className="pointer-events-none relative flex h-full flex-col p-3">
+        <div className={cn("flex h-full flex-col rounded-sm p-3", getCardBackgroundClass(canvas.background))}>
+          <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col flex-1 min-w-0">
+                <Heading
+                  level={3}
+                  className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                >
+                  <span className="truncate">{canvas.name}</span>
+                </Heading>
+              </div>
+              <div className="pointer-events-auto">
+                <CanvasActionsMenu
+                  canvas={canvas}
+                  organizationId={organizationId}
+                  onEdit={onEdit}
+                  onChangeBackground={onChangeBackground}
+                  canUpdateCanvases={canUpdateCanvases}
+                  canDeleteCanvases={canDeleteCanvases}
+                  permissionsLoading={permissionsLoading}
+                />
+              </div>
             </div>
-            <div className="pointer-events-auto">
-              <CanvasActionsMenu
-                canvas={canvas}
-                organizationId={organizationId}
-                onEdit={onEdit}
-                canUpdateCanvases={canUpdateCanvases}
-                canDeleteCanvases={canDeleteCanvases}
-                permissionsLoading={permissionsLoading}
-              />
+
+            {canvas.description ? (
+              <div className="mb-4">
+                <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
+                  {canvas.description}
+                </Text>
+              </div>
+            ) : null}
+
+            <div className="flex flex-col items-start">
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
+                Last run: {canvas.lastRunAt ? formatRelativeTime(canvas.lastRunAt) : "Never"}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-2">
+                {canvas.createdBy?.name ? (
+                  <>
+                    Created by: {canvas.createdBy.name}, on {canvas.createdAt}
+                  </>
+                ) : (
+                  <>Created on {canvas.createdAt}</>
+                )}
+              </p>
             </div>
           </div>
 
-          {canvas.description ? (
-            <div className="mb-4">
-              <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
-                {canvas.description}
-              </Text>
-            </div>
-          ) : null}
-
-          <div className="flex justify-between items-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
-              {canvas.createdBy?.name ? (
-                <>
-                  Created by {canvas.createdBy.name}, on {canvas.createdAt}
-                </>
-              ) : (
-                <>Created on {canvas.createdAt}</>
-              )}
-            </p>
-          </div>
+          <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
         </div>
-
-        <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
       </div>
     </div>
   );
@@ -515,7 +693,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
 
   if (!positionedNodes.length) {
     return (
-      <div className="p-4">
+      <div className="mt-4">
         <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center gap-1 text-[13px] text-gray-500">
           <Rainbow size={24} className="text-gray-500" />
           Canvas is empty
@@ -550,7 +728,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
     ) || [];
 
   return (
-    <div className="p-4 w-full overflow-hidden">
+    <div className="mt-4 w-full overflow-hidden">
       <svg
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
@@ -599,6 +777,7 @@ interface CanvasActionsMenuProps {
   canvas: CanvasCardData;
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
+  onChangeBackground: (canvasId: string, background: CanvasCardBackground) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -608,6 +787,7 @@ function CanvasActionsMenu({
   canvas,
   organizationId,
   onEdit,
+  onChangeBackground,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -678,7 +858,7 @@ function CanvasActionsMenu({
             message="You don't have permission to manage this canvas."
           >
             <button
-              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 rounded hover:bg-gray-950/5 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Canvas actions"
               disabled
             >
@@ -695,7 +875,7 @@ function CanvasActionsMenu({
               }}
             >
               <button
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1 rounded hover:bg-gray-950/5 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Canvas actions"
                 disabled={deleteCanvasMutation.isPending}
               >
@@ -716,19 +896,50 @@ function CanvasActionsMenu({
                   }}
                   disabled={!canUpdateCanvases}
                 >
-                  <Pencil size={16} />
                   Change Name
                 </DropdownMenuItem>
               </PermissionTooltip>
+              <DropdownMenuSeparator />
+              <div
+                className="px-2 py-2"
+                onClick={(event: MouseEvent<HTMLDivElement>) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  {CARD_BACKGROUND_SWATCHES.map((swatch) => (
+                    <button
+                      key={swatch.value}
+                      type="button"
+                      title={swatch.label}
+                      aria-label={`Change background to ${swatch.label}`}
+                      className={cn(
+                        "h-5 w-5 rounded-full border border-black/10 transition-colors hover:border-black/50",
+                        swatch.className,
+                        swatch.value === "transparent" &&
+                          "bg-[linear-gradient(45deg,#ffffff_25%,#f3f4f6_25%,#f3f4f6_50%,#ffffff_50%,#ffffff_75%,#f3f4f6_75%,#f3f4f6_100%)] bg-[length:8px_8px]",
+                        canvas.background === swatch.value && "border-black/50",
+                      )}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onChangeBackground(canvas.id, swatch.value);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <DropdownMenuSeparator />
               <PermissionTooltip
                 allowed={canDeleteCanvases || permissionsLoading}
                 message="You don't have permission to delete canvases."
               >
-                <DropdownMenuItem
-                  onClick={openDialog}
-                  className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                  disabled={!canDeleteCanvases}
-                >
+                <DropdownMenuItem onClick={openDialog} disabled={!canDeleteCanvases}>
                   <Trash2 size={16} />
                   Delete
                 </DropdownMenuItem>
@@ -777,6 +988,7 @@ function CanvasListRow({
   canvas,
   organizationId,
   onEdit,
+  onChangeBackground,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -784,43 +996,49 @@ function CanvasListRow({
   const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
 
   return (
-    <div className="relative overflow-hidden rounded-md bg-white outline outline-gray-950/15 hover:shadow-md dark:bg-gray-800">
+    <div className="relative overflow-hidden rounded-md bg-white outline outline-gray-950/15 hover:shadow-md">
       <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
-      <div className="pointer-events-none relative flex w-full min-w-0 flex-col justify-center p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <Heading
-              level={3}
-              className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate"
-            >
-              <span className="truncate">{canvas.name}</span>
-            </Heading>
+      <div className="pointer-events-none relative flex w-full min-w-0 flex-col justify-center p-3">
+        <div className={cn("w-full rounded-sm p-3", getCardBackgroundClass(canvas.background))}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <Heading
+                level={3}
+                className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate"
+              >
+                <span className="truncate">{canvas.name}</span>
+              </Heading>
+            </div>
+            <div className="pointer-events-auto">
+              <CanvasActionsMenu
+                canvas={canvas}
+                organizationId={organizationId}
+                onEdit={onEdit}
+                onChangeBackground={onChangeBackground}
+                canUpdateCanvases={canUpdateCanvases}
+                canDeleteCanvases={canDeleteCanvases}
+                permissionsLoading={permissionsLoading}
+              />
+            </div>
           </div>
-          <div className="pointer-events-auto">
-            <CanvasActionsMenu
-              canvas={canvas}
-              organizationId={organizationId}
-              onEdit={onEdit}
-              canUpdateCanvases={canUpdateCanvases}
-              canDeleteCanvases={canDeleteCanvases}
-              permissionsLoading={permissionsLoading}
-            />
-          </div>
-        </div>
-        {canvas.description ? (
-          <Text className="mt-1 text-left text-[13px] !leading-normal text-gray-800 dark:text-gray-400 line-clamp-2">
-            {canvas.description}
-          </Text>
-        ) : null}
+          {canvas.description ? (
+            <Text className="mt-1 text-left text-[13px] !leading-normal text-gray-800 dark:text-gray-400 line-clamp-2">
+              {canvas.description}
+            </Text>
+          ) : null}
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Last Run: {canvas.lastRunAt ? formatRelativeTime(canvas.lastRunAt) : "Never"}
+          </p>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {canvas.createdBy?.name ? (
-            <>
-              Created by {canvas.createdBy.name}, on {canvas.createdAt}
-            </>
-          ) : (
-            <>Created on {canvas.createdAt}</>
-          )}
-        </p>
+            {canvas.createdBy?.name ? (
+              <>
+                Created by {canvas.createdBy.name}, on {canvas.createdAt}
+              </>
+            ) : (
+              <>Created on {canvas.createdAt}</>
+            )}
+          </p>
+        </div>
       </div>
     </div>
   );
