@@ -3831,7 +3831,7 @@ export function WorkflowPageV2() {
   );
 
   const handleRun = useCallback(
-    async (nodeId: string, channel: string, data: any) => {
+    async (nodeId: string, template: string, data: any) => {
       if (!canvasId) return;
 
       try {
@@ -3844,7 +3844,7 @@ export function WorkflowPageV2() {
             },
             body: {
               parameters: {
-                template: channel,
+                template,
                 payload: data,
               },
             },
@@ -4911,7 +4911,11 @@ export function WorkflowPageV2() {
   );
 
   const getCustomField = useCallback(
-    (nodeId: string, onRun?: (initialData?: string) => void, integration?: OrganizationsIntegration) => {
+    (
+      nodeId: string,
+      onRun?: (initialData?: string, templateName?: string) => void,
+      integration?: OrganizationsIntegration,
+    ) => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
@@ -4926,7 +4930,7 @@ export function WorkflowPageV2() {
       if (!renderer) return null;
 
       const context: {
-        onRun?: (initialData?: string) => void;
+        onRun?: (initialData?: string, templateName?: string) => void;
         integration?: OrganizationsIntegration;
       } = onRun ? { onRun } : {};
       if (integration) context.integration = integration;
