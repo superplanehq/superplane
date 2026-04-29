@@ -5,7 +5,8 @@ You can set up an integration through the CLI, interactively, with `integrations
 ```
 superplane integrations setup init --interactive \
   --name rtx \
-  --integration semaphore 
+  --integration semaphore \
+  --capabilities semaphore.onPipelineDone,semaphore.runWorkflow
 ```
 
 This one will create the integration, and start the setup flow, showing instructions and inputs appropriately. It will be done to completion. Good for use for humans.
@@ -17,7 +18,8 @@ It is also possible to set up an integration, non-interactively. This is particu
 ```
 superplane integrations setup init \
   --name rtx \
-  --integration semaphore
+  --integration semaphore \
+  --capabilities semaphore.onPipelineDone,semaphore.runWorkflow
 ```
 
 This creates the integration, and sets its initial state, showing instructions and inputs in the output.
@@ -28,7 +30,7 @@ To submit the current pending step and proceed to the next, use `setup next`:
 superplane integrations setup next \
   --name rtx \
   --integration semaphore \
-  --step-inputs '...'
+  --inputs '...'
 ```
 
 To revert the last submitted step, use `setup previous`:
@@ -45,4 +47,4 @@ If for some reason, you started and came back to the setup flow later, you can f
 superplane integrations setup status --name rtx --integration semaphore
 ```
 
-This will give you the current status of the setup flow, including the instructions and inputs for the next step.
+This will give you the current status of the setup flow, including the instructions and inputs for the current pending step.
