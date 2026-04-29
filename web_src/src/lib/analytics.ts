@@ -1,4 +1,9 @@
+import { useEffect, useRef } from "react";
 import { posthog } from "@/posthog";
+import type { OrganizationsIntegration } from "@/api-client";
+// Tracks when a connect form was opened so duration_s can be computed on submit.
+// Keyed by integration name; last-write-wins for the same integration.
+const integrationConnectStartTimes = new Map<string, number>();
 
 export const analytics = {
   memberAccept: (organizationId: string) => {
@@ -98,9 +103,15 @@ export const analytics = {
     posthog.capture("canvas:version_publish", { canvas_id: canvasId, organization_id: organizationId });
   },
 
-  integrationCreate: (integrationType: string, organizationId: string) => {
-    posthog.capture("integration:integration_create", {
-      integration_type: integrationType,
+  integrationConnectStart: (
+    integration: string,
+    source: "node_configuration" | "integrations_page",
+    organizationId: string,
+  ) => {
+    integrationConnectStartTimes.set(integration, Date.now());
+    posthog.capture("integration:connect_start", {
+      integration,
+      source,
       organization_id: organizationId,
     });
   },
@@ -108,4 +119,90 @@ export const analytics = {
   orgCreate: (organizationId: string) => {
     posthog.capture("auth:org_create", { organization_id: organizationId });
   },
+
+  canvasRunItemOpen: (nodeRef: string | undefined, executionStatus: string, organizationId: string) => {
+    posthog.capture("canvas:run_item_open", {
+      node_ref: nodeRef,
+      execution_status: executionStatus,
+      organization_id: organizationId,
+    });
+  },
+
+  canvasRunItemTabView: (tab: "details" | "payload" | "config", organizationId: string) => {
+    posthog.capture("canvas:run_item_tab_view", { tab, organization_id: organizationId });
+  },
+
+  canvasComponentError: (nodeRef: string | undefined, errorMessage: string, organizationId: string) => {
+    posthog.capture("canvas:component_error", {
+      node_ref: nodeRef,
+      error_message: errorMessage,
+      organization_id: organizationId,
+    });
+  },
+
+  canvasLogView: (organizationId: string) => {
+    posthog.capture("canvas:log_view", { organization_id: organizationId });
+  },
+
+  integrationConnectSubmit: (
+    integration: string,
+    source: "node_configuration" | "integrations_page",
+    status: "ready" | "error" | "pending",
+    organizationId: string,
+  ) => {
+    const startTime = integrationConnectStartTimes.get(integration);
+    const durationS = startTime !== undefined ? (Date.now() - startTime) / 1000 : undefined;
+    integrationConnectStartTimes.delete(integration);
+    posthog.capture("integration:connect_submit", {
+      integration,
+      source,
+      status,
+      duration_s: durationS,
+      organization_id: organizationId,
+    });
+  },
+
+  integrationConfigureOpen: (
+    integration: string,
+    source: "node_configuration" | "integrations_page",
+    previousStatus: "ready" | "error" | "pending",
+    organizationId: string,
+  ) => {
+    posthog.capture("integration:configure_open", {
+      integration,
+      source,
+      previous_status: previousStatus,
+      organization_id: organizationId,
+    });
+  },
+
+  integrationDelete: (integration: string, organizationId: string) => {
+    posthog.capture("integration:integration_delete", {
+      integration,
+      organization_id: organizationId,
+    });
+  },
 };
+
+export function useIntegrationConfigureOpen(
+  integration: OrganizationsIntegration | undefined,
+  integrationId: string | null | undefined,
+  source: "node_configuration" | "integrations_page",
+  organizationId: string | undefined,
+) {
+  const firedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!integration || !integrationId || !organizationId) return;
+    if (firedRef.current === integrationId) return;
+    const integrationTypeName = integration.spec?.integrationName;
+    if (!integrationTypeName) return;
+    const previousStatus = (integration.status?.state || "pending") as "ready" | "error" | "pending";
+    analytics.integrationConfigureOpen(integrationTypeName, source, previousStatus, organizationId);
+    firedRef.current = integrationId;
+  }, [integration, integrationId, source, organizationId]);
+
+  useEffect(() => {
+    if (!integrationId) firedRef.current = null;
+  }, [integrationId]);
+}
