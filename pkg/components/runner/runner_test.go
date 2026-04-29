@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	workerctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gopkg.in/yaml.v3"
 )
@@ -222,4 +224,25 @@ func TestParseExitCode(t *testing.T) {
 
 	_, ok = parseExitCode(time.Now().String())
 	assert.False(t, ok)
+}
+
+func TestFitRunnerEmitPayload_StaysWithinWorkflowEventLimit(t *testing.T) {
+	huge := strings.Repeat("x", maxCapturedLogBytes+8000)
+	meta := ExecutionMetadata{
+		Status:   "SUCCEEDED",
+		BuildID:  "build-1",
+		BuildARN: strings.Repeat("a", 400),
+		Logs:     LogMetadata{DeepLink: "https://example.com/logs"},
+		Output:   OutputMetadata{Stdout: huge},
+	}
+	out := fitRunnerEmitPayload(payloadFromMetadata(meta))
+	raw, err := json.Marshal(workflowEventEnvelope(payloadType, out))
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(raw), workerctx.DefaultMaxPayloadSize)
+
+	stdout, ok := out["command"].(map[string]any)["stdout"].(string)
+	require.True(t, ok)
+	assert.Less(t, len(stdout), len(huge))
+	trunc, _ := out["command"].(map[string]any)["outputTruncated"].(bool)
+	assert.True(t, trunc)
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -106,25 +107,40 @@ func (c *codeBuildClient) stopBuild(id string) (*build, error) {
 }
 
 func (c *codeBuildClient) getLogEvents(groupName, streamName string) ([]logEvent, error) {
+	events, _, err := c.getLogEventsPaged(groupName, streamName, "")
+	return events, err
+}
+
+const cloudWatchLogEventsPageLimit = 10000
+
+func (c *codeBuildClient) getLogEventsPaged(groupName, streamName, nextForwardToken string) ([]logEvent, string, error) {
 	if groupName == "" || streamName == "" {
-		return nil, nil
+		return nil, "", nil
+	}
+
+	payload := map[string]any{
+		"logGroupName":  groupName,
+		"logStreamName": streamName,
+		"limit":         cloudWatchLogEventsPageLimit,
+	}
+	if strings.TrimSpace(nextForwardToken) != "" {
+		payload["nextToken"] = nextForwardToken
+	} else {
+		payload["startFromHead"] = true
 	}
 
 	var response getLogEventsResponse
-	err := c.postCloudWatchLogsJSON("GetLogEvents", map[string]any{
-		"logGroupName":  groupName,
-		"logStreamName": streamName,
-		"startFromHead": true,
-	}, &response)
+	err := c.postCloudWatchLogsJSON("GetLogEvents", payload, &response)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return response.Events, nil
+	return response.Events, response.NextForwardToken, nil
 }
 
 type getLogEventsResponse struct {
-	Events []logEvent `json:"events"`
+	Events           []logEvent `json:"events"`
+	NextForwardToken string     `json:"nextForwardToken,omitempty"`
 }
 
 type logEvent struct {

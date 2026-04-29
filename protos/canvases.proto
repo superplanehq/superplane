@@ -355,6 +355,17 @@ service Canvases {
     };
   }
 
+  rpc GetRunnerExecutionLogs(GetRunnerExecutionLogsRequest) returns (GetRunnerExecutionLogsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/runner/logs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get Runner CloudWatch logs";
+      description: "Returns CloudWatch log events for a Runner node execution. Use next_forward_token from the response to poll for newer lines while the run is in progress.";
+      tags: "CanvasNodeExecution";
+    };
+  }
+
   rpc ResolveExecutionErrors(ResolveExecutionErrorsRequest) returns (ResolveExecutionErrorsResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id}/executions/resolve"
@@ -899,6 +910,22 @@ message InvokeNodeExecutionHookRequest {
 }
 
 message InvokeNodeExecutionHookResponse {}
+
+message GetRunnerExecutionLogsRequest {
+  string canvas_id = 1;
+  string execution_id = 2;
+  optional string next_forward_token = 3;
+}
+
+message RunnerLogEvent {
+  int64 timestamp_ms = 1;
+  string message = 2;
+}
+
+message GetRunnerExecutionLogsResponse {
+  repeated RunnerLogEvent events = 1;
+  string next_forward_token = 2;
+}
 
 message InvokeNodeTriggerHookRequest {
   string canvas_id = 1;

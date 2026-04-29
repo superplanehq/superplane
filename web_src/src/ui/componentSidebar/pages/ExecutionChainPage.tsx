@@ -141,6 +141,8 @@ interface ExecutionChainPageProps {
   workflowNodes?: SuperplaneComponentsNode[]; // Workflow spec nodes for metadata lookup
   actions?: SuperplaneActionsAction[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
+  /** Canvas ID for Runner in-app log viewer. */
+  canvasId?: string;
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 }
 
@@ -156,6 +158,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   workflowNodes = [],
   actions = [],
   triggers = [],
+  canvasId,
   onHighlightedNodesChange,
 }) => {
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
@@ -458,6 +461,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                   isSelected={false}
                   onToggleOpen={onToggleOpen}
                   getExecutionState={getExecutionState}
+                  canvasId={canvasId}
                 />
               </div>
             )}
@@ -479,6 +483,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                         isSelected={item.executionId === selectedExecutionId}
                         onToggleOpen={onToggleOpen}
                         getExecutionState={getExecutionState}
+                        canvasId={canvasId}
                       />
                     </div>
                   ))}

@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 const (
@@ -391,11 +392,13 @@ func (c *Runner) complete(
 	}
 
 	if isSuccessfulStatus(metadata.Status) && (metadata.ExitCode == nil || *metadata.ExitCode == 0) {
-		return state.Emit(channelSuccess, payloadType, []any{payloadFromMetadata(metadata)})
+		payload := fitRunnerEmitPayload(payloadFromMetadata(metadata))
+		return state.Emit(channelSuccess, payloadType, []any{payload})
 	}
 
 	if isFailedCommandStatus(metadata.Status) {
-		return state.Emit(channelFailed, payloadType, []any{payloadFromMetadata(metadata)})
+		payload := fitRunnerEmitPayload(payloadFromMetadata(metadata))
+		return state.Emit(channelFailed, payloadType, []any{payload})
 	}
 
 	return state.Fail("RESULT_REASON_ERROR", fmt.Sprintf("run ended with unexpected status: %s", metadata.Status))
@@ -704,6 +707,107 @@ func decodeMetadata(raw any) (ExecutionMetadata, error) {
 		return ExecutionMetadata{}, fmt.Errorf("failed to decode execution metadata: %w", err)
 	}
 	return metadata, nil
+}
+
+// workflowEventEnvelope matches pkg/workers/contexts.ExecutionStateContext.Emit JSON shape.
+func workflowEventEnvelope(payloadTypeName string, data map[string]any) map[string]any {
+	return map[string]any{
+		"type":      payloadTypeName,
+		"timestamp": time.Now(),
+		"data":      data,
+	}
+}
+
+// fitRunnerEmitPayload trims stdout/stderr in the emitted payload so the marshaled workflow event
+// stays within DefaultMaxPayloadSize (the limit includes type, timestamp, and wrapper JSON).
+func fitRunnerEmitPayload(data map[string]any) map[string]any {
+	max := contexts.DefaultMaxPayloadSize
+	for range 10000 {
+		raw, err := json.Marshal(workflowEventEnvelope(payloadType, data))
+		if err != nil {
+			return data
+		}
+		if len(raw) <= max {
+			return data
+		}
+		cmd, ok := data["command"].(map[string]any)
+		if !ok {
+			return data
+		}
+		if shrinkRunnerCommandStreams(cmd) {
+			cmd["outputTruncated"] = true
+			continue
+		}
+		if deleteRunnerOptionalCommandFields(cmd) {
+			cmd["outputTruncated"] = true
+			continue
+		}
+		return data
+	}
+
+	return data
+}
+
+func deleteRunnerOptionalCommandFields(cmd map[string]any) bool {
+	removed := false
+	if _, ok := cmd["artifacts"]; ok {
+		delete(cmd, "artifacts")
+		removed = true
+	}
+	if _, ok := cmd["source"]; ok {
+		delete(cmd, "source")
+		removed = true
+	}
+	return removed
+}
+
+func shrinkRunnerCommandStreams(cmd map[string]any) bool {
+	if s, ok := cmd["stdout"].(string); ok && len(s) > 0 {
+		step := runnerStreamShrinkStep(len(s))
+		newLen := len(s) - step
+		if newLen < 0 {
+			newLen = 0
+		}
+		cmd["stdout"] = truncateStringByBytes(s, newLen)
+		return true
+	}
+	if s, ok := cmd["stderr"].(string); ok && len(s) > 0 {
+		step := runnerStreamShrinkStep(len(s))
+		newLen := len(s) - step
+		if newLen < 0 {
+			newLen = 0
+		}
+		cmd["stderr"] = truncateStringByBytes(s, newLen)
+		return true
+	}
+	return false
+}
+
+func runnerStreamShrinkStep(n int) int {
+	if n <= 1 {
+		return 1
+	}
+	step := n / 4
+	if step < 512 {
+		step = 512
+	}
+	return step
+}
+
+// truncateStringByBytes cuts s to at most maxBytes UTF-8 octets without splitting a code point.
+func truncateStringByBytes(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	b := []byte(s)
+	if len(b) <= maxBytes {
+		return s
+	}
+	b = b[:maxBytes]
+	for len(b) > 0 && (b[len(b)-1]&0xc0) == 0x80 {
+		b = b[:len(b)-1]
+	}
+	return string(b)
 }
 
 func payloadFromMetadata(metadata ExecutionMetadata) map[string]any {
