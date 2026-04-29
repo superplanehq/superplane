@@ -90,9 +90,8 @@ func Test__DeleteCanvas(t *testing.T) {
 		_, err = models.FindCanvas(r.Organization.ID, canvas.ID)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
-		// But the workflow should still exist when queried with Unscoped
-		var canvasUnscoped models.Canvas
-		err = database.Conn().Unscoped().Where("id = ?", canvas.ID).First(&canvasUnscoped).Error
+		// But the workflow should still exist when queried with Unscoped.
+		canvasUnscoped, err := models.FindUnscopedCanvas(canvas.ID)
 		require.NoError(t, err)
 		assert.NotNil(t, canvasUnscoped.DeletedAt)
 

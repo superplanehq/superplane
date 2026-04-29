@@ -546,6 +546,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="current-password"
                   value={loginPassword}
+                  className="ph-no-capture"
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginPassword(e.target.value)}
                 />
               </div>
@@ -607,6 +608,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="new-password"
                   value={signupPassword}
+                  className="ph-no-capture"
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupPassword(e.target.value)}
                 />
               </div>
@@ -620,6 +622,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="new-password"
                   value={signupConfirmPassword}
+                  className="ph-no-capture"
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupConfirmPassword(e.target.value)}
                 />
               </div>

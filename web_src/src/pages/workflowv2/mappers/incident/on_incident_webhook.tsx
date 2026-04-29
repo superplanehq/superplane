@@ -163,7 +163,7 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
           placeholder="whsec_..."
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          className="font-mono text-sm"
+          className="font-mono text-sm ph-no-capture"
         />
         <Button
           type="button"
