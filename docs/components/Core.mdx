@@ -935,12 +935,12 @@ The Wait component pauses workflow execution for a specified duration or until a
 
 - **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
   - Supports expressions for dynamic wait times
-  - Example: `{{$.retry_delay}}` or `{{$.status == "urgent" ? 0 : 30}}`
+  - Example: `{{$['Node Name'].data.retry_delay}}` or `{{$['Node Name'].data.status == "urgent" ? 0 : 30}}`
   
 - **Countdown**: Wait until a specific date/time is reached
   - Supports ISO 8601 date formats
   - Supports expressions for dynamic target times
-  - Example: `{{$.release_date}}` or `{{$.run_time + duration("48h")}}`
+  - Example: `{{$['Node Name'].data.release_date}}` or `{{$['Node Name'].data.run_time + duration("48h")}}`
 
 ### Behavior
 

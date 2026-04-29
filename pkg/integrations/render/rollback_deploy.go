@@ -106,7 +106,7 @@ func (c *RollbackDeploy) Configuration() []configuration.Field {
 			Label:       "Deploy ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Placeholder: "e.g., dep-... or {{$.event.data.deployId}}",
+			Placeholder: "e.g., dep-... or {{$['Node Name'].data.deployId}}",
 			Description: "Deploy ID to roll back to",
 		},
 	}
