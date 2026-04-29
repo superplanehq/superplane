@@ -5,7 +5,7 @@ import { Text } from "../../components/Text/text";
 import { Button } from "../../components/ui/button";
 import { Switch } from "@/ui/switch";
 import superplaneLogo from "../../assets/superplane.svg";
-import { posthog } from "@/posthog";
+import { posthog, isPostHogEnabled } from "@/posthog";
 import OwnerSetupSurvey, { type PostHogSurvey } from "./OwnerSetupSurvey";
 
 const OwnerSetup: React.FC = () => {
@@ -146,6 +146,12 @@ const OwnerSetup: React.FC = () => {
 
       const data: { organization_id: string } = await response.json();
       const orgId = data.organization_id;
+
+      if (!isPostHogEnabled) {
+        window.location.href = `/${orgId}`;
+        return;
+      }
+
       setPendingOrganizationId(orgId);
       posthog.getActiveMatchingSurveys((surveys) => {
         const survey = surveys[0] as PostHogSurvey | undefined;
