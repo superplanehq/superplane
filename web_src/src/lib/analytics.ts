@@ -46,7 +46,7 @@ export const analytics = {
   yamlExport: (canvasId: string, organizationId: string) => {
     posthog.capture("canvas:yaml_export", { canvas_id: canvasId, organization_id: organizationId });
   },
-  
+
   integrationRequested: (organizationId: string) => {
     posthog.capture("request_integration_clicked", { organization_id: organizationId });
   },
@@ -191,7 +191,7 @@ export const analytics = {
     });
   },
 
-  surveySent: (surveyId: string, surveyName: string, responseProps: Record<string, string>) => {
+  surveySent: (surveyId: string, surveyName: string, responseProps: Record<string, string | string[]>) => {
     posthog.capture("survey sent", {
       $survey_id: surveyId,
       $survey_name: surveyName,
