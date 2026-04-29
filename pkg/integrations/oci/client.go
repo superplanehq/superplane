@@ -21,9 +21,10 @@ import (
 )
 
 const (
-	coreServicesHostTemplate = "iaas.%s.oraclecloud.com"
-	identityHostTemplate     = "identity.%s.oraclecloud.com"
-	coreServicesAPIVersion   = "20160918"
+	coreServicesHostTemplate  = "iaas.%s.oraclecloud.com"
+	identityHostTemplate      = "identity.%s.oraclecloud.com"
+	objectStorageHostTemplate = "objectstorage.%s.oraclecloud.com"
+	coreServicesAPIVersion    = "20160918"
 )
 
 // Client is an OCI REST API client that signs requests using OCI API Key authentication.
@@ -122,6 +123,24 @@ func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 	return &instance, nil
 }
 
+func (c *Client) ListInstances(compartmentID string) ([]Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances?compartmentId=%s&limit=1000",
+		host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instances []Instance
+	if err := json.Unmarshal(respBody, &instances); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instances: %w", err)
+	}
+
+	return instances, nil
+}
+
 // ListVNICAttachments lists VNIC attachments for an instance, used to find IP addresses.
 func (c *Client) ListVNICAttachments(compartmentID, instanceID string) ([]VNICAttachment, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
@@ -212,23 +231,166 @@ func (c *Client) ListShapes(compartmentID string) ([]Shape, error) {
 
 func (c *Client) ListImages(compartmentID, operatingSystem string) ([]Image, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/images?compartmentId=%s&limit=100&sortBy=DISPLAYNAME&sortOrder=ASC",
+	baseURL := fmt.Sprintf("https://%s/%s/images?compartmentId=%s&limit=100&sortBy=DISPLAYNAME&sortOrder=ASC",
 		host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
 	if operatingSystem != "" {
-		url += "&operatingSystem=" + neturl.QueryEscape(operatingSystem)
+		baseURL += "&operatingSystem=" + neturl.QueryEscape(operatingSystem)
 	}
+
+	var images []Image
+	page := ""
+	for {
+		url := baseURL
+		if page != "" {
+			url += "&page=" + neturl.QueryEscape(page)
+		}
+
+		respBody, headers, err := c.doRequestWithHeaders(http.MethodGet, host, url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var pageImages []Image
+		if err := json.Unmarshal(respBody, &pageImages); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal images: %w", err)
+		}
+
+		images = append(images, pageImages...)
+		page = headerValue(headers, "opc-next-page")
+		if page == "" {
+			break
+		}
+	}
+
+	return images, nil
+}
+
+func (c *Client) CreateImage(req CreateImageRequest) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images", host, coreServicesAPIVersion)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) GetImage(imageID string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var images []Image
-	if err := json.Unmarshal(respBody, &images); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal images: %w", err)
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
 	}
 
-	return images, nil
+	return &image, nil
+}
+
+func (c *Client) UpdateImage(imageID, displayName string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	body, err := json.Marshal(UpdateImageRequest{DisplayName: displayName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) DeleteImage(imageID string) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+func (c *Client) GetObjectStorageNamespace() (string, error) {
+	host := fmt.Sprintf(objectStorageHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/n", host)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var namespace string
+	if err := json.Unmarshal(respBody, &namespace); err == nil {
+		return namespace, nil
+	}
+
+	return strings.Trim(strings.TrimSpace(string(respBody)), `"`), nil
+}
+
+func (c *Client) ListBuckets(namespaceName, compartmentID string) ([]Bucket, error) {
+	host := fmt.Sprintf(objectStorageHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/n/%s/b?compartmentId=%s&limit=1000",
+		host,
+		neturl.PathEscape(namespaceName),
+		neturl.QueryEscape(compartmentID),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var buckets []Bucket
+	if err := json.Unmarshal(respBody, &buckets); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal buckets: %w", err)
+	}
+
+	return buckets, nil
+}
+
+func (c *Client) ListObjects(namespaceName, bucketName string) ([]ObjectSummary, error) {
+	host := fmt.Sprintf(objectStorageHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/n/%s/b/%s/o?limit=1000",
+		host,
+		neturl.PathEscape(namespaceName),
+		neturl.PathEscape(bucketName),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ListObjectsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal objects: %w", err)
+	}
+
+	return response.Objects, nil
 }
 
 func (c *Client) ListSubnets(compartmentID string) ([]Subnet, error) {
@@ -267,12 +429,17 @@ func (c *Client) ListBlockVolumes(compartmentID string) ([]BlockVolume, error) {
 
 // doRequest signs and executes an HTTP request against the OCI API.
 func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, error) {
+	respBody, _, err := c.doRequestWithHeaders(method, host, url, body)
+	return respBody, err
+}
+
+func (c *Client) doRequestWithHeaders(method, host, url string, body io.Reader) ([]byte, http.Header, error) {
 	var bodyBytes []byte
 	if body != nil {
 		var err error
 		bodyBytes, err = io.ReadAll(body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read request body: %w", err)
+			return nil, nil, fmt.Errorf("failed to read request body: %w", err)
 		}
 	}
 
@@ -283,7 +450,7 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 
 	req, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build request: %w", err)
+		return nil, nil, fmt.Errorf("failed to build request: %w", err)
 	}
 
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
@@ -297,25 +464,39 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 	}
 
 	if err := c.signRequest(req, len(bodyBytes) > 0); err != nil {
-		return nil, fmt.Errorf("failed to sign request: %w", err)
+		return nil, nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
+		return nil, nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("OCI API returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, nil, fmt.Errorf("OCI API returned %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	return respBody, nil
+	return respBody, resp.Header, nil
+}
+
+func headerValue(headers http.Header, name string) string {
+	if value := headers.Get(name); value != "" {
+		return value
+	}
+
+	for key, values := range headers {
+		if strings.EqualFold(key, name) && len(values) > 0 {
+			return values[0]
+		}
+	}
+
+	return ""
 }
 
 // signRequest adds the OCI HTTP Signature Authorization header.
@@ -430,6 +611,27 @@ type ConfidentialInstanceOptions struct {
 	IsEnabled bool `json:"isEnabled"`
 }
 
+type CreateImageRequest struct {
+	CompartmentID      string              `json:"compartmentId"`
+	DisplayName        string              `json:"displayName,omitempty"`
+	InstanceID         string              `json:"instanceId,omitempty"`
+	ImageSourceDetails *ImageSourceDetails `json:"imageSourceDetails,omitempty"`
+	FreeformTags       map[string]string   `json:"freeformTags,omitempty"`
+}
+
+type ImageSourceDetails struct {
+	SourceType      string `json:"sourceType"`
+	SourceImageType string `json:"sourceImageType,omitempty"`
+	SourceURI       string `json:"sourceUri,omitempty"`
+	NamespaceName   string `json:"namespaceName,omitempty"`
+	BucketName      string `json:"bucketName,omitempty"`
+	ObjectName      string `json:"objectName,omitempty"`
+}
+
+type UpdateImageRequest struct {
+	DisplayName string `json:"displayName"`
+}
+
 type Instance struct {
 	ID                 string `json:"id"`
 	DisplayName        string `json:"displayName"`
@@ -469,9 +671,18 @@ type Shape struct {
 }
 
 type Image struct {
-	ID             string `json:"id"`
-	DisplayName    string `json:"displayName"`
-	LifecycleState string `json:"lifecycleState"`
+	ID                     string            `json:"id"`
+	DisplayName            string            `json:"displayName"`
+	LifecycleState         string            `json:"lifecycleState"`
+	CompartmentID          string            `json:"compartmentId"`
+	BaseImageID            string            `json:"baseImageId"`
+	OperatingSystem        string            `json:"operatingSystem"`
+	OperatingSystemVersion string            `json:"operatingSystemVersion"`
+	LaunchMode             string            `json:"launchMode"`
+	SizeInMBs              int               `json:"sizeInMBs"`
+	TimeCreated            string            `json:"timeCreated"`
+	CreateImageAllowed     bool              `json:"createImageAllowed"`
+	FreeformTags           map[string]string `json:"freeformTags"`
 }
 
 type Subnet struct {
@@ -486,6 +697,20 @@ type BlockVolume struct {
 	DisplayName    string `json:"displayName"`
 	LifecycleState string `json:"lifecycleState"`
 	SizeInGBs      int    `json:"sizeInGBs"`
+}
+
+type Bucket struct {
+	Name          string `json:"name"`
+	CompartmentID string `json:"compartmentId"`
+	Namespace     string `json:"namespace"`
+}
+
+type ObjectSummary struct {
+	Name string `json:"name"`
+}
+
+type ListObjectsResponse struct {
+	Objects []ObjectSummary `json:"objects"`
 }
 
 type VolumeAttachment struct {
