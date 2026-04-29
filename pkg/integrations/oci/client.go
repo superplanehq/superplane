@@ -299,8 +299,10 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 		}
 	}
 
+	includeBodyHeaders := method == http.MethodPost || method == http.MethodPut
+
 	var bodyReader io.Reader
-	if len(bodyBytes) > 0 {
+	if len(bodyBytes) > 0 || includeBodyHeaders {
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
@@ -312,14 +314,15 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	req.Header.Set("Host", host)
 
-	if len(bodyBytes) > 0 {
+	if includeBodyHeaders {
 		hash := sha256.Sum256(bodyBytes)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
 		req.Header.Set("x-content-sha256", base64.StdEncoding.EncodeToString(hash[:]))
+		req.ContentLength = int64(len(bodyBytes))
 	}
 
-	if err := c.signRequest(req, len(bodyBytes) > 0); err != nil {
+	if err := c.signRequest(req, includeBodyHeaders); err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
