@@ -210,9 +210,9 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       const button = (e.target as HTMLElement).closest("button");
       if (!button) return;
       const text = button.textContent?.trim().toLowerCase();
-      if (text === "details") analytics.canvasRunItemTabView("details", organizationId ?? "");
-      else if (text === "payload") analytics.canvasRunItemTabView("payload", organizationId ?? "");
-      else if (text === "config") analytics.canvasRunItemTabView("config", organizationId ?? "");
+      if (["details", "payload", "config"].includes(text)) {
+        analytics.canvasRunItemTabView(text as "details" | "payload" | "config", organizationId ?? "");
+      }
     },
     [organizationId],
   );
