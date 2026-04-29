@@ -14,6 +14,29 @@ import (
 const runTestCanvasID = "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 
 func runDescribeResponse(canvasID string, templates []map[string]any) string {
+	return runDescribeResponseWithExtraNodes(canvasID, templates, nil)
+}
+
+func runDescribeResponseWithExtraNodes(canvasID string, templates []map[string]any, extraNodes []map[string]any) string {
+	nodes := []map[string]any{
+		{
+			"id":        "start-node",
+			"name":      "Manual Run",
+			"type":      "TYPE_TRIGGER",
+			"component": "start",
+			"configuration": map[string]any{
+				"templates": templates,
+			},
+		},
+		{
+			"id":        "component-node",
+			"name":      "Some Component",
+			"type":      "TYPE_ACTION",
+			"component": "noop",
+		},
+	}
+	nodes = append(nodes, extraNodes...)
+
 	canvas := map[string]any{
 		"canvas": map[string]any{
 			"metadata": map[string]any{
@@ -21,23 +44,7 @@ func runDescribeResponse(canvasID string, templates []map[string]any) string {
 				"name": "run-test",
 			},
 			"spec": map[string]any{
-				"nodes": []map[string]any{
-					{
-						"id":        "start-node",
-						"name":      "Manual Run",
-						"type":      "TYPE_TRIGGER",
-						"component": "start",
-						"configuration": map[string]any{
-							"templates": templates,
-						},
-					},
-					{
-						"id":        "component-node",
-						"name":      "Some Component",
-						"type":      "TYPE_ACTION",
-						"component": "noop",
-					},
-				},
+				"nodes": nodes,
 				"edges": []map[string]any{},
 			},
 		},
@@ -291,6 +298,93 @@ func TestRunCommandRejectsMissingNode(t *testing.T) {
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not found")
+}
+
+func TestRunCommandRejectsNonStartTriggerNode(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello"}},
+	}
+	extraNodes := []map[string]any{
+		{
+			"id":        "webhook-node",
+			"name":      "Webhook Trigger",
+			"type":      "TYPE_TRIGGER",
+			"component": "webhook",
+		},
+	}
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponseWithExtraNodes(runTestCanvasID, templates, extraNodes)))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("webhook-node"),
+		template: strPtr("Hello World"),
+		payload:  strPtr(""),
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "webhook")
+	require.Contains(t, err.Error(), "not a Manual Run")
+}
+
+func TestRunCommandRejectsUnknownTemplateName(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello"}},
+		{"name": "Goodbye", "payload": map[string]any{"message": "Bye"}},
+	}
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Typo Template"),
+		payload:  strPtr(""),
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Typo Template")
+	require.Contains(t, err.Error(), "Hello World")
+	require.Contains(t, err.Error(), "Goodbye")
+}
+
+func TestRunCommandRejectsArrayPayload(t *testing.T) {
+	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	arrayPayload := `[1, 2, 3]`
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Hello World"),
+		payload:  &arrayPayload,
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not an array")
 }
 
 func strPtr(s string) *string {

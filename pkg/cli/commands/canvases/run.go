@@ -63,9 +63,25 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("canvas %q not found", ctx.Args[0])
 	}
 
-	_, err = findStartTriggerNode(*describeResp.Canvas, nodeID)
+	node, err := findStartTriggerNode(*describeResp.Canvas, nodeID)
 	if err != nil {
 		return err
+	}
+
+	if names := extractTemplateNames(node); len(names) > 0 {
+		found := false
+		for _, n := range names {
+			if n == templateName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf(
+				"template %q not found on node %q; available templates: %s",
+				templateName, nodeID, strings.Join(names, ", "),
+			)
+		}
 	}
 
 	body := openapi_client.NewCanvasesInvokeNodeTriggerHookBody()
@@ -89,27 +105,31 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 	})
 }
 
-// loadPayload accepts either an inline JSON object/array or a path to a file
-// containing JSON. Inline JSON is detected by a leading '{' or '['; anything
-// else is treated as a file path.
+// loadPayload accepts either an inline JSON object or a path to a file
+// containing a JSON object. Inline JSON is detected by a leading '{';
+// anything else is treated as a file path.
 func loadPayload(raw string) (map[string]any, error) {
-	trimmed := strings.TrimLeftFunc(raw, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' })
-	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+	trimmed := strings.TrimSpace(raw)
+	if strings.HasPrefix(trimmed, "[") {
+		return nil, fmt.Errorf("--payload must be a JSON object, not an array")
+	}
+
+	if strings.HasPrefix(trimmed, "{") {
 		parsed := map[string]any{}
-		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
 			return nil, fmt.Errorf("invalid --payload (inline JSON): %w", err)
 		}
 		return parsed, nil
 	}
 
-	data, err := os.ReadFile(raw)
+	data, err := os.ReadFile(trimmed)
 	if err != nil {
-		return nil, fmt.Errorf("--payload: cannot read file %q: %w", raw, err)
+		return nil, fmt.Errorf("--payload: cannot read file %q: %w", trimmed, err)
 	}
 
 	parsed := map[string]any{}
 	if err := json.Unmarshal(data, &parsed); err != nil {
-		return nil, fmt.Errorf("--payload: %s does not contain a valid JSON object: %w", raw, err)
+		return nil, fmt.Errorf("--payload: %s does not contain a valid JSON object: %w", trimmed, err)
 	}
 	return parsed, nil
 }
@@ -143,4 +163,29 @@ func findStartTriggerNode(
 	}
 
 	return openapi_client.SuperplaneComponentsNode{}, fmt.Errorf("node %q not found on canvas", nodeID)
+}
+
+func extractTemplateNames(node openapi_client.SuperplaneComponentsNode) []string {
+	config := node.GetConfiguration()
+	rawTemplates, ok := config["templates"]
+	if !ok {
+		return nil
+	}
+
+	templates, ok := rawTemplates.([]any)
+	if !ok {
+		return nil
+	}
+
+	var names []string
+	for _, t := range templates {
+		m, ok := t.(map[string]any)
+		if !ok {
+			continue
+		}
+		if name, ok := m["name"].(string); ok {
+			names = append(names, name)
+		}
+	}
+	return names
 }
