@@ -20,9 +20,10 @@ import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { renderIntegrationMetadata } from "./integrationMetadataRenderers";
+import { analytics } from "@/lib/analytics";
 
 interface IntegrationDetailsProps {
   organizationId: string;
@@ -58,6 +59,18 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
       setConfigLoaded(true);
     }
   }, [integration]);
+
+  const configureOpenFiredRef = useRef(false);
+  useEffect(() => {
+    if (!integration || configureOpenFiredRef.current) return;
+    const integrationTypeName = integration.spec?.integrationName;
+    if (!integrationTypeName) return;
+    const rawState = integration.status?.state;
+    const previousStatus =
+      rawState === "ready" || rawState === "error" || rawState === "pending" ? rawState : "pending";
+    analytics.integrationConfigureOpen(integrationTypeName, "integrations_page", previousStatus, organizationId);
+    configureOpenFiredRef.current = true;
+  }, [integration, organizationId]);
 
   useEffect(() => {
     setIntegrationName(integration?.metadata?.name || integration?.spec?.integrationName || "");
@@ -195,7 +208,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const handleDelete = async () => {
     if (!canDeleteIntegrations) return;
     try {
-      await deleteMutation.mutateAsync();
+      await deleteMutation.mutateAsync({ integrationName: integration?.spec?.integrationName ?? "" });
       navigate(`/${organizationId}/settings/integrations`);
     } catch {
       showErrorToast("Failed to delete integration");
