@@ -44,14 +44,7 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
     const envelope = getEventEnvelope(context.event);
     const data = envelope?.data;
     return compactDetails([
-      [
-        "Triggered At",
-        context.event?.createdAt
-          ? new Date(context.event.createdAt).toLocaleString()
-          : envelope?.eventTime
-            ? new Date(envelope.eventTime).toLocaleString()
-            : undefined,
-      ],
+      getTimeDetail(context.event, envelope),
       ["Instance Name", data?.resourceName],
       ["Instance ID", data?.resourceId],
       ["Shape", data?.additionalDetails?.shape],
@@ -84,3 +77,18 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
     };
   },
 };
+
+function getTimeDetail(
+  event: TriggerEventContext["event"],
+  envelope: OciComputeLaunchEvent | undefined,
+): [string, string | undefined] {
+  if (event?.createdAt) {
+    return ["Triggered At", new Date(event.createdAt).toLocaleString()];
+  }
+
+  if (envelope?.eventTime) {
+    return ["Triggered At", new Date(envelope.eventTime).toLocaleString()];
+  }
+
+  return ["Triggered At", undefined];
+}

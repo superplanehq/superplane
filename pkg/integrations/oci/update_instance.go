@@ -57,6 +57,8 @@ Emits the updated instance details on the default output channel, including:
 - ` + "`instanceId`" + ` — instance OCID
 - ` + "`displayName`" + ` — instance display name
 - ` + "`lifecycleState`" + ` — current lifecycle state
+- ` + "`publicIp`" + ` — public IP address, if assigned
+- ` + "`privateIp`" + ` — primary private IP address, if available
 - ` + "`shape`" + ` — the instance shape
 - ` + "`availabilityDomain`" + ` — the availability domain
 - ` + "`compartmentId`" + ` — the compartment OCID
@@ -171,7 +173,10 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to update instance: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, UpdateInstancePayloadType, []any{instanceToMap(instance)})
+	payload := instanceToMap(instance)
+	enrichInstanceWithVNICIPs(ctx.Logger, client, instance, payload)
+
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, UpdateInstancePayloadType, []any{payload})
 }
 
 func (c *UpdateInstance) Hooks() []core.Hook {
