@@ -142,7 +142,7 @@ const componentCases: Array<{
   {
     name: "manageInstancePower",
     mapper: manageInstancePowerMapper,
-    config: { instance: "ocid1.instance.oc1.eu-frankfurt-1.example", action: "STOP" },
+    config: { instanceId: "ocid1.instance.oc1.eu-frankfurt-1.example", action: "STOP" },
     metadata: [
       { icon: "server", label: "ocid1.instance.oc1.eu-frankfurt-1.example" },
       { icon: "zap", label: "STOP" },
