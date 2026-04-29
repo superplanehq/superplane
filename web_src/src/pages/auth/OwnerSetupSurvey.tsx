@@ -1,23 +1,19 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { analytics } from "@/lib/analytics";
-import superplaneLogo from "../../assets/superplane.svg";
 import { Button } from "@/components/ui/button";
-import {
-  Github,
-  Video,
-  MessageSquare,
-  GraduationCap,
-  Trophy,
-  Plug,
-  Users,
-  Sparkles,
-  type LucideIcon,
-} from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/ui/checkbox";
+import superplaneLogo from "../../assets/superplane.svg";
 
 interface SurveyQuestion {
   id?: string;
-  question: string;
+  question?: string;
   choices?: string[];
+  type?: string;
+  display_type?: string;
+  allow_multiple?: boolean;
+  multiple?: boolean;
+  placeholder?: string;
 }
 
 export interface PostHogSurvey {
@@ -31,142 +27,54 @@ interface OwnerSetupSurveyProps {
   organizationId: string;
 }
 
-// Parse "Title (subtitle text)" into { title, subtitle }
-const parseChoice = (choice: string): { title: string; subtitle: string | null } => {
+type SurveyAnswer = string | string[];
+type SurveyResponses = Record<number, SurveyAnswer>;
+
+const parseChoiceLabel = (choice: string): { title: string; subtitle: string | null } => {
   const match = choice.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-  if (match) {
-    return { title: match[1].trim(), subtitle: match[2].trim() };
+  if (!match) {
+    return { title: choice, subtitle: null };
   }
-  return { title: choice, subtitle: null };
+  return { title: match[1].trim(), subtitle: match[2].trim() };
 };
 
-const ICON_MAP: Array<{ keywords: string[]; icon: LucideIcon }> = [
-  { keywords: ["github"], icon: Github },
-  { keywords: ["dev", "content", "video", "blog", "tutorial"], icon: Video },
-  { keywords: ["social", "media", "linkedin", "discord"], icon: MessageSquare },
-  { keywords: ["university", "campus", "student"], icon: GraduationCap },
-  { keywords: ["hackathon", "community", "meetup", "event"], icon: Trophy },
-  { keywords: ["partner", "integration"], icon: Plug },
-  { keywords: ["referral", "friend", "colleague", "recommend"], icon: Users },
-];
+const getQuestionType = (
+  question: SurveyQuestion,
+  hasChoices: boolean,
+): "single_choice" | "multiple_choice" | "text" => {
+  const rawType = `${question.type ?? ""} ${question.display_type ?? ""}`.toLowerCase();
+  const isMultiple =
+    question.allow_multiple === true || question.multiple === true || /multi|multiple|checkbox/.test(rawType);
 
-// Match icon based on the title only (not the subtitle) to avoid false positives
-const getChoiceIcon = (title: string): LucideIcon => {
-  const lower = title.toLowerCase();
-  return ICON_MAP.find(({ keywords }) => keywords.some((k) => lower.includes(k)))?.icon ?? Sparkles;
+  if (isMultiple && hasChoices) {
+    return "multiple_choice";
+  }
+
+  if (!hasChoices || /open|text|free|long|short/.test(rawType)) {
+    return "text";
+  }
+
+  return "single_choice";
 };
-
-interface SurveyIntroProps {
-  onStart: () => void;
-  onSkip: () => void;
-}
-
-const SurveyIntro: React.FC<SurveyIntroProps> = ({ onStart, onSkip }) => (
-  <div className="space-y-6">
-    <div className="text-center">
-      <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
-      <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Help us get to know you</h4>
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        A couple of quick questions to help us understand our community better.
-      </p>
-    </div>
-    <div className="space-y-3">
-      <Button className="w-full" onClick={onStart}>
-        Let&apos;s go
-      </Button>
-      <Button variant="outline" className="w-full" onClick={onSkip}>
-        Skip for now
-      </Button>
-    </div>
-    <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-      Takes less than a minute. You can skip any question.
-    </p>
-  </div>
-);
-
-interface SurveyQuestionStepProps {
-  question: SurveyQuestion;
-  questionIndex: number;
-  totalQuestions: number;
-  showIcons: boolean;
-  onAnswer: (answer: string) => void;
-  onSkip: () => void;
-}
-
-const SurveyQuestionStep: React.FC<SurveyQuestionStepProps> = ({
-  question,
-  questionIndex,
-  totalQuestions,
-  showIcons,
-  onAnswer,
-  onSkip,
-}) => (
-  <div className="space-y-6">
-    <div className="text-center">
-      <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
-      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{question.question}</h4>
-    </div>
-    <div className="space-y-2">
-      {question.choices?.map((choice) => {
-        const { title, subtitle } = parseChoice(choice);
-        const Icon = getChoiceIcon(title);
-        return (
-          <button
-            key={choice}
-            type="button"
-            onClick={() => onAnswer(choice)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 hover:border-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-200 dark:hover:bg-gray-800 text-left transition-colors group"
-          >
-            {showIcons && (
-              <div className="flex-shrink-0 w-9 h-9 rounded-md bg-gray-100 dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700 flex items-center justify-center transition-colors">
-                <Icon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              </div>
-            )}
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{title}</span>
-              {subtitle && <span className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</span>}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex gap-1.5">
-        {Array.from({ length: totalQuestions }).map((_, i) => (
-          <div
-            key={i}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              i === questionIndex ? "w-4 bg-gray-900 dark:bg-white" : "w-1.5 bg-gray-300 dark:bg-gray-600"
-            }`}
-          />
-        ))}
-      </div>
-      <button
-        type="button"
-        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-        onClick={onSkip}
-      >
-        Skip this question
-      </button>
-    </div>
-  </div>
-);
 
 const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizationId }) => {
-  const [surveyStep, setSurveyStep] = useState<"intro" | "questions">("intro");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [surveyResponses, setSurveyResponses] = useState<Record<number, string>>({});
+  const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
+  const [textAnswer, setTextAnswer] = useState("");
+  const [multiAnswer, setMultiAnswer] = useState<string[]>([]);
 
-  const handleSkipAll = () => {
-    analytics.surveyDismissed(survey.id);
-    window.location.href = `/${organizationId}`;
-  };
+  const currentQuestion = survey.questions[currentQuestionIndex];
+  const currentChoices = useMemo(
+    () => currentQuestion?.choices?.filter((choice) => Boolean(choice?.trim())) ?? [],
+    [currentQuestion],
+  );
+  const currentType = currentQuestion ? getQuestionType(currentQuestion, currentChoices.length > 0) : "text";
 
-  const finishSurvey = (responses: Record<number, string>) => {
+  const finishSurvey = (responses: SurveyResponses) => {
     if (Object.keys(responses).length === 0) {
       analytics.surveyDismissed(survey.id);
     } else {
-      const responseProps: Record<string, string> = {};
+      const responseProps: Record<string, string | string[]> = {};
       survey.questions.forEach((question, index) => {
         const answer = responses[index];
         if (answer === undefined) return;
@@ -183,37 +91,162 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
     window.location.href = `/${organizationId}`;
   };
 
-  const handleAnswerQuestion = (answer: string) => {
-    const newResponses = { ...surveyResponses, [currentQuestionIndex]: answer };
+  const advanceOrFinish = (responses: SurveyResponses) => {
     if (currentQuestionIndex < survey.questions.length - 1) {
-      setSurveyResponses(newResponses);
+      setSurveyResponses(responses);
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      finishSurvey(newResponses);
+      setTextAnswer("");
+      setMultiAnswer([]);
+      return;
     }
+    finishSurvey(responses);
+  };
+
+  const handleSingleChoice = (answer: string) => {
+    const newResponses = { ...surveyResponses, [currentQuestionIndex]: answer };
+    advanceOrFinish(newResponses);
+  };
+
+  const handleSubmitTextAnswer = () => {
+    const answer = textAnswer.trim();
+    if (!answer) return;
+    const newResponses = { ...surveyResponses, [currentQuestionIndex]: answer };
+    advanceOrFinish(newResponses);
+  };
+
+  const handleToggleMultiChoice = (choice: string, checked: boolean) => {
+    if (checked) {
+      setMultiAnswer((previous) => [...previous, choice]);
+      return;
+    }
+    setMultiAnswer((previous) => previous.filter((item) => item !== choice));
+  };
+
+  const handleSubmitMultiChoice = () => {
+    if (multiAnswer.length === 0) return;
+    const newResponses = { ...surveyResponses, [currentQuestionIndex]: multiAnswer };
+    advanceOrFinish(newResponses);
   };
 
   const handleSkipQuestion = () => {
     if (currentQuestionIndex < survey.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setTextAnswer("");
+      setMultiAnswer([]);
     } else {
       finishSurvey(surveyResponses);
     }
   };
 
-  if (surveyStep === "intro") {
-    return <SurveyIntro onStart={() => setSurveyStep("questions")} onSkip={handleSkipAll} />;
-  }
+  useEffect(() => {
+    if (currentQuestion) {
+      return;
+    }
+    analytics.surveyDismissed(survey.id);
+    window.location.href = `/${organizationId}`;
+  }, [currentQuestion, organizationId, survey.id]);
+
+  if (!currentQuestion) return null;
 
   return (
-    <SurveyQuestionStep
-      question={survey.questions[currentQuestionIndex]}
-      questionIndex={currentQuestionIndex}
-      totalQuestions={survey.questions.length}
-      showIcons={currentQuestionIndex === 0}
-      onAnswer={handleAnswerQuestion}
-      onSkip={handleSkipQuestion}
-    />
+    <div className="space-y-6">
+      <div className="text-center">
+        <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
+        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {currentQuestion.question ?? "Question"}
+        </h4>
+      </div>
+
+      {currentType === "single_choice" && (
+        <div className="space-y-2">
+          {currentChoices.map((choice) => {
+            const { title, subtitle } = parseChoiceLabel(choice);
+            return (
+              <Button
+                key={choice}
+                type="button"
+                variant="outline"
+                className="w-full justify-start whitespace-normal h-auto py-3 text-left"
+                onClick={() => handleSingleChoice(choice)}
+              >
+                <span className="flex flex-col items-start">
+                  <span className="font-medium">{title}</span>
+                  {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
+                </span>
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
+      {currentType === "multiple_choice" && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            {currentChoices.map((choice) => {
+              const isChecked = multiAnswer.includes(choice);
+              const { title, subtitle } = parseChoiceLabel(choice);
+              return (
+                <label
+                  key={choice}
+                  className="flex items-start gap-3 rounded-md border border-gray-200 px-3 py-2 text-left cursor-pointer"
+                >
+                  <Checkbox
+                    checked={isChecked}
+                    onCheckedChange={(checked) => handleToggleMultiChoice(choice, checked === true)}
+                    className="mt-0.5"
+                  />
+                  <span className="flex flex-col text-sm text-gray-800 dark:text-gray-200">
+                    <span className="font-medium">{title}</span>
+                    {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={handleSubmitMultiChoice}
+            disabled={multiAnswer.length === 0}
+          >
+            Continue
+          </Button>
+        </div>
+      )}
+
+      {currentType === "text" && (
+        <div className="space-y-4">
+          <Textarea
+            placeholder={currentQuestion.placeholder ?? "Type your answer"}
+            value={textAnswer}
+            onChange={(event) => setTextAnswer(event.target.value)}
+          />
+          <Button type="button" className="w-full" onClick={handleSubmitTextAnswer} disabled={!textAnswer.trim()}>
+            Continue
+          </Button>
+        </div>
+      )}
+
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex gap-1.5">
+          {Array.from({ length: survey.questions.length }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === currentQuestionIndex ? "w-4 bg-gray-900 dark:bg-white" : "w-1.5 bg-gray-300 dark:bg-gray-600"
+              }`}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          onClick={handleSkipQuestion}
+        >
+          Skip this question
+        </button>
+      </div>
+    </div>
   );
 };
 

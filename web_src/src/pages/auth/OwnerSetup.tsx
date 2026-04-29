@@ -155,7 +155,8 @@ const OwnerSetup: React.FC = () => {
       setPendingOrganizationId(orgId);
       posthog.getActiveMatchingSurveys((surveys) => {
         const survey = surveys[0] as PostHogSurvey | undefined;
-        if (!survey || !survey.questions[0]?.choices?.length) {
+        const hasQuestions = Array.isArray(survey?.questions) && survey.questions.length > 0;
+        if (!hasQuestions) {
           window.location.href = `/${orgId}`;
           return;
         }
