@@ -34,6 +34,7 @@ Early feedback is extremely valuable.
 - **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
 - **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI and via the CLI.
 - **Agent-friendly**: Equip your coding agents with SuperPlane's CLI and skills to autonomously trigger workflows, manage resources, and investigate executions.
+- **Secure by design**: Manage secrets and sensitive environment variables securely within the control plane.
 
 ### Example use cases
 
