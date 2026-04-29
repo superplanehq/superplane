@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -143,8 +144,11 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		event, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
-			logger.Info("Event already being processed - skipping")
-			return nil
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.Info("Event already being processed - skipping")
+				return nil
+			}
+			return err
 		}
 
 		createdQueueItems, execution, err = w.processEvent(tx, logger, event)
@@ -341,8 +345,11 @@ func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry,
 		//
 		parentExecution, err := models.LockCanvasNodeExecution(tx, *execution.ParentExecutionID)
 		if err != nil {
-			logger.Info("Child node is a terminal node, but parent is locked - skipping")
-			return createdQueueItems, nil, nil
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.Info("Child node is a terminal node, but parent is locked - skipping")
+				return createdQueueItems, nil, nil
+			}
+			return nil, nil, err
 		}
 
 		logger.Info("Child node is a terminal node - checking parent execution")
