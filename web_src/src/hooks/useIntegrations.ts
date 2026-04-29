@@ -145,8 +145,7 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
-      const rawState = data.data?.integration?.status?.state;
-      const status = rawState === "ready" || rawState === "error" || rawState === "pending" ? rawState : "pending";
+      const status = (data.data?.integration?.status?.state || "pending") as "ready" | "error" | "pending";
       analytics.integrationConnectSubmit(variables.integrationName, source, status, organizationId);
     },
   });
