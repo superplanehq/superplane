@@ -108,6 +108,18 @@ dataset = Dataset(
             ),
         ),
         Case(
+            name="parallel_http_ssh_merge",
+            inputs=(
+                "I need a workflow that makes an API call and runs a server health check "
+                "at the same time, and only proceeds after both respond."
+            ),
+            evaluators=(
+                evals.CanvasHasNode("merge", count=1),
+                evals.CanvasHasWorkflow("...", "merge"),
+                evals.CanvasEdgeUsesChannel("success"),
+            ),
+        ),
+        Case(
             name="github_pr_close_long_open_filter",
             inputs=(
                 "When a GitHub pull request is closed, add a filter so the workflow only continues "

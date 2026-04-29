@@ -1,4 +1,5 @@
 from .bracket_selectors_match_canvas_name import BracketSelectorsMatchCanvasNames
+from .canvas_edge_uses_channel import CanvasEdgeUsesChannel
 from .canvas_has_node import CanvasHasNode
 from .canvas_has_trigger import CanvasHasTrigger
 from .canvas_has_workflow import CanvasHasWorkflow
@@ -8,6 +9,7 @@ from .no_dollar_data_as_root import NoDollarDataAsRoot
 from .tool_called import ToolCalled
 
 __all__ = [
+    "CanvasEdgeUsesChannel",
     "CanvasHasNode",
     "CanvasHasTrigger",
     "CanvasHasWorkflow",
