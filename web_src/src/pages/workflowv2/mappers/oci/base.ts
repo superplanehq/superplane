@@ -52,6 +52,18 @@ export const baseMapper: ComponentBaseMapper = {
   },
 };
 
+export function compactDetails(entries: Array<[string, string | undefined]>): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  for (const [key, value] of entries) {
+    if (value) {
+      details[key] = value;
+    }
+  }
+
+  return details;
+}
+
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootEvent = execution.rootEvent;
   if (!rootEvent?.nodeId || !rootEvent?.id) {
