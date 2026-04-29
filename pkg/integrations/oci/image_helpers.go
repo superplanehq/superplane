@@ -45,10 +45,6 @@ type imageExecutionMetadata struct {
 	PollAttempts  int    `json:"pollAttempts" mapstructure:"pollAttempts"`
 }
 
-func imageIDField(required bool) configuration.Field {
-	return imageResourceField(required, ResourceTypeImage)
-}
-
 func customImageIDField(required bool) configuration.Field {
 	return imageResourceField(required, ResourceTypeCustomImage)
 }
