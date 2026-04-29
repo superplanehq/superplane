@@ -123,6 +123,8 @@ func (g *GitHub) Actions() []core.Action {
 		&UpdateRelease{},
 		&DeleteRelease{},
 		&GetWorkflowUsage{},
+		&CreatePullRequest{},
+		&MergePullRequest{},
 	}
 }
 
