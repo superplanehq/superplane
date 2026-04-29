@@ -250,6 +250,8 @@ export interface CanvasPageProps {
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
+  onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
+  onLogView?: () => void;
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
@@ -1219,6 +1221,7 @@ function CanvasPage(props: CanvasPageProps) {
               missingIntegrations={props.missingIntegrations}
               onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
+              onLogView={props.onLogView}
             />
           </ReactFlowProvider>
 
@@ -1239,6 +1242,7 @@ function CanvasPage(props: CanvasPageProps) {
             getHasMoreQueue={props.getHasMoreQueue}
             getLoadingMoreQueue={props.getLoadingMoreQueue}
             onReEmit={props.onReEmit}
+            onRunItemOpen={props.onRunItemOpen}
             loadExecutionChain={props.loadExecutionChain}
             getExecutionState={props.getExecutionState}
             onSidebarClose={handleSidebarClose}
@@ -1294,6 +1298,7 @@ function Sidebar({
   onCancelQueueItem,
   onCancelExecution,
   onReEmit,
+  onRunItemOpen,
   getAllHistoryEvents,
   onLoadMoreHistory,
   getHasMoreHistory,
@@ -1333,6 +1338,7 @@ function Sidebar({
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
+  onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -1503,6 +1509,15 @@ function Sidebar({
       getHasMoreQueue={() => getHasMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       onReEmit={onReEmit}
+      onEventClick={(event) => {
+        if (event.kind === "trigger" || event.kind === "execution") {
+          onRunItemOpen?.(
+            state.componentSidebar.selectedNodeId ?? undefined,
+            event.state ?? "unknown",
+            event.originalExecution?.resultMessage,
+          );
+        }
+      }}
       loadExecutionChain={loadExecutionChain}
       getExecutionState={getExecutionState}
       showSettingsTab={true}
@@ -1745,6 +1760,7 @@ function CanvasContent({
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
+  onLogView,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1807,6 +1823,7 @@ function CanvasContent({
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
+  onLogView?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
@@ -2419,10 +2436,16 @@ function CanvasContent({
     );
   }, [logEntries, logSearch]);
 
-  const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
-    setConsoleTab(tab);
-    setIsLogSidebarOpen(true);
-  }, []);
+  const handleLogButtonClick = useCallback(
+    (tab: ConsoleTab) => {
+      setConsoleTab(tab);
+      setIsLogSidebarOpen(true);
+      if (tab === "runs") {
+        onLogView?.();
+      }
+    },
+    [onLogView],
+  );
 
   return (
     <div className="h-full w-full relative">
