@@ -177,7 +177,15 @@ export interface EventStateRegistry {
  * (via getCustomFieldRenderer) and canvas nodes (via customField prop).
  */
 export interface CustomFieldRendererContext {
-  onRun?: (initialData?: string) => void;
+  /**
+   * Open the run/emit-event modal for this node.
+   *
+   * @param initialData Optional JSON string to prefill the payload editor.
+   * @param templateName Optional name of the trigger template that originated the run.
+   *  When set, the modal will run that specific template via the trigger's `run` hook
+   *  instead of presenting a generic channel selector.
+   */
+  onRun?: (initialData?: string, templateName?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
   integration?: OrganizationsIntegration;
 }

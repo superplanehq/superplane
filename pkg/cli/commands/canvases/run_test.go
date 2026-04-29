@@ -1,0 +1,392 @@
+package canvases
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+const runTestCanvasID = "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+func runDescribeResponse(canvasID string, templates []map[string]any) string {
+	return runDescribeResponseWithExtraNodes(canvasID, templates, nil)
+}
+
+func runDescribeResponseWithExtraNodes(canvasID string, templates []map[string]any, extraNodes []map[string]any) string {
+	nodes := []map[string]any{
+		{
+			"id":        "start-node",
+			"name":      "Manual Run",
+			"type":      "TYPE_TRIGGER",
+			"component": "start",
+			"configuration": map[string]any{
+				"templates": templates,
+			},
+		},
+		{
+			"id":        "component-node",
+			"name":      "Some Component",
+			"type":      "TYPE_ACTION",
+			"component": "noop",
+		},
+	}
+	nodes = append(nodes, extraNodes...)
+
+	canvas := map[string]any{
+		"canvas": map[string]any{
+			"metadata": map[string]any{
+				"id":   canvasID,
+				"name": "run-test",
+			},
+			"spec": map[string]any{
+				"nodes": nodes,
+				"edges": []map[string]any{},
+			},
+		},
+	}
+
+	raw, err := json.Marshal(canvas)
+	if err != nil {
+		panic(err)
+	}
+	return string(raw)
+}
+
+func TestRunCommandRequiresCanvasAndFlags(t *testing.T) {
+	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
+
+	cmd := &runCommand{node: strPtr(""), template: strPtr("Hello"), payload: strPtr("")}
+	err := cmd.Execute(ctx)
+	require.ErrorContains(t, err, "canvas")
+
+	ctx.Args = []string{"my-canvas"}
+
+	cmd = &runCommand{node: strPtr(""), template: strPtr("Hello"), payload: strPtr("")}
+	err = cmd.Execute(ctx)
+	require.ErrorContains(t, err, "--node is required")
+
+	cmd = &runCommand{node: strPtr("start-node"), template: strPtr(""), payload: strPtr("")}
+	err = cmd.Execute(ctx)
+	require.ErrorContains(t, err, "--template is required")
+}
+
+func TestRunCommandInvokesHookWithTemplate(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello, World!"}},
+	}
+
+	var sentBody map[string]any
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + runTestCanvasID + "/triggers/start-node/hooks/run",
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				require.NoError(t, json.Unmarshal(raw, &sentBody))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"result":{"template":"Hello World"}}`))
+			},
+		},
+	)
+
+	ctx, stdout := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Hello World"),
+		payload:  strPtr(""),
+	}
+	err := cmd.Execute(ctx)
+	require.NoError(t, err)
+
+	parameters, ok := sentBody["parameters"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "Hello World", parameters["template"])
+	require.NotContains(t, parameters, "payload", "payload override should not be sent when not provided")
+	require.Contains(t, stdout.String(), "Run started")
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + runTestCanvasID,
+		http.MethodPost + " /api/v1/canvases/" + runTestCanvasID + "/triggers/start-node/hooks/run",
+	})
+}
+
+func TestRunCommandSendsInlinePayloadOverride(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello, World!"}},
+	}
+
+	var sentBody map[string]any
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + runTestCanvasID + "/triggers/start-node/hooks/run",
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				require.NoError(t, json.Unmarshal(raw, &sentBody))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"result":{"template":"Hello World"}}`))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	override := `{"message":"Override"}`
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Hello World"),
+		payload:  &override,
+	}
+	require.NoError(t, cmd.Execute(ctx))
+
+	parameters, ok := sentBody["parameters"].(map[string]any)
+	require.True(t, ok)
+	payload, ok := parameters["payload"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "Override", payload["message"])
+}
+
+func TestRunCommandSendsFilePayloadOverride(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello, World!"}},
+	}
+
+	dir := t.TempDir()
+	payloadPath := filepath.Join(dir, "payload.json")
+	require.NoError(t, os.WriteFile(payloadPath, []byte(`{"message":"FromFile"}`), 0o600))
+
+	var sentBody map[string]any
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + runTestCanvasID + "/triggers/start-node/hooks/run",
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				require.NoError(t, json.Unmarshal(raw, &sentBody))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"result":{"template":"Hello World"}}`))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Hello World"),
+		payload:  &payloadPath,
+	}
+	require.NoError(t, cmd.Execute(ctx))
+
+	parameters, ok := sentBody["parameters"].(map[string]any)
+	require.True(t, ok)
+	payload, ok := parameters["payload"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "FromFile", payload["message"])
+}
+
+func TestRunCommandRejectsMissingPayloadFile(t *testing.T) {
+	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	missing := "/this/file/should/not/exist.json"
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Hello World"),
+		payload:  &missing,
+	}
+
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--payload")
+}
+
+func TestRunCommandRejectsNonTriggerNode(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello"}},
+	}
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("component-node"),
+		template: strPtr("Hello World"),
+		payload:  strPtr(""),
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not a trigger")
+}
+
+func TestRunCommandRejectsMissingNode(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello"}},
+	}
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("nonexistent"),
+		template: strPtr("Hello World"),
+		payload:  strPtr(""),
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not found")
+}
+
+func TestRunCommandRejectsNonStartTriggerNode(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello"}},
+	}
+	extraNodes := []map[string]any{
+		{
+			"id":        "webhook-node",
+			"name":      "Webhook Trigger",
+			"type":      "TYPE_TRIGGER",
+			"component": "webhook",
+		},
+	}
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponseWithExtraNodes(runTestCanvasID, templates, extraNodes)))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("webhook-node"),
+		template: strPtr("Hello World"),
+		payload:  strPtr(""),
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "webhook")
+	require.Contains(t, err.Error(), "not a Manual Run")
+}
+
+func TestRunCommandRejectsUnknownTemplateName(t *testing.T) {
+	templates := []map[string]any{
+		{"name": "Hello World", "payload": map[string]any{"message": "Hello"}},
+		{"name": "Goodbye", "payload": map[string]any{"message": "Bye"}},
+	}
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + runTestCanvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(runDescribeResponse(runTestCanvasID, templates)))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Typo Template"),
+		payload:  strPtr(""),
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Typo Template")
+	require.Contains(t, err.Error(), "Hello World")
+	require.Contains(t, err.Error(), "Goodbye")
+}
+
+func TestRunCommandRejectsArrayPayload(t *testing.T) {
+	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
+	ctx.Args = []string{runTestCanvasID}
+
+	arrayPayload := `[1, 2, 3]`
+	cmd := &runCommand{
+		node:     strPtr("start-node"),
+		template: strPtr("Hello World"),
+		payload:  &arrayPayload,
+	}
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not an array")
+}
+
+func strPtr(s string) *string {
+	return &s
+}

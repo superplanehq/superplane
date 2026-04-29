@@ -242,6 +242,29 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
+	var runNode string
+	var runTemplate string
+	var runPayload string
+	runCmd := &cobra.Command{
+		Use:   "run <name-or-id>",
+		Short: "Run a canvas by emitting an event to a Manual Run trigger node",
+		Long: "Trigger a canvas programmatically by emitting an event to one of its Manual Run (start) trigger nodes. " +
+			"This is the CLI equivalent of pressing the Run button in the UI.\n\n" +
+			"Examples:\n" +
+			"  superplane canvases run my-canvas --node start-node --template \"Hello World\"\n" +
+			"  superplane canvases run my-canvas --node start-node --template \"Hello World\" --payload payload.json\n" +
+			"  superplane canvases run my-canvas --node start-node --template \"Hello World\" --payload '{\"message\":\"hi\"}'",
+		Args: cobra.ExactArgs(1),
+	}
+	runCmd.Flags().StringVar(&runNode, "node", "", "id of the Manual Run (start) trigger node to run")
+	runCmd.Flags().StringVar(&runTemplate, "template", "", "name of the template to use as the event channel and default payload")
+	runCmd.Flags().StringVar(&runPayload, "payload", "", "optional JSON payload override; either inline JSON ('{...}') or a path to a JSON file (replaces the template's saved payload)")
+	core.Bind(runCmd, &runCommand{
+		node:     &runNode,
+		template: &runTemplate,
+		payload:  &runPayload,
+	}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
@@ -249,6 +272,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(deleteCmd)
+	root.AddCommand(runCmd)
 	root.AddCommand(changeRequestsCmd)
 
 	return root

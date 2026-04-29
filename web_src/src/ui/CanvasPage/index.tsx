@@ -211,7 +211,7 @@ export interface CanvasPageProps {
   onAnnotationBlur?: () => void;
   getCustomField?: (
     nodeId: string,
-    onRun?: (initialData?: string) => void,
+    onRun?: (initialData?: string, templateName?: string) => void,
     integration?: OrganizationsIntegration,
   ) => (() => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -367,6 +367,12 @@ type CanvasAnnotationUpdate = {
 type PendingRunData = {
   nodeId?: string;
   initialData?: string;
+  /**
+   * When the run originates from a Manual Run trigger template button, this is
+   * the name of the template to invoke. The modal uses it to call the trigger's
+   * `run` hook instead of presenting a generic channel selector.
+   */
+  templateName?: string;
 };
 
 type CanvasNodeRendererCallbacks = {
@@ -655,6 +661,7 @@ function CanvasPage(props: CanvasPageProps) {
     nodeName: string;
     channels: string[];
     initialData?: string;
+    templateName?: string;
   } | null>(null);
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
@@ -720,11 +727,13 @@ function CanvasPage(props: CanvasPageProps) {
       if (props.runDisabled) return;
 
       // Check for pending run data from custom field
-      // Note: This uses a window property as a workaround to pass nodeId and initialData
-      // through the onRun callback chain without breaking existing signatures
+      // Note: This uses a window property as a workaround to pass nodeId,
+      // initialData, and templateName through the onRun callback chain without
+      // breaking existing signatures.
       const pendingData = window.__pendingRunData;
       const actualNodeId = nodeId || pendingData?.nodeId;
       const actualInitialData = initialData || pendingData?.initialData;
+      const actualTemplateName = pendingData?.templateName;
 
       if (!actualNodeId) return;
 
@@ -741,6 +750,7 @@ function CanvasPage(props: CanvasPageProps) {
         nodeName,
         channels,
         initialData: actualInitialData,
+        templateName: actualTemplateName,
       });
     },
     [state.nodes, props.runDisabled],
@@ -1279,6 +1289,7 @@ function CanvasPage(props: CanvasPageProps) {
           channels={emitModalData.channels}
           onEmit={handleEmit}
           initialData={emitModalData.initialData}
+          templateName={emitModalData.templateName}
         />
       )}
     </div>
@@ -1360,7 +1371,7 @@ function Sidebar({
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
-    onRun?: (initialData?: string) => void,
+    onRun?: (initialData?: string, templateName?: string) => void,
     integration?: OrganizationsIntegration,
   ) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
