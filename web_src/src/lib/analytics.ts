@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import { posthog } from "@/posthog";
+import type { OrganizationsIntegration } from "@/api-client";
 // Tracks when a connect form was opened so duration_s can be computed on submit.
 // Keyed by integration name; last-write-wins for the same integration.
 const integrationConnectStartTimes = new Map<string, number>();
@@ -181,3 +183,26 @@ export const analytics = {
     });
   },
 };
+
+export function useIntegrationConfigureOpen(
+  integration: OrganizationsIntegration | undefined,
+  integrationId: string | null | undefined,
+  source: "node_configuration" | "integrations_page",
+  organizationId: string | undefined,
+) {
+  const firedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!integration || !integrationId || !organizationId) return;
+    if (firedRef.current === integrationId) return;
+    const integrationTypeName = integration.spec?.integrationName;
+    if (!integrationTypeName) return;
+    const previousStatus = (integration.status?.state || "pending") as "ready" | "error" | "pending";
+    analytics.integrationConfigureOpen(integrationTypeName, source, previousStatus, organizationId);
+    firedRef.current = integrationId;
+  }, [integration, integrationId, source, organizationId]);
+
+  useEffect(() => {
+    if (!integrationId) firedRef.current = null;
+  }, [integrationId]);
+}

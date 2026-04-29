@@ -41,7 +41,7 @@ import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
-import { analytics } from "@/lib/analytics";
+import { analytics, useIntegrationConfigureOpen } from "@/lib/analytics";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -263,7 +263,6 @@ export const ComponentSidebar = ({
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const [configureIntegrationName, setConfigureIntegrationName] = useState("");
-  const configureOpenFiredRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
@@ -282,6 +281,14 @@ export const ComponentSidebar = ({
     [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
   );
   const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
+
+  useIntegrationConfigureOpen(
+    configureIntegration ?? undefined,
+    configureIntegrationId,
+    "node_configuration",
+    domainId,
+  );
+
   const createIntegrationDefinition = useMemo(
     () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
     [availableIntegrationDefinitions, integrationName],
@@ -326,7 +333,6 @@ export const ComponentSidebar = ({
     setConfigureIntegrationId(null);
     setConfigureIntegrationName("");
     setConfigureIntegrationConfig({});
-    configureOpenFiredRef.current = null;
     updateIntegrationMutation.reset();
   }, [updateIntegrationMutation]);
 
@@ -384,18 +390,6 @@ export const ComponentSidebar = ({
       setConfigureIntegrationConfig(configureIntegration.spec.configuration);
     }
   }, [configureIntegration?.spec?.configuration]);
-
-  useEffect(() => {
-    if (!configureIntegration || !configureIntegrationId || !domainId) return;
-    if (configureOpenFiredRef.current === configureIntegrationId) return;
-    const integrationTypeName = configureIntegration.spec?.integrationName;
-    if (!integrationTypeName) return;
-    const rawState = configureIntegration.status?.state;
-    const previousStatus =
-      rawState === "ready" || rawState === "error" || rawState === "pending" ? rawState : "pending";
-    analytics.integrationConfigureOpen(integrationTypeName, "node_configuration", previousStatus, domainId);
-    configureOpenFiredRef.current = configureIntegrationId;
-  }, [configureIntegration, configureIntegrationId, domainId]);
 
   useEffect(() => {
     setConfigureIntegrationName(
