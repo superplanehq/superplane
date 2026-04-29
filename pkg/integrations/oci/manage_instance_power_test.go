@@ -16,13 +16,13 @@ func Test__ManageInstancePower__Setup(t *testing.T) {
 	component := &ManageInstancePower{}
 
 	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{"instance": "", "action": "STOP"},
+		Configuration: map[string]any{"instanceId": "", "action": "STOP"},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "instance is required")
+	assert.Contains(t, err.Error(), "instanceId is required")
 
 	err = component.Setup(core.SetupContext{
-		Configuration: map[string]any{"instance": testInstanceID, "action": ""},
+		Configuration: map[string]any{"instanceId": testInstanceID, "action": ""},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "action is required")
@@ -39,7 +39,7 @@ func Test__ManageInstancePower__Execute(t *testing.T) {
 	requests := &contexts.RequestContext{}
 
 	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{"instance": testInstanceID, "action": "STOP"},
+		Configuration: map[string]any{"instanceId": testInstanceID, "action": "STOP"},
 		HTTP:          httpCtx,
 		Integration:   ociIntegrationContext(),
 		Metadata:      metadata,
@@ -74,7 +74,7 @@ func Test__ManageInstancePower__Execute__SoftStop(t *testing.T) {
 	requests := &contexts.RequestContext{}
 
 	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{"instance": testInstanceID, "action": "SOFTSTOP"},
+		Configuration: map[string]any{"instanceId": testInstanceID, "action": "SOFTSTOP"},
 		HTTP:          httpCtx,
 		Integration:   ociIntegrationContext(),
 		Metadata:      metadata,
@@ -90,16 +90,6 @@ func Test__ManageInstancePower__Execute__SoftStop(t *testing.T) {
 		Action:      "SOFTSTOP",
 		TargetState: instanceStateStopped,
 	}, metadata.Metadata)
-}
-
-func Test__ManageInstancePower__SupportsLegacyInstanceIDConfiguration(t *testing.T) {
-	component := &ManageInstancePower{}
-
-	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{"instanceId": testInstanceID, "action": "STOP"},
-	})
-
-	require.NoError(t, err)
 }
 
 func Test__ManageInstancePower__PollReschedulesUntilTargetState(t *testing.T) {

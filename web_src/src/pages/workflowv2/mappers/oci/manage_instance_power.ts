@@ -9,7 +9,6 @@ import type {
 import { baseMapper } from "./base";
 
 interface ManageInstancePowerConfiguration {
-  instance?: string;
   instanceId?: string;
   action?: string;
 }
@@ -48,10 +47,9 @@ export const manageInstancePowerMapper: ComponentBaseMapper = {
     const props = baseMapper.props(context);
     const config = context.node.configuration as ManageInstancePowerConfiguration | undefined;
     const metadata: MetadataItem[] = [];
-    const instance = config?.instance ?? config?.instanceId;
 
-    if (instance) {
-      metadata.push({ icon: "server", label: instance });
+    if (config?.instanceId) {
+      metadata.push({ icon: "server", label: config.instanceId });
     }
     if (config?.action) {
       metadata.push({ icon: "zap", label: config.action });
