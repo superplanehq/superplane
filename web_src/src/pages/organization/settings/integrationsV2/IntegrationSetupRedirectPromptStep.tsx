@@ -31,14 +31,11 @@ export function IntegrationSetupRedirectPromptStep({
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          disabled={Boolean(isSubmitting || isReverting || !onBack)}
-        >
-          {isReverting ? "Going back..." : "Previous"}
-        </Button>
+        {onBack ? (
+          <Button type="button" variant="outline" onClick={onBack} disabled={Boolean(isSubmitting || isReverting)}>
+            {isReverting ? "Going back..." : "Previous"}
+          </Button>
+        ) : null}
         <Button type="button" variant="outline" onClick={onOpenRedirect} disabled={!redirectPrompt?.url}>
           Open Redirect
         </Button>

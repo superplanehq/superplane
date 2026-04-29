@@ -50,19 +50,21 @@ export function IntegrationSetupInputsStep({
       })}
 
       <div className="flex w-fit max-w-full items-center gap-4 pt-2">
-        <Button
-          type="button"
-          variant="link"
-          onClick={onBack}
-          disabled={Boolean(isSubmitting || isReverting || !onBack)}
-          className="group h-auto shrink-0 gap-1.5 px-0 py-1 font-normal hover:!no-underline"
-        >
-          <ArrowLeft
-            aria-hidden
-            className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
-          />
-          {isReverting ? "Going back..." : "Previous"}
-        </Button>
+        {onBack ? (
+          <Button
+            type="button"
+            variant="link"
+            onClick={onBack}
+            disabled={Boolean(isSubmitting || isReverting)}
+            className="group h-auto shrink-0 gap-1.5 px-0 py-1 font-normal hover:!no-underline"
+          >
+            <ArrowLeft
+              aria-hidden
+              className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+            />
+            {isReverting ? "Going back..." : "Previous"}
+          </Button>
+        ) : null}
         <Button
           onClick={onSubmit}
           disabled={Boolean(isSubmitting || isReverting)}

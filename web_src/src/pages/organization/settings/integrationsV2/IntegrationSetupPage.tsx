@@ -8,13 +8,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ArrowLeft, Check, CircleOff, Info, Minus, MoveLeft, MoveRight } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
   useCreateIntegration,
   useDeleteIntegration,
+  useIntegration,
   useNextIntegrationSetupStep,
   usePreviousIntegrationSetupStep,
 } from "@/hooks/useIntegrations";
@@ -173,6 +174,11 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
 
   const { data: availableIntegrations = [], isLoading: isAvailableIntegrationsLoading } = useAvailableIntegrations();
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId);
+  const { data: resumeIntegrationDescribe, isPending: isResumeDescribePending } = useIntegration(
+    organizationId,
+    setupIntegrationId || "",
+  );
+  const lastResumeDescribeKey = useRef<string | null>(null);
 
   const createMutation = useCreateIntegration(organizationId);
   const submitStepMutation = useNextIntegrationSetupStep(organizationId);
@@ -195,6 +201,8 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     integrationDefinition?.label || getIntegrationTypeDisplayName(undefined, integrationName) || integrationName;
   const currentStep = getCurrentSetupStep(createdIntegration);
   const canRevertCurrentStep = canRevertSetupStep(createdIntegration);
+  const integrationReady = createdIntegration?.status?.state === "ready";
+  const showSetupStepBack = Boolean(createdIntegration) && (!integrationReady || canRevertCurrentStep);
   const integrationCapabilities = useMemo(() => {
     return [...(integrationDefinition?.capabilities || [])]
       .filter((capability) => Boolean(capability.name))
@@ -247,6 +255,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
   }, [connectedIntegrations]);
 
   useEffect(() => {
+    lastResumeDescribeKey.current = null;
     setCreatedIntegration(null);
     setStepInputs({});
     setValidationErrors(new Set());
@@ -281,23 +290,25 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
       return;
     }
 
-    if (createdIntegration?.metadata?.id === setupIntegrationId) {
+    if (!resumeIntegrationDescribe || resumeIntegrationDescribe.metadata?.id !== setupIntegrationId) {
       return;
     }
 
-    const integration = connectedIntegrations.find(
-      (connectedIntegration) => connectedIntegration.metadata?.id === setupIntegrationId,
-    );
-    if (!integration) {
+    const setupStepName = resumeIntegrationDescribe.status?.setupState?.currentStep?.name ?? "";
+    const resumeKey = `${resumeIntegrationDescribe.metadata?.updatedAt ?? ""}:${setupStepName}`;
+    if (lastResumeDescribeKey.current === resumeKey) {
       return;
     }
+    lastResumeDescribeKey.current = resumeKey;
 
-    setCreatedIntegration(integration);
+    setCreatedIntegration(resumeIntegrationDescribe);
     setStepInputs({});
     setValidationErrors(new Set());
     setSelectedCapabilities(new Set());
-    setInstanceName(integration.metadata?.name || integration.metadata?.integrationName || "");
-  }, [connectedIntegrations, createdIntegration?.metadata?.id, setupIntegrationId]);
+    setInstanceName(
+      resumeIntegrationDescribe.metadata?.name || resumeIntegrationDescribe.metadata?.integrationName || "",
+    );
+  }, [setupIntegrationId, resumeIntegrationDescribe]);
 
   useEffect(() => {
     const id = createdIntegration?.metadata?.id;
@@ -305,8 +316,19 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
       return;
     }
 
+    if (setupIntegrationId && id === setupIntegrationId && (isResumeDescribePending || !resumeIntegrationDescribe)) {
+      return;
+    }
+
     navigate(`/${organizationId}/settings/integrations/${id}`, { replace: true });
-  }, [createdIntegration, organizationId, navigate]);
+  }, [
+    createdIntegration,
+    organizationId,
+    navigate,
+    setupIntegrationId,
+    isResumeDescribePending,
+    resumeIntegrationDescribe,
+  ]);
 
   async function handleCreateIntegration() {
     const trimmedName = instanceName.trim();
@@ -734,14 +756,14 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
             setStepInputs((currentValues) => ({ ...currentValues, [fieldName]: value }));
           }}
           onSubmit={handleSubmitCurrentStep}
-          onBack={() => void handleSetupStepBack()}
+          onBack={showSetupStepBack ? () => void handleSetupStepBack() : undefined}
           isSubmitting={submitStepMutation.isPending}
           isReverting={revertStepMutation.isPending || deleteIntegrationMutation.isPending}
         />
       ) : currentStep?.type === "REDIRECT_PROMPT" ? (
         <IntegrationSetupRedirectPromptStep
           step={currentStep}
-          onBack={() => void handleSetupStepBack()}
+          onBack={showSetupStepBack ? () => void handleSetupStepBack() : undefined}
           onOpenRedirect={() => openRedirectPrompt(currentStep)}
           onSubmit={handleSubmitCurrentStep}
           isSubmitting={submitStepMutation.isPending}
@@ -771,7 +793,9 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
             <IntegrationSetupStepHistory
               previousSteps={createdIntegration.status?.setupState?.previousSteps ?? []}
               currentStep={currentStep}
-              onDiscard={createdIntegration.metadata?.id ? () => void handleDiscardIntegration() : undefined}
+              onDiscard={
+                createdIntegration.metadata?.id && !integrationReady ? () => void handleDiscardIntegration() : undefined
+              }
               discardDisabled={
                 deleteIntegrationMutation.isPending ||
                 submitStepMutation.isPending ||

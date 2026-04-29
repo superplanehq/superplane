@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { PermissionTooltip, RequirePermission } from "@/components/PermissionGate";
+import { PermissionTooltip, RequirePermission, RequireAnyPermission } from "@/components/PermissionGate";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 
 export function OrganizationSettings() {
@@ -492,9 +492,14 @@ export function OrganizationSettings() {
             <Route
               path="integrations/:integrationName/setup"
               element={
-                <RequirePermission resource="integrations" action="create">
+                <RequireAnyPermission
+                  checks={[
+                    { resource: "integrations", action: "create" },
+                    { resource: "integrations", action: "update" },
+                  ]}
+                >
                   <IntegrationSetupPage organizationId={organizationId || ""} />
-                </RequirePermission>
+                </RequireAnyPermission>
               }
             />
             <Route

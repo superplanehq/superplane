@@ -17,11 +17,6 @@ const (
 	IntegrationStateReady   = "ready"
 	IntegrationStateError   = "error"
 
-	IntegrationCapabilityStateRequested   = "requested"
-	IntegrationCapabilityStateEnabled     = "enabled"
-	IntegrationCapabilityStateDisabled    = "disabled"
-	IntegrationCapabilityStateUnavailable = "unavailable"
-
 	IntegrationCapabilityTypeAction  = "action"
 	IntegrationCapabilityTypeTrigger = "trigger"
 )
@@ -65,8 +60,8 @@ type SetupState struct {
 }
 
 type CapabilityState struct {
-	Name  string `json:"name"`
-	State string `json:"state"`
+	Name  string                          `json:"name"`
+	State core.IntegrationCapabilityState `json:"state"`
 }
 
 type IntegrationSecret struct {
@@ -185,6 +180,8 @@ type CanvasNodeReference struct {
 	CanvasName string
 	NodeID     string
 	NodeName   string
+	NodeType   string
+	NodeRef    datatypes.JSONType[NodeRef]
 }
 
 func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReference, error) {
@@ -192,7 +189,7 @@ func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReferen
 	err := database.Conn().
 		Table("workflow_nodes AS wn").
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
-		Select("w.id as canvas_id, w.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
+		Select("w.id as canvas_id, w.name as canvas_name, wn.node_id as node_id, wn.name as node_name, wn.type as node_type, wn.ref as node_ref").
 		Where("wn.app_installation_id = ?", integrationID).
 		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).

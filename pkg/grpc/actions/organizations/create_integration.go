@@ -183,9 +183,9 @@ func initialCapabilityStates(definitions []core.Capability, requestedCapabilitie
 
 	states := make([]models.CapabilityState, 0, len(definitions))
 	for _, definition := range definitions {
-		state := models.IntegrationCapabilityStateUnavailable
+		state := core.IntegrationCapabilityStateUnavailable
 		if requested[definition.Name] {
-			state = models.IntegrationCapabilityStateRequested
+			state = core.IntegrationCapabilityStateRequested
 		}
 
 		states = append(states, models.CapabilityState{
@@ -416,27 +416,27 @@ func serializeCapabilities(capabilities []models.CapabilityState) []*pb.Integrat
 	return protos
 }
 
-func ProtoToCapabilityState(s pb.Integration_CapabilityState_State) string {
+func ProtoToCapabilityState(s pb.Integration_CapabilityState_State) core.IntegrationCapabilityState {
 	switch s {
 	case pb.Integration_CapabilityState_STATE_ENABLED:
-		return models.IntegrationCapabilityStateEnabled
+		return core.IntegrationCapabilityStateEnabled
 	case pb.Integration_CapabilityState_STATE_DISABLED:
-		return models.IntegrationCapabilityStateDisabled
+		return core.IntegrationCapabilityStateDisabled
 	case pb.Integration_CapabilityState_STATE_REQUESTED:
-		return models.IntegrationCapabilityStateRequested
+		return core.IntegrationCapabilityStateRequested
 	}
-	return models.IntegrationCapabilityStateUnavailable
+	return core.IntegrationCapabilityStateUnavailable
 }
 
-func CapabilityStateToProto(t string) pb.Integration_CapabilityState_State {
+func CapabilityStateToProto(t core.IntegrationCapabilityState) pb.Integration_CapabilityState_State {
 	switch t {
-	case models.IntegrationCapabilityStateEnabled:
+	case core.IntegrationCapabilityStateEnabled:
 		return pb.Integration_CapabilityState_STATE_ENABLED
-	case models.IntegrationCapabilityStateDisabled:
+	case core.IntegrationCapabilityStateDisabled:
 		return pb.Integration_CapabilityState_STATE_DISABLED
-	case models.IntegrationCapabilityStateRequested:
+	case core.IntegrationCapabilityStateRequested:
 		return pb.Integration_CapabilityState_STATE_REQUESTED
-	case models.IntegrationCapabilityStateUnavailable:
+	case core.IntegrationCapabilityStateUnavailable:
 		return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 	}
 	return pb.Integration_CapabilityState_STATE_UNAVAILABLE

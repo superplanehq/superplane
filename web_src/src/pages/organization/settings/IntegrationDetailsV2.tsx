@@ -26,6 +26,7 @@ import {
 } from "@/lib/integrationCapabilityGroups";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import { getIntegrationV2SetupPath } from "@/lib/integrationV2";
 import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -266,7 +267,18 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
   const handleCapabilitiesSubmit = async () => {
     if (!canUpdateIntegrations || stagedCapabilityUpdates.length === 0) return;
     try {
-      await updateCapabilitiesMutation.mutateAsync(stagedCapabilityUpdates);
+      const response = await updateCapabilitiesMutation.mutateAsync(stagedCapabilityUpdates);
+      const updated = response.data?.integration ?? null;
+      const providerName = updated?.metadata?.integrationName ?? integration?.metadata?.integrationName;
+      const resolvedIntegrationId = updated?.metadata?.id ?? integrationId ?? "";
+
+      if (providerName && updated?.status?.setupState?.currentStep && resolvedIntegrationId) {
+        navigate(getIntegrationV2SetupPath(organizationId, providerName), {
+          state: { integrationId: resolvedIntegrationId },
+        });
+        return;
+      }
+
       showSuccessToast("Integration capabilities updated");
     } catch (_error) {
       showErrorToast(`Failed to update capabilities: ${getApiErrorMessage(_error)}`);

@@ -19,10 +19,11 @@ import (
 type SetupProvider struct{}
 
 const (
-	SetupStepSelectOwner      = "selectOwner"
-	SetupStepSelectAuthMethod = "selectAuthMethod"
-	SetupStepEnterPAT         = "enterPAT"
-	SetupStepSetupApp         = "setupApp"
+	SetupStepSelectOwner       = "selectOwner"
+	SetupStepSelectAuthMethod  = "selectAuthMethod"
+	SetupStepEnterPAT          = "enterPAT"
+	SetupStepUpdatePermissions = "updatePermissions"
+	SetupStepSetupApp          = "setupApp"
 
 	//
 	// An integration can be connected to:
@@ -59,6 +60,72 @@ const (
 	SecretPAT          = "Personal Access Token"
 	SecretGitHubAppPEM = "GitHub App Private Key (PEM)"
 )
+
+func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
+	changes := ctx.Changes
+	if len(changes) == 0 {
+		return nil, nil
+	}
+
+	requested := ctx.Changes[core.IntegrationCapabilityStateRequested]
+	if len(requested) == 0 {
+		return nil, errors.New("no requested capabilities")
+	}
+
+	instructions, err := g.instructionsForTokenUpdate(ctx.Parameters, requested)
+	if err != nil {
+		return nil, fmt.Errorf("error generating instructions: %v", err)
+	}
+
+	return &core.SetupStep{
+		Type:         core.SetupStepTypeInputs,
+		Name:         SetupStepUpdatePermissions,
+		Label:        "Update the permissions on your personal access token",
+		Inputs:       []configuration.Field{},
+		Instructions: instructions,
+	}, nil
+}
+
+const patUpdateInstructionsTemplate = `
+- Go to https://github.com/settings/personal-access-tokens
+- Find the token you want to update
+- Edit the permissions to include the following:
+
+| Resource | Permission Level |
+|---------|------------|
+{{- range $key, $value := .Permissions }}
+| {{ $key }} | {{ $value }} |
+{{- end }}
+`
+
+func (g *SetupProvider) instructionsForTokenUpdate(parameters core.IntegrationParameterStorage, newCapabilities []string) (string, error) {
+	owner, err := parameters.GetString(ParameterOwner)
+	if err != nil {
+		return "", err
+	}
+
+	permissions, err := g.getPermissions(newCapabilities)
+	if err != nil {
+		return "", err
+	}
+
+	tmpl, err := template.New("patUpdateInstructions").Parse(patUpdateInstructionsTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing template: %v", err)
+	}
+
+	data := map[string]any{
+		"Owner":       owner,
+		"Permissions": permissions,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("error executing template: %v", err)
+	}
+
+	return buf.String(), nil
+}
 
 func (g *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 	return []core.CapabilityGroup{
@@ -366,10 +433,20 @@ func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	switch ctx.Step {
 	case SetupStepSelectOwner:
 		return g.onSelectOwnerSubmit(ctx.Inputs, ctx)
+
 	case SetupStepSelectAuthMethod:
 		return g.onSelectAuthMethodSubmit(ctx.Inputs, ctx)
+
 	case SetupStepEnterPAT:
 		return g.onEnterPATSubmit(ctx.Inputs, ctx)
+
+	case SetupStepUpdatePermissions:
+		err := ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+		if err != nil {
+			return nil, fmt.Errorf("error enabling capabilities: %v", err)
+		}
+
+		return nil, nil
 	case SetupStepSetupApp:
 		return nil, fmt.Errorf("not implemented")
 	}
@@ -547,7 +624,12 @@ func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (s
 		return "", err
 	}
 
-	permissions, err := g.getPermissions(ctx)
+	requestedCapabilities := ctx.Capabilities.Requested()
+	if len(requestedCapabilities) == 0 {
+		return "", fmt.Errorf("no capabilities requested")
+	}
+
+	permissions, err := g.getPermissions(requestedCapabilities)
 	if err != nil {
 		return "", err
 	}
@@ -570,12 +652,7 @@ func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (s
 	return buf.String(), nil
 }
 
-func (g *SetupProvider) getPermissions(ctx core.SetupStepContext) (map[string]string, error) {
-	requestedCapabilities := ctx.Capabilities.Requested()
-	if len(requestedCapabilities) == 0 {
-		return nil, fmt.Errorf("no capabilities requested")
-	}
-
+func (g *SetupProvider) getPermissions(requestedCapabilities []string) (map[string]string, error) {
 	//
 	// TODO: this looks awful, need a better way to build this kind of logic.
 	//
@@ -654,7 +731,10 @@ func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (
 		return nil, err
 	}
 
-	// TODO: enable capabilities
+	err = ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+	if err != nil {
+		return nil, fmt.Errorf("error enabling capabilities: %v", err)
+	}
 
 	return finishPATSetup(ctx.Parameters, repos)
 }

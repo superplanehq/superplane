@@ -3,7 +3,7 @@ package organizations
 import (
 	"context"
 	"errors"
-	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -113,10 +113,14 @@ func submitStep(registry *registry.Registry, integration *models.Integration, se
 		}
 
 		//
-		// If no next step, make integration ready
+		// If no next step, clear the setup state and return.
 		//
 		if nextStep == nil {
-			return fmt.Errorf("no next step")
+			now := time.Now()
+			integration.UpdatedAt = &now
+			integration.Capabilities = capabilityCtx.States()
+			integration.SetupState = nil
+			return tx.Save(integration).Error
 		}
 
 		//

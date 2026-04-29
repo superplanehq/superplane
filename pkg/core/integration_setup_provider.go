@@ -40,6 +40,12 @@ type IntegrationSetupProvider interface {
 	// A secret update might trigger a new setup flow.
 	//
 	OnSecretUpdate(ctx SecretUpdateContext) (*SetupStep, error)
+
+	//
+	// Called when the user requests new capabilities
+	// from an already setup integration.
+	//
+	OnCapabilityUpdate(ctx CapabilityUpdateContext) (*SetupStep, error)
 }
 
 type SetupStepType string
@@ -72,6 +78,15 @@ type ParameterUpdateContext struct {
 type SecretUpdateContext struct {
 	SecretName   string
 	Value        string
+	Logger       *log.Entry
+	HTTP         HTTPContext
+	Secrets      IntegrationSecretStorage
+	Parameters   IntegrationParameterStorage
+	Capabilities CapabilityContext
+}
+
+type CapabilityUpdateContext struct {
+	Changes      map[IntegrationCapabilityState][]string
 	Logger       *log.Entry
 	HTTP         HTTPContext
 	Secrets      IntegrationSecretStorage
@@ -127,14 +142,16 @@ type IntegrationParameterDefinition struct {
 }
 
 type IntegrationCapabilityType string
+type IntegrationCapabilityState string
 
 const (
 	IntegrationCapabilityTypeAction  IntegrationCapabilityType = "action"
 	IntegrationCapabilityTypeTrigger IntegrationCapabilityType = "trigger"
 
-	IntegrationCapabilityStateRequested = "requested"
-	IntegrationCapabilityStateEnabled   = "enabled"
-	IntegrationCapabilityStateDisabled  = "disabled"
+	IntegrationCapabilityStateRequested   IntegrationCapabilityState = "requested"
+	IntegrationCapabilityStateEnabled     IntegrationCapabilityState = "enabled"
+	IntegrationCapabilityStateDisabled    IntegrationCapabilityState = "disabled"
+	IntegrationCapabilityStateUnavailable IntegrationCapabilityState = "unavailable"
 )
 
 type CapabilityContext interface {

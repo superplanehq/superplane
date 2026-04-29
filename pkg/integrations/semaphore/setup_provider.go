@@ -110,6 +110,20 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 	}
 }
 
+func (s *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
+	//
+	// The token we have already has permissions to do all the capabilities that Semaphore offers.
+	// The only thing to do here is to enable the newly requested capabilities.
+	//
+	requested, ok := ctx.Changes[core.IntegrationCapabilityStateRequested]
+	if !ok {
+		return nil, errors.New("no requested capabilities")
+	}
+
+	ctx.Logger.Infof("requested capabilities: %v", requested)
+	return nil, ctx.Capabilities.Enable(requested...)
+}
+
 func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	return core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
@@ -304,7 +318,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error listing projects: %v", err)
 	}
 
-	err = s.enableCapabilities(ctx)
+	err = ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 	if err != nil {
 		return nil, fmt.Errorf("error enabling capability group: %v", err)
 	}
@@ -340,16 +354,4 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		Label:        "Setup complete",
 		Instructions: buf.String(),
 	}, nil
-}
-
-func (s *SetupProvider) enableCapabilities(ctx core.SetupStepContext) error {
-	runWorkflow := &RunWorkflow{}
-	getPipeline := &GetPipeline{}
-	onPipelineDone := &OnPipelineDone{}
-
-	return ctx.Capabilities.Enable(
-		runWorkflow.Name(),
-		getPipeline.Name(),
-		onPipelineDone.Name(),
-	)
 }
