@@ -8,6 +8,8 @@ import type {
 } from "../types";
 import { baseMapper } from "./base";
 
+const MAX_NODE_METADATA_ITEMS = 3;
+
 interface CreateComputeInstanceConfiguration {
   compartmentId?: string;
   availabilityDomain?: string;
@@ -25,6 +27,15 @@ interface CreateComputeInstanceConfiguration {
   blockVolumeId?: string;
   enableShieldedInstance?: boolean;
   enableConfidentialComputing?: boolean;
+}
+
+interface CreateComputeInstanceNodeMetadata {
+  displayName?: string;
+  shape?: string;
+  availabilityDomain?: string;
+  imageName?: string;
+  subnetName?: string;
+  blockVolumeName?: string;
 }
 
 interface CreateComputeInstanceOutputData {
@@ -113,19 +124,28 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 
 function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateComputeInstanceConfiguration | undefined;
-  const items: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as CreateComputeInstanceNodeMetadata | undefined;
 
-  if (config?.displayName) {
-    items.push({ icon: "tag", label: config.displayName });
-  }
+  const displayName = nodeMetadata?.displayName ?? config?.displayName;
+  const shape = nodeMetadata?.shape ?? config?.shape;
+  const availabilityDomain = nodeMetadata?.availabilityDomain ?? config?.availabilityDomain;
 
-  if (config?.shape) {
-    items.push({ icon: "cpu", label: config.shape });
-  }
+  return [
+    metadataItem("tag", displayName),
+    metadataItem("cpu", shape),
+    metadataItem("map-pin", availabilityDomain),
+    metadataItem("disc", nodeMetadata?.imageName),
+    metadataItem("network", nodeMetadata?.subnetName),
+    metadataItem("database", nodeMetadata?.blockVolumeName),
+  ]
+    .filter(isMetadataItem)
+    .slice(0, MAX_NODE_METADATA_ITEMS);
+}
 
-  if (config?.availabilityDomain) {
-    items.push({ icon: "map-pin", label: config.availabilityDomain });
-  }
+function metadataItem(icon: MetadataItem["icon"], label?: string): MetadataItem | undefined {
+  return label ? { icon, label } : undefined;
+}
 
-  return items;
+function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
+  return item !== undefined;
 }
