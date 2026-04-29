@@ -548,7 +548,7 @@ After implementing your integration:
 1. **Build and format**: Run `make format.go && make lint && make check.build.app`
 2. **Test the backend**: Run `make test`
 3. **Test the UI**: Run `make check.build.ui`
-4. **E2E tests**: Consider adding E2E tests (see [e2e_tests.md](e2e_tests.md))
+4. **E2E tests**: Consider adding E2E tests (see [e2e-tests.md](e2e-tests.md))
 
 ## Best Practices
 
