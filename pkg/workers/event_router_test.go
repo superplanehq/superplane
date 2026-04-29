@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
@@ -329,6 +330,164 @@ func TestEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	parentOutputEvents, err := models.ListCanvasEvents(canvas.ID, customComponentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "default"), 5)
+
+	assert.True(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__EventRouter_ProcessRootEvent_ErrorNode_CreatesFailedExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	errorNode := "component-error"
+	errorMsg := "field 'timeoutSeconds': must be a number"
+
+	canvas, createdNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
+			{NodeID: errorNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: errorNode, Channel: "default"},
+		},
+	)
+
+	// Put the target node into error state (simulating a validation error)
+	var targetNode models.CanvasNode
+	for _, n := range createdNodes {
+		if n.NodeID == errorNode {
+			targetNode = n
+			break
+		}
+	}
+	require.NoError(t, database.Conn().Model(&targetNode).Updates(map[string]any{
+		"state":        models.CanvasNodeStateError,
+		"state_reason": errorMsg,
+	}).Error)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	err := router.LockAndProcessEvent(logger, *event)
+	require.NoError(t, err)
+
+	// Event should be marked routed
+	updatedEvent, err := models.FindCanvasEvent(event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
+
+	// No queue items should be created for the error node
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, errorNode, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+
+	// A failed execution must exist for the error node
+	executions, err := models.ListNodeExecutions(canvas.ID, errorNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	exec := executions[0]
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, exec.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, exec.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, exec.ResultReason)
+	assert.Equal(t, errorMsg, exec.ResultMessage)
+	assert.Equal(t, event.ID, exec.RootEventID)
+	assert.Equal(t, event.ID, exec.EventID)
+	assert.Nil(t, exec.PreviousExecutionID)
+
+	// An execution message must be published so the system records the failure
+	assert.True(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__EventRouter_ProcessExecutionEvent_ErrorNode_CreatesFailedExecution(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	goodNode := "component-1"
+	errorNode := "component-error"
+	errorMsg := "field 'timeoutSeconds': must be a number"
+
+	canvas, createdNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
+			{NodeID: goodNode, Type: models.NodeTypeComponent},
+			{NodeID: errorNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: goodNode, Channel: "default"},
+			{SourceID: goodNode, TargetID: errorNode, Channel: "default"},
+		},
+	)
+
+	// Put the target node into error state
+	var targetNode models.CanvasNode
+	for _, n := range createdNodes {
+		if n.NodeID == errorNode {
+			targetNode = n
+			break
+		}
+	}
+	require.NoError(t, database.Conn().Model(&targetNode).Updates(map[string]any{
+		"state":        models.CanvasNodeStateError,
+		"state_reason": errorMsg,
+	}).Error)
+
+	// Create a root event and an execution for goodNode that emits on "default"
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, goodNode, rootEvent.ID, rootEvent.ID, nil)
+	_, err := execution.Pass(map[string][]any{"default": {map[string]any{}}})
+	require.NoError(t, err)
+
+	// Get the output event emitted by goodNode
+	events, err := models.ListCanvasEvents(canvas.ID, goodNode, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	outputEvent := events[0]
+
+	err = router.LockAndProcessEvent(logger, outputEvent)
+	require.NoError(t, err)
+
+	// Output event should be routed
+	updatedEvent, err := models.FindCanvasEvent(outputEvent.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
+
+	// No queue items for the error node
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, errorNode, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+
+	// A failed execution must exist with PreviousExecutionID pointing to the upstream execution
+	executions, err := models.ListNodeExecutions(canvas.ID, errorNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	exec := executions[0]
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, exec.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, exec.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, exec.ResultReason)
+	assert.Equal(t, errorMsg, exec.ResultMessage)
+	assert.Equal(t, rootEvent.ID, exec.RootEventID)
+	assert.Equal(t, outputEvent.ID, exec.EventID)
+	require.NotNil(t, exec.PreviousExecutionID)
+	assert.Equal(t, execution.ID, *exec.PreviousExecutionID)
 
 	assert.True(t, executionConsumer.HasReceivedMessage())
 }
