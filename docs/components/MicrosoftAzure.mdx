@@ -53,6 +53,34 @@ Enter the following information below and create the integration:
 After creation, you will be guided through configuring the Federated Identity Credential and granting the required permissions.
 
 SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
+### Practical Azure Setup (Real-world usage)
+
+In most real-world Azure environments, authentication is typically handled using Service Principals rather than manual credentials.
+
+This is especially common when integrating with:
+
+- CI/CD pipelines (GitHub Actions, Azure DevOps)
+- Data platforms (Azure Data Factory, Databricks)
+- Infrastructure automation workflows
+
+A typical setup includes:
+
+- Creating a Service Principal linked to the App Registration
+- Assigning appropriate roles (e.g., Contributor or Storage Blob Data Contributor)
+- Using Workload Identity Federation to avoid storing secrets
+
+This approach improves security by eliminating long-lived credentials and aligns with modern cloud-native practices.
+
+### Example Scenario
+
+A common use case is triggering a workflow when a new file arrives in Azure Blob Storage:
+
+1. A data pipeline uploads a CSV file
+2. Azure Event Grid emits a BlobCreated event
+3. SuperPlane triggers a workflow
+4. The workflow processes the file or triggers downstream systems
+
+This pattern is widely used in data engineering and ETL workflows.
 
 <a id="on-blob-created"></a>
 
