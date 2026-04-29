@@ -32,6 +32,11 @@ const (
 
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// cloneRepoFieldVisibility hides repository sub-fields unless "Clone repository" is on (matches JS String(true) === "true").
+var cloneRepoFieldVisibility = []configuration.VisibilityCondition{
+	{Field: "enabled", Values: []string{"true"}},
+}
+
 func init() {
 	registry.RegisterAction("runner", &Runner{})
 }
@@ -39,19 +44,17 @@ func init() {
 type Runner struct{}
 
 type Spec struct {
-	Source           *SourceSpec           `json:"source,omitempty" mapstructure:"source"`
-	Commands         string                `json:"commands" mapstructure:"commands"`
-	WorkingDirectory string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
-	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
-	Secrets          []SecretVariable      `json:"secrets,omitempty" mapstructure:"secrets"`
-	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
-	RuntimeImage     string                `json:"runtimeImage,omitempty" mapstructure:"runtimeImage"`
-	ComputeSize      string                `json:"computeSize,omitempty" mapstructure:"computeSize"`
-	Docker           *DockerSpec           `json:"docker,omitempty" mapstructure:"docker"`
-	Artifacts        *ArtifactsSpec        `json:"artifacts,omitempty" mapstructure:"artifacts"`
+	Source       *SourceSpec           `json:"source,omitempty" mapstructure:"source"`
+	Commands     string                `json:"commands" mapstructure:"commands"`
+	Environment  []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
+	Secrets      []SecretVariable      `json:"secrets,omitempty" mapstructure:"secrets"`
+	Timeout      int                   `json:"timeout" mapstructure:"timeout"`
+	RuntimeImage string                `json:"runtimeImage,omitempty" mapstructure:"runtimeImage"`
+	ComputeSize  string                `json:"computeSize,omitempty" mapstructure:"computeSize"`
 }
 
 type SourceSpec struct {
+	Enabled    bool                       `json:"enabled,omitempty" mapstructure:"enabled"`
 	Repository string                     `json:"repository" mapstructure:"repository"`
 	Ref        string                     `json:"ref" mapstructure:"ref"`
 	Depth      int                        `json:"depth,omitempty" mapstructure:"depth"`
@@ -67,20 +70,6 @@ type EnvironmentVariable struct {
 type SecretVariable struct {
 	Name  string                     `json:"name" mapstructure:"name"`
 	Value configuration.SecretKeyRef `json:"value" mapstructure:"value"`
-}
-
-type DockerSpec struct {
-	Enabled bool `json:"enabled" mapstructure:"enabled"`
-}
-
-type ArtifactsSpec struct {
-	Enabled bool             `json:"enabled" mapstructure:"enabled"`
-	Paths   []ArtifactConfig `json:"paths,omitempty" mapstructure:"paths"`
-}
-
-type ArtifactConfig struct {
-	Name string `json:"name" mapstructure:"name"`
-	Path string `json:"path" mapstructure:"path"`
 }
 
 type ExecutionMetadata struct {
@@ -124,10 +113,9 @@ type OutputMetadata struct {
 }
 
 type backendConfig struct {
-	Region        string
-	Project       string
-	DockerProject string
-	Credentials   *aws.Credentials
+	Region      string
+	Project     string
+	Credentials *aws.Credentials
 }
 
 func (c *Runner) Name() string  { return "runner" }
@@ -172,9 +160,6 @@ func (c *Runner) ExampleOutput() map[string]any {
 				"ref":        "main",
 				"commitSha":  "abc123",
 			},
-			"artifacts": []map[string]any{
-				{"name": "image-digest.txt", "path": "dist/image-digest.txt"},
-			},
 			"buildId":  "superplane-runner:example",
 			"buildArn": "arn:example:superplane-run/abc123",
 			"logUrl":   "https://example.com/logs/...",
@@ -191,6 +176,18 @@ func (c *Runner) OutputChannels(configuration any) []core.OutputChannel {
 
 func (c *Runner) Configuration() []configuration.Field {
 	return []configuration.Field{
+		{
+			Name:    "computeSize",
+			Label:   "Compute size",
+			Type:    configuration.FieldTypeSelect,
+			Default: "small",
+			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
+				// Matches AWS CodeBuild Linux general1.small | medium | large (standard compute types).
+				{Label: "2 vCPU · 3 GB", Value: "small"},
+				{Label: "4 vCPU · 7 GB", Value: "medium"},
+				{Label: "8 vCPU · 15 GB", Value: "large"},
+			}}},
+		},
 		sourceField(),
 		{
 			Name:        "commands",
@@ -199,13 +196,6 @@ func (c *Runner) Configuration() []configuration.Field {
 			Description: "Bash commands or script body to execute. Supports expressions.",
 			Placeholder: "docker build -t registry.example.com/app:$TAG .\ndocker push registry.example.com/app:$TAG",
 			Required:    true,
-		},
-		{
-			Name:        "workingDirectory",
-			Label:       "Working directory",
-			Type:        configuration.FieldTypeString,
-			Description: "Directory to run commands from. When a repository is configured, this is relative to the checkout root.",
-			Placeholder: "e.g. . or infra/terraform",
 		},
 		listField("environment", "Environment variables", "Variable", []configuration.Field{
 			{Name: "name", Label: "Name", Type: configuration.FieldTypeString, Required: true, Placeholder: "e.g. IMAGE_TAG"},
@@ -224,48 +214,27 @@ func (c *Runner) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "runtimeImage",
-			Label:       "Runtime image",
+			Label:       "Environment preset",
 			Type:        configuration.FieldTypeSelect,
 			Default:     "default",
-			Description: "Runtime image profile for the execution environment.",
+			Description: "Server-defined tooling preset (not a custom image URL). Match Docker or Terraform to the CLIs your commands need.",
 			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-				{Label: "Default build image", Value: "default"},
-				{Label: "Docker capable image", Value: "docker"},
-				{Label: "Terraform capable image", Value: "terraform"},
+				{Label: "Default · general-purpose CLI", Value: "default"},
+				{Label: "Docker · includes Docker CLI", Value: "docker"},
+				{Label: "Terraform · includes Terraform CLI", Value: "terraform"},
 			}}},
 		},
-		{
-			Name:        "computeSize",
-			Label:       "Compute size",
-			Type:        configuration.FieldTypeSelect,
-			Default:     "small",
-			Description: "Compute size tier. Actual resources are defined by your SuperPlane deployment.",
-			TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-				{Label: "Small", Value: "small"},
-				{Label: "Medium", Value: "medium"},
-				{Label: "Large", Value: "large"},
-			}}},
-		},
-		objectField("docker", "Docker", "Enable Docker builds for commands like docker build and docker push.", []configuration.Field{
-			{Name: "enabled", Label: "Enable Docker", Type: configuration.FieldTypeBool, Default: false},
-		}),
-		objectField("artifacts", "Artifacts", "Optional artifact paths to collect after the command completes.", []configuration.Field{
-			{Name: "enabled", Label: "Collect artifacts", Type: configuration.FieldTypeBool, Default: false},
-			listField("paths", "Paths", "Artifact", []configuration.Field{
-				{Name: "name", Label: "Name", Type: configuration.FieldTypeString, Required: true, Placeholder: "e.g. image-digest.txt"},
-				{Name: "path", Label: "Path", Type: configuration.FieldTypeString, Required: true, Placeholder: "e.g. dist/image-digest.txt"},
-			}),
-		}),
 	}
 }
 
 func sourceField() configuration.Field {
-	return objectField("source", "Repository source", "Optional Git repository to clone before running commands.", []configuration.Field{
-		{Name: "repository", Label: "Repository URL", Type: configuration.FieldTypeString, Placeholder: "https://github.com/org/repo.git"},
-		{Name: "ref", Label: "Ref", Type: configuration.FieldTypeString, Placeholder: "main"},
-		{Name: "depth", Label: "Checkout depth", Type: configuration.FieldTypeNumber, Default: 1},
-		{Name: "username", Label: "Username", Type: configuration.FieldTypeString, Placeholder: "git"},
-		{Name: "token", Label: "Token", Type: configuration.FieldTypeSecretKey},
+	return objectField("source", "Repository source", "", []configuration.Field{
+		{Name: "enabled", Label: "Clone repository", Type: configuration.FieldTypeBool, Default: false, Description: "When enabled, clones the repository before your commands run."},
+		{Name: "repository", Label: "Repository URL", Type: configuration.FieldTypeString, Placeholder: "https://github.com/org/repo.git", VisibilityConditions: cloneRepoFieldVisibility},
+		{Name: "ref", Label: "Ref", Type: configuration.FieldTypeString, Placeholder: "main", VisibilityConditions: cloneRepoFieldVisibility},
+		{Name: "depth", Label: "Checkout depth", Type: configuration.FieldTypeNumber, Default: 1, VisibilityConditions: cloneRepoFieldVisibility},
+		{Name: "username", Label: "Username", Type: configuration.FieldTypeString, Placeholder: "git", VisibilityConditions: cloneRepoFieldVisibility},
+		{Name: "token", Label: "Token", Type: configuration.FieldTypeSecretKey, VisibilityConditions: cloneRepoFieldVisibility},
 	})
 }
 
@@ -319,7 +288,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	backend, err := loadBackendConfig(spec)
+	backend, err := loadBackendConfig()
 	if err != nil {
 		return err
 	}
@@ -331,7 +300,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 
 	client := newCodeBuildClient(ctx.HTTP, backend.Credentials, backend.Region)
 	build, err := client.startBuild(startBuildInput{
-		ProjectName:                  projectName(backend, spec),
+		ProjectName:                  backend.Project,
 		BuildspecOverride:            buildspec(spec),
 		SourceTypeOverride:           "NO_SOURCE",
 		EnvironmentVariablesOverride: env,
@@ -371,7 +340,7 @@ func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
 	if err != nil {
 		return err
 	}
-	backend, err := loadBackendConfig(spec)
+	backend, err := loadBackendConfig()
 	if err != nil {
 		return err
 	}
@@ -441,7 +410,7 @@ func (c *Runner) Cancel(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	backend, err := loadBackendConfig(spec)
+	backend, err := loadBackendConfig()
 	if err != nil {
 		return err
 	}
@@ -471,10 +440,45 @@ func decodeSpec(raw any) (Spec, error) {
 	if err := mapstructure.Decode(raw, &spec); err != nil {
 		return Spec{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
+	normalizeSourceEnabledFromRaw(raw, &spec)
 	if spec.Timeout == 0 {
 		spec.Timeout = defaultTimeoutSeconds
 	}
 	return spec, nil
+}
+
+// normalizeSourceEnabledFromRaw sets Source.Enabled for workflows saved before the toggle existed:
+// if "enabled" was never stored and a repository URL is present, treat clone as on.
+func normalizeSourceEnabledFromRaw(raw any, spec *Spec) {
+	if spec.Source == nil {
+		return
+	}
+	srcMap, ok := sourceConfigMap(raw)
+	if !ok {
+		return
+	}
+	if _, hasEnabled := srcMap["enabled"]; hasEnabled {
+		return
+	}
+	if strings.TrimSpace(spec.Source.Repository) != "" {
+		spec.Source.Enabled = true
+	}
+}
+
+func sourceConfigMap(raw any) (map[string]any, bool) {
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	src, ok := m["source"].(map[string]any)
+	if !ok || src == nil {
+		return nil, false
+	}
+	return src, true
+}
+
+func sourceCloneRequested(spec Spec) bool {
+	return spec.Source != nil && spec.Source.Enabled && strings.TrimSpace(spec.Source.Repository) != ""
 }
 
 func validateSpec(spec Spec) error {
@@ -498,20 +502,16 @@ func validateSpec(spec Spec) error {
 		}
 	}
 	if spec.Source != nil {
-		if strings.TrimSpace(spec.Source.Repository) == "" && (strings.TrimSpace(spec.Source.Ref) != "" || spec.Source.Token.IsSet()) {
-			return errors.New("source repository is required when source options are set")
-		}
 		if spec.Source.Depth < 0 {
 			return errors.New("source checkout depth must be 0 or greater")
 		}
-	}
-	if spec.Artifacts != nil {
-		for _, artifact := range spec.Artifacts.Paths {
-			if strings.TrimSpace(artifact.Path) == "" {
-				return errors.New("artifact path is required")
+		if spec.Source.Enabled {
+			if strings.TrimSpace(spec.Source.Repository) == "" {
+				return errors.New("source repository is required when clone repository is enabled")
 			}
-			if strings.HasPrefix(artifact.Path, "/") || strings.Contains(artifact.Path, "..") {
-				return fmt.Errorf("artifact path must be relative and stay inside the workspace: %s", artifact.Path)
+		} else {
+			if strings.TrimSpace(spec.Source.Repository) == "" && (strings.TrimSpace(spec.Source.Ref) != "" || spec.Source.Token.IsSet()) {
+				return errors.New("enable clone repository or clear source ref and token")
 			}
 		}
 	}
@@ -528,7 +528,7 @@ func validateEnvironmentName(name string) error {
 	return nil
 }
 
-func loadBackendConfig(spec Spec) (backendConfig, error) {
+func loadBackendConfig() (backendConfig, error) {
 	region := strings.TrimSpace(os.Getenv("RUNNER_CODEBUILD_REGION"))
 	if region == "" {
 		return backendConfig{}, errors.New("RUNNER_CODEBUILD_REGION is required")
@@ -547,9 +547,8 @@ func loadBackendConfig(spec Spec) (backendConfig, error) {
 	}
 
 	return backendConfig{
-		Region:        region,
-		Project:       project,
-		DockerProject: os.Getenv("RUNNER_CODEBUILD_DOCKER_PROJECT"),
+		Region:  region,
+		Project: project,
 		Credentials: &aws.Credentials{
 			AccessKeyID:     accessKey,
 			SecretAccessKey: secretKey,
@@ -574,7 +573,7 @@ func buildEnvironment(secrets core.SecretsContext, spec Spec) ([]environmentVari
 		}
 		env = append(env, environmentVariableOverride{Name: secret.Name, Value: string(value), Type: "PLAINTEXT"})
 	}
-	if spec.Source != nil && strings.TrimSpace(spec.Source.Repository) != "" {
+	if sourceCloneRequested(spec) {
 		env = append(env,
 			environmentVariableOverride{Name: "SUPERPLANE_SOURCE_REPOSITORY", Value: spec.Source.Repository, Type: "PLAINTEXT"},
 			environmentVariableOverride{Name: "SUPERPLANE_SOURCE_REF", Value: spec.Source.Ref, Type: "PLAINTEXT"},
@@ -616,7 +615,7 @@ func renderScript(spec Spec) string {
 	b.WriteString("set -u\n")
 	b.WriteString("workspace=\"$CODEBUILD_SRC_DIR\"\n")
 	b.WriteString("cd \"$workspace\"\n")
-	if spec.Source != nil && strings.TrimSpace(spec.Source.Repository) != "" {
+	if sourceCloneRequested(spec) {
 		b.WriteString(`repo="$SUPERPLANE_SOURCE_REPOSITORY"
 clone_url="$repo"
 if [[ -n "${SUPERPLANE_SOURCE_TOKEN:-}" && "$repo" == https://* ]]; then
@@ -634,9 +633,6 @@ cd source
 resolved_sha="$(git rev-parse HEAD || true)"
 echo "SUPERPLANE_SOURCE_COMMIT_SHA=$resolved_sha"
 `)
-	}
-	if strings.TrimSpace(spec.WorkingDirectory) != "" {
-		b.WriteString(fmt.Sprintf("cd %s\n", shellQuote(spec.WorkingDirectory)))
 	}
 	b.WriteString("set +e\n")
 	b.WriteString("bash <<'SUPERPLANE_USER_COMMANDS'\n")
@@ -657,17 +653,6 @@ func indent(value string, spaces int) string {
 		}
 	}
 	return strings.Join(lines, "\n")
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
-}
-
-func projectName(backend backendConfig, spec Spec) string {
-	if spec.Docker != nil && spec.Docker.Enabled && backend.DockerProject != "" {
-		return backend.DockerProject
-	}
-	return backend.Project
 }
 
 func timeoutMinutes(seconds int) int {
@@ -700,19 +685,12 @@ func metadataFromBuild(build *build, spec Spec, existing *ExecutionMetadata) Exe
 	}
 	metadata.RuntimeImage = firstNonEmpty(spec.RuntimeImage, "default")
 	metadata.ComputeSize = firstNonEmpty(spec.ComputeSize, "small")
-	metadata.DockerEnabled = spec.Docker != nil && spec.Docker.Enabled
-	if spec.Source != nil && strings.TrimSpace(spec.Source.Repository) != "" {
+	if sourceCloneRequested(spec) {
 		source := SourceMetadata{Repository: sanitizeRepository(spec.Source.Repository), Ref: spec.Source.Ref}
 		if existing != nil && existing.Source != nil {
 			source.CommitSHA = existing.Source.CommitSHA
 		}
 		metadata.Source = &source
-	}
-	if spec.Artifacts != nil && spec.Artifacts.Enabled {
-		metadata.Artifacts = make([]ArtifactMetadata, 0, len(spec.Artifacts.Paths))
-		for _, artifact := range spec.Artifacts.Paths {
-			metadata.Artifacts = append(metadata.Artifacts, ArtifactMetadata{Name: artifact.Name, Path: artifact.Path})
-		}
 	}
 	return metadata
 }

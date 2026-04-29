@@ -20,6 +20,7 @@ const RUNNER_STATE_MAP: EventStateMap = {
 };
 
 interface RunnerSource {
+  enabled?: boolean;
   repository?: string;
   ref?: string;
   commitSha?: string;
@@ -68,9 +69,6 @@ interface RunnerConfiguration {
   runtimeImage?: string;
   computeSize?: string;
   timeout?: number;
-  docker?: {
-    enabled?: boolean;
-  };
 }
 
 function getCommandResult(execution: ExecutionInfo): RunnerCommandPayload["command"] | undefined {
@@ -247,18 +245,27 @@ export const runnerMapper: ComponentBaseMapper = {
   },
 };
 
+function shouldShowConfiguredRepositoryChip(config: RunnerConfiguration | undefined): boolean {
+  const src = config?.source;
+  if (!src?.repository?.trim()) {
+    return false;
+  }
+  if (src.enabled === false) {
+    return false;
+  }
+  return true;
+}
+
 function getRunnerMetadataList(node: NodeInfo): Array<{ icon: string; label: string }> {
   const config = node.configuration as RunnerConfiguration | undefined;
   const metadata = node.metadata as RunnerMetadata | undefined;
   const items: Array<{ icon: string; label: string }> = [];
 
-  const repository = metadata?.source?.repository || config?.source?.repository;
+  const repository =
+    metadata?.source?.repository ??
+    (shouldShowConfiguredRepositoryChip(config) ? config?.source?.repository : undefined);
   if (repository) {
     items.push({ icon: "git-branch", label: repositoryLabel(repository) });
-  }
-
-  if (config?.docker?.enabled || metadata?.dockerEnabled) {
-    items.push({ icon: "box", label: "Docker" });
   }
 
   const runtime = metadata?.runtimeImage || config?.runtimeImage;

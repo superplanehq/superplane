@@ -78,7 +78,6 @@ The component should expose the following configuration fields:
 |-------|------|----------|---------|-------------|
 | `source` | `object` | No | None | Optional repository to clone before running commands. |
 | `commands` | `text` | Yes | None | Bash commands or script body to execute. Supports expressions. |
-| `workingDirectory` | `string` | No | Empty | Directory to run from after checkout/setup, if present. |
 | `environment` | `list` | No | Empty | Name/value pairs exposed as environment variables. Values may use expressions. |
 | `secrets` | `list` | No | Empty | Environment variables sourced from organization secrets. |
 | `timeout` | `number` | No | `600` | Maximum execution time in seconds. |
@@ -105,7 +104,6 @@ Configuration guidelines:
   - Optional checkout depth.
   - Optional credentials through organization secrets.
 - The checkout path should be predictable and documented.
-- `workingDirectory` should be resolved relative to the checkout root when a source repository is configured.
 - Checkout metadata should be included in execution metadata and emitted payload:
   - Repository URL or sanitized repository identifier.
   - Requested ref.
@@ -163,7 +161,7 @@ Requirements:
 
 ### Inputs
 
-- Commands, source refs, working directory, and environment values may reference upstream workflow payloads through existing expression support.
+- Commands, source refs, and environment values may reference upstream workflow payloads through existing expression support.
 - The component should receive the full message chain through normal SuperPlane execution context.
 - Large payloads should not be automatically written to files in v1 unless explicitly configured in a future iteration.
 - Source checkout credentials, registry credentials, Terraform credentials, and other sensitive inputs must use organization secrets.
@@ -259,7 +257,7 @@ Payload requirements:
 ### Artifacts
 
 - Users should be able to configure optional artifact paths to collect after successful or failed runs.
-- Artifact paths must be relative to the checkout or working directory and must not allow reading outside the execution workspace.
+- Artifact paths must be relative to the checkout root and must not allow reading outside the execution workspace.
 - Artifacts should be stored in backend-managed storage with access controlled by SuperPlane.
 - The emitted payload should include artifact metadata, not raw artifact contents.
 - Artifacts are intended for build outputs such as image digest files, Terraform plans, reports, and logs that are too large for stdout.

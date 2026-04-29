@@ -18,11 +18,11 @@ func TestBuildspecValidYAML(t *testing.T) {
 	spec := Spec{
 		Commands: "echo hello\necho world",
 		Source: &SourceSpec{
+			Enabled:    true,
 			Repository: "https://github.com/example/app.git",
 			Ref:        "main",
 			Depth:      1,
 		},
-		WorkingDirectory: "subdir",
 	}
 	out := buildspec(spec)
 	var parsed any
@@ -53,6 +53,39 @@ func TestRunnerSetup(t *testing.T) {
 	t.Run("valid configuration", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{Configuration: validConfig()})
 		require.NoError(t, err)
+	})
+
+	t.Run("clone disabled without source is valid", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{Configuration: map[string]any{
+			"commands": "echo ok",
+			"source": map[string]any{
+				"enabled": false,
+			},
+		}})
+		require.NoError(t, err)
+	})
+
+	t.Run("clone enabled requires repository", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{Configuration: map[string]any{
+			"commands": "echo ok",
+			"source": map[string]any{
+				"enabled": true,
+			},
+		}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "source repository is required when clone repository is enabled")
+	})
+
+	t.Run("clone disabled rejects ref without repository", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{Configuration: map[string]any{
+			"commands": "echo ok",
+			"source": map[string]any{
+				"enabled": false,
+				"ref":     "main",
+			},
+		}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "enable clone repository or clear source ref and token")
 	})
 }
 
@@ -151,9 +184,8 @@ func TestRunnerPollCompletesFailedBuild(t *testing.T) {
 
 func validConfig() map[string]any {
 	return map[string]any{
-		"commands":         "echo hello",
-		"workingDirectory": ".",
-		"timeout":          600,
+		"commands": "echo hello",
+		"timeout":  600,
 		"source": map[string]any{
 			"repository": "https://github.com/example/app.git",
 			"ref":        "main",
@@ -163,14 +195,12 @@ func validConfig() map[string]any {
 				"key":    "token",
 			},
 		},
-		"docker": map[string]any{"enabled": true},
 	}
 }
 
 func withBackendEnv(t *testing.T) {
 	t.Setenv("RUNNER_CODEBUILD_REGION", "us-east-1")
 	t.Setenv("RUNNER_CODEBUILD_PROJECT", "superplane-runner")
-	t.Setenv("RUNNER_CODEBUILD_DOCKER_PROJECT", "superplane-runner-docker")
 	t.Setenv("RUNNER_AWS_ACCESS_KEY_ID", "AKIAEXAMPLE")
 	t.Setenv("RUNNER_AWS_SECRET_ACCESS_KEY", "secret")
 	t.Setenv("RUNNER_AWS_SESSION_TOKEN", "token")
