@@ -187,7 +187,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.acceptPendingInvitations(account)
+	err = a.acceptPendingInvitations(account, mockUser.Provider)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -221,7 +221,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.acceptPendingInvitations(account)
+	err = a.acceptPendingInvitations(account, gothUser.Provider)
 	if err != nil {
 		log.Errorf("Error accepting pending invitations for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -231,7 +231,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	a.handleSuccessfulAuth(w, r, gothUser)
 }
 
-func (a *Handler) acceptPendingInvitations(account *models.Account) error {
+func (a *Handler) acceptPendingInvitations(account *models.Account, provider string) error {
 	invitations, err := account.FindPendingInvitations()
 	if err != nil {
 		log.Errorf("Error finding pending invitations for account %s: %v", account.Email, err)
@@ -239,7 +239,7 @@ func (a *Handler) acceptPendingInvitations(account *models.Account) error {
 	}
 
 	for _, invitation := range invitations {
-		err := a.acceptInvitation(invitation, account)
+		err := a.acceptInvitation(invitation, account, provider)
 		if err != nil {
 			log.Errorf("Error accepting invitation to %s for account %s: %v", invitation.OrganizationID, account.Email, err)
 			return err
@@ -249,7 +249,27 @@ func (a *Handler) acceptPendingInvitations(account *models.Account) error {
 	return nil
 }
 
-func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, account *models.Account) error {
+func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, account *models.Account, provider string) error {
+	// provider is empty for password/magic-code logins; those are not OAuth-based
+	// so allowed_providers does not apply to them.
+	if provider != "" {
+		org, err := models.FindOrganizationByID(invitation.OrganizationID.String())
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// FindOrganizationByID excludes soft-deleted orgs, so this covers
+				// both "never existed" and "was deleted" cases.
+				log.Warnf("Skipping invitation to org %s for account %s: org not found or deleted", invitation.OrganizationID, account.Email)
+				return nil
+			}
+			return err
+		}
+
+		if !org.IsProviderAllowed(provider) {
+			log.Warnf("Skipping invitation to org %s for account %s: provider %q not allowed", invitation.OrganizationID, account.Email, provider)
+			return nil
+		}
+	}
+
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		user, err := models.CreateUserInTransaction(tx, invitation.OrganizationID, account.ID, account.Email, account.Name)
 		if err != nil {
@@ -377,7 +397,7 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Accept pending invitations
-	err = a.acceptPendingInvitations(account)
+	err = a.acceptPendingInvitations(account, "")
 	if err != nil {
 		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -484,7 +504,7 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := a.acceptPendingInvitations(account); err != nil {
+	if err := a.acceptPendingInvitations(account, ""); err != nil {
 		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -782,7 +802,7 @@ func errorStatusForAccountError(err error) int {
 }
 
 func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account) {
-	if err := a.acceptPendingInvitations(account); err != nil {
+	if err := a.acceptPendingInvitations(account, ""); err != nil {
 		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
