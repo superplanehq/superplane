@@ -255,8 +255,10 @@ func (o *OCI) Cleanup(ctx core.IntegrationCleanupContext) error {
 		}
 	}
 
-	if err := client.DeleteONSTopic(metadata.TopicID); err != nil {
-		ctx.Logger.Warnf("failed to delete ONS topic %q during cleanup: %v", metadata.TopicID, err)
+	if metadata.TopicID != "" {
+		if err := client.DeleteONSTopic(metadata.TopicID); err != nil {
+			ctx.Logger.Warnf("failed to delete ONS topic %q during cleanup: %v", metadata.TopicID, err)
+		}
 	}
 
 	return nil
