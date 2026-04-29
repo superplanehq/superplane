@@ -71,12 +71,10 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
-		Use:   "update [name-or-id]",
+		Use:   "update",
 		Short: "Update a canvas from a YAML file",
-		Long: "Updates the canvas using --file. If metadata.id is omitted in the YAML, pass the canvas name or id, " +
-			"or set an active canvas with `superplane canvases active`. When the file includes metadata.id and a " +
-			"name-or-id argument is given, they must refer to the same canvas.",
-		Args: cobra.MaximumNArgs(1),
+		Long:  "Updates the canvas using --file. The file must include metadata.id to identify the target canvas.",
+		Args:  cobra.NoArgs,
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	_ = updateCmd.MarkFlagRequired("file")
