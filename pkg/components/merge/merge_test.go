@@ -105,6 +105,32 @@ func Test_Merge_BadStopIfExpression(t *testing.T) {
 	steps.AssertQueueIsEmpty()
 }
 
+func Test_Merge_StopIfExpression_EvaluationError(t *testing.T) {
+	steps := NewMergeTestSteps(t)
+	steps.CreateWorkflow()
+
+	steps.SetMergeConfiguration(map[string]any{
+		"stopIfExpression": `$["process-1"].metrics.lastOutcome == "Critical" || $["process-1"].result[0].value != "0"`,
+	})
+
+	steps.CreateEventsWithData(
+		map[string]any{"metrics": map[string]any{"lastOutcome": "Healthy"}},
+		map[string]any{"result": []any{map[string]any{"value": "0"}}},
+	)
+	steps.CreateQueueItems()
+
+	m := &Merge{}
+
+	steps.ProcessFirstEventExpectFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFailedWithErrorContains("stop expression evaluation failed")
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	// Subsequent events on the same merge must be dequeued without re-failing.
+	steps.ProcessSecondEventExpectNoFinish(m)
+	steps.AssertQueueIsEmpty()
+}
+
 func Test_Merge_StopIfExpression_SourceNodeReference(t *testing.T) {
 	steps := NewMergeTestSteps(t)
 
@@ -558,6 +584,15 @@ func (s *MergeTestSteps) AssertExecutionFailedWithError(errorMessage string) {
 	assert.Equal(s.t, models.CanvasNodeExecutionResultFailed, execution.Result)
 	assert.Equal(s.t, "error", execution.ResultReason)
 	assert.Equal(s.t, errorMessage, execution.ResultMessage)
+}
+
+func (s *MergeTestSteps) AssertExecutionFailedWithErrorContains(substring string) {
+	var execution models.CanvasNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.CanvasNodeExecutionResultFailed, execution.Result)
+	assert.Equal(s.t, "error", execution.ResultReason)
+	assert.Contains(s.t, execution.ResultMessage, substring)
 }
 
 // AssertExecutionFailed checks that the execution finished and emitted to the fail channel.

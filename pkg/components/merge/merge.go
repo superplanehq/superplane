@@ -292,29 +292,25 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	// configs created before the toggle will still work if they have an expression.
 	//
 	if spec.StopIfExpression != "" {
-		out, err := ctx.Expressions.Run(spec.StopIfExpression)
-		if err != nil {
-			return nil, err
+		failWithError := func(message string) (*uuid.UUID, error) {
+			md.StopEarly = true
+			if err := executionCtx.Metadata.Set(md); err != nil {
+				return nil, err
+			}
+			if err := executionCtx.ExecutionState.Fail("error", message); err != nil {
+				return nil, err
+			}
+			return &executionCtx.ID, nil
 		}
 
-		//
-		// If the stop expression does not evaluate to a boolean value,
-		// we fail the execution and mark the merge as stopped early.
-		//
+		out, err := ctx.Expressions.Run(spec.StopIfExpression)
+		if err != nil {
+			return failWithError(fmt.Sprintf("stop expression evaluation failed: %v", err))
+		}
+
 		stopEarly, ok := out.(bool)
 		if !ok {
-			md.StopEarly = true
-			err := executionCtx.Metadata.Set(md)
-			if err != nil {
-				return nil, err
-			}
-
-			err = executionCtx.ExecutionState.Fail("error", fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
-			if err != nil {
-				return nil, err
-			}
-
-			return &executionCtx.ID, nil
+			return failWithError(fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
 		}
 
 		//
@@ -323,8 +319,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		//
 		if stopEarly {
 			md.StopEarly = true
-			err := executionCtx.Metadata.Set(md)
-			if err != nil {
+			if err := executionCtx.Metadata.Set(md); err != nil {
 				return nil, err
 			}
 
