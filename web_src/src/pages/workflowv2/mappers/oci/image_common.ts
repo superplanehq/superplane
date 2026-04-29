@@ -1,6 +1,8 @@
 import type { MetadataItem } from "@/ui/metadataList";
 import type { ComponentBaseContext, ExecutionDetailsContext, OutputPayload } from "../types";
 
+const MAX_NODE_METADATA_ITEMS = 3;
+
 export interface OCIImageConfiguration {
   imageId?: string;
   compartmentId?: string;
@@ -64,39 +66,29 @@ export function getOutputData(context: ExecutionDetailsContext): OCIImageOutputD
 export function imageMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as OCIImageConfiguration | undefined;
   const nodeMetadata = node.metadata as OCIImageNodeMetadata | undefined;
-  const items: MetadataItem[] = [];
 
   const displayName = nodeMetadata?.displayName ?? config?.displayName;
-  if (displayName) {
-    items.push({ icon: "tag", label: displayName });
-  }
-
-  if (nodeMetadata?.imageName) {
-    items.push({ icon: "disc", label: nodeMetadata.imageName });
-  }
-
-  if (nodeMetadata?.compartmentName) {
-    items.push({ icon: "folder", label: nodeMetadata.compartmentName });
-  }
-
-  if (nodeMetadata?.instanceName) {
-    items.push({ icon: "server", label: nodeMetadata.instanceName });
-  }
-
-  if (config?.bucketName) {
-    items.push({ icon: "archive", label: config.bucketName });
-  }
-
-  if (config?.objectName) {
-    items.push({ icon: "file", label: config.objectName });
-  }
-
   const sourceType = sourceTypeLabel(nodeMetadata?.sourceType ?? config?.sourceType);
-  if (sourceType) {
-    items.push({ icon: "hard-drive", label: sourceType });
-  }
 
-  return items;
+  return [
+    metadataItem("tag", displayName),
+    metadataItem("disc", nodeMetadata?.imageName),
+    metadataItem("folder", nodeMetadata?.compartmentName),
+    metadataItem("server", nodeMetadata?.instanceName),
+    metadataItem("archive", config?.bucketName),
+    metadataItem("file", config?.objectName),
+    metadataItem("hard-drive", sourceType),
+  ]
+    .filter(isMetadataItem)
+    .slice(0, MAX_NODE_METADATA_ITEMS);
+}
+
+function metadataItem(icon: MetadataItem["icon"], label?: string): MetadataItem | undefined {
+  return label ? { icon, label } : undefined;
+}
+
+function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
+  return item !== undefined;
 }
 
 function sourceTypeLabel(sourceType?: string): string | undefined {
@@ -127,7 +119,6 @@ export function imageDetails(context: ExecutionDetailsContext): Record<string, s
   const image = data?.image;
   if (!image) return details;
 
-  if (image.id) details["Image ID"] = image.id;
   if (image.displayName) details["Display Name"] = image.displayName;
   if (image.lifecycleState) details["State"] = image.lifecycleState;
   if (image.operatingSystem) {
@@ -140,7 +131,6 @@ export function imageDetails(context: ExecutionDetailsContext): Record<string, s
       .map(([key, value]) => `${key}: ${value}`)
       .join(", ");
   }
-  if (image.timeCreated) details["Created At"] = new Date(image.timeCreated).toLocaleString();
 
   return details;
 }

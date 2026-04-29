@@ -8,6 +8,8 @@ import type {
 } from "../types";
 import { baseMapper } from "./base";
 
+const MAX_NODE_METADATA_ITEMS = 3;
+
 interface CreateComputeInstanceConfiguration {
   compartmentId?: string;
   availabilityDomain?: string;
@@ -123,34 +125,27 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateComputeInstanceConfiguration | undefined;
   const nodeMetadata = node.metadata as CreateComputeInstanceNodeMetadata | undefined;
-  const items: MetadataItem[] = [];
 
   const displayName = nodeMetadata?.displayName ?? config?.displayName;
-  if (displayName) {
-    items.push({ icon: "tag", label: displayName });
-  }
-
   const shape = nodeMetadata?.shape ?? config?.shape;
-  if (shape) {
-    items.push({ icon: "cpu", label: shape });
-  }
-
   const availabilityDomain = nodeMetadata?.availabilityDomain ?? config?.availabilityDomain;
-  if (availabilityDomain) {
-    items.push({ icon: "map-pin", label: availabilityDomain });
-  }
 
-  if (nodeMetadata?.imageName) {
-    items.push({ icon: "disc", label: nodeMetadata.imageName });
-  }
+  return [
+    metadataItem("tag", displayName),
+    metadataItem("cpu", shape),
+    metadataItem("map-pin", availabilityDomain),
+    metadataItem("disc", nodeMetadata?.imageName),
+    metadataItem("network", nodeMetadata?.subnetName),
+    metadataItem("database", nodeMetadata?.blockVolumeName),
+  ]
+    .filter(isMetadataItem)
+    .slice(0, MAX_NODE_METADATA_ITEMS);
+}
 
-  if (nodeMetadata?.subnetName) {
-    items.push({ icon: "network", label: nodeMetadata.subnetName });
-  }
+function metadataItem(icon: MetadataItem["icon"], label?: string): MetadataItem | undefined {
+  return label ? { icon, label } : undefined;
+}
 
-  if (nodeMetadata?.blockVolumeName) {
-    items.push({ icon: "database", label: nodeMetadata.blockVolumeName });
-  }
-
-  return items;
+function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
+  return item !== undefined;
 }

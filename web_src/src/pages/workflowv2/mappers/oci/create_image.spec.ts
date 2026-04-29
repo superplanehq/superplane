@@ -26,9 +26,29 @@ describe("createImageMapper.props", () => {
         expect.objectContaining({ icon: "tag", label: "golden-image" }),
         expect.objectContaining({ icon: "folder", label: "Production" }),
         expect.objectContaining({ icon: "server", label: "source-instance" }),
-        expect.objectContaining({ icon: "hard-drive", label: "Instance" }),
       ]),
     );
+  });
+
+  it("limits node metadata to three items", () => {
+    const props = createImageMapper.props(
+      buildImageComponentCtx({
+        componentName: "oci.createImage",
+        configuration: {
+          displayName: "golden-image",
+          bucketName: "images",
+          objectName: "golden-image.qcow2",
+          sourceType: "objectStorageObject",
+        },
+        metadata: {
+          imageName: "created-image",
+          compartmentName: "Production",
+          instanceName: "source-instance",
+        },
+      }),
+    );
+
+    expect(props.metadata).toHaveLength(3);
   });
 });
 
@@ -58,12 +78,12 @@ describe("createImageMapper.getExecutionDetails", () => {
 
     const details = createImageMapper.getExecutionDetails(ctx);
     expect(details["Executed At"]).toBe(new Date(startedAt).toLocaleString());
-    expect(details["Image ID"]).toBe("ocid1.image.oc1..example");
+    expect(details["Image ID"]).toBeUndefined();
     expect(details["Display Name"]).toBe("golden-image");
     expect(details["State"]).toBe("AVAILABLE");
     expect(details["Operating System"]).toBe("Oracle Linux 8");
     expect(details["Launch Mode"]).toBe("PARAVIRTUALIZED");
-    expect(details["Created At"]).toBe(new Date("2026-01-01T07:59:00Z").toLocaleString());
+    expect(details["Created At"]).toBeUndefined();
   });
 
   it("does not throw when outputs are missing", () => {

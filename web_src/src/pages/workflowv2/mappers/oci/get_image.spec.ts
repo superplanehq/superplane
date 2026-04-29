@@ -42,7 +42,7 @@ describe("getImageMapper", () => {
 
     const details = getImageMapper.getExecutionDetails(ctx);
     expect(details["Executed At"]).toBe(new Date(createdAt).toLocaleString());
-    expect(details["Image ID"]).toBe("ocid1.image.oc1..example");
+    expect(details["Image ID"]).toBeUndefined();
     expect(details["Display Name"]).toBe("golden-image");
     expect(details["State"]).toBe("AVAILABLE");
     expect(details["Operating System"]).toBe("Ubuntu");

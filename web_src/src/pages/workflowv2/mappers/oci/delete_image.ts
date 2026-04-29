@@ -22,9 +22,7 @@ export const deleteImageMapper: ComponentBaseMapper = {
     const data = getOutputData(context);
     if (!data) return details;
 
-    if (data.imageId) details["Image ID"] = data.imageId;
     if (data.state) details["State"] = data.state;
-    if (data.deletedAt) details["Deleted At"] = new Date(data.deletedAt).toLocaleString();
 
     return details;
   },

@@ -36,8 +36,8 @@ describe("deleteImageMapper", () => {
 
     const details = deleteImageMapper.getExecutionDetails(ctx);
     expect(details["Executed At"]).toBe(new Date("2026-01-01T08:00:00Z").toLocaleString());
-    expect(details["Image ID"]).toBe("ocid1.image.oc1..example");
+    expect(details["Image ID"]).toBeUndefined();
     expect(details["State"]).toBe("DELETED");
-    expect(details["Deleted At"]).toBe(new Date("2026-01-01T08:00:01Z").toLocaleString());
+    expect(details["Deleted At"]).toBeUndefined();
   });
 });
