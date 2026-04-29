@@ -78,6 +78,62 @@ describe("CategorySection", () => {
     expect(container.querySelector('[data-slot="item-group"]')).toBeInTheDocument();
   });
 
+  it("renders the graphql block icon as an img element", () => {
+    const category: BuildingBlockCategory = {
+      name: "Core",
+      blocks: [
+        {
+          name: "graphql.request",
+          label: "GraphQL Request",
+          type: "component",
+        },
+      ],
+    };
+
+    const { container } = render(
+      <CategorySection
+        category={category}
+        integrations={[]}
+        showIntegrationSetupStatus={false}
+        canvasZoom={1}
+        isDraggingRef={{ current: false }}
+        setHoveredBlock={() => {}}
+        dragPreviewRef={{ current: null }}
+      />,
+    );
+
+    expect(screen.getByText("GraphQL Request")).toBeInTheDocument();
+    expect(container.querySelector("img[alt='GraphQL Request']")).toBeInTheDocument();
+  });
+
+  it("renders non-graphql core blocks without a custom img icon", () => {
+    const category: BuildingBlockCategory = {
+      name: "Core",
+      blocks: [
+        {
+          name: "filter",
+          label: "Filter",
+          type: "component",
+        },
+      ],
+    };
+
+    const { container } = render(
+      <CategorySection
+        category={category}
+        integrations={[]}
+        showIntegrationSetupStatus={false}
+        canvasZoom={1}
+        isDraggingRef={{ current: false }}
+        setHoveredBlock={() => {}}
+        dragPreviewRef={{ current: null }}
+      />,
+    );
+
+    expect(screen.getByText("Filter")).toBeInTheDocument();
+    expect(container.querySelector("img[alt='Filter']")).not.toBeInTheDocument();
+  });
+
   it("renders the ItemGroup for a non-Core category after it is manually opened", () => {
     const category = createCategory("Email");
 
