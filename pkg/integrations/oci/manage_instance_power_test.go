@@ -1,6 +1,8 @@
 package oci
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"net/http"
 	"testing"
 
@@ -48,10 +50,44 @@ func Test__ManageInstancePower__Execute(t *testing.T) {
 	require.Len(t, httpCtx.Requests, 1)
 	assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 	assert.Equal(t, "STOP", httpCtx.Requests[0].URL.Query().Get("action"))
+	assert.Equal(t, "0", httpCtx.Requests[0].Header.Get("Content-Length"))
+	assert.Equal(t, "application/json", httpCtx.Requests[0].Header.Get("Content-Type"))
+	emptyHash := sha256.Sum256(nil)
+	assert.Equal(t, base64.StdEncoding.EncodeToString(emptyHash[:]), httpCtx.Requests[0].Header.Get("x-content-sha256"))
+	assert.Contains(t, httpCtx.Requests[0].Header.Get("Authorization"), "content-length content-type x-content-sha256")
 	assert.Equal(t, "poll", requests.Action)
 	assert.Equal(t, ManageInstancePowerMetadata{
 		InstanceID:  testInstanceID,
 		Action:      "STOP",
+		TargetState: instanceStateStopped,
+	}, metadata.Metadata)
+}
+
+func Test__ManageInstancePower__Execute__SoftStop(t *testing.T) {
+	component := &ManageInstancePower{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			ociMockResponse(http.StatusOK, ociInstanceBody("STOPPING")),
+		},
+	}
+	metadata := &contexts.MetadataContext{}
+	requests := &contexts.RequestContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{"instance": testInstanceID, "action": "SOFTSTOP"},
+		HTTP:          httpCtx,
+		Integration:   ociIntegrationContext(),
+		Metadata:      metadata,
+		Requests:      requests,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Equal(t, "SOFTSTOP", httpCtx.Requests[0].URL.Query().Get("action"))
+	assert.Equal(t, "poll", requests.Action)
+	assert.Equal(t, ManageInstancePowerMetadata{
+		InstanceID:  testInstanceID,
+		Action:      "SOFTSTOP",
 		TargetState: instanceStateStopped,
 	}, metadata.Metadata)
 }
