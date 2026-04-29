@@ -2,7 +2,7 @@ import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import ociIcon from "@/assets/icons/integrations/oci.svg";
 import { compactDetails } from "./base";
 
@@ -18,17 +18,21 @@ interface OciInstanceStateChangeEvent {
     additionalDetails?: {
       shape?: string;
       imageId?: string;
+      instanceActionType?: string;
     };
   };
 }
 
-const eventTypeLabels: Record<string, string> = {
-  "com.oraclecloud.computeapi.startinstance.end": "Instance started",
-  "com.oraclecloud.computeapi.stopinstance.end": "Instance stopped",
+const instanceActionTypeLabels: Record<string, string> = {
+  start: "Instance started",
+  stop: "Instance stopped",
+  reset: "Instance reset",
+  softstop: "Instance soft-stopped",
+  softreset: "Instance soft-reset",
+};
+
+const nonActionEventTypeLabels: Record<string, string> = {
   "com.oraclecloud.computeapi.terminateinstance.end": "Instance terminated",
-  "com.oraclecloud.computeapi.resetinstance.end": "Instance reset",
-  "com.oraclecloud.computeapi.softstopinstance.end": "Instance soft-stopped",
-  "com.oraclecloud.computeapi.softresetinstance.end": "Instance soft-reset",
 };
 
 function getEventEnvelope(event: TriggerEventContext["event"]): OciInstanceStateChangeEvent | undefined {
@@ -40,17 +44,29 @@ function getInstanceName(event: TriggerEventContext["event"]): string {
   return envelope?.data?.resourceName ?? "";
 }
 
+function getEventSubtitle(event: TriggerEventContext["event"]): string | React.ReactNode {
+  const title = getEventTitle(event);
+  return title && event?.createdAt
+    ? renderWithTimeAgo(title, new Date(event.createdAt))
+    : title || (event?.createdAt ? renderTimeAgo(new Date(event.createdAt)) : "");
+}
+
 function getEventTitle(event: TriggerEventContext["event"]): string {
   const envelope = getEventEnvelope(event);
-  return eventTypeLabels[envelope?.eventType ?? ""] ?? "Instance state changed";
+  const actionType = envelope?.data?.additionalDetails?.instanceActionType;
+  if (actionType) {
+    return instanceActionTypeLabels[actionType] ?? "Instance state changed";
+  }
+
+  return nonActionEventTypeLabels[envelope?.eventType ?? ""] ?? "Instance state changed";
 }
 
 export const onInstanceStateChangeTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const name = getInstanceName(context.event);
     return {
-      title: getEventTitle(context.event),
-      subtitle: name || "",
+      title: name || getEventTitle(context.event),
+      subtitle: getEventSubtitle(context.event),
     };
   },
 
@@ -61,7 +77,7 @@ export const onInstanceStateChangeTriggerRenderer: TriggerRenderer = {
     return compactDetails([
       getTimeDetail(context.event, envelope),
       ["Instance Name", data?.resourceName],
-      ["Instance ID", data?.resourceId],
+      ["Action", data?.additionalDetails?.instanceActionType],
       ["Shape", data?.additionalDetails?.shape],
       ["Availability Domain", data?.availabilityDomain],
       ["Compartment", compartment],
@@ -70,7 +86,6 @@ export const onInstanceStateChangeTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
-    const instanceName = lastEvent ? getInstanceName(lastEvent) : "";
 
     return {
       title: node.name || definition.label || "On Instance State Change",
@@ -81,8 +96,7 @@ export const onInstanceStateChangeTriggerRenderer: TriggerRenderer = {
       metadata: [],
       ...(lastEvent && {
         lastEventData: {
-          title: getEventTitle(lastEvent),
-          subtitle: instanceName || renderTimeAgo(new Date(lastEvent.createdAt)),
+          ...onInstanceStateChangeTriggerRenderer.getTitleAndSubtitle({ event: lastEvent }),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,

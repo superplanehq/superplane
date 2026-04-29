@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -15,21 +16,45 @@ type OnInstanceStateChange struct{}
 const OnInstanceStateChangePayloadType = "oci.onInstanceStateChange"
 
 var ociInstanceStateChangeEventTypes = map[string]struct{}{
-	"com.oraclecloud.computeapi.startinstance.end":     {},
-	"com.oraclecloud.computeapi.stopinstance.end":      {},
+	"com.oraclecloud.computeapi.instanceaction.end":    {},
 	"com.oraclecloud.computeapi.terminateinstance.end": {},
-	"com.oraclecloud.computeapi.resetinstance.end":     {},
-	"com.oraclecloud.computeapi.softstopinstance.end":  {},
-	"com.oraclecloud.computeapi.softresetinstance.end": {},
+}
+
+var ociInstanceStateChangeActionTypes = map[string]struct{}{
+	"start":     {},
+	"stop":      {},
+	"reset":     {},
+	"softstop":  {},
+	"softreset": {},
+}
+
+const (
+	ociInstanceStateChangeStart     = "start"
+	ociInstanceStateChangeStop      = "stop"
+	ociInstanceStateChangeReset     = "reset"
+	ociInstanceStateChangeSoftStop  = "softstop"
+	ociInstanceStateChangeSoftReset = "softreset"
+	ociInstanceStateChangeTerminate = "terminate"
+)
+
+var ociInstanceStateChangeOptions = []configuration.FieldOption{
+	{Label: "Start", Value: ociInstanceStateChangeStart},
+	{Label: "Stop", Value: ociInstanceStateChangeStop},
+	{Label: "Reset", Value: ociInstanceStateChangeReset},
+	{Label: "Soft Stop", Value: ociInstanceStateChangeSoftStop},
+	{Label: "Soft Reset", Value: ociInstanceStateChangeSoftReset},
+	{Label: "Terminate", Value: ociInstanceStateChangeTerminate},
 }
 
 type OnInstanceStateChangeConfiguration struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
+	CompartmentID string   `json:"compartmentId" mapstructure:"compartmentId"`
+	StateChanges  []string `json:"stateChanges" mapstructure:"stateChanges"`
 }
 
 type OnInstanceStateChangeMetadata struct {
 	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
 	EventsRuleID  string `json:"eventsRuleId" mapstructure:"eventsRuleId"`
+	Condition     string `json:"condition" mapstructure:"condition"`
 }
 
 func (t *OnInstanceStateChange) Name() string {
@@ -54,15 +79,17 @@ When this trigger is added to a workflow, SuperPlane creates an **OCI Events rul
 ## Configuration
 
 - **Compartment**: The compartment to monitor for Compute instance state changes.
+- **State Changes**: Optional list of state changes to emit. Leave empty to emit all supported state changes.
 
 ## Event Data
 
 Each event payload includes:
-- ` + "`eventType`" + ` — the OCI Compute API event type, such as ` + "`com.oraclecloud.computeapi.stopinstance.end`" + `
+- ` + "`eventType`" + ` — the OCI Compute API event type, such as ` + "`com.oraclecloud.computeapi.instanceaction.end`" + `
 - ` + "`data.resourceId`" + ` — the instance OCID
 - ` + "`data.resourceName`" + ` — the instance display name
 - ` + "`data.compartmentId`" + ` — the compartment OCID
 - ` + "`data.availabilityDomain`" + ` — the availability domain
+- ` + "`data.additionalDetails.instanceActionType`" + ` — the completed power action, such as ` + "`start`" + `, ` + "`stop`" + `, or ` + "`softstop`" + `
 - ` + "`eventTime`" + ` — ISO-8601 timestamp of the event
 `
 }
@@ -89,6 +116,26 @@ func (t *OnInstanceStateChange) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:     "stateChanges",
+			Label:    "State Changes",
+			Type:     configuration.FieldTypeMultiSelect,
+			Required: true,
+			Default: []string{
+				ociInstanceStateChangeStart,
+				ociInstanceStateChangeStop,
+				ociInstanceStateChangeReset,
+				ociInstanceStateChangeSoftStop,
+				ociInstanceStateChangeSoftReset,
+				ociInstanceStateChangeTerminate,
+			},
+			Description: "Only emit events for these state changes. Leave empty to emit all supported state changes.",
+			TypeOptions: &configuration.TypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: ociInstanceStateChangeOptions,
+				},
+			},
+		},
 	}
 }
 
@@ -105,6 +152,9 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 	if config.CompartmentID == "" {
 		return fmt.Errorf("compartmentId is required")
 	}
+	if err := validateStateChanges(config.StateChanges); err != nil {
+		return err
+	}
 
 	var integrationMetadata IntegrationMetadata
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
@@ -119,7 +169,9 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode trigger metadata: %w", err)
 	}
 
-	if metadata.CompartmentID == config.CompartmentID && metadata.EventsRuleID != "" {
+	condition := `{"eventType": ["com.oraclecloud.computeapi.instanceaction.end","com.oraclecloud.computeapi.terminateinstance.end"]}`
+
+	if metadata.CompartmentID == config.CompartmentID && metadata.EventsRuleID != "" && metadata.Condition == condition {
 		return ctx.Integration.RequestWebhook(WebhookConfiguration{
 			CompartmentID: config.CompartmentID,
 			TopicID:       integrationMetadata.TopicID,
@@ -131,13 +183,11 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	if metadata.EventsRuleID != "" && metadata.CompartmentID != config.CompartmentID {
+	if metadata.EventsRuleID != "" {
 		if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
 			ctx.Logger.Warnf("failed to delete old Events rule %q: %v", metadata.EventsRuleID, err)
 		}
 	}
-
-	condition := `{"eventType": ["com.oraclecloud.computeapi.startinstance.end","com.oraclecloud.computeapi.stopinstance.end","com.oraclecloud.computeapi.terminateinstance.end","com.oraclecloud.computeapi.resetinstance.end","com.oraclecloud.computeapi.softstopinstance.end","com.oraclecloud.computeapi.softresetinstance.end"]}`
 
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
@@ -161,6 +211,7 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 	if err := ctx.Metadata.Set(OnInstanceStateChangeMetadata{
 		CompartmentID: config.CompartmentID,
 		EventsRuleID:  rule.ID,
+		Condition:     condition,
 	}); err != nil {
 		return fmt.Errorf("failed to persist trigger metadata: %w", err)
 	}
@@ -222,8 +273,25 @@ func (t *OnInstanceStateChange) HandleWebhook(ctx core.WebhookRequestContext) (i
 		return http.StatusOK, nil, nil
 	}
 
+	data, _ := envelope["data"].(map[string]any)
+	if eventType == "com.oraclecloud.computeapi.instanceaction.end" {
+		additionalDetails, _ := data["additionalDetails"].(map[string]any)
+		actionType, _ := additionalDetails["instanceActionType"].(string)
+		if _, ok := ociInstanceStateChangeActionTypes[actionType]; !ok {
+			return http.StatusOK, nil, nil
+		}
+		if len(cfg.StateChanges) > 0 && !slices.Contains(cfg.StateChanges, actionType) {
+			return http.StatusOK, nil, nil
+		}
+	}
+
+	if eventType == "com.oraclecloud.computeapi.terminateinstance.end" {
+		if len(cfg.StateChanges) > 0 && !slices.Contains(cfg.StateChanges, ociInstanceStateChangeTerminate) {
+			return http.StatusOK, nil, nil
+		}
+	}
+
 	if cfg.CompartmentID != "" {
-		data, _ := envelope["data"].(map[string]any)
 		compartmentID, _ := data["compartmentId"].(string)
 		if compartmentID != cfg.CompartmentID {
 			return http.StatusOK, nil, nil
@@ -235,4 +303,20 @@ func (t *OnInstanceStateChange) HandleWebhook(ctx core.WebhookRequestContext) (i
 	}
 
 	return http.StatusOK, nil, nil
+}
+
+func validateStateChanges(stateChanges []string) error {
+	for _, stateChange := range stateChanges {
+		if !slices.Contains([]string{
+			ociInstanceStateChangeStart,
+			ociInstanceStateChangeStop,
+			ociInstanceStateChangeReset,
+			ociInstanceStateChangeSoftStop,
+			ociInstanceStateChangeSoftReset,
+			ociInstanceStateChangeTerminate,
+		}, stateChange) {
+			return fmt.Errorf("unsupported state change: %s", stateChange)
+		}
+	}
+	return nil
 }

@@ -5,6 +5,7 @@
     "data": {
       "additionalDetails": {
         "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaa4ktlslmw2fqu5trx2xk3rnnqozgstuqutjm3ffusi6juo3ef4zaq",
+        "instanceActionType": "stop",
         "shape": "VM.Standard.E2.1.Micro",
         "type": "CustomerVmi"
       },
@@ -18,7 +19,7 @@
     },
     "eventID": "8fc0df4c-ea5d-4438-a817-db7fa6440b8a",
     "eventTime": "2026-04-22T20:34:54Z",
-    "eventType": "com.oraclecloud.computeapi.stopinstance.end",
+    "eventType": "com.oraclecloud.computeapi.instanceaction.end",
     "eventTypeVersion": "2.0",
     "extensions": {
       "compartmentId": "ocid1.tenancy.oc1..aaaaaaaaorle4tqd7rmhv2w7h37k32u6bskjrsnbnfem6i7qjupvexidmwpq"
