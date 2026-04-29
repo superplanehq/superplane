@@ -1,7 +1,7 @@
 import type { MetadataItem } from "@/ui/metadataList";
 import type { ComponentBaseContext, ExecutionDetailsContext, OutputPayload } from "../types";
 
-const MAX_NODE_METADATA_ITEMS = 3;
+export const MAX_NODE_METADATA_ITEMS = 3;
 
 export interface OCIImageConfiguration {
   imageId?: string;
@@ -83,11 +83,11 @@ export function imageMetadataList(node: ComponentBaseContext["node"]): MetadataI
     .slice(0, MAX_NODE_METADATA_ITEMS);
 }
 
-function metadataItem(icon: MetadataItem["icon"], label?: string): MetadataItem | undefined {
+export function metadataItem(icon: MetadataItem["icon"], label?: string): MetadataItem | undefined {
   return label ? { icon, label } : undefined;
 }
 
-function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
+export function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
   return item !== undefined;
 }
 

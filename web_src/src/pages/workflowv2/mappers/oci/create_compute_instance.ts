@@ -7,8 +7,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import { baseMapper } from "./base";
-
-const MAX_NODE_METADATA_ITEMS = 3;
+import { isMetadataItem, MAX_NODE_METADATA_ITEMS, metadataItem } from "./image_common";
 
 interface CreateComputeInstanceConfiguration {
   compartmentId?: string;
@@ -140,12 +139,4 @@ function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): 
   ]
     .filter(isMetadataItem)
     .slice(0, MAX_NODE_METADATA_ITEMS);
-}
-
-function metadataItem(icon: MetadataItem["icon"], label?: string): MetadataItem | undefined {
-  return label ? { icon, label } : undefined;
-}
-
-function isMetadataItem(item: MetadataItem | undefined): item is MetadataItem {
-  return item !== undefined;
 }

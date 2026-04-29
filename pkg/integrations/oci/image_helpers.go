@@ -18,8 +18,6 @@ const (
 	imageStateAvailable        = "AVAILABLE"
 	imageStateDeleted          = "DELETED"
 	imageStateDisabled         = "DISABLED"
-	imageStateImporting        = "IMPORTING"
-	imageStateProvisioning     = "PROVISIONING"
 	createImagePollInterval    = 10 * time.Second
 	createImageMaxPollAttempts = 180
 )
