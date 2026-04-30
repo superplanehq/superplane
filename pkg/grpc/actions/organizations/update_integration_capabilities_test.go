@@ -71,7 +71,7 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 	})
 
 	t.Run("no capability changes -> invalid argument", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 		stored, err := models.FindIntegration(r.Organization.ID, uuid.MustParse(idStr))
 		require.NoError(t, err)
 		require.Len(t, stored.Capabilities, 1)
@@ -100,7 +100,7 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 	})
 
 	t.Run("enable unavailable capability -> success", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 		resp, err := UpdateIntegrationCapabilities(ctx, r.Registry, r.Organization.ID.String(), idStr, []*pb.Integration_CapabilityState{
 			{Name: "feat", State: pb.Integration_CapabilityState_STATE_ENABLED},
 		})

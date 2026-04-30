@@ -39,7 +39,7 @@ func Test__PreviousIntegrationSetupStep(t *testing.T) {
 	baseURL := "http://localhost"
 
 	t.Run("no previous steps -> invalid argument", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 		_, err := PreviousIntegrationSetupStep(ctx, r.Registry, r.Organization.ID.String(), idStr)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
@@ -49,7 +49,7 @@ func Test__PreviousIntegrationSetupStep(t *testing.T) {
 	})
 
 	t.Run("after advancing once -> previous restores first step", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 
 		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), idStr, nil)
 		require.NoError(t, err)

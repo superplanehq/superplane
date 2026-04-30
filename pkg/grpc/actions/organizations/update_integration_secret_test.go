@@ -45,7 +45,7 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 	})
 
 	t.Run("secret not found -> not found", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 		_, err := UpdateIntegrationSecret(ctx, r.Registry, r.Organization.ID.String(), idStr, "missing_secret", "v")
 		require.Error(t, err)
 		s, ok := status.FromError(err)
@@ -54,7 +54,7 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 	})
 
 	t.Run("existing secret -> success", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 		integrationID := uuid.MustParse(idStr)
 		seedIntegrationSecret(t, r, integrationID, "api_token", "secret-value")
 

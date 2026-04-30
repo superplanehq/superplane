@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useQueries } from "@tanstack/react-query";
-import type { ConfigurationField, SecretsSecret } from "@/api-client";
+import type { ConfigurationField, SuperplaneSecretsSecret } from "@/api-client";
 import { useSecrets } from "@/hooks/useSecrets";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 
@@ -18,7 +18,7 @@ vi.mock("@/hooks/useSecrets", () => ({
   },
 }));
 
-function createMockSecrets(): SecretsSecret[] {
+function createMockSecrets(): SuperplaneSecretsSecret[] {
   return [
     {
       metadata: { id: "1", name: "secret-1" },

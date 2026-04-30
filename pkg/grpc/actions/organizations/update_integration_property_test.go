@@ -53,7 +53,7 @@ func Test__UpdateIntegrationProperty(t *testing.T) {
 	})
 
 	t.Run("property not found -> not found", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 		_, err := UpdateIntegrationProperty(ctx, r.Registry, r.Organization.ID.String(), idStr, "missing_prop", "v")
 		require.Error(t, err)
 		s, ok := status.FromError(err)
@@ -63,7 +63,7 @@ func Test__UpdateIntegrationProperty(t *testing.T) {
 	})
 
 	t.Run("existing property -> success", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 		integrationID := uuid.MustParse(idStr)
 		seedIntegrationProperty(t, integrationID, core.IntegrationPropertyDefinition{
 			Type:     core.IntegrationPropertyTypeString,

@@ -56,7 +56,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	})
 
 	t.Run("submit advances step and completes flow", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(t, ctx, r, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
 
 		afterOne, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), idStr, nil)
 		require.NoError(t, err)
@@ -117,7 +117,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 				return core.SetupStep{Type: core.SetupStepTypeDone, Name: "finish"}
 			},
 		}))
-		idStr := createSetupFlowIntegration(t, ctx3, r3, support.RandomName("installation"))
+		idStr := createSetupFlowIntegration(ctx3, t, r3, support.RandomName("installation"))
 
 		resp, err := NextIntegrationSetupStep(ctx3, r3.Registry, baseURL, baseURL, r3.Organization.ID.String(), idStr, nil)
 		require.NoError(t, err)

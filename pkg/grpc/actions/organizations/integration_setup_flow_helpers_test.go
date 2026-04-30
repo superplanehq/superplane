@@ -24,7 +24,7 @@ func registerDevelopmentSetupFlowIntegration(t *testing.T, r *support.ResourceRe
 	r.Registry.SetupProviders[setupFlowIntegrationAppName] = provider
 }
 
-func createSetupFlowIntegration(t *testing.T, ctx context.Context, r *support.ResourceRegistry, installationName string) string {
+func createSetupFlowIntegration(ctx context.Context, t *testing.T, r *support.ResourceRegistry, installationName string) string {
 	t.Helper()
 	appConfig, err := structpb.NewStruct(map[string]any{})
 	require.NoError(t, err)
