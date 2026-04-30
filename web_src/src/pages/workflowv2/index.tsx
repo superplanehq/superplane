@@ -1631,7 +1631,7 @@ export function WorkflowPageV2() {
                 return node;
               });
 
-              queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), {
+              applyLocalWorkflowUpdate({
                 ...currentWorkflow,
                 spec: {
                   ...currentWorkflow.spec,
