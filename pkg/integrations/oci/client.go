@@ -804,6 +804,18 @@ func (c *Client) InvokeFunction(functionID string, payload []byte) ([]byte, int,
 		return nil, resp.StatusCode, fmt.Errorf("failed to read invoke response body: %w", err)
 	}
 
+	// Distinguish platform-level errors (auth, rate limit, infra) from
+	// legitimate function responses.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var ociErr struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(respBody, &ociErr) == nil && ociErr.Code != "" {
+			return nil, resp.StatusCode, fmt.Errorf("OCI platform error %d (%s): %s", resp.StatusCode, ociErr.Code, ociErr.Message)
+		}
+	}
+
 	return respBody, resp.StatusCode, nil
 }
 
