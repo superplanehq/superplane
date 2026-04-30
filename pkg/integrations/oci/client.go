@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	coreServicesHostTemplate = "iaas.%s.oraclecloud.com"
-	identityHostTemplate     = "identity.%s.oraclecloud.com"
-	coreServicesAPIVersion   = "20160918"
-	artifactsAPIVersion      = "20160918"
+	coreServicesHostTemplate    = "iaas.%s.oraclecloud.com"
+	identityHostTemplate        = "identity.%s.oraclecloud.com"
+	coreServicesAPIVersion      = "20160918"
+	containerRegistryAPIVersion = "20160918"
 )
 
 // Client is an OCI REST API client that signs requests using OCI API Key authentication.
@@ -1007,6 +1007,23 @@ func (c *Client) DeleteEventsRule(ruleID string) error {
 	return err
 }
 
+// UpdateEventsRule updates the condition of an existing OCI Events rule.
+func (c *Client) UpdateEventsRule(ruleID, condition string) error {
+	host := fmt.Sprintf("events.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/rules/%s", host, ruleID)
+
+	body := map[string]any{
+		"condition": condition,
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update events rule request: %w", err)
+	}
+
+	_, err = c.doRequest(http.MethodPut, host, url, bytes.NewReader(bodyBytes))
+	return err
+}
+
 func (c *Client) artifactsHost() string {
 	return fmt.Sprintf("artifacts.%s.oci.oraclecloud.com", c.region)
 }
@@ -1081,7 +1098,7 @@ type ContainerImage struct {
 func (c *Client) ListContainerRepositories(compartmentID string) ([]ContainerRepository, error) {
 	host := c.artifactsHost()
 	url := fmt.Sprintf("https://%s/%s/container/repositories?compartmentId=%s&limit=100",
-		host, artifactsAPIVersion, neturl.QueryEscape(compartmentID))
+		host, containerRegistryAPIVersion, neturl.QueryEscape(compartmentID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -1102,7 +1119,7 @@ func (c *Client) ListContainerRepositories(compartmentID string) ([]ContainerRep
 func (c *Client) ListContainerImages(compartmentID, repositoryID string) ([]ContainerImage, error) {
 	host := c.artifactsHost()
 	url := fmt.Sprintf("https://%s/%s/container/images?compartmentId=%s&repositoryId=%s&limit=100",
-		host, artifactsAPIVersion, neturl.QueryEscape(compartmentID), neturl.QueryEscape(repositoryID))
+		host, containerRegistryAPIVersion, neturl.QueryEscape(compartmentID), neturl.QueryEscape(repositoryID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -1123,7 +1140,7 @@ func (c *Client) ListContainerImages(compartmentID, repositoryID string) ([]Cont
 func (c *Client) GetOCIRNamespace(compartmentID string) (string, error) {
 	host := c.artifactsHost()
 	url := fmt.Sprintf("https://%s/%s/container/configuration?compartmentId=%s",
-		host, artifactsAPIVersion, neturl.QueryEscape(compartmentID))
+		host, containerRegistryAPIVersion, neturl.QueryEscape(compartmentID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
