@@ -45,7 +45,7 @@ export const UserFieldRenderer = ({ value, onChange, domainId, allValues }: User
   if (!users || users.length === 0) {
     return (
       <div className="space-y-2">
-        <Select disabled>
+        <Select value="" disabled>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="No users available" />
           </SelectTrigger>
