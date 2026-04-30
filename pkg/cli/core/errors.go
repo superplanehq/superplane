@@ -44,13 +44,13 @@ func FormatCommandError(err error) error {
 	return fallbackAPIError(apiErr)
 }
 
-func extractGoogleRPCStatus(apiErr *openapi_client.GenericOpenAPIError) *openapi_client.GooglerpcStatus {
+func extractGoogleRPCStatus(apiErr *openapi_client.GenericOpenAPIError) *openapi_client.GoogleRpcStatus {
 	switch model := apiErr.Model().(type) {
-	case *openapi_client.GooglerpcStatus:
+	case *openapi_client.GoogleRpcStatus:
 		if model != nil && !isEmptyRPCStatus(model) {
 			return model
 		}
-	case openapi_client.GooglerpcStatus:
+	case openapi_client.GoogleRpcStatus:
 		if !isEmptyRPCStatus(&model) {
 			return &model
 		}
@@ -61,7 +61,7 @@ func extractGoogleRPCStatus(apiErr *openapi_client.GenericOpenAPIError) *openapi
 		return nil
 	}
 
-	var decoded openapi_client.GooglerpcStatus
+	var decoded openapi_client.GoogleRpcStatus
 	if err := json.Unmarshal(body, &decoded); err != nil {
 		return nil
 	}
@@ -71,14 +71,14 @@ func extractGoogleRPCStatus(apiErr *openapi_client.GenericOpenAPIError) *openapi
 	return &decoded
 }
 
-func isEmptyRPCStatus(status *openapi_client.GooglerpcStatus) bool {
+func isEmptyRPCStatus(status *openapi_client.GoogleRpcStatus) bool {
 	if status == nil {
 		return true
 	}
 	return status.Message == nil && status.Code == nil && len(status.Details) == 0
 }
 
-func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
+func formatGoogleRPCStatusError(status *openapi_client.GoogleRpcStatus) error {
 	if status == nil {
 		return nil
 	}
@@ -110,7 +110,7 @@ func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
 	return fmt.Errorf("%s", message)
 }
 
-func appendFieldViolations(base error, status *openapi_client.GooglerpcStatus) error {
+func appendFieldViolations(base error, status *openapi_client.GoogleRpcStatus) error {
 	violations := extractFieldViolations(status)
 	if len(violations) == 0 {
 		return base
@@ -125,7 +125,7 @@ func appendFieldViolations(base error, status *openapi_client.GooglerpcStatus) e
 	return errors.New(sb.String())
 }
 
-func extractFieldViolations(status *openapi_client.GooglerpcStatus) []string {
+func extractFieldViolations(status *openapi_client.GoogleRpcStatus) []string {
 	if status == nil {
 		return nil
 	}

@@ -174,6 +174,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 <TableRow>
                   <TableHeader>Name</TableHeader>
                   <TableHeader>Description</TableHeader>
+                  <TableHeader>Created by</TableHeader>
                   <TableHeader>Token</TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
@@ -195,6 +196,19 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">{sa.description || "—"}</span>
+                    </TableCell>
+                    <TableCell>
+                      {sa.createdByUser?.id ? (
+                        <Link
+                          href={`/${organizationId}/settings/members#member-${sa.createdByUser.id}`}
+                          className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                          data-testid="sa-created-by-link"
+                        >
+                          {sa.createdByUser.name || "—"}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">

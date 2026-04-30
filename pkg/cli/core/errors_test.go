@@ -15,7 +15,7 @@ import (
 
 func TestFormatGoogleRPCStatusErrorForUsageLimit(t *testing.T) {
 	message := "organization canvas limit exceeded"
-	status := openapi_client.GooglerpcStatus{Message: &message}
+	status := openapi_client.GoogleRpcStatus{Message: &message}
 
 	err := formatGoogleRPCStatusError(&status)
 	require.Error(t, err)
@@ -28,7 +28,7 @@ func TestFormatGoogleRPCStatusErrorForUsageLimit(t *testing.T) {
 
 func TestFormatGoogleRPCStatusErrorSurfacesUnknownMessage(t *testing.T) {
 	message := "something else"
-	status := openapi_client.GooglerpcStatus{Message: &message}
+	status := openapi_client.GoogleRpcStatus{Message: &message}
 
 	err := formatGoogleRPCStatusError(&status)
 	require.Error(t, err)
@@ -107,7 +107,7 @@ func TestFormatGoogleRPCStatusErrorWithGRPCCodePrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code := tt.code
-			status := openapi_client.GooglerpcStatus{
+			status := openapi_client.GoogleRpcStatus{
 				Code:    &code,
 				Message: &tt.message,
 			}
@@ -122,7 +122,7 @@ func TestFormatGoogleRPCStatusErrorWithGRPCCodePrefix(t *testing.T) {
 func TestFormatGoogleRPCStatusErrorReturnsNilForEmptyMessage(t *testing.T) {
 	message := ""
 	code := int32(3)
-	status := openapi_client.GooglerpcStatus{Message: &message, Code: &code}
+	status := openapi_client.GoogleRpcStatus{Message: &message, Code: &code}
 
 	err := formatGoogleRPCStatusError(&status)
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestFormatGoogleRPCStatusErrorReturnsNilForNilStatus(t *testing.T) {
 func TestFormatGoogleRPCStatusErrorUsageLimitTakesPrecedence(t *testing.T) {
 	message := "organization canvas limit exceeded"
 	code := int32(3)
-	status := openapi_client.GooglerpcStatus{Message: &message, Code: &code}
+	status := openapi_client.GoogleRpcStatus{Message: &message, Code: &code}
 
 	err := formatGoogleRPCStatusError(&status)
 	require.Error(t, err)
