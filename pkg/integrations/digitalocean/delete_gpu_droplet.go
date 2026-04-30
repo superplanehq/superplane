@@ -151,11 +151,11 @@ func (d *DeleteGPUDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteGPUDroplet) Actions() []core.Action {
-	return []core.Action{}
+func (d *DeleteGPUDroplet) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *DeleteGPUDroplet) HandleAction(ctx core.ActionContext) error {
+func (d *DeleteGPUDroplet) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 

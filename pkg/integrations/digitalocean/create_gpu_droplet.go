@@ -147,7 +147,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Name:        "oneClickImage",
 			Label:       "One-Click Application",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    false,
 			Description: "Pre-configured GPU-optimized applications including ML-in-a-Box, CUDA Toolkit, PyTorch, and TensorFlow",
 			Placeholder: "Select a one-click application",
 			TypeOptions: &configuration.TypeOptions{
@@ -163,7 +163,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Name:        "baseImage",
 			Label:       "Base OS Image",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    false,
 			Description: "GPU-compatible base operating system (Ubuntu, Debian, Rocky Linux, Fedora)",
 			Placeholder: "Select a base OS",
 			TypeOptions: &configuration.TypeOptions{
@@ -380,18 +380,18 @@ func (c *CreateGPUDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateGPUDroplet) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateGPUDroplet) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateGPUDroplet) HandleAction(ctx core.ActionContext) error {
+func (c *CreateGPUDroplet) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {
