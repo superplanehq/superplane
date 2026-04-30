@@ -8,6 +8,8 @@ import { onDeployTriggerRenderer } from "./on_deploy";
 import { PURGE_CACHE_STATE_REGISTRY, purgeCacheMapper } from "./purge_cache";
 import { rollbackDeployMapper } from "./rollback_deploy";
 import { updateEnvVarMapper } from "./update_env_var";
+import { addCustomDomainMapper, ADD_CUSTOM_DOMAIN_STATE_REGISTRY } from "./add_custom_domain";
+import { removeCustomDomainMapper } from "./remove_custom_domain";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   deploy: deployMapper,
@@ -17,6 +19,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   rollbackDeploy: rollbackDeployMapper,
   purgeCache: purgeCacheMapper,
   updateEnvVar: updateEnvVarMapper,
+  addCustomDomain: addCustomDomainMapper,
+  removeCustomDomain: removeCustomDomainMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -29,4 +33,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   cancelDeploy: DEPLOY_STATE_REGISTRY,
   rollbackDeploy: DEPLOY_STATE_REGISTRY,
   purgeCache: PURGE_CACHE_STATE_REGISTRY,
+  addCustomDomain: ADD_CUSTOM_DOMAIN_STATE_REGISTRY,
 };

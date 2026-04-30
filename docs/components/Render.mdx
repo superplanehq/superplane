@@ -16,11 +16,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Custom Domain" href="#add-custom-domain" description="Add a custom domain to a Render service" />
   <LinkCard title="Cancel Deploy" href="#cancel-deploy" description="Cancel an in-progress deploy for a Render service and wait for it to complete" />
   <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
   <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service by ID" />
   <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
+  <LinkCard title="Remove Custom Domain" href="#remove-custom-domain" description="Remove a custom domain from a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
 </CardGrid>
@@ -122,6 +124,47 @@ The default output emits payload data fields like `deployId`, `eventId`, `servic
   },
   "timestamp": "2026-02-05T16:00:01.000000Z",
   "type": "render.deploy.ended"
+}
+```
+
+<a id="add-custom-domain"></a>
+
+## Add Custom Domain
+
+The Add Custom Domain component adds a custom domain to a Render service.
+
+### Use Cases
+
+- **Blue/green deployments**: Add the live domain to the new (green) service as part of a traffic switch
+- **Domain management**: Automate custom domain provisioning as part of a deployment workflow
+
+### Configuration
+
+- **Service**: Render service to add the domain to
+- **Domain Name**: The custom domain name (e.g., `app.example.com`)
+- **Wait For Verification**: When enabled, waits for DNS verification before completing
+
+### Output Channels
+
+- **Success**: Emitted when the domain is added (and verified, if `waitForVerification` is enabled)
+- **Failed**: Emitted when DNS verification fails
+
+### Output
+
+Emits a `render.customDomain.added` payload with `id`, `name`, `serviceId`, and `verificationStatus`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "cdm-abc123xyz456",
+    "name": "app.example.com",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "verificationStatus": "verified"
+  },
+  "timestamp": "2026-02-05T16:25:00.000000Z",
+  "type": "render.customDomain.added"
 }
 ```
 
@@ -342,6 +385,39 @@ Emits a `render.cache.purge.requested` payload with `serviceId` and a `status` f
   },
   "timestamp": "2026-02-05T16:20:00.000000Z",
   "type": "render.cache.purge.requested"
+}
+```
+
+<a id="remove-custom-domain"></a>
+
+## Remove Custom Domain
+
+The Remove Custom Domain component removes a custom domain from a Render service.
+
+### Use Cases
+
+- **Blue/green deployments**: Remove the live domain from the old (blue) service before adding it to the new one
+- **Domain cleanup**: Automate domain removal as part of a decommission or rotation workflow
+
+### Configuration
+
+- **Service**: Render service to remove the domain from
+- **Domain Name**: The custom domain name to remove (e.g., `app.example.com`)
+
+### Output
+
+Emits a `render.customDomain.removed` payload with `name` and `serviceId`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "app.example.com",
+    "serviceId": "srv-cukouhrtq21c73e9scng"
+  },
+  "timestamp": "2026-02-05T16:25:00.000000Z",
+  "type": "render.customDomain.removed"
 }
 ```
 
