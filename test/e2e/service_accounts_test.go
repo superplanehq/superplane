@@ -49,12 +49,22 @@ func TestServiceAccounts(t *testing.T) {
 		steps.assertServiceAccountVisibleInList("list-test-bot")
 	})
 
+	t.Run("creator link from list goes to members with anchor", func(t *testing.T) {
+		steps.start()
+		steps.givenServiceAccountExists("creator-link-bot", "Creator link test")
+		steps.visitServiceAccountsPage()
+		steps.assertCreatorLinkVisibleInList("E2E User")
+		steps.clickCreatorLinkFromList()
+		steps.assertMembersPageWithCreatorHash()
+	})
+
 	t.Run("navigating to service account detail", func(t *testing.T) {
 		steps.start()
 		steps.givenServiceAccountExists("detail-test-bot", "For detail test")
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertCreatorLinkVisibleOnDetail("E2E User")
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
@@ -211,6 +221,37 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 
 func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 	s.session.AssertText(name)
+}
+
+func (s *serviceAccountSteps) assertCreatorLinkVisibleInList(displayName string) {
+	page := s.session.Page()
+	link := page.GetByTestId("sa-created-by-link").GetByText(displayName, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
+	err := link.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+}
+
+func (s *serviceAccountSteps) clickCreatorLinkFromList() {
+	page := s.session.Page()
+	err := page.GetByTestId("sa-created-by-link").First().Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(1000)
+}
+
+func (s *serviceAccountSteps) assertMembersPageWithCreatorHash() {
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), "e2e@superplane.local")
+	require.NoError(s.t, err)
+
+	page := s.session.Page()
+	url := page.URL()
+	require.Contains(s.t, url, "/settings/members")
+	require.Contains(s.t, url, "#member-"+user.ID.String())
+}
+
+func (s *serviceAccountSteps) assertCreatorLinkVisibleOnDetail(displayName string) {
+	page := s.session.Page()
+	link := page.GetByTestId("sa-created-by-link").GetByText(displayName, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
+	err := link.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {

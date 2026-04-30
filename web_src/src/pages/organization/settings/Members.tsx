@@ -372,7 +372,7 @@ export function Members({ organizationId }: MembersProps) {
               </TableHead>
               <TableBody>
                 {getSortedMembers().map((member) => (
-                  <TableRow key={member.id} className="last:[&>td]:border-b-0">
+                  <TableRow key={member.id} id={`member-${member.id}`} className="last:[&>td]:border-b-0 scroll-mt-24">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar src={member.avatar} initials={member.initials} className="size-8" />
