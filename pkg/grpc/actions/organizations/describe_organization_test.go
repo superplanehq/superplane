@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,5 +38,11 @@ func Test__DescribeOrganization(t *testing.T) {
 		require.NotNil(t, response.Organization.Spec)
 		require.NotNil(t, response.Organization.Spec.ChangeManagementEnabled)
 		assert.Equal(t, r.Organization.ChangeManagementEnabled, response.Organization.Spec.GetChangeManagementEnabled())
+		require.NotNil(t, response.Organization.Spec.AllowedOauthProviders)
+		assert.ElementsMatch(
+			t,
+			[]string{models.ProviderGitHub, models.ProviderGoogle},
+			response.Organization.Spec.AllowedOauthProviders.GetProviders(),
+		)
 	})
 }

@@ -64,6 +64,47 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, changeManagementEnabled, organization.ChangeManagementEnabled)
 	})
 
+	t.Run("update allowed OAuth providers -> success", func(t *testing.T) {
+		updatedOrg := &protos.Organization{
+			Metadata: &protos.Organization_Metadata{
+				Name: r.Organization.Name,
+			},
+			Spec: &protos.Organization_Spec{
+				AllowedOauthProviders: &protos.Organization_AllowedOAuthProviders{
+					Providers: []string{models.ProviderGoogle},
+				},
+			},
+		}
+
+		response, err := UpdateOrganization(context.Background(), r.Organization.ID.String(), updatedOrg)
+		require.NoError(t, err)
+		require.NotNil(t, response.Organization.Spec.AllowedOauthProviders)
+		assert.Equal(t, []string{models.ProviderGoogle}, response.Organization.Spec.AllowedOauthProviders.GetProviders())
+
+		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{models.ProviderGoogle}, []string(organization.AllowedProviders))
+	})
+
+	t.Run("invalid OAuth provider -> error", func(t *testing.T) {
+		updatedOrg := &protos.Organization{
+			Metadata: &protos.Organization_Metadata{
+				Name: r.Organization.Name,
+			},
+			Spec: &protos.Organization_Spec{
+				AllowedOauthProviders: &protos.Organization_AllowedOAuthProviders{
+					Providers: []string{"gitlab"},
+				},
+			},
+		}
+
+		_, err := UpdateOrganization(context.Background(), r.Organization.ID.String(), updatedOrg)
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+	})
+
 	t.Run("nil organization -> error", func(t *testing.T) {
 		_, err := UpdateOrganization(context.Background(), uuid.New().String(), nil)
 		s, ok := status.FromError(err)
