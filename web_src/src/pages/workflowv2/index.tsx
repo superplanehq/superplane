@@ -30,7 +30,12 @@ import type {
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import {
+  canvasesApplyCanvasVersionChangeset,
+  canvasesEmitNodeEvent,
+  canvasesInvokeNodeTriggerHook,
+  canvasesUpdateNodePause,
+} from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
@@ -3827,23 +3832,41 @@ export function WorkflowPageV2() {
   );
 
   const handleRun = useCallback(
-    async (nodeId: string, channel: string, data: any) => {
+    async (nodeId: string, channelOrTemplate: string, data: any, templateName?: string) => {
       if (!canvasId) return;
 
       try {
-        await canvasesEmitNodeEvent(
-          withOrganizationHeader({
-            path: {
-              canvasId: canvasId,
-              nodeId: nodeId,
-            },
-            body: {
-              channel,
-              data,
-            },
-          }),
-        );
-        // Note: Success toast is shown by EmitEventModal
+        if (templateName) {
+          await canvasesInvokeNodeTriggerHook(
+            withOrganizationHeader({
+              path: {
+                canvasId: canvasId,
+                nodeId: nodeId,
+                hookName: "run",
+              },
+              body: {
+                parameters: {
+                  template: channelOrTemplate,
+                  payload: data,
+                },
+              },
+            }),
+          );
+        } else {
+          await canvasesEmitNodeEvent(
+            withOrganizationHeader({
+              path: {
+                canvasId: canvasId,
+                nodeId: nodeId,
+              },
+              body: {
+                channel: channelOrTemplate,
+                data,
+              },
+            }),
+          );
+        }
+
         const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
         if (node && organizationId) {
           const { nodeType, integration } = getNodeAnalyticsProps(node, availableIntegrations);
@@ -3851,7 +3874,7 @@ export function WorkflowPageV2() {
         }
       } catch (error) {
         showErrorToast("Failed to emit event");
-        throw error; // Re-throw to let EmitEventModal handle it
+        throw error;
       }
     },
     [canvasId, canvas, availableIntegrations, organizationId],
@@ -4905,7 +4928,11 @@ export function WorkflowPageV2() {
   );
 
   const getCustomField = useCallback(
-    (nodeId: string, onRun?: (initialData?: string) => void, integration?: OrganizationsIntegration) => {
+    (
+      nodeId: string,
+      onRun?: (initialData?: string, templateName?: string) => void,
+      integration?: OrganizationsIntegration,
+    ) => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
@@ -4920,7 +4947,7 @@ export function WorkflowPageV2() {
       if (!renderer) return null;
 
       const context: {
-        onRun?: (initialData?: string) => void;
+        onRun?: (initialData?: string, templateName?: string) => void;
         integration?: OrganizationsIntegration;
       } = onRun ? { onRun } : {};
       if (integration) context.integration = integration;

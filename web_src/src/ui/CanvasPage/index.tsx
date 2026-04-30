@@ -211,7 +211,7 @@ export interface CanvasPageProps {
   onAnnotationBlur?: () => void;
   getCustomField?: (
     nodeId: string,
-    onRun?: (initialData?: string) => void,
+    onRun?: (initialData?: string, templateName?: string) => void,
     integration?: OrganizationsIntegration,
   ) => (() => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -243,7 +243,7 @@ export interface CanvasPageProps {
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
   onCancelExecution?: (nodeId: string, executionId: string) => void;
 
-  onRun?: (nodeId: string, channel: string, data: unknown) => void | Promise<void>;
+  onRun?: (nodeId: string, channelOrTemplate: string, data: unknown, templateName?: string) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
@@ -367,6 +367,7 @@ type CanvasAnnotationUpdate = {
 type PendingRunData = {
   nodeId?: string;
   initialData?: string;
+  templateName?: string;
 };
 
 type CanvasNodeRendererCallbacks = {
@@ -655,6 +656,7 @@ function CanvasPage(props: CanvasPageProps) {
     nodeName: string;
     channels: string[];
     initialData?: string;
+    templateName?: string;
   } | null>(null);
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
@@ -720,11 +722,13 @@ function CanvasPage(props: CanvasPageProps) {
       if (props.runDisabled) return;
 
       // Check for pending run data from custom field
-      // Note: This uses a window property as a workaround to pass nodeId and initialData
-      // through the onRun callback chain without breaking existing signatures
+      // Note: This uses a window property as a workaround to pass nodeId,
+      // initialData, and templateName through the onRun callback chain without
+      // breaking existing signatures.
       const pendingData = window.__pendingRunData;
       const actualNodeId = nodeId || pendingData?.nodeId;
       const actualInitialData = initialData || pendingData?.initialData;
+      const actualTemplateName = pendingData?.templateName;
 
       if (!actualNodeId) return;
 
@@ -741,6 +745,7 @@ function CanvasPage(props: CanvasPageProps) {
         nodeName,
         channels,
         initialData: actualInitialData,
+        templateName: actualTemplateName,
       });
     },
     [state.nodes, props.runDisabled],
@@ -750,8 +755,7 @@ function CanvasPage(props: CanvasPageProps) {
     async (channel: string, data: unknown) => {
       if (!emitModalData || !props.onRun) return;
 
-      // Call the onRun prop with nodeId, channel, and data
-      await props.onRun(emitModalData.nodeId, channel, data);
+      await props.onRun(emitModalData.nodeId, channel, data, emitModalData.templateName);
     },
     [emitModalData, props],
   );
@@ -1279,6 +1283,7 @@ function CanvasPage(props: CanvasPageProps) {
           channels={emitModalData.channels}
           onEmit={handleEmit}
           initialData={emitModalData.initialData}
+          templateName={emitModalData.templateName}
         />
       )}
     </div>
@@ -1360,7 +1365,7 @@ function Sidebar({
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
-    onRun?: (initialData?: string) => void,
+    onRun?: (initialData?: string, templateName?: string) => void,
     integration?: OrganizationsIntegration,
   ) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
