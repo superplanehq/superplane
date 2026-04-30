@@ -173,7 +173,8 @@ export function CategorySection({
   const matchingIntegrationStates = normalizedIntegrationName
     ? integrations
         .filter(
-          (integration) => normalizeIntegrationName(integration.spec?.integrationName) === normalizedIntegrationName,
+          (integration) =>
+            normalizeIntegrationName(integration.metadata?.integrationName) === normalizedIntegrationName,
         )
         .map((integration) => integration.status?.state)
     : [];
