@@ -21,6 +21,9 @@ service Usage {
 message SetupOrganizationRequest {
   string organization_id = 1;
   string account_id = 2;
+  string created_by_name = 3;
+  string created_by_email = 4;
+  string organization_name = 5;
 }
 
 message SetupOrganizationResponse {
