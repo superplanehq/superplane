@@ -436,12 +436,12 @@ func serializeCapabilities(registry *registry.Registry, integration *models.Inte
 	for _, group := range setupProvider.CapabilityGroups() {
 		capabilities = append(capabilities, group.Capabilities...)
 	}
-	protos := make([]*pb.Integration_CapabilityState, len(capabilities))
-	for i, capability := range integration.Capabilities {
-		protos[i] = &pb.Integration_CapabilityState{
+	protos := []*pb.Integration_CapabilityState{}
+	for _, capability := range integration.Capabilities {
+		protos = append(protos, &pb.Integration_CapabilityState{
 			Name:  capability.Name,
 			State: CapabilityStateToProto(capability.State),
-		}
+		})
 	}
 
 	return protos
