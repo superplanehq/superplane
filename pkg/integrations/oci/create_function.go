@@ -41,8 +41,8 @@ type CreateFunctionNodeMetadata struct {
 }
 
 type CreateFunctionSpec struct {
-	CompartmentID                  string    `json:"compartmentId" mapstructure:"compartmentId"`
-	ApplicationID                  string    `json:"applicationId" mapstructure:"applicationId"`
+	Compartment                    string    `json:"compartment" mapstructure:"compartment"`
+	Application                    string    `json:"application" mapstructure:"application"`
 	DisplayName                    string    `json:"displayName" mapstructure:"displayName"`
 	ImageRepository                string    `json:"imageRepository" mapstructure:"imageRepository"`
 	Image                          string    `json:"image" mapstructure:"image"`
@@ -117,7 +117,7 @@ func (c *CreateFunction) ExampleOutput() map[string]any {
 func (c *CreateFunction) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -129,7 +129,7 @@ func (c *CreateFunction) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "applicationId",
+			Name:        "application",
 			Label:       "Application",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -141,7 +141,7 @@ func (c *CreateFunction) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -169,7 +169,7 @@ func (c *CreateFunction) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -189,7 +189,7 @@ func (c *CreateFunction) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 						{
@@ -312,8 +312,8 @@ func (c *CreateFunction) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(spec.ApplicationID) == "" {
-		return errors.New("applicationId is required")
+	if strings.TrimSpace(spec.Application) == "" {
+		return errors.New("application is required")
 	}
 	if strings.TrimSpace(spec.DisplayName) == "" {
 		return errors.New("displayName is required")
@@ -325,7 +325,7 @@ func (c *CreateFunction) Setup(ctx core.SetupContext) error {
 		return errors.New("memoryInMBs must be at least 128")
 	}
 
-	return resolveCreateFunctionMetadata(ctx, spec.ApplicationID)
+	return resolveCreateFunctionMetadata(ctx, spec.Application)
 }
 
 func resolveCreateFunctionMetadata(ctx core.SetupContext, applicationID string) error {
@@ -372,7 +372,7 @@ func (c *CreateFunction) Execute(ctx core.ExecutionContext) error {
 	}
 
 	fn, err := client.CreateFunction(CreateFunctionInput{
-		ApplicationID:                  spec.ApplicationID,
+		ApplicationID:                  spec.Application,
 		DisplayName:                    spec.DisplayName,
 		Image:                          spec.Image,
 		MemoryInMBs:                    spec.MemoryInMBs,

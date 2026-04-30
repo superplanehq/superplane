@@ -17,12 +17,12 @@ const CreateApplicationPayloadType = "oci.applicationCreated"
 type CreateApplication struct{}
 
 type CreateApplicationSpec struct {
-	CompartmentID string    `json:"compartmentId" mapstructure:"compartmentId"`
-	DisplayName   string    `json:"displayName" mapstructure:"displayName"`
-	VcnID         string    `json:"vcnId" mapstructure:"vcnId"`
-	SubnetIDs     string    `json:"subnetIds" mapstructure:"subnetIds"`
-	Shape         string    `json:"shape" mapstructure:"shape"`
-	FreeformTags  []TagItem `json:"freeformTags" mapstructure:"freeformTags"`
+	Compartment  string    `json:"compartment" mapstructure:"compartment"`
+	DisplayName  string    `json:"displayName" mapstructure:"displayName"`
+	Vcn          string    `json:"vcn" mapstructure:"vcn"`
+	Subnet       string    `json:"subnet" mapstructure:"subnet"`
+	Shape        string    `json:"shape" mapstructure:"shape"`
+	FreeformTags []TagItem `json:"freeformTags" mapstructure:"freeformTags"`
 }
 
 func (c *CreateApplication) Name() string {
@@ -81,7 +81,7 @@ func (c *CreateApplication) ExampleOutput() map[string]any {
 func (c *CreateApplication) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -101,7 +101,7 @@ func (c *CreateApplication) Configuration() []configuration.Field {
 			Placeholder: "my-functions-app",
 		},
 		{
-			Name:        "vcnId",
+			Name:        "vcn",
 			Label:       "VCN",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -113,7 +113,7 @@ func (c *CreateApplication) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -121,7 +121,7 @@ func (c *CreateApplication) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "subnetIds",
+			Name:        "subnet",
 			Label:       "Subnet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -133,13 +133,13 @@ func (c *CreateApplication) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 						{
 							Name: "vcnId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "vcnId",
+								Field: "vcn",
 							},
 						},
 					},
@@ -197,51 +197,60 @@ func (c *CreateApplication) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(spec.CompartmentID) == "" {
-		return errors.New("compartmentId is required")
+	if strings.TrimSpace(spec.Compartment) == "" {
+		return errors.New("compartment is required")
 	}
 	if strings.TrimSpace(spec.DisplayName) == "" {
 		return errors.New("displayName is required")
 	}
-	if strings.TrimSpace(spec.VcnID) == "" {
-		return errors.New("vcnId is required")
+	if strings.TrimSpace(spec.Vcn) == "" {
+		return errors.New("vcn is required")
 	}
-	if strings.TrimSpace(spec.SubnetIDs) == "" {
-		return errors.New("subnetIds is required")
+	if strings.TrimSpace(spec.Subnet) == "" {
+		return errors.New("subnet is required")
 	}
 
 	return resolveCreateApplicationMetadata(ctx, spec)
+}
+
+func resolveSubnetName(ctx core.SetupContext, spec CreateApplicationSpec) string {
+	if strings.Contains(spec.Subnet, "{{") {
+		return spec.Subnet
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return spec.Subnet
+	}
+
+	subnets, err := client.ListSubnets(spec.Compartment, spec.Vcn)
+	if err != nil {
+		return spec.Subnet
+	}
+
+	for _, sn := range subnets {
+		if sn.ID == spec.Subnet {
+			return sn.DisplayName
+		}
+	}
+
+	return spec.Subnet
 }
 
 func resolveCreateApplicationMetadata(ctx core.SetupContext, spec CreateApplicationSpec) error {
 	// Return early if the subnet name is already cached for this subnet.
 	var existing CreateApplicationNodeMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil &&
-		existing.SubnetID == spec.SubnetIDs && existing.SubnetName != "" {
+		existing.SubnetID == spec.Subnet && existing.SubnetName != "" {
 		// Update shape in case it changed.
 		existing.Shape = spec.Shape
 		return ctx.Metadata.Set(existing)
 	}
 
-	subnetName := spec.SubnetIDs // fallback to OCID
-
-	if !strings.Contains(spec.SubnetIDs, "{{") {
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err == nil {
-			subnets, err := client.ListSubnets(spec.CompartmentID, spec.VcnID)
-			if err == nil {
-				for _, sn := range subnets {
-					if sn.ID == spec.SubnetIDs {
-						subnetName = sn.DisplayName
-						break
-					}
-				}
-			}
-		}
-	}
+	subnetName := resolveSubnetName(ctx, spec)
 
 	return ctx.Metadata.Set(CreateApplicationNodeMetadata{
-		SubnetID:   spec.SubnetIDs,
+		SubnetID:   spec.Subnet,
 		SubnetName: subnetName,
 		Shape:      spec.Shape,
 	})
@@ -259,9 +268,9 @@ func (c *CreateApplication) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Subnet IDs are stored as a single OCID from the resource picker.
-	subnetIDs := []string{spec.SubnetIDs}
+	subnetIDs := []string{spec.Subnet}
 
-	app, err := client.CreateApplication(spec.CompartmentID, spec.DisplayName, spec.Shape, subnetIDs, tagItemsToMap(spec.FreeformTags))
+	app, err := client.CreateApplication(spec.Compartment, spec.DisplayName, spec.Shape, subnetIDs, tagItemsToMap(spec.FreeformTags))
 	if err != nil {
 		return fmt.Errorf("failed to create application: %w", err)
 	}

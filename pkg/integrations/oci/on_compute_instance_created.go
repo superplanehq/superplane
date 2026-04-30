@@ -22,7 +22,7 @@ const (
 )
 
 type OnComputeInstanceCreatedConfiguration struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
+	Compartment string `json:"compartment" mapstructure:"compartment"`
 }
 
 type OnComputeInstanceCreatedMetadata struct {
@@ -75,7 +75,7 @@ func (t *OnComputeInstanceCreated) Color() string {
 func (t *OnComputeInstanceCreated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -100,12 +100,12 @@ func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
 	}
 
 	if err := ctx.Metadata.Set(OnComputeInstanceCreatedMetadata{
-		CompartmentID: config.CompartmentID,
+		CompartmentID: config.Compartment,
 	}); err != nil {
 		return fmt.Errorf("failed to persist trigger metadata: %w", err)
 	}
 
-	return requestWebhook(ctx, config.CompartmentID, integrationMetadata.TopicID)
+	return requestWebhook(ctx, config.Compartment, integrationMetadata.TopicID)
 }
 
 // decodeSetupInputs decodes and validates all inputs needed by Setup.
@@ -114,7 +114,7 @@ func decodeSetupInputs(ctx core.TriggerContext) (OnComputeInstanceCreatedConfigu
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return config, IntegrationMetadata{}, fmt.Errorf("failed to decode trigger configuration: %w", err)
 	}
-	if config.CompartmentID == "" {
+	if config.Compartment == "" {
 		return config, IntegrationMetadata{}, fmt.Errorf("compartmentId is required")
 	}
 
@@ -176,7 +176,7 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 		return http.StatusOK, nil, nil
 	}
 
-	if !matchesCompartment(envelope, cfg.CompartmentID) {
+	if !matchesCompartment(envelope, cfg.Compartment) {
 		return http.StatusOK, nil, nil
 	}
 

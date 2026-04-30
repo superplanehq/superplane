@@ -17,9 +17,9 @@ const DeleteFunctionPayloadType = "oci.functionDeleted"
 type DeleteFunction struct{}
 
 type DeleteFunctionSpec struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
-	ApplicationID string `json:"applicationId" mapstructure:"applicationId"`
-	FunctionID    string `json:"functionId" mapstructure:"functionId"`
+	Compartment string `json:"compartment" mapstructure:"compartment"`
+	Application string `json:"application" mapstructure:"application"`
+	Function    string `json:"function" mapstructure:"function"`
 }
 
 func (d *DeleteFunction) Name() string {
@@ -70,7 +70,7 @@ func (d *DeleteFunction) ExampleOutput() map[string]any {
 func (d *DeleteFunction) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -82,7 +82,7 @@ func (d *DeleteFunction) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "applicationId",
+			Name:        "application",
 			Label:       "Application",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -94,7 +94,7 @@ func (d *DeleteFunction) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -102,7 +102,7 @@ func (d *DeleteFunction) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "functionId",
+			Name:        "function",
 			Label:       "Function",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -114,7 +114,7 @@ func (d *DeleteFunction) Configuration() []configuration.Field {
 						{
 							Name: "applicationId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "applicationId",
+								Field: "application",
 							},
 						},
 					},
@@ -130,11 +130,11 @@ func (d *DeleteFunction) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(spec.FunctionID) == "" {
-		return errors.New("functionId is required")
+	if strings.TrimSpace(spec.Function) == "" {
+		return errors.New("function is required")
 	}
 
-	return resolveDeleteFunctionMetadata(ctx, spec.ApplicationID, spec.FunctionID)
+	return resolveDeleteFunctionMetadata(ctx, spec.Application, spec.Function)
 }
 
 type DeleteFunctionNodeMetadata struct {
@@ -205,12 +205,12 @@ func (d *DeleteFunction) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	if err := client.DeleteFunction(spec.FunctionID); err != nil {
+	if err := client.DeleteFunction(spec.Function); err != nil {
 		return fmt.Errorf("failed to delete function: %w", err)
 	}
 
 	payload := map[string]any{
-		"functionId": spec.FunctionID,
+		"functionId": spec.Function,
 		"deleted":    true,
 	}
 

@@ -17,10 +17,10 @@ const InvokeFunctionPayloadType = "oci.functionInvoked"
 type InvokeFunction struct{}
 
 type InvokeFunctionSpec struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
-	ApplicationID string `json:"applicationId" mapstructure:"applicationId"`
-	FunctionID    string `json:"functionId" mapstructure:"functionId"`
-	Payload       string `json:"payload" mapstructure:"payload"`
+	Compartment string `json:"compartment" mapstructure:"compartment"`
+	Application string `json:"application" mapstructure:"application"`
+	Function    string `json:"function" mapstructure:"function"`
+	Payload     string `json:"payload" mapstructure:"payload"`
 }
 
 func (i *InvokeFunction) Name() string {
@@ -79,7 +79,7 @@ func (i *InvokeFunction) ExampleOutput() map[string]any {
 func (i *InvokeFunction) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -91,7 +91,7 @@ func (i *InvokeFunction) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "applicationId",
+			Name:        "application",
 			Label:       "Application",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -103,7 +103,7 @@ func (i *InvokeFunction) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -111,7 +111,7 @@ func (i *InvokeFunction) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "functionId",
+			Name:        "function",
 			Label:       "Function",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -123,7 +123,7 @@ func (i *InvokeFunction) Configuration() []configuration.Field {
 						{
 							Name: "applicationId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "applicationId",
+								Field: "application",
 							},
 						},
 					},
@@ -148,11 +148,11 @@ func (i *InvokeFunction) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(spec.FunctionID) == "" {
-		return errors.New("functionId is required")
+	if strings.TrimSpace(spec.Function) == "" {
+		return errors.New("function is required")
 	}
 
-	return resolveInvokeFunctionMetadata(ctx, spec.ApplicationID, spec.FunctionID)
+	return resolveInvokeFunctionMetadata(ctx, spec.Application, spec.Function)
 }
 
 type InvokeFunctionNodeMetadata struct {
@@ -227,13 +227,13 @@ func (i *InvokeFunction) Execute(ctx core.ExecutionContext) error {
 		payloadBytes = []byte(spec.Payload)
 	}
 
-	respBody, statusCode, err := client.InvokeFunction(spec.FunctionID, payloadBytes)
+	respBody, statusCode, err := client.InvokeFunction(spec.Function, payloadBytes)
 	if err != nil {
 		return fmt.Errorf("failed to invoke function: %w", err)
 	}
 
 	payload := map[string]any{
-		"functionId": spec.FunctionID,
+		"functionId": spec.Function,
 		"statusCode": statusCode,
 		"response":   string(respBody),
 	}

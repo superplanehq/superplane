@@ -17,8 +17,8 @@ const DeleteApplicationPayloadType = "oci.applicationDeleted"
 type DeleteApplication struct{}
 
 type DeleteApplicationSpec struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
-	ApplicationID string `json:"applicationId" mapstructure:"applicationId"`
+	Compartment string `json:"compartment" mapstructure:"compartment"`
+	Application string `json:"application" mapstructure:"application"`
 }
 
 func (d *DeleteApplication) Name() string {
@@ -72,7 +72,7 @@ func (d *DeleteApplication) ExampleOutput() map[string]any {
 func (d *DeleteApplication) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -84,7 +84,7 @@ func (d *DeleteApplication) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "applicationId",
+			Name:        "application",
 			Label:       "Application",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -96,7 +96,7 @@ func (d *DeleteApplication) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -117,15 +117,15 @@ func (d *DeleteApplication) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(spec.CompartmentID) == "" {
-		return errors.New("compartmentId is required")
+	if strings.TrimSpace(spec.Compartment) == "" {
+		return errors.New("compartment is required")
 	}
 
-	if strings.TrimSpace(spec.ApplicationID) == "" {
-		return errors.New("applicationId is required")
+	if strings.TrimSpace(spec.Application) == "" {
+		return errors.New("application is required")
 	}
 
-	return resolveDeleteApplicationMetadata(ctx, spec.ApplicationID)
+	return resolveDeleteApplicationMetadata(ctx, spec.Application)
 }
 
 func resolveDeleteApplicationMetadata(ctx core.SetupContext, applicationID string) error {
@@ -181,17 +181,17 @@ func (d *DeleteApplication) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	app, err := client.GetApplication(spec.ApplicationID)
+	app, err := client.GetApplication(spec.Application)
 	if err != nil {
 		return fmt.Errorf("failed to get application: %w", err)
 	}
 
-	if err := client.DeleteApplication(spec.ApplicationID); err != nil {
+	if err := client.DeleteApplication(spec.Application); err != nil {
 		return fmt.Errorf("failed to delete application: %w", err)
 	}
 
 	payload := map[string]any{
-		"applicationId": spec.ApplicationID,
+		"applicationId": spec.Application,
 		"displayName":   app.DisplayName,
 		"deleted":       true,
 	}
