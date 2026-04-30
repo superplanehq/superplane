@@ -622,8 +622,9 @@ def test_list_components_includes_integration_scoped_components() -> None:
                 "integrations": [
                     {
                         "name": "slack",
-                        "actions": [
+                        "capabilities": [
                             {
+                                "type": "TYPE_ACTION",
                                 "name": "slack.sendTextMessage",
                                 "label": "Send Text Message",
                             }
@@ -651,8 +652,9 @@ def test_list_triggers_includes_integration_scoped_triggers() -> None:
                 "integrations": [
                     {
                         "name": "github",
-                        "triggers": [
+                        "capabilities": [
                             {
+                                "type": "TYPE_TRIGGER",
                                 "name": "github.onPRReviewComment",
                                 "label": "On PR Review Comment",
                             }
