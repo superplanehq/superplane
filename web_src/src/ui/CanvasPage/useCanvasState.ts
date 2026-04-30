@@ -1,7 +1,34 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CanvasPageProps } from ".";
+
+function areEdgeListsReferentiallyEqual(currentEdges: Edge[], nextEdges: Edge[]): boolean {
+  if (currentEdges.length !== nextEdges.length) {
+    return false;
+  }
+
+  return currentEdges.every((edge, index) => edge === nextEdges[index]);
+}
+
+function arePositionsEqual(
+  left: { x: number; y: number } | undefined,
+  right: { x: number; y: number } | undefined,
+): boolean {
+  return left?.x === right?.x && left?.y === right?.y;
+}
+
+function getRoundedPosition(position: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: Math.round(position.x),
+    y: Math.round(position.y),
+  };
+}
+
+type PendingNodePosition = {
+  localPosition: { x: number; y: number };
+  savedPosition: { x: number; y: number };
+};
 
 export interface CanvasPageState {
   nodes: Node[];
@@ -28,6 +55,16 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
+  const pendingNodePositionsRef = useRef<Map<string, PendingNodePosition>>(new Map());
+  const localOnlyNodeIdsKey = useMemo(
+    () =>
+      nodes
+        .filter((node) => node.data.isTemplate || node.data.isPendingConnection)
+        .map((node) => node.id)
+        .sort()
+        .join("\0"),
+    [nodes],
+  );
 
   // Sync node data changes from parent (but not collapsed state or selected state)
   useEffect(() => {
@@ -36,8 +73,10 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     setNodes((currentNodes) => {
       // Preserve locally-added template and pending connection nodes
       const localOnlyNodes = currentNodes.filter((node) => node.data.isTemplate || node.data.isPendingConnection);
+      const syncedNodeIds = new Set<string>();
 
       const syncedNodes = initialNodes.map((newNode) => {
+        syncedNodeIds.add(newNode.id);
         const existingNode = currentNodes.find((n) => n.id === newNode.id);
         const nodeData = { ...newNode.data };
         const nodeType = nodeData.type as string;
@@ -53,15 +92,31 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
           };
         }
 
+        const pendingPosition = pendingNodePositionsRef.current.get(newNode.id);
+        let position = (existingNode?.dragging && existingNode.position) || newNode.position;
+        if (pendingPosition) {
+          if (arePositionsEqual(newNode.position, pendingPosition.savedPosition)) {
+            pendingNodePositionsRef.current.delete(newNode.id);
+          } else {
+            position = pendingPosition.localPosition;
+          }
+        }
+
         // Preserve selected state and position of actively dragged nodes
         return {
           ...newNode,
           data: nodeData,
           selected: existingNode?.selected ?? newNode.selected,
-          position: (existingNode?.dragging && existingNode.position) || newNode.position,
+          position,
           dragging: existingNode?.dragging,
         };
       });
+
+      for (const nodeId of pendingNodePositionsRef.current.keys()) {
+        if (!syncedNodeIds.has(nodeId)) {
+          pendingNodePositionsRef.current.delete(nodeId);
+        }
+      }
 
       // Append local-only nodes at the end
       return [...syncedNodes, ...localOnlyNodes];
@@ -71,22 +126,23 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   useEffect(() => {
     if (!initialEdges) return;
 
+    const localOnlyNodeIds = new Set(localOnlyNodeIdsKey ? localOnlyNodeIdsKey.split("\0") : []);
+
     setEdges((currentEdges) => {
       // Preserve edges connected to template or pending connection nodes
       const localOnlyEdges = currentEdges.filter((edge) => {
-        const sourceIsLocal = nodes.some(
-          (n) => n.id === edge.source && (n.data.isTemplate || n.data.isPendingConnection),
-        );
-        const targetIsLocal = nodes.some(
-          (n) => n.id === edge.target && (n.data.isTemplate || n.data.isPendingConnection),
-        );
-        return sourceIsLocal || targetIsLocal;
+        return localOnlyNodeIds.has(edge.source) || localOnlyNodeIds.has(edge.target);
       });
 
       // Combine synced edges with local-only edges
-      return [...initialEdges, ...localOnlyEdges];
+      const nextEdges = [...initialEdges, ...localOnlyEdges];
+      if (areEdgeListsReferentiallyEqual(currentEdges, nextEdges)) {
+        return currentEdges;
+      }
+
+      return nextEdges;
     });
-  }, [initialEdges, nodes]);
+  }, [initialEdges, localOnlyNodeIdsKey]);
 
   // Apply initial collapsed state to nodes
   useEffect(() => {
@@ -130,6 +186,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       );
 
       if (positionChanges.length > 0) {
+        positionChanges.forEach((change) => {
+          pendingNodePositionsRef.current.set(change.id, {
+            localPosition: change.position,
+            savedPosition: getRoundedPosition(change.position),
+          });
+        });
+
         // If batch update is supported, use it for multiple nodes
         if (positionChanges.length > 1 && props.onNodesPositionChange) {
           const updates = positionChanges.map((change) => ({
