@@ -80,7 +80,7 @@ Allow group SuperPlaneIntegration to manage volume-attachments in tenancy
 Allow group SuperPlaneIntegration to manage virtual-network-family in tenancy
 Allow group SuperPlaneIntegration to manage buckets in tenancy
 Allow group SuperPlaneIntegration to manage objects in tenancy
-Allow group SuperPlaneIntegration to manage objectstorage-namespaces in tenancy   
+Allow group SuperPlaneIntegration to manage objectstorage-namespaces in tenancy
 Allow group SuperPlaneIntegration to manage fn-app in tenancy
 Allow group SuperPlaneIntegration to manage fn-function in tenancy
 Allow group SuperPlaneIntegration to manage fn-invocation in tenancy
@@ -92,7 +92,7 @@ Allow group SuperPlaneIntegration to manage cloudevents-rules in tenancy
 Allow group SuperPlaneIntegration to manage autonomous-database-family in tenancy
 Allow service cloudEvents to use ons-topics in tenancy
 ` + "```" + `
- 
+
 ### Part 3 — Generate API Keys for the Service User and Connect to SuperPlane
 
 1. Go to **Menu** → **Identity & Security → Domains → Default → User Management → Users**.
@@ -160,12 +160,21 @@ func (o *OCI) Configuration() []configuration.Field {
 func (o *OCI) Actions() []core.Action {
 	return []core.Action{
 		&CreateComputeInstance{},
+		&GetInstance{},
+		&UpdateInstance{},
+		&ManageInstancePower{},
+		&DeleteInstance{},
+		&CreateImage{},
+		&GetImage{},
+		&UpdateImage{},
+		&DeleteImage{},
 	}
 }
 
 func (o *OCI) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnComputeInstanceCreated{},
+		&OnInstanceStateChange{},
 	}
 }
 
