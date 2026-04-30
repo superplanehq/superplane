@@ -571,6 +571,88 @@ func (c *Client) UpdateEnvVar(serviceID string, key string, request UpdateEnvVar
 	return response, nil
 }
 
+type CustomDomainResponse struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	ServiceID          string `json:"serviceId"`
+	VerificationStatus string `json:"verificationStatus"`
+	CreatedAt          string `json:"createdAt,omitempty"`
+	UpdatedAt          string `json:"updatedAt,omitempty"`
+}
+
+type addCustomDomainRequest struct {
+	Name string `json:"name"`
+}
+
+func (c *Client) AddCustomDomain(serviceID string, domainName string) (CustomDomainResponse, error) {
+	if serviceID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if domainName == "" {
+		return CustomDomainResponse{}, fmt.Errorf("domainName is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains",
+		nil,
+		addCustomDomainRequest{Name: domainName},
+	)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	response := CustomDomainResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return CustomDomainResponse{}, fmt.Errorf("failed to unmarshal custom domain response: %w", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetCustomDomain(serviceID string, domainNameOrID string) (CustomDomainResponse, error) {
+	if serviceID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if domainNameOrID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("domainNameOrID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains/"+url.PathEscape(domainNameOrID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	response := CustomDomainResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return CustomDomainResponse{}, fmt.Errorf("failed to unmarshal custom domain response: %w", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) RemoveCustomDomain(serviceID string, domainNameOrID string) error {
+	if serviceID == "" {
+		return fmt.Errorf("serviceID is required")
+	}
+	if domainNameOrID == "" {
+		return fmt.Errorf("domainNameOrID is required")
+	}
+
+	_, _, err := c.execRequestWithResponse(
+		http.MethodDelete,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains/"+url.PathEscape(domainNameOrID),
+		nil,
+		nil,
+	)
+	return err
+}
+
 func (c *Client) GetEvent(eventID string) (EventResponse, error) {
 	if eventID == "" {
 		return EventResponse{}, fmt.Errorf("eventID is required")
