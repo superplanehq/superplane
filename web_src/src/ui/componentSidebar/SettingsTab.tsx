@@ -43,6 +43,7 @@ interface SettingsTabProps {
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
   integrationDefinition?: { name?: string; label?: string; icon?: string };
+  defaultRunTitle?: string;
   autocompleteExampleObj?: Record<string, unknown> | null;
   onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
@@ -86,6 +87,7 @@ export function SettingsTab({
   integrationRef,
   integrations = [],
   integrationDefinition,
+  defaultRunTitle,
   autocompleteExampleObj,
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
@@ -490,11 +492,15 @@ export function SettingsTab({
         {(() => {
           const runTitleField = configurationFields?.find((f) => f.name === "customName");
           if (!runTitleField || !shouldShowConfiguration) return null;
+          const runTitleFieldWithDefaultPlaceholder = {
+            ...runTitleField,
+            placeholder: defaultRunTitle?.trim() || runTitleField.placeholder,
+          };
           return (
             <div className={isReadOnly ? "pointer-events-none opacity-60" : ""}>
               <ConfigurationFieldRenderer
                 allowExpressions={true}
-                field={runTitleField}
+                field={runTitleFieldWithDefaultPlaceholder}
                 value={nodeConfiguration[runTitleField.name!]}
                 onChange={(value) => {
                   setNodeConfiguration((prev) => ({

@@ -293,6 +293,10 @@ export const ComponentSidebar = ({
     () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
     [availableIntegrationDefinitions, integrationName],
   );
+  const defaultRunTitle = useMemo(
+    () => (blockName ? triggers.find((trigger) => trigger.name === blockName)?.defaultRunTitle : undefined),
+    [blockName, triggers],
+  );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const integrationHomeHref = useMemo(() => {
     if (!domainId) return "#";
@@ -775,6 +779,7 @@ export const ComponentSidebar = ({
                   canCreateIntegrations={canCreateIntegrations}
                   canUpdateIntegrations={canUpdateIntegrations}
                   integrationDefinition={createIntegrationDefinition}
+                  defaultRunTitle={defaultRunTitle}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
