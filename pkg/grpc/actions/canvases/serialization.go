@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -264,6 +265,19 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	nodesByID := make(map[string]models.Node, len(nodes))
 	for _, node := range nodes {
 		nodesByID[node.ID] = node
+	}
+
+	for nodeID, errs := range expressionvalidation.ValidateCanvasExpressions(registry, canvas.Spec.Nodes) {
+		msgs := make([]string, 0, len(errs))
+		for _, e := range errs {
+			msgs = append(msgs, e.Error())
+		}
+		joined := strings.Join(msgs, "\n")
+		if existing, ok := nodeValidationErrors[nodeID]; ok {
+			nodeValidationErrors[nodeID] = existing + "\n" + joined
+		} else {
+			nodeValidationErrors[nodeID] = joined
+		}
 	}
 
 	for i, edge := range canvas.Spec.Edges {
