@@ -30,16 +30,19 @@ func (d *DeleteApplication) Label() string {
 }
 
 func (d *DeleteApplication) Description() string {
-	return "Delete an OCI Functions application and all of its functions"
+	return "Delete an OCI Functions application"
 }
 
 func (d *DeleteApplication) Documentation() string {
-	return `The Delete Application component removes an Oracle Cloud Infrastructure Functions application and all functions it contains.
+	return `The Delete Application component removes an Oracle Cloud Infrastructure Functions application.
+
+> **Important:** OCI will reject the deletion with a 409 Conflict if the application still contains functions.
+> You must delete all functions inside the application (using the **Delete Function** component) before using this component.
 
 ## Configuration
 
 - **Compartment**: The compartment containing the application
-- **Application**: The application to delete
+- **Application**: The application to delete. The application must have no remaining functions.
 
 ## Output
 
@@ -181,18 +184,6 @@ func (d *DeleteApplication) Execute(ctx core.ExecutionContext) error {
 	app, err := client.GetApplication(spec.ApplicationID)
 	if err != nil {
 		return fmt.Errorf("failed to get application: %w", err)
-	}
-
-	// OCI rejects application deletion when functions still exist (409 Conflict).
-	// Enumerate and delete all child functions first.
-	functions, err := client.ListFunctions(spec.ApplicationID)
-	if err != nil {
-		return fmt.Errorf("failed to list functions in application: %w", err)
-	}
-	for _, fn := range functions {
-		if err := client.DeleteFunction(fn.ID); err != nil {
-			return fmt.Errorf("failed to delete function %q: %w", fn.ID, err)
-		}
 	}
 
 	if err := client.DeleteApplication(spec.ApplicationID); err != nil {
