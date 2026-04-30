@@ -188,6 +188,10 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     }
   };
 
+  const handleRequestIntegration = () => {
+    analytics.integrationRequested(organizationId);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedIntegration(null);
@@ -237,6 +241,16 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           <Plug className="w-6 h-6 text-gray-800 mx-auto mb-2" />
           <p className="text-sm text-gray-800">
             {integrationCatalog.length === 0 ? "No integrations available." : "No integrations match your filter."}
+          </p>
+          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+            Can't find your integration?{" "}
+            <button
+              type="button"
+              onClick={handleRequestIntegration}
+              className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+            >
+              Request it
+            </button>
           </p>
         </div>
       ) : (
@@ -356,6 +370,16 @@ export function Integrations({ organizationId }: IntegrationsProps) {
               </div>
             );
           })}
+          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Can't find your integration?{" "}
+            <button
+              type="button"
+              onClick={handleRequestIntegration}
+              className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+            >
+              Request it
+            </button>
+          </p>
         </div>
       )}
 
