@@ -1,8 +1,12 @@
+import { Handle, Position } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import type React from "react";
+import { HANDLE_STYLE } from "./handleStyle";
 import type { BlockProps } from "./types";
 
 export const APPEND_CONNECTOR_COLOR = "#C9D5E1";
+const APPEND_SOURCE_LINE_WIDTH = 42;
+const APPEND_SOURCE_BUTTON_LEFT = 54;
 
 const APPEND_HANDLE_STYLE: React.CSSProperties = {
   width: 24,
@@ -27,6 +31,76 @@ const APPEND_PREVIEW_DOT_STYLE: React.CSSProperties = {
 };
 
 export type AppendFromNodeHandler = NonNullable<BlockProps["onAppendFromNode"]>;
+
+function getAppendSourceHandleClassName(isHighlighted: boolean | undefined) {
+  return isHighlighted ? "sp-append-source-hitbox highlighted" : "sp-append-source-hitbox";
+}
+
+export function AppendSourceHandle({
+  channel,
+  label,
+  isHighlighted,
+  onAppend,
+  style,
+  lineWidth = APPEND_SOURCE_LINE_WIDTH,
+  buttonLeft = APPEND_SOURCE_BUTTON_LEFT,
+  buttonTop = -7,
+}: {
+  channel: string;
+  label: string;
+  isHighlighted: boolean | undefined;
+  onAppend: () => void | Promise<void>;
+  style: React.CSSProperties;
+  lineWidth?: number;
+  buttonLeft?: number;
+  buttonTop?: number;
+}) {
+  const handleStyle: React.CSSProperties & { "--sp-append-source-hitbox-width": string } = {
+    ...HANDLE_STYLE,
+    "--sp-append-source-hitbox-width": `${buttonLeft + 24}px`,
+    pointerEvents: "auto",
+    ...style,
+  };
+
+  return (
+    <Handle
+      type="source"
+      position={Position.Right}
+      id={channel}
+      className={getAppendSourceHandleClassName(isHighlighted)}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void onAppend();
+      }}
+      style={handleStyle}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: 12,
+          top: "50%",
+          width: lineWidth,
+          height: 3,
+          transform: "translateY(-50%)",
+          backgroundColor: APPEND_CONNECTOR_COLOR,
+          pointerEvents: "none",
+        }}
+      />
+      <AppendHandleButton
+        label={label}
+        onClick={onAppend}
+        style={{
+          left: buttonLeft,
+          top: buttonTop,
+          position: "absolute",
+          pointerEvents: "none",
+        }}
+      />
+    </Handle>
+  );
+}
 
 export function AppendHandleButton({
   label,
