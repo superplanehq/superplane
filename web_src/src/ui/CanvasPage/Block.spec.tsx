@@ -166,11 +166,70 @@ describe("Block fallback rendering", () => {
             iconSlug: "box",
             collapsed: false,
           },
+          _allEdges: [
+            {
+              source: "component-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+            {
+              source: "prev-node",
+              sourceHandle: "default",
+              target: "component-node",
+            },
+          ],
         }}
       />,
     );
 
     expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
+  });
+
+  it("shows an append connector button for end nodes in edit mode", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="end-node"
+        data={{
+          label: "End node",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "End node",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "prev-node", sourceHandle: "default", target: "end-node" }],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Add next component" })).toBeInTheDocument();
+  });
+
+  it("shows append connector buttons for unconnected output channels", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="router-node"
+        data={{
+          label: "Router",
+          state: "pending",
+          type: "component",
+          outputChannels: ["success", "failure"],
+          component: {
+            title: "Router",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "router-node", sourceHandle: "success", target: "success-node" }],
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Add next component (success)" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add next component (failure)" })).toBeInTheDocument();
   });
 });
