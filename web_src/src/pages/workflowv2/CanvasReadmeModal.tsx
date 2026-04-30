@@ -11,7 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CanvasMarkdown, type NodeChipDetails, type NodeChipIcon } from "@/ui/Markdown/CanvasMarkdown";
+import {
+  CanvasMarkdown,
+  type NodeChipDetails,
+  type NodeChipIcon,
+  type TriggerTemplateInfo,
+} from "@/ui/Markdown/CanvasMarkdown";
 import { useEffect, useMemo, useState } from "react";
 
 //
@@ -43,6 +48,16 @@ export type CanvasReadmeModalProps = {
    * focus the clicked node on the canvas instead of triggering a page load.
    */
   onNodeClick?: (slug: string) => void;
+  /**
+   * Manual Run trigger templates indexed by node slug, then by template slug.
+   * Used to render `@trigger:run/template` chips inside the readme markdown.
+   */
+  triggerTemplates?: Record<string, Record<string, TriggerTemplateInfo>>;
+  /**
+   * Click handler for trigger-run chips. When omitted (typically because the
+   * user lacks permission to run nodes) chips render disabled.
+   */
+  onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
   onSaveDraft: (content: string) => Promise<void>;
   onCreateChangeRequest: (args: { title: string; description: string }) => Promise<void>;
 };
@@ -53,6 +68,8 @@ type NodeRefs = {
   details?: Record<string, NodeChipDetails>;
   linkFor: (slug: string) => string;
   onNodeClick?: (slug: string) => void;
+  triggerTemplates?: Record<string, Record<string, TriggerTemplateInfo>>;
+  onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
 };
 
 export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
@@ -72,13 +89,15 @@ export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
     details,
     linkFor,
     onNodeClick,
+    triggerTemplates,
+    onTriggerTemplateRun,
     onSaveDraft,
     onCreateChangeRequest,
   } = props;
 
   const nodeRefs = useMemo(
-    () => ({ nodes, icons, details, linkFor, onNodeClick }),
-    [nodes, icons, details, linkFor, onNodeClick],
+    () => ({ nodes, icons, details, linkFor, onNodeClick, triggerTemplates, onTriggerTemplateRun }),
+    [nodes, icons, details, linkFor, onNodeClick, triggerTemplates, onTriggerTemplateRun],
   );
   const subtitle = mode === "edit" ? "Draft" : "Published";
 

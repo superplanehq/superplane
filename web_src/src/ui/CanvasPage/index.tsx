@@ -343,6 +343,13 @@ export interface CanvasPageProps {
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   /**
+   * Imperative request to open the EmitEventModal for the given node, used by
+   * surfaces outside CanvasPage (Launchpad markdown, Readme modal). Bumping
+   * the nonce re-fires the modal even when nodeId is unchanged. Honors the
+   * existing `runDisabled` gate inside `handleNodeRun`.
+   */
+  runRequest?: { nonce: number; nodeId: string; initialData?: string } | null;
+  /**
    * Nonce that, when it changes, triggers a fit-to-view over the currently
    * rendered nodes (same behavior as the "Fit all components" button in the
    * zoom toolbar). Used by the Runs view to re-focus when the user picks a
@@ -788,6 +795,21 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [emitModalData, props],
   );
+
+  //
+  // Bridge external runRequest -> EmitEventModal: when the parent bumps the
+  // nonce, open the modal pre-filled with the node + payload from the
+  // request. handleNodeRun's `runDisabled` early return is the source of
+  // truth for permission gating.
+  //
+  const lastRunRequestNonceRef = useRef<number | null>(null);
+  useEffect(() => {
+    const req = props.runRequest;
+    if (!req) return;
+    if (lastRunRequestNonceRef.current === req.nonce) return;
+    lastRunRequestNonceRef.current = req.nonce;
+    handleNodeRun(req.nodeId, req.initialData);
+  }, [props.runRequest, handleNodeRun]);
 
   const handleConnectionDropInEmptySpace = useCallback(
     async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {

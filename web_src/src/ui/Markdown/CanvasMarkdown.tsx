@@ -12,6 +12,7 @@ import {
   MessageCircleWarning,
   ExternalLink,
   CircleHelp,
+  Play,
 } from "lucide-react";
 
 import { resolveIcon } from "@/lib/utils";
@@ -32,8 +33,20 @@ import "highlight.js/styles/github.css";
 //
 
 export const NODE_REF_CLASS = "sp-node-ref";
+//
+// Trigger-run chip: a sibling token to the node-ref chip that targets a
+// specific template on a Manual Run trigger. Authored as either
+// `@trigger:run/template-name` or `[[run:trigger:template-name]]`. When the
+// surrounding NodeChipContext provides `onTriggerTemplateRun`, the chip
+// becomes a button that opens the existing EmitEventModal pre-filled with the
+// template payload; otherwise it renders disabled.
+//
+export const TRIGGER_RUN_CLASS = "sp-trigger-run";
 
-const NODE_TOKEN_RE = /(\[\[node:([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*))/g;
+// Order matters: longer / more-specific patterns first so the regex prefers
+// the run variant over the bare node reference when both could match.
+const NODE_TOKEN_RE =
+  /(\[\[run:([a-zA-Z0-9][a-zA-Z0-9_-]*):([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|\[\[node:([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*):run\/([a-zA-Z0-9][a-zA-Z0-9_-]*)|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*))/g;
 
 type MdastNode = {
   type: string;
@@ -71,14 +84,29 @@ export function remarkNodeRefs() {
           let match: RegExpExecArray | null;
           while ((match = NODE_TOKEN_RE.exec(value)) !== null) {
             const full = match[0];
-            const slug = match[2] || match[3];
+            // Capture groups in the regex (1-indexed):
+            //  2,3  -> [[run:trigger:template]]
+            //  4    -> [[node:slug]]
+            //  5,6  -> @trigger:run/template
+            //  7    -> @slug
+            const runTrigger = match[2] || match[5];
+            const runTemplate = match[3] || match[6];
+            const nodeSlug = match[4] || match[7];
+
             if (match.index > lastIndex) {
               replacements.push({ type: "text", value: value.slice(lastIndex, match.index) });
             }
-            replacements.push({
-              type: "html",
-              value: `<span class="${NODE_REF_CLASS}">${escapeHtml(slug)}</span>`,
-            });
+            if (runTrigger && runTemplate) {
+              replacements.push({
+                type: "html",
+                value: `<span class="${TRIGGER_RUN_CLASS}" data-trigger="${escapeHtml(runTrigger)}" data-template="${escapeHtml(runTemplate)}">${escapeHtml(`${runTrigger}:run/${runTemplate}`)}</span>`,
+              });
+            } else if (nodeSlug) {
+              replacements.push({
+                type: "html",
+                value: `<span class="${NODE_REF_CLASS}">${escapeHtml(nodeSlug)}</span>`,
+              });
+            }
             lastIndex = match.index + full.length;
           }
           if (lastIndex < value.length) {
@@ -112,7 +140,7 @@ const sanitizeSchema = {
   tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
-    span: [...((defaultSchema.attributes ?? {}).span ?? []), "className", "class"],
+    span: [...((defaultSchema.attributes ?? {}).span ?? []), "className", "class", "data-trigger", "data-template"],
   },
 };
 
@@ -442,6 +470,15 @@ export interface NodeChipDetails {
   hasError?: boolean;
 }
 
+export interface TriggerTemplateInfo {
+  /** Display name of the template (used as the chip label). */
+  name: string;
+  /** JSON payload preview shown in the hover card and pre-filled into EmitEventModal. */
+  payload: unknown;
+  /** Available output channels on the trigger; the modal defaults to the first one. */
+  outputChannels?: string[];
+}
+
 export interface NodeChipContext {
   /** Known node slug -> display name. Slugs not in this map render as "unknown node" chips. */
   nodes?: Record<string, string>;
@@ -453,6 +490,10 @@ export interface NodeChipContext {
   linkFor?: (slug: string) => string;
   /** Optional click handler instead of navigation (e.g. to open a side panel). */
   onNodeClick?: (slug: string) => void;
+  /** Manual Run trigger templates indexed by node slug, then by template slug (kebab-case template name). */
+  triggerTemplates?: Record<string, Record<string, TriggerTemplateInfo>>;
+  /** Click handler for `@trigger:run/template` chips. When undefined, chips render disabled. */
+  onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
 }
 
 interface ChipTheme {
@@ -680,6 +721,115 @@ function UnknownNodeChip({ slug }: { slug: string }) {
   );
 }
 
+const TRIGGER_RUN_CHIP_CLASSES =
+  "sp-trigger-run inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-300";
+
+const TRIGGER_RUN_CHIP_DISABLED_CLASSES =
+  "sp-trigger-run inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-medium leading-none text-slate-500";
+
+const MAX_PAYLOAD_PREVIEW_CHARS = 800;
+
+function payloadPreview(payload: unknown): string {
+  let text: string;
+  try {
+    text = JSON.stringify(payload ?? {}, null, 2);
+  } catch {
+    text = String(payload ?? "");
+  }
+  if (text.length > MAX_PAYLOAD_PREVIEW_CHARS) {
+    return `${text.slice(0, MAX_PAYLOAD_PREVIEW_CHARS)}\n…`;
+  }
+  return text;
+}
+
+function TriggerRunChip({
+  nodeSlug,
+  templateSlug,
+  template,
+  triggerName,
+  onRun,
+}: {
+  nodeSlug: string;
+  templateSlug: string;
+  template?: TriggerTemplateInfo;
+  triggerName?: string;
+  onRun?: () => void;
+}) {
+  // Unknown trigger or template -> disabled fallback variant.
+  if (!template) {
+    return (
+      <span
+        className={TRIGGER_RUN_CHIP_DISABLED_CLASSES}
+        title={`Unknown trigger or template: ${nodeSlug}:run/${templateSlug}`}
+      >
+        <CircleHelp className="h-3 w-3" />
+        {nodeSlug}:run/{templateSlug}
+      </span>
+    );
+  }
+
+  const label = template.name || templateSlug;
+
+  // Read-only / no-callback variant.
+  if (!onRun) {
+    return (
+      <span
+        className={TRIGGER_RUN_CHIP_DISABLED_CLASSES}
+        title={`Run not available here: ${nodeSlug}:run/${templateSlug}`}
+      >
+        <Play className="h-3 w-3" />
+        {label}
+      </span>
+    );
+  }
+
+  const button = (
+    <button
+      type="button"
+      className={TRIGGER_RUN_CHIP_CLASSES}
+      onClick={onRun}
+      title={`Run ${label} on ${triggerName ?? nodeSlug}`}
+      data-trigger={nodeSlug}
+      data-template={templateSlug}
+    >
+      <Play className="h-3 w-3" />
+      {label}
+    </button>
+  );
+
+  return (
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>{button}</HoverCardTrigger>
+      <HoverCardContent
+        side="top"
+        align="start"
+        className="w-80 overflow-hidden rounded-lg border border-slate-200 p-0 text-xs shadow-xl"
+        sideOffset={6}
+      >
+        <div className="flex flex-col bg-white">
+          <div className="flex items-start gap-3 px-4 pt-3.5 pb-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50">
+              <Play className="h-5 w-5 text-emerald-500" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <div className="min-w-0 truncate text-[13px] font-semibold leading-tight text-slate-900">{label}</div>
+              <div className="mt-1 truncate text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                Run on {triggerName ?? nodeSlug}
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">Payload</div>
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700">
+              {payloadPreview(template.payload)}
+            </pre>
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
 function defaultLinkFor(slug: string): string {
   try {
     const url = new URL(window.location.href);
@@ -694,8 +844,49 @@ function defaultLinkFor(slug: string): string {
 }
 
 function buildSpanComponent(context: NodeChipContext) {
-  return function Span(props: React.HTMLAttributes<HTMLSpanElement>) {
+  return function Span(props: React.HTMLAttributes<HTMLSpanElement> & Record<string, unknown>) {
     const className = typeof props.className === "string" ? props.className : "";
+
+    if (className.includes(TRIGGER_RUN_CLASS)) {
+      // rehype/react-markdown converts data-* attributes into camelCase props, but
+      // since we render via rehype-raw and rehype-sanitize they often stay as
+      // `data-trigger`/`data-template`. Be tolerant of both forms.
+      const triggerAttr =
+        (props["data-trigger"] as string | undefined) ?? (props.dataTrigger as string | undefined) ?? "";
+      const templateAttr =
+        (props["data-template"] as string | undefined) ?? (props.dataTemplate as string | undefined) ?? "";
+      let nodeSlug = String(triggerAttr).trim();
+      let templateSlug = String(templateAttr).trim();
+      if (!nodeSlug || !templateSlug) {
+        // Fallback: parse from text content `<trigger>:run/<template>`.
+        const text = extractTextFromChildren(props.children).trim();
+        const m = text.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*):run\/([a-zA-Z0-9][a-zA-Z0-9_-]*)$/);
+        if (m) {
+          nodeSlug = nodeSlug || m[1];
+          templateSlug = templateSlug || m[2];
+        }
+      }
+      if (!nodeSlug || !templateSlug) {
+        return <span {...props} />;
+      }
+
+      const template = context.triggerTemplates?.[nodeSlug]?.[templateSlug];
+      const triggerName = context.nodes?.[nodeSlug];
+      const onRun = context.onTriggerTemplateRun
+        ? () => context.onTriggerTemplateRun?.({ nodeSlug, templateSlug })
+        : undefined;
+
+      return (
+        <TriggerRunChip
+          nodeSlug={nodeSlug}
+          templateSlug={templateSlug}
+          template={template}
+          triggerName={triggerName}
+          onRun={onRun}
+        />
+      );
+    }
+
     if (!className.includes(NODE_REF_CLASS)) {
       return <span {...props} />;
     }

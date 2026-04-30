@@ -5,7 +5,13 @@ import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { isUrl } from "@/lib/utils";
-import type { NodeChipConfigField, NodeChipDetails, NodeChipIcon, NodeChipKind } from "@/ui/Markdown/CanvasMarkdown";
+import type {
+  NodeChipConfigField,
+  NodeChipDetails,
+  NodeChipIcon,
+  NodeChipKind,
+  TriggerTemplateInfo,
+} from "@/ui/Markdown/CanvasMarkdown";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
@@ -1993,6 +1999,15 @@ export function WorkflowPageV2() {
   const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
   const [resolvedExecutionIds, setResolvedExecutionIds] = useState<Set<string>>(new Set());
+  // `runRequest` bridges the Launchpad / Readme surfaces to the existing
+  // EmitEventModal flow inside CanvasPage. Bumping the nonce inside an
+  // existing-equal payload still re-fires the modal, mirroring the
+  // `focusRequest` pattern.
+  const [runRequest, setRunRequest] = useState<{
+    nonce: number;
+    nodeId: string;
+    initialData?: string;
+  } | null>(null);
   const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
 
   const handleSidebarChange = useCallback(
@@ -4977,7 +4992,15 @@ export function WorkflowPageV2() {
       }
     }
     await handleToggleEditMode();
-  }, [isRunsMode, hasEditableVersion, setRunsMode, isLaunchpadMode, setLaunchpadMode, canvasMode, handleToggleEditMode]);
+  }, [
+    isRunsMode,
+    hasEditableVersion,
+    setRunsMode,
+    isLaunchpadMode,
+    setLaunchpadMode,
+    canvasMode,
+    handleToggleEditMode,
+  ]);
 
   const handleResetDraftChanges = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -5378,11 +5401,13 @@ export function WorkflowPageV2() {
     nodeIdBySlug: readmeNodeIdBySlug,
     iconsBySlug: readmeIconsBySlug,
     detailsBySlug: readmeNodeDetailsBySlug,
+    triggerTemplatesBySlug: readmeTriggerTemplatesBySlug,
   } = useMemo(() => {
     const nodesBySlug: Record<string, string> = {};
     const nodeIdBySlug: Record<string, string> = {};
     const iconsBySlug: Record<string, NodeChipIcon> = {};
     const detailsBySlug: Record<string, NodeChipDetails> = {};
+    const triggerTemplatesBySlug: Record<string, Record<string, TriggerTemplateInfo>> = {};
     const toKebab = (value: string) =>
       value
         .toLowerCase()
@@ -5442,6 +5467,7 @@ export function WorkflowPageV2() {
       nodeId: string | undefined,
       icon: NodeChipIcon | undefined,
       details: NodeChipDetails | undefined,
+      templates: Record<string, TriggerTemplateInfo> | undefined,
     ) => {
       if (!slug) return;
       if (!nodesBySlug[slug]) {
@@ -5455,6 +5481,9 @@ export function WorkflowPageV2() {
       }
       if (details && !detailsBySlug[slug]) {
         detailsBySlug[slug] = details;
+      }
+      if (templates && !triggerTemplatesBySlug[slug]) {
+        triggerTemplatesBySlug[slug] = templates;
       }
     };
 
@@ -5523,11 +5552,37 @@ export function WorkflowPageV2() {
         hasError: Boolean(node.errorMessage),
       };
 
-      register(node.name, displayName, node.id, icon, details);
-      register(node.id, displayName, node.id, icon, details);
-      register(toKebab(displayName), displayName, node.id, icon, details);
+      // Manual Run triggers (`type: trigger`, `trigger.name: start`) expose a
+      // list of named templates in their configuration. Index them by kebab-
+      // cased template name so authors can reference them as
+      // `@trigger:run/template-name` or `[[run:trigger:template-name]]`.
+      let templatesMap: Record<string, TriggerTemplateInfo> | undefined;
+      if (node.type === "TYPE_TRIGGER" && node.trigger?.name === "start") {
+        const rawTemplates = (rawConfig.templates as unknown) ?? [];
+        if (Array.isArray(rawTemplates)) {
+          const collected: Record<string, TriggerTemplateInfo> = {};
+          for (const entry of rawTemplates) {
+            if (!entry || typeof entry !== "object") continue;
+            const tpl = entry as { name?: unknown; payload?: unknown };
+            if (typeof tpl.name !== "string" || !tpl.name) continue;
+            const slug = toKebab(tpl.name);
+            if (!slug || collected[slug]) continue;
+            collected[slug] = {
+              name: tpl.name,
+              payload: tpl.payload,
+            };
+          }
+          if (Object.keys(collected).length > 0) {
+            templatesMap = collected;
+          }
+        }
+      }
+
+      register(node.name, displayName, node.id, icon, details, templatesMap);
+      register(node.id, displayName, node.id, icon, details, templatesMap);
+      register(toKebab(displayName), displayName, node.id, icon, details, templatesMap);
     }
-    return { nodesBySlug, nodeIdBySlug, iconsBySlug, detailsBySlug };
+    return { nodesBySlug, nodeIdBySlug, iconsBySlug, detailsBySlug, triggerTemplatesBySlug };
   }, [
     selectedCanvasVersion,
     liveCanvasVersion,
@@ -5565,6 +5620,31 @@ export function WorkflowPageV2() {
       setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
     },
     [readmeNodeIdBySlug, handleSidebarChange, setFocusRequest],
+  );
+
+  //
+  // Resolve a `@trigger:run/template` chip click to the underlying node + the
+  // template's payload, then bump the runRequest nonce so CanvasPage opens
+  // its existing EmitEventModal pre-filled. The CanvasPage hard-guards on
+  // `runDisabled` again inside `handleNodeRun`.
+  //
+  const handleTriggerTemplateRun = useCallback(
+    ({ nodeSlug, templateSlug }: { nodeSlug: string; templateSlug: string }) => {
+      const nodeId = readmeNodeIdBySlug[nodeSlug];
+      const tpl = readmeTriggerTemplatesBySlug[nodeSlug]?.[templateSlug];
+      if (!nodeId || !tpl) return;
+      let initialData: string | undefined;
+      try {
+        initialData = JSON.stringify(tpl.payload ?? {}, null, 2);
+      } catch {
+        initialData = undefined;
+      }
+      // If the chip was clicked from inside the Readme modal, close it so the
+      // EmitEventModal isn't rendered behind another modal.
+      setIsReadmeModalOpen(false);
+      setRunRequest({ nonce: Date.now(), nodeId, initialData });
+    },
+    [readmeNodeIdBySlug, readmeTriggerTemplatesBySlug],
   );
 
   const handleReadmeSaveDraft = useCallback(
@@ -5950,6 +6030,7 @@ export function WorkflowPageV2() {
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
+          runRequest={runRequest}
           fitAllRequest={showRunCanvas ? runsFitAllNonce : null}
           onExecutionChainHandled={handleExecutionChainHandled}
           onSelectRuns={() => setRunsMode(true)}
@@ -5970,6 +6051,9 @@ export function WorkflowPageV2() {
                   details: readmeNodeDetailsBySlug,
                   linkFor: linkForReadmeNode,
                   onNodeClick: handleReadmeNodeChipClick,
+                  triggerTemplates: readmeTriggerTemplatesBySlug,
+                  onTriggerTemplateRun:
+                    !canUpdateCanvas || isTemplate || runDisabled ? undefined : handleTriggerTemplateRun,
                 }}
                 onChange={(next) => updateCanvasLaunchpadMutation.mutate(next)}
               />
@@ -6121,6 +6205,8 @@ export function WorkflowPageV2() {
         details={readmeNodeDetailsBySlug}
         linkFor={linkForReadmeNode}
         onNodeClick={handleReadmeNodeChipClick}
+        triggerTemplates={readmeTriggerTemplatesBySlug}
+        onTriggerTemplateRun={!canUpdateCanvas || isTemplate || runDisabled ? undefined : handleTriggerTemplateRun}
         onSaveDraft={handleReadmeSaveDraft}
         onCreateChangeRequest={handleReadmeCreateChangeRequest}
       />

@@ -32,9 +32,41 @@ vi.mock("react-grid-layout/legacy", () => ({
   ),
 }));
 
-// Avoid running the real markdown pipeline in tests.
+// Avoid running the real markdown pipeline in tests. Surface the nodeRefs
+// context as data attributes / a simulator button so tests can assert that
+// LaunchpadView wires triggerTemplates and onTriggerTemplateRun through to
+// the markdown layer. The button matches a hardcoded slug pair for tests
+// that opt into the run-chip flow.
+type MockTriggerInfo = { name: string; payload: unknown };
+type MockNodeRefs = {
+  triggerTemplates?: Record<string, Record<string, MockTriggerInfo>>;
+  onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
+};
+
 vi.mock("@/ui/Markdown/CanvasMarkdown", () => ({
-  CanvasMarkdown: ({ children }: { children: string }) => <pre data-testid="markdown">{children}</pre>,
+  CanvasMarkdown: ({ children, nodeRefs }: { children: string; nodeRefs?: MockNodeRefs }) => {
+    const triggerKey = "my-trigger";
+    const templateKey = "hello-world";
+    const hasTemplate = Boolean(nodeRefs?.triggerTemplates?.[triggerKey]?.[templateKey]);
+    const canRun = Boolean(nodeRefs?.onTriggerTemplateRun);
+    return (
+      <div data-testid="markdown" data-has-template={hasTemplate ? "yes" : "no"} data-can-run={canRun ? "yes" : "no"}>
+        <pre>{children}</pre>
+        {hasTemplate && canRun ? (
+          <button
+            type="button"
+            data-testid="run-chip"
+            onClick={(e) => {
+              e.stopPropagation();
+              nodeRefs?.onTriggerTemplateRun?.({ nodeSlug: triggerKey, templateSlug: templateKey });
+            }}
+          >
+            run
+          </button>
+        ) : null}
+      </div>
+    );
+  },
 }));
 
 // jsdom doesn't ship ResizeObserver; the component falls back gracefully but
@@ -148,6 +180,36 @@ describe("LaunchpadView", () => {
     expect(args.panels).toHaveLength(1);
     expect(args.panels[0].id).toBe("p2");
     expect(args.layout.map((l: LaunchpadLayoutItem) => l.i)).toEqual(["p2"]);
+  });
+
+  it("forwards triggerTemplates + onTriggerTemplateRun through nodeRefs into the markdown layer", () => {
+    const onTriggerTemplateRun = vi.fn();
+    const nodeRefs = {
+      nodes: { "my-trigger": "My trigger" },
+      triggerTemplates: {
+        "my-trigger": {
+          "hello-world": { name: "Hello World", payload: { greet: "hi" } },
+        },
+      },
+      onTriggerTemplateRun,
+    };
+    render(
+      <LaunchpadView
+        panels={[makePanel("p1", "[[run:my-trigger:hello-world]]")]}
+        layout={[makeLayout("p1")]}
+        isLoading={false}
+        readOnly={false}
+        nodeRefs={nodeRefs}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const runChip = screen.getByTestId("run-chip");
+    fireEvent.click(runChip);
+    expect(onTriggerTemplateRun).toHaveBeenCalledWith({
+      nodeSlug: "my-trigger",
+      templateSlug: "hello-world",
+    });
   });
 
   it("layout change from the grid library triggers a debounced save with the new layout", () => {
