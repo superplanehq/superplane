@@ -2758,7 +2758,9 @@ export function WorkflowPageV2() {
 
   const integrationDialogPendingInstance = useMemo(() => {
     if (!integrationDialogName) return undefined;
-    return integrations.find((i) => i.metadata?.integrationName === integrationDialogName && i.status?.state !== "ready");
+    return integrations.find(
+      (i) => i.metadata?.integrationName === integrationDialogName && i.status?.state !== "ready",
+    );
   }, [integrationDialogName, integrations]);
 
   const initialWebhookSetup = useMemo(() => {
