@@ -67,6 +67,10 @@ func (t *DummyTrigger) ExampleData() map[string]any {
 	return nil
 }
 
+func (t *DummyTrigger) DefaultRunTitle() string {
+	return ""
+}
+
 func (t *DummyTrigger) Configuration() []configuration.Field {
 	return nil
 }

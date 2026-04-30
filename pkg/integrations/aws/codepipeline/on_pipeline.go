@@ -85,6 +85,10 @@ func (p *OnPipeline) Color() string {
 	return "gray"
 }
 
+func (p *OnPipeline) DefaultRunTitle() string {
+	return `{{ root().data.detail.pipeline }} #{{ root().data.detail["execution-id"] }}`
+}
+
 func (p *OnPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

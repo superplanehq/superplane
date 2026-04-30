@@ -25,7 +25,7 @@ function makeExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
     rootEvent: {
       id: "event-1",
       createdAt: now,
-      customName: "Start event",
+      runTitle: "Start event",
       data: {},
       nodeId: "trigger-1",
       type: "trigger",

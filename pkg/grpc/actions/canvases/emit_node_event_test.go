@@ -158,8 +158,8 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
-		require.NotNil(t, event.CustomName)
-		assert.Equal(t, "Run: hello", *event.CustomName)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
 	})
 
 	t.Run("successful event emission publishes RabbitMQ message", func(t *testing.T) {

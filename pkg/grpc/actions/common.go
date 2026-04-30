@@ -689,16 +689,17 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		// Metadata is something only triggers/components implementations can set.
 		//
 		result[i] = models.Node{
-			ID:             node.Id,
-			Name:           node.Name,
-			Type:           nodeType,
-			Ref:            *nodeRef,
-			Configuration:  node.Configuration.AsMap(),
-			Position:       ProtoToPosition(node.Position),
-			IsCollapsed:    node.IsCollapsed,
-			IntegrationID:  integrationID,
-			ErrorMessage:   errorMessage,
-			WarningMessage: warningMessage,
+			ID:               node.Id,
+			Name:             node.Name,
+			Type:             nodeType,
+			Ref:              *nodeRef,
+			Configuration:    node.Configuration.AsMap(),
+			RunTitleTemplate: node.RunTitleTemplate,
+			Position:         ProtoToPosition(node.Position),
+			IsCollapsed:      node.IsCollapsed,
+			IntegrationID:    integrationID,
+			ErrorMessage:     errorMessage,
+			WarningMessage:   warningMessage,
 		}
 	}
 
@@ -739,6 +740,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			Type:        NodeTypeToProto(node.Type),
 			Position:    PositionToProto(node.Position),
 			IsCollapsed: node.IsCollapsed,
+		}
+
+		if node.RunTitleTemplate != nil {
+			result[i].RunTitleTemplate = node.RunTitleTemplate
 		}
 
 		if node.Ref.Component != nil {
@@ -1027,13 +1032,14 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 		exampleData, _ := structpb.NewStruct(trigger.ExampleData())
 
 		out[i] = &triggerpb.Trigger{
-			Name:          trigger.Name(),
-			Label:         trigger.Label(),
-			Description:   trigger.Description(),
-			Icon:          trigger.Icon(),
-			Color:         trigger.Color(),
-			Configuration: configuration,
-			ExampleData:   exampleData,
+			Name:            trigger.Name(),
+			Label:           trigger.Label(),
+			Description:     trigger.Description(),
+			Icon:            trigger.Icon(),
+			Color:           trigger.Color(),
+			Configuration:   configuration,
+			ExampleData:     exampleData,
+			DefaultRunTitle: trigger.DefaultRunTitle(),
 		}
 	}
 	return out

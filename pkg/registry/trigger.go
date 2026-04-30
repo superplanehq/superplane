@@ -52,6 +52,10 @@ func (s *PanicableTrigger) ExampleData() map[string]any {
 	return s.underlying.ExampleData()
 }
 
+func (s *PanicableTrigger) DefaultRunTitle() string {
+	return s.underlying.DefaultRunTitle()
+}
+
 func (s *PanicableTrigger) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }

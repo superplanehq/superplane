@@ -65,6 +65,10 @@ func (p *OnPRComment) Color() string {
 	return "gray"
 }
 
+func (p *OnPRComment) DefaultRunTitle() string {
+	return "#{{ root().data.issue.number }} - {{ root().data.issue.title }}"
+}
+
 func (p *OnPRComment) Configuration() []configuration.Field {
 	return prCommentConfigurationFields()
 }

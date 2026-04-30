@@ -25,6 +25,7 @@ message Node {
   optional string error_message = 10;
   optional string warning_message = 11;
   bool paused = 12;
+  optional string run_title_template = 16;
 }
 
 message Position {
