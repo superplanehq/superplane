@@ -122,6 +122,29 @@ func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 	return &instance, nil
 }
 
+// ListInstances lists Compute instances in a compartment.
+func (c *Client) ListInstances(compartmentID string) ([]Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances?compartmentId=%s&limit=100",
+		host,
+		coreServicesAPIVersion,
+		neturl.QueryEscape(compartmentID),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instances []Instance
+	if err := json.Unmarshal(respBody, &instances); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instances: %w", err)
+	}
+
+	return instances, nil
+}
+
 // ListVNICAttachments lists VNIC attachments for an instance, used to find IP addresses.
 func (c *Client) ListVNICAttachments(compartmentID, instanceID string) ([]VNICAttachment, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
@@ -231,6 +254,75 @@ func (c *Client) ListImages(compartmentID, operatingSystem string) ([]Image, err
 	return images, nil
 }
 
+func (c *Client) CreateImage(req CreateImageRequest) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images", host, coreServicesAPIVersion)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) GetImage(imageID string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) UpdateImage(imageID, displayName string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	body, err := json.Marshal(UpdateImageRequest{DisplayName: displayName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) DeleteImage(imageID string) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
 func (c *Client) ListSubnets(compartmentID string) ([]Subnet, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
 	url := fmt.Sprintf("https://%s/%s/subnets?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
@@ -276,8 +368,10 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 		}
 	}
 
+	includeBodyHeaders := method == http.MethodPost || method == http.MethodPut
+
 	var bodyReader io.Reader
-	if len(bodyBytes) > 0 {
+	if len(bodyBytes) > 0 || includeBodyHeaders {
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
@@ -289,14 +383,15 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	req.Header.Set("Host", host)
 
-	if len(bodyBytes) > 0 {
+	if includeBodyHeaders {
 		hash := sha256.Sum256(bodyBytes)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
 		req.Header.Set("x-content-sha256", base64.StdEncoding.EncodeToString(hash[:]))
+		req.ContentLength = int64(len(bodyBytes))
 	}
 
-	if err := c.signRequest(req, len(bodyBytes) > 0); err != nil {
+	if err := c.signRequest(req, includeBodyHeaders); err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
@@ -420,6 +515,11 @@ type InstanceShapeConfig struct {
 	MemoryInGBs *float64 `json:"memoryInGBs,omitempty"`
 }
 
+type UpdateInstanceRequest struct {
+	DisplayName *string              `json:"displayName,omitempty"`
+	ShapeConfig *InstanceShapeConfig `json:"shapeConfig,omitempty"`
+}
+
 type ShieldedInstanceConfig struct {
 	IsSecureBootEnabled            bool `json:"isSecureBootEnabled"`
 	IsMeasuredBootEnabled          bool `json:"isMeasuredBootEnabled"`
@@ -428,6 +528,26 @@ type ShieldedInstanceConfig struct {
 
 type ConfidentialInstanceOptions struct {
 	IsEnabled bool `json:"isEnabled"`
+}
+
+type CreateImageRequest struct {
+	CompartmentID      string              `json:"compartmentId"`
+	DisplayName        string              `json:"displayName,omitempty"`
+	InstanceID         string              `json:"instanceId,omitempty"`
+	ImageSourceDetails *ImageSourceDetails `json:"imageSourceDetails,omitempty"`
+}
+
+type ImageSourceDetails struct {
+	SourceType      string `json:"sourceType"`
+	SourceImageType string `json:"sourceImageType,omitempty"`
+	SourceURI       string `json:"sourceUri,omitempty"`
+	NamespaceName   string `json:"namespaceName,omitempty"`
+	BucketName      string `json:"bucketName,omitempty"`
+	ObjectName      string `json:"objectName,omitempty"`
+}
+
+type UpdateImageRequest struct {
+	DisplayName string `json:"displayName"`
 }
 
 type Instance struct {
@@ -469,9 +589,17 @@ type Shape struct {
 }
 
 type Image struct {
-	ID             string `json:"id"`
-	DisplayName    string `json:"displayName"`
-	LifecycleState string `json:"lifecycleState"`
+	ID                     string `json:"id"`
+	DisplayName            string `json:"displayName"`
+	LifecycleState         string `json:"lifecycleState"`
+	CompartmentID          string `json:"compartmentId"`
+	BaseImageID            string `json:"baseImageId"`
+	OperatingSystem        string `json:"operatingSystem"`
+	OperatingSystemVersion string `json:"operatingSystemVersion"`
+	LaunchMode             string `json:"launchMode"`
+	SizeInMBs              int    `json:"sizeInMBs"`
+	TimeCreated            string `json:"timeCreated"`
+	CreateImageAllowed     bool   `json:"createImageAllowed"`
 }
 
 type Subnet struct {
@@ -523,6 +651,62 @@ func (c *Client) AttachVolume(instanceID, volumeID string) (*VolumeAttachment, e
 	}
 
 	return &attachment, nil
+}
+
+// UpdateInstance updates mutable Compute instance attributes.
+func (c *Client) UpdateInstance(instanceID string, req UpdateInstanceRequest) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, instanceID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update instance request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// InstanceAction performs a power lifecycle action on a Compute instance.
+func (c *Client) InstanceAction(instanceID, action string) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s?action=%s", host, coreServicesAPIVersion, instanceID, neturl.QueryEscape(action))
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// TerminateInstance terminates a Compute instance, optionally preserving the boot volume.
+func (c *Client) TerminateInstance(instanceID string, preserveBootVolume bool) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances/%s?preserveBootVolume=%t",
+		host,
+		coreServicesAPIVersion,
+		instanceID,
+		preserveBootVolume,
+	)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
 }
 
 // ONS (Notifications) types
