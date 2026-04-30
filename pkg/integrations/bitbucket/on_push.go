@@ -65,6 +65,10 @@ func (p *OnPush) Color() string {
 	return "blue"
 }
 
+func (p *OnPush) DefaultRunTitle() string {
+	return "{{ root().data.push.changes[0].new.target.message }}"
+}
+
 func (p *OnPush) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

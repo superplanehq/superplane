@@ -44,12 +44,12 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	customName, err := resolveCustomName(node, data)
+	runTitle, err := resolveRunTitle(node, data)
 	if err != nil {
 		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
-		event.CustomName = &failed
-	} else if customName != nil {
-		event.CustomName = customName
+		event.RunTitle = &failed
+	} else if runTitle != nil {
+		event.RunTitle = runTitle
 	}
 
 	if err := database.Conn().Create(&event).Error; err != nil {
@@ -68,23 +68,12 @@ func EmitNodeEvent(
 	}, nil
 }
 
-func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string, error) {
-	config := node.Configuration.Data()
-	if config == nil {
-		return nil, nil
+func resolveRunTitle(node *models.CanvasNode, payload map[string]any) (*string, error) {
+	template := strings.TrimSpace(valueOrEmpty(node.RunTitleTemplate))
+	if template == "" {
+		template = legacyRunTitleTemplate(node.Configuration.Data())
 	}
 
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return nil, nil
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return nil, nil
-	}
-
-	template = strings.TrimSpace(template)
 	if template == "" {
 		return nil, nil
 	}
@@ -98,10 +87,28 @@ func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string
 		return nil, err
 	}
 
-	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedName == "" {
+	resolvedTitle := strings.TrimSpace(fmt.Sprintf("%v", resolved))
+	if resolvedTitle == "" {
 		return nil, nil
 	}
 
-	return &resolvedName, nil
+	return &resolvedTitle, nil
+}
+
+func legacyRunTitleTemplate(config map[string]any) string {
+	if config == nil {
+		return ""
+	}
+
+	rawTemplate, ok := config["customName"]
+	if !ok || rawTemplate == nil {
+		return ""
+	}
+
+	template, ok := rawTemplate.(string)
+	if !ok {
+		return ""
+	}
+
+	return strings.TrimSpace(template)
 }
