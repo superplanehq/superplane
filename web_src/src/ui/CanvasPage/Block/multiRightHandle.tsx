@@ -1,6 +1,11 @@
 import React from "react";
 import { Handle, Position } from "@xyflow/react";
-import { APPEND_CONNECTOR_COLOR, AppendHandleButton } from "./appendHandle";
+import {
+  APPEND_CONNECTOR_COLOR,
+  AppendHandleButton,
+  AppendHandlePreview,
+  type AppendFromNodeHandler,
+} from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import type { BlockConnectionState, BlockEdgeState } from "./types";
 
@@ -158,6 +163,7 @@ function MultiRightChannelControl({
   isHighlighted,
   isConnectionInteractive,
   canAppend,
+  onAppend,
 }: {
   layout: MultiRightHandleLayout;
   channel: string;
@@ -165,6 +171,7 @@ function MultiRightChannelControl({
   isHighlighted: boolean | undefined;
   isConnectionInteractive: boolean;
   canAppend: boolean;
+  onAppend: () => void | Promise<void>;
 }) {
   return (
     <React.Fragment>
@@ -213,12 +220,22 @@ function MultiRightChannelControl({
           />
           <AppendHandleButton
             label={`Add next component (${channel})`}
+            onClick={onAppend}
             style={{
               left: layout.handleLeftX + 32,
               top: `calc(50% + ${offsetY}px)`,
               transform: "translateY(-50%)",
               position: "absolute",
             }}
+          />
+          <AppendHandlePreview
+            style={{
+              position: "absolute",
+              left: layout.handleLeftX + 52,
+              top: `calc(50% + ${offsetY}px)`,
+              transform: "translateY(-50%)",
+            }}
+            containerOffsetY={54}
           />
         </>
       ) : null}
@@ -233,6 +250,7 @@ export function MultiRightHandle({
   nodeId,
   allEdges,
   isConnectionInteractive,
+  onAppendFromNode,
 }: {
   channels: string[];
   hoveredEdge?: BlockEdgeState;
@@ -240,6 +258,7 @@ export function MultiRightHandle({
   nodeId?: string;
   allEdges: BlockEdgeState[];
   isConnectionInteractive: boolean;
+  onAppendFromNode?: AppendFromNodeHandler;
 }) {
   const getChannelHighlight = getChannelHighlightResolver({
     hoveredEdge,
@@ -261,7 +280,7 @@ export function MultiRightHandle({
       <MultiRightHandleLines layout={layout} channels={channelPositions} />
 
       {channelPositions.map(({ channel, offsetY, isHighlighted, hasOutgoingForChannel }) => {
-        const canAppend = isConnectionInteractive && !hasOutgoingForChannel;
+        const canAppend = isConnectionInteractive && !!nodeId && !!onAppendFromNode && !hasOutgoingForChannel;
 
         return (
           <MultiRightChannelControl
@@ -272,6 +291,7 @@ export function MultiRightHandle({
             isHighlighted={isHighlighted}
             isConnectionInteractive={isConnectionInteractive}
             canAppend={canAppend}
+            onAppend={() => (nodeId ? onAppendFromNode?.(nodeId, channel) : undefined)}
           />
         );
       })}
