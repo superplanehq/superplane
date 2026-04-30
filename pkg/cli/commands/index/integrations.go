@@ -111,7 +111,7 @@ func renderIntegrationText(stdout io.Writer, integration openapi_client.Integrat
 		return err
 	}
 
-	err = renderIntegrationActionsText(stdout, integration.GetActions())
+	err = renderIntegrationActionsText(stdout, actionsFromCapabilities(integration.GetCapabilities()))
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func renderIntegrationText(stdout io.Writer, integration openapi_client.Integrat
 		return err
 	}
 
-	return renderIntegrationTriggersText(stdout, integration.GetTriggers())
+	return renderIntegrationTriggersText(stdout, triggersFromCapabilities(integration.GetCapabilities()))
 }
 
 func renderIntegrationActionsText(stdout io.Writer, actions []openapi_client.SuperplaneActionsAction) error {

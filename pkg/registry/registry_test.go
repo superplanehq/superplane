@@ -465,3 +465,131 @@ func TestRegistry_ComponentType(t *testing.T) {
 		assert.EqualError(t, err, "component missing_component not found")
 	})
 }
+
+func TestRegistry_SupportsNewSetupFlow(t *testing.T) {
+	stub := impl.NewStubIntegrationSetupProvider()
+	t.Run("true when provider exists and app env is development", func(t *testing.T) {
+		r := &registry.Registry{
+			AppEnv:         "development",
+			SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
+		}
+		assert.True(t, r.SupportsNewSetupFlow("acme"))
+	})
+
+	t.Run("false when app env is not development", func(t *testing.T) {
+		r := &registry.Registry{
+			AppEnv:         "production",
+			SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
+		}
+		assert.False(t, r.SupportsNewSetupFlow("acme"))
+	})
+
+	t.Run("false when setup provider is missing", func(t *testing.T) {
+		r := &registry.Registry{
+			AppEnv:         "development",
+			SetupProviders: map[string]core.IntegrationSetupProvider{},
+		}
+		assert.False(t, r.SupportsNewSetupFlow("missing"))
+	})
+}
+
+func TestRegistry_GetSetupProvider(t *testing.T) {
+	stub := impl.NewStubIntegrationSetupProvider()
+	r := &registry.Registry{
+		SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
+	}
+
+	got, err := r.GetSetupProvider("acme")
+	require.NoError(t, err)
+	assert.Equal(t, stub, got)
+
+	_, err = r.GetSetupProvider("nope")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "setup provider not registered for integration nope")
+}
+
+func TestRegistry_GetIntegrationTrigger(t *testing.T) {
+	tr := impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "app.on_event"})
+	integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{tr},
+	})
+
+	r := &registry.Registry{
+		Integrations: map[string]core.Integration{"app": registry.NewPanicableIntegration(integration)},
+	}
+
+	got, err := r.GetTrigger("app.on_event")
+	require.NoError(t, err)
+	assert.Equal(t, "app.on_event", got.Name())
+
+	_, err = r.GetIntegrationTrigger("missing", "app.on_event")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "integration missing not registered")
+
+	_, err = r.GetIntegrationTrigger("app", "other.trigger")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "trigger other.trigger not found for integration app")
+}
+
+func TestRegistry_GetIntegrationAction(t *testing.T) {
+	act := impl.NewDummyAction(impl.DummyActionOptions{Name: "app.do_thing"})
+	integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Actions: []core.Action{act},
+	})
+
+	r := &registry.Registry{
+		Integrations: map[string]core.Integration{"app": registry.NewPanicableIntegration(integration)},
+	}
+
+	got, err := r.GetAction("app.do_thing")
+	require.NoError(t, err)
+	assert.Equal(t, "app.do_thing", got.Name())
+
+	_, err = r.GetIntegrationAction("missing", "app.do_thing")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "integration missing not registered")
+
+	_, err = r.GetIntegrationAction("app", "app.other")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "action app.other not found for integration app")
+}
+
+func TestRegistry_ListFunctionsSortByName(t *testing.T) {
+	a := impl.NewDummyAction(impl.DummyActionOptions{Name: "zebra"})
+	b := impl.NewDummyAction(impl.DummyActionOptions{Name: "alpha"})
+	r := &registry.Registry{
+		Actions: map[string]core.Action{
+			"zebra": registry.NewPanicableAction(a),
+			"alpha": registry.NewPanicableAction(b),
+		},
+		Triggers: map[string]core.Trigger{
+			"b_trigger": registry.NewPanicableTrigger(impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "b_trigger"})),
+			"a_trigger": registry.NewPanicableTrigger(impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "a_trigger"})),
+		},
+		Integrations: map[string]core.Integration{
+			"only": registry.NewPanicableIntegration(impl.NewDummyIntegration(impl.DummyIntegrationOptions{})),
+		},
+		Widgets: map[string]core.Widget{
+			"w2": impl.NewDummyWidget(impl.DummyWidgetOptions{Name: "w2"}),
+			"w1": impl.NewDummyWidget(impl.DummyWidgetOptions{Name: "w1"}),
+		},
+	}
+
+	actions := r.ListActions()
+	require.Len(t, actions, 2)
+	assert.Equal(t, "alpha", actions[0].Name())
+	assert.Equal(t, "zebra", actions[1].Name())
+
+	triggers := r.ListTriggers()
+	require.Len(t, triggers, 2)
+	assert.Equal(t, "a_trigger", triggers[0].Name())
+	assert.Equal(t, "b_trigger", triggers[1].Name())
+
+	integrations := r.ListIntegrations()
+	require.Len(t, integrations, 1)
+
+	widgets := r.ListWidgets()
+	require.Len(t, widgets, 2)
+	assert.Equal(t, "w1", widgets[0].Name())
+	assert.Equal(t, "w2", widgets[1].Name())
+}
