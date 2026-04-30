@@ -11,7 +11,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/datatypes"
 )
 
 func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Organization) (*pb.UpdateOrganizationResponse, error) {
@@ -40,6 +40,15 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		organization.ChangeManagementEnabled = *pbOrganization.Spec.ChangeManagementEnabled
 	}
 
+	if pbOrganization.Spec != nil && pbOrganization.Spec.AllowedOauthProviders != nil {
+		list := pbOrganization.Spec.AllowedOauthProviders.GetProviders()
+		list = models.NormalizeAllowedOAuthProviders(list)
+		if err := models.ValidateAllowedOAuthProviders(list); err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		organization.AllowedProviders = datatypes.JSONSlice[string](list)
+	}
+
 	now := time.Now()
 	organization.UpdatedAt = &now
 	err = database.Conn().Save(organization).Error
@@ -53,18 +62,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	}
 
 	response := &pb.UpdateOrganizationResponse{
-		Organization: &pb.Organization{
-			Metadata: &pb.Organization_Metadata{
-				Id:          organization.ID.String(),
-				Name:        organization.Name,
-				Description: organization.Description,
-				CreatedAt:   timestamppb.New(*organization.CreatedAt),
-				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
-			},
-			Spec: &pb.Organization_Spec{
-				ChangeManagementEnabled: &organization.ChangeManagementEnabled,
-			},
-		},
+		Organization: organizationToProto(organization),
 	}
 
 	return response, nil
