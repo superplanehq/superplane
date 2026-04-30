@@ -26,9 +26,9 @@ func ListServiceAccounts(ctx context.Context) (*pb.ListServiceAccountsResponse, 
 		return nil, status.Error(codes.Internal, "failed to list service accounts")
 	}
 
-	serviceAccounts := make([]*pb.ServiceAccount, len(users))
-	for i := range users {
-		serviceAccounts[i] = serializeServiceAccount(&users[i])
+	serviceAccounts, err := serializeServiceAccounts(orgID, users)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to list service accounts")
 	}
 
 	return &pb.ListServiceAccountsResponse{

@@ -50,7 +50,18 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, status.Error(codes.Internal, "failed to update service account")
 	}
 
+	var creator *models.User
+	if user.CreatedBy != nil {
+		creator, err = models.FindMaybeDeletedUserByID(orgID, user.CreatedBy.String())
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to update service account")
+		}
+		if creator.OrganizationID.String() != orgID {
+			creator = nil
+		}
+	}
+
 	return &pb.UpdateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: serializeServiceAccount(user, creator),
 	}, nil
 }
