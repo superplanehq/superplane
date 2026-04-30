@@ -32,13 +32,14 @@ import (
 var ErrRecordLocked = errors.New("record locked")
 
 type NodeExecutor struct {
-	encryptor      crypto.Encryptor
-	registry       *registry.Registry
-	authService    authorization.Authorization
-	baseURL        string
-	webhookBaseURL string
-	semaphore      *semaphore.Weighted
-	logger         *logrus.Entry
+	encryptor           crypto.Encryptor
+	registry            *registry.Registry
+	authService         authorization.Authorization
+	baseURL             string
+	webhookBaseURL      string
+	semaphore           *semaphore.Weighted
+	logger              *logrus.Entry
+	maxResourcesPerTick int
 
 	rabbitMQURL string
 	consumer    *tackle.Consumer
@@ -46,14 +47,15 @@ type NodeExecutor struct {
 
 func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
-		encryptor:      encryptor,
-		registry:       registry,
-		baseURL:        baseURL,
-		webhookBaseURL: webhookBaseURL,
-		semaphore:      semaphore.NewWeighted(25),
-		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
-		rabbitMQURL:    rabbitMQURL,
-		authService:    authService,
+		encryptor:           encryptor,
+		registry:            registry,
+		baseURL:             baseURL,
+		webhookBaseURL:      webhookBaseURL,
+		semaphore:           semaphore.NewWeighted(defaultWorkerConcurrency),
+		logger:              logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
+		maxResourcesPerTick: defaultWorkerConcurrency,
+		rabbitMQURL:         rabbitMQURL,
+		authService:         authService,
 	}
 }
 
@@ -74,7 +76,7 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			executions, err := models.ListPendingNodeExecutions()
+			executions, err := models.ListPendingNodeExecutions(w.maxResourcesPerTick)
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
@@ -82,7 +84,7 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 			telemetry.RecordExecutorWorkerNodesCount(context.Background(), len(executions))
 
 			for _, execution := range executions {
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -90,9 +92,11 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 				go func(execution models.CanvasNodeExecution) {
 					defer w.semaphore.Release(1)
 
-					err := w.LockAndProcessNodeExecution(execution.ID)
+					processed, err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
-						messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+						if processed {
+							messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+						}
 						return
 					}
 
@@ -128,12 +132,16 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
 			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasExecutionRoutingKey, err)
-			time.Sleep(5 * time.Second)
+			if !sleepWithContext(ctx, 5*time.Second) {
+				return
+			}
 			continue
 		}
 
 		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasExecutionRoutingKey)
-		time.Sleep(5 * time.Second)
+		if !sleepWithContext(ctx, 5*time.Second) {
+			return
+		}
 	}
 }
 
@@ -151,9 +159,11 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 		return err
 	}
 
-	err = w.LockAndProcessNodeExecution(executionID)
+	processed, err := w.LockAndProcessNodeExecution(executionID)
 	if err == nil {
-		messages.NewCanvasExecutionMessage(data.CanvasId, data.Id, data.NodeId).Publish()
+		if processed {
+			messages.NewCanvasExecutionMessage(data.CanvasId, data.Id, data.NodeId).Publish()
+		}
 		return nil
 	}
 
@@ -165,12 +175,13 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 	return err
 }
 
-func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
+func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) (bool, error) {
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
 	}
 
+	processed := false
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var execution models.CanvasNodeExecution
 
@@ -205,18 +216,19 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			return ErrRecordLocked
 		}
 
+		processed = true
 		return w.processNodeExecution(tx, &execution, onNewEvents)
 	})
 
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
-	return nil
+	return processed, nil
 }
 
 func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEvents func([]models.CanvasEvent)) error {

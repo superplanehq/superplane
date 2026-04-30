@@ -25,20 +25,22 @@ import (
 )
 
 type NodeRequestWorker struct {
-	semaphore      *semaphore.Weighted
-	registry       *registry.Registry
-	encryptor      crypto.Encryptor
-	webhookBaseURL string
-	authService    authorization.Authorization
+	semaphore           *semaphore.Weighted
+	registry            *registry.Registry
+	encryptor           crypto.Encryptor
+	webhookBaseURL      string
+	authService         authorization.Authorization
+	maxResourcesPerTick int
 }
 
 func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
 	return &NodeRequestWorker{
-		encryptor:      encryptor,
-		registry:       registry,
-		webhookBaseURL: webhookBaseURL,
-		semaphore:      semaphore.NewWeighted(25),
-		authService:    authService,
+		encryptor:           encryptor,
+		registry:            registry,
+		webhookBaseURL:      webhookBaseURL,
+		semaphore:           semaphore.NewWeighted(defaultWorkerConcurrency),
+		authService:         authService,
+		maxResourcesPerTick: defaultWorkerConcurrency,
 	}
 }
 
@@ -53,7 +55,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			requests, err := models.ListNodeRequests()
+			requests, err := models.ListNodeRequests(w.maxResourcesPerTick)
 			if err != nil {
 				w.log("Error finding workflow nodes ready to be processed: %v", err)
 			}
@@ -61,7 +63,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 			telemetry.RecordNodeRequestWorkerRequestsCount(context.Background(), len(requests))
 
 			for _, request := range requests {
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					w.log("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -69,11 +71,12 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 				go func(request models.CanvasNodeRequest) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessRequest(request); err != nil {
+					processed, err := w.LockAndProcessRequest(request)
+					if err != nil {
 						w.log("Error processing request %s: %v", request.ID, err)
 					}
 
-					if request.ExecutionID != nil {
+					if processed && request.ExecutionID != nil {
 						messages.NewCanvasExecutionMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
 					}
 				}(request)
@@ -84,12 +87,13 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeRequest) error {
+func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeRequest) (bool, error) {
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
 	}
 
+	processed := false
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err != nil {
@@ -97,18 +101,23 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 			return nil
 		}
 
+		processed = true
 		return w.processRequest(tx, r, onNewEvents)
 	})
 
 	if err != nil {
-		return err
+		return false, err
+	}
+
+	if !processed {
+		return false, nil
 	}
 
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
-	return nil
+	return true, nil
 }
 
 func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {

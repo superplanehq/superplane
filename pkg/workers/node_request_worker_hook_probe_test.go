@@ -114,8 +114,9 @@ func Test_NodeRequestWorker_InternalHookUsesExecutionSnapshotConfiguration(t *te
 	require.NoError(t, database.Conn().Create(&req).Error)
 
 	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
-	err := worker.LockAndProcessRequest(req)
+	processed, err := worker.LockAndProcessRequest(req)
 	require.NoError(t, err)
+	require.True(t, processed)
 
 	cfg, ok := testHookProbeLastConfiguration().(map[string]any)
 	require.True(t, ok, "hook should receive configuration map")

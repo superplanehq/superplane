@@ -18,18 +18,20 @@ import (
 )
 
 type WebhookProvisioner struct {
-	semaphore *semaphore.Weighted
-	registry  *registry.Registry
-	encryptor crypto.Encryptor
-	baseURL   string
+	semaphore           *semaphore.Weighted
+	registry            *registry.Registry
+	encryptor           crypto.Encryptor
+	baseURL             string
+	maxResourcesPerTick int
 }
 
 func NewWebhookProvisioner(baseURL string, encryptor crypto.Encryptor, registry *registry.Registry) *WebhookProvisioner {
 	return &WebhookProvisioner{
-		registry:  registry,
-		baseURL:   baseURL,
-		encryptor: encryptor,
-		semaphore: semaphore.NewWeighted(25),
+		registry:            registry,
+		baseURL:             baseURL,
+		encryptor:           encryptor,
+		semaphore:           semaphore.NewWeighted(defaultWorkerConcurrency),
+		maxResourcesPerTick: defaultWorkerConcurrency,
 	}
 }
 
@@ -50,13 +52,13 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			webhooks, err := models.ListPendingWebhooks()
+			webhooks, err := models.ListPendingWebhooks(w.maxResourcesPerTick)
 			if err != nil {
 				w.log("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
 			for _, webhook := range webhooks {
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					w.log("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -64,7 +66,7 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 				go func(webhook models.Webhook) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessWebhook(webhook); err != nil {
+					if _, err := w.LockAndProcessWebhook(webhook); err != nil {
 						w.log("Error processing webhook %s: %v", webhook.ID, err)
 					}
 				}(webhook)
@@ -79,16 +81,16 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 //   - Phase 1 (short tx): Lock the webhook and set state to "provisioning"
 //   - Phase 2 (no tx): Run the external handler.Setup() call
 //   - Phase 3 (short tx): Set state to "ready" or handle errors
-func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) error {
+func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) (bool, error) {
 	// Phase 1: Lock and mark as provisioning in a short transaction.
 	// Non-integration webhooks are marked ready directly in this phase.
-	lockedWebhook, err := w.lockAndMarkProvisioning(webhook)
+	lockedWebhook, processed, err := w.lockAndMarkProvisioning(webhook)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if lockedWebhook == nil {
 		// Already being processed, no longer pending, or non-integration (already ready).
-		return nil
+		return processed, nil
 	}
 
 	// Phase 2: Run handler.Setup() outside any transaction.
@@ -96,17 +98,18 @@ func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) error
 
 	// Phase 3: Finalize state based on the result.
 	if setupErr != nil {
-		return w.handleProvisioningError(lockedWebhook, setupErr)
+		return true, w.handleProvisioningError(lockedWebhook, setupErr)
 	}
 
-	return w.markReady(lockedWebhook, metadata)
+	return true, w.markReady(lockedWebhook, metadata)
 }
 
 // lockAndMarkProvisioning acquires a row lock and transitions the webhook
 // from "pending" to "provisioning". Returns nil if the webhook was already
 // picked up by another worker.
-func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*models.Webhook, error) {
+func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*models.Webhook, bool, error) {
 	var locked *models.Webhook
+	processed := false
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockWebhook(tx, webhook.ID)
@@ -114,7 +117,9 @@ func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*m
 			return err
 		}
 
-		// Non-integration webhooks don't need external calls — mark ready directly.
+		// Non-integration webhooks don't need external calls - mark ready directly.
+		processed = true
+
 		if r.AppInstallationID == nil {
 			return r.Ready(tx)
 		}
@@ -129,10 +134,10 @@ func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*m
 
 	if err != nil {
 		w.log("Webhook %s already being processed - skipping", webhook.ID)
-		return nil, nil //nolint:nilerr
+		return nil, false, nil //nolint:nilerr
 	}
 
-	return locked, nil
+	return locked, processed, nil
 }
 
 // runIntegrationSetup calls the external webhook handler outside any

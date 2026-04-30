@@ -45,9 +45,12 @@ type IntegrationInvokeAction struct {
 func LockIntegrationRequest(tx *gorm.DB, id uuid.UUID) (*IntegrationRequest, error) {
 	var request IntegrationRequest
 
+	now := time.Now()
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
+		Where("state = ?", IntegrationRequestStatePending).
+		Where("run_at <= ?", now).
 		First(&request).
 		Error
 	if err != nil {
@@ -57,17 +60,22 @@ func LockIntegrationRequest(tx *gorm.DB, id uuid.UUID) (*IntegrationRequest, err
 	return &request, nil
 }
 
-func ListIntegrationRequests() ([]IntegrationRequest, error) {
+func ListIntegrationRequests(limit int) ([]IntegrationRequest, error) {
 	var requests []IntegrationRequest
 
 	now := time.Now()
-	err := database.Conn().
+	query := database.Conn().
 		Joins("JOIN app_installations ON app_installation_requests.app_installation_id = app_installations.id").
 		Where("app_installation_requests.state = ?", IntegrationRequestStatePending).
 		Where("app_installation_requests.run_at <= ?", now).
 		Where("app_installations.deleted_at IS NULL").
-		Find(&requests).
-		Error
+		Order("app_installation_requests.run_at ASC, app_installation_requests.created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&requests).Error
 	if err != nil {
 		return nil, err
 	}

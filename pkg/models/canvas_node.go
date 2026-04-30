@@ -180,17 +180,22 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 	return nodes, nil
 }
 
-func ListCanvasNodesReady() ([]CanvasNode, error) {
+func ListCanvasNodesReady(limit int) ([]CanvasNode, error) {
 	var nodes []CanvasNode
-	err := database.Conn().
+	query := database.Conn().
 		Distinct().
 		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
 		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
 		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
 		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
 		Where("workflows.deleted_at IS NULL").
-		Find(&nodes).
-		Error
+		Order("workflow_nodes.created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&nodes).Error
 
 	if err != nil {
 		return nil, err

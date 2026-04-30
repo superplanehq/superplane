@@ -57,12 +57,14 @@ func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	go func() {
 		executor1 := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-		results <- executor1.LockAndProcessNodeExecution(execution.ID)
+		_, err := executor1.LockAndProcessNodeExecution(execution.ID)
+		results <- err
 	}()
 
 	go func() {
 		executor2 := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-		results <- executor2.LockAndProcessNodeExecution(execution.ID)
+		_, err := executor2.LockAndProcessNodeExecution(execution.ID)
+		results <- err
 	}()
 
 	// Collect results - one should succeed (return nil) and one should get ErrRecordLocked
@@ -147,8 +149,9 @@ func Test__NodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	// and moves the parent execution to started state.
 	//
 	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-	err := executor.LockAndProcessNodeExecution(execution.ID)
+	processed, err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	// Verify parent execution moved to started state
 	parentExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
@@ -225,8 +228,9 @@ func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// The approval component doesn't call Pass() in Execute(), so it should remain in started state.
 	//
 	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-	err = executor.LockAndProcessNodeExecution(execution.ID)
+	processed, err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	// Verify execution moved to started state but not finished,
 	// and metadata is updated.
@@ -292,8 +296,9 @@ func Test__NodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	// The noop component calls Pass() in Execute(), which should finish the execution.
 	//
 	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-	err := executor.LockAndProcessNodeExecution(execution.ID)
+	processed, err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	// Verify execution moved to finished state with passed result
 	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
@@ -373,8 +378,9 @@ func Test__NodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCannotBeBuil
 	// since this isn't a runtime error, but a configuration error.
 	//
 	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-	err := executor.LockAndProcessNodeExecution(execution.ID)
+	processed, err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	//
 	// Verify the execution was marked as failed with an error reason.

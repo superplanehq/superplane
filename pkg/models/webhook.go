@@ -123,12 +123,17 @@ func FindWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]CanvasNo
 	return nodes, nil
 }
 
-func ListPendingWebhooks() ([]Webhook, error) {
+func ListPendingWebhooks(limit int) ([]Webhook, error) {
 	var webhooks []Webhook
-	err := database.Conn().
+	query := database.Conn().
 		Where("state = ?", WebhookStatePending).
-		Find(&webhooks).
-		Error
+		Order("created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&webhooks).Error
 
 	if err != nil {
 		return nil, err

@@ -41,8 +41,9 @@ func Test__WebhookProvisioner_WithoutAppInstallation(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err := provisioner.LockAndProcessWebhook(webhook)
+	processed, err := provisioner.LockAndProcessWebhook(webhook)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
 	require.NoError(t, err)
@@ -84,8 +85,9 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err = provisioner.LockAndProcessWebhook(webhook)
+	processed, err := provisioner.LockAndProcessWebhook(webhook)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
 	require.NoError(t, err)
@@ -126,8 +128,9 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err = provisioner.LockAndProcessWebhook(webhook)
+	processed, err := provisioner.LockAndProcessWebhook(webhook)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
 	require.NoError(t, err)
@@ -149,22 +152,34 @@ func Test__WebhookProvisioner_ConcurrentProcessing(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	results := make(chan error, 2)
+	results := make(chan struct {
+		processed bool
+		err       error
+	}, 2)
 
 	go func() {
 		worker1 := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
-		results <- worker1.LockAndProcessWebhook(webhook)
+		processed, err := worker1.LockAndProcessWebhook(webhook)
+		results <- struct {
+			processed bool
+			err       error
+		}{processed: processed, err: err}
 	}()
 
 	go func() {
 		worker2 := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
-		results <- worker2.LockAndProcessWebhook(webhook)
+		processed, err := worker2.LockAndProcessWebhook(webhook)
+		results <- struct {
+			processed bool
+			err       error
+		}{processed: processed, err: err}
 	}()
 
 	result1 := <-results
 	result2 := <-results
-	assert.NoError(t, result1)
-	assert.NoError(t, result2)
+	assert.NoError(t, result1.err)
+	assert.NoError(t, result2.err)
+	assert.Equal(t, 1, processedCount(result1.processed, result2.processed))
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
 	require.NoError(t, err)

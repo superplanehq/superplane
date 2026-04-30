@@ -1,7 +1,9 @@
 package workers
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -70,8 +72,9 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	//
 	// Process the request and verify it completes successfully.
 	//
-	err := worker.LockAndProcessRequest(request)
+	processed, err := worker.LockAndProcessRequest(request)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	//
 	// Verify the request was marked as completed.
@@ -124,8 +127,9 @@ func Test__NodeRequestWorker_InvokeNodeComponentActionWithoutExecution(t *testin
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	err := worker.LockAndProcessRequest(request)
+	processed, err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
+	assert.False(t, processed)
 	assert.Contains(t, err.Error(), "hook non-existent-action not found for action noop")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
@@ -186,27 +190,39 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Have two workers call LockAndProcessRequest concurrently on the same request.
 	// LockAndProcessRequest uses a transaction with locking, so only one should actually process.
 	//
-	results := make(chan error, 2)
+	results := make(chan struct {
+		processed bool
+		err       error
+	}, 2)
 
 	//
 	// Create two workers and have them try to process the request concurrently.
 	//
 	go func() {
 		worker1 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
-		results <- worker1.LockAndProcessRequest(request)
+		processed, err := worker1.LockAndProcessRequest(request)
+		results <- struct {
+			processed bool
+			err       error
+		}{processed: processed, err: err}
 	}()
 
 	go func() {
 		worker2 := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
-		results <- worker2.LockAndProcessRequest(request)
+		processed, err := worker2.LockAndProcessRequest(request)
+		results <- struct {
+			processed bool
+			err       error
+		}{processed: processed, err: err}
 	}()
 
 	// Collect results - both should succeed (return nil)
 	// because LockAndProcessRequest returns nil when it can't acquire the lock
 	result1 := <-results
 	result2 := <-results
-	assert.NoError(t, result1)
-	assert.NoError(t, result2)
+	assert.NoError(t, result1.err)
+	assert.NoError(t, result2.err)
+	assert.Equal(t, 1, processedCount(result1.processed, result2.processed))
 
 	//
 	// Verify the request was marked as completed.
@@ -276,8 +292,9 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	processed, err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
+	assert.False(t, processed)
 	assert.Contains(t, err.Error(), "unsupported node execution request type")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
@@ -333,8 +350,9 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	processed, err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
+	assert.False(t, processed)
 	assert.Contains(t, err.Error(), "spec is not specified")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
@@ -389,8 +407,9 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	processed, err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
+	assert.False(t, processed)
 	assert.Contains(t, err.Error(), "trigger non-existent-trigger not registered")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
@@ -451,8 +470,9 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	//
 	// Process the request and verify it returns an error.
 	//
-	err := worker.LockAndProcessRequest(request)
+	processed, err := worker.LockAndProcessRequest(request)
 	require.Error(t, err)
+	assert.False(t, processed)
 	assert.Contains(t, err.Error(), "hook non-existent-action not found for trigger schedule")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
@@ -517,7 +537,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	//
 	// Verify that ListNodeRequests does not return the request for the deleted node.
 	//
-	requests, err := models.ListNodeRequests()
+	requests, err := models.ListNodeRequests(0)
 	require.NoError(t, err)
 
 	// Check that our request is not in the list
@@ -531,6 +551,106 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	assert.False(t, found, "Request for deleted node should not be returned by ListNodeRequests")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__NodeRequestWorker_SkipsCompletedRequest(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "component-1",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	executionID := uuid.New()
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      "component-1",
+		ExecutionID: &executionID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "emitEvent",
+				Parameters: map[string]interface{}{},
+			},
+		}),
+		State: models.NodeExecutionRequestStateCompleted,
+		RunAt: time.Now().Add(-time.Second),
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	processed, err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+	assert.False(t, processed)
+	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__NodeRequestWorker_StartExitsWhenSemaphoreAcquireIsCanceled(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	request := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     "trigger-1",
+		Type:       models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{ActionName: "emitEvent"},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+		RunAt: time.Now().Add(-time.Second),
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	require.NoError(t, worker.semaphore.Acquire(context.Background(), defaultWorkerConcurrency))
+	defer worker.semaphore.Release(defaultWorkerConcurrency)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		worker.Start(ctx)
+		close(done)
+	}()
+
+	time.Sleep(1100 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not exit after semaphore acquire context was canceled")
+	}
 }
 
 func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T) {
@@ -592,7 +712,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	//
 	// Verify that ListNodeRequests does not return the request for the deleted workflow.
 	//
-	requests, err := models.ListNodeRequests()
+	requests, err := models.ListNodeRequests(0)
 	require.NoError(t, err)
 
 	// Check that our request is not in the list

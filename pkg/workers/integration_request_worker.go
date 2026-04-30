@@ -20,22 +20,24 @@ import (
 )
 
 type IntegrationRequestWorker struct {
-	semaphore       *semaphore.Weighted
-	registry        *registry.Registry
-	encryptor       crypto.Encryptor
-	oidcProvider    oidc.Provider
-	baseURL         string
-	webhooksBaseURL string
+	semaphore           *semaphore.Weighted
+	registry            *registry.Registry
+	encryptor           crypto.Encryptor
+	oidcProvider        oidc.Provider
+	baseURL             string
+	webhooksBaseURL     string
+	maxResourcesPerTick int
 }
 
 func NewIntegrationRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string) *IntegrationRequestWorker {
 	return &IntegrationRequestWorker{
-		encryptor:       encryptor,
-		registry:        registry,
-		oidcProvider:    oidcProvider,
-		baseURL:         baseURL,
-		webhooksBaseURL: webhooksBaseURL,
-		semaphore:       semaphore.NewWeighted(25),
+		encryptor:           encryptor,
+		registry:            registry,
+		oidcProvider:        oidcProvider,
+		baseURL:             baseURL,
+		webhooksBaseURL:     webhooksBaseURL,
+		semaphore:           semaphore.NewWeighted(defaultWorkerConcurrency),
+		maxResourcesPerTick: defaultWorkerConcurrency,
 	}
 }
 
@@ -48,13 +50,13 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			requests, err := models.ListIntegrationRequests()
+			requests, err := models.ListIntegrationRequests(w.maxResourcesPerTick)
 			if err != nil {
 				w.log("Error finding app installation requests: %v", err)
 			}
 
 			for _, request := range requests {
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					w.log("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -62,7 +64,7 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 				go func(request models.IntegrationRequest) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessRequest(request); err != nil {
+					if _, err := w.LockAndProcessRequest(request); err != nil {
 						w.log("Error processing request %s: %v", request.ID, err)
 					}
 				}(request)
@@ -71,16 +73,24 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *IntegrationRequestWorker) LockAndProcessRequest(request models.IntegrationRequest) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
+func (w *IntegrationRequestWorker) LockAndProcessRequest(request models.IntegrationRequest) (bool, error) {
+	processed := false
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockIntegrationRequest(tx, request.ID)
 		if err != nil {
 			w.log("Request %s already being processed - skipping", request.ID)
 			return nil
 		}
 
+		processed = true
 		return w.processRequest(tx, r)
 	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return processed, nil
 }
 
 func (w *IntegrationRequestWorker) processRequest(tx *gorm.DB, request *models.IntegrationRequest) error {

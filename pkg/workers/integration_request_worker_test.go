@@ -50,8 +50,9 @@ func Test__IntegrationRequestWorker_Sync(t *testing.T) {
 	//
 	// Lock and process request
 	//
-	err = worker.LockAndProcessRequest(*request)
+	processed, err := worker.LockAndProcessRequest(*request)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	//
 	// Reload request, verify it was completed, and sync was called
@@ -95,7 +96,9 @@ func Test__IntegrationRequestWorker_SyncError(t *testing.T) {
 	//
 	// Process request
 	//
-	require.NoError(t, worker.LockAndProcessRequest(*request))
+	processed, err := worker.LockAndProcessRequest(*request)
+	require.NoError(t, err)
+	assert.True(t, processed)
 
 	//
 	// Reload request, verify it was completed, and app installation was moved to error state.
@@ -150,8 +153,9 @@ func Test__AppInstallationRequestWorker_InvokeHook(t *testing.T) {
 	//
 	// Lock and process request
 	//
-	err = worker.LockAndProcessRequest(*request)
+	processed, err := worker.LockAndProcessRequest(*request)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	//
 	// Reload request, verify it was completed, and sync was called
@@ -201,7 +205,9 @@ func Test__AppInstallationRequestWorker_InvokeHookError(t *testing.T) {
 	//
 	// Process request
 	//
-	require.NoError(t, worker.LockAndProcessRequest(*request))
+	processed, err := worker.LockAndProcessRequest(*request)
+	require.NoError(t, err)
+	assert.True(t, processed)
 
 	//
 	// Reload request, verify it was completed, even though the action failed.
@@ -210,4 +216,36 @@ func Test__AppInstallationRequestWorker_InvokeHookError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
 	assert.True(t, hookCalled)
+}
+
+func Test__IntegrationRequestWorker_SkipsCompletedRequest(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+
+	var syncCalled bool
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		OnSync: func(ctx core.SyncContext) error {
+			syncCalled = true
+			return nil
+		},
+	})
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+	require.NoError(t, err)
+
+	request := models.IntegrationRequest{
+		ID:                uuid.New(),
+		AppInstallationID: integration.ID,
+		State:             models.IntegrationRequestStateCompleted,
+		Type:              models.IntegrationRequestTypeSync,
+		RunAt:             time.Now().Add(-time.Second),
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	processed, err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+	assert.False(t, processed)
+	assert.False(t, syncCalled)
 }

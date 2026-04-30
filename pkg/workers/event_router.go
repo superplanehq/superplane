@@ -21,17 +21,19 @@ import (
 )
 
 type EventRouter struct {
-	semaphore   *semaphore.Weighted
-	logger      *log.Entry
-	rabbitMQURL string
-	consumer    *tackle.Consumer
+	semaphore           *semaphore.Weighted
+	logger              *log.Entry
+	maxResourcesPerTick int
+	rabbitMQURL         string
+	consumer            *tackle.Consumer
 }
 
 func NewEventRouter(rabbitMQURL string) *EventRouter {
 	return &EventRouter{
-		semaphore:   semaphore.NewWeighted(25),
-		logger:      log.WithFields(log.Fields{"worker": "EventRouter"}),
-		rabbitMQURL: rabbitMQURL,
+		semaphore:           semaphore.NewWeighted(defaultWorkerConcurrency),
+		logger:              log.WithFields(log.Fields{"worker": "EventRouter"}),
+		maxResourcesPerTick: defaultWorkerConcurrency,
+		rabbitMQURL:         rabbitMQURL,
 	}
 }
 
@@ -52,7 +54,7 @@ func (w *EventRouter) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			events, err := models.ListPendingCanvasEvents()
+			events, err := models.ListPendingCanvasEvents(w.maxResourcesPerTick)
 			if err != nil {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
@@ -61,7 +63,7 @@ func (w *EventRouter) Start(ctx context.Context) {
 
 			for _, event := range events {
 				logger := logging.ForEvent(w.logger, event)
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -69,7 +71,7 @@ func (w *EventRouter) Start(ctx context.Context) {
 				go func(event models.CanvasEvent) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessEvent(logger, event); err != nil {
+					if _, err := w.LockAndProcessEvent(logger, event); err != nil {
 						w.logger.Errorf("Error processing event %s: %v", event.ID, err)
 					}
 				}(event)
@@ -99,12 +101,16 @@ func (w *EventRouter) StartRabbitMQConsumer(ctx context.Context) {
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
 			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasEventCreatedRoutingKey, err)
-			time.Sleep(5 * time.Second)
+			if !sleepWithContext(ctx, 5*time.Second) {
+				return
+			}
 			continue
 		}
 
 		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasEventCreatedRoutingKey)
-		time.Sleep(5 * time.Second)
+		if !sleepWithContext(ctx, 5*time.Second) {
+			return
+		}
 	}
 }
 
@@ -134,12 +140,14 @@ func (w *EventRouter) Consume(delivery tackle.Delivery) error {
 	}
 
 	logger := logging.ForEvent(w.logger, *event)
-	return w.LockAndProcessEvent(logger, *event)
+	_, err = w.LockAndProcessEvent(logger, *event)
+	return err
 }
 
-func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
+func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) (bool, error) {
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var execution *models.CanvasNodeExecution
+	processed := false
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		event, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
@@ -147,6 +155,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 			return nil
 		}
 
+		processed = true
 		createdQueueItems, execution, err = w.processEvent(tx, logger, event)
 		if err != nil {
 			return err
@@ -156,7 +165,11 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	})
 
 	if err != nil {
-		return err
+		return false, err
+	}
+
+	if !processed {
+		return false, nil
 	}
 
 	if len(createdQueueItems) > 0 {
@@ -177,7 +190,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		).Publish()
 	}
 
-	return nil
+	return true, nil
 }
 
 func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, error) {
