@@ -18,6 +18,7 @@ import {
   useDeleteServiceAccount,
   useRegenerateServiceAccountToken,
 } from "@/hooks/useServiceAccounts";
+import { ServiceAccountCreatorLink } from "./ServiceAccountCreatorLink";
 
 interface ServiceAccountDetailProps {
   organizationId: string;
@@ -239,6 +240,10 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
             <dl className="grid grid-cols-2 gap-y-4 text-sm">
               <dt className="text-gray-500 dark:text-gray-400">Description</dt>
               <dd className="text-gray-800 dark:text-white">{serviceAccount.description || "—"}</dd>
+              <dt className="text-gray-500 dark:text-gray-400">Created by</dt>
+              <dd className="text-gray-800 dark:text-white">
+                <ServiceAccountCreatorLink organizationId={organizationId} creator={serviceAccount.createdByUser} />
+              </dd>
               <dt className="text-gray-500 dark:text-gray-400">Created</dt>
               <dd className="text-gray-800 dark:text-white">{createdAt}</dd>
               <dt className="text-gray-500 dark:text-gray-400">ID</dt>
