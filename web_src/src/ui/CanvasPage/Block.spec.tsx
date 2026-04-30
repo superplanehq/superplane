@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@xyflow/react", () => ({
@@ -166,11 +166,108 @@ describe("Block fallback rendering", () => {
             iconSlug: "box",
             collapsed: false,
           },
+          _allEdges: [
+            {
+              source: "component-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+            {
+              source: "prev-node",
+              sourceHandle: "default",
+              target: "component-node",
+            },
+          ],
         }}
       />,
     );
 
     expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
+  });
+
+  it("shows an append connector button for end nodes in edit mode", () => {
+    const onAppendFromNode = vi.fn();
+
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="end-node"
+        onAppendFromNode={onAppendFromNode}
+        data={{
+          label: "End node",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "End node",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "prev-node", sourceHandle: "default", target: "end-node" }],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add next component" }));
+
+    expect(onAppendFromNode).toHaveBeenCalledWith("end-node", "default");
+  });
+
+  it("highlights the append connector source handle during compatible connection drags", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="end-node"
+        data={{
+          label: "End node",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "End node",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _connectingFrom: {
+            nodeId: "target-node",
+            handleType: "target",
+          },
+          _allEdges: [{ source: "prev-node", sourceHandle: "default", target: "end-node" }],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("shows append connector buttons for unconnected output channels", () => {
+    const onAppendFromNode = vi.fn();
+
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="router-node"
+        onAppendFromNode={onAppendFromNode}
+        data={{
+          label: "Router",
+          state: "pending",
+          type: "component",
+          outputChannels: ["success", "failure"],
+          component: {
+            title: "Router",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "router-node", sourceHandle: "success", target: "success-node" }],
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Add next component (success)" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add next component (failure)" }));
+
+    expect(onAppendFromNode).toHaveBeenCalledWith("router-node", "failure");
   });
 });
