@@ -43,6 +43,10 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 		return nil, status.Error(codes.Internal, "failed to find integration")
 	}
 
+	if integration.SetupState == nil {
+		return nil, status.Error(codes.InvalidArgument, "current step is not set, cannot submit")
+	}
+
 	setupState := integration.SetupState.Data()
 	if setupState.CurrentStep == nil {
 		return nil, status.Error(codes.InvalidArgument, "current step is not set, cannot submit")
