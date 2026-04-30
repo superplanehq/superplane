@@ -50,7 +50,12 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, status.Error(codes.Internal, "failed to update service account")
 	}
 
+	creatorsByID, enrichErr := enrichServiceAccountCreators([]models.User{*user})
+	if enrichErr != nil {
+		return nil, status.Error(codes.Internal, "failed to update service account")
+	}
+
 	return &pb.UpdateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: serializeServiceAccount(user, creatorsByID),
 	}, nil
 }
