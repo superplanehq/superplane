@@ -21,8 +21,10 @@ const integrationsListResponse = `{
 			"label": "Slack",
 			"description": "Slack integration",
 			"configuration": [{"name": "token", "type": "string", "required": true}],
-			"actions": [{"name": "slack.post-message"}],
-			"triggers": [{"name": "slack.message-received"}]
+			"capabilities": [
+				{"type": "TYPE_ACTION", "name": "slack.post-message"},
+				{"type": "TYPE_TRIGGER", "name": "slack.message-received"}
+			]
 		}
 	]
 }`
