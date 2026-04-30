@@ -39,18 +39,17 @@ export const startTriggerRenderer: TriggerRenderer = {
     const nodeId = node.id;
 
     // Create customField as a function that will receive onRun when ComponentBase renders it
-    // We'll create a wrapper that captures nodeId and allows passing initialData
+    // We'll create a wrapper that captures nodeId and allows passing initialData and templateName.
     const customField = (onRunBase?: () => void) => {
       if (!onRunBase) {
         return startCustomFieldRenderer.render(node);
       }
 
-      // Create a wrapper onRun that can accept initialData
-      // Store initialData temporarily in window and trigger the base onRun
-      // handleNodeRun will check for this data
-      const onRunWithContext = (initialData?: string) => {
-        // Store initialData temporarily and trigger the run
-        (window as any).__pendingRunData = { nodeId, initialData };
+      // Create a wrapper onRun that can accept initialData and templateName
+      // Store them temporarily in window and trigger the base onRun.
+      // handleNodeRun will check for this data.
+      const onRunWithContext = (initialData?: string, templateName?: string) => {
+        (window as any).__pendingRunData = { nodeId, initialData, templateName };
         onRunBase();
         // Clear after a short delay to allow handleNodeRun to read it
         setTimeout(() => {
@@ -90,7 +89,10 @@ export const startTriggerRenderer: TriggerRenderer = {
  * This is only used internally by startTriggerRenderer, not registered in the global registry
  */
 const startCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: NodeInfo, context?: { onRun?: (initialData?: string) => void }): React.ReactNode => {
+  render: (
+    node: NodeInfo,
+    context?: { onRun?: (initialData?: string, templateName?: string) => void },
+  ): React.ReactNode => {
     const config = node.configuration as StartConfiguration;
     const templates = config?.templates || [];
 
@@ -101,7 +103,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     const handleRun = (template: StartTemplate) => {
       if (context?.onRun) {
         const payloadString = JSON.stringify(template.payload, null, 2);
-        context.onRun(payloadString);
+        context.onRun(payloadString, template.name);
       }
     };
 
