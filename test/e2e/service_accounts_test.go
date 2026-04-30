@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/playwright-community/playwright-go"
@@ -47,6 +48,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
 		steps.assertServiceAccountVisibleInList("list-test-bot")
+		steps.assertCreatorShownForServiceAccount("list-test-bot", "E2E User")
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
@@ -55,6 +57,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertDetailPageShowsCreator("E2E User")
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
@@ -211,6 +214,27 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 
 func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 	s.session.AssertText(name)
+}
+
+func (s *serviceAccountSteps) assertCreatorShownForServiceAccount(saName, creatorDisplay string) {
+	page := s.session.Page()
+	row := page.Locator("tr").Filter(pw.LocatorFilterOptions{HasText: saName}).First()
+	cell := row.GetByTestId("sa-created-by")
+	err := cell.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+	text, err := cell.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, creatorDisplay, strings.TrimSpace(text))
+}
+
+func (s *serviceAccountSteps) assertDetailPageShowsCreator(creatorDisplay string) {
+	page := s.session.Page()
+	cell := page.GetByTestId("sa-detail-created-by")
+	err := cell.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+	text, err := cell.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, creatorDisplay, strings.TrimSpace(text))
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {

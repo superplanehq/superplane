@@ -16,6 +16,7 @@ import { Bot, Copy } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
+import { serviceAccountCreatorLabel } from "@/lib/serviceAccounts";
 
 interface ServiceAccountsProps {
   organizationId: string;
@@ -174,6 +175,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 <TableRow>
                   <TableHeader>Name</TableHeader>
                   <TableHeader>Description</TableHeader>
+                  <TableHeader>Created by</TableHeader>
                   <TableHeader>Token</TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
@@ -195,6 +197,11 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">{sa.description || "—"}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-500 dark:text-gray-400" data-testid="sa-created-by">
+                        {serviceAccountCreatorLabel(sa)}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
