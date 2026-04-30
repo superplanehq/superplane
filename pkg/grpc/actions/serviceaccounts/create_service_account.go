@@ -86,8 +86,13 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, status.Errorf(codes.Internal, "failed to create service account: %v", err)
 	}
 
+	saProto, serErr := serializeServiceAccountSingle(sa)
+	if serErr != nil {
+		return nil, status.Error(codes.Internal, "failed to serialize service account")
+	}
+
 	return &pb.CreateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(sa),
+		ServiceAccount: saProto,
 		Token:          plainToken,
 	}, nil
 }

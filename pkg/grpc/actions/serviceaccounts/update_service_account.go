@@ -50,7 +50,12 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, status.Error(codes.Internal, "failed to update service account")
 	}
 
+	saProto, serErr := serializeServiceAccountSingle(user)
+	if serErr != nil {
+		return nil, status.Error(codes.Internal, "failed to serialize service account")
+	}
+
 	return &pb.UpdateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: saProto,
 	}, nil
 }

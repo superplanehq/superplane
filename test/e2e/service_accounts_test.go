@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/playwright-community/playwright-go"
@@ -47,6 +48,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
 		steps.assertServiceAccountVisibleInList("list-test-bot")
+		steps.assertCreatorLinkInListRow("list-test-bot")
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
@@ -55,6 +57,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertCreatorLinkOnDetailPage()
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
@@ -224,6 +227,56 @@ func (s *serviceAccountSteps) clickServiceAccountLink(name string) {
 func (s *serviceAccountSteps) assertOnDetailPage(name string) {
 	s.session.AssertText(name)
 	s.session.AssertText("API Token")
+}
+
+func (s *serviceAccountSteps) assertCreatorLinkInListRow(saName string) {
+	creator, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), "e2e@superplane.local")
+	require.NoError(s.t, err)
+
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(s.session.OrgID.String())
+	require.NoError(s.t, err)
+	var saID string
+	for _, sa := range serviceAccounts {
+		if sa.Name == saName {
+			saID = sa.ID.String()
+			break
+		}
+	}
+	require.NotEmpty(s.t, saID, "service account %q not found", saName)
+
+	page := s.session.Page()
+	row := page.GetByTestId("sa-row-" + saID)
+	link := row.GetByTestId("sa-created-by-link")
+	err = link.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+
+	text, err := link.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, "E2E User", strings.TrimSpace(text))
+
+	href, err := link.GetAttribute("href")
+	require.NoError(s.t, err)
+	require.Contains(s.t, href, "settings/members")
+	require.Contains(s.t, href, "highlightUserId="+creator.ID.String())
+}
+
+func (s *serviceAccountSteps) assertCreatorLinkOnDetailPage() {
+	creator, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), "e2e@superplane.local")
+	require.NoError(s.t, err)
+
+	page := s.session.Page()
+	link := page.GetByTestId("sa-detail-created-by-link")
+	err = link.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+
+	text, err := link.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, "E2E User", strings.TrimSpace(text))
+
+	href, err := link.GetAttribute("href")
+	require.NoError(s.t, err)
+	require.Contains(s.t, href, "settings/members")
+	require.Contains(s.t, href, "highlightUserId="+creator.ID.String())
 }
 
 func (s *serviceAccountSteps) clickEditButton() {

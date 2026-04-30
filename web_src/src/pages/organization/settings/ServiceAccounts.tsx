@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/lib/errors";
+import { membersHighlightHref } from "@/lib/serviceAccountCreatorLink";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot, Copy } from "lucide-react";
@@ -174,13 +175,14 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 <TableRow>
                   <TableHeader>Name</TableHeader>
                   <TableHeader>Description</TableHeader>
+                  <TableHeader>Created by</TableHeader>
                   <TableHeader>Token</TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {sorted.map((sa) => (
-                  <TableRow key={sa.id} className="last:[&>td]:border-b-0">
+                  <TableRow key={sa.id} className="last:[&>td]:border-b-0" data-testid={`sa-row-${sa.id}`}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Bot size={16} className="text-gray-500" />
@@ -195,6 +197,19 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">{sa.description || "—"}</span>
+                    </TableCell>
+                    <TableCell>
+                      {sa.createdByUser?.id && sa.createdByUser?.name ? (
+                        <Link
+                          href={membersHighlightHref(organizationId, sa.createdByUser.id)}
+                          className="text-sm !font-medium text-gray-800 !underline underline-offset-2"
+                          data-testid="sa-created-by-link"
+                        >
+                          {sa.createdByUser.name}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">

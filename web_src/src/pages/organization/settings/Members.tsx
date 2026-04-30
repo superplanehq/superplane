@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Avatar } from "../../../components/Avatar/avatar";
@@ -42,6 +43,8 @@ interface MembersProps {
 
 export function Members({ organizationId }: MembersProps) {
   usePageTitle(["Members"]);
+  const [searchParams] = useSearchParams();
+  const highlightUserId = searchParams.get("highlightUserId")?.trim() || null;
   const { data: me } = useMe();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [sortConfig, setSortConfig] = useState<{
@@ -125,6 +128,17 @@ export function Members({ organizationId }: MembersProps) {
       };
     });
   }, [users]);
+
+  useEffect(() => {
+    if (!highlightUserId || loadingMembers) {
+      return;
+    }
+    const el = document.querySelector(`[data-member-user-id="${CSS.escape(highlightUserId)}"]`);
+    if (!(el instanceof HTMLElement)) {
+      return;
+    }
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [highlightUserId, loadingMembers, members.length]);
 
   const handleSort = (key: keyof Member) => {
     setSortConfig((prevConfig) => ({
@@ -372,7 +386,15 @@ export function Members({ organizationId }: MembersProps) {
               </TableHead>
               <TableBody>
                 {getSortedMembers().map((member) => (
-                  <TableRow key={member.id} className="last:[&>td]:border-b-0">
+                  <TableRow
+                    key={member.id}
+                    className={`last:[&>td]:border-b-0 ${
+                      highlightUserId && member.id === highlightUserId
+                        ? "bg-blue-50/80 ring-2 ring-inset ring-blue-400 dark:bg-blue-950/40 dark:ring-blue-500"
+                        : ""
+                    }`}
+                    data-member-user-id={member.id}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar src={member.avatar} initials={member.initials} className="size-8" />
