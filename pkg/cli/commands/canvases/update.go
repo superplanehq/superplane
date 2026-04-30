@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -15,6 +16,29 @@ type updateCommand struct {
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
+}
+
+func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.CanvasesCanvas, error) {
+	resource, err := parseCanvasResourceFromFile(filePath, "update")
+	if err != nil {
+		return "", openapi_client.CanvasesCanvas{}, err
+	}
+
+	if resource.Metadata == nil {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata is required")
+	}
+
+	fileID := ""
+	if resource.Metadata.Id != nil {
+		fileID = strings.TrimSpace(resource.Metadata.GetId())
+	}
+
+	if fileID == "" {
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata.id is required in the YAML file")
+	}
+
+	canvas := models.CanvasFromCanvas(*resource)
+	return fileID, canvas, nil
 }
 
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
@@ -37,23 +61,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 	draftMode := c.draft != nil && *c.draft
 
-	var (
-		canvasID string
-		canvas   openapi_client.CanvasesCanvas
-		err      error
-	)
-
-	if filePath != "" {
-		canvasID, canvas, err = loadCanvasFromFile(filePath)
-		if err != nil {
-			return err
-		}
-
-	} else {
-		canvasID, canvas, err = loadCanvasFromExisting(ctx)
-		if err != nil {
-			return err
-		}
+	canvasID, canvas, err := resolveCanvasForFileUpdate(filePath)
+	if err != nil {
+		return err
 	}
 
 	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
@@ -95,6 +105,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	version := response.GetVersion()
+	if errText := formatNodeSpecErrorsForCLI(version); errText != "" {
+		return fmt.Errorf("%s", errText)
+	}
 
 	// When not in draft mode, auto-publish the updated draft version.
 	if !draftMode {
@@ -129,37 +142,14 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 			}
 		}
 		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
+		if err != nil {
+			return err
+		}
+		if warnText := formatNodeSpecWarningsForCLI(version); warnText != "" {
+			_, err = fmt.Fprint(stdout, warnText)
+		}
 		return err
 	})
-}
-
-func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {
-	if len(ctx.Args) > 1 {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("update accepts at most one positional argument")
-	}
-
-	target := ""
-	if len(ctx.Args) == 1 {
-		target = ctx.Args[0]
-	} else if ctx.Config != nil {
-		target = strings.TrimSpace(ctx.Config.GetActiveCanvas())
-	}
-
-	if target == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("either --file or <name-or-id> (or an active canvas) is required")
-	}
-
-	canvasID, err := findCanvasID(ctx, ctx.API, target)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	canvas, err := describeCanvasByID(ctx, canvasID)
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	return canvasID, canvas, nil
 }
 
 func parseAutoLayout(value string, scopeValue string, nodeIDs []string) (*openapi_client.CanvasesCanvasAutoLayout, error) {
@@ -227,21 +217,82 @@ func autoLayoutFlagsWereSet(ctx core.CommandContext) bool {
 	return flags.Changed("auto-layout") || flags.Changed("auto-layout-scope") || flags.Changed("auto-layout-node")
 }
 
-func describeCanvasByID(ctx core.CommandContext, canvasID string) (openapi_client.CanvasesCanvas, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
-	if err != nil {
-		return openapi_client.CanvasesCanvas{}, err
-	}
-	if response.Canvas == nil {
-		return openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas %q not found", canvasID)
-	}
-
-	return *response.Canvas, nil
-}
-
 func buildDefaultAutoLayout() openapi_client.CanvasesCanvasAutoLayout {
 	autoLayout := openapi_client.CanvasesCanvasAutoLayout{}
 	autoLayout.SetAlgorithm(openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL)
 	autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS)
 	return autoLayout
+}
+
+// formatNodeSpecErrorsForCLI summarizes node error_message from the API response (blocks execution until fixed).
+func formatNodeSpecErrorsForCLI(version openapi_client.CanvasesCanvasVersion) string {
+	spec, ok := version.GetSpecOk()
+	if !ok || spec == nil {
+		return ""
+	}
+
+	var lines []string
+	for _, node := range spec.GetNodes() {
+		if !node.HasErrorMessage() {
+			continue
+		}
+		msg := strings.TrimSpace(node.GetErrorMessage())
+		if msg == "" {
+			continue
+		}
+		id := node.GetId()
+		name := strings.TrimSpace(node.GetName())
+		if name == "" {
+			name = id
+		}
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("canvas was saved but the following nodes have configuration errors (error_message on each node):\n")
+	for _, line := range lines {
+		b.WriteString("  - ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func formatNodeSpecWarningsForCLI(version openapi_client.CanvasesCanvasVersion) string {
+	spec, ok := version.GetSpecOk()
+	if !ok || spec == nil {
+		return ""
+	}
+
+	var lines []string
+	for _, node := range spec.GetNodes() {
+		if !node.HasWarningMessage() {
+			continue
+		}
+		msg := strings.TrimSpace(node.GetWarningMessage())
+		if msg == "" {
+			continue
+		}
+		id := node.GetId()
+		name := strings.TrimSpace(node.GetName())
+		if name == "" {
+			name = id
+		}
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\nNode warnings (warning_message):\n")
+	for _, line := range lines {
+		b.WriteString("  - ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
 }

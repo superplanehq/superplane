@@ -555,6 +555,70 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.True(t, versionHasNewID)
 	})
 
+	t.Run("add trigger with conflicting id rewrites connected edge source", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				componentCanvasNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			},
+			nil,
+		)
+
+		conflictingID := "pr-opened"
+		legacyNode := componentCanvasNode(conflictingID, "Legacy Trigger", "noop", map[string]any{"value": "legacy"})
+		legacyNode.WorkflowID = canvas.ID
+		legacyNode.State = models.CanvasNodeStateReady
+		require.NoError(t, database.Conn().Create(&legacyNode).Error)
+		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
+
+		draft, err := models.SaveCanvasDraftInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			[]models.Node{
+				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+				triggerNode(conflictingID, "PR Opened", "schedule", map[string]any{
+					"type":            "minutes",
+					"minutesInterval": 1,
+				}),
+			},
+			[]models.Edge{
+				{SourceID: conflictingID, TargetID: "node-a", Channel: "default"},
+			},
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		index := slices.IndexFunc(activeNodes, func(node models.CanvasNode) bool {
+			return node.Name == "PR Opened"
+		})
+		require.True(t, index != -1, "expected added trigger with conflicting ID")
+
+		addedTrigger := activeNodes[index]
+		require.NotEqual(t, conflictingID, addedTrigger.NodeID)
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+		require.Equal(
+			t,
+			datatypes.NewJSONSlice([]models.Edge{{SourceID: addedTrigger.NodeID, TargetID: "node-a", Channel: "default"}}),
+			publishedVersion.Edges,
+		)
+	})
+
 	t.Run("add node with conflicting id and setup error does not duplicate final nodes", func(t *testing.T) {
 		r := support.Setup(t)
 
