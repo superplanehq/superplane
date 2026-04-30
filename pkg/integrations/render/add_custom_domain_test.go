@@ -86,6 +86,53 @@ func Test__Render_AddCustomDomain__Execute(t *testing.T) {
 		assert.Contains(t, request.URL.Path, "/v1/services/srv-123/custom-domains")
 	})
 
+	t.Run("array response -> picks added domain and emits success", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body: io.NopCloser(strings.NewReader(
+						`[
+							{
+								"id":"cdm-existing",
+								"name":"existing.example.com",
+								"verificationStatus":"unverified"
+							},
+							{
+								"id":"cdm-abc123",
+								"name":"app.example.com",
+								"verificationStatus":"unverified"
+							}
+						]`,
+					)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		metadataCtx := &contexts.MetadataContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			HTTP:           httpCtx,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			ExecutionState: executionState,
+			Metadata:       metadataCtx,
+			Configuration: map[string]any{
+				"service":             "srv-123",
+				"domainName":          "app.example.com",
+				"waitForVerification": false,
+			},
+		})
+
+		require.NoError(t, err)
+
+		emittedPayload := readMap(executionState.Payloads[0])
+		data := readMap(emittedPayload["data"])
+		assert.Equal(t, "cdm-abc123", data["id"])
+		assert.Equal(t, "app.example.com", data["name"])
+		assert.Equal(t, "srv-123", data["serviceId"])
+	})
+
 	t.Run("waitForVerification true, already verified -> emits success immediately", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{

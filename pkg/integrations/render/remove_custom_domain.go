@@ -79,10 +79,21 @@ func (c *RemoveCustomDomain) Configuration() []configuration.Field {
 		{
 			Name:        "domainName",
 			Label:       "Domain Name",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Placeholder: "e.g., app.example.com",
-			Description: "The custom domain name to remove",
+			Description: "The custom domain to remove",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "custom_domain",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "service",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "service"},
+						},
+					},
+				},
+			},
 		},
 	}
 }

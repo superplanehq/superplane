@@ -580,8 +580,36 @@ type CustomDomainResponse struct {
 	UpdatedAt          string `json:"updatedAt,omitempty"`
 }
 
+type customDomainWithCursor struct {
+	Cursor       string               `json:"cursor"`
+	CustomDomain CustomDomainResponse `json:"customDomain"`
+}
+
 type addCustomDomainRequest struct {
 	Name string `json:"name"`
+}
+
+func (c *Client) ListCustomDomains(serviceID string) ([]CustomDomainResponse, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains",
+		nil,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := parseCustomDomains(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal custom domains response: %w", err)
+	}
+
+	return response, nil
 }
 
 func (c *Client) AddCustomDomain(serviceID string, domainName string) (CustomDomainResponse, error) {
@@ -602,8 +630,8 @@ func (c *Client) AddCustomDomain(serviceID string, domainName string) (CustomDom
 		return CustomDomainResponse{}, err
 	}
 
-	response := CustomDomainResponse{}
-	if err := json.Unmarshal(body, &response); err != nil {
+	response, err := parseCustomDomain(body, domainName)
+	if err != nil {
 		return CustomDomainResponse{}, fmt.Errorf("failed to unmarshal custom domain response: %w", err)
 	}
 
@@ -651,6 +679,69 @@ func (c *Client) RemoveCustomDomain(serviceID string, domainNameOrID string) err
 		nil,
 	)
 	return err
+}
+
+func parseCustomDomains(body []byte) ([]CustomDomainResponse, error) {
+	var domains []CustomDomainResponse
+	if err := json.Unmarshal(body, &domains); err == nil {
+		domains = compactCustomDomains(domains)
+		if len(domains) > 0 {
+			return domains, nil
+		}
+	}
+
+	var wrapped []customDomainWithCursor
+	if err := json.Unmarshal(body, &wrapped); err == nil {
+		domains := make([]CustomDomainResponse, 0, len(wrapped))
+		for _, item := range wrapped {
+			domains = append(domains, item.CustomDomain)
+		}
+
+		return compactCustomDomains(domains), nil
+	}
+
+	if err := json.Unmarshal(body, &domains); err != nil {
+		return nil, err
+	}
+
+	return compactCustomDomains(domains), nil
+}
+
+func parseCustomDomain(body []byte, domainName string) (CustomDomainResponse, error) {
+	var domain CustomDomainResponse
+	if err := json.Unmarshal(body, &domain); err == nil {
+		return domain, nil
+	}
+
+	domains, err := parseCustomDomains(body)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	for _, domain := range domains {
+		if domain.Name == domainName {
+			return domain, nil
+		}
+	}
+
+	if len(domains) == 0 {
+		return CustomDomainResponse{}, fmt.Errorf("empty custom domain response")
+	}
+
+	return domains[0], nil
+}
+
+func compactCustomDomains(domains []CustomDomainResponse) []CustomDomainResponse {
+	result := make([]CustomDomainResponse, 0, len(domains))
+	for _, domain := range domains {
+		if domain.ID == "" && domain.Name == "" {
+			continue
+		}
+
+		result = append(result, domain)
+	}
+
+	return result
 }
 
 func (c *Client) GetEvent(eventID string) (EventResponse, error) {
