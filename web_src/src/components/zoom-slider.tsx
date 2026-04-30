@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect } from "react";
+import React, { memo, useCallback, useEffect } from "react";
 import { Camera, CircleDot, CircleDotDashed, Eye, Minus, Plus } from "lucide-react";
 import { toPng } from "html-to-image";
 
@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export function ZoomSlider({
+export const ZoomSlider = memo(function ZoomSlider({
   className,
   orientation = "horizontal",
   children,
@@ -232,4 +232,4 @@ export function ZoomSlider({
       )}
     </TooltipProvider>
   );
-}
+});
