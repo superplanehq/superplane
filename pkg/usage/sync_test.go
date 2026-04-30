@@ -17,12 +17,12 @@ import (
 type fakeSyncService struct {
 	enabled bool
 
-	setupAccountCalls            []string
-	setupOrganizationCalls       [][2]string
-	setupOrganizationDetails     []SetupOrganizationDetails
-	setupAccountError            error
-	setupOrganizationError       error
-	describeLimitsError          error
+	setupAccountCalls        []string
+	setupOrganizationCalls   [][2]string
+	setupOrganizationDetails []SetupOrganizationDetails
+	setupAccountError        error
+	setupOrganizationError   error
+	describeLimitsError      error
 }
 
 func (s *fakeSyncService) Enabled() bool {
@@ -41,12 +41,10 @@ func (s *fakeSyncService) SetupAccount(_ context.Context, accountID string) (*us
 func (s *fakeSyncService) SetupOrganization(
 	_ context.Context,
 	organizationID, accountID string,
-	details ...SetupOrganizationDetails,
+	details SetupOrganizationDetails,
 ) (*usagepb.SetupOrganizationResponse, error) {
 	s.setupOrganizationCalls = append(s.setupOrganizationCalls, [2]string{organizationID, accountID})
-	if len(details) > 0 {
-		s.setupOrganizationDetails = append(s.setupOrganizationDetails, details[0])
-	}
+	s.setupOrganizationDetails = append(s.setupOrganizationDetails, details)
 	if s.setupOrganizationError != nil {
 		return nil, s.setupOrganizationError
 	}

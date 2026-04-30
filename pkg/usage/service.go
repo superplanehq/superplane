@@ -13,7 +13,8 @@ import (
 
 const defaultTimeout = 5 * time.Second
 
-// SetupOrganizationDetails is optional metadata forwarded to the usage service (e.g. for notifications).
+// SetupOrganizationDetails is metadata forwarded to the usage service (e.g. for notifications).
+// Use the zero value when there is nothing extra to send.
 type SetupOrganizationDetails struct {
 	CreatedByName    string
 	CreatedByEmail   string
@@ -23,7 +24,7 @@ type SetupOrganizationDetails struct {
 type Service interface {
 	Enabled() bool
 	SetupAccount(ctx context.Context, accountID string) (*pb.SetupAccountResponse, error)
-	SetupOrganization(ctx context.Context, organizationID, accountID string, details ...SetupOrganizationDetails) (*pb.SetupOrganizationResponse, error)
+	SetupOrganization(ctx context.Context, organizationID, accountID string, details SetupOrganizationDetails) (*pb.SetupOrganizationResponse, error)
 	DescribeAccountLimits(ctx context.Context, accountID string) (*pb.DescribeAccountLimitsResponse, error)
 	DescribeOrganizationLimits(ctx context.Context, organizationID string) (*pb.DescribeOrganizationLimitsResponse, error)
 	DescribeOrganizationUsage(ctx context.Context, organizationID string) (*pb.DescribeOrganizationUsageResponse, error)
@@ -62,7 +63,7 @@ func (disabledService) SetupAccount(context.Context, string) (*pb.SetupAccountRe
 	return nil, ErrUsageDisabled
 }
 
-func (disabledService) SetupOrganization(context.Context, string, string, ...SetupOrganizationDetails) (*pb.SetupOrganizationResponse, error) {
+func (disabledService) SetupOrganization(context.Context, string, string, SetupOrganizationDetails) (*pb.SetupOrganizationResponse, error) {
 	return nil, ErrUsageDisabled
 }
 
@@ -109,23 +110,18 @@ func (s *grpcService) SetupAccount(ctx context.Context, accountID string) (*pb.S
 func (s *grpcService) SetupOrganization(
 	ctx context.Context,
 	organizationID, accountID string,
-	details ...SetupOrganizationDetails,
+	details SetupOrganizationDetails,
 ) (*pb.SetupOrganizationResponse, error) {
 	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	req := &pb.SetupOrganizationRequest{
-		OrganizationId: organizationID,
-		AccountId:      accountID,
-	}
-	if len(details) > 0 {
-		d := details[0]
-		req.CreatedByName = d.CreatedByName
-		req.CreatedByEmail = d.CreatedByEmail
-		req.OrganizationName = d.OrganizationName
-	}
-
-	return s.client.SetupOrganization(callCtx, req)
+	return s.client.SetupOrganization(callCtx, &pb.SetupOrganizationRequest{
+		OrganizationId:   organizationID,
+		AccountId:        accountID,
+		CreatedByName:    details.CreatedByName,
+		CreatedByEmail:   details.CreatedByEmail,
+		OrganizationName: details.OrganizationName,
+	})
 }
 
 func (s *grpcService) DescribeOrganizationLimits(
