@@ -374,6 +374,7 @@ type PendingRunData = {
 
 type CanvasNodeRendererCallbacks = {
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
+  onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onRun: React.MutableRefObject<((nodeId: string) => void) | undefined>;
@@ -529,6 +530,7 @@ function buildInteractiveNodeBlockProps(
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
     canvasMode: callbacks.canvasMode,
+    onAppendFromNode: callbacks.onAppendFromNode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -1895,7 +1897,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
   onLogView?: () => void;
 }) {
-  const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
@@ -2311,9 +2313,54 @@ function CanvasContent({
 
   const hasMultiSelection = multiSelectedNodes.length >= 2;
 
+  const handleAppendFromNode = useCallback(
+    (sourceNodeId: string, sourceHandleId?: string | null) => {
+      if (isReadOnly || !onConnectionDropInEmptySpace) {
+        return;
+      }
+
+      const sourceNode = stateRef.current.nodes?.find((node) => node.id === sourceNodeId);
+      if (!sourceNode) {
+        return;
+      }
+
+      const sourceWidth = sourceNode.width ?? 240;
+      const appendGapX = 300;
+      const appendAlignmentY = 30;
+      const placeholderPosition = {
+        x: sourceNode.position.x + sourceWidth + appendGapX,
+        y: sourceNode.position.y + appendAlignmentY,
+      };
+
+      const currentViewport = getViewport();
+      const canvasWidth =
+        typeof document === "undefined" ? 0 : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
+      const rightSidebarSafeArea = 560;
+      const placeholderEstimatedWidth = 420;
+      const viewportBuffer = 48;
+      const placeholderRightScreenX =
+        (placeholderPosition.x + placeholderEstimatedWidth) * currentViewport.zoom + currentViewport.x;
+      const maxVisibleScreenX = canvasWidth - rightSidebarSafeArea - viewportBuffer;
+
+      if (canvasWidth > 0 && placeholderRightScreenX > maxVisibleScreenX) {
+        const overflow = placeholderRightScreenX - maxVisibleScreenX;
+        const nextViewport = { ...currentViewport, x: currentViewport.x - overflow };
+        setViewport(nextViewport, { duration: 180 });
+        viewportRef.current = nextViewport;
+      }
+
+      onConnectionDropInEmptySpace(placeholderPosition, {
+        nodeId: sourceNodeId,
+        handleId: sourceHandleId ?? "default",
+      });
+    },
+    [getViewport, isReadOnly, onConnectionDropInEmptySpace, setViewport, viewportRef],
+  );
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeClick,
+    onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
@@ -2331,6 +2378,7 @@ function CanvasContent({
   });
   callbacksRef.current = {
     handleNodeClick,
+    onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
