@@ -198,7 +198,7 @@ func (c *ManageInstancePower) poll(ctx core.ActionHookContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 	if metadata.InstanceID == "" {
-		return nil
+		return fmt.Errorf("poll metadata is missing instanceId: execution state may be corrupted")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

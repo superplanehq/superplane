@@ -154,6 +154,23 @@ func Test__ManageInstancePower__PollEmitsAtTargetState(t *testing.T) {
 	assert.Equal(t, ManageInstancePowerPayloadType, executionState.Type)
 }
 
+func Test__ManageInstancePower__PollErrorsWhenMetadataMissingInstanceID(t *testing.T) {
+	component := &ManageInstancePower{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name:           "poll",
+		HTTP:           &contexts.HTTPContext{},
+		Integration:    ociIntegrationContext(),
+		Metadata:       &contexts.MetadataContext{Metadata: ManageInstancePowerMetadata{}},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Logger:         ociLogger(),
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "poll metadata is missing instanceId")
+}
+
 func Test__ManageInstancePower__PollHandlesConsecutiveErrors(t *testing.T) {
 	component := &ManageInstancePower{}
 	httpCtx := &contexts.HTTPContext{
