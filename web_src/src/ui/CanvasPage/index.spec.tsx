@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import type { Edge, Node } from "@xyflow/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,7 +55,28 @@ vi.mock("./Header", () => ({
   Header: () => <header data-testid="canvas-header" />,
 }));
 
-import { CanvasNodeErrorBoundary, CanvasPage } from "./index";
+import { CanvasNodeErrorBoundary, CanvasPage, getCollapsedDescendantNodeIds } from "./index";
+
+function makeCanvasNode(id: string, collapsed = false): Node {
+  return {
+    id,
+    position: { x: 0, y: 0 },
+    data: {
+      label: id,
+      state: "pending",
+      type: "component",
+      component: { collapsed },
+    },
+  };
+}
+
+function makeCanvasEdge(source: string, target: string): Edge {
+  return {
+    id: `${source}-${target}`,
+    source,
+    target,
+  };
+}
 
 function ThrowingNode(): ReactElement {
   throw new Error("render failed");
@@ -137,6 +159,32 @@ describe("CanvasNodeErrorBoundary", () => {
     expect(screen.getByText("unknown fallback")).toBeInTheDocument();
     expect(captureException).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
+  });
+});
+
+describe("getCollapsedDescendantNodeIds", () => {
+  it("hides downstream descendants of collapsed nodes without hiding the collapsed root", () => {
+    const hiddenNodeIds = getCollapsedDescendantNodeIds(
+      [
+        makeCanvasNode("root", true),
+        makeCanvasNode("child"),
+        makeCanvasNode("grandchild"),
+        makeCanvasNode("sibling"),
+        makeCanvasNode("unrelated"),
+      ],
+      [makeCanvasEdge("root", "child"), makeCanvasEdge("child", "grandchild"), makeCanvasEdge("sibling", "child")],
+    );
+
+    expect([...hiddenNodeIds].sort()).toEqual(["child", "grandchild"]);
+  });
+
+  it("handles cycles without hiding the collapsed root", () => {
+    const hiddenNodeIds = getCollapsedDescendantNodeIds(
+      [makeCanvasNode("root", true), makeCanvasNode("child"), makeCanvasNode("grandchild")],
+      [makeCanvasEdge("root", "child"), makeCanvasEdge("child", "grandchild"), makeCanvasEdge("grandchild", "root")],
+    );
+
+    expect([...hiddenNodeIds].sort()).toEqual(["child", "grandchild"]);
   });
 });
 

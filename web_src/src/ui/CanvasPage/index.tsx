@@ -248,7 +248,7 @@ export interface CanvasPageProps {
   onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
-  onToggleView?: (nodeId: string) => void;
+  onToggleView?: (nodeId: string, collapsed: boolean) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   // Building blocks for adding new nodes
@@ -378,7 +378,7 @@ type CanvasNodeRendererCallbacks = {
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
-  onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
+  onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
   runDisabled?: boolean;
@@ -405,6 +405,7 @@ type EnrichedCanvasNodeCacheEntry = {
   sourceData: ReactFlowNode["data"];
   node: ReactFlowNode;
   data: CanvasBlockNodeData;
+  hidden: boolean;
   hoveredEdge: CanvasEdge | null;
   connectingFrom: CanvasConnectionState | null;
   edges: CanvasEdge[];
@@ -449,6 +450,55 @@ function getNodeErrorDisplayName(data: BlockData): string {
   const labelGetter = NODE_ERROR_LABEL_GETTERS[data.type as BlockData["type"]];
 
   return labelGetter?.(data) || getNonEmptyString(data.label) || "unknown";
+}
+
+function isCanvasNodeCollapsed(node: ReactFlowNode | undefined): boolean {
+  const data = node?.data as CanvasBlockNodeData | undefined;
+  const nodeType = data?.type;
+  if (nodeType !== "component" && nodeType !== "trigger" && nodeType !== "composite") {
+    return false;
+  }
+
+  return Boolean(data && (data[nodeType] as { collapsed?: boolean } | undefined)?.collapsed);
+}
+
+export function getCollapsedDescendantNodeIds(nodes: ReactFlowNode[], edges: ReactFlowEdge[]): Set<string> {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const collapsedNodeIds = nodes.filter(isCanvasNodeCollapsed).map((node) => node.id);
+
+  if (collapsedNodeIds.length === 0 || edges.length === 0) {
+    return new Set();
+  }
+
+  const outgoingNodeIdsBySourceId = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
+      continue;
+    }
+
+    const targetIds = outgoingNodeIdsBySourceId.get(edge.source) ?? [];
+    targetIds.push(edge.target);
+    outgoingNodeIdsBySourceId.set(edge.source, targetIds);
+  }
+
+  const hiddenNodeIds = new Set<string>();
+  for (const collapsedNodeId of collapsedNodeIds) {
+    const visitedNodeIds = new Set([collapsedNodeId]);
+    const queue = [...(outgoingNodeIdsBySourceId.get(collapsedNodeId) ?? [])];
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift();
+      if (!nodeId || visitedNodeIds.has(nodeId)) {
+        continue;
+      }
+
+      visitedNodeIds.add(nodeId);
+      hiddenNodeIds.add(nodeId);
+      queue.push(...(outgoingNodeIdsBySourceId.get(nodeId) ?? []));
+    }
+  }
+
+  return hiddenNodeIds;
 }
 
 function areOutputChannelsEqual(previous: string[] | undefined, next: string[] | undefined) {
@@ -1042,10 +1092,12 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleToggleView = useCallback(
     (nodeId: string) => {
+      const node = state.nodes.find((candidate) => candidate.id === nodeId);
+      const collapsed = !isCanvasNodeCollapsed(node);
       state.toggleNodeCollapse(nodeId);
-      props.onToggleView?.(nodeId);
+      props.onToggleView?.(nodeId, collapsed);
     },
-    [state.toggleNodeCollapse, props.onToggleView],
+    [state.nodes, state.toggleNodeCollapse, props.onToggleView],
   );
 
   const handleCancelQueueItem = (queueId: string) => {
@@ -2381,6 +2433,11 @@ function CanvasContent({
     return (state.edges?.find((e) => e.id === hoveredEdgeId) as CanvasEdge | undefined) ?? null;
   }, [hoveredEdgeId, state.edges]);
 
+  const collapsedDescendantNodeIds = useMemo(
+    () => getCollapsedDescendantNodeIds(state.nodes, state.edges),
+    [state.nodes, state.edges],
+  );
+
   const enrichedNodeCacheRef = useRef<Map<string, EnrichedCanvasNodeCacheEntry>>(new Map());
   const nodesWithCallbacks = useMemo(() => {
     const hasHighlightedNodes = highlightedNodeIds.size > 0;
@@ -2389,10 +2446,12 @@ function CanvasContent({
       visibleNodeIds.add(node.id);
 
       const isHighlighted = highlightedNodeIds.has(node.id);
+      const hidden = collapsedDescendantNodeIds.has(node.id);
       const cachedNode = enrichedNodeCacheRef.current.get(node.id);
       const canReuseData =
         cachedNode &&
         cachedNode.sourceData === node.data &&
+        cachedNode.hidden === hidden &&
         cachedNode.hoveredEdge === hoveredEdge &&
         cachedNode.connectingFrom === connectingFrom &&
         cachedNode.edges === state.edges &&
@@ -2417,6 +2476,7 @@ function CanvasContent({
           };
       const enrichedNode: ReactFlowNode = {
         ...node,
+        hidden,
         data: data as ReactFlowNode["data"],
       };
 
@@ -2425,6 +2485,7 @@ function CanvasContent({
         sourceData: node.data,
         node: enrichedNode,
         data,
+        hidden,
         hoveredEdge,
         connectingFrom,
         edges: state.edges,
@@ -2442,7 +2503,15 @@ function CanvasContent({
     }
 
     return enrichedNodes;
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom]);
+  }, [
+    state.nodes,
+    hoveredEdge,
+    connectingFrom,
+    state.edges,
+    highlightedNodeIds,
+    blockConnectingFrom,
+    collapsedDescendantNodeIds,
+  ]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -2461,6 +2530,7 @@ function CanvasContent({
       state.edges?.map((e) => ({
         ...e,
         ...EDGE_STYLE,
+        hidden: collapsedDescendantNodeIds.has(e.source) || collapsedDescendantNodeIds.has(e.target),
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
@@ -2469,7 +2539,7 @@ function CanvasContent({
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly],
+    [state.edges, collapsedDescendantNodeIds, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly],
   );
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;

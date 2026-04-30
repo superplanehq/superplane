@@ -3866,23 +3866,21 @@ export function WorkflowPageV2() {
   );
 
   const handleNodeCollapseChange = useCallback(
-    async (nodeId: string) => {
+    async (nodeId: string, collapsed: boolean) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      // Save snapshot before making changes
-
-      // Find the current node to determine its collapsed state
       const currentNode = canvas.spec?.nodes?.find((node) => node.id === nodeId);
       if (!currentNode) return;
 
-      // Toggle the collapsed state
-      const newIsCollapsed = !currentNode.isCollapsed;
+      if (currentNode.isCollapsed === collapsed) {
+        return;
+      }
 
       const updatedNodes = canvas.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
               ...node,
-              isCollapsed: newIsCollapsed,
+              isCollapsed: collapsed,
             }
           : node,
       );
