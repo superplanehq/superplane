@@ -6,7 +6,14 @@ import type { BlockData } from "./Block";
 
 const { captureException, reactFlowPropsRef } = vi.hoisted(() => ({
   captureException: vi.fn(),
-  reactFlowPropsRef: { current: null as null | Record<string, (...args: unknown[]) => unknown> },
+  reactFlowPropsRef: {
+    current: null as null | {
+      nodes?: unknown;
+      onConnectStart?: (...args: unknown[]) => unknown;
+      onConnectEnd?: (...args: unknown[]) => unknown;
+      onPaneClick?: (...args: unknown[]) => unknown;
+    },
+  },
 }));
 
 vi.mock("@/sentry", () => ({
@@ -23,8 +30,8 @@ vi.mock("@/sentry", () => ({
 vi.mock("@xyflow/react", () => ({
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  ReactFlow: (props: { children?: ReactNode }) => {
-    reactFlowPropsRef.current = props as unknown as Record<string, (...args: unknown[]) => unknown>;
+  ReactFlow: (props: { children?: ReactNode; nodes?: unknown }) => {
+    reactFlowPropsRef.current = props;
     return <div>{props.children}</div>;
   },
   ReactFlowProvider: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
@@ -33,6 +40,9 @@ vi.mock("@xyflow/react", () => ({
   useReactFlow: vi.fn(() => ({
     fitView: vi.fn(),
     screenToFlowPosition: vi.fn((position) => position),
+    getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
+    setViewport: vi.fn(),
+    getInternalNode: vi.fn(),
     zoomTo: vi.fn(),
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
@@ -189,5 +199,63 @@ describe("CanvasPage connection drop", () => {
 
     expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
+  });
+
+  it("creates a placeholder when appending from an end-node connector", () => {
+    const onPlaceholderAdd = vi.fn(async () => "placeholder-node");
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          nodes={[
+            {
+              id: "source-node",
+              position: { x: 100, y: 200 },
+              width: 240,
+              data: {
+                label: "Source",
+                state: "pending",
+                type: "component",
+                outputChannels: ["default"],
+                component: {
+                  title: "Source",
+                  iconSlug: "box",
+                  collapsed: false,
+                },
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onMemoryOpen={vi.fn()}
+          onYamlOpen={vi.fn()}
+          onEdgeCreate={vi.fn()}
+          onPlaceholderAdd={onPlaceholderAdd}
+        />
+      </MemoryRouter>,
+    );
+
+    const nodes = reactFlowPropsRef.current?.nodes as Array<{
+      data: {
+        _callbacksRef?: {
+          current?: {
+            onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void;
+          };
+        };
+      };
+    }>;
+
+    act(() => {
+      nodes[0].data._callbacksRef?.current?.onAppendFromNode?.("source-node", "default");
+    });
+
+    expect(onPlaceholderAdd).toHaveBeenCalledWith({
+      position: { x: 640, y: 200 },
+      sourceNodeId: "source-node",
+      sourceHandleId: "default",
+    });
   });
 });
