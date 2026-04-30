@@ -117,6 +117,28 @@ func FindServiceAccountsByOrganizationInTransaction(tx *gorm.DB, orgID string) (
 	return users, err
 }
 
+// FindUsersByIDsInOrganization returns users in the org matching the given IDs,
+// including soft-deleted rows (Unscoped). Used to resolve display names for FKs
+// such as service account created_by.
+func FindUsersByIDsInOrganization(orgID string, ids []string) ([]User, error) {
+	return FindUsersByIDsInOrganizationInTransaction(database.Conn(), orgID, ids)
+}
+
+func FindUsersByIDsInOrganizationInTransaction(tx *gorm.DB, orgID string, ids []string) ([]User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var users []User
+	err := tx.Unscoped().
+		Where("organization_id = ?", orgID).
+		Where("id IN ?", ids).
+		Find(&users).
+		Error
+
+	return users, err
+}
+
 func FindUnscopedUserByID(id string) (*User, error) {
 	var user User
 	userUUID, err := uuid.Parse(id)
