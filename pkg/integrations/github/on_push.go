@@ -44,7 +44,7 @@ func (p *OnPush) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., ` + "`refs/heads/main`" + `, ` + "`refs/tags/*`" + `)
-- **Paths** *(optional)*: Filter by changed file paths. When set, the trigger only fires if at least one added, modified, or removed file matches any configured predicate. Leave empty to fire on all pushes regardless of changed files.
+- **Paths** *(optional)*: When set, only fires if at least one added, modified, or removed file matches any configured predicate. Leave empty to fire on all pushes.
 
 ## Event Data
 
@@ -100,14 +100,15 @@ func (p *OnPush) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:      "paths",
-			Label:     "Paths",
-			Type:      configuration.FieldTypeAnyPredicateList,
-			Required:  false,
-			Togglable: true,
+			Name:        "paths",
+			Label:       "Paths",
+			Description: "Optional. When set, only fires if at least one added, modified, or removed file matches any predicate. Leave empty to fire on all pushes.",
+			Type:        configuration.FieldTypeAnyPredicateList,
+			Required:    false,
+			Togglable:   true,
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
+					Operators: configuration.EqualsAndMatchesPredicateOperators,
 				},
 			},
 		},

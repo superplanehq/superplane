@@ -75,36 +75,4 @@ func Test__MatchesAnyPredicateInList(t *testing.T) {
 			[]string{"README.md", "web_src/src/App.tsx"},
 		))
 	})
-
-	t.Run("notEquals matches when excluded path is absent", func(t *testing.T) {
-		assert.True(t, MatchesAnyPredicateInList(
-			[]Predicate{{Type: PredicateTypeNotEquals, Value: "README.md"}},
-			[]string{"go.mod", "pkg/main.go"},
-		))
-	})
-
-	t.Run("notEquals does not match when excluded path is present", func(t *testing.T) {
-		assert.False(t, MatchesAnyPredicateInList(
-			[]Predicate{{Type: PredicateTypeNotEquals, Value: "README.md"}},
-			[]string{"README.md", "go.mod"},
-		))
-	})
-
-	t.Run("equals and notEquals are ANDed for list matching", func(t *testing.T) {
-		assert.False(t, MatchesAnyPredicateInList(
-			[]Predicate{
-				{Type: PredicateTypeEquals, Value: "go.mod"},
-				{Type: PredicateTypeNotEquals, Value: "README.md"},
-			},
-			[]string{"README.md", "go.mod"},
-		))
-
-		assert.True(t, MatchesAnyPredicateInList(
-			[]Predicate{
-				{Type: PredicateTypeEquals, Value: "go.mod"},
-				{Type: PredicateTypeNotEquals, Value: "README.md"},
-			},
-			[]string{"go.mod", "pkg/main.go"},
-		))
-	})
 }
