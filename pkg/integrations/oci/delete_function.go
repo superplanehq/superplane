@@ -165,7 +165,13 @@ func resolveDeleteFunctionMetadata(ctx core.SetupContext, applicationID, functio
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to create OCI client: %w", err)
+		// Non-fatal: fall back to showing the IDs.
+		return ctx.Metadata.Set(DeleteFunctionNodeMetadata{
+			ApplicationID:   applicationID,
+			ApplicationName: applicationID,
+			FunctionID:      functionID,
+			FunctionName:    functionID,
+		})
 	}
 
 	meta := DeleteFunctionNodeMetadata{
