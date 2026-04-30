@@ -28,6 +28,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
+	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
 	_ "github.com/superplanehq/superplane/pkg/components/if"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
@@ -65,7 +66,9 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/launchdarkly"
+	_ "github.com/superplanehq/superplane/pkg/integrations/logfire"
 	_ "github.com/superplanehq/superplane/pkg/integrations/newrelic"
+	_ "github.com/superplanehq/superplane/pkg/integrations/oci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
@@ -86,7 +89,6 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
-	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
 func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
@@ -112,7 +114,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -120,7 +122,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL)
+		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
 		go w.Start(context.Background())
 	}
 

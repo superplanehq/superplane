@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { Activity, Database, Gauge, Layers3, Users } from "lucide-react";
+import { Activity, Cpu, Database, Gauge, Layers3, Users } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useOrganizationUsage } from "@/hooks/useOrganizationData";
+import { useOrganizationUsage, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { isUsagePageForced } from "@/lib/env";
 import { EmptyState } from "@/ui/emptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -25,14 +26,17 @@ export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
   const { data, isLoading, error } = useOrganizationUsage(organizationId);
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useOrganizationUsers(organizationId);
+  const {
+    data: integrations,
+    isLoading: isLoadingIntegrations,
+    error: integrationsError,
+  } = useConnectedIntegrations(organizationId);
   const forceUsagePage = isUsagePageForced();
-  const isPreviewMode = forceUsagePage && data?.enabled !== true;
+  const anyLoading = [isLoading, isLoadingUsers, isLoadingIntegrations].some(Boolean);
+  const anyError = [error, usersError, integrationsError].find(Boolean);
 
-  const usageCards = useMemo(() => buildLimitCards(data?.limits), [data?.limits]);
-  const eventUsage = useMemo(() => buildEventUsage(data), [data]);
-  const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
-
-  if (isLoading) {
+  if (anyLoading) {
     return (
       <div className="pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -42,13 +46,13 @@ export function Usage({ organizationId }: UsageProps) {
     );
   }
 
-  if (error) {
+  if (anyError) {
     return (
       <div className="pt-6">
         <Alert variant="destructive">
           <Gauge className="h-4 w-4" />
           <AlertTitle>Unable to load usage</AlertTitle>
-          <AlertDescription>{error instanceof Error ? error.message : "Unknown error"}</AlertDescription>
+          <AlertDescription>{anyError instanceof Error ? anyError.message : "Unknown error"}</AlertDescription>
         </Alert>
       </div>
     );
@@ -72,6 +76,38 @@ export function Usage({ organizationId }: UsageProps) {
     return <Navigate to={`/${organizationId}/settings/general`} replace />;
   }
 
+  const memberCount = users ? users.length : 0;
+  const integrationCount = integrations ? integrations.length : 0;
+
+  return (
+    <UsageContent
+      data={data}
+      isPreviewMode={forceUsagePage && data.enabled !== true}
+      memberCount={memberCount}
+      integrationCount={integrationCount}
+    />
+  );
+}
+
+function UsageContent({
+  data,
+  isPreviewMode,
+  memberCount,
+  integrationCount,
+}: {
+  data: OrganizationsDescribeUsageResponse;
+  isPreviewMode: boolean;
+  memberCount: number;
+  integrationCount: number;
+}) {
+  const usageCards = useMemo(
+    () => buildLimitCards(data.limits, memberCount, integrationCount),
+    [data.limits, memberCount, integrationCount],
+  );
+  const eventUsage = useMemo(() => buildEventUsage(data), [data]);
+  const agentTokenUsage = useMemo(() => buildAgentTokenUsage(data), [data]);
+  const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
+
   return (
     <div className="pt-6 space-y-6">
       <Alert>
@@ -84,7 +120,7 @@ export function Usage({ organizationId }: UsageProps) {
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <UsageMetricCard
           title="Canvases"
           value={canvasUsage.value}
@@ -98,6 +134,13 @@ export function Usage({ organizationId }: UsageProps) {
           subtitle={eventUsage.subtitle}
           progress={eventUsage.progress}
           icon={Activity}
+        />
+        <UsageMetricCard
+          title="Agent Token Budget"
+          value={agentTokenUsage.value}
+          subtitle={agentTokenUsage.subtitle}
+          progress={agentTokenUsage.progress}
+          icon={Cpu}
         />
       </div>
 
@@ -173,35 +216,62 @@ function buildCanvasUsage(data: OrganizationsDescribeUsageResponse | null | unde
   };
 }
 
-function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
-  const level = data?.usage?.eventBucketLevel ?? 0;
+function buildBucketUsage(
+  level: number,
+  capacity: number | undefined,
+  lastUpdatedAt: string | undefined,
+  nextDecreaseAt: string | undefined,
+  defaultSubtitle: string,
+) {
   const displayedLevel = Math.max(0, Math.ceil(level));
-  const capacity = data?.usage?.eventBucketCapacity;
-  const lastUpdatedAt = data?.usage?.eventBucketLastUpdatedAt;
-  const nextDecreaseAt = data?.usage?.nextEventBucketDecreaseAt;
   const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const value = isUnlimited ? "∞" : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
+  const value = isUnlimited
+    ? `${formatNumber(displayedLevel)} consumed`
+    : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
+
+  let subtitle = defaultSubtitle;
+  if (nextDecreaseAt) {
+    subtitle = `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
+  } else if (lastUpdatedAt) {
+    subtitle = `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
+  }
 
   return {
     value,
-    subtitle: formatEventUsageSubtitle(nextDecreaseAt, lastUpdatedAt),
+    subtitle,
     progress: isUnlimited ? null : percentage(displayedLevel, capacity),
   };
 }
 
-function formatEventUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: string) {
-  if (nextDecreaseAt) {
-    return `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
-  }
-
-  if (lastUpdatedAt) {
-    return `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
-  }
-
-  return "Rolling event usage for the current 30-day window.";
+function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
+  return buildBucketUsage(
+    data?.usage?.eventBucketLevel ?? 0,
+    data?.usage?.eventBucketCapacity,
+    data?.usage?.eventBucketLastUpdatedAt,
+    data?.usage?.nextEventBucketDecreaseAt,
+    "Rolling event usage for the current 30-day window.",
+  );
 }
 
-function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
+function buildAgentTokenUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
+  return buildBucketUsage(
+    data?.usage?.agentTokenBucketLevel ?? 0,
+    data?.usage?.agentTokenBucketCapacity,
+    data?.usage?.agentTokenBucketLastUpdatedAt,
+    data?.usage?.nextAgentTokenBucketDecreaseAt,
+    "Rolling agent token usage for the current 30-day window.",
+  );
+}
+
+function formatCountWithLimit(count: number, limit: number | undefined) {
+  return `${formatNumber(count)} / ${formatNumericLimit(limit)}`;
+}
+
+function buildLimitCards(
+  limits: OrganizationsOrganizationLimits | undefined,
+  memberCount: number,
+  integrationCount: number,
+): LimitCard[] {
   return [
     {
       label: "Nodes per canvas",
@@ -211,13 +281,13 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
     },
     {
       label: "Members",
-      value: formatNumericLimit(limits?.maxUsers),
+      value: formatCountWithLimit(memberCount, limits?.maxUsers),
       icon: Users,
       description: "Maximum users allowed in the organization.",
     },
     {
       label: "Integrations",
-      value: formatNumericLimit(limits?.maxIntegrations),
+      value: formatCountWithLimit(integrationCount, limits?.maxIntegrations),
       icon: Database,
       description: "Maximum connected integrations for the organization.",
     },
@@ -232,6 +302,12 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
       value: formatStringLimit(limits?.maxEventsPerMonth),
       icon: Gauge,
       description: "Rolling 30-day event allowance.",
+    },
+    {
+      label: "Agent tokens per month",
+      value: formatStringLimit(limits?.maxAgentTokensPerMonth),
+      icon: Cpu,
+      description: "Rolling 30-day agent token allowance.",
     },
   ];
 }

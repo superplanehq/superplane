@@ -441,14 +441,6 @@ func (c *SendEmail) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 	return 200, nil, nil
 }
 
-func (c *SendEmail) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *SendEmail) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *SendEmail) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -541,4 +533,12 @@ func parseCSV(value string) []string {
 	}
 
 	return result
+}
+
+func (c *SendEmail) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendEmail) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

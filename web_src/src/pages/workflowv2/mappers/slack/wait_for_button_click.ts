@@ -22,7 +22,6 @@ import { getTriggerRenderer } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 interface WaitForButtonClickConfiguration {
   channel?: string;
@@ -69,7 +68,7 @@ const WAIT_FOR_BUTTON_CLICK_STATE_MAP: EventStateMap = {
 };
 
 // State function to determine the state of an execution
-const waitForButtonClickStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+const waitForButtonClickStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (execution.result === "RESULT_CANCELLED") {
     return "cancelled";
   }

@@ -64,14 +64,14 @@ type Trigger interface {
 	Setup(ctx TriggerContext) error
 
 	/*
-	 * Allows triggers to define custom actions.
+	 * Allows triggers to define custom hooks.
 	 */
-	Actions() []Action
+	Hooks() []Hook
 
 	/*
-	 * Execute a custom action - defined in Actions() for a trigger.
+	 * Execute a custom hook - defined in Hooks() for a trigger.
 	 */
-	HandleAction(ctx TriggerActionContext) (map[string]any, error)
+	HandleHook(ctx TriggerHookContext) (map[string]any, error)
 
 	/*
 	 * Cleanup allows triggers to clean up resources after being removed from a canvas.
@@ -84,7 +84,7 @@ type TriggerContext struct {
 	Logger        *log.Entry
 	Configuration any
 	HTTP          HTTPContext
-	Metadata      MetadataContext
+	Metadata      MetadataWriter
 	Requests      RequestContext
 	Events        EventContext
 	Webhook       NodeWebhookContext
@@ -95,26 +95,13 @@ type EventContext interface {
 	Emit(payloadType string, payload any) error
 }
 
-type TriggerActionContext struct {
-	Name          string
-	Parameters    map[string]any
-	Configuration any
-	Logger        *log.Entry
-	HTTP          HTTPContext
-	Metadata      MetadataContext
-	Requests      RequestContext
-	Events        EventContext
-	Webhook       NodeWebhookContext
-	Integration   IntegrationContext
-}
-
 type WebhookRequestContext struct {
 	Body          []byte
 	Headers       http.Header
 	WorkflowID    string
 	NodeID        string
 	Configuration any
-	Metadata      MetadataContext
+	Metadata      MetadataWriter
 	Logger        *log.Entry
 	Webhook       NodeWebhookContext
 	Events        EventContext

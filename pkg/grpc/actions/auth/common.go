@@ -9,10 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
-	pb "github.com/superplanehq/superplane/pkg/protos/users"
-	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	userpb "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -94,116 +91,43 @@ func FindUser(org, id, email string) (*models.User, error) {
 	return models.FindActiveUserByEmail(orgID.String(), email)
 }
 
-func GetUsersWithRolesInDomain(domainID, domainType string, includeServiceAccounts bool, authService authorization.Authorization) ([]*pbUsers.User, error) {
-	if domainType != models.DomainTypeOrganization {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be organization")
-	}
-
-	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Extract all role names for batch metadata lookup
-	roleNames := make([]string, len(roleDefinitions))
-	for i, roleDef := range roleDefinitions {
-		roleNames[i] = roleDef.Name
-	}
-
-	// Batch fetch role metadata
-	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
-	if err != nil {
-		return nil, status.Error(codes.NotFound, "role not found")
-	}
-
-	userRoleMap := make(map[string][]*pbUsers.UserRoleAssignment)
-
-	for _, roleDef := range roleDefinitions {
-		userIDs, err := authService.GetOrgUsersForRole(roleDef.Name, domainID)
-		if err != nil {
-			continue
-		}
-
-		roleMetadata := roleMetadataMap[roleDef.Name]
-		roleAssignment := &pb.UserRoleAssignment{
-			RoleName:        roleDef.Name,
-			RoleDisplayName: roleMetadata.DisplayName,
-			RoleDescription: roleMetadata.Description,
-			DomainType:      actions.DomainTypeToProto(domainType),
-			DomainId:        domainID,
-			AssignedAt:      timestamppb.Now(),
-		}
-
-		for _, userID := range userIDs {
-			userRoleMap[userID] = append(userRoleMap[userID], roleAssignment)
+func usersToProto(users []models.User, accountProviders []models.UserAccountProvider) []*userpb.User {
+	protoUsers := make([]*userpb.User, len(users))
+	for i, user := range users {
+		protoUsers[i] = &userpb.User{
+			Metadata: &userpb.User_Metadata{
+				Id:        user.ID.String(),
+				Email:     user.GetEmail(),
+				CreatedAt: timestamppb.New(user.CreatedAt),
+				UpdatedAt: timestamppb.New(user.UpdatedAt),
+			},
+			Spec: &userpb.User_Spec{
+				DisplayName: user.Name,
+			},
+			Status: &userpb.User_Status{
+				AccountProviders: accountProvidersForUser(user.ID.String(), accountProviders),
+			},
 		}
 	}
 
-	userIDs := make([]string, 0, len(userRoleMap))
-	for userID := range userRoleMap {
-		userIDs = append(userIDs, userID)
-	}
-
-	var dbUsers []models.User
-	if includeServiceAccounts {
-		dbUsers, err = models.FindUsersByIDs(userIDs)
-	} else {
-		dbUsers, err = models.FindHumanUsersByIDs(userIDs)
-	}
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch users")
-	}
-
-	var users []*pbUsers.User
-	for i := range dbUsers {
-		roleAssignments := userRoleMap[dbUsers[i].ID.String()]
-		user, err := convertUserToProto(&dbUsers[i], roleAssignments)
-		if err != nil {
-			continue
-		}
-		users = append(users, user)
-	}
-
-	return users, nil
+	return protoUsers
 }
 
-func convertUserToProto(dbUser *models.User, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
-	var pbAccountProviders []*pbUsers.AccountProvider
-
-	if dbUser.AccountID != nil {
-		account, err := models.FindAccountByID(dbUser.AccountID.String())
-		if err == nil {
-			providers, err := account.GetAccountProviders()
-			if err == nil {
-				pbAccountProviders = make([]*pbUsers.AccountProvider, len(providers))
-				for i, provider := range providers {
-					pbAccountProviders[i] = &pb.AccountProvider{
-						ProviderType: provider.Provider,
-						ProviderId:   provider.ProviderID,
-						Email:        provider.Email,
-						DisplayName:  provider.Name,
-						AvatarUrl:    provider.AvatarURL,
-						CreatedAt:    timestamppb.New(provider.CreatedAt),
-						UpdatedAt:    timestamppb.New(provider.UpdatedAt),
-					}
-				}
-			}
+func accountProvidersForUser(userID string, accountProviders []models.UserAccountProvider) []*userpb.AccountProvider {
+	providers := []*userpb.AccountProvider{}
+	for _, provider := range accountProviders {
+		if provider.UserID == userID {
+			providers = append(providers, &userpb.AccountProvider{
+				ProviderType: provider.Provider,
+				ProviderId:   provider.ProviderID,
+				Email:        provider.Email,
+				DisplayName:  provider.Name,
+				AvatarUrl:    provider.AvatarURL,
+				CreatedAt:    timestamppb.New(provider.CreatedAt),
+				UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+			})
 		}
 	}
 
-	return &pb.User{
-		Metadata: &pb.User_Metadata{
-			Id:        dbUser.ID.String(),
-			Email:     dbUser.GetEmail(),
-			CreatedAt: timestamppb.New(dbUser.CreatedAt),
-			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
-		},
-		Spec: &pb.User_Spec{
-			DisplayName:      dbUser.Name,
-			AccountProviders: pbAccountProviders,
-		},
-		Status: &pb.User_Status{
-			RoleAssignments: roleAssignments,
-		},
-	}, nil
+	return providers
 }

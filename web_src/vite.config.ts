@@ -25,6 +25,7 @@ const setHmrPortFromPortPlugin = {
 // https://vite.dev/config/
 export default defineConfig(({ command }: { command: string }) => {
   const isDev = command !== "build";
+  const isProduction = process.env.APP_ENV === "production";
   const apiPort = process.env.API_PORT || process.env.PUBLIC_API_PORT || "8000";
   const devPort = Number.parseInt(process.env.VITE_DEV_PORT || "5173", 10);
 
@@ -35,6 +36,7 @@ export default defineConfig(({ command }: { command: string }) => {
       port: devPort,
       strictPort: true,
       host: true,
+      headers: !isProduction ? { "X-Robots-Tag": "noindex" } : undefined,
       watch: {
         usePolling: true,
         interval: 1000,

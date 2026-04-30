@@ -24,6 +24,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
+	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
 	_ "github.com/superplanehq/superplane/pkg/components/if"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
@@ -41,7 +42,6 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
-	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
 type ResourceRegistry struct {
@@ -97,6 +97,22 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 	}
 
 	account, err := models.CreateAccountInTransaction(tx, "test@example.com", "test")
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	accountProvider := &models.AccountProvider{
+		AccountID:  account.ID,
+		Provider:   "github",
+		ProviderID: "testuser",
+		Username:   "testuser",
+		Email:      account.Email,
+		Name:       account.Name,
+		AvatarURL:  "https://github.com/testuser.png",
+	}
+
+	err = tx.Create(accountProvider).Error
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
@@ -308,7 +324,7 @@ func CreateNextNodeExecution(
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
-	canvasVersioningEnabled, err := models.IsCanvasVersioningEnabled(orgID)
+	changeManagementEnabled, err := models.IsChangeManagementEnabled(orgID)
 	require.NoError(t, err)
 
 	inputNodes := make([]models.Node, len(nodes))
@@ -329,15 +345,15 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 	// Create canvas
 	//
 	workflow := &models.Canvas{
-		ID:                uuid.New(),
-		OrganizationID:    orgID,
-		LiveVersionID:     &liveVersionID,
-		VersioningEnabled: canvasVersioningEnabled,
-		Name:              RandomName("canvas"),
-		Description:       "Test canvas",
-		CreatedBy:         &userID,
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
+		ID:                      uuid.New(),
+		OrganizationID:          orgID,
+		LiveVersionID:           &liveVersionID,
+		ChangeManagementEnabled: changeManagementEnabled,
+		Name:                    RandomName("canvas"),
+		Description:             "Test canvas",
+		CreatedBy:               &userID,
+		CreatedAt:               &now,
+		UpdatedAt:               &now,
 	}
 
 	//
@@ -382,21 +398,37 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 		}
 
 		version := models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  workflow.ID,
-			OwnerID:     &userID,
-			IsPublished: true,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice(expandedNodes),
-			Edges:       datatypes.NewJSONSlice(edges),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:                      liveVersionID,
+			WorkflowID:              workflow.ID,
+			OwnerID:                 &userID,
+			State:                   models.CanvasVersionStatePublished,
+			Name:                    workflow.Name,
+			Description:             workflow.Description,
+			ChangeManagementEnabled: workflow.ChangeManagementEnabled,
+			ChangeRequestApprovers:  datatypes.NewJSONSlice(models.DefaultCanvasChangeRequestApprovers()),
+			PublishedAt:             &now,
+			Nodes:                   datatypes.NewJSONSlice(expandedNodes),
+			Edges:                   datatypes.NewJSONSlice(edges),
+			CreatedAt:               &now,
+			UpdatedAt:               &now,
 		}
 
 		return tx.Create(&version).Error
 	}))
 
 	return workflow, createdNodes
+}
+
+func SetCanvasChangeManagementEnabled(t require.TestingT, canvasID uuid.UUID, enabled bool) {
+	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+	require.NoError(t, err)
+	require.NotNil(t, canvas.LiveVersionID)
+
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasVersion{}).
+		Where("id = ?", *canvas.LiveVersionID).
+		Update("change_management_enabled", enabled).
+		Error)
 }
 
 func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {

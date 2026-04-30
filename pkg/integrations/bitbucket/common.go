@@ -19,7 +19,7 @@ type RepositoryMetadata struct {
 	Slug     string `json:"slug" mapstructure:"slug"`
 }
 
-func ensureRepoInMetadata(http core.HTTPContext, ctx core.MetadataContext, integration core.IntegrationContext, repository string) (*RepositoryMetadata, error) {
+func ensureRepoInMetadata(http core.HTTPContext, ctx core.MetadataWriter, integration core.IntegrationContext, repository string) (*RepositoryMetadata, error) {
 	if repository == "" {
 		return nil, fmt.Errorf("repository is required")
 	}

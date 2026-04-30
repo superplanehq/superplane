@@ -2,7 +2,6 @@ import re
 import warnings
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode
 
 # Suppress a known pydantic warning emitted by generated OpenAPI models.
 # Keep this narrow to avoid hiding unrelated warnings.
@@ -17,6 +16,7 @@ warnings.filterwarnings(
 
 from ai.config import config as app_config
 from ai.models import (
+    CanvasChangeset,
     CanvasEdge,
     CanvasNode,
     CanvasShape,
@@ -25,30 +25,51 @@ from ai.models import (
     CanvasSummary,
     NodeDetails,
     NodeEvent,
+    NodeExecution,
 )
+from superplaneapi.api.action_api import ActionApi
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_node_api import CanvasNodeApi
-from superplaneapi.api.component_api import ComponentApi
+from superplaneapi.api.canvas_version_api import CanvasVersionApi
 from superplaneapi.api.integration_api import IntegrationApi
 from superplaneapi.api.organization_api import OrganizationApi
 from superplaneapi.api.trigger_api import TriggerApi
 from superplaneapi.api_client import ApiClient
 from superplaneapi.configuration import Configuration
 from superplaneapi.exceptions import ApiException
-from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
-from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
-from superplaneapi.models.components_component import ComponentsComponent
-from superplaneapi.models.components_describe_component_response import (
-    ComponentsDescribeComponentResponse,
+from superplaneapi.models.actions_describe_action_response import (
+    ActionsDescribeActionResponse,
 )
-from superplaneapi.models.components_list_components_response import (
-    ComponentsListComponentsResponse,
+from superplaneapi.models.actions_list_actions_response import (
+    ActionsListActionsResponse,
+)
+from superplaneapi.models.canvases_canvas_version import CanvasesCanvasVersion
+from superplaneapi.models.canvases_create_canvas_version_response import (
+    CanvasesCreateCanvasVersionResponse,
+)
+from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_describe_canvas_version_response import (
+    CanvasesDescribeCanvasVersionResponse,
+)
+from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
+from superplaneapi.models.canvases_list_node_executions_response import (
+    CanvasesListNodeExecutionsResponse,
+)
+from superplaneapi.models.canvases_validate_canvas_version_changeset_body import (
+    CanvasesValidateCanvasVersionChangesetBody,
+)
+from superplaneapi.models.canvases_validate_canvas_version_changeset_response import (
+    CanvasesValidateCanvasVersionChangesetResponse,
 )
 from superplaneapi.models.components_node_type import ComponentsNodeType
 from superplaneapi.models.configuration_field import ConfigurationField
 from superplaneapi.models.organizations_integration import OrganizationsIntegration
 from superplaneapi.models.organizations_list_integration_resources_response import (
     OrganizationsListIntegrationResourcesResponse,
+)
+from superplaneapi.models.superplane_actions_action import SuperplaneActionsAction
+from superplaneapi.models.superplane_components_node import (
+    SuperplaneComponentsNode as ComponentsNode,
 )
 from superplaneapi.models.superplane_integrations_list_integrations_response import (
     SuperplaneIntegrationsListIntegrationsResponse,
@@ -92,7 +113,8 @@ class SuperplaneClient:
         self._api_client.set_default_header("User-Agent", app_config.superplane_user_agent)  # type: ignore[no-untyped-call]
         self._canvas_api = CanvasApi(self._api_client)
         self._canvas_node_api = CanvasNodeApi(self._api_client)
-        self._component_api = ComponentApi(self._api_client)
+        self._canvas_version_api = CanvasVersionApi(self._api_client)
+        self._action_api = ActionApi(self._api_client)
         self._trigger_api = TriggerApi(self._api_client)
         self._integration_api = IntegrationApi(self._api_client)
         self._organization_api = OrganizationApi(self._api_client)
@@ -123,7 +145,7 @@ class SuperplaneClient:
 
             raise RuntimeError("Failed to reach Superplane API.") from error
 
-    def describe_canvas(self, canvas_id: str) -> CanvasSummary:
+    def _fetch_describe_canvas_response(self, canvas_id: str) -> CanvasesDescribeCanvasResponse:
         response = self._api_request(
             lambda: self._canvas_api.canvases_describe_canvas(
                 canvas_id,
@@ -134,33 +156,73 @@ class SuperplaneClient:
         )
         if not isinstance(response, CanvasesDescribeCanvasResponse):
             raise ValueError("Expected typed response from Superplane API.")
+        return response
 
-        raw_canvas = response.canvas
-        if raw_canvas is None:
-            raise ValueError("Canvas response is missing 'canvas'.")
-        metadata = raw_canvas.metadata
-        spec = raw_canvas.spec
+    def _fetch_describe_canvas_version_response(
+        self, canvas_id: str, version_id: str
+    ) -> CanvasesDescribeCanvasVersionResponse:
+        response = self._api_request(
+            lambda: self._canvas_version_api.canvases_describe_canvas_version(
+                canvas_id,
+                version_id,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_describe_canvas_version",
+            fields={"canvas_id": canvas_id, "version_id": version_id},
+        )
+        if not isinstance(response, CanvasesDescribeCanvasVersionResponse):
+            raise ValueError("Expected typed response from Superplane API.")
+        return response
+
+    @staticmethod
+    def _canvas_node_from_components_item(item: ComponentsNode) -> CanvasNode | None:
+        node_id = item.id
+        if not isinstance(node_id, str) or not node_id:
+            return None
+
+        block_name = item.component if isinstance(item.component, str) and item.component else None
+
+        return CanvasNode(
+            id=node_id,
+            name=item.name if isinstance(item.name, str) else None,
+            type=item.type.value if isinstance(item.type, ComponentsNodeType) else None,
+            block_name=block_name,
+        )
+
+    @staticmethod
+    def _configuration_dict_from_components_node(item: ComponentsNode) -> dict[str, Any]:
+        raw = item.configuration
+        if not isinstance(raw, dict):
+            return {}
+        return dict(raw)
+
+    @staticmethod
+    def _integration_summary_from_components_node(
+        item: ComponentsNode,
+    ) -> dict[str, str | None] | None:
+        ref = item.integration
+        if ref is None:
+            return None
+        out: dict[str, str | None] = {}
+        if isinstance(ref.id, str) and ref.id:
+            out["id"] = ref.id
+        if isinstance(ref.name, str) and ref.name:
+            out["name"] = ref.name
+        return out if out else None
+
+    def _build_canvas_summary(
+        self,
+        canvas_id: str,
+        name: str | None,
+        description: str | None,
+        spec: Any,
+    ) -> CanvasSummary:
         raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
         nodes: list[CanvasNode] = []
         for item in raw_nodes:
-            node_id = item.id
-            if not isinstance(node_id, str) or not node_id:
-                continue
-
-            block_name: str | None = None
-            if item.trigger is not None and isinstance(item.trigger.name, str):
-                block_name = item.trigger.name
-            elif item.component is not None and isinstance(item.component.name, str):
-                block_name = item.component.name
-
-            nodes.append(
-                CanvasNode(
-                    id=node_id,
-                    name=item.name if isinstance(item.name, str) else None,
-                    type=item.type.value if isinstance(item.type, ComponentsNodeType) else None,
-                    block_name=block_name,
-                )
-            )
+            mapped = self._canvas_node_from_components_item(item)
+            if mapped is not None:
+                nodes.append(mapped)
 
         raw_edges = spec.edges if spec is not None and spec.edges is not None else []
         edges: list[CanvasEdge] = []
@@ -179,16 +241,111 @@ class SuperplaneClient:
             )
 
         return CanvasSummary(
-            canvas_id=(
-                metadata.id if metadata is not None and isinstance(metadata.id, str) else canvas_id
-            ),
-            name=metadata.name if metadata is not None and isinstance(metadata.name, str) else None,
-            description=metadata.description
-            if metadata is not None and isinstance(metadata.description, str)
-            else None,
+            canvas_id=canvas_id,
+            name=name,
+            description=description,
             nodes=nodes,
             edges=edges,
         )
+
+    def _canvas_summary_from_describe_response(
+        self, response: CanvasesDescribeCanvasResponse, canvas_id: str
+    ) -> CanvasSummary:
+        raw_canvas = response.canvas
+        if raw_canvas is None:
+            raise ValueError("Canvas response is missing 'canvas'.")
+        metadata = raw_canvas.metadata
+        spec = raw_canvas.spec
+        resolved_id = (
+            metadata.id if metadata is not None and isinstance(metadata.id, str) else canvas_id
+        )
+        name = metadata.name if metadata is not None and isinstance(metadata.name, str) else None
+        description = (
+            metadata.description
+            if metadata is not None and isinstance(metadata.description, str)
+            else None
+        )
+        return self._build_canvas_summary(resolved_id, name, description, spec)
+
+    def _canvas_summary_from_version_object(
+        self, version: CanvasesCanvasVersion, canvas_id: str
+    ) -> CanvasSummary:
+        meta = version.metadata
+        resolved_id = canvas_id
+        if meta is not None and isinstance(meta.canvas_id, str) and meta.canvas_id:
+            resolved_id = meta.canvas_id
+        return self._build_canvas_summary(resolved_id, None, None, version.spec)
+
+    def _load_editing_canvas_bundle(
+        self, canvas_id: str, canvas_version_id: str
+    ) -> tuple[CanvasSummary, CanvasesCanvasVersion]:
+        vresp = self._fetch_describe_canvas_version_response(canvas_id, canvas_version_id)
+        version = vresp.version
+        if version is None:
+            raise ValueError("Canvas version response is missing 'version'.")
+        from_version = self._canvas_summary_from_version_object(version, canvas_id)
+        meta = self.describe_canvas(canvas_id)
+        merged = CanvasSummary(
+            canvas_id=from_version.canvas_id,
+            name=meta.name,
+            description=meta.description,
+            nodes=from_version.nodes,
+            edges=from_version.edges,
+        )
+        return merged, version
+
+    def describe_editing_canvas(
+        self, canvas_id: str, canvas_version_id: str | None
+    ) -> CanvasSummary:
+        if not canvas_version_id:
+            return self.describe_canvas(canvas_id)
+        summary, _version = self._load_editing_canvas_bundle(canvas_id, canvas_version_id)
+        return summary
+
+    def describe_canvas(self, canvas_id: str) -> CanvasSummary:
+        return self._canvas_summary_from_describe_response(
+            self._fetch_describe_canvas_response(canvas_id), canvas_id
+        )
+
+    def create_canvas_version(self, canvas_id: str) -> str:
+        response = self._api_request(
+            lambda: self._canvas_version_api.canvases_create_canvas_version(
+                canvas_id,
+                {},
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_create_canvas_version",
+            fields={"canvas_id": canvas_id},
+        )
+        if not isinstance(response, CanvasesCreateCanvasVersionResponse):
+            raise ValueError("Expected typed response from Superplane API.")
+
+        version = response.version
+        metadata = version.metadata if version is not None else None
+        version_id = metadata.id if metadata is not None and isinstance(metadata.id, str) else None
+        if not version_id:
+            raise ValueError("Canvas version create response is missing version metadata id.")
+        return version_id
+
+    def validate_canvas_version_changeset(
+        self,
+        canvas_id: str,
+        canvas_version_id: str,
+        changeset: CanvasChangeset,
+    ) -> CanvasesValidateCanvasVersionChangesetResponse:
+        response = self._api_request(
+            lambda: self._canvas_version_api.canvases_validate_canvas_version_changeset(
+                canvas_id,
+                canvas_version_id,
+                CanvasesValidateCanvasVersionChangesetBody(changeset=changeset),
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_validate_canvas_version_changeset",
+            fields={"canvas_id": canvas_id, "version_id": canvas_version_id},
+        )
+        if not isinstance(response, CanvasesValidateCanvasVersionChangesetResponse):
+            raise ValueError("Expected typed response from Superplane API.")
+        return response
 
     @staticmethod
     def _provider_from_name(name: str | None) -> str | None:
@@ -328,7 +485,7 @@ class SuperplaneClient:
         return serialized
 
     @staticmethod
-    def _serialize_component_list_item(component: ComponentsComponent) -> dict[str, Any]:
+    def _serialize_component_list_item(component: SuperplaneActionsAction) -> dict[str, Any]:
         """Compact shape for list_components only; use describe_component for full schema."""
         output_channels = component.output_channels or []
         names: list[str] = []
@@ -358,7 +515,7 @@ class SuperplaneClient:
         }
 
     @staticmethod
-    def _serialize_component(component: ComponentsComponent) -> dict[str, Any]:
+    def _serialize_component(component: SuperplaneActionsAction) -> dict[str, Any]:
         output_channels = component.output_channels or []
         configuration_fields = SuperplaneClient._serialize_configuration_fields(
             component.configuration
@@ -410,20 +567,21 @@ class SuperplaneClient:
     @staticmethod
     def _serialize_org_integration(integration: OrganizationsIntegration) -> dict[str, Any]:
         metadata = integration.metadata
-        spec = integration.spec
         status = integration.status
+        integration_name = metadata.integration_name if metadata is not None else None
+
         return {
             "id": metadata.id if metadata is not None else None,
             "name": metadata.name if metadata is not None else None,
-            "integration_name": spec.integration_name if spec is not None else None,
-            "provider": spec.integration_name if spec is not None else None,
+            "integration_name": integration_name,
+            "provider": integration_name,
             "state": status.state if status is not None else None,
             "state_description": status.state_description if status is not None else None,
         }
 
     @staticmethod
     def _serialize_available_integration(integration: Any) -> dict[str, Any]:
-        components = integration.components if isinstance(integration.components, list) else []
+        components = integration.actions if isinstance(integration.actions, list) else []
         triggers = integration.triggers if isinstance(integration.triggers, list) else []
         return {
             "name": integration.name,
@@ -452,34 +610,32 @@ class SuperplaneClient:
         query: str | None = None,
     ) -> list[dict[str, Any]]:
         response = self._api_request(
-            lambda: self._component_api.components_list_components(
+            lambda: self._action_api.actions_list_actions(
                 _request_timeout=self._config.timeout_seconds,
             ),
-            operation="components_list_components",
+            operation="actions_list_actions",
         )
-        if not isinstance(response, ComponentsListComponentsResponse):
+        if not isinstance(response, ActionsListActionsResponse):
             return []
-        root_components = response.components if isinstance(response.components, list) else []
-        components_by_name: dict[str, ComponentsComponent] = {}
+        root_components = response.actions if isinstance(response.actions, list) else []
+        components_by_name: dict[str, SuperplaneActionsAction] = {}
         for component in root_components:
-            if not isinstance(component, ComponentsComponent):
+            if not isinstance(component, SuperplaneActionsAction):
                 continue
             if isinstance(component.name, str) and component.name:
                 components_by_name[component.name] = component
 
-        # Integration-scoped components are exposed under /api/v1/integrations.
+        # Integration-scoped actions are exposed under /api/v1/integrations.
         try:
             integration_definitions = self._list_available_integrations_raw()
         except Exception as error:
-            _debug_log(f"integration_components_unavailable reason={error}")
+            _debug_log(f"integration_actions_unavailable reason={error}")
             integration_definitions = []
 
         for integration in integration_definitions:
-            scoped_components = (
-                integration.components if isinstance(integration.components, list) else []
-            )
+            scoped_components = integration.actions if isinstance(integration.actions, list) else []
             for component in scoped_components:
-                if not isinstance(component, ComponentsComponent):
+                if not isinstance(component, SuperplaneActionsAction):
                     continue
                 if isinstance(component.name, str) and component.name:
                     components_by_name[component.name] = component
@@ -502,17 +658,17 @@ class SuperplaneClient:
 
     def describe_component(self, name: str) -> dict[str, Any]:
         response = self._api_request(
-            lambda: self._component_api.components_describe_component(
+            lambda: self._action_api.actions_describe_action(
                 name,
                 _request_timeout=self._config.timeout_seconds,
             ),
-            operation="components_describe_component",
+            operation="actions_describe_action",
         )
-        if not isinstance(response, ComponentsDescribeComponentResponse) or not isinstance(
-            response.component, ComponentsComponent
+        if not isinstance(response, ActionsDescribeActionResponse) or not isinstance(
+            response.action, SuperplaneActionsAction
         ):
-            raise ValueError(f"Component '{name}' was not found or response shape was invalid.")
-        return self._serialize_component(response.component)
+            raise ValueError(f"Action '{name}' was not found or response shape was invalid.")
+        return self._serialize_component(response.action)
 
     def list_triggers(
         self,
@@ -604,6 +760,37 @@ class SuperplaneClient:
             if isinstance(integration, OrganizationsIntegration)
         ]
 
+    # This endpoint expects top-level query keys (e.g. `?type=project`) so grpc-gateway
+    # can map them into req.parameters["type"]. The generated OpenAPI clients model it as
+    # a single `parameters` query field, which sends `?parameters=type%3Dproject` and
+    # causes a 400 ("resource type is required"), so we build the request manually here.
+    def _list_integration_resources_raw(
+        self, integration_id: str, query_params: dict[str, str]
+    ) -> OrganizationsListIntegrationResourcesResponse | None:
+        request = self._api_client.param_serialize(
+            method="GET",
+            resource_path="/api/v1/organizations/{id}/integrations/{integrationId}/resources",
+            path_params={"id": self._config.organization_id, "integrationId": integration_id},
+            query_params=list(query_params.items()),
+            header_params={"Accept": "application/json"},
+            post_params=[],
+            files={},
+            auth_settings=[],
+            collection_formats={},
+        )
+        response_data = self._api_client.call_api(
+            *request,
+            _request_timeout=self._config.timeout_seconds,
+        )
+        response_data.read()  # type: ignore[no-untyped-call]
+        deserialized = self._api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map={"200": "OrganizationsListIntegrationResourcesResponse"},
+        )
+        if isinstance(deserialized.data, OrganizationsListIntegrationResourcesResponse):
+            return deserialized.data
+        return None
+
     def list_integration_resources(
         self,
         integration_id: str,
@@ -615,14 +802,8 @@ class SuperplaneClient:
             query_params.update(
                 {str(key): str(value) for key, value in parameters.items() if key and value}
             )
-        encoded_parameters = urlencode(query_params)
         response = self._api_request(
-            lambda: self._organization_api.organizations_list_integration_resources(
-                self._config.organization_id,
-                integration_id,
-                parameters=encoded_parameters,
-                _request_timeout=self._config.timeout_seconds,
-            ),
+            lambda: self._list_integration_resources_raw(integration_id, query_params),
             operation="organizations_list_integration_resources",
         )
         if not isinstance(response, OrganizationsListIntegrationResourcesResponse):
@@ -638,11 +819,11 @@ class SuperplaneClient:
             if resource is not None
         ]
 
-    def get_canvas_shape(self, canvas_id: str) -> CanvasShape:
-        summary = self.describe_canvas(canvas_id)
+    def get_canvas_shape(self, canvas_id: str, canvas_version_id: str | None = None) -> CanvasShape:
+        summary = self.describe_editing_canvas(canvas_id, canvas_version_id)
         node_kind_by_type = {
             "TYPE_TRIGGER": "trigger",
-            "TYPE_COMPONENT": "component",
+            "TYPE_ACTION": "action",
             "TYPE_BLUEPRINT": "blueprint",
             "TYPE_WIDGET": "widget",
         }
@@ -708,17 +889,107 @@ class SuperplaneClient:
         return events
 
     def get_node_details(
-        self, canvas_id: str, node_id: str, include_recent_events: bool = True
+        self,
+        canvas_id: str,
+        node_id: str,
+        include_recent_events: bool = True,
+        canvas_version_id: str | None = None,
     ) -> NodeDetails:
-        canvas = self.describe_canvas(canvas_id)
-        node = next((current for current in canvas.nodes if current.id == node_id), None)
-        if node is None:
-            raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+        if canvas_version_id:
+            canvas, version = self._load_editing_canvas_bundle(canvas_id, canvas_version_id)
+            node = next((current for current in canvas.nodes if current.id == node_id), None)
+            if node is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+            spec = version.spec
+            raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
+            raw_item = next(
+                (n for n in raw_nodes if isinstance(n.id, str) and n.id == node_id),
+                None,
+            )
+            if raw_item is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+        else:
+            response = self._fetch_describe_canvas_response(canvas_id)
+            canvas = self._canvas_summary_from_describe_response(response, canvas_id)
+            node = next((current for current in canvas.nodes if current.id == node_id), None)
+            if node is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+            raw_canvas = response.canvas
+            if raw_canvas is None:
+                raise ValueError("Canvas response is missing 'canvas'.")
+            spec = raw_canvas.spec
+            raw_nodes = spec.nodes if spec is not None and spec.nodes is not None else []
+            raw_item = next(
+                (n for n in raw_nodes if isinstance(n.id, str) and n.id == node_id),
+                None,
+            )
+            if raw_item is None:
+                raise ValueError(f"Node '{node_id}' not found in canvas '{canvas_id}'.")
+
+        configuration = self._configuration_dict_from_components_node(raw_item)
+        integration = self._integration_summary_from_components_node(raw_item)
+        error_message = raw_item.error_message if isinstance(raw_item.error_message, str) else None
+        warning_message = (
+            raw_item.warning_message if isinstance(raw_item.warning_message, str) else None
+        )
+        paused = raw_item.paused if isinstance(raw_item.paused, bool) else None
 
         recent_events = self.list_node_events(canvas_id, node_id) if include_recent_events else []
         return NodeDetails(
             canvas_id=canvas.canvas_id,
             node=node,
-            configuration={},
+            configuration=configuration,
+            error_message=error_message,
+            warning_message=warning_message,
+            paused=paused,
+            integration=integration,
             recent_events=recent_events,
         )
+
+    def list_node_executions(
+        self,
+        canvas_id: str,
+        node_id: str,
+        *,
+        limit: int = 10,
+        states: list[str] | None = None,
+        results: list[str] | None = None,
+    ) -> list[NodeExecution]:
+        response = self._api_request(
+            lambda: self._canvas_node_api.canvases_list_node_executions(
+                canvas_id,
+                node_id,
+                states=states,
+                results=results,
+                limit=limit,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="canvases_list_node_executions",
+            fields={"canvas_id": canvas_id, "node_id": node_id},
+        )
+        if not isinstance(response, CanvasesListNodeExecutionsResponse) or not isinstance(
+            response.executions, list
+        ):
+            return []
+
+        out: list[NodeExecution] = []
+        for item in response.executions:
+            if item is None:
+                continue
+            state_v = item.state.value if item.state is not None else None
+            result_v = item.result.value if item.result is not None else None
+            reason_v = item.result_reason.value if item.result_reason is not None else None
+            out.append(
+                NodeExecution(
+                    id=item.id if isinstance(item.id, str) else None,
+                    state=state_v,
+                    result=result_v,
+                    result_reason=reason_v,
+                    result_message=item.result_message
+                    if isinstance(item.result_message, str)
+                    else None,
+                    created_at=item.created_at.isoformat() if item.created_at is not None else None,
+                    updated_at=item.updated_at.isoformat() if item.updated_at is not None else None,
+                )
+            )
+        return out

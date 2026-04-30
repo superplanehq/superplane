@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { posthog } from "@/posthog";
 
 interface AccountImpersonation {
   active: boolean;
@@ -60,6 +61,14 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
         if (response.status === 200) {
           const accountData = await response.json();
           setAccount(accountData);
+
+          if (!accountData.impersonation?.active) {
+            posthog.identify(accountData.id, {
+              email: accountData.email,
+              name: accountData.name,
+              installation_admin: accountData.installation_admin,
+            });
+          }
         }
         // If response is not 200 (e.g., 307 redirect, 401, etc.), user is not authenticated
       } catch {

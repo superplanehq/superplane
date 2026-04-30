@@ -2,6 +2,7 @@ package digitalocean
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -36,6 +37,32 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listSpacesBuckets(ctx)
 	case "app":
 		return listApps(ctx)
+	case "database_cluster":
+		return listDatabaseClusters(ctx)
+	case "database":
+		return listDatabases(ctx)
+	case "database_cluster_version":
+		return listDatabaseClusterVersions(ctx)
+	case "database_cluster_size":
+		return listDatabaseClusterSizes(ctx)
+	case "embedding_model":
+		return listEmbeddingModels(ctx)
+	case "project":
+		return listProjects(ctx)
+	case "opensearch_database":
+		return listOpenSearchDatabases(ctx)
+	case "agent":
+		return listAgents(ctx)
+	case "knowledge_base":
+		return listKnowledgeBases(ctx)
+	case "knowledge_base_data_source":
+		return listKBDataSources(ctx)
+	case "agent_available_knowledge_base":
+		return listAgentAvailableKnowledgeBases(ctx)
+	case "agent_knowledge_base":
+		return listAgentKnowledgeBases(ctx)
+	case "evaluation_test_case":
+		return listEvaluationTestCases(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -237,6 +264,38 @@ func listLoadBalancers(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	return resources, nil
 }
 
+func listDatabases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	clusterID := ctx.Parameters["databaseCluster"]
+	if clusterID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if strings.Contains(clusterID, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	databases, err := client.ListDatabases(clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing databases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(databases))
+	for _, database := range databases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "database",
+			Name: database.Name,
+			ID:   database.Name,
+		})
+	}
+
+	return resources, nil
+}
+
 func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -255,6 +314,109 @@ func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource,
 			Name: ip.IP,
 			ID:   ip.IP,
 		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusters(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	clusters, err := client.ListDatabaseClusters()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database clusters: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(clusters))
+	for _, cluster := range clusters {
+		name := cluster.Name
+		if name == "" {
+			name = cluster.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "database_cluster",
+			Name: name,
+			ID:   cluster.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusterVersions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	engine := ctx.Parameters["engine"]
+	if engine == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	options, err := client.GetDatabaseOptions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database cluster versions: %w", err)
+	}
+
+	engineOptions, ok := options[engine]
+	if !ok {
+		return []core.IntegrationResource{}, nil
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(engineOptions.Versions))
+	for _, version := range engineOptions.Versions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "database_cluster_version",
+			Name: version,
+			ID:   version,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusterSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	engine := ctx.Parameters["engine"]
+	numNodes := ctx.Parameters["numNodes"]
+	if engine == "" || numNodes == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	options, err := client.GetDatabaseOptions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database cluster sizes: %w", err)
+	}
+
+	engineOptions, ok := options[engine]
+	if !ok {
+		return []core.IntegrationResource{}, nil
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, layout := range engineOptions.Layouts {
+		if fmt.Sprintf("%d", layout.NumNodes) != numNodes {
+			continue
+		}
+
+		resources = make([]core.IntegrationResource, 0, len(layout.Sizes))
+		for _, size := range layout.Sizes {
+			resources = append(resources, core.IntegrationResource{
+				Type: "database_cluster_size",
+				Name: size,
+				ID:   size,
+			})
+		}
+		break
 	}
 
 	return resources, nil
@@ -377,6 +539,255 @@ func listVPCs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 			Type: "vpc",
 			Name: vpc.Name,
 			ID:   vpc.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listEmbeddingModels(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	models, err := client.ListEmbeddingModels()
+	if err != nil {
+		return nil, fmt.Errorf("error listing embedding models: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(models))
+	for _, model := range models {
+		name := model.Name
+		if model.KBMinChunkSize > 0 && model.KBMaxChunkSize > 0 {
+			name = fmt.Sprintf("%s (%d–%d tokens)", model.Name, model.KBMinChunkSize, model.KBMaxChunkSize)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "embedding_model",
+			Name: name,
+			ID:   model.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	projects, err := client.ListProjects()
+	if err != nil {
+		return nil, fmt.Errorf("error listing projects: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(projects))
+	for _, project := range projects {
+		name := project.Name
+		if project.IsDefault {
+			name += " (default)"
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "project",
+			Name: name,
+			ID:   project.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listOpenSearchDatabases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	databases, err := client.ListDatabasesByEngine("opensearch")
+	if err != nil {
+		return nil, fmt.Errorf("error listing OpenSearch databases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(databases))
+	for _, db := range databases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "opensearch_database",
+			Name: db.Name,
+			ID:   db.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAgents(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agents, err := client.ListAgents()
+	if err != nil {
+		return nil, fmt.Errorf("error listing agents: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(agents))
+	for _, agent := range agents {
+		resources = append(resources, core.IntegrationResource{
+			Type: "agent",
+			Name: agent.Name,
+			ID:   agent.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAgentKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	agentID := ctx.Parameters["agent"]
+	if agentID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agent, err := client.GetAgent(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching agent: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(agent.KnowledgeBases))
+	for _, kb := range agent.KnowledgeBases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "agent_knowledge_base",
+			Name: kb.Name,
+			ID:   kb.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAgentAvailableKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	agentID := ctx.Parameters["agent"]
+	if agentID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agent, err := client.GetAgent(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching agent: %w", err)
+	}
+
+	attached := make(map[string]bool, len(agent.KnowledgeBases))
+	for _, kb := range agent.KnowledgeBases {
+		attached[kb.UUID] = true
+	}
+
+	kbs, err := client.ListKnowledgeBases()
+	if err != nil {
+		return nil, fmt.Errorf("error listing knowledge bases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(kbs))
+	for _, kb := range kbs {
+		if !attached[kb.UUID] {
+			resources = append(resources, core.IntegrationResource{
+				Type: "agent_available_knowledge_base",
+				Name: kb.Name,
+				ID:   kb.UUID,
+			})
+		}
+	}
+
+	return resources, nil
+}
+
+func listKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	kbs, err := client.ListKnowledgeBases()
+	if err != nil {
+		return nil, fmt.Errorf("error listing knowledge bases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(kbs))
+	for _, kb := range kbs {
+		resources = append(resources, core.IntegrationResource{
+			Type: "knowledge_base",
+			Name: kb.Name,
+			ID:   kb.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listKBDataSources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	kbUUID := ctx.Parameters["knowledgeBase"]
+	if kbUUID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	dataSources, err := client.ListKBDataSources(kbUUID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing data sources: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(dataSources))
+	for _, ds := range dataSources {
+		name := ds.UUID
+		if ds.BucketName != "" {
+			name = fmt.Sprintf("%s (%s)", ds.BucketName, ds.Region)
+		} else if ds.WebCrawlerDataSource != nil && ds.WebCrawlerDataSource.BaseURL != "" {
+			name = ds.WebCrawlerDataSource.BaseURL
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "knowledge_base_data_source",
+			Name: name,
+			ID:   ds.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listEvaluationTestCases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	testCases, err := client.ListEvaluationTestCases()
+	if err != nil {
+		return nil, fmt.Errorf("error listing evaluation test cases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(testCases))
+	for _, tc := range testCases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "evaluation_test_case",
+			Name: tc.Name,
+			ID:   tc.UUID,
 		})
 	}
 

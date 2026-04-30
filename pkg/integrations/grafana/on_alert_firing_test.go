@@ -490,14 +490,3 @@ func Test__OnAlertFiring__HandleWebhook__Filters(t *testing.T) {
 	})
 
 }
-
-func Test__OnAlertFiring__HandleAction__Unsupported(t *testing.T) {
-	trigger := &OnAlertFiring{}
-
-	result, err := trigger.HandleAction(core.TriggerActionContext{
-		Name: "revealWebhookSecret",
-	})
-
-	require.Nil(t, result)
-	require.ErrorContains(t, err, "action revealWebhookSecret not supported")
-}

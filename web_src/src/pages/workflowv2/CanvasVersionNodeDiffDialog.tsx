@@ -1,13 +1,10 @@
-import type {
-  CanvasesCanvasChangeRequest,
-  CanvasesCanvasChangeRequestApprovalConfig,
-  CanvasesCanvasVersion,
-} from "@/api-client";
+import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { formatTimestamp, summarizeNodeDiff, VersionNodeDiffAccordion } from "./VersionNodeDiff";
+import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 import { getChangeRequestReviewActionFlags, getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 
 export type CanvasVersionNodeDiffContext = {
@@ -36,7 +33,7 @@ export function CanvasVersionNodeDiffDialog({
   context: CanvasVersionNodeDiffContext | null;
   onOpenChange: (open: boolean) => void;
   liveVersionOwnerProfilesById?: Map<string, { name: string; avatarUrl?: string }>;
-  changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
+  changeRequestApprovalConfig?: CanvasChangeManagement;
   canActOnChangeRequests?: boolean;
   currentUserId?: string;
   changeRequestActionPending?: boolean;
@@ -217,6 +214,12 @@ export function CanvasVersionNodeDiffDialog({
             </DialogDescription>
           ) : null}
         </DialogHeader>
+
+        {effectiveChangeRequest?.metadata?.description?.trim() ? (
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+            <WorkflowMarkdownPreview content={effectiveChangeRequest.metadata.description} />
+          </div>
+        ) : null}
 
         {showReviewActionsSection ? (
           <div

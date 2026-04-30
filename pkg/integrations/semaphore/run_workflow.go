@@ -358,6 +358,8 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	pipelineState, _ := pipelineData["state"].(string)
 	pipelineResult, _ := pipelineData["result"].(string)
 
+	ctx.Logger.Infof("Received webhook for pipeline %s (state=%s, result=%s)", pipelineID, pipelineState, pipelineResult)
+
 	executionCtx, err := ctx.FindExecutionByKV("pipeline", pipelineID)
 
 	//
@@ -365,6 +367,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	// so we just ignore them.
 	//
 	if err != nil {
+		ctx.Logger.Infof("No execution found for pipeline %s: %v", pipelineID, err)
 		return http.StatusOK, nil, nil
 	}
 
@@ -378,6 +381,7 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	// Already finished, do not do anything.
 	//
 	if metadata.Pipeline.State == PipelineStateDone {
+		ctx.Logger.Infof("Pipeline %s already marked as done, skipping", pipelineID)
 		return http.StatusOK, nil, nil
 	}
 
@@ -407,18 +411,19 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 		return http.StatusInternalServerError, nil, err
 	}
 
+	ctx.Logger.Infof("Pipeline %s finished with result=%s, emitted to channel", pipelineID, pipelineResult)
 	return http.StatusOK, nil, nil
 }
 
-func (r *RunWorkflow) Actions() []core.Action {
-	return []core.Action{
+func (r *RunWorkflow) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 		{
-			Name:           "finish",
-			UserAccessible: true,
+			Name: "finish",
+			Type: core.HookTypeUser,
 			Parameters: []configuration.Field{
 				{
 					Name:     "data",
@@ -431,7 +436,7 @@ func (r *RunWorkflow) Actions() []core.Action {
 	}
 }
 
-func (r *RunWorkflow) HandleAction(ctx core.ActionContext) error {
+func (r *RunWorkflow) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return r.poll(ctx)
@@ -442,7 +447,7 @@ func (r *RunWorkflow) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (r *RunWorkflow) poll(ctx core.ActionContext) error {
+func (r *RunWorkflow) poll(ctx core.ActionHookContext) error {
 	spec := RunWorkflowSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
@@ -506,7 +511,7 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
 }
 
-func (r *RunWorkflow) finish(ctx core.ActionContext) error {
+func (r *RunWorkflow) finish(ctx core.ActionHookContext) error {
 	metadata := RunWorkflowExecutionMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {

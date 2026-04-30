@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,10 +16,11 @@ import (
 // AssetHandler serves static files from the assets filesystem
 // and handles SPA routing by serving index.html for non-asset routes.
 type AssetHandler struct {
-	assets       http.FileSystem
-	basePath     string
-	indexContent []byte
-	indexModTime time.Time
+	assets        http.FileSystem
+	basePath      string
+	indexContent  []byte
+	indexModTime  time.Time
+	shouldNoIndex bool
 }
 
 // NewAssetHandler creates a new AssetHandler with the given file system.
@@ -26,15 +28,20 @@ func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 	indexContent, indexModTime := loadIndexContent(assets)
 
 	return &AssetHandler{
-		assets:       assets,
-		basePath:     basePath,
-		indexContent: indexContent,
-		indexModTime: indexModTime,
+		assets:        assets,
+		basePath:      basePath,
+		indexContent:  indexContent,
+		indexModTime:  indexModTime,
+		shouldNoIndex: os.Getenv("APP_ENV") != "production",
 	}
 }
 
 // ServeHTTP implements the http.Handler interface.
 func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h.shouldNoIndex {
+		w.Header().Set("X-Robots-Tag", "noindex")
+	}
+
 	// Handle /assets/* paths
 	if h.isAssetPath(r.URL.Path) {
 		h.serveAsset(w, r)

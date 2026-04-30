@@ -1,47 +1,32 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import type { MetadataItem } from "@/ui/metadataList";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
-  SubtitleContext,
 } from "../types";
-import type { MetadataItem } from "@/ui/metadataList";
-import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import type { QueryDataSourceConfiguration } from "./types";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { truncate } from "../safeMappers";
 import { formatTimestamp } from "../utils";
+import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
+import { asRecord, getFrameRowCount } from "./queryResponse";
+import type { QueryDataSourceConfiguration } from "./types";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const componentName = context.componentDefinition.name || "unknown";
-
-    return {
-      iconSrc: grafanaIcon,
-      collapsedBackground: "bg-white",
-      collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(context.node),
-      includeEmptyState: !lastExecution,
-      eventStateMap: getStateMap(componentName),
-    };
+  props(context: ComponentBaseContext) {
+    return grafanaComponentBaseProps(context, metadataList(context.node));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const configuration = context.node.configuration as QueryDataSourceConfiguration | undefined;
+    const dataSource = configuration?.dataSource;
     const details: Record<string, string> = {
       "Queried At": formatTimestamp(context.execution.createdAt),
     };
 
-    if (configuration?.dataSourceUid) {
-      details["Data Source"] = configuration.dataSourceUid;
+    if (dataSource) {
+      details["Data Source"] = dataSource;
     }
 
     if (configuration?.query) {
@@ -75,23 +60,20 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string | React.ReactNode {
-    if (!context.execution.createdAt) return "-";
-    return renderTimeAgo(new Date(context.execution.createdAt));
-  },
+  subtitle: grafanaCreatedAtSubtitle,
 };
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as QueryDataSourceConfiguration;
+  const dataSource = configuration?.dataSource;
 
-  if (configuration?.dataSourceUid) {
-    metadata.push({ icon: "database", label: `Data Source: ${configuration.dataSourceUid}` });
+  if (dataSource) {
+    metadata.push({ icon: "database", label: `Data Source: ${dataSource}` });
   }
 
   if (configuration?.query) {
-    const preview =
-      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
+    const preview = truncate(configuration.query, 50);
     metadata.push({ icon: "code", label: preview });
   }
 
@@ -99,28 +81,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "funnel", label: `Format: ${configuration.format}` });
   }
 
-  if (configuration?.timezone) {
-    metadata.push({ icon: "schedule", label: `Timezone: ${configuration.timezone}` });
-  }
-
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Trigger event";
-
-  return [
-    {
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id || "",
-    },
-  ];
 }
 
 function buildQueryResultSummary(responseData: Record<string, unknown>): Record<string, string> {
@@ -198,29 +159,4 @@ function collectFieldNames(frame: Record<string, unknown>, fieldNames: Set<strin
       fieldNames.add(field.name);
     }
   }
-}
-
-function getFrameRowCount(frame: Record<string, unknown>): number {
-  const data = asRecord(frame.data);
-  const values = data?.values;
-  if (!Array.isArray(values)) {
-    return 0;
-  }
-
-  let maxLength = 0;
-  for (const column of values) {
-    if (Array.isArray(column) && column.length > maxLength) {
-      maxLength = column.length;
-    }
-  }
-
-  return maxLength;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-
-  return value as Record<string, unknown>;
 }

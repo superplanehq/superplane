@@ -75,7 +75,7 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 	}
 
 	// Find shadowed names within connected components
-	nodeWarnings := actions.FindShadowedNameWarnings(blueprint.Nodes, blueprint.Edges)
+	nodeWarnings := actions.FindShadowedNameWarnings(registry, blueprint.Nodes, blueprint.Edges)
 
 	for i, edge := range blueprint.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -111,46 +111,37 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *componentpb.Node) error {
-	switch node.Type {
-	case componentpb.Node_TYPE_COMPONENT:
-		if node.Component == nil {
-			return fmt.Errorf("component reference is required for component ref type")
-		}
-
-		if node.Component.Name == "" {
-			return fmt.Errorf("component name is required")
-		}
-
-		// Check if this is an application component (contains a dot)
-		parts := strings.SplitN(node.Component.Name, ".", 2)
-		if len(parts) > 2 {
-			return fmt.Errorf("invalid component name: %s", node.Component.Name)
-		}
-
-		// For application components, validate the app installation
-		if len(parts) == 2 {
-			if err := validateIntegration(organizationID, node.Integration); err != nil {
-				return err
-			}
-		}
-
-		_, err := registry.GetComponent(node.Component.Name)
-		if err != nil {
-			return fmt.Errorf("component %s not found", node.Component.Name)
-		}
-
-		return nil
-	default:
-		return fmt.Errorf("invalid node type")
+	if node.Component == "" {
+		return fmt.Errorf("component name is required")
 	}
+
+	// Check if this is an application action (contains a dot)
+	parts := strings.SplitN(node.Component, ".", 2)
+	if len(parts) > 2 {
+		return fmt.Errorf("invalid component name: %s", node.Component)
+	}
+
+	// For application components, validate the app installation
+	if len(parts) == 2 {
+		if err := validateIntegration(organizationID, node.Integration); err != nil {
+			return err
+		}
+	}
+
+	_, err := registry.GetAction(node.Component)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func validateIntegration(organizationID string, ref *componentpb.IntegrationRef) error {
-	if ref == nil || ref.Id == "" {
+	if ref == nil || ref.Id == nil {
 		return fmt.Errorf("integration is required")
 	}
 
-	integrationID, err := uuid.Parse(ref.Id)
+	integrationID, err := uuid.Parse(*ref.Id)
 	if err != nil {
 		return fmt.Errorf("invalid integration ID: %v", err)
 	}

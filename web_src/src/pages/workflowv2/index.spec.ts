@@ -1,11 +1,13 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComponentsComponent, ComponentsNode } from "@/api-client";
+import type { SuperplaneActionsAction, SuperplaneComponentsNode } from "@/api-client";
+import { makeCanvas, makeComponentsNode } from "@/test/factories";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
 import { createSafeCustomFieldRenderer } from "./mappers/safeMappers";
 import { prepareComponentBaseNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
+import { getWorkflowSaveSignature } from "./utils";
 
 type FallbackComponentData = {
   renderFallback?: {
@@ -16,25 +18,24 @@ type FallbackComponentData = {
     error?: string;
     emptyStateProps?: {
       title?: string;
+      purpose?: string;
     };
   };
 };
 
-function makeNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
-  return {
+function makeNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {
+  return makeComponentsNode({
     id: "node-1",
     name: "Broken Component",
-    type: "TYPE_COMPONENT",
+    type: "TYPE_ACTION",
     position: { x: 10, y: 20 },
-    component: {
-      name: "approval",
-    },
+    component: "approval",
     configuration: {},
     ...overrides,
-  } as ComponentsNode;
+  });
 }
 
-function makeComponent(overrides: Partial<ComponentsComponent> = {}): ComponentsComponent {
+function makeComponent(overrides: Partial<SuperplaneActionsAction> = {}): SuperplaneActionsAction {
   return {
     name: "approval",
     label: "Approval",
@@ -42,21 +43,19 @@ function makeComponent(overrides: Partial<ComponentsComponent> = {}): Components
     color: "orange",
     outputChannels: [{ name: "default" }],
     ...overrides,
-  } as ComponentsComponent;
+  } as SuperplaneActionsAction;
 }
 
-function makeTriggerNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
-  return {
+function makeTriggerNode(overrides: Partial<SuperplaneComponentsNode> = {}): SuperplaneComponentsNode {
+  return makeComponentsNode({
     id: "trigger-1",
     name: "Incoming Event",
     type: "TYPE_TRIGGER",
     position: { x: 0, y: 0 },
-    trigger: {
-      name: "webhook",
-    },
+    component: "webhook",
     configuration: {},
     ...overrides,
-  } as ComponentsNode;
+  });
 }
 
 describe("canvas node preparation resilience", () => {
@@ -65,11 +64,6 @@ describe("canvas node preparation resilience", () => {
   });
 
   it("returns a fallback canvas node when component preparation fails", () => {
-    vi.spyOn(mappers, "getComponentAdditionalDataBuilder").mockReturnValue({
-      buildAdditionalData: () => {
-        throw new Error("builder failed");
-      },
-    });
     vi.spyOn(mappers, "getComponentBaseMapper").mockReturnValue({
       props: () => {
         throw new Error("mapper failed");
@@ -86,7 +80,6 @@ describe("canvas node preparation resilience", () => {
       nodeQueueItemsMap: {},
       canvasId: "canvas-1",
       queryClient: new QueryClient(),
-      organizationId: "org-1",
     });
 
     const fallbackData = result.data as unknown as FallbackComponentData;
@@ -97,6 +90,7 @@ describe("canvas node preparation resilience", () => {
     });
     expect(fallbackData.component.error).toBeUndefined();
     expect(fallbackData.component.emptyStateProps?.title).toBe("Can't display");
+    expect(fallbackData.component.emptyStateProps?.purpose).toBe("fallback");
   });
 
   it("returns null when a custom field renderer throws so sidebar rendering stays alive", () => {
@@ -146,5 +140,40 @@ describe("canvas node preparation resilience", () => {
 
     expect(triggerData.trigger.error).toBeUndefined();
     expect(triggerData.trigger.warning).toBeUndefined();
+  });
+});
+
+describe("getWorkflowSaveSignature", () => {
+  it("treats integration refs with the same id as the same saved draft even when only the display name differs", () => {
+    const workflowWithIntegrationName = makeCanvas({
+      spec: {
+        nodes: [
+          makeNode({
+            integration: {
+              id: "integration-1",
+              name: "github-1",
+            },
+          }),
+        ],
+        edges: [],
+      },
+    });
+
+    const workflowWithPersistedIntegrationShape = makeCanvas({
+      spec: {
+        nodes: [
+          makeNode({
+            integration: {
+              id: "integration-1",
+            },
+          }),
+        ],
+        edges: [],
+      },
+    });
+
+    expect(getWorkflowSaveSignature(workflowWithIntegrationName)).toBe(
+      getWorkflowSaveSignature(workflowWithPersistedIntegrationShape),
+    );
   });
 });

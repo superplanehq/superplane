@@ -21,7 +21,6 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
-import type { ChildEventsState } from "../composite";
 import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
@@ -32,10 +31,9 @@ import type {
   AuthorizationDomainType,
   ConfigurationField,
   CanvasesCanvasNodeExecution,
-  ComponentsNode,
-  ComponentsComponent,
+  SuperplaneComponentsNode as ComponentsNode,
+  SuperplaneActionsAction,
   TriggersTrigger,
-  BlueprintsBlueprint,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
@@ -43,6 +41,7 @@ import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { analytics, useIntegrationConfigureOpen } from "@/lib/analytics";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -56,14 +55,13 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
-  setIsOpen?: (isOpen: boolean) => void;
+  canvasMode?: "live" | "edit";
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
   nodeId?: string;
   iconSrc?: string;
   iconSlug?: string;
-  iconColor?: string;
   totalInQueueCount: number;
   totalInHistoryCount: number;
   hideQueueEvents?: boolean;
@@ -73,19 +71,7 @@ interface ComponentSidebarProps {
   onSeeFullHistory?: () => void;
   onSeeQueue?: () => void;
 
-  // Action handlers
-  onRun?: () => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
-  onDuplicate?: () => void;
-  onDocs?: () => void;
-  onEdit?: () => void;
-  onConfigure?: () => void;
-  onDeactivate?: () => void;
-  onToggleView?: () => void;
-  onDelete?: () => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  isCompactView?: boolean;
 
   // Tab data function to get tab data for each event
   getTabData?: (event: SidebarEvent) => TabData | undefined;
@@ -93,8 +79,6 @@ interface ComponentSidebarProps {
   // Execution and Queue actions
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  onPushThrough?: (executionId: string) => void;
-  supportsPushThrough?: boolean;
 
   // Full history props
   getAllHistoryEvents?: () => SidebarEvent[];
@@ -162,9 +146,8 @@ interface ComponentSidebarProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
+  actions?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
 
   // Highlighting callback for execution chain nodes
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
@@ -180,6 +163,7 @@ interface ComponentSidebarProps {
 
 export const ComponentSidebar = ({
   isOpen,
+  canvasMode = "live",
   nodeId,
   iconSrc,
   iconSlug,
@@ -192,23 +176,10 @@ export const ComponentSidebar = ({
   hideQueueEvents = false,
   onSeeQueue,
   onSeeFullHistory,
-  onRun: _onRun,
-  runDisabled: _runDisabled,
-  runDisabledTooltip: _runDisabledTooltip,
-  onDuplicate: _onDuplicate,
-  onDocs: _onDocs,
-  onEdit: _onEdit,
-  onConfigure: _onConfigure,
-  onDeactivate: _onDeactivate,
-  onToggleView: _onToggleView,
-  onDelete: _onDelete,
   onReEmit,
-  isCompactView: _isCompactView = false,
   getTabData,
   onCancelQueueItem,
   onCancelExecution,
-  onPushThrough,
-  supportsPushThrough,
   onLoadMoreHistory,
   getAllHistoryEvents,
   getHasMoreHistory,
@@ -249,9 +220,8 @@ export const ComponentSidebar = ({
   componentPayloadLabel,
   componentDocumentationUrl,
   workflowNodes = [],
-  components = [],
+  actions = [],
   triggers = [],
-  blueprints = [],
   onHighlightedNodesChange,
   executionChainEventId,
   executionChainExecutionId,
@@ -274,9 +244,21 @@ export const ComponentSidebar = ({
   const [activeExecutionChainEventId, setActiveExecutionChainEventId] = useState<string | null>(null);
   const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
-  const activeTab = currentTab || "latest";
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
+  const shouldShowRunsTab = !hideRunsTab && canvasMode === "live";
+  const activeTab = useMemo(() => {
+    if (shouldShowRunsTab || currentTab !== "latest") {
+      return currentTab || "latest";
+    }
+
+    return "settings";
+  }, [currentTab, shouldShowRunsTab]);
+
+  useEffect(() => {
+    if (!shouldShowRunsTab && currentTab === "latest") {
+      onTabChange?.("settings");
+    }
+  }, [currentTab, onTabChange, shouldShowRunsTab]);
+
   const [justCopied, setJustCopied] = useState(false);
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
@@ -290,15 +272,23 @@ export const ComponentSidebar = ({
     configureIntegrationId ?? "",
   );
   const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
-  const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const createIntegrationMutation = useCreateIntegration(domainId ?? "", "node_configuration");
   const configureIntegrationDefinition = useMemo(
     () =>
-      configureIntegration?.spec?.integrationName
-        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.spec?.integrationName)
+      configureIntegration?.metadata?.integrationName
+        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.metadata?.integrationName)
         : undefined,
-    [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
+    [availableIntegrationDefinitions, configureIntegration?.metadata?.integrationName],
   );
   const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
+
+  useIntegrationConfigureOpen(
+    configureIntegration ?? undefined,
+    configureIntegrationId,
+    "node_configuration",
+    domainId,
+  );
+
   const createIntegrationDefinition = useMemo(
     () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
     [availableIntegrationDefinitions, integrationName],
@@ -308,7 +298,7 @@ export const ComponentSidebar = ({
     if (!domainId) return "#";
     const selectedIntegrationId =
       integrationRef?.id ||
-      integrations?.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
+      integrations?.find((integration) => integration.metadata?.integrationName === selectedIntegrationForDialog?.name)
         ?.metadata?.id;
     if (selectedIntegrationId) {
       return `/${domainId}/settings/integrations/${selectedIntegrationId}`;
@@ -326,7 +316,10 @@ export const ComponentSidebar = ({
 
   const handleOpenCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(true);
-  }, []);
+    if (integrationName && domainId) {
+      analytics.integrationConnectStart(integrationName, "node_configuration", domainId);
+    }
+  }, [integrationName, domainId]);
 
   const handleCloseCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(false);
@@ -400,9 +393,9 @@ export const ComponentSidebar = ({
 
   useEffect(() => {
     setConfigureIntegrationName(
-      configureIntegration?.metadata?.name || configureIntegration?.spec?.integrationName || "",
+      configureIntegration?.metadata?.name || configureIntegration?.metadata?.integrationName || "",
     );
-  }, [configureIntegration?.metadata?.name, configureIntegration?.spec?.integrationName]);
+  }, [configureIntegration?.metadata?.name, configureIntegration?.metadata?.integrationName]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -493,8 +486,6 @@ export const ComponentSidebar = ({
     } else {
       setPage("overview");
     }
-    setSearchQuery("");
-    setStatusFilter("all");
     setActiveExecutionChainEventId(null);
     setActiveExecutionChainTriggerEvent(null);
     setSelectedExecutionId(null);
@@ -601,27 +592,6 @@ export const ComponentSidebar = ({
     }
   }, [allEvents, totalInHistoryCount, totalInQueueCount, listPage]);
 
-  const filteredHistoryEvents = React.useMemo(() => {
-    if (!allEvents) return [];
-    let events = allEvents;
-
-    if (statusFilter !== "all") {
-      events = events.filter((event) => event.state === statusFilter);
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      events = events.filter(
-        (event) =>
-          event.title.toLowerCase().includes(query) ||
-          (typeof event.subtitle === "string" && event.subtitle?.toLowerCase().includes(query)) ||
-          Object.values(event.values || {}).some((value) => String(value).toLowerCase().includes(query)),
-      );
-    }
-
-    return events;
-  }, [allEvents, statusFilter, searchQuery]);
-
   // Clear highlights when sidebar closes or when leaving execution chain page
   useEffect(() => {
     if (!isOpen && onHighlightedNodesChange) {
@@ -645,7 +615,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
+      className="ph-no-capture border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -713,7 +683,7 @@ export const ComponentSidebar = ({
             {showSettingsTab && (
               <div className="border-border border-b-1">
                 <div className="flex px-4">
-                  {!hideRunsTab && (
+                  {shouldShowRunsTab && (
                     <button
                       onClick={() => onTabChange?.("latest")}
                       className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
@@ -754,34 +724,34 @@ export const ComponentSidebar = ({
               </div>
             )}
 
-            <TabsContent
-              value="latest"
-              className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
-              style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
-            >
-              <LatestTab
-                latestEvents={latestEvents}
-                nextInQueueEvents={nextInQueueEvents}
-                totalInQueueCount={totalInQueueCount}
-                hideQueueEvents={hideQueueEvents}
-                openEventIds={openEventIds}
-                onToggleOpen={handleToggleOpen}
-                onEventClick={onEventClick}
-                onSeeFullHistory={handleSeeFullHistory}
-                onSeeQueue={handleSeeQueue}
-                onSeeExecutionChain={handleSeeExecutionChain}
-                getTabData={getTabData}
-                onCancelQueueItem={onCancelQueueItem}
-                onCancelExecution={onCancelExecution}
-                onPushThrough={onPushThrough}
-                supportsPushThrough={supportsPushThrough}
-                onReEmit={onReEmit}
-                loadExecutionChain={loadExecutionChain}
-                getExecutionState={getExecutionState}
-                workflowNodes={workflowNodes}
-                components={components}
-              />
-            </TabsContent>
+            {shouldShowRunsTab && (
+              <TabsContent
+                value="latest"
+                className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
+                style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
+              >
+                <LatestTab
+                  latestEvents={latestEvents}
+                  nextInQueueEvents={nextInQueueEvents}
+                  totalInQueueCount={totalInQueueCount}
+                  hideQueueEvents={hideQueueEvents}
+                  openEventIds={openEventIds}
+                  onToggleOpen={handleToggleOpen}
+                  onEventClick={onEventClick}
+                  onSeeFullHistory={handleSeeFullHistory}
+                  onSeeQueue={handleSeeQueue}
+                  onSeeExecutionChain={handleSeeExecutionChain}
+                  getTabData={getTabData}
+                  onCancelQueueItem={onCancelQueueItem}
+                  onCancelExecution={onCancelExecution}
+                  onReEmit={onReEmit}
+                  loadExecutionChain={loadExecutionChain}
+                  getExecutionState={getExecutionState}
+                  workflowNodes={workflowNodes}
+                  actions={actions}
+                />
+              </TabsContent>
+            )}
 
             {showSettingsTab && (
               <TabsContent value="settings" className="mt-0">
@@ -852,7 +822,7 @@ export const ComponentSidebar = ({
                     previousPage === "queue") && (
                     <HistoryQueuePage
                       page={(page === "execution-chain" ? previousPage : page) as "history" | "queue"}
-                      filteredEvents={filteredHistoryEvents}
+                      events={allEvents}
                       openEventIds={openEventIds}
                       onToggleOpen={handleToggleOpen}
                       onEventClick={onEventClick}
@@ -877,9 +847,7 @@ export const ComponentSidebar = ({
                         }
                       }}
                       getTabData={getTabData}
-                      onPushThrough={onPushThrough}
                       onCancelExecution={onCancelExecution}
-                      supportsPushThrough={supportsPushThrough}
                       onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
                       getExecutionState={getExecutionState}
@@ -887,8 +855,6 @@ export const ComponentSidebar = ({
                       loadingMoreItems={loadingMoreItems}
                       showMoreCount={showMoreCount}
                       onLoadMoreItems={handleLoadMoreItems}
-                      searchQuery={searchQuery}
-                      statusFilter={statusFilter}
                     />
                   )}
                 </div>
@@ -909,10 +875,10 @@ export const ComponentSidebar = ({
                       getTabData={getTabData}
                       onEventClick={onEventClick}
                       workflowNodes={workflowNodes}
-                      components={components}
+                      actions={actions}
                       triggers={triggers}
-                      blueprints={blueprints}
                       onHighlightedNodesChange={onHighlightedNodesChange}
+                      organizationId={domainId}
                     />
                   )}
                 </div>
@@ -960,15 +926,15 @@ export const ComponentSidebar = ({
               <DialogHeader>
                 <div className="flex items-center gap-3">
                   <IntegrationIcon
-                    integrationName={configureIntegration.spec?.integrationName}
+                    integrationName={configureIntegration.metadata?.integrationName}
                     iconSlug={configureIntegrationDefinition?.icon}
                     className="h-6 w-6 text-gray-500 dark:text-gray-400"
                   />
                   <div className="flex items-center gap-2">
                     <DialogTitle>
                       Configure{" "}
-                      {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
-                        configureIntegration.spec?.integrationName}
+                      {getIntegrationTypeDisplayName(undefined, configureIntegration.metadata?.integrationName) ||
+                        configureIntegration.metadata?.integrationName}
                     </DialogTitle>
                     <a
                       href={

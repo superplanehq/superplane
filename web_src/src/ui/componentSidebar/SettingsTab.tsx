@@ -131,7 +131,7 @@ export function SettingsTab({
   // All installations of this integration type (ready, error, pending)
   const integrationsOfType = useMemo(() => {
     if (!integrationName) return [];
-    return integrations.filter((i) => i.spec?.integrationName === integrationName);
+    return integrations.filter((i) => i.metadata?.integrationName === integrationName);
   }, [integrations, integrationName]);
   const selectedIntegrationFull = useMemo(() => {
     const id = selectedIntegration?.id ?? integrationRef?.id;
@@ -466,9 +466,9 @@ export function SettingsTab({
         }
       }}
     >
-      <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
+      <div className="space-y-6">
         {/* Node identification section — always visible */}
-        <div className="flex flex-col gap-2">
+        <div className={`flex flex-col gap-2 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}>
           <Label className="min-w-[100px] text-left">
             Name
             <span className="text-gray-800 ml-1">*</span>
@@ -486,9 +486,42 @@ export function SettingsTab({
           />
         </div>
 
+        {/* Run title field — rendered right after name, before the separator */}
+        {(() => {
+          const runTitleField = configurationFields?.find((f) => f.name === "customName");
+          if (!runTitleField || !shouldShowConfiguration) return null;
+          return (
+            <div className={isReadOnly ? "pointer-events-none opacity-60" : ""}>
+              <ConfigurationFieldRenderer
+                allowExpressions={true}
+                field={runTitleField}
+                value={nodeConfiguration[runTitleField.name!]}
+                onChange={(value) => {
+                  setNodeConfiguration((prev) => ({
+                    ...prev,
+                    [runTitleField.name!]: value,
+                  }));
+                  if (value === undefined || value === null || value === "") {
+                    requestAutosave();
+                  }
+                }}
+                allValues={nodeConfiguration}
+                domainId={domainId}
+                domainType={domainType}
+                organizationId={domainId}
+                autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                realtimeValidationErrors={realtimeValidationErrors}
+                enableRealtimeValidation={true}
+              />
+            </div>
+          );
+        })()}
+
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+          <div
+            className={`border-t border-gray-200 dark:border-gray-700 pt-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
+          >
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
                 You don't have permission to view integrations.
@@ -553,7 +586,7 @@ export function SettingsTab({
                     <SelectContent>
                       {integrationsOfType.map((integration) => {
                         const instanceName = integration.metadata?.name;
-                        const typeName = integration.spec?.integrationName;
+                        const typeName = integration.metadata?.integrationName;
                         const displayName =
                           instanceName?.toLowerCase() === typeName?.toLowerCase()
                             ? getIntegrationTypeDisplayName(undefined, typeName) || instanceName
@@ -593,7 +626,7 @@ export function SettingsTab({
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <IntegrationIcon
-                              integrationName={selectedIntegrationFull.spec?.integrationName}
+                              integrationName={selectedIntegrationFull.metadata?.integrationName}
                               iconSlug={integrationDefinition?.icon}
                               className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
                             />
@@ -601,7 +634,7 @@ export function SettingsTab({
                               <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
                                 {getIntegrationTypeDisplayName(
                                   undefined,
-                                  selectedIntegrationFull.spec?.integrationName,
+                                  selectedIntegrationFull.metadata?.integrationName,
                                 ) || "Integration"}
                               </h3>
                             </div>
@@ -638,7 +671,10 @@ export function SettingsTab({
 
                       if (hasIntegrationError) {
                         return (
-                          <SimpleTooltip content={selectedIntegrationFull.status?.stateDescription || ""}>
+                          <SimpleTooltip
+                            content={selectedIntegrationFull.status?.stateDescription || ""}
+                            interactive={true}
+                          >
                             {integrationStatusCard}
                           </SimpleTooltip>
                         );
@@ -655,9 +691,11 @@ export function SettingsTab({
 
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+          <div
+            className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
+          >
             {configurationFields.map((field) => {
-              if (!field.name) return null;
+              if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;
               return (
                 <ConfigurationFieldRenderer

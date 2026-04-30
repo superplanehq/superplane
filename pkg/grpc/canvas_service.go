@@ -50,24 +50,27 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 
 func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvas(
-		ctx,
-		s.authService,
-		organizationID,
-		req.Id,
-		req.Name,
-		req.Description,
-		req.VersioningEnabled,
-		req.ChangeRequestApprovalConfig,
-	)
+	return canvases.UpdateCanvas(ctx, s.authService, organizationID, req.Id, req.Name, req.Description, req.ChangeManagement)
 }
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
 	if req.Canvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
 	}
+
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CreateCanvasWithAutoLayoutAndUsage(ctx, s.usageService, s.registry, organizationID, req.Canvas, req.AutoLayout)
+
+	return canvases.CreateCanvas(
+		ctx,
+		s.registry,
+		s.encryptor,
+		s.authService,
+		s.webhookBaseURL,
+		uuid.MustParse(organizationID),
+		req.Canvas,
+		req.AutoLayout,
+		s.usageService,
+	)
 }
 
 func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
@@ -102,6 +105,71 @@ func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateC
 		req.Canvas,
 		req.AutoLayout,
 		s.webhookBaseURL,
+		s.authService,
+	)
+}
+
+func (s *CanvasService) ApplyCanvasVersionChangeset(ctx context.Context, req *pb.ApplyCanvasVersionChangesetRequest) (*pb.ApplyCanvasVersionChangesetResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+	}
+
+	versionID, err := uuid.Parse(req.VersionId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+	}
+
+	return canvases.ApplyCanvasVersionChangeset(
+		ctx,
+		s.registry,
+		uuid.MustParse(organizationID),
+		canvasID,
+		versionID,
+		req.Changeset,
+		req.AutoLayout,
+	)
+}
+
+func (s *CanvasService) ValidateCanvasVersionChangeset(ctx context.Context, req *pb.ValidateCanvasVersionChangesetRequest) (*pb.ValidateCanvasVersionChangesetResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+	}
+
+	versionID, err := uuid.Parse(req.VersionId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+	}
+
+	return canvases.ValidateCanvasVersionChangeset(
+		ctx,
+		s.registry,
+		uuid.MustParse(organizationID),
+		canvasID,
+		versionID,
+		req.Changeset,
+	)
+}
+
+func (s *CanvasService) DeleteCanvasVersion(ctx context.Context, req *pb.DeleteCanvasVersionRequest) (*pb.DeleteCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DeleteCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
+}
+
+func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.PublishCanvasVersion(
+		ctx,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		req.VersionId,
+		s.webhookBaseURL,
+		s.authService,
 	)
 }
 
@@ -228,7 +296,7 @@ func (s *CanvasService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEvent
 	)
 }
 
-func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionRequest) (*pb.InvokeNodeExecutionActionResponse, error) {
+func (s *CanvasService) InvokeNodeExecutionHook(ctx context.Context, req *pb.InvokeNodeExecutionHookRequest) (*pb.InvokeNodeExecutionHookResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
 	canvasID, err := uuid.Parse(req.CanvasId)
@@ -241,7 +309,7 @@ func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.I
 		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
 	}
 
-	return canvases.InvokeNodeExecutionAction(
+	return canvases.InvokeNodeExecutionHook(
 		ctx,
 		s.authService,
 		s.encryptor,
@@ -249,12 +317,12 @@ func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.I
 		uuid.MustParse(organizationID),
 		canvasID,
 		executionID,
-		req.ActionName,
+		req.HookName,
 		req.Parameters.AsMap(),
 	)
 }
 
-func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.InvokeNodeTriggerActionRequest) (*pb.InvokeNodeTriggerActionResponse, error) {
+func (s *CanvasService) InvokeNodeTriggerHook(ctx context.Context, req *pb.InvokeNodeTriggerHookRequest) (*pb.InvokeNodeTriggerHookResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
 	canvasID, err := uuid.Parse(req.CanvasId)
@@ -266,11 +334,11 @@ func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.Inv
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	if req.ActionName == "" {
-		return nil, status.Error(codes.InvalidArgument, "action_name is required")
+	if req.HookName == "" {
+		return nil, status.Error(codes.InvalidArgument, "hook_name is required")
 	}
 
-	return canvases.InvokeNodeTriggerAction(
+	return canvases.InvokeNodeTriggerHook(
 		ctx,
 		s.authService,
 		s.encryptor,
@@ -278,7 +346,7 @@ func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.Inv
 		uuid.MustParse(organizationID),
 		canvasID,
 		req.NodeId,
-		req.ActionName,
+		req.HookName,
 		req.Parameters.AsMap(),
 		s.webhookBaseURL,
 	)

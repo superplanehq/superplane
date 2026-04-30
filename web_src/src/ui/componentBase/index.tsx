@@ -1,8 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Rabbit } from "lucide-react";
 import React from "react";
-import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
 import type { MetadataItem } from "../metadataList";
@@ -94,14 +93,6 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
           {section.eventTitle}
         </span>
       </div>
-      {section.childEventsInfo && (
-        <ChildEvents
-          childEventsInfo={section.childEventsInfo}
-          onExpandChildEvents={section.onExpandChildEvents}
-          onReRunChildEvents={section.onReRunChildEvents}
-          showItems={false}
-        />
-      )}
     </div>
   );
 };
@@ -131,6 +122,8 @@ export interface ComponentBaseSpec {
   // Content type for value tooltips (json, xml, or text)
   contentType?: "json" | "xml" | "text";
 }
+
+export type EmptyStatePurpose = "runtime" | "setup" | "fallback";
 
 export type EventState = "success" | "failed" | "neutral" | "queued" | "running" | string;
 
@@ -203,9 +196,6 @@ export interface EventSection {
   eventTitle?: string;
   eventSubtitle?: string | React.ReactNode;
   handleComponent?: React.ReactNode;
-  childEventsInfo?: ChildEventsInfo;
-  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
-  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
 }
 
 export interface ComponentBaseProps extends ComponentActionsProps {
@@ -227,15 +217,20 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   customField?: React.ReactNode | ((onRun?: () => void, nodeId?: string) => React.ReactNode);
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
   customFieldPosition?: "before" | "after";
+  /** Whether the custom field should only be shown in live mode */
+  customFieldVisibility?: "always" | "live-only";
   eventStateMap?: EventStateMap;
   includeEmptyState?: boolean;
   emptyStateProps?: {
     icon?: React.ComponentType<{ size?: number }>;
     title?: string;
     description?: string;
+    purpose?: EmptyStatePurpose;
+    tone?: "accent" | "neutral";
   };
   error?: string;
   warning?: string;
+  canvasMode?: "live" | "edit";
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -249,13 +244,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
-  onToggleCollapse,
   onRun,
   runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
   onTogglePause,
   onEdit: _onEdit,
-  onConfigure: _onConfigure,
   onDuplicate,
   onDeactivate: _onDeactivate,
   onToggleView,
@@ -266,12 +259,14 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   metadata,
   customField,
   customFieldPosition = "after",
+  customFieldVisibility = "always",
   eventStateMap,
   includeEmptyState = false,
   emptyStateProps,
   error,
   warning,
   paused,
+  canvasMode = "live",
 }) => {
   const safeMetadata = Array.isArray(metadata) ? metadata : undefined;
   const safeSpecs = Array.isArray(specs) ? specs : undefined;
@@ -279,6 +274,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const safeError = typeof error === "string" ? error : "";
   const safeWarning = typeof warning === "string" ? warning : "";
   const safeCustomFieldPosition = customFieldPosition === "before" ? "before" : "after";
+  const safeCustomFieldVisibility = customFieldVisibility === "live-only" ? "live-only" : "always";
   const safeCustomField = React.useMemo(() => {
     if (typeof customField === "function") {
       return (onRunHandler?: () => void, nodeId?: string) => {
@@ -296,6 +292,22 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const hasError = safeError.trim() !== "";
   const hasWarning = safeWarning.trim() !== "";
   const hasBadge = hasError || hasWarning;
+  const emptyStatePurpose =
+    emptyStateProps?.purpose || (includeEmptyState ? (hasError ? "setup" : "runtime") : undefined);
+  const resolvedEmptyStateProps = React.useMemo(() => {
+    if (canvasMode !== "edit" || emptyStatePurpose !== "runtime") {
+      return emptyStateProps;
+    }
+
+    return {
+      ...emptyStateProps,
+      icon: Rabbit,
+      title: "Ready to run...",
+      description: undefined,
+      purpose: "runtime" as const,
+      tone: "neutral" as const,
+    };
+  }, [canvasMode, emptyStateProps, emptyStatePurpose]);
   const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
   const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
@@ -310,6 +322,13 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     safeEventSections && safeEventSections.length > 0
       ? (resolvedEventStateMap[compactEventState] || resolvedEventStateMap.neutral).badgeColor
       : undefined;
+  const customFieldOnRun = canvasMode === "edit" || runDisabled ? undefined : onRun;
+  const renderedCustomField =
+    safeCustomFieldVisibility === "live-only" && canvasMode === "edit"
+      ? null
+      : typeof safeCustomField === "function"
+        ? safeCustomField(customFieldOnRun)
+        : safeCustomField || null;
 
   return (
     <SelectionWrapper selected={selected}>
@@ -384,7 +403,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           iconSlug={iconSlug}
           iconColor={iconColor}
           title={title}
-          onDoubleClick={onToggleCollapse}
           isCompactView={isCompactView}
           statusBadgeColor={compactStatusBadgeColor}
         />
@@ -463,16 +481,13 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               </div>
             )}
 
-            {safeCustomFieldPosition === "before" &&
-              (typeof safeCustomField === "function"
-                ? safeCustomField(runDisabled ? undefined : onRun)
-                : safeCustomField || null)}
+            {safeCustomFieldPosition === "before" && renderedCustomField}
 
             {safeEventSections?.map((section, index) => (
               <EventSectionDisplay
                 className={
                   "pb-3" +
-                  (!!includeEmptyState || (!!safeCustomField && safeCustomFieldPosition === "after")
+                  (!!includeEmptyState || (!!renderedCustomField && safeCustomFieldPosition === "after")
                     ? " border-b border-slate-950/20"
                     : "")
                 }
@@ -484,17 +499,14 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 lastSection={
                   index === safeEventSections.length - 1 &&
                   !includeEmptyState &&
-                  !(safeCustomField && safeCustomFieldPosition === "after")
+                  !(renderedCustomField && safeCustomFieldPosition === "after")
                 }
               />
             ))}
 
-            {includeEmptyState && <EmptyState compact {...emptyStateProps} />}
+            {includeEmptyState && <EmptyState compact {...resolvedEmptyStateProps} />}
 
-            {safeCustomFieldPosition === "after" &&
-              (typeof safeCustomField === "function"
-                ? safeCustomField(runDisabled ? undefined : onRun)
-                : safeCustomField || null)}
+            {safeCustomFieldPosition === "after" && renderedCustomField}
           </>
         )}
       </div>

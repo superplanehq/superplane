@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -17,10 +18,7 @@ import (
 type Client struct {
 	baseURL   string
 	kibanaURL string
-	authType  string
 	apiKey    string
-	username  string
-	password  string
 	http      core.HTTPContext
 }
 
@@ -30,37 +28,15 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 		return nil, fmt.Errorf("error getting url: %v", err)
 	}
 
-	authType := "apiKey"
-	if configuredAuthType, err := ctx.GetConfig("authType"); err == nil && string(configuredAuthType) != "" {
-		authType = string(configuredAuthType)
+	apiKey, err := ctx.GetConfig("apiKey")
+	if err != nil {
+		return nil, fmt.Errorf("error getting apiKey: %v", err)
 	}
 
 	c := &Client{
-		baseURL:  strings.TrimRight(string(serverURL), "/"),
-		authType: authType,
-		http:     httpCtx,
-	}
-
-	switch authType {
-	case "apiKey":
-		apiKey, err := ctx.GetConfig("apiKey")
-		if err != nil {
-			return nil, fmt.Errorf("error getting apiKey: %v", err)
-		}
-		c.apiKey = string(apiKey)
-	case "basic":
-		username, err := ctx.GetConfig("username")
-		if err != nil {
-			return nil, fmt.Errorf("error getting username: %v", err)
-		}
-		password, err := ctx.GetConfig("password")
-		if err != nil {
-			return nil, fmt.Errorf("error getting password: %v", err)
-		}
-		c.username = string(username)
-		c.password = string(password)
-	default:
-		return nil, fmt.Errorf("unsupported authType %q", authType)
+		baseURL: strings.TrimRight(string(serverURL), "/"),
+		apiKey:  string(apiKey),
+		http:    httpCtx,
 	}
 
 	if kibanaURL, err := ctx.GetConfig("kibanaUrl"); err == nil {
@@ -71,11 +47,6 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 }
 
 func (c *Client) setAuthHeaders(req *http.Request) {
-	if c.authType == "basic" {
-		req.SetBasicAuth(c.username, c.password)
-		return
-	}
-
 	req.Header.Set("Authorization", "ApiKey "+c.apiKey)
 }
 
@@ -163,10 +134,22 @@ func (c *Client) ValidateCredentials() error {
 }
 
 // ValidateKibana checks that the Kibana URL is reachable and that the
-// credentials have permission to manage connectors (required for webhook setup).
+// credentials can list, create, and delete connectors (required for webhook setup).
 func (c *Client) ValidateKibana() error {
-	_, err := c.execKibanaRequest(http.MethodGet, "/api/actions/connectors", nil)
-	return err
+	if _, err := c.execKibanaRequest(http.MethodGet, "/api/actions/connectors", nil); err != nil {
+		return err
+	}
+
+	validationConnector, err := c.CreateKibanaConnector(
+		fmt.Sprintf("SuperPlane Validation %d", time.Now().UnixNano()),
+		"https://superplane.invalid/webhooks/elastic/validation",
+		"superplane-validation-secret",
+	)
+	if err != nil {
+		return err
+	}
+
+	return c.DeleteKibanaConnector(validationConnector.ID)
 }
 
 // KibanaRule is the relevant subset of a Kibana alerting rule.
@@ -353,18 +336,24 @@ func (c *Client) GetKibanaRule(ruleID string) (*KibanaRuleDetails, error) {
 
 func (c *Client) EnsureKibanaRuleHasConnector(ruleID, connectorID string) error {
 	return c.updateKibanaRuleWithRetry(ruleID, func(rule *KibanaRuleDetails) error {
-		for _, action := range rule.Actions {
-			if action.ID == connectorID {
-				return nil
-			}
-		}
-
 		actionGroupID, err := c.GetKibanaRuleDefaultActionGroupID(rule.RuleTypeID)
 		if err != nil {
 			return err
 		}
 
-		rule.Actions = append(rule.Actions, superPlaneKibanaRuleAction(connectorID, actionGroupID))
+		desired := superPlaneKibanaRuleAction(connectorID, actionGroupID)
+
+		for i, action := range rule.Actions {
+			if action.ID == connectorID {
+				if action.Group == desired.Group && fmt.Sprint(action.Params) == fmt.Sprint(desired.Params) {
+					return nil
+				}
+				rule.Actions[i] = desired
+				return c.updateKibanaRule(ruleID, rule)
+			}
+		}
+
+		rule.Actions = append(rule.Actions, desired)
 		return c.updateKibanaRule(ruleID, rule)
 	})
 }
@@ -565,8 +554,9 @@ func (c *Client) CreateKibanaConnector(name, webhookURL, secret string) (*Kibana
 		"connector_type_id": ".webhook",
 		"name":              name,
 		"config": map[string]any{
-			"url":    webhookURL,
-			"method": "post",
+			"url":      webhookURL,
+			"method":   "post",
+			"authType": nil,
 			"headers": map[string]string{
 				"Content-Type":    "application/json",
 				SigningHeaderName: secret,

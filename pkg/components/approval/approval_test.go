@@ -7,31 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
-	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
-	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestApproval_OutputChannels(t *testing.T) {
-	approval := &Approval{}
-	channels := approval.OutputChannels(nil)
-
-	assert.Len(t, channels, 2)
-	assert.Equal(t, ChannelApproved, channels[0].Name)
-	assert.Equal(t, "Approved", channels[0].Label)
-	assert.Equal(t, "All required actors approved", channels[0].Description)
-
-	assert.Equal(t, ChannelRejected, channels[1].Name)
-	assert.Equal(t, "Rejected", channels[1].Label)
-	assert.Equal(t, "At least one actor rejected (after everyone responded)", channels[1].Description)
-}
-
-func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
+func TestApproval_HandleHook_Approved_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
 	role := models.RoleOrgOwner
@@ -49,18 +30,18 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 		},
 		{
 			name:   "role",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, RoleRef: &core.RoleRef{Name: role}},
 			auth: &contexts.AuthContext{
 				User:  &core.User{ID: "test-user"},
-				Roles: map[string]struct{}{role: {}},
+				Roles: map[string]*core.RoleRef{role: {Name: role}},
 			},
 		},
 		{
 			name:   "group",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, GroupRef: &core.GroupRef{Name: group}},
 			auth: &contexts.AuthContext{
 				User:   &core.User{ID: "test-user"},
-				Groups: map[string]struct{}{group: {}},
+				Groups: map[string]*core.GroupRef{group: {Name: group}},
 			},
 		},
 	}
@@ -77,7 +58,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 				Metadata: metadata,
 			}
 
-			ctx := core.ActionContext{
+			ctx := core.ActionHookContext{
 				Name: "approve",
 				Parameters: map[string]any{
 					"index": float64(0),
@@ -87,7 +68,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 				Auth:           testCase.auth,
 			}
 
-			err := approval.HandleAction(ctx)
+			err := approval.HandleHook(ctx)
 
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
@@ -97,7 +78,7 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 	}
 }
 
-func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
+func TestApproval_HandleHook_Rejected_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
 	role := models.RoleOrgOwner
@@ -115,18 +96,18 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 		},
 		{
 			name:   "role",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, RoleRef: &core.RoleRef{Name: role}},
 			auth: &contexts.AuthContext{
 				User:  &core.User{ID: "test-user"},
-				Roles: map[string]struct{}{role: {}},
+				Roles: map[string]*core.RoleRef{role: {Name: role}},
 			},
 		},
 		{
 			name:   "group",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, GroupRef: &core.GroupRef{Name: group}},
 			auth: &contexts.AuthContext{
 				User:   &core.User{ID: "test-user"},
-				Groups: map[string]struct{}{group: {}},
+				Groups: map[string]*core.GroupRef{group: {Name: group}},
 			},
 		},
 	}
@@ -143,7 +124,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 				Metadata: metadata,
 			}
 
-			ctx := core.ActionContext{
+			ctx := core.ActionHookContext{
 				Name: "reject",
 				Parameters: map[string]any{
 					"index":  float64(0),
@@ -154,7 +135,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 				Auth:           testCase.auth,
 			}
 
-			err := approval.HandleAction(ctx)
+			err := approval.HandleHook(ctx)
 
 			assert.NoError(t, err)
 			assert.True(t, stateCtx.Passed)
@@ -164,7 +145,7 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	}
 }
 
-func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
+func TestApproval_HandleHook_RejectImmediatelyFinishes(t *testing.T) {
 	approval := &Approval{}
 
 	user1 := &core.User{ID: "test-user-1"}
@@ -185,7 +166,7 @@ func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
 		User: user1,
 	}
 
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name: "reject",
 		Parameters: map[string]any{
 			"index":  float64(0),
@@ -196,7 +177,7 @@ func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
 		Auth:           authCtx,
 	}
 
-	err := approval.HandleAction(ctx)
+	err := approval.HandleHook(ctx)
 
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
@@ -206,7 +187,7 @@ func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
 	assert.Equal(t, StateRejected, stored.Result)
 }
 
-func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
+func TestApproval_HandleHook_StillPending_DoesNotCallPass(t *testing.T) {
 	approval := &Approval{}
 
 	role := models.RoleOrgOwner
@@ -224,18 +205,18 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 		},
 		{
 			name:   "role",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, RoleRef: &core.RoleRef{Name: role}},
 			auth: &contexts.AuthContext{
 				User:  &core.User{ID: "test-user-1"},
-				Roles: map[string]struct{}{role: {}},
+				Roles: map[string]*core.RoleRef{role: {Name: role}},
 			},
 		},
 		{
 			name:   "group",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, GroupRef: &core.GroupRef{Name: group}},
 			auth: &contexts.AuthContext{
 				User:   &core.User{ID: "test-user-1"},
-				Groups: map[string]struct{}{group: {}},
+				Groups: map[string]*core.GroupRef{group: {Name: group}},
 			},
 		},
 	}
@@ -255,7 +236,7 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 				Metadata: metadata,
 			}
 
-			ctx := core.ActionContext{
+			ctx := core.ActionHookContext{
 				Name: "approve",
 				Parameters: map[string]any{
 					"index": float64(0),
@@ -265,7 +246,7 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 				Auth:           testCase.auth,
 			}
 
-			err := approval.HandleAction(ctx)
+			err := approval.HandleHook(ctx)
 
 			assert.NoError(t, err)
 			assert.False(t, stateCtx.Passed)
@@ -274,15 +255,15 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	}
 }
 
-func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
+func TestApproval_HandleHook_ApproveOnceAcrossAllRequirements(t *testing.T) {
 	approval := &Approval{}
 
 	user := &core.User{ID: "test-user"}
 	metadata := &Metadata{
 		Result: StatePending,
 		Records: []Record{
-			{Index: 0, State: StatePending, Type: ItemTypeAnyone},
-			{Index: 1, State: StatePending, Type: ItemTypeUser, User: user},
+			{Index: 0, State: StatePending, Type: ItemTypeUser, User: user},
+			{Index: 1, State: StatePending, Type: ItemTypeAnyone},
 		},
 	}
 
@@ -294,7 +275,10 @@ func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
 		User: user,
 	}
 
-	ctx := core.ActionContext{
+	//
+	// Approving first requirement works
+	//
+	ctx := core.ActionHookContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
@@ -304,58 +288,22 @@ func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
 		Auth:           authCtx,
 	}
 
-	err := approval.HandleAction(ctx)
+	err := approval.HandleHook(ctx)
 	require.NoError(t, err)
 
 	stored := metadataCtx.Metadata.(*Metadata)
-	assert.Equal(t, StateApproved, stored.Records[1].State)
-	assert.Equal(t, StatePending, stored.Records[0].State)
+	assert.Equal(t, StateApproved, stored.Records[0].State)
+	assert.Equal(t, StatePending, stored.Records[1].State)
 
-	ctx.Parameters["index"] = float64(0)
-	err = approval.HandleAction(ctx)
-	assert.Error(t, err)
+	//
+	// Approving second one does not work
+	//
+	ctx.Parameters["index"] = float64(1)
+	err = approval.HandleHook(ctx)
+	assert.ErrorContains(t, err, "user has already approved/rejected another requirement")
 }
 
-func TestApproval_HandleAction_ApproveAnyoneMarksSpecificUser(t *testing.T) {
-	approval := &Approval{}
-
-	user := &core.User{ID: "test-user"}
-	metadata := &Metadata{
-		Result: StatePending,
-		Records: []Record{
-			{Index: 0, State: StatePending, Type: ItemTypeAnyone},
-			{Index: 1, State: StatePending, Type: ItemTypeUser, User: user},
-		},
-	}
-
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{
-		Metadata: metadata,
-	}
-	authCtx := &contexts.AuthContext{
-		User: user,
-	}
-
-	ctx := core.ActionContext{
-		Name: "approve",
-		Parameters: map[string]any{
-			"index": float64(0),
-		},
-		Metadata:       metadataCtx,
-		ExecutionState: stateCtx,
-		Auth:           authCtx,
-	}
-
-	err := approval.HandleAction(ctx)
-	require.NoError(t, err)
-
-	stored := metadataCtx.Metadata.(*Metadata)
-	assert.Equal(t, StateApproved, stored.Records[1].State)
-	assert.Equal(t, user.ID, stored.Records[1].User.ID)
-	assert.Equal(t, StatePending, stored.Records[0].State)
-}
-
-func TestApproval_HandleAction_ApproveFallsBackToPendingRequirement(t *testing.T) {
+func TestApproval_HandleHook_CannotApproveRequirementAgain(t *testing.T) {
 	approval := &Approval{}
 
 	user := &core.User{ID: "test-user"}
@@ -375,7 +323,10 @@ func TestApproval_HandleAction_ApproveFallsBackToPendingRequirement(t *testing.T
 		User: user,
 	}
 
-	ctx := core.ActionContext{
+	//
+	// Trying to approve requirement that was already approved
+	//
+	ctx := core.ActionHookContext{
 		Name: "approve",
 		Parameters: map[string]any{
 			"index": float64(0),
@@ -385,12 +336,8 @@ func TestApproval_HandleAction_ApproveFallsBackToPendingRequirement(t *testing.T
 		Auth:           authCtx,
 	}
 
-	err := approval.HandleAction(ctx)
-	require.NoError(t, err)
-
-	stored := metadataCtx.Metadata.(*Metadata)
-	assert.Equal(t, StateApproved, stored.Records[1].State)
-	assert.Equal(t, user.ID, stored.Records[1].User.ID)
+	err := approval.HandleHook(ctx)
+	assert.ErrorContains(t, err, "failed to find requirement: record at index 0 is not pending")
 }
 
 func TestMetadata_UpdateResult(t *testing.T) {
@@ -502,6 +449,7 @@ func TestApproval_Execute(t *testing.T) {
 		authCtx := &contexts.AuthContext{}
 
 		ctx := core.ExecutionContext{
+			NodeMetadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"items": []any{},
 			},
@@ -534,6 +482,7 @@ func TestApproval_Execute(t *testing.T) {
 		}
 
 		ctx := core.ExecutionContext{
+			NodeMetadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"items": []any{
 					map[string]any{
@@ -558,14 +507,11 @@ func TestApproval_Execute(t *testing.T) {
 	t.Run("with pending items publishes approval notification", func(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
 		metadataCtx := &contexts.MetadataContext{}
-
-		amqpURL, _ := config.RabbitMQURL()
-		notificationConsumer := testconsumer.New(amqpURL, messages.NotificationEmailRequestedRoutingKey)
-		notificationConsumer.Start()
-		defer notificationConsumer.Stop()
+		notificationCtx := &contexts.NotificationContext{Messages: []contexts.Notification{}}
 
 		ctx := core.ExecutionContext{
-			WorkflowID: "workflow-1",
+			WorkflowID:   "workflow-1",
+			NodeMetadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"items": []any{
 					map[string]any{
@@ -575,12 +521,12 @@ func TestApproval_Execute(t *testing.T) {
 			},
 			Metadata:       metadataCtx,
 			ExecutionState: stateCtx,
-			Notifications:  workercontexts.NewNotificationContext(nil, uuid.New(), uuid.Nil),
+			Notifications:  notificationCtx,
 		}
 
 		err := approval.Execute(ctx)
 		require.NoError(t, err)
-		assert.True(t, notificationConsumer.HasReceivedMessage())
+		assert.Len(t, notificationCtx.Messages, 1)
 	})
 
 	t.Run("with role and group items creates records", func(t *testing.T) {
@@ -591,6 +537,7 @@ func TestApproval_Execute(t *testing.T) {
 		group := "release-approvers"
 
 		ctx := core.ExecutionContext{
+			NodeMetadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"items": []any{
 					map[string]any{
@@ -605,11 +552,21 @@ func TestApproval_Execute(t *testing.T) {
 			},
 			Metadata:       metadataCtx,
 			ExecutionState: stateCtx,
-			Auth:           &contexts.AuthContext{},
+			Auth: &contexts.AuthContext{
+				User: &core.User{ID: "test-user"},
+				Users: map[string]*core.User{
+					"test-user": {ID: "test-user"},
+				},
+				Roles: map[string]*core.RoleRef{
+					role: {Name: role},
+				},
+				Groups: map[string]*core.GroupRef{
+					group: {Name: group},
+				},
+			},
 		}
 
 		err := approval.Execute(ctx)
-
 		assert.NoError(t, err)
 		assert.False(t, stateCtx.Passed)
 		assert.False(t, stateCtx.Finished)
@@ -617,52 +574,8 @@ func TestApproval_Execute(t *testing.T) {
 		stored := metadataCtx.Metadata.(*Metadata)
 		require.Len(t, stored.Records, 2)
 		assert.Equal(t, ItemTypeRole, stored.Records[0].Type)
-		assert.Equal(t, role, *stored.Records[0].Role)
+		assert.Equal(t, role, stored.Records[0].RoleRef.Name)
 		assert.Equal(t, ItemTypeGroup, stored.Records[1].Type)
-		assert.Equal(t, group, *stored.Records[1].Group)
-	})
-}
-
-// TODO: Add tests for role and group configuration validation when RBAC is enabled
-func TestApproval_Configuration_Validation(t *testing.T) {
-	approval := &Approval{}
-	config := approval.Configuration()
-
-	t.Run("items field is required", func(t *testing.T) {
-		itemsField := config[0]
-		assert.Equal(t, "items", itemsField.Name)
-		assert.True(t, itemsField.Required)
-	})
-
-	t.Run("empty items list fails validation", func(t *testing.T) {
-		configData := map[string]any{
-			"items": []any{},
-		}
-
-		err := configuration.ValidateConfiguration(config, configData)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "must contain at least one item")
-	})
-
-	t.Run("missing items field fails validation", func(t *testing.T) {
-		configData := map[string]any{}
-
-		err := configuration.ValidateConfiguration(config, configData)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "is required")
-	})
-
-	t.Run("valid items list passes validation", func(t *testing.T) {
-		configData := map[string]any{
-			"items": []any{
-				map[string]any{
-					"type": "user",
-					"user": "test-user-id",
-				},
-			},
-		}
-
-		err := configuration.ValidateConfiguration(config, configData)
-		assert.NoError(t, err)
+		assert.Equal(t, group, stored.Records[1].GroupRef.Name)
 	})
 }

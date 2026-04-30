@@ -12,6 +12,14 @@ const (
 	APIVersion = "v1"
 )
 
+// OrganizationDomainType returns the authorization domain type used for all
+// organization-scoped CLI requests. Packages should use this instead of
+// referencing the openapi_client enum directly so the scoping rule lives in
+// one place.
+func OrganizationDomainType() openapi_client.AuthorizationDomainType {
+	return openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION
+}
+
 func ParseYamlResourceHeaders(raw []byte) (string, string, error) {
 	m := make(map[string]interface{})
 
@@ -63,11 +71,11 @@ func ResolveOrganizationID(ctx CommandContext) (string, error) {
 		return "", err
 	}
 
-	if !me.HasOrganizationId() || strings.TrimSpace(me.GetOrganizationId()) == "" {
+	if !me.User.HasOrganizationId() || strings.TrimSpace(me.User.GetOrganizationId()) == "" {
 		return "", fmt.Errorf("organization id not found for authenticated user")
 	}
 
-	return me.GetOrganizationId(), nil
+	return me.User.GetOrganizationId(), nil
 }
 
 func ResolveCanvasID(ctx CommandContext, canvasID string) (string, error) {

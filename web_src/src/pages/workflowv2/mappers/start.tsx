@@ -115,19 +115,20 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
               </div>
               <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
             </div>
-            <Button
-              size="sm"
-              data-testid="start-template-run"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleRun(template);
-              }}
-              disabled={!context?.onRun}
-              className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-            >
-              Run
-            </Button>
+            {context?.onRun && (
+              <Button
+                size="sm"
+                data-testid="start-template-run"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleRun(template);
+                }}
+                className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+              >
+                Run
+              </Button>
+            )}
           </div>
         ))}
       </div>

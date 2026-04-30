@@ -67,8 +67,3 @@ func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {
 	steps.session.Click(saveComponentButton)
 	steps.session.Sleep(500)
 }
-
-func (steps *TestHomePageSteps) SwitchToComponentsTab() {
-	componentsTab := q.Text("Bundles")
-	steps.session.Click(componentsTab)
-}

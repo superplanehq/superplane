@@ -89,8 +89,8 @@ func (d *Datadog) Configuration() []configuration.Field {
 	}
 }
 
-func (d *Datadog) Components() []core.Component {
-	return []core.Component{
+func (d *Datadog) Actions() []core.Action {
+	return []core.Action{
 		&CreateEvent{},
 	}
 }
@@ -144,10 +144,10 @@ func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesConte
 	return []core.IntegrationResource{}, nil
 }
 
-func (d *Datadog) Actions() []core.Action {
-	return []core.Action{}
+func (d *Datadog) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *Datadog) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *Datadog) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

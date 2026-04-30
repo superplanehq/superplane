@@ -2,6 +2,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 
+import { hasDialogChildOfType } from "@/lib/dialogAccessibility";
 import { cn } from "@/lib/utils";
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -44,6 +45,11 @@ function DialogContent({
   /** "large" removes default max-width so className can set e.g. 80vw/80vh */
   size?: "default" | "large";
 }) {
+  const titlePresent = hasDialogChildOfType(children, [DialogTitle, DialogPrimitive.Title]);
+  const descriptionPresent = hasDialogChildOfType(children, [DialogDescription, DialogPrimitive.Description]);
+  const contentProps =
+    "aria-describedby" in props || descriptionPresent ? props : { ...props, "aria-describedby": undefined };
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -54,8 +60,9 @@ function DialogContent({
           size === "default" && "w-full max-w-[calc(100%-2rem)] sm:max-w-lg",
           className,
         )}
-        {...props}
+        {...contentProps}
       >
+        {!titlePresent && <DialogTitle className="sr-only">Dialog</DialogTitle>}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -100,6 +107,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
     />
   );
 }
+DialogTitle.displayName = "DialogTitle";
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (

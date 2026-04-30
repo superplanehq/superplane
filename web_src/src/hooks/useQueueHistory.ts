@@ -1,13 +1,13 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeQueueItems } from "./useCanvasData";
-import type { ComponentsNode, CanvasesListNodeQueueItemsResponse } from "@/api-client";
+import type { SuperplaneComponentsNode, CanvasesListNodeQueueItemsResponse } from "@/api-client";
 import { mapQueueItemsToSidebarEvents } from "@/pages/workflowv2/utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 interface UseQueueHistoryProps {
   canvasId: string;
   nodeId: string;
-  allNodes: ComponentsNode[];
+  allNodes: SuperplaneComponentsNode[];
   enabled: boolean;
 }
 

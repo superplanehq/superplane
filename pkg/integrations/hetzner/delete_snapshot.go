@@ -56,12 +56,6 @@ func (c *DeleteSnapshot) OutputChannels(configuration any) []core.OutputChannel 
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *DeleteSnapshot) ExampleOutput() map[string]any {
-	return map[string]any{
-		"imageId": "67890",
-	}
-}
-
 func (c *DeleteSnapshot) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -119,14 +113,6 @@ func (c *DeleteSnapshot) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteSnapshotPayloadType, []any{payload})
 }
 
-func (c *DeleteSnapshot) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteSnapshot) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteSnapshot) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
@@ -136,5 +122,13 @@ func (c *DeleteSnapshot) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *DeleteSnapshot) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteSnapshot) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteSnapshot) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

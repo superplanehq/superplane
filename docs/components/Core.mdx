@@ -23,6 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
@@ -85,16 +86,20 @@ Each scheduled execution includes calendar information:
 
 ```json
 {
-  "calendar": {
-    "day": "1",
-    "hour": "09",
-    "minute": "00",
-    "month": "January",
-    "second": "00",
-    "week_day": "Monday",
-    "year": "2024"
+  "data": {
+    "calendar": {
+      "day": "1",
+      "hour": "09",
+      "minute": "00",
+      "month": "January",
+      "second": "00",
+      "week_day": "Monday",
+      "year": "2024"
+    },
+    "timezone": "+00:00"
   },
-  "timezone": "+00:00"
+  "timestamp": "2024-01-01T09:00:00Z",
+  "type": "scheduler.tick"
 }
 ```
 
@@ -155,7 +160,7 @@ The Webhook trigger starts a new workflow execution when an HTTP request is rece
 
 ### Authentication Methods
 
-- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the `X-Signature-256` header
+- **Signature (HMAC)**: Verify requests using an HMAC-SHA256 signature
 - **Bearer Token**: Require a Bearer token in the `Authorization` header
 - **Header Token**: Require a raw token in a custom header (default: `X-Webhook-Token`)
 - **None (unsafe)**: No authentication (not recommended for production)
@@ -180,15 +185,19 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 
 ```json
 {
-  "body": {
-    "event": "push",
-    "repository": "superplanehq/superplane"
+  "data": {
+    "body": {
+      "event": "push",
+      "repository": "superplanehq/superplane"
+    },
+    "headers": {
+      "X-Event": [
+        "push"
+      ]
+    }
   },
-  "headers": {
-    "X-Event": [
-      "push"
-    ]
-  }
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "webhook"
 }
 ```
 
@@ -215,13 +224,17 @@ The Add Memory component appends a new item to canvas-level memory storage.
 ```json
 {
   "data": {
-    "namespace": "machines",
-    "values": {
-      "creator": "alex",
-      "id": "1",
-      "pull_request": "123"
+    "data": {
+      "namespace": "machines",
+      "values": {
+        "creator": "alex",
+        "id": "1",
+        "pull_request": "123"
+      }
     }
-  }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "memory.added"
 }
 ```
 
@@ -320,19 +333,21 @@ The Delete Memory component removes memory rows from canvas-level memory storage
 ```json
 {
   "data": {
-    "count": 1,
-    "deleted": [
-      {
+    "data": {
+      "count": 1,
+      "deleted": [
+        {
+          "creator": "igor",
+          "pull_request": 123,
+          "sandbox_id": "sbx-001"
+        }
+      ],
+      "matches": {
         "creator": "igor",
-        "pull_request": 123,
-        "sandbox_id": "sbx-001"
-      }
-    ],
-    "matches": {
-      "creator": "igor",
-      "pull_request": 123
-    },
-    "namespace": "machines"
+        "pull_request": 123
+      },
+      "namespace": "machines"
+    }
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.deleted"
@@ -381,6 +396,50 @@ The expression has access to:
 }
 ```
 
+<a id="graph-ql-request"></a>
+
+## GraphQL Request
+
+The GraphQL component runs a GraphQL document against a URL using the standard **GraphQL over HTTP** JSON body shape.
+
+### Request
+
+- **URL** — GraphQL HTTP endpoint (supports expressions)
+- **Query** — Multi-line GraphQL document (no JSON escaping in the canvas)
+- **Variables** — Key/value pairs merged into the request variables object
+- **Headers** — Request headers
+- **Authorization** — Optional bearer token stored in an organization Secret
+
+### Response
+
+- **status** - Response status code
+- **headers** - Response headers
+- **body** - Response body converted to JSON
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": {
+      "data": {
+        "viewer": {
+          "login": "octocat"
+        }
+      }
+    },
+    "headers": {
+      "Content-Type": [
+        "application/json"
+      ]
+    },
+    "status": 200
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "graphql.request.finished"
+}
+```
+
 <a id="http-request"></a>
 
 ## HTTP Request
@@ -404,6 +463,7 @@ The HTTP component allows you to make HTTP requests to external APIs and service
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
+- **Authorization** (optional): Bearer Token, Basic Auth password, or custom header value
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
@@ -694,11 +754,13 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 
 ```json
 {
-  "result": {
+  "data": {
     "exitCode": 0,
     "stderr": "",
     "stdout": "Hello, World!\n"
-  }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "ssh.command.executed"
 }
 ```
 
@@ -767,24 +829,26 @@ The Update Memory component updates matching rows in canvas-level memory storage
 ```json
 {
   "data": {
-    "count": 1,
-    "matches": {
-      "creator": "igor",
-      "pull_request": 123
-    },
-    "namespace": "machines",
-    "updated": [
-      {
+    "data": {
+      "count": 1,
+      "matches": {
         "creator": "igor",
-        "pull_request": 123,
-        "sandbox_id": "sbx-001",
+        "pull_request": 123
+      },
+      "namespace": "machines",
+      "updated": [
+        {
+          "creator": "igor",
+          "pull_request": 123,
+          "sandbox_id": "sbx-001",
+          "status": "running",
+          "updated_by": "workflow"
+        }
+      ],
+      "values": {
         "status": "running",
         "updated_by": "workflow"
       }
-    ],
-    "values": {
-      "status": "running",
-      "updated_by": "workflow"
     }
   },
   "timestamp": "2026-02-28T00:00:00Z",
@@ -825,24 +889,26 @@ Always emits to the default channel. Check `data.operation` to know whether the 
 ```json
 {
   "data": {
-    "count": 1,
-    "matches": {
-      "environment": "production",
-      "latest_deployment_source": "manual_run"
-    },
-    "namespace": "deployments",
-    "operation": "updated",
-    "records": [
-      {
+    "data": {
+      "count": 1,
+      "matches": {
+        "environment": "production",
+        "latest_deployment_source": "manual_run"
+      },
+      "namespace": "deployments",
+      "operation": "updated",
+      "records": [
+        {
+          "environment": "production",
+          "latest_deployment": "v1.0.1",
+          "latest_deployment_source": "manual_run"
+        }
+      ],
+      "values": {
         "environment": "production",
         "latest_deployment": "v1.0.1",
         "latest_deployment_source": "manual_run"
       }
-    ],
-    "values": {
-      "environment": "production",
-      "latest_deployment": "v1.0.1",
-      "latest_deployment_source": "manual_run"
     }
   },
   "timestamp": "2026-02-28T00:00:00Z",
@@ -867,12 +933,12 @@ The Wait component pauses workflow execution for a specified duration or until a
 
 - **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
   - Supports expressions for dynamic wait times
-  - Example: `{{$.retry_delay}}` or `{{$.status == "urgent" ? 0 : 30}}`
+  - Example: `{{$['Node Name'].data.retry_delay}}` or `{{$['Node Name'].data.status == "urgent" ? 0 : 30}}`
   
 - **Countdown**: Wait until a specific date/time is reached
   - Supports ISO 8601 date formats
   - Supports expressions for dynamic target times
-  - Example: `{{$.release_date}}` or `{{$.run_time + duration("48h")}}`
+  - Example: `{{$['Node Name'].data.release_date}}` or `{{$['Node Name'].data.run_time + duration("48h")}}`
 
 ### Behavior
 

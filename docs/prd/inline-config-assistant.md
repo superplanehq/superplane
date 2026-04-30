@@ -122,7 +122,7 @@ Proto and generated code may live under `protos/config_assistant.proto` and
 
 ## Agent service (Python)
 
-- **Mount:** Same FastAPI app as the builder; router mounted from `repl_web` at an internal path
+- **Mount:** Same FastAPI app as the builder; router mounted from `ai.web` at an internal path
   (e.g. **`POST /config-assistant/suggest`**).
 - **Validate:** JWT (shared validator in `agent/src/ai/jwt.py` with purpose allowlist:
   `agent-builder`, `config-assistant`).

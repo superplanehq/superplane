@@ -2,7 +2,6 @@ import React from "react";
 import { ComponentBase, type EventSection, type EventState } from "../componentBase";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { type MetadataItem } from "../metadataList";
-import { type ChildEventsInfo } from "../childEvents";
 
 export type LastRunState = "success" | "failed" | "running";
 export type ChildEventsState = "processed" | "discarded" | "waiting" | "running" | string;
@@ -34,7 +33,6 @@ export interface QueueItem {
 }
 
 export interface LastRunItem extends QueueItem {
-  childEventsInfo?: ChildEventsInfo;
   state: LastRunState;
   values: Record<string, string>;
   id?: string;
@@ -51,6 +49,7 @@ export interface CompositeProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   showHeader?: boolean;
+  canvasMode?: "live" | "edit";
   metadata?: MetadataItem[];
   parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
@@ -65,9 +64,6 @@ export interface CompositeProps extends ComponentActionsProps {
   warning?: string;
   paused?: boolean;
 
-  onExpandChildEvents?: () => void;
-  onReRunChildEvents?: () => void;
-  onToggleCollapse?: () => void;
   onViewMoreEvents?: () => void;
 }
 
@@ -77,6 +73,7 @@ export const Composite: React.FC<CompositeProps> = ({
   iconColor,
   title,
   showHeader,
+  canvasMode,
   metadata,
   parameters = [],
   lastRunItem,
@@ -85,9 +82,6 @@ export const Composite: React.FC<CompositeProps> = ({
   nextInQueue,
   collapsed = false,
   collapsedBackground,
-  onExpandChildEvents,
-  onReRunChildEvents,
-  onToggleCollapse,
   onViewMoreEvents,
   selected = false,
   isMissing = false,
@@ -98,7 +92,6 @@ export const Composite: React.FC<CompositeProps> = ({
   runDisabled,
   runDisabledTooltip,
   onEdit,
-  onConfigure,
   onDuplicate,
   onDeactivate,
   onTogglePause,
@@ -137,9 +130,6 @@ export const Composite: React.FC<CompositeProps> = ({
         eventSubtitle: event.subtitle,
         receivedAt: event.receivedAt,
         showAutomaticTime: true,
-        childEventsInfo: event.childEventsInfo,
-        onExpandChildEvents,
-        onReRunChildEvents,
       });
     });
 
@@ -161,7 +151,7 @@ export const Composite: React.FC<CompositeProps> = ({
     }
 
     return sections;
-  }, [visibleEvents, hiddenEventsCount, nextInQueue, onExpandChildEvents, onReRunChildEvents, onViewMoreEvents]);
+  }, [visibleEvents, hiddenEventsCount, nextInQueue, onViewMoreEvents]);
 
   // Convert parameters to specs format
   const specs = React.useMemo(() => {
@@ -208,18 +198,17 @@ export const Composite: React.FC<CompositeProps> = ({
       iconColor={iconColor}
       title={title}
       showHeader={showHeader}
+      canvasMode={canvasMode}
       metadata={metadata}
       specs={specs}
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
       selected={selected}
-      onToggleCollapse={onToggleCollapse}
       onRun={onRun}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
-      onConfigure={onConfigure}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}
       onTogglePause={onTogglePause}
@@ -227,7 +216,7 @@ export const Composite: React.FC<CompositeProps> = ({
       onDelete={onDelete}
       isCompactView={isCompactView}
       includeEmptyState={eventsToDisplay.length === 0}
-      emptyStateProps={{ title: "No executions received yet" }}
+      emptyStateProps={{ title: "No executions received yet", purpose: "runtime" }}
       customField={customField}
       error={error}
       warning={warning}

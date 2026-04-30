@@ -244,3 +244,18 @@
   color: transparent;
   animation: sp-ai-thinking-shimmer 1.4s linear infinite;
 }
+
+@keyframes sp-tool-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sp-tool-enter {
+  animation: sp-tool-enter 0.2s ease-out both;
+}

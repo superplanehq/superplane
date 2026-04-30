@@ -2,11 +2,10 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: dev
-
+      target: dev-base
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
-
     command: bash /app/docker-entrypoint.dev.sh
     environment:
       DB_HOST: "db"
@@ -14,6 +13,8 @@ services:
       DB_NAME: "superplane_dev"
       DB_USERNAME: "postgres"
       DB_POOL_SIZE: "2"
+      DB_STATEMENT_TIMEOUT: ${DB_STATEMENT_TIMEOUT:-60s}
+      DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT: ${DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT:-30s}
       POSTGRES_DB_SSL: "false"
       APP_ENV: development
       APPLICATION_NAME: "superplane"
@@ -29,7 +30,7 @@ services:
       GOCACHE: "/app/tmp/go-build"
       XDG_CACHE_HOME: "/app/tmp"
       # Lock Playwright browsers location so install and runtime match
-      PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
+      PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
@@ -58,6 +59,7 @@ services:
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
@@ -69,6 +71,8 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
+      AGENT_ENABLED: ${AGENT_ENABLED:-yes}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
       AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
       TEMPLATE_DIR: "/app/templates"
@@ -83,9 +87,8 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
-      VITE_ENABLE_CUSTOM_COMPONENTS: "true"
-      VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
+      VITE_CHANGE_MANAGEMENT_SETTINGS: ${VITE_CHANGE_MANAGEMENT_SETTINGS:-true}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -97,7 +100,6 @@ services:
     links:
       - db:db
       - rabbitmq:rabbitmq
-      - otel:otel
 
     depends_on:
       db:
@@ -117,6 +119,8 @@ services:
       context: agent
       dockerfile: Dockerfile
       target: dev
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:agent-latest
     working_dir: /app/agent
     env_file:
       - agent/.env
@@ -132,22 +136,28 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-the-cake-is-a-lie}
       DB_SSLMODE: ${DB_SSLMODE:-disable}
       APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
-      REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
+      AGENT_HTTP_DEBUG: ${AGENT_HTTP_DEBUG:-true}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
+      OTEL_ENABLED: "yes"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
+      OTEL_SERVICE_NAME: "superplane-agent"
+      SENTRY_DSN: ""
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
     command: >-
       bash -lc "uv run python -m uvicorn ai.web:create_app
       --factory
       --host 0.0.0.0
       --port 8090
-      --timeout-graceful-shutdown 310
+      --timeout-graceful-shutdown ${AGENT_UVICORN_GRACEFUL_SHUTDOWN:-0}
       --reload
       --reload-dir /app/agent/src
       --reload-dir /app/agent/evals"
-    stop_grace_period: 330s
+    stop_grace_period: ${AGENT_STOP_GRACE_PERIOD:-0s}
     tty: true
     stdin_open: true
     ports:
-      - ${AGENT_REPL_WEB_PORT:-8090}:8090
+      - ${AGENT_HTTP_PORT:-${AGENT_REPL_WEB_PORT:-8090}}:8090
     volumes:
       - .:/app
       - ./tmp/agent/evals:/app/tmp/agent/evals
@@ -160,6 +170,7 @@ services:
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
+    profiles: [dev]
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
@@ -182,6 +193,7 @@ services:
 
   pgweb:
     image: sosedoff/pgweb
+    profiles: [dev]
     environment:
       DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane_dev?sslmode=disable"
     ports:

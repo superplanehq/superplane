@@ -1,9 +1,13 @@
 {
-  "body": {
-    "event": "push",
-    "repository": "superplanehq/superplane"
+  "type": "webhook",
+  "data": {
+    "body": {
+      "event": "push",
+      "repository": "superplanehq/superplane"
+    },
+    "headers": {
+      "X-Event": ["push"]
+    }
   },
-  "headers": {
-    "X-Event": ["push"]
-  }
+  "timestamp": "2026-01-19T12:00:00Z"
 }

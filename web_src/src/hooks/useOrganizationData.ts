@@ -66,10 +66,10 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeServiceAccounts = false) => {
+export const useOrganizationUsers = (organizationId: string, includeRoles = false) => {
   return useQuery({
-    queryKey: includeServiceAccounts
-      ? [...organizationKeys.users(organizationId), includeServiceAccounts]
+    queryKey: includeRoles
+      ? [...organizationKeys.users(organizationId), includeRoles]
       : organizationKeys.users(organizationId),
     queryFn: async () => {
       const response = await usersListUsers(
@@ -77,7 +77,7 @@ export const useOrganizationUsers = (organizationId: string, includeServiceAccou
           query: {
             domainType: "DOMAIN_TYPE_ORGANIZATION",
             domainId: organizationId,
-            includeServiceAccounts,
+            includeRoles,
           },
         }),
       );
@@ -226,6 +226,7 @@ export const useOrganizationUsage = (organizationId: string, enabled = true) => 
     },
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     enabled: !!organizationId && enabled,
   });
 };
@@ -615,7 +616,7 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string; versioningEnabled?: boolean }) => {
+    mutationFn: async (params: { name?: string; description?: string; changeManagementEnabled?: boolean }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -624,8 +625,11 @@ export const useUpdateOrganization = (organizationId: string) => {
               metadata: {
                 name: params.name,
                 description: params.description,
-                versioningEnabled: params.versioningEnabled,
               },
+              spec:
+                typeof params.changeManagementEnabled === "boolean"
+                  ? { changeManagementEnabled: params.changeManagementEnabled }
+                  : undefined,
             },
           },
         }),
@@ -633,7 +637,7 @@ export const useUpdateOrganization = (organizationId: string) => {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
-      if (typeof variables.versioningEnabled === "boolean") {
+      if (typeof variables.changeManagementEnabled === "boolean") {
         queryClient.invalidateQueries({ queryKey: canvasKeys.all });
       }
     },

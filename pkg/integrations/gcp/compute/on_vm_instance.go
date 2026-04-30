@@ -90,23 +90,6 @@ func (t *OnVMInstance) Configuration() []configuration.Field {
 	return nil
 }
 
-func (t *OnVMInstance) ExampleData() map[string]any {
-	return map[string]any{
-		"serviceName":  computeServiceName,
-		"methodName":   instancesInsertMethod,
-		"resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-		"logName":      "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
-		"timestamp":    "2025-02-14T12:00:00Z",
-		"data": map[string]any{
-			"protoPayload": map[string]any{
-				"methodName":   instancesInsertMethod,
-				"resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-				"serviceName":  computeServiceName,
-			},
-		},
-	}
-}
-
 func (t *OnVMInstance) Setup(ctx core.TriggerContext) error {
 	if ctx.Integration == nil {
 		return fmt.Errorf("connect the GCP integration to this trigger to enable automatic event routing")
@@ -140,21 +123,21 @@ func (t *OnVMInstance) Setup(ctx core.TriggerContext) error {
 	}, 2*time.Second)
 }
 
-func (t *OnVMInstance) Actions() []core.Action {
-	return []core.Action{
-		{Name: "provisionSink"},
+func (t *OnVMInstance) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "provisionSink", Type: core.HookTypeInternal},
 	}
 }
 
-func (t *OnVMInstance) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMInstance) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	if ctx.Name != "provisionSink" {
-		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	return t.provisionSink(ctx)
 }
 
-func (t *OnVMInstance) provisionSink(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMInstance) provisionSink(ctx core.TriggerHookContext) (map[string]any, error) {
 	meta, err := integrationMetadata(ctx.Integration)
 	if err != nil {
 		return nil, err

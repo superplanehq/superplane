@@ -22,7 +22,7 @@
 - One-shot backend tests: `make test` (Golang).
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `make e2e E2E_TEST_PACKAGES=./test/e2e/workflows`
-- For E2E test authoring, see [docs/development/e2e_tests.md](docs/development/e2e_tests.md)
+- For E2E test authoring, see [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
 - After updating UI code, always run `make check.build.ui` to verify everything is correct
 - After editing JS code, always run `make format.js` to make sure that the files are consistently formatted
 - After editing Golang code, always run `make format.go` to make sure that files are consistently formatted
@@ -34,7 +34,6 @@
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
 - For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
-- Whenever adding or updating components/triggers that should be AI-assisted, always create or update the matching skill file in `templates/skills/` (for example `templates/skills/<component-or-trigger>.md`).
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
   - `make openapi.spec.gen` to generate OpenAPI spec for the API

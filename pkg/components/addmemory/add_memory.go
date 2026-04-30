@@ -16,7 +16,7 @@ const ComponentName = "addMemory"
 const PayloadType = "memory.added"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &AddMemory{})
+	registry.RegisterAction(ComponentName, &AddMemory{})
 }
 
 type AddMemory struct{}
@@ -136,10 +136,6 @@ func (c *AddMemory) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
-	}
-
 	if err := ctx.CanvasMemory.Add(spec.Namespace, values); err != nil {
 		return fmt.Errorf("failed to add canvas memory: %w", err)
 	}
@@ -210,14 +206,6 @@ func (c *AddMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 	return ctx.DefaultProcessing()
 }
 
-func (c *AddMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *AddMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("addMemory does not support actions")
-}
-
 func (c *AddMemory) Setup(ctx core.SetupContext) error {
 	return nil
 }
@@ -231,5 +219,13 @@ func (c *AddMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 }
 
 func (c *AddMemory) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *AddMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *AddMemory) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

@@ -1,0 +1,35 @@
+package groups
+
+import (
+	"fmt"
+	"io"
+
+	"github.com/superplanehq/superplane/pkg/cli/core"
+)
+
+type deleteCommand struct{}
+
+func (c *deleteCommand) Execute(ctx core.CommandContext) error {
+	organizationID, err := core.ResolveOrganizationID(ctx)
+	if err != nil {
+		return err
+	}
+
+	response, _, err := ctx.API.GroupsAPI.
+		GroupsDeleteGroup(ctx.Context, ctx.Args[0]).
+		DomainType(string(core.OrganizationDomainType())).
+		DomainId(organizationID).
+		Execute()
+	if err != nil {
+		return err
+	}
+
+	if ctx.Renderer.IsText() {
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, err := fmt.Fprintf(stdout, "Group deleted: %s\n", ctx.Args[0])
+			return err
+		})
+	}
+
+	return ctx.Renderer.Render(response)
+}

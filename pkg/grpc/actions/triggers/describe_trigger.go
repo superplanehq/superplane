@@ -7,13 +7,15 @@ import (
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func DescribeTrigger(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeTriggerResponse, error) {
 	trigger, err := registry.GetTrigger(name)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.NotFound, "trigger %s not found", name)
 	}
 
 	configFields := trigger.Configuration()

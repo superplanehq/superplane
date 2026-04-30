@@ -14,9 +14,10 @@ from ai.session_store import SessionStore
 
 
 class PersistedRunRecorder:
-    def __init__(self, store: SessionStore, chat_id: str, user_prompt: str) -> None:
+    def __init__(self, store: SessionStore, chat_id: str, run_id: str, user_prompt: str) -> None:
         self._store = store
         self._chat_id = chat_id
+        self._run_id = run_id
         self._history_count_before_run = self._store.count_chat_model_messages(chat_id)
         self._authoritative_messages_saved = False
         self._current_response_message_id: str | None = None
@@ -25,6 +26,7 @@ class PersistedRunRecorder:
         self._store.create_agent_chat_model_message(
             chat_id,
             ModelRequest(parts=[UserPromptPart(user_prompt)]),
+            run_id=run_id,
         )
 
     @property
@@ -37,7 +39,7 @@ class PersistedRunRecorder:
 
         if self._current_response_message_id is None:
             record = self._store.create_agent_chat_model_message(
-                self._chat_id, self._current_response
+                self._chat_id, self._current_response, run_id=self._run_id
             )
             self._current_response_message_id = record.id
             return
@@ -52,6 +54,7 @@ class PersistedRunRecorder:
             self._chat_id,
             self._history_count_before_run,
             list(validated_messages),
+            run_id=self._run_id,
         )
         self._authoritative_messages_saved = True
         self._current_response_message_id = None
@@ -157,6 +160,7 @@ class PersistedRunRecorder:
         self._store.create_agent_chat_model_message(
             self._chat_id,
             ModelRequest(parts=parts),
+            run_id=self._run_id,
         )
         self._current_response_message_id = None
         self._current_response = None

@@ -1,0 +1,229 @@
+package logfire
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
+)
+
+type LogfireWebhookHandler struct{}
+
+type logfireWebhookConfiguration struct {
+	EventType string `json:"eventType"`
+	Resource  string `json:"resource"`
+	ProjectID string `json:"projectId"`
+	AlertID   string `json:"alertId"`
+}
+
+type LogfireWebhookMetadata struct {
+	ManagedChannel       bool   `json:"managedChannel"`
+	SupportsWebhookSetup bool   `json:"supportsWebhookSetup"`
+	ChannelID            string `json:"channelId,omitempty"`
+	ChannelName          string `json:"channelName,omitempty"`
+	ChannelsPath         string `json:"channelsPath,omitempty"`
+}
+
+func (h *LogfireWebhookHandler) CompareConfig(a, b any) (bool, error) {
+	configA := logfireWebhookConfiguration{}
+	if err := decodeAny(a, &configA); err != nil {
+		return false, fmt.Errorf("failed to decode current webhook config: %w", err)
+	}
+
+	configB := logfireWebhookConfiguration{}
+	if err := decodeAny(b, &configB); err != nil {
+		return false, fmt.Errorf("failed to decode requested webhook config: %w", err)
+	}
+
+	matchEventResource := strings.EqualFold(strings.TrimSpace(configA.EventType), strings.TrimSpace(configB.EventType)) &&
+		strings.EqualFold(strings.TrimSpace(configA.Resource), strings.TrimSpace(configB.Resource))
+
+	projectIDA := strings.TrimSpace(configA.ProjectID)
+	alertIDA := strings.TrimSpace(configA.AlertID)
+	projectIDB := strings.TrimSpace(configB.ProjectID)
+	alertIDB := strings.TrimSpace(configB.AlertID)
+
+	if projectIDA == "" || alertIDA == "" || projectIDB == "" || alertIDB == "" {
+		return false, fmt.Errorf("incomplete webhook configuration: projectId and alertId are required")
+	}
+
+	return matchEventResource &&
+		strings.EqualFold(projectIDA, projectIDB) &&
+		strings.EqualFold(alertIDA, alertIDB), nil
+}
+
+func (h *LogfireWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
+func (h *LogfireWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Logfire client: %w", err)
+	}
+
+	requestedConfig := logfireWebhookConfiguration{}
+	if err := decodeAny(ctx.Webhook.GetConfiguration(), &requestedConfig); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
+	}
+
+	requestedConfig.ProjectID = strings.TrimSpace(requestedConfig.ProjectID)
+	requestedConfig.AlertID = strings.TrimSpace(requestedConfig.AlertID)
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get webhook secret: %w", err)
+	}
+	if len(secret) == 0 {
+		secret = []byte(uuid.NewString())
+		if err := ctx.Webhook.SetSecret(secret); err != nil {
+			return nil, fmt.Errorf("failed to set webhook secret: %w", err)
+		}
+	}
+
+	channelName := fmt.Sprintf("superplane-webhook-%s", strings.ToLower(ctx.Webhook.GetID()))
+	if requestedConfig.ProjectID == "" || requestedConfig.AlertID == "" {
+		return nil, fmt.Errorf("missing required logfire webhook configuration: projectId and alertId are required")
+	}
+
+	// If the selected Logfire alert already has the channel that points to our webhook
+	// URL, we don't need to create a new channel.
+	assignedChannelID, assigned, err := client.FindAssignedAlertChannelID(
+		requestedConfig.ProjectID,
+		requestedConfig.AlertID,
+		channelName,
+		ctx.Webhook.GetURL(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing alert webhook assignment: %w", err)
+	}
+
+	managedChannel := false
+	channelsPath := defaultChannelsPath
+	channelID := assignedChannelID
+	channelLabel := channelName
+
+	if !assigned {
+		channel, channelPath, upsertErr := client.UpsertAlertChannel(channelName, ctx.Webhook.GetURL(), string(secret))
+		if upsertErr != nil {
+			if isUnsupportedWebhookProvisioningError(upsertErr) || isPermissionDeniedWebhookProvisioningError(upsertErr) {
+				setWebhookSetupSupport(ctx.Integration, false)
+				return LogfireWebhookMetadata{
+					ManagedChannel:       false,
+					SupportsWebhookSetup: false,
+				}, nil
+			}
+
+			return nil, fmt.Errorf("failed to provision Logfire alert channel: %w", upsertErr)
+		}
+
+		managedChannel = true
+		channelsPath = channelPath
+		channelID = channel.ID
+		channelLabel = channel.Label
+
+		if err := client.EnsureAlertHasChannelID(requestedConfig.ProjectID, requestedConfig.AlertID, channelID); err != nil {
+			return nil, fmt.Errorf("failed to assign Logfire channel to alert: %w", err)
+		}
+	} else if assignedChannelID != "" {
+		// The alert is already configured; no channel creation necessary.
+		managedChannel = false
+		channelsPath = defaultChannelsPath
+	}
+
+	setWebhookSetupSupport(ctx.Integration, true)
+	return LogfireWebhookMetadata{
+		ManagedChannel:       managedChannel,
+		SupportsWebhookSetup: true,
+		ChannelID:            channelID,
+		ChannelName:          channelLabel,
+		ChannelsPath:         channelsPath,
+	}, nil
+}
+
+func (h *LogfireWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	metadata := LogfireWebhookMetadata{}
+	if err := decodeAny(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+		ctx.Logger.WithError(err).Warn("failed to decode webhook metadata during cleanup")
+		return nil
+	}
+
+	if !metadata.ManagedChannel || strings.TrimSpace(metadata.ChannelID) == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Logfire client: %w", err)
+	}
+
+	err = client.DeleteAlertChannel(metadata.ChannelID, metadata.ChannelsPath)
+	if err != nil && !isNotFoundOrUnauthorized(err) && !isUnsupportedWebhookProvisioningError(err) {
+		return fmt.Errorf("failed to delete Logfire alert channel: %w", err)
+	}
+
+	return nil
+}
+
+func isUnsupportedWebhookProvisioningError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusNotFound || apiErr.StatusCode == http.StatusMethodNotAllowed
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "not supported")
+}
+
+func isNotFoundOrUnauthorized(err error) bool {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusNotFound || apiErr.StatusCode == http.StatusUnauthorized
+	}
+
+	return false
+}
+
+func isPermissionDeniedWebhookProvisioningError(err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden {
+		return false
+	}
+
+	body := strings.ToLower(strings.TrimSpace(apiErr.Body))
+	return strings.Contains(body, "not enough permissions") || strings.Contains(body, "permission")
+}
+
+func decodeAny(value any, target any) error {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(raw, target)
+}
+
+func setWebhookSetupSupport(integration core.IntegrationContext, supported bool) {
+	if integration == nil {
+		return
+	}
+
+	metadata := Metadata{
+		SupportsWebhookSetup: supported,
+		SupportsQueryAPI:     true,
+	}
+
+	_ = decodeAny(integration.GetMetadata(), &metadata)
+	metadata.SupportsWebhookSetup = supported
+	if !metadata.SupportsQueryAPI {
+		metadata.SupportsQueryAPI = true
+	}
+
+	integration.SetMetadata(metadata)
+}

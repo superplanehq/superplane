@@ -14,6 +14,7 @@ import (
 func newTriggersCommand(options core.BindOptions) *cobra.Command {
 	var from string
 	var name string
+	var full bool
 
 	cmd := &cobra.Command{
 		Use:   "triggers",
@@ -22,7 +23,8 @@ func newTriggersCommand(options core.BindOptions) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&from, "from", "", "integration definition name")
 	cmd.Flags().StringVar(&name, "name", "", "trigger name")
-	core.Bind(cmd, &triggersCommand{from: &from, name: &name}, options)
+	cmd.Flags().BoolVar(&full, "full", false, "show full output including all fields")
+	core.Bind(cmd, &triggersCommand{from: &from, name: &name, full: &full}, options)
 
 	return cmd
 }
@@ -30,6 +32,7 @@ func newTriggersCommand(options core.BindOptions) *cobra.Command {
 type triggersCommand struct {
 	from *string
 	name *string
+	full *bool
 }
 
 func (c *triggersCommand) Execute(ctx core.CommandContext) error {
@@ -46,7 +49,19 @@ func (c *triggersCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(triggers)
+		if c.full != nil && *c.full {
+			return ctx.Renderer.Render(triggers)
+		}
+
+		summary := make([]map[string]string, len(triggers))
+		for i, trigger := range triggers {
+			summary[i] = map[string]string{
+				"name":        trigger.GetName(),
+				"label":       trigger.GetLabel(),
+				"description": trigger.GetDescription(),
+			}
+		}
+		return ctx.Renderer.Render(summary)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -137,7 +152,7 @@ func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.TriggersTrigger{}, err
+			return openapi_client.TriggersTrigger{}, fmt.Errorf("trigger %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationTrigger(integration, triggerName)
 	}

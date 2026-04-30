@@ -5,7 +5,7 @@ from typing import Any
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
 from ai.models import CanvasAnswer
-from evals.evaluators.workflow_utils import iter_config_strings_from_operations
+from evals.evaluators.workflow_utils import iter_config_strings_from_changes
 
 _DATE_CALL_RE = re.compile(r"\bdate\s*\(")
 _NOW_CALL_RE = re.compile(r"\bnow\s*\(")
@@ -85,7 +85,7 @@ class ContainsDatetimeExpression(Evaluator):
         if ctx.output.proposal is None:
             return EvaluationReason(value=False, reason="No proposal to check")
 
-        texts = list(iter_config_strings_from_operations(ctx.output.proposal.operations))
+        texts = list(iter_config_strings_from_changes(ctx.output.proposal.changeset.changes or []))
         if not texts:
             return EvaluationReason(
                 value=False, reason="No configuration strings in proposal operations"

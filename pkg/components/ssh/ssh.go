@@ -23,7 +23,7 @@ const (
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func init() {
-	registry.RegisterComponent("ssh", &SSHCommand{})
+	registry.RegisterAction("ssh", &SSHCommand{})
 }
 
 type SSHCommand struct{}
@@ -112,16 +112,6 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 }
 func (c *SSHCommand) Icon() string  { return "terminal" }
 func (c *SSHCommand) Color() string { return "blue" }
-
-func (c *SSHCommand) ExampleOutput() map[string]any {
-	return map[string]any{
-		"result": map[string]any{
-			"stdout":   "Hello, World!\n",
-			"stderr":   "",
-			"exitCode": 0,
-		},
-	}
-}
 
 func (c *SSHCommand) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
@@ -429,7 +419,7 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	return c.executeSSH(execCtx)
 }
 
-func (c *SSHCommand) HandleAction(ctx core.ActionContext) error {
+func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "connectionRetry" {
 		if ctx.ExecutionState.IsFinished() {
 			return nil
@@ -459,7 +449,7 @@ type ExecuteSSHContext struct {
 	secretsCtx  core.SecretsContext
 	requestsCtx core.RequestContext
 	stateCtx    core.ExecutionStateContext
-	metadataCtx core.MetadataContext
+	metadataCtx core.MetadataWriter
 
 	execMetadata ExecutionMetadata
 }
@@ -525,7 +515,7 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	return ctx.stateCtx.Emit(channel, "ssh.command.executed", []any{result})
 }
 
-func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.MetadataContext) bool {
+func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.MetadataWriter) bool {
 	if retrySpec == nil || !retrySpec.Enabled {
 		return false
 	}
@@ -533,14 +523,14 @@ func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.M
 	return c.getRetryAttempt(metadata) < retrySpec.Retries
 }
 
-func (c *SSHCommand) incrementRetryCount(metadata core.MetadataContext) error {
+func (c *SSHCommand) incrementRetryCount(metadata core.MetadataWriter) error {
 	current := c.getMetadataMap(metadata)
 	current["attempt"] = c.getRetryAttempt(metadata) + 1
 
 	return metadata.Set(current)
 }
 
-func (c *SSHCommand) getRetryAttempt(metadata core.MetadataContext) int {
+func (c *SSHCommand) getRetryAttempt(metadata core.MetadataWriter) int {
 	meta := c.getMetadataMap(metadata)
 
 	attempt, ok := meta["attempt"]
@@ -559,7 +549,7 @@ func (c *SSHCommand) getRetryAttempt(metadata core.MetadataContext) int {
 	}
 }
 
-func (c *SSHCommand) getMetadataMap(metadata core.MetadataContext) map[string]any {
+func (c *SSHCommand) getMetadataMap(metadata core.MetadataWriter) map[string]any {
 	current := metadata.Get()
 	if current == nil {
 		return map[string]any{}
@@ -582,7 +572,7 @@ func (c *SSHCommand) getMetadataMap(metadata core.MetadataContext) map[string]an
 	return metadataMap
 }
 
-func (c *SSHCommand) setResultMetadata(metadata core.MetadataContext, result *CommandResult) error {
+func (c *SSHCommand) setResultMetadata(metadata core.MetadataWriter, result *CommandResult) error {
 	current := c.getMetadataMap(metadata)
 	current["result"] = map[string]any{
 		"exitCode": result.ExitCode,
@@ -655,9 +645,12 @@ func (c *SSHCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (c *SSHCommand) Actions() []core.Action {
-	return []core.Action{
-		{Name: "connectionRetry"},
+func (c *SSHCommand) Hooks() []core.Hook {
+	return []core.Hook{
+		{
+			Name: "connectionRetry",
+			Type: core.HookTypeInternal,
+		},
 	}
 }
 

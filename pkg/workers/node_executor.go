@@ -15,6 +15,7 @@ import (
 	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -33,6 +34,7 @@ var ErrRecordLocked = errors.New("record locked")
 type NodeExecutor struct {
 	encryptor      crypto.Encryptor
 	registry       *registry.Registry
+	authService    authorization.Authorization
 	baseURL        string
 	webhookBaseURL string
 	semaphore      *semaphore.Weighted
@@ -42,7 +44,7 @@ type NodeExecutor struct {
 	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
@@ -51,6 +53,7 @@ func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, ba
 		semaphore:      semaphore.NewWeighted(25),
 		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
 		rabbitMQURL:    rabbitMQURL,
+		authService:    authService,
 	}
 }
 
@@ -226,7 +229,7 @@ func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.Canva
 		return w.executeBlueprintNode(tx, execution, node)
 	}
 
-	return w.executeComponentNode(tx, execution, node, onNewEvents)
+	return w.executeActionNode(tx, execution, node, onNewEvents)
 }
 
 func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
@@ -302,11 +305,11 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.Node) ([]configuration.Field, error) {
 	switch {
 	case node.Ref.Component != nil && node.Ref.Component.Name != "":
-		comp, err := w.registry.GetComponent(node.Ref.Component.Name)
+		action, err := w.registry.GetAction(node.Ref.Component.Name)
 		if err != nil {
 			return nil, fmt.Errorf("component %s not found: %w", node.Ref.Component.Name, err)
 		}
-		return comp.Configuration(), nil
+		return action.Configuration(), nil
 	case node.Ref.Trigger != nil && node.Ref.Trigger.Name != "":
 		trigger, err := w.registry.GetTrigger(node.Ref.Trigger.Name)
 		if err != nil {
@@ -324,7 +327,7 @@ func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node mod
 	}
 }
 
-func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
@@ -338,10 +341,10 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 	}
 
 	ref := node.Ref.Data()
-	component, err := w.registry.GetComponent(ref.Component.Name)
+	action, err := w.registry.GetAction(ref.Component.Name)
 	if err != nil {
-		logger.Errorf("component %s not found: %v", ref.Component.Name, err)
-		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+		logger.Errorf("action %s not found: %v", ref.Component.Name, err)
+		return fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 	}
 
 	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
@@ -382,7 +385,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
+		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
@@ -407,13 +410,13 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 	}
 
 	ctx.Logger = logger
-	if err := component.Execute(ctx); err != nil {
-		logger.Errorf("failed to execute component: %v", err)
+	if err := action.Execute(ctx); err != nil {
+		logger.Errorf("failed to execute action: %v", err)
 		err = execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, err.Error())
 		return err
 	}
 
-	logger.Info("Component executed successfully")
+	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
 }

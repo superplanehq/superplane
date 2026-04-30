@@ -1,6 +1,6 @@
 """JSON-serialization helpers shared across agent packages (e.g. evals).
 
-Distinct from ``repl_web._to_jsonable``: kept separate deliberately so the web
+Distinct from ``ai.web._to_jsonable``: kept separate deliberately so the HTTP
 layer can evolve without coupling; this module adds dataclass support for types
 such as ``pydantic_ai.usage.RunUsage``.
 """

@@ -101,7 +101,7 @@ func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
 		return tx.Create(&CanvasVersion{
 			ID:          liveVersionID,
 			WorkflowID:  wf.ID,
-			IsPublished: true,
+			State:       CanvasVersionStatePublished,
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice([]Node{}),
 			Edges:       datatypes.NewJSONSlice([]Edge{}),

@@ -192,14 +192,6 @@ func (c *GetImageScanFindings) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *GetImageScanFindings) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetImageScanFindings) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetImageScanFindings) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -209,5 +201,13 @@ func (c *GetImageScanFindings) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *GetImageScanFindings) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetImageScanFindings) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetImageScanFindings) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

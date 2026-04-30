@@ -1,7 +1,7 @@
-import type { ComponentsNode } from "@/api-client";
+import type { SuperplaneComponentsNode } from "@/api-client";
 import type { CanvasNode } from "@/ui/CanvasPage";
 
-export function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
+export function prepareAnnotationNode(node: SuperplaneComponentsNode): CanvasNode {
   const width = (node.configuration?.width as number) || 320;
   const height = (node.configuration?.height as number) || 200;
   const position = {

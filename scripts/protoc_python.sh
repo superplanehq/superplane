@@ -21,4 +21,5 @@ python -m grpc_tools.protoc \
        --proto_path "$PROTO_DIR/include" \
        --proto_path "$GRPC_TOOLS_INCLUDE" \
        --python_out="$PYTHON_OUT" \
-       "$PROTO_DIR/private/agents.proto"
+       "$PROTO_DIR/private/agents.proto" \
+       "$PROTO_DIR/usage.proto"

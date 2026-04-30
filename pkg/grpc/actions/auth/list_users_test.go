@@ -14,18 +14,29 @@ import (
 func Test__ListUsers(t *testing.T) {
 	r := support.Setup(t)
 
-	resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), false, r.AuthService)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Len(t, resp.Users, 1)
+	t.Run("returns role assignments", func(t *testing.T) {
+		resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), true, r.AuthService)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Len(t, resp.Users, 1)
 
-	for _, user := range resp.Users {
-		assert.NotEmpty(t, user.Metadata.Id)
-		assert.NotEmpty(t, user.Status.RoleAssignments)
-		for _, roleAssignment := range user.Status.RoleAssignments {
-			assert.NotEmpty(t, roleAssignment.RoleName)
-			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, roleAssignment.DomainType)
-			assert.Equal(t, r.Organization.ID.String(), roleAssignment.DomainId)
+		for _, user := range resp.Users {
+			assert.NotEmpty(t, user.Metadata.Id)
+			assert.NotEmpty(t, user.Status.Roles)
+			assert.NotEmpty(t, user.Status.AccountProviders)
+			for _, role := range user.Status.Roles {
+				assert.NotEmpty(t, role)
+				assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, role.DomainType)
+				assert.Equal(t, r.Organization.ID.String(), role.DomainId)
+			}
 		}
-	}
+	})
+
+	t.Run("returns no role assignments", func(t *testing.T) {
+		resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), false, r.AuthService)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Len(t, resp.Users, 1)
+		assert.Empty(t, resp.Users[0].Status.Roles)
+	})
 }

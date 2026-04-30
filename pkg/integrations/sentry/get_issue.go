@@ -145,14 +145,6 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "sentry.issue", []any{issue})
 }
 
-func (c *GetIssue) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetIssue) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -173,4 +165,12 @@ func decodeGetIssueConfiguration(input any) (GetIssueConfiguration, error) {
 
 	config.IssueID = strings.TrimSpace(config.IssueID)
 	return config, nil
+}
+
+func (c *GetIssue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetIssue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

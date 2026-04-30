@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { DeleteHttpSyntheticCheckConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const deleteHttpSyntheticCheckMapper: ComponentBaseMapper = {
@@ -70,8 +71,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as DeleteHttpSyntheticCheckConfiguration;
 
   if (configuration?.checkId) {
-    const idPreview =
-      configuration.checkId.length > 24 ? configuration.checkId.substring(0, 24) + "…" : configuration.checkId;
+    const idPreview = truncate(configuration.checkId, 24, "…");
     metadata.push({ icon: "fingerprint", label: idPreview });
   }
 

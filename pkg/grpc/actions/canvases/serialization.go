@@ -6,12 +6,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -67,7 +68,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	canvasVersioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, err := isChangeManagementEnabledForCanvas(canvas)
 	if err != nil {
 		return nil, err
 	}
@@ -85,22 +86,19 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:                canvas.ID.String(),
-				OrganizationId:    canvas.OrganizationID.String(),
-				Name:              canvas.Name,
-				Description:       canvas.Description,
-				CreatedAt:         timestamppb.New(*canvas.CreatedAt),
-				UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
-				CreatedBy:         createdBy,
-				IsTemplate:        canvas.IsTemplate,
-				VersioningEnabled: canvasVersioningEnabled,
-				ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
-					canvas.EffectiveChangeRequestApprovers(),
-				),
+				Id:             canvas.ID.String(),
+				OrganizationId: canvas.OrganizationID.String(),
+				Name:           canvas.Name,
+				Description:    canvas.Description,
+				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:      createdBy,
+				IsTemplate:     canvas.IsTemplate,
 			},
 			Spec: &pb.Canvas_Spec{
-				Nodes: serializedNodes,
-				Edges: actions.EdgesToProto(liveVersion.Edges),
+				Nodes:            serializedNodes,
+				Edges:            actions.EdgesToProto(liveVersion.Edges),
+				ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
 			},
 			Status: nil,
 		}, nil
@@ -140,22 +138,19 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:                canvas.ID.String(),
-			OrganizationId:    canvas.OrganizationID.String(),
-			Name:              canvas.Name,
-			Description:       canvas.Description,
-			CreatedAt:         timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:         createdBy,
-			IsTemplate:        canvas.IsTemplate,
-			VersioningEnabled: canvasVersioningEnabled,
-			ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
-				canvas.EffectiveChangeRequestApprovers(),
-			),
+			Id:             canvas.ID.String(),
+			OrganizationId: canvas.OrganizationID.String(),
+			Name:           canvas.Name,
+			Description:    canvas.Description,
+			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:      createdBy,
+			IsTemplate:     canvas.IsTemplate,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: serializedNodes,
-			Edges: actions.EdgesToProto(liveVersion.Edges),
+			Nodes:            serializedNodes,
+			Edges:            actions.EdgesToProto(liveVersion.Edges),
+			ChangeManagement: serializeChangeManagement(changeManagementEnabled, canvas.EffectiveChangeRequestApprovers()),
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
@@ -164,38 +159,40 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 	}, nil
 }
 
-func serializeCanvasChangeRequestApprovalConfig(
+func serializeChangeManagement(
+	enabled bool,
 	approvers []models.CanvasChangeRequestApprover,
-) *pb.CanvasChangeRequestApprovalConfig {
-	config := &pb.CanvasChangeRequestApprovalConfig{
-		Items: make([]*pb.CanvasChangeRequestApprover, 0, len(approvers)),
+) *pb.Canvas_ChangeManagement {
+	cm := &pb.Canvas_ChangeManagement{
+		Enabled:   enabled,
+		Approvals: make([]*pb.Canvas_ChangeManagement_Approver, 0, len(approvers)),
 	}
 
 	for _, approver := range approvers {
-		config.Items = append(config.Items, &pb.CanvasChangeRequestApprover{
+		cm.Approvals = append(cm.Approvals, &pb.Canvas_ChangeManagement_Approver{
 			Type:     canvasChangeRequestApproverTypeToProto(approver.Type),
 			UserId:   approver.User,
 			RoleName: approver.Role,
 		})
 	}
 
-	return config
+	return cm
 }
 
-func canvasChangeRequestApproverTypeToProto(value string) pb.CanvasChangeRequestApprover_Type {
+func canvasChangeRequestApproverTypeToProto(value string) pb.Canvas_ChangeManagement_Approver_Type {
 	switch value {
 	case models.CanvasChangeRequestApproverTypeAnyone:
-		return pb.CanvasChangeRequestApprover_TYPE_ANYONE
+		return pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE
 	case models.CanvasChangeRequestApproverTypeUser:
-		return pb.CanvasChangeRequestApprover_TYPE_USER
+		return pb.Canvas_ChangeManagement_Approver_TYPE_USER
 	case models.CanvasChangeRequestApproverTypeRole:
-		return pb.CanvasChangeRequestApprover_TYPE_ROLE
+		return pb.Canvas_ChangeManagement_Approver_TYPE_ROLE
 	default:
-		return pb.CanvasChangeRequestApprover_TYPE_UNSPECIFIED
+		return pb.Canvas_ChangeManagement_Approver_TYPE_UNSPECIFIED
 	}
 }
 
-func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*compb.Node, error) {
+func serializeCanvasNodes(canvasID uuid.UUID, nodes []models.Node) ([]*componentpb.Node, error) {
 	serialized := actions.NodesToProto(nodes)
 	if len(serialized) == 0 {
 		return serialized, nil
@@ -239,7 +236,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	}
 
 	nodeIDs := make(map[string]bool)
-	nodeTypeByID := make(map[string]compb.Node_Type)
+	nodeTypeByID := make(map[string]componentpb.Node_Type)
 	nodeValidationErrors := make(map[string]string)
 
 	for i, node := range canvas.Spec.Nodes {
@@ -257,14 +254,31 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 		nodeIDs[node.Id] = true
 		nodeTypeByID[node.Id] = node.Type
-
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
 	// Find shadowed names within connected components
-	nodeWarnings := actions.FindShadowedNameWarnings(canvas.Spec.Nodes, canvas.Spec.Edges)
+	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
+	nodeWarnings := actions.FindShadowedNameWarnings(registry, canvas.Spec.Nodes, canvas.Spec.Edges)
+	nodesByID := make(map[string]models.Node, len(nodes))
+	for _, node := range nodes {
+		nodesByID[node.ID] = node
+	}
+
+	for nodeID, errs := range expressionvalidation.ValidateCanvasExpressions(registry, canvas.Spec.Nodes) {
+		msgs := make([]string, 0, len(errs))
+		for _, e := range errs {
+			msgs = append(msgs, e.Error())
+		}
+		joined := strings.Join(msgs, "\n")
+		if existing, ok := nodeValidationErrors[nodeID]; ok {
+			nodeValidationErrors[nodeID] = existing + "\n" + joined
+		} else {
+			nodeValidationErrors[nodeID] = joined
+		}
+	}
 
 	for i, edge := range canvas.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -279,62 +293,25 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if nodeTypeByID[edge.SourceId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.SourceId] == componentpb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
-		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.TargetId] == componentpb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
-	}
 
-	groupNodeIDs := make(map[string]bool)
-	for _, node := range canvas.Spec.Nodes {
-		if node.Type == compb.Node_TYPE_WIDGET && node.Widget != nil && node.Widget.Name == "group" {
-			groupNodeIDs[node.Id] = true
+		if err := changesets.ValidateSourceNodeOutputChannel(
+			registry,
+			nodesByID[edge.SourceId],
+			edge.Channel,
+		); err != nil {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: %v", i, err)
 		}
-	}
-
-	claimedChildren := make(map[string]string)
-	for _, node := range canvas.Spec.Nodes {
-		if node.Type != compb.Node_TYPE_WIDGET || node.Widget == nil || node.Widget.Name != "group" {
-			continue
-		}
-
-		config := node.Configuration.AsMap()
-		childIDs, _ := config["childNodeIds"].([]any)
-		for _, raw := range childIDs {
-			childID, ok := raw.(string)
-			if !ok || childID == "" {
-				continue
-			}
-
-			if !nodeIDs[childID] {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s not found", node.Id, childID)
-			}
-
-			if childID == node.Id {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: cannot reference itself as a child", node.Id)
-			}
-
-			if groupNodeIDs[childID] {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is a group (nested groups are not supported)", node.Id, childID)
-			}
-
-			if ownerID, taken := claimedChildren[childID]; taken {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is already claimed by group %s", node.Id, childID, ownerID)
-			}
-
-			claimedChildren[childID] = node.Id
-		}
-	}
-
-	if err := actions.CheckForCycles(canvas.Spec.Nodes, canvas.Spec.Edges); err != nil {
-		return nil, nil, err
 	}
 
 	// Convert proto nodes to models, adding validation errors and warnings where applicable
-	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
+	edges := actions.ProtoToEdges(canvas.Spec.Edges)
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
 			nodes[i].ErrorMessage = &errorMsg
@@ -349,130 +326,47 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 	}
 
-	return nodes, actions.ProtoToEdges(canvas.Spec.Edges), nil
-}
-
-func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {
-	switch node.Type {
-	case compb.Node_TYPE_COMPONENT:
-		if node.Component == nil {
-			return fmt.Errorf("component reference is required for component ref type")
-		}
-
-		if node.Component.Name == "" {
-			return fmt.Errorf("component name is required")
-		}
-
-		component, err := findAndValidateComponent(registry, organizationID, node)
-		if err != nil {
-			return err
-		}
-
-		return configuration.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
-
-	case compb.Node_TYPE_BLUEPRINT:
-		if node.Blueprint == nil {
-			return fmt.Errorf("blueprint reference is required for blueprint ref type")
-		}
-
-		if node.Blueprint.Id == "" {
-			return fmt.Errorf("blueprint ID is required")
-		}
-
-		blueprint, err := models.FindBlueprint(organizationID, node.Blueprint.Id)
-		if err != nil {
-			return fmt.Errorf("blueprint %s not found", node.Blueprint.Id)
-		}
-
-		return configuration.ValidateConfiguration(blueprint.Configuration, node.Configuration.AsMap())
-
-	case compb.Node_TYPE_TRIGGER:
-		if node.Trigger == nil {
-			return fmt.Errorf("trigger reference is required for trigger ref type")
-		}
-
-		if node.Trigger.Name == "" {
-			return fmt.Errorf("trigger name is required")
-		}
-
-		trigger, err := findAndValidateTrigger(registry, organizationID, node)
-		if err != nil {
-			return err
-		}
-
-		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
-
-	case compb.Node_TYPE_WIDGET:
-		if node.Widget == nil {
-			return fmt.Errorf("widget reference is required for widget ref type")
-		}
-
-		if node.Widget.Name == "" {
-			return fmt.Errorf("widget name is required")
-		}
-
-		widget, err := findAndValidateWidget(registry, organizationID, node)
-		if err != nil {
-			return err
-		}
-
-		return configuration.ValidateConfiguration(widget.Configuration(), node.Configuration.AsMap())
-
-	default:
-		return fmt.Errorf("invalid node type: %s", node.Type)
+	//
+	// Check for cycles in the canvas
+	//
+	if err := changesets.CheckForCycles(nodes, edges); err != nil {
+		return nil, nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+
+	return nodes, edges, nil
 }
 
-func findAndValidateTrigger(registry *registry.Registry, organizationID string, node *compb.Node) (core.Trigger, error) {
-	parts := strings.SplitN(node.Trigger.Name, ".", 2)
+func validateNodeRef(registry *registry.Registry, organizationID string, node *componentpb.Node) error {
+	if node.Component == "" {
+		return fmt.Errorf("component name is required")
+	}
+
+	parts := strings.SplitN(node.Component, ".", 2)
 	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid trigger name: %s", node.Trigger.Name)
+		return fmt.Errorf("invalid component name: %s", node.Component)
 	}
 
-	if len(parts) == 1 {
-		return registry.GetTrigger(parts[0])
-	}
-
-	err := validateIntegration(organizationID, node.Integration)
+	configurable, err := registry.FindConfigurableComponent(node.Component)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return registry.GetIntegrationTrigger(parts[0], node.Trigger.Name)
+	if len(parts) > 1 {
+		err := validateIntegration(organizationID, node.Integration)
+		if err != nil {
+			return err
+		}
+	}
+
+	return configuration.ValidateConfiguration(configurable.Configuration(), node.Configuration.AsMap())
 }
 
-func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
-	if node.Widget != nil && node.Widget.Name == "" {
-		return nil, fmt.Errorf("widget name is required")
-	}
-
-	return registry.GetWidget(node.Widget.Name)
-}
-
-func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (core.Component, error) {
-	parts := strings.SplitN(node.Component.Name, ".", 2)
-	if len(parts) > 2 {
-		return nil, fmt.Errorf("invalid component name: %s", node.Component.Name)
-	}
-
-	if len(parts) == 1 {
-		return registry.GetComponent(parts[0])
-	}
-
-	err := validateIntegration(organizationID, node.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	return registry.GetIntegrationComponent(parts[0], node.Component.Name)
-}
-
-func validateIntegration(organizationID string, ref *compb.IntegrationRef) error {
-	if ref == nil || ref.Id == "" {
+func validateIntegration(organizationID string, ref *componentpb.IntegrationRef) error {
+	if ref == nil || ref.Id == nil {
 		return fmt.Errorf("integration is required")
 	}
 
-	integrationID, err := uuid.Parse(ref.Id)
+	integrationID, err := uuid.Parse(*ref.Id)
 	if err != nil {
 		return fmt.Errorf("invalid integration ID: %v", err)
 	}

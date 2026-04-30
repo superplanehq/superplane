@@ -5,9 +5,10 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
-  ComponentsComponent,
-  ComponentsEdge,
-  ComponentsNode,
+  SuperplaneActionsAction,
+  SuperplaneComponentsEdge as ComponentsEdge,
+  SuperplaneComponentsNode as ComponentsNode,
+  SuperplaneMeUser,
 } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/lib/date";
@@ -17,29 +18,48 @@ import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEven
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
-import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
-
-export function collectGroupChildIds(node: ComponentsNode): string[] {
-  if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return [];
-  return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);
-}
-
-export function buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const node of nodes) {
-    if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group" || !node.id) continue;
-    for (const childId of collectGroupChildIds(node)) {
-      map.set(childId, node.id);
-    }
-  }
-  return map;
-}
+import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
   const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
+}
+
+export function getComparableIntegrationId(node: Record<string, unknown>): string | null {
+  const integration = node.integration;
+  if (integration && typeof integration === "object" && "id" in integration) {
+    const integrationId = integration.id;
+    return typeof integrationId === "string" && integrationId ? integrationId : null;
+  }
+
+  const integrationId = node.integrationId;
+  return typeof integrationId === "string" && integrationId ? integrationId : null;
+}
+
+function normalizeNodeForSaveSignature(node: ComponentsNode): ComponentsNode {
+  if (!node.integration) {
+    return node;
+  }
+
+  return {
+    ...node,
+    integration: node.integration.id ? { id: node.integration.id } : undefined,
+  };
+}
+
+export function getWorkflowSaveSignature(workflow: CanvasesCanvas | null | undefined): string {
+  if (!workflow) {
+    return "";
+  }
+
+  return JSON.stringify({
+    name: workflow.metadata?.name ?? "",
+    description: workflow.metadata?.description ?? "",
+    nodes: (workflow.spec?.nodes ?? []).map(normalizeNodeForSaveSignature),
+    edges: workflow.spec?.edges ?? [],
+  });
 }
 
 /**
@@ -92,7 +112,7 @@ export function mapTriggerEventsToSidebarEvents(
 }
 
 export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: ComponentsNode): SidebarEvent {
-  const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
+  const triggerRenderer = getTriggerRenderer(node.component || "");
   const eventInfo = buildEventInfo(event);
   const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: eventInfo });
   const values = triggerRenderer.getRootEventValues({ event: eventInfo });
@@ -136,23 +156,21 @@ export function mapExecutionsToSidebarEvents(
   executions: CanvasesCanvasNodeExecution[],
   nodes: ComponentsNode[],
   limit?: number,
-  additionalData?: unknown,
 ): SidebarEvent[] {
   const executionsToMap = limit ? executions.slice(0, limit) : executions;
 
   return executionsToMap.map((execution) => {
     const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
-    const stateResolver = getState(currentComponentNode?.component?.name || "");
+    const stateResolver = getState(currentComponentNode?.component || "");
     const state = stateResolver(buildExecutionInfo(execution));
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
 
-    const componentName = currentComponentNode?.component?.name || "";
+    const componentName = currentComponentNode?.component || "";
     const componentMapper = getComponentBaseMapper(componentName);
     const componentSubtitle = componentMapper.subtitle?.({
       node: buildNodeInfo(currentComponentNode as ComponentsNode),
       execution: buildExecutionInfo(execution),
-      additionalData,
     });
 
     const { title, subtitle } = execution.rootEvent
@@ -198,7 +216,7 @@ export function getNextInQueueInfo(
   }
 
   const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
 
   const { title, subtitle } = queueItem.rootEvent
     ? rootTriggerRenderer.getTitleAndSubtitle({
@@ -224,7 +242,7 @@ export function mapQueueItemsToSidebarEvents(
   const queueItemsToMap = limit ? queueItems.slice(0, limit) : queueItems;
   return queueItemsToMap.map((item) => {
     const rootTriggerNode = nodes.find((n) => n.id === item.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
 
     const { title, subtitle } = item.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle({
@@ -367,7 +385,7 @@ export function buildRunItemFromExecution(options: {
 }): LogRunItem {
   const { execution, nodes } = options;
   const componentNode = nodes.find((node) => node.id === execution.nodeId);
-  const componentName = componentNode?.component?.name || "";
+  const componentName = componentNode?.component || "";
   const stateResolver = getState(componentName);
   const resolvedState = stateResolver(buildExecutionInfo(execution));
 
@@ -403,7 +421,7 @@ export function buildRunEntryFromEvent(options: {
 }): LogEntry {
   const { event, nodes, runItems = [] } = options;
   const triggerNode = nodes.find((node) => node.id === event.nodeId);
-  const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
+  const triggerRenderer = getTriggerRenderer(triggerNode?.component || "");
   const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(event) });
   const rootValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(event) });
 
@@ -524,6 +542,60 @@ export function mapCanvasNodesToLogEntries(options: {
     });
 
   return entries;
+}
+
+export function mergeWorkflowLogEntries(options: {
+  isViewingLiveVersion: boolean;
+  runEntries: LogEntry[];
+  liveRunEntries: LogEntry[];
+  canvasEntries: LogEntry[];
+  liveCanvasEntries: LogEntry[];
+  resolvedExecutionIds: Set<string>;
+}): LogEntry[] {
+  const { isViewingLiveVersion, runEntries, liveRunEntries, canvasEntries, liveCanvasEntries, resolvedExecutionIds } =
+    options;
+  const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
+
+  if (!isViewingLiveVersion) {
+    return allCanvasEntries.sort((a, b) => {
+      const aTime = Date.parse(a.timestamp || "") || 0;
+      const bTime = Date.parse(b.timestamp || "") || 0;
+      return aTime - bTime;
+    });
+  }
+
+  const mergedRunEntries = new Map<string, LogEntry>();
+  runEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
+  liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
+  const allRunEntries = Array.from(mergedRunEntries.values());
+
+  return [...allRunEntries, ...allCanvasEntries]
+    .map((entry) => {
+      if (!entry.runItems?.length || resolvedExecutionIds.size === 0) {
+        return entry;
+      }
+
+      const runItems = entry.runItems.map((item) => {
+        if (!resolvedExecutionIds.has(item.id)) {
+          return item;
+        }
+
+        return {
+          ...item,
+          type: "resolved-error" as const,
+        };
+      });
+
+      return {
+        ...entry,
+        runItems,
+      };
+    })
+    .sort((a, b) => {
+      const aTime = Date.parse(a.timestamp || "") || 0;
+      const bTime = Date.parse(b.timestamp || "") || 0;
+      return aTime - bTime;
+    });
 }
 
 export function buildCanvasStatusLogEntry(options: {
@@ -1123,7 +1195,7 @@ export function buildTabData(
     if (!triggerEvent) return undefined;
 
     const tabData: TabData = {};
-    const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
+    const triggerRenderer = getTriggerRenderer(node.component || "");
     const eventValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(triggerEvent) });
 
     tabData.current = {
@@ -1153,7 +1225,7 @@ export function buildTabData(
 
     if (queueItem.rootEvent) {
       const rootTriggerNode = workflowNodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-      const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+      const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
       const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(queueItem.rootEvent!) });
 
       tabData.root = Object.assign({}, rootEventValues, {
@@ -1200,7 +1272,7 @@ export function buildTabData(
   // Root tab: root event data
   if (execution.rootEvent) {
     const rootTriggerNode = workflowNodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.component || "");
     const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(execution.rootEvent!) });
 
     tabData.root = {
@@ -1247,7 +1319,7 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
   };
 }
 
-export function buildComponentDefinition(component?: Partial<ComponentsComponent>): ComponentDefinition {
+export function buildComponentDefinition(component?: Partial<SuperplaneActionsAction>): ComponentDefinition {
   return {
     name: component?.name || "unknown",
     label: component?.label || "Unknown",
@@ -1263,6 +1335,7 @@ export function buildEventInfo(event: CanvasesCanvasEvent): EventInfo | undefine
   return {
     id: event.id!,
     createdAt: event.createdAt!,
+    customName: event.customName,
     data: event.data?.data || {},
     nodeId: event.nodeId!,
     type: (event.data?.type as string) || "",
@@ -1281,9 +1354,21 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
   return {
     id: node.id!,
     name: node.name || "",
-    componentName: node.type === "TYPE_TRIGGER" ? node.trigger?.name || "" : node.component?.name || "",
+    componentName: node.component || "",
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
     metadata: node.metadata,
+  };
+}
+
+export function buildUserInfo(user?: SuperplaneMeUser | null): User | undefined {
+  if (!user) return undefined;
+
+  return {
+    id: user.id!,
+    name: user.name || "",
+    email: user.email || "",
+    roles: user.roles || [],
+    groups: user.groups || [],
   };
 }

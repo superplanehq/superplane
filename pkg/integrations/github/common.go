@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/go-github/v74/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -27,7 +27,7 @@ type NodeMetadata struct {
 	Repository *Repository `json:"repository"`
 }
 
-func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext, configuration any) error {
+func ensureRepoInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, configuration any) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {

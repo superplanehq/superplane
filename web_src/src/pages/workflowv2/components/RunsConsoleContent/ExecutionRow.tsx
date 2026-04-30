@@ -1,4 +1,4 @@
-import type { CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
 import { handleKeyboardActivation } from "@/lib/utils";
@@ -20,9 +20,9 @@ export function ExecutionRow({
   onSelect,
 }: {
   execution: CanvasesCanvasNodeExecution;
-  node: ComponentsNode | undefined;
+  node: SuperplaneComponentsNode | undefined;
   componentIconMap: Record<string, string>;
-  nodes: ComponentsNode[];
+  nodes: SuperplaneComponentsNode[];
   onSelect?: () => void;
 }) {
   const { nodeName, iconSrc, iconSlug, status, duration, errorMessage } = resolveExecutionRowData(
@@ -65,13 +65,13 @@ export function ExecutionRow({
 
 function resolveExecutionRowData(
   execution: CanvasesCanvasNodeExecution,
-  node: ComponentsNode | undefined,
+  node: SuperplaneComponentsNode | undefined,
   componentIconMap: Record<string, string>,
-  nodes: ComponentsNode[],
+  nodes: SuperplaneComponentsNode[],
 ) {
   return {
     nodeName: node?.name || execution.nodeId || "Unknown",
-    iconSrc: getHeaderIconSrc(node?.component?.name || node?.trigger?.name),
+    iconSrc: getHeaderIconSrc(node?.component),
     iconSlug: resolveNodeIconSlug(node, componentIconMap),
     status: resolveExecutionDisplayStatus(execution, nodes),
     duration: computeDuration(execution),

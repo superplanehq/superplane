@@ -248,7 +248,7 @@ export function GroupMembersPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar
-                          src={member.spec?.accountProviders?.[0]?.avatarUrl}
+                          src={member.status?.accountProviders?.[0]?.avatarUrl}
                           initials={member.spec?.displayName?.charAt(0) || "U"}
                           className="size-8"
                         />

@@ -1,13 +1,12 @@
 import type {
   ComponentBaseMapper,
   TriggerRenderer,
-  ComponentAdditionalDataBuilder,
   EventStateRegistry,
   CustomFieldRenderer,
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { SuperplaneComponentsNode as ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -19,6 +18,7 @@ import { updateMemoryMapper } from "./updateMemory";
 import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
+import { graphqlMapper, GRAPHQL_STATE_REGISTRY } from "./graphql";
 import {
   componentMappers as semaphoreComponentMappers,
   triggerRenderers as semaphoreTriggerRenderers,
@@ -28,7 +28,6 @@ import {
   componentMappers as githubComponentMappers,
   triggerRenderers as githubTriggerRenderers,
   eventStateRegistry as githubEventStateRegistry,
-  customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
 import {
   componentMappers as gitlabComponentMappers,
@@ -182,6 +181,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as logfireComponentMappers,
+  triggerRenderers as logfireTriggerRenderers,
+  eventStateRegistry as logfireEventStateRegistry,
+} from "./logfire/index";
+import {
   componentMappers as perplexityComponentMappers,
   triggerRenderers as perplexityTriggerRenderers,
   eventStateRegistry as perplexityEventStateRegistry,
@@ -231,22 +235,22 @@ import {
   triggerRenderers as elasticTriggerRenderers,
   eventStateRegistry as elasticEventStateRegistry,
 } from "./elastic/index";
+import {
+  componentMappers as ociComponentMappers,
+  triggerRenderers as ociTriggerRenderers,
+  eventStateRegistry as ociEventStateRegistry,
+} from "./oci/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
-import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
-import { mergeDataBuilder, mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
+import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
+import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
-import {
-  createSafeAdditionalDataBuilder,
-  createSafeComponentMapper,
-  createSafeCustomFieldRenderer,
-  createSafeTriggerRenderer,
-} from "./safeMappers";
+import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -267,6 +271,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   upsertMemory: upsertMemoryMapper,
   if: ifMapper,
   http: httpMapper,
+  graphql: graphqlMapper,
   ssh: sshMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
@@ -306,6 +311,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  logfire: logfireComponentMappers,
   perplexity: perplexityComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
@@ -318,6 +324,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   harness: harnessComponentMappers,
   servicenow: servicenowComponentMappers,
   elastic: elasticComponentMappers,
+  oci: ociComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -349,6 +356,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  logfire: logfireTriggerRenderers,
   perplexity: perplexityTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
@@ -362,6 +370,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   harness: harnessTriggerRenderers,
   servicenow: servicenowTriggerRenderers,
   elastic: elasticTriggerRenderers,
+  oci: ociTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -390,6 +399,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  logfire: logfireEventStateRegistry,
   perplexity: perplexityEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
@@ -405,16 +415,13 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   harness: harnessEventStateRegistry,
   servicenow: servicenowEventStateRegistry,
   elastic: elasticEventStateRegistry,
-};
-
-const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
-  approval: approvalDataBuilder,
-  merge: mergeDataBuilder,
+  oci: ociEventStateRegistry,
 };
 
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
+  graphql: GRAPHQL_STATE_REGISTRY,
   ssh: SSH_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
@@ -431,7 +438,6 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 };
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
-  github: githubCustomFieldRenderers,
   grafana: grafanaCustomFieldRenderers,
   newrelic: newrelicCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
@@ -475,15 +481,6 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
  */
 export function getComponentBaseMapper(name: string): ComponentBaseMapper {
   return createSafeComponentMapper(findRegisteredComponentMapper(name) || noopMapper, name || "noop");
-}
-
-/**
- * Get the appropriate additional data builder for a component type.
- * Returns undefined if no specific builder is registered.
- */
-export function getComponentAdditionalDataBuilder(componentName: string): ComponentAdditionalDataBuilder | undefined {
-  const builder = componentAdditionalDataBuilders[componentName];
-  return builder ? createSafeAdditionalDataBuilder(builder, componentName) : undefined;
 }
 
 /**

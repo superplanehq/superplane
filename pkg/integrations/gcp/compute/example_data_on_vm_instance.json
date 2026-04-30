@@ -1,0 +1,18 @@
+{
+  "type": "gcp.compute.vmInstance",
+  "data": {
+    "serviceName": "compute.googleapis.com",
+    "methodName": "v1.compute.instances.insert",
+    "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+    "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
+    "timestamp": "2025-02-14T12:00:00Z",
+    "data": {
+      "protoPayload": {
+        "methodName": "v1.compute.instances.insert",
+        "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+        "serviceName": "compute.googleapis.com"
+      }
+    }
+  },
+  "timestamp": "2025-02-14T12:00:00Z"
+}

@@ -18,11 +18,23 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		owner = &pb.UserRef{Id: ownerID, Name: ownerName}
 	}
 
+	state := pb.CanvasVersion_STATE_UNSPECIFIED
+	switch version.State {
+	case models.CanvasVersionStateDraft:
+		state = pb.CanvasVersion_STATE_DRAFT
+	case models.CanvasVersionStatePublished:
+		state = pb.CanvasVersion_STATE_PUBLISHED
+	case models.CanvasVersionStateSnapshot:
+		state = pb.CanvasVersion_STATE_SNAPSHOT
+	}
+
 	metadata := &pb.CanvasVersion_Metadata{
 		Id:          version.ID.String(),
 		CanvasId:    version.WorkflowID.String(),
 		Owner:       owner,
-		IsPublished: version.IsPublished,
+		State:       state,
+		Name:        version.Name,
+		Description: version.Description,
 	}
 
 	if version.PublishedAt != nil {
@@ -38,8 +50,9 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	return &pb.CanvasVersion{
 		Metadata: metadata,
 		Spec: &pb.Canvas_Spec{
-			Nodes: actions.NodesToProto(version.Nodes),
-			Edges: actions.EdgesToProto(version.Edges),
+			Nodes:            actions.NodesToProto(version.Nodes),
+			Edges:            actions.EdgesToProto(version.Edges),
+			ChangeManagement: serializeChangeManagement(version.ChangeManagementEnabled, version.EffectiveChangeRequestApprovers()),
 		},
 	}
 }

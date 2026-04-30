@@ -90,7 +90,7 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 
 - Top-level tenant boundary providing complete data isolation
 - All resources (canvases, integrations, secrets) are scoped to an organization
-- Organization metadata `versioning_enabled` (API field `versioningEnabled`) acts as a global override for canvas versioning when enabled
+- Organization metadata `change_management_enabled` (API field `changeManagementEnabled`) acts as a global override for canvas change management when enabled
 
 **Canvas:**
 
@@ -98,11 +98,12 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 - Belongs to an organization
 - Contains multiple workflows with their nodes and edges
 - Stores workflow graph structure, node configurations, and metadata
-- Canvas editing behavior is controlled by effective canvas versioning: organization metadata `versioning_enabled` OR canvas metadata `versioning_enabled` (API field `versioningEnabled`)
+- Versioning is always enabled: users always edit draft versions and publish them
+- Change management (change requests with approvals) is controlled by: organization metadata `change_management_enabled` OR canvas metadata `change_management_enabled` (API field `changeManagementEnabled`)
 - Effective behavior:
-  - Organization versioning enabled: all canvases are effectively versioned
-  - Organization versioning disabled: each canvas uses its own `versioning_enabled` value
-- When effective canvas versioning is enabled, users edit draft versions and submit change requests; when disabled, users edit the live canvas directly
+  - Organization change management enabled: all canvases require change requests
+  - Organization change management disabled: each canvas uses its own `change_management_enabled` value
+- When change management is enabled, users must submit change requests for approval before publishing; when disabled, users can publish draft versions directly
 - Change request lifecycle:
   - `STATUS_OPEN`: active change request
   - `STATUS_REJECTED`: closed without publish

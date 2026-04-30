@@ -18,7 +18,7 @@ const OperationUpdated = "updated"
 const OperationCreated = "created"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &UpsertMemory{})
+	registry.RegisterAction(ComponentName, &UpsertMemory{})
 }
 
 type UpsertMemory struct{}
@@ -217,11 +217,9 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 		"operation":    operation,
 		"updatedCount": len(updatedValues),
 	}
+
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
-	}
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -298,14 +296,6 @@ func (c *UpsertMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpsertMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpsertMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("upsertMemory does not support actions")
-}
-
 func (c *UpsertMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -315,5 +305,13 @@ func (c *UpsertMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 }
 
 func (c *UpsertMemory) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpsertMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpsertMemory) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

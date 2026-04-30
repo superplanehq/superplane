@@ -226,13 +226,6 @@ export const Default: Story = {
     nodeName: "Listen to code changes",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
-    onDuplicate: () => console.log("Duplicate action"),
-    onDocs: () => console.log("Documentation action"),
-    onEdit: () => console.log("Edit action"),
-    onToggleView: () => console.log("Toggle view action"),
-    onDeactivate: () => console.log("Deactivate action"),
-    onDelete: () => console.log("Delete action"),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -287,10 +280,6 @@ export const WithInteractiveEvents: Story = {
     nodeName: "Interactive Event Sidebar",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
-    onDuplicate: () => console.log("Duplicate action"),
-    onDocs: () => console.log("Documentation action"),
-    onToggleView: () => console.log("Toggle view action"),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -352,11 +341,7 @@ export const WithDifferentIcon: Story = {
     ],
     nodeName: "Database Changes",
     iconSlug: "database",
-    iconColor: "text-blue-700",
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
-    onDeactivate: () => console.log("Deactivate action"),
-    onDelete: () => console.log("Delete action"),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -426,15 +411,7 @@ export const ExtendedMetadata: Story = {
     ],
     nodeName: "Enterprise Application Monitoring",
     iconSlug: "eye",
-    iconColor: "text-purple-800",
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
-    onDuplicate: () => console.log("Duplicate action"),
-    onDocs: () => console.log("Documentation action"),
-    onEdit: () => console.log("Edit action"),
-    onToggleView: () => console.log("Toggle view action"),
-    onDeactivate: () => console.log("Deactivate action"),
-    onDelete: () => console.log("Delete action"),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -463,7 +440,6 @@ export const ZeroState: Story = {
   args: {
     nodeName: "Empty Component",
     iconSlug: "circle-dashed",
-    iconColor: "text-gray-800",
     onClose: () => console.log("Close sidebar"),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
@@ -494,27 +470,6 @@ export const WithActionsDropdown: Story = {
     nodeName: "Component with All Actions",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => {
-      console.log("Run action triggered");
-    },
-    onDuplicate: () => {
-      console.log("Duplicate action triggered");
-    },
-    onDocs: () => {
-      console.log("Documentation action triggered");
-    },
-    onEdit: () => {
-      console.log("Edit action triggered");
-    },
-    onToggleView: () => {
-      console.log("Toggle view action triggered");
-    },
-    onDeactivate: () => {
-      console.log("Deactivate action triggered");
-    },
-    onDelete: () => {
-      console.log("Delete action triggered");
-    },
   },
 };
 
@@ -597,13 +552,6 @@ export const WithFullHistory: Story = {
     nodeName: "Full History Demo",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
-    onDuplicate: () => console.log("Duplicate action"),
-    onDocs: () => console.log("Documentation action"),
-    onEdit: () => console.log("Edit action"),
-    onToggleView: () => console.log("Toggle view action"),
-    onDeactivate: () => console.log("Deactivate action"),
-    onDelete: () => console.log("Delete action"),
     getExecutionState: () => ({
       map: DEFAULT_EVENT_STATE_MAP,
       state: "success" as const,
@@ -648,6 +596,5 @@ export const HistoryCountDemo: Story = {
     nodeName: "History vs Queue Counts Demo",
     iconSrc: GithubIcon,
     onClose: () => console.log("Close sidebar"),
-    onRun: () => console.log("Run action"),
   },
 };

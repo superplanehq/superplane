@@ -216,18 +216,18 @@ func (u *UpdateAlertPolicy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uui
 	return ctx.DefaultProcessing()
 }
 
-func (u *UpdateAlertPolicy) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (u *UpdateAlertPolicy) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (u *UpdateAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (u *UpdateAlertPolicy) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (u *UpdateAlertPolicy) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (u *UpdateAlertPolicy) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

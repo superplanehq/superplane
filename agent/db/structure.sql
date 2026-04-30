@@ -24,6 +24,17 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: agent_canvas_markdown_memory; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_canvas_markdown_memory (
+    canvas_id uuid NOT NULL,
+    markdown_body text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: agent_chat_messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -33,7 +44,25 @@ CREATE TABLE public.agent_chat_messages (
     message_index integer NOT NULL,
     message jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    run_id uuid
+);
+
+
+--
+-- Name: agent_chat_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_chat_runs (
+    id uuid NOT NULL,
+    chat_id uuid NOT NULL,
+    model text DEFAULT ''::text NOT NULL,
+    input_tokens bigint DEFAULT 0 NOT NULL,
+    output_tokens bigint DEFAULT 0 NOT NULL,
+    cache_read_tokens bigint DEFAULT 0 NOT NULL,
+    cache_write_tokens bigint DEFAULT 0 NOT NULL,
+    total_tokens bigint DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -48,7 +77,10 @@ CREATE TABLE public.agent_chats (
     canvas_id uuid NOT NULL,
     initial_message text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    total_input_tokens bigint DEFAULT 0 NOT NULL,
+    total_output_tokens bigint DEFAULT 0 NOT NULL,
+    total_tokens bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -63,11 +95,27 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: agent_canvas_markdown_memory agent_canvas_markdown_memory_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_canvas_markdown_memory
+    ADD CONSTRAINT agent_canvas_markdown_memory_pkey PRIMARY KEY (canvas_id);
+
+
+--
 -- Name: agent_chat_messages agent_chat_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.agent_chat_messages
     ADD CONSTRAINT agent_chat_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_chat_runs agent_chat_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_runs
+    ADD CONSTRAINT agent_chat_runs_pkey PRIMARY KEY (id);
 
 
 --
@@ -94,6 +142,13 @@ CREATE UNIQUE INDEX idx_agent_chat_messages_chat_id_message_index ON public.agen
 
 
 --
+-- Name: idx_agent_chat_runs_chat_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_chat_runs_chat_id ON public.agent_chat_runs USING btree (chat_id);
+
+
+--
 -- Name: idx_agent_chats_owner_canvas_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -106,6 +161,22 @@ CREATE INDEX idx_agent_chats_owner_canvas_created ON public.agent_chats USING bt
 
 ALTER TABLE ONLY public.agent_chat_messages
     ADD CONSTRAINT agent_chat_messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.agent_chats(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_chat_messages agent_chat_messages_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_messages
+    ADD CONSTRAINT agent_chat_messages_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.agent_chat_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: agent_chat_runs agent_chat_runs_chat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_runs
+    ADD CONSTRAINT agent_chat_runs_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.agent_chats(id) ON DELETE CASCADE;
 
 
 --
@@ -140,7 +211,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260325205949	f
+20260412145739	f
 \.
 
 

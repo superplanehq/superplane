@@ -39,6 +39,7 @@ func (s *fakeLimitService) SetupAccount(_ context.Context, accountID string) (*u
 func (s *fakeLimitService) SetupOrganization(
 	_ context.Context,
 	organizationID, accountID string,
+	_ SetupOrganizationDetails,
 ) (*usagepb.SetupOrganizationResponse, error) {
 	s.setupOrganizationCalls = append(s.setupOrganizationCalls, [2]string{organizationID, accountID})
 	return &usagepb.SetupOrganizationResponse{}, nil
@@ -83,6 +84,26 @@ func (s *fakeLimitService) CheckOrganizationLimits(
 	}
 
 	return s.checkOrganizationResponse, nil
+}
+
+func TestLimitViolationErrorForMaxEventsPerMonth(t *testing.T) {
+	violations := []*usagepb.LimitViolation{
+		{Limit: usagepb.LimitName_LIMIT_NAME_MAX_EVENTS_PER_MONTH},
+	}
+	err := LimitViolationError(violations)
+	require.Error(t, err)
+	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
+	assert.Equal(t, "organization event limit exceeded", status.Convert(err).Message())
+}
+
+func TestLimitViolationErrorForMaxAgentTokensPerMonth(t *testing.T) {
+	violations := []*usagepb.LimitViolation{
+		{Limit: usagepb.LimitName_LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH},
+	}
+	err := LimitViolationError(violations)
+	require.Error(t, err)
+	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
+	assert.Equal(t, "organization agent token limit exceeded", status.Convert(err).Message())
 }
 
 func TestEnsureAccountWithinLimitsReturnsResourceExhaustedForViolations(t *testing.T) {

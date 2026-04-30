@@ -581,18 +581,18 @@ func (c *CreateApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateApp) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateApp) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateApp) HandleAction(ctx core.ActionContext) error {
+func (c *CreateApp) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	return pollDeployment(ctx, "digitalocean.app.created")

@@ -5,6 +5,7 @@ from .canvas_has_workflow import CanvasHasWorkflow
 from .canvas_total_node_count import CanvasTotalNodeCount
 from .contains_datetime_expression import ContainsDatetimeExpression
 from .no_dollar_data_as_root import NoDollarDataAsRoot
+from .tool_called import ToolCalled
 
 __all__ = [
     "CanvasHasNode",
@@ -14,4 +15,5 @@ __all__ = [
     "NoDollarDataAsRoot",
     "BracketSelectorsMatchCanvasNames",
     "ContainsDatetimeExpression",
+    "ToolCalled",
 ]

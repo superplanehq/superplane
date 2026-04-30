@@ -19,6 +19,7 @@ func TestSendEmailComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Send Email User")
 		steps.addSendEmailWithUser("Notify User", "Test Subject", "Test Body")
+		steps.canvas.Publish()
 		steps.assertSendEmailSavedToDB("Notify User", "Test Subject")
 	})
 
@@ -55,6 +56,7 @@ func (s *SendEmailSteps) start() {
 func (s *SendEmailSteps) givenACanvasExists(canvasName string) {
 	s.canvas = shared.NewCanvasSteps(canvasName, s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 }
 
 func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
@@ -78,7 +80,6 @@ func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
 
 	s.typeIntoMonacoEditor(body)
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -111,6 +112,7 @@ func (s *SendEmailSteps) assertSendEmailSavedToDB(nodeName, expectedSubject stri
 func (s *SendEmailSteps) givenCanvasWithManualTriggerSendEmailAndOutput() {
 	s.canvas = shared.NewCanvasSteps("Send Email Flow", s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.addSendEmailNode("Send Email", models.Position{X: 1000, Y: 200})
@@ -120,6 +122,7 @@ func (s *SendEmailSteps) givenCanvasWithManualTriggerSendEmailAndOutput() {
 	s.canvas.Connect("Send Email", "Output")
 
 	s.canvas.Save()
+	s.canvas.Publish()
 }
 
 func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) {
@@ -143,7 +146,6 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 
 	s.typeIntoMonacoEditor("This is a test email body")
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 

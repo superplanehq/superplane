@@ -336,7 +336,7 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		return tx.Create(&models.CanvasVersion{
 			ID:          templateLiveVersionID,
 			WorkflowID:  templateCanvas.ID,
-			IsPublished: true,
+			State:       models.CanvasVersionStatePublished,
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
 			Edges:       datatypes.NewJSONSlice([]models.Edge{}),

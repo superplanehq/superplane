@@ -1,5 +1,4 @@
 import type React from "react";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import type { ComponentBaseProps, ComponentBaseSpec, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type {
@@ -7,6 +6,7 @@ import type {
   ComponentBaseMapper,
   EventStateRegistry,
   ExecutionDetailsContext,
+  ExecutionInfo,
   OutputPayload,
   StateFunction,
   SubtitleContext,
@@ -54,7 +54,7 @@ export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   },
 };
 
-export const runPipelineStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const runPipelineStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (

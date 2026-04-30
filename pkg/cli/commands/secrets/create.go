@@ -26,7 +26,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	resource, err := parseSecretFile(filePath)
+	resource, err := parseSecretInput(filePath, ctx.Cmd.InOrStdin())
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 
 	request := openapi_client.SecretsCreateSecretRequest{}
 	request.SetSecret(secret)
-	request.SetDomainType(organizationDomainType())
+	request.SetDomainType(core.OrganizationDomainType())
 	request.SetDomainId(organizationID)
 
 	response, _, err := ctx.API.SecretAPI.SecretsCreateSecret(ctx.Context).Body(request).Execute()

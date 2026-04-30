@@ -1,0 +1,16 @@
+{
+  "data": {
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test",
+    "config": {
+      "autovacuum_naptime": 60,
+      "backtrack_commit_timeout": 30,
+      "default_toast_compression": "pglz",
+      "idle_in_transaction_session_timeout": 0,
+      "jit": true,
+      "max_parallel_workers": 8
+    }
+  },
+  "timestamp": "2026-03-27T11:10:00.000000000Z",
+  "type": "digitalocean.database.cluster.config.fetched"
+}

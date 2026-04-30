@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeQueueItem,
+  SuperplaneComponentsNode,
+} from "@/api-client";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LoadMoreButton } from "./LoadMoreButton";
 import { RunRow } from "./RunRow";
@@ -63,7 +67,7 @@ export function RunsConsoleContent({
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
-  nodes: ComponentsNode[];
+  nodes: SuperplaneComponentsNode[];
   componentIconMap?: Record<string, string>;
   searchQuery: string;
   nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;

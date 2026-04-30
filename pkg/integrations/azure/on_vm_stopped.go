@@ -107,26 +107,6 @@ func (t *OnVMStopped) Color() string {
 	return "blue"
 }
 
-func (t *OnVMStopped) ExampleData() map[string]any {
-	return map[string]any{
-		"id":              "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc",
-		"subject":         "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/powerOff",
-		"eventType":       "Microsoft.Resources.ResourceActionSuccess",
-		"eventTime":       "2026-02-11T10:30:00Z",
-		"dataVersion":     "2",
-		"metadataVersion": "1",
-		"data": map[string]any{
-			"operationName":    "Microsoft.Compute/virtualMachines/powerOff/action",
-			"status":           "Succeeded",
-			"resourceProvider": "Microsoft.Compute",
-			"resourceUri":      "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-			"subscriptionId":   "12345678-1234-1234-1234-123456789abc",
-			"tenantId":         "12345678-1234-1234-1234-123456789abc",
-		},
-	}
-}
-
 func (t *OnVMStopped) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -359,11 +339,11 @@ func (t *OnVMStopped) authenticateWebhook(ctx core.WebhookRequestContext) error 
 	return fmt.Errorf("webhook secret required but not provided in Authorization or X-Webhook-Secret header")
 }
 
-func (t *OnVMStopped) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnVMStopped) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnVMStopped) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMStopped) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

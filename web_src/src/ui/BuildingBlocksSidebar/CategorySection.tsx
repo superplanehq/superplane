@@ -4,30 +4,26 @@ import { resolveIcon } from "@/lib/utils";
 import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
 import { useState } from "react";
 import { toTestId } from "../../lib/testID";
-import { getComponentSubtype } from "../buildingBlocks";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
+import { filterBlocksInCategory, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
-const SUBTYPE_HOVER_BG: Record<string, string> = {
+const TYPE_HOVER_BG: Record<string, string> = {
   trigger: "hover:bg-sky-100 dark:hover:bg-sky-900/20",
-  flow: "hover:bg-purple-100 dark:hover:bg-purple-900/20",
-  action: "hover:bg-green-100 dark:hover:bg-green-900/20",
+  component: "hover:bg-green-100 dark:hover:bg-green-900/20",
 };
 
-const SUBTYPE_BADGE_COLOR: Record<string, string> = {
+const TYPE_BADGE_COLOR: Record<string, string> = {
   trigger: "text-sky-600 dark:text-sky-400",
-  flow: "text-purple-600 dark:text-purple-400",
-  action: "text-green-600 dark:text-green-400",
+  component: "text-green-600 dark:text-green-400",
 };
 
-const SUBTYPE_LABEL: Record<string, string> = {
+const TYPE_LABEL: Record<string, string> = {
   trigger: "Trigger",
-  flow: "Flow",
-  action: "Action",
+  component: "Action",
 };
 
 function resolveIconSlug(block: BuildingBlock): string {
-  if (block.type === "blueprint") return "component";
   const firstPart = block.name?.split(".")[0];
   if (firstPart === "smtp") return "mail";
   return block.icon || "zap";
@@ -76,9 +72,8 @@ function BlockItem({
 }: BlockItemProps) {
   const appIconSrc = getHeaderIconSrc(block.name);
   const IconComponent = resolveIcon(resolveIconSlug(block));
-  const subtype = block.componentSubtype || getComponentSubtype(block);
-  const hoverBg = SUBTYPE_HOVER_BG[subtype] || SUBTYPE_HOVER_BG.action;
-  const badgeColor = SUBTYPE_BADGE_COLOR[subtype] || SUBTYPE_BADGE_COLOR.action;
+  const hoverBg = TYPE_HOVER_BG[block.type] || TYPE_HOVER_BG.component;
+  const badgeColor = TYPE_BADGE_COLOR[block.type] || TYPE_BADGE_COLOR.component;
 
   return (
     <Item
@@ -122,13 +117,8 @@ function BlockItem({
           <span
             className={`inline-block text-left px-1.5 py-0.5 text-[11px] font-medium ${badgeColor} rounded whitespace-nowrap flex-shrink-0 ml-auto`}
           >
-            {SUBTYPE_LABEL[subtype] || "Action"}
+            {TYPE_LABEL[block.type] || "Action"}
           </span>
-          {block.deprecated && (
-            <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
-              Deprecated
-            </span>
-          )}
         </div>
       </ItemContent>
 
@@ -143,7 +133,7 @@ export interface CategorySectionProps {
   showIntegrationSetupStatus: boolean;
   canvasZoom: number;
   searchTerm?: string;
-  typeFilter?: "all" | "trigger" | "action" | "flow";
+  typeFilter?: TypeFilter;
   isDraggingRef: React.RefObject<boolean>;
   setHoveredBlock: (block: BuildingBlock | null) => void;
   dragPreviewRef: React.RefObject<HTMLDivElement | null>;
@@ -164,36 +154,18 @@ export function CategorySection({
 }: CategorySectionProps) {
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-  const query = searchTerm.trim().toLowerCase();
-  const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
-
-  const baseBlocks = categoryMatches
-    ? category.blocks || []
-    : (category.blocks || []).filter((block) => {
-        const name = (block.name || "").toLowerCase();
-        const label = (block.label || "").toLowerCase();
-        return name.includes(query) || label.includes(query);
-      });
-
-  let allBlocks = baseBlocks;
-
-  if (typeFilter !== "all") {
-    allBlocks = allBlocks.filter((block) => {
-      const subtype = block.componentSubtype || getComponentSubtype(block);
-      return subtype === typeFilter;
-    });
-  }
+  const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
   const isCoreCategory = category.name === "Core";
-  const hasSearchTerm = query.length > 0;
+  const hasSearchTerm = searchTerm.trim().length > 0;
   const [isManuallyOpen, setIsManuallyOpen] = useState<boolean | null>(null);
   const isOpen = hasSearchTerm || (isManuallyOpen ?? isCoreCategory);
 
-  if (allBlocks.length === 0) {
+  if (sortedBlocks.length === 0) {
     return null;
   }
 
-  const firstBlock = allBlocks[0];
+  const firstBlock = sortedBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
 
@@ -201,7 +173,8 @@ export function CategorySection({
   const matchingIntegrationStates = normalizedIntegrationName
     ? integrations
         .filter(
-          (integration) => normalizeIntegrationName(integration.spec?.integrationName) === normalizedIntegrationName,
+          (integration) =>
+            normalizeIntegrationName(integration.metadata?.integrationName) === normalizedIntegrationName,
         )
         .map((integration) => integration.status?.state)
     : [];
@@ -231,36 +204,12 @@ export function CategorySection({
     CategoryIcon = resolveIcon("zap");
   } else if (category.name === "Memory") {
     CategoryIcon = resolveIcon("database");
-  } else if (category.name === "Bundles") {
-    CategoryIcon = resolveIcon("package");
   } else if (integrationName === "smtp") {
     CategoryIcon = resolveIcon("mail");
   } else if (categoryIconSrc) {
     // Integration category - will use img tag
   } else {
     CategoryIcon = resolveIcon("puzzle");
-  }
-
-  let sortedBlocks: BuildingBlock[] = [];
-  if (isOpen) {
-    const subtypeOrder: Record<"trigger" | "action" | "flow", number> = {
-      trigger: 0,
-      action: 1,
-      flow: 2,
-    };
-
-    sortedBlocks = [...allBlocks].sort((a, b) => {
-      const aSubtype = a.componentSubtype || getComponentSubtype(a);
-      const bSubtype = b.componentSubtype || getComponentSubtype(b);
-      const subtypeComparison = subtypeOrder[aSubtype] - subtypeOrder[bSubtype];
-      if (subtypeComparison !== 0) {
-        return subtypeComparison;
-      }
-
-      const aName = (a.label || a.name || "").toLowerCase();
-      const bName = (b.label || b.name || "").toLowerCase();
-      return aName.localeCompare(bName);
-    });
   }
 
   return (

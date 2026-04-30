@@ -22,7 +22,7 @@ export function buildFallbackComponentProps(data: BlockData, fallbackTitle: stri
     iconSlug: "circle-off",
     metadata: [],
     includeEmptyState: true,
-    emptyStateProps: { title: "Can't display" },
+    emptyStateProps: { title: "Can't display", purpose: "fallback" },
   };
 }
 

@@ -27,6 +27,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("00:00", "23:59")
 		steps.setTimezone("0")
 		steps.saveTimeGate()
+		steps.canvas.Publish()
 		steps.assertTimeGateSavedToDB("00:00-23:59", "0", weekendDays)
 	})
 
@@ -38,6 +39,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
 		steps.saveTimeGate()
+		steps.canvas.Publish()
 		steps.assertTimeGateSavedToDB("09:00 - 17:00", "-5", workweekDays)
 	})
 
@@ -48,8 +50,7 @@ func TestTimeGateComponent(t *testing.T) {
 		activeDay := dayString(tomorrow.Weekday())
 		steps.givenACanvasWithManualTriggerTimeGateAndOutput([]string{activeDay}, "00:00-23:59", "0")
 		steps.runManualTrigger()
-		steps.openSidebarForNode("timeGate")
-		steps.pushThroughFirstItemFromSidebar()
+		steps.pushThroughFromNode("timeGate")
 		steps.assertTimeGateExecutionFinishedAndOutputNodeProcessed()
 	})
 }
@@ -69,6 +70,7 @@ func (s *TimeGateSteps) start() {
 func (s *TimeGateSteps) givenACanvasExists(canvasName string) {
 	s.canvas = shared.NewCanvasSteps(canvasName, s.t, s.session)
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 }
 
 func (s *TimeGateSteps) addTimeGate() {
@@ -117,7 +119,6 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -147,6 +148,7 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []st
 	s.canvas = shared.NewCanvasSteps("Time Gate Push Through", s.t, s.session)
 
 	s.canvas.Create()
+	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddTimeGate("timeGate", models.Position{X: 1000, Y: 250})
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
@@ -164,6 +166,7 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []st
 	s.canvas.Connect("timeGate", "Output")
 
 	s.saveCanvas()
+	s.canvas.Publish()
 }
 
 func (s *TimeGateSteps) runManualTrigger() {
@@ -175,20 +178,13 @@ func (s *TimeGateSteps) runManualTrigger() {
 	)
 }
 
-func (s *TimeGateSteps) openSidebarForNode(node string) {
-	header := q.TestID("node", node, "header")
-	s.session.AssertVisible(header)
-	s.session.Click(header)
-}
-
-func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
-	// TimeGate maps pending/started executions to UI state "waiting" (see timegate mapper).
-	eventItem := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"]`)
-	s.session.HoverOver(eventItem)
-	s.session.Sleep(300)
-	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"] button[aria-label="Open actions"]`))
-	s.session.Sleep(300)
-	s.session.Click(q.TestID("push-through-item"))
+func (s *TimeGateSteps) pushThroughFromNode(node string) {
+	s.canvas.StartEditingNode(node)
+	pushThroughButton := q.Locator(
+		`.react-flow__node:has([data-testid="node-` + strings.ToLower(node) + `-header"]) button:has-text("Push through")`,
+	)
+	s.session.AssertVisible(pushThroughButton)
+	s.session.Click(pushThroughButton)
 	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 }
 

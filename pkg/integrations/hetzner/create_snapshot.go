@@ -70,16 +70,6 @@ func (c *CreateSnapshot) OutputChannels(configuration any) []core.OutputChannel 
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *CreateSnapshot) ExampleOutput() map[string]any {
-	return map[string]any{
-		"actionId":     "12345",
-		"imageId":      67890,
-		"imageType":    "snapshot",
-		"serverId":     "42",
-		"snapshotName": "workflow-snapshot",
-	}
-}
-
 func (c *CreateSnapshot) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -162,20 +152,20 @@ func (c *CreateSnapshot) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateSnapshotPollInterval)
 }
 
-func (c *CreateSnapshot) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *CreateSnapshot) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *CreateSnapshot) HandleAction(ctx core.ActionContext) error {
+func (c *CreateSnapshot) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (c *CreateSnapshot) poll(ctx core.ActionContext) error {
+func (c *CreateSnapshot) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

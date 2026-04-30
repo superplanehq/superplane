@@ -37,7 +37,7 @@ export const Trigger: React.FC<TriggerProps> = ({ lastEventData, ...componentBas
       <ComponentBase
         {...componentBaseProps}
         includeEmptyState
-        emptyStateProps={{ title: "Waiting for the first event" }}
+        emptyStateProps={{ title: "Waiting for the first event", purpose: "runtime" }}
       />
     );
   }

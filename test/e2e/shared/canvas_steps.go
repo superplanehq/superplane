@@ -28,80 +28,62 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
-// WaitForCanvasSaveStatusSaved waits until the canvas is durably saved.
-// It avoids returning on the initial stale "saved" state by giving autosave
-// one debounce window to start, but still accepts saves that completed before
-// the waiter began observing.
-func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
-	saveButton := q.TestID("save-canvas-button").Run(s.session)
-	clickedManualSave := false
-	if isVisible, _ := saveButton.IsVisible(); isVisible {
-		s.session.Click(q.TestID("save-canvas-button"))
-		clickedManualSave = true
+// EnterEditMode clicks the Editor segment in the header to create a draft version.
+// This must be called before making any canvas changes.
+func (s *CanvasSteps) EnterEditMode() {
+	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
+
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		disabled, err := editButton.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			break
+		}
+		if time.Now().After(deadline) {
+			s.t.Fatalf("editor control did not become enabled")
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 
-	status := q.Locator(`[data-testid="canvas-save-status"]`).Run(s.session)
-	deadline := time.Now().Add(20 * time.Second)
-	initialStateCaptured := false
-	initialState := ""
-	initialSavedLabel := ""
-	seenFreshCycle := clickedManualSave
-	seenSaving := false
-	initialSavedStateStableUntil := time.Time{}
-	lastState := ""
-	for time.Now().Before(deadline) {
-		isVisible, _ := status.IsVisible()
-		if !isVisible {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
+	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(500)
+}
 
-		state, _ := status.GetAttribute("data-state")
-		if state != "" {
-			lastState = state
-		}
-		savedLabel, _ := status.GetAttribute("data-saved-label")
+// Publish clicks the Publish button in the header to publish the current draft version.
+// This should be called after making and saving canvas changes.
+func (s *CanvasSteps) Publish() {
+	publishButton := q.Locator(`header button:has-text("Publish")`).Run(s.session)
 
-		if !initialStateCaptured {
-			initialState = lastState
-			initialSavedLabel = savedLabel
-			initialStateCaptured = true
-			if initialState == "saved" {
-				initialSavedStateStableUntil = time.Now().Add(1 * time.Second)
-			}
-			if initialState != "saved" {
-				seenFreshCycle = true
-			}
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		disabled, err := publishButton.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			break
 		}
-
-		if lastState == "saving" {
-			seenFreshCycle = true
-			seenSaving = true
+		if time.Now().After(deadline) {
+			s.t.Fatalf("publish button did not become enabled")
 		}
-
-		if lastState != "" && lastState != "saved" {
-			seenFreshCycle = true
-		}
-
-		if initialState == "saved" && initialSavedLabel != "visible" && savedLabel == "visible" {
-			seenFreshCycle = true
-		}
-
-		if lastState == "saved" && seenFreshCycle && (seenSaving || initialState != "saved") {
-			return
-		}
-
-		if savedLabel == "visible" && seenFreshCycle && initialSavedLabel != "visible" {
-			return
-		}
-
-		if initialState == "saved" && !seenFreshCycle && !initialSavedStateStableUntil.IsZero() && time.Now().After(initialSavedStateStableUntil) {
-			return
-		}
-
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}
-	s.t.Fatalf("timed out waiting for canvas save status saved, last state=%q", lastState)
+
+	require.NoError(s.t, publishButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(1000)
+}
+
+// FindCurrentDraft returns the current draft version for this canvas, or nil if none exists.
+func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
+	versions, err := models.ListCanvasVersions(s.WorkflowID)
+	require.NoError(s.t, err)
+
+	for i := range versions {
+		if versions[i].State == models.CanvasVersionStateDraft {
+			return &versions[i]
+		}
+	}
+
+	return nil
 }
 
 func (s *CanvasSteps) Create() {
@@ -126,7 +108,7 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 	}
 
 	openButton := q.TestID("open-sidebar-button").Run(s.session)
-	editButton := q.Locator(`button:has-text("Edit")`).Run(s.session)
+	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -189,7 +171,20 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) AddNote() {
+	// The "Add Note" button only appears in the closed building blocks sidebar.
+	// If the sidebar is currently open, close it first by clicking on empty canvas area.
+	sidebar := q.TestID("building-blocks-sidebar").Run(s.session)
+	if isVisible, _ := sidebar.IsVisible(); isVisible {
+		s.ClickOnEmptyCanvasArea()
+		s.session.Sleep(300)
+	}
+
+	s.session.Click(q.TestID("add-note-button"))
+	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
 	s.session.Sleep(300)
 }
 
@@ -209,7 +204,6 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	generatedName, err := loc.InputValue()
 	require.NoError(s.t, err)
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 
 	return generatedName
@@ -226,7 +220,6 @@ func (s *CanvasSteps) Save() {
 		return
 	}
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -247,7 +240,6 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -259,7 +251,6 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -284,7 +275,6 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -298,7 +288,6 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 
@@ -330,7 +319,6 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
-	s.WaitForCanvasSaveStatusSaved()
 	s.session.Sleep(300)
 }
 

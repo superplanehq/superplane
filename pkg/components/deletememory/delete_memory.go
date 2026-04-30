@@ -18,7 +18,7 @@ const ChannelNameDeleted = "deleted"
 const ChannelNameNotFound = "notFound"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &DeleteMemory{})
+	registry.RegisterAction(ComponentName, &DeleteMemory{})
 }
 
 type DeleteMemory struct{}
@@ -167,11 +167,9 @@ func (c *DeleteMemory) Execute(ctx core.ExecutionContext) error {
 		"matches":   matches,
 		"count":     len(deletedValues),
 	}
+
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
-	}
-	if err := ctx.NodeMetadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set node metadata: %w", err)
 	}
 
 	channel := ChannelNameNotFound
@@ -254,14 +252,6 @@ func (c *DeleteMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (c *DeleteMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("deleteMemory does not support actions")
-}
-
 func (c *DeleteMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -271,5 +261,13 @@ func (c *DeleteMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 }
 
 func (c *DeleteMemory) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteMemory) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

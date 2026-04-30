@@ -81,18 +81,6 @@ func (c *DeleteVMComponent) Color() string {
 	return "blue"
 }
 
-func (c *DeleteVMComponent) ExampleOutput() map[string]any {
-	return map[string]any{
-		"data": map[string]any{
-			"id":            "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-			"name":          "my-vm",
-			"resourceGroup": "my-rg",
-		},
-		"timestamp": "2026-02-12T12:10:00Z",
-		"type":      "azure.vm",
-	}
-}
-
 func (c *DeleteVMComponent) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
@@ -184,18 +172,18 @@ func (c *DeleteVMComponent) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *DeleteVMComponent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteVMComponent) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined for this component")
-}
-
 func (c *DeleteVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *DeleteVMComponent) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteVMComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteVMComponent) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

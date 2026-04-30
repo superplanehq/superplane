@@ -88,6 +88,10 @@ func limitViolationError(violations []*pb.LimitViolation) error {
 		return status.Error(codes.ResourceExhausted, "organization user limit exceeded")
 	case pb.LimitName_LIMIT_NAME_MAX_INTEGRATIONS:
 		return status.Error(codes.ResourceExhausted, "organization integration limit exceeded")
+	case pb.LimitName_LIMIT_NAME_MAX_EVENTS_PER_MONTH:
+		return status.Error(codes.ResourceExhausted, "organization event limit exceeded")
+	case pb.LimitName_LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH:
+		return status.Error(codes.ResourceExhausted, "organization agent token limit exceeded")
 	default:
 		return status.Error(codes.ResourceExhausted, "organization usage limit exceeded")
 	}

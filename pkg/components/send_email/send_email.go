@@ -21,7 +21,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent(ComponentName, &SendEmail{})
+	registry.RegisterAction(ComponentName, &SendEmail{})
 }
 
 type SendEmail struct{}
@@ -262,14 +262,6 @@ func (c *SendEmail) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *SendEmail) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *SendEmail) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("sendEmail does not support actions")
-}
-
 func (c *SendEmail) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -282,7 +274,7 @@ func (c *SendEmail) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func buildReceivers(config Config, auth core.AuthContext) (core.NotificationReceivers, error) {
+func buildReceivers(config Config, auth core.AuthReader) (core.NotificationReceivers, error) {
 	emailSet := map[string]struct{}{}
 	groupSet := map[string]struct{}{}
 	roleSet := map[string]struct{}{}
@@ -307,7 +299,7 @@ func buildReceivers(config Config, auth core.AuthContext) (core.NotificationRece
 	}, nil
 }
 
-func resolveUserEmail(rawID string, auth core.AuthContext, dest map[string]struct{}) error {
+func resolveUserEmail(rawID string, auth core.AuthReader, dest map[string]struct{}) error {
 	if rawID == "" {
 		return nil
 	}
@@ -341,4 +333,12 @@ func mapKeys(input map[string]struct{}) []string {
 		result = append(result, key)
 	}
 	return result
+}
+
+func (c *SendEmail) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendEmail) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

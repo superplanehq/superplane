@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -51,21 +52,21 @@ func ResolveCanvasChangeRequest(
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, modeErr := isCanvasVersioningEnabledForCanvas(canvas)
+	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
 	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", modeErr)
+		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
 	}
-	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
+	if !changeManagementEnabled {
+		return nil, status.Error(codes.FailedPrecondition, "change management is disabled for this canvas")
 	}
 
 	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
 	if err != nil {
 		return nil, err
 	}
-	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
+	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "failed to apply layout: %v", err)
 	}
 
 	userUUID := uuid.MustParse(userID)
@@ -103,7 +104,7 @@ func ResolveCanvasChangeRequest(
 			}
 			return err
 		}
-		if version.IsPublished {
+		if version.State == models.CanvasVersionStatePublished {
 			return status.Error(codes.FailedPrecondition, "published versions are immutable")
 		}
 		if version.OwnerID == nil || *version.OwnerID != userUUID {

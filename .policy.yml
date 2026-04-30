@@ -3,11 +3,12 @@ approval_defaults:
     request_review:
       enabled: true
       mode: all-users
+    ignore_update_merges: true
 
 policy:
   approval:
     - db_changes_require_core_reviewer
-    - agent_changes_require_shiroyasha
+    - agent_changes_require_agent_reviewer
     - protos_changes_require_platform_reviewer
     - rbac_changes_require_security_reviewer
     - release_changes_require_release_reviewer
@@ -33,11 +34,13 @@ approval_rules:
         - shiroyasha
         - forestileao
 
-  - name: agent_changes_require_shiroyasha
+  - name: agent_changes_require_agent_reviewer
     if:
       changed_files:
         paths:
           - "^agent/.*$"
+        ignore:
+          - "^agent/src/superplaneapi/.*$"
     options:
       allow_author: true
       allow_contributor: true
@@ -45,6 +48,7 @@ approval_rules:
       count: 1
       users:
         - shiroyasha
+        - lucaspin
 
   - name: protos_changes_require_platform_reviewer
     if:

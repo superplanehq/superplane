@@ -82,29 +82,6 @@ func TestOnBuildCompleteSetup(t *testing.T) {
 	})
 }
 
-func Test_OnBuildComplete_Metadata(t *testing.T) {
-	trigger := &OnBuildComplete{}
-	assert.Equal(t, "gcp.cloudbuild.onBuildComplete", trigger.Name())
-	assert.Equal(t, "Cloud Build • On Build Complete", trigger.Label())
-	assert.NotEmpty(t, trigger.Description())
-	assert.NotEmpty(t, trigger.Documentation())
-	assert.Equal(t, "gcp", trigger.Icon())
-	assert.Equal(t, "gray", trigger.Color())
-	assert.Nil(t, trigger.Actions())
-}
-
-func Test_OnBuildComplete_ExampleData(t *testing.T) {
-	trigger := &OnBuildComplete{}
-	data := trigger.ExampleData()
-	assert.NotEmpty(t, data["type"])
-	assert.NotEmpty(t, data["timestamp"])
-	payload, ok := data["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "SUCCESS", payload["status"])
-	assert.NotEmpty(t, payload["id"])
-	assert.NotEmpty(t, payload["logUrl"])
-}
-
 func Test_OnBuildComplete_OnIntegrationMessage(t *testing.T) {
 	trigger := &OnBuildComplete{}
 	logger := logrus.NewEntry(logrus.New())

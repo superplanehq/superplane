@@ -31,7 +31,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(response)
+		return ctx.Renderer.Render(normalizeUsageResponse(response))
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -68,6 +68,15 @@ func renderUsageText(stdout io.Writer, response *openapi_client.OrganizationsDes
 		if updatedAt, ok := usage.GetEventBucketLastUpdatedAtOk(); ok {
 			_, _ = fmt.Fprintf(writer, "Event bucket updated\t%s\n", updatedAt.Format(time.RFC3339))
 		}
+		_, _ = fmt.Fprintf(
+			writer,
+			"Agent token bucket\t%s / %s\n",
+			formatFloat64Value(usage.GetAgentTokenBucketLevelOk()),
+			formatFloat64Value(usage.GetAgentTokenBucketCapacityOk()),
+		)
+		if updatedAt, ok := usage.GetAgentTokenBucketLastUpdatedAtOk(); ok {
+			_, _ = fmt.Fprintf(writer, "Agent token bucket updated\t%s\n", updatedAt.Format(time.RFC3339))
+		}
 		if err := writer.Flush(); err != nil {
 			return err
 		}
@@ -84,6 +93,7 @@ func renderUsageText(stdout io.Writer, response *openapi_client.OrganizationsDes
 		_, _ = fmt.Fprintf(writer, "Retention window days\t%s\n", formatInt32Limit(limits.GetRetentionWindowDaysOk()))
 		_, _ = fmt.Fprintf(writer, "Max events per month\t%s\n", formatStringLimit(limits.GetMaxEventsPerMonthOk()))
 		_, _ = fmt.Fprintf(writer, "Max integrations\t%s\n", formatInt32Limit(limits.GetMaxIntegrationsOk()))
+		_, _ = fmt.Fprintf(writer, "Max agent tokens per month\t%s\n", formatStringLimit(limits.GetMaxAgentTokensPerMonthOk()))
 		return writer.Flush()
 	}
 
@@ -120,6 +130,90 @@ func formatStringLimit(value *string, ok bool) string {
 	}
 
 	return *value
+}
+
+func normalizeUsageResponse(response *openapi_client.OrganizationsDescribeUsageResponse) map[string]any {
+	if response == nil {
+		return map[string]any{}
+	}
+
+	result := map[string]any{
+		"enabled": response.GetEnabled(),
+	}
+
+	if response.HasStatusMessage() {
+		result["statusMessage"] = response.GetStatusMessage()
+	}
+
+	if response.HasUsage() {
+		usage := response.GetUsage()
+		usageMap := map[string]any{}
+		if v, ok := usage.GetCanvasesOk(); ok {
+			usageMap["canvases"] = *v
+		}
+		if v, ok := usage.GetEventBucketLevelOk(); ok {
+			usageMap["eventBucketLevel"] = *v
+		}
+		if v, ok := usage.GetEventBucketCapacityOk(); ok {
+			usageMap["eventBucketCapacity"] = *v
+		}
+		if v, ok := usage.GetEventBucketLastUpdatedAtOk(); ok {
+			usageMap["eventBucketLastUpdatedAt"] = *v
+		}
+		if v, ok := usage.GetNextEventBucketDecreaseAtOk(); ok {
+			usageMap["nextEventBucketDecreaseAt"] = *v
+		}
+		if v, ok := usage.GetAgentTokenBucketLevelOk(); ok {
+			usageMap["agentTokenBucketLevel"] = *v
+		}
+		if v, ok := usage.GetAgentTokenBucketCapacityOk(); ok {
+			usageMap["agentTokenBucketCapacity"] = *v
+		}
+		if v, ok := usage.GetAgentTokenBucketLastUpdatedAtOk(); ok {
+			usageMap["agentTokenBucketLastUpdatedAt"] = *v
+		}
+		if v, ok := usage.GetNextAgentTokenBucketDecreaseAtOk(); ok {
+			usageMap["nextAgentTokenBucketDecreaseAt"] = *v
+		}
+		result["usage"] = usageMap
+	}
+
+	if response.HasLimits() {
+		limits := response.GetLimits()
+		limitsMap := map[string]any{}
+		if v, ok := limits.GetMaxCanvasesOk(); ok {
+			limitsMap["maxCanvases"] = *v
+		}
+		if v, ok := limits.GetMaxNodesPerCanvasOk(); ok {
+			limitsMap["maxNodesPerCanvas"] = *v
+		}
+		if v, ok := limits.GetMaxUsersOk(); ok {
+			limitsMap["maxUsers"] = *v
+		}
+		if v, ok := limits.GetRetentionWindowDaysOk(); ok {
+			limitsMap["retentionWindowDays"] = *v
+		}
+		if v, ok := limits.GetMaxEventsPerMonthOk(); ok {
+			if parsed, err := strconv.ParseInt(*v, 10, 64); err == nil {
+				limitsMap["maxEventsPerMonth"] = parsed
+			} else {
+				limitsMap["maxEventsPerMonth"] = *v
+			}
+		}
+		if v, ok := limits.GetMaxIntegrationsOk(); ok {
+			limitsMap["maxIntegrations"] = *v
+		}
+		if v, ok := limits.GetMaxAgentTokensPerMonthOk(); ok {
+			if parsed, err := strconv.ParseInt(*v, 10, 64); err == nil {
+				limitsMap["maxAgentTokensPerMonth"] = parsed
+			} else {
+				limitsMap["maxAgentTokensPerMonth"] = *v
+			}
+		}
+		result["limits"] = limitsMap
+	}
+
+	return result
 }
 
 func formatFloat64Value(value *float64, ok bool) string {

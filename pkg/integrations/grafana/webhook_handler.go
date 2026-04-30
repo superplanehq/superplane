@@ -32,26 +32,19 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 		return nil, fmt.Errorf("failed to persist shared secret in webhook storage: %w", err)
 	}
 
+	name := buildContactPointName(ctx.Webhook.GetID())
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.Warnf("grafana webhook setup: falling back to manual setup (client unavailable): %v", err)
-		}
-		return nil, nil
+		return nil, fmt.Errorf("grafana webhook setup: failed to create Grafana client: %w", err)
 	}
-
-	name := buildContactPointName(ctx.Webhook.GetID())
 
 	uid, err := client.UpsertWebhookContactPoint(name, ctx.Webhook.GetURL(), sharedSecret)
 	if err != nil {
-		if !shouldFallbackToManualSetup(err) {
-			return nil, fmt.Errorf("grafana webhook setup: contact point provisioning will be retried: %w", err)
+		if isNonRetryableContactPointProvisioningError(err) {
+			return nil, fmt.Errorf("grafana webhook setup: contact point provisioning failed: %w", err)
 		}
-
-		if ctx.Logger != nil {
-			ctx.Logger.Warnf("grafana webhook setup: falling back to manual setup (contact point provisioning failed): %v", err)
-		}
-		return nil, nil
+		return nil, fmt.Errorf("grafana webhook setup: contact point provisioning will be retried: %w", err)
 	}
 
 	if err := client.UpsertNotificationPolicyRoute(name, config.AlertNames); err != nil {
@@ -220,7 +213,9 @@ func buildContactPointName(webhookID string) string {
 	return fmt.Sprintf("superplane-%s", suffix[:16])
 }
 
-func shouldFallbackToManualSetup(err error) bool {
+// isNonRetryableContactPointProvisioningError is true for client errors where retrying the same
+// request is unlikely to succeed until the Grafana integration or permissions are fixed.
+func isNonRetryableContactPointProvisioningError(err error) bool {
 	var statusErr *apiStatusError
 	if !errors.As(err, &statusErr) {
 		return false

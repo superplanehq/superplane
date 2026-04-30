@@ -238,17 +238,21 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
 ```json
 {
   "data": {
-    "protoPayload": {
-      "methodName": "v1.compute.instances.insert",
-      "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-      "serviceName": "compute.googleapis.com"
-    }
+    "data": {
+      "protoPayload": {
+        "methodName": "v1.compute.instances.insert",
+        "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+        "serviceName": "compute.googleapis.com"
+      }
+    },
+    "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
+    "methodName": "v1.compute.instances.insert",
+    "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+    "serviceName": "compute.googleapis.com",
+    "timestamp": "2025-02-14T12:00:00Z"
   },
-  "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
-  "methodName": "v1.compute.instances.insert",
-  "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-  "serviceName": "compute.googleapis.com",
-  "timestamp": "2025-02-14T12:00:00Z"
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance"
 }
 ```
 
@@ -735,14 +739,18 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
 
 ```json
 {
-  "externalIP": "34.1.2.3",
-  "instanceId": "1234567890123456789",
-  "internalIP": "10.0.0.2",
-  "machineType": "e2-medium",
-  "name": "my-vm",
-  "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
-  "status": "RUNNING",
-  "zone": "us-central1-a"
+  "data": {
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.createVM.completed"
 }
 ```
 

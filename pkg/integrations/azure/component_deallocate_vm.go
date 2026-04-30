@@ -81,14 +81,6 @@ func (c *DeallocateVMComponent) Color() string {
 	return "blue"
 }
 
-func (c *DeallocateVMComponent) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":            "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-		"name":          "my-vm",
-		"resourceGroup": "my-rg",
-	}
-}
-
 func (c *DeallocateVMComponent) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
@@ -172,18 +164,18 @@ func (c *DeallocateVMComponent) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *DeallocateVMComponent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeallocateVMComponent) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined for this component")
-}
-
 func (c *DeallocateVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *DeallocateVMComponent) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeallocateVMComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeallocateVMComponent) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

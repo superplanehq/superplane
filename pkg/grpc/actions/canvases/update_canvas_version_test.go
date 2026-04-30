@@ -20,16 +20,8 @@ import (
 func Test__UpdateCanvasVersion(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("versioning enabled at canvas level and no version id -> error", func(t *testing.T) {
+	t.Run("no version id -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", true).Error,
-		)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		_, err := UpdateCanvasVersion(
@@ -42,116 +34,18 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "canvas versioning is enabled")
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), "version id is required")
 	})
 
-	t.Run("versioning enabled at org level and no version id -> error", func(t *testing.T) {
+	t.Run("valid draft version id -> updates draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			"",
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-		)
-
-		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "canvas versioning is enabled")
-	})
-
-	t.Run("versioning disabled and version id provided -> error", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			canvas.LiveVersionID.String(),
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-		)
-
-		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "canvas versioning is disabled")
-	})
-
-	t.Run("versioning disabled and no version id -> updates live canvas", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		response, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			"",
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-		)
-
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
-	})
-
-	t.Run("versioning enabled and valid draft version id -> updates draft", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", true).Error,
-		)
 
 		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
 		require.NoError(t, err)
@@ -167,6 +61,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.NoError(t, err)
@@ -176,10 +71,6 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 
 	t.Run("usage limit violation blocks oversized draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
-		)
 
 		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
 		require.NoError(t, err)
@@ -209,6 +100,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.Error(t, err)
@@ -216,6 +108,114 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.ResourceExhausted, s.Code())
 		assert.Equal(t, "canvas node limit exceeded", s.Message())
+	})
+
+	t.Run("invalid source output channel -> error", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err = UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			&pb.Canvas{
+				Metadata: &pb.Canvas_Metadata{
+					Name: canvas.Name,
+				},
+				Spec: &pb.Canvas_Spec{
+					Nodes: []*componentpb.Node{
+						{
+							Id:        "http-1",
+							Name:      "HTTP Request",
+							Component: "http",
+							Configuration: structFromAnyMap(t, map[string]any{
+								"method": "GET",
+								"url":    "https://example.com",
+							}),
+						},
+						{
+							Id:        "if-1",
+							Name:      "If",
+							Component: "if",
+							Configuration: structFromAnyMap(t, map[string]any{
+								"expression": "true",
+							}),
+						},
+					},
+					Edges: []*componentpb.Edge{
+						{
+							SourceId: "http-1",
+							TargetId: "if-1",
+							Channel:  "default",
+						},
+					},
+				},
+			},
+			nil,
+			"",
+			r.AuthService,
+		)
+
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), `source node http-1 does not have output channel "default"`)
+	})
+
+	t.Run("invalid node field type -> serialized node carries error_message", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		response, err := UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			&pb.Canvas{
+				Metadata: &pb.Canvas_Metadata{
+					Name: canvas.Name,
+				},
+				Spec: &pb.Canvas_Spec{
+					Nodes: []*componentpb.Node{
+						{
+							Id:        "wait-1",
+							Name:      "Wait",
+							Component: "wait",
+							Configuration: structFromAnyMap(t, map[string]any{
+								"mode":    "interval",
+								"waitFor": 30,
+								"unit":    "seconds",
+							}),
+						},
+					},
+					Edges: []*componentpb.Edge{},
+				},
+			},
+			nil,
+			"",
+			r.AuthService,
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Version)
+		require.NotNil(t, response.Version.Spec)
+		require.Len(t, response.Version.Spec.Nodes, 1)
+		errMsg := response.Version.Spec.Nodes[0].GetErrorMessage()
+		require.NotEmpty(t, errMsg)
+		assert.Contains(t, errMsg, "waitFor")
 	})
 }
 

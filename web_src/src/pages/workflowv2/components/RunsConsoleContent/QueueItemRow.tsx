@@ -1,4 +1,4 @@
-import type { CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasNodeQueueItem, SuperplaneComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
@@ -15,12 +15,12 @@ export function QueueItemRow({
   onNodeSelect,
 }: {
   item: CanvasesCanvasNodeQueueItem;
-  node: ComponentsNode | undefined;
+  node: SuperplaneComponentsNode | undefined;
   componentIconMap: Record<string, string>;
   onNodeSelect?: (nodeId: string) => void;
 }) {
   const nodeName = node?.name || item.nodeId || "Unknown";
-  const iconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
+  const iconSrc = getHeaderIconSrc(node?.component);
   const iconSlug = resolveNodeIconSlug(node, componentIconMap);
 
   return (

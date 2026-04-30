@@ -1354,19 +1354,6 @@ func (c *CreateVM) Color() string {
 	return "gray"
 }
 
-func (c *CreateVM) ExampleOutput() map[string]any {
-	return map[string]any{
-		"instanceId":  "1234567890123456789",
-		"selfLink":    "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
-		"internalIP":  "10.0.0.2",
-		"externalIP":  "34.1.2.3",
-		"status":      "RUNNING",
-		"zone":        "us-central1-a",
-		"name":        "my-vm",
-		"machineType": "e2-medium",
-	}
-}
-
 func (c *CreateVM) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: createVMOutputChannel, Label: "Default"},
@@ -2304,14 +2291,6 @@ func (c *CreateVM) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(createVMOutputChannel, createVMPayloadType, []any{payload})
 }
 
-func (c *CreateVM) Actions() []core.Action {
-	return nil
-}
-
-func (c *CreateVM) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateVM) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -2365,4 +2344,12 @@ type CreateVMConfig struct {
 	IdentityConfig         `mapstructure:",squash"`
 	NetworkingConfig       `mapstructure:",squash"`
 	OSAndStorageConfig     `mapstructure:",squash"`
+}
+
+func (c *CreateVM) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateVM) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

@@ -89,8 +89,8 @@ func (d *DigitalOcean) Configuration() []configuration.Field {
 	}
 }
 
-func (d *DigitalOcean) Components() []core.Component {
-	return []core.Component{
+func (d *DigitalOcean) Actions() []core.Action {
+	return []core.Action{
 		&CreateDroplet{},
 		&GetDroplet{},
 		&DeleteDroplet{},
@@ -108,14 +108,29 @@ func (d *DigitalOcean) Components() []core.Component {
 		&UpdateAlertPolicy{},
 		&DeleteAlertPolicy{},
 		&GetDropletMetrics{},
+		&GetDatabase{},
+		&GetClusterConfiguration{},
 		&GetObject{},
 		&PutObject{},
 		&CopyObject{},
 		&DeleteObject{},
 		&CreateApp{},
+		&CreateDatabase{},
+		&DeleteDatabase{},
+		&CreateDatabaseCluster{},
+		&GetDatabaseCluster{},
 		&GetApp{},
 		&DeleteApp{},
 		&UpdateApp{},
+		&CreateKnowledgeBase{},
+		&GetKnowledgeBase{},
+		&IndexKnowledgeBase{},
+		&AddDataSource{},
+		&DeleteDataSource{},
+		&AttachKnowledgeBase{},
+		&DetachKnowledgeBase{},
+		&DeleteKnowledgeBase{},
+		&RunEvaluation{},
 	}
 }
 
@@ -160,10 +175,10 @@ func (d *DigitalOcean) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (d *DigitalOcean) Actions() []core.Action {
-	return []core.Action{}
+func (d *DigitalOcean) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *DigitalOcean) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *DigitalOcean) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

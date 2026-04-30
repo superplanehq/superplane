@@ -9,17 +9,17 @@ import (
 )
 
 func parseCanvasChangeRequestApprovalConfig(
-	config *pb.CanvasChangeRequestApprovalConfig,
+	config *pb.Canvas_ChangeManagement,
 ) ([]models.CanvasChangeRequestApprover, error) {
-	if config == nil {
+	if config == nil || len(config.Approvals) == 0 {
 		return nil, nil
 	}
 
-	approvers := make([]models.CanvasChangeRequestApprover, 0, len(config.Items))
+	approvers := make([]models.CanvasChangeRequestApprover, 0, len(config.Approvals))
 	seenAnyone := false
 	seenUsers := map[string]struct{}{}
 	seenRoles := map[string]struct{}{}
-	for index, item := range config.Items {
+	for index, item := range config.Approvals {
 		if item == nil {
 			return nil, fmt.Errorf("approver %d is required", index+1)
 		}
@@ -54,20 +54,16 @@ func parseCanvasChangeRequestApprovalConfig(
 		approvers = append(approvers, approver)
 	}
 
-	if len(approvers) == 0 {
-		return nil, fmt.Errorf("at least one approver is required")
-	}
-
 	return approvers, nil
 }
 
-func canvasChangeRequestApproverTypeFromProto(value pb.CanvasChangeRequestApprover_Type) (string, error) {
+func canvasChangeRequestApproverTypeFromProto(value pb.Canvas_ChangeManagement_Approver_Type) (string, error) {
 	switch value {
-	case pb.CanvasChangeRequestApprover_TYPE_ANYONE:
+	case pb.Canvas_ChangeManagement_Approver_TYPE_ANYONE:
 		return models.CanvasChangeRequestApproverTypeAnyone, nil
-	case pb.CanvasChangeRequestApprover_TYPE_USER:
+	case pb.Canvas_ChangeManagement_Approver_TYPE_USER:
 		return models.CanvasChangeRequestApproverTypeUser, nil
-	case pb.CanvasChangeRequestApprover_TYPE_ROLE:
+	case pb.Canvas_ChangeManagement_Approver_TYPE_ROLE:
 		return models.CanvasChangeRequestApproverTypeRole, nil
 	default:
 		return "", fmt.Errorf("unsupported approver type %q", value.String())

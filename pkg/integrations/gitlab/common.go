@@ -90,7 +90,7 @@ func verifyWebhookToken(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-func ensureProjectInMetadata(ctx core.MetadataContext, app core.IntegrationContext, projectID string) error {
+func ensureProjectInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, projectID string) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {

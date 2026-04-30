@@ -36,11 +36,11 @@ describe("formatVersionTimestamp", () => {
 
 describe("formatVersionLabel", () => {
   it("labels published versions", () => {
-    expect(formatVersionLabel({ metadata: { isPublished: true } })).toBe("Published version");
+    expect(formatVersionLabel({ metadata: { state: "STATE_PUBLISHED" } })).toBe("Published version");
   });
 
   it("labels unpublished versions as drafts", () => {
-    expect(formatVersionLabel({ metadata: { isPublished: false } })).toBe("Draft version");
+    expect(formatVersionLabel({ metadata: { state: "STATE_DRAFT" } })).toBe("Draft version");
   });
 });
 
@@ -55,7 +55,7 @@ describe("formatVersionLabelWithTimestamp", () => {
     expect(
       formatVersionLabelWithTimestamp({
         metadata: {
-          isPublished: false,
+          state: "STATE_DRAFT",
           createdAt,
         },
       }),
@@ -63,7 +63,7 @@ describe("formatVersionLabelWithTimestamp", () => {
   });
 
   it("returns only the label when no valid timestamp exists", () => {
-    expect(formatVersionLabelWithTimestamp({ metadata: { isPublished: true } })).toBe("Published version");
+    expect(formatVersionLabelWithTimestamp({ metadata: { state: "STATE_PUBLISHED" } })).toBe("Published version");
   });
 });
 

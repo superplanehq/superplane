@@ -2,7 +2,7 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  ComponentsNode,
+  SuperplaneComponentsNode,
 } from "@/api-client";
 import { findNode } from "@/pages/workflowv2/lib/canvas-runs";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -26,7 +26,7 @@ export function RunRow({
   onExecutionSelect,
 }: {
   event: CanvasesCanvasEventWithExecutions;
-  nodes: ComponentsNode[];
+  nodes: SuperplaneComponentsNode[];
   componentIconMap?: Record<string, string>;
   queueItems?: CanvasesCanvasNodeQueueItem[];
   isExpanded: boolean;

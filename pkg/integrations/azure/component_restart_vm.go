@@ -78,14 +78,6 @@ func (c *RestartVMComponent) Color() string {
 	return "blue"
 }
 
-func (c *RestartVMComponent) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":            "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-		"name":          "my-vm",
-		"resourceGroup": "my-rg",
-	}
-}
-
 func (c *RestartVMComponent) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
@@ -169,18 +161,18 @@ func (c *RestartVMComponent) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *RestartVMComponent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *RestartVMComponent) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined for this component")
-}
-
 func (c *RestartVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *RestartVMComponent) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *RestartVMComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *RestartVMComponent) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

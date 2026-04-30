@@ -37,14 +37,6 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	versioningEnabled, err := isCanvasVersioningEnabledForCanvas(canvas)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load canvas versioning: %v", err)
-	}
-	if !versioningEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "canvas versioning is disabled for this canvas")
-	}
-
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion
 

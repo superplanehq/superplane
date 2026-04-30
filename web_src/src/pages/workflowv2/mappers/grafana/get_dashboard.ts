@@ -1,0 +1,86 @@
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
+import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
+import { getStateMap } from "..";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
+import { formatTimestamp } from "../utils";
+import { buildGrafanaEventSections } from "./base";
+import { buildDashboardMetadata } from "./dashboard_shared";
+import type { DashboardDetails, GetDashboardConfiguration } from "./types";
+
+export const getDashboardMapper: ComponentBaseMapper = {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
+
+    return {
+      iconSrc: grafanaIcon,
+      collapsedBackground: "bg-white",
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition.label || "Unnamed component",
+      eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: buildDashboardMetadata(
+        context.node,
+        typeof context.node.configuration === "object" && context.node.configuration !== null
+          ? (context.node.configuration as GetDashboardConfiguration).dashboard
+          : undefined,
+      ),
+      includeEmptyState: !lastExecution,
+      eventStateMap: getStateMap(componentName),
+    };
+  },
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const defaultOutputs = context.execution.outputs?.["default"];
+    const details: Record<string, string> = {
+      "Fetched At": formatTimestamp(context.execution.createdAt),
+    };
+
+    const payload = (Array.isArray(defaultOutputs) ? defaultOutputs[0] : undefined) as OutputPayload | undefined;
+    if (!payload) {
+      details.Response = "No data returned";
+      return details;
+    }
+
+    if (payload.timestamp) {
+      const ts = formatTimestamp(payload.timestamp);
+      if (ts !== "-") {
+        details["Fetched At"] = ts;
+      }
+    }
+
+    const dashboard: DashboardDetails | undefined = payload.data;
+    if (!dashboard) {
+      details.Response = "No data returned";
+      return details;
+    }
+
+    if (dashboard.title) {
+      details.Title = dashboard.title;
+    }
+    if (dashboard.url) {
+      details["Dashboard URL"] = dashboard.url;
+    }
+    if (dashboard.folderTitle) {
+      details.Folder = dashboard.folderTitle;
+    } else if (dashboard.folder) {
+      details.Folder = dashboard.folder;
+    }
+    const panelCount = dashboard.panels?.length ?? 0;
+    details.Panels = `${panelCount} panels`;
+
+    return details;
+  },
+
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    if (!context.execution.createdAt) return "-";
+    return renderTimeAgo(new Date(context.execution.createdAt));
+  },
+};

@@ -1,11 +1,15 @@
-export const isCustomComponentsEnabled = () => {
-  return import.meta.env.VITE_ENABLE_CUSTOM_COMPONENTS === "true";
+type SuperplaneWindow = Window & {
+  SUPERPLANE_AGENT_ENABLED?: boolean;
 };
 
-export const isAgentReplEnabled = () => {
-  return import.meta.env.VITE_ENABLE_AGENT_REPL === "true";
-};
+export function isAgentEnabled(): boolean {
+  return (window as SuperplaneWindow).SUPERPLANE_AGENT_ENABLED ?? false;
+}
 
 export const isUsagePageForced = () => {
   return import.meta.env.VITE_FORCE_USAGE_PAGE === "true";
+};
+
+export const isChangeManagementSettingsEnabled = () => {
+  return import.meta.env.VITE_CHANGE_MANAGEMENT_SETTINGS === "true";
 };

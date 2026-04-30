@@ -2,7 +2,7 @@
 title: "Grafana"
 ---
 
-Connect Grafana alerts and data queries to SuperPlane workflows
+Connect Grafana alerts, alert rules, dashboards, annotations, silences, and data queries to SuperPlane workflows
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -15,7 +15,33 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Incident Activity" href="#add-incident-activity" description="Add a note to a Grafana IRM incident activity timeline" />
+  <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
+  <LinkCard title="Create Annotation" href="#create-annotation" description="Create an annotation in Grafana to mark deploys, incidents, or other operational events on timelines" />
+  <LinkCard title="Create HTTP Synthetic Check" href="#create-http-synthetic-check" description="Create a Grafana Synthetic Monitoring HTTP check" />
+  <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
+  <LinkCard title="Declare Drill" href="#declare-drill" description="Declare a Grafana IRM drill incident" />
+  <LinkCard title="Declare Incident" href="#declare-incident" description="Declare a Grafana IRM incident" />
+  <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
+  <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
+  <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete a Grafana HTTP synthetic check" />
+  <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
+  <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
+  <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
+  <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Retrieve a Grafana HTTP synthetic check configuration and best-effort operational metrics" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Retrieve a Grafana IRM incident" />
+  <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
+  <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
+  <LinkCard title="List Annotations" href="#list-annotations" description="List Grafana annotations filtered by tag, dashboard, or time range" />
+  <LinkCard title="List Silences" href="#list-silences" description="List active and pending silences from the Grafana Alertmanager" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
+  <LinkCard title="Query Logs" href="#query-logs" description="Run a LogQL query against a Loki data source and return structured log results" />
+  <LinkCard title="Query Traces" href="#query-traces" description="Run a TraceQL query against a Tempo data source and return matching traces" />
+  <LinkCard title="Render Panel" href="#render-panel" description="Construct a Grafana image render URL for a dashboard panel" />
+  <LinkCard title="Resolve Incident" href="#resolve-incident" description="Resolve a Grafana IRM incident" />
+  <LinkCard title="Update Alert Rule" href="#update-alert-rule" description="Update an existing Grafana-managed alert rule from structured alert settings" />
+  <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update a Grafana Synthetic Monitoring HTTP check" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update supported Grafana IRM incident fields" />
 </CardGrid>
 
 ## Instructions
@@ -41,7 +67,7 @@ The On Alert Firing trigger starts a workflow when Grafana Unified Alerting send
 
 1. SuperPlane automatically creates or updates a Grafana Webhook contact point and notification policy route for this trigger when provisioning succeeds.
 2. SuperPlane manages webhook bearer authentication automatically.
-3. If Grafana provisioning is unavailable or rejected, manual setup may still be required.
+3. Provisioning requires a Grafana integration with **Base URL** and **Service Account Token** and sufficient permissions for alerting and provisioning APIs.
 
 ### Configuration
 
@@ -85,6 +111,1123 @@ The trigger emits the full Grafana webhook payload, including:
 }
 ```
 
+<a id="add-incident-activity"></a>
+
+## Add Incident Activity
+
+The Add Incident Activity component posts a user note to a Grafana IRM incident timeline.
+
+### Configuration
+
+- **Incident**: The incident to update (required)
+- **Body**: Note body (required)
+
+### Output
+
+Returns the created activity item.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "activityItemID": "activity-123",
+    "activityKind": "userNote",
+    "body": "Root cause identified and mitigation is in progress.",
+    "createdTime": "2026-04-20T10:05:00Z",
+    "incidentID": "incident-123"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.activityAdded"
+}
+```
+
+<a id="create-alert-rule"></a>
+
+## Create Alert Rule
+
+The Create Alert Rule component creates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Monitoring onboarding**: create baseline alerts when a new service or environment is provisioned
+- **Incident automation**: create temporary alert rules during an incident or validation workflow
+- **Policy rollout**: standardize alert coverage across teams using a shared rule definition
+
+### Configuration
+
+- **Title**: Human-readable alert name shown in Grafana
+- **Folder**: Existing Grafana folder that should contain the rule
+- **Rule Group**: Grafana rule group to create the rule in
+- **Data Source**: Existing Grafana data source the query should use
+- **Query**: Expression Grafana evaluates when checking the alert
+- **Lookback Window**: How far back to query when evaluating the rule
+- **Reducer / Condition / Threshold(s)**: How the series is reduced, how it is compared to thresholds, and optional upper bound for range conditions
+- **For**: How long the condition must hold before firing
+- **No Data / Execution Error State**: Grafana behavior when the query returns no data or errors
+- **Contact Point**: Optional Grafana contact point for notifications when the rule fires
+- **Labels / Annotations**: Optional routing and context metadata attached to the rule
+- **Paused**: Whether the rule starts paused
+
+### Output
+
+Returns the created Grafana alert rule object, including identifiers and evaluation metadata.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "C",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
+```
+
+<a id="create-annotation"></a>
+
+## Create Annotation
+
+The Create Annotation component writes an annotation into Grafana, marking operational events on dashboard timelines.
+
+### Use Cases
+
+- **Deploy tracking**: Annotate graphs at the exact moment a deployment is triggered or completes
+- **Incident markers**: Place a marker when an incident is opened or resolved for post-incident correlation
+- **Maintenance windows**: Mark the start and end of a maintenance window as a region annotation
+- **Change correlation**: Record configuration changes, feature flag toggles, or rollbacks directly on the timeline
+
+### Configuration
+
+	- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
+	- **Panel**: Required — choose the panel within the selected dashboard to attach the annotation to
+	- **Text**: The annotation message (required)
+	- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
+	- **Time**: Optional start time value. Examples: `{{ now() }}` or `{{ now() - duration("5m") }}`
+	- **Time End**: Optional end time value for a region annotation. Examples: `{{ now() }}` or `{{ now() + duration("24h") }}`
+
+### Output
+
+Returns the ID of the newly created annotation.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 42,
+    "url": "https://grafana.example.com/d/production-overview/production-overview?from=1739376783362\u0026to=1739377383362"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotation.created"
+}
+```
+
+<a id="create-http-synthetic-check"></a>
+
+## Create HTTP Synthetic Check
+
+The Create HTTP Synthetic Check component creates an HTTP synthetic check in Grafana Synthetic Monitoring.
+
+### Use Cases
+
+- **Availability monitoring**: create checks for API and website uptime
+- **Deployment verification**: validate a service immediately after deployment
+- **Operational automation**: provision consistent HTTP checks from workflows
+
+### Configuration
+
+Fields are grouped like other synthetic check components:
+
+- **Job** and **Labels**: Check display name and optional key/value labels
+- **Request**: URL, HTTP method, headers, body, redirects, basic auth, and bearer token
+- **Schedule**: Whether the check is enabled, frequency (seconds), timeout (ms), and probe locations
+- **Response validation**: SSL expectations, accepted status codes, and body/header regex rules (optional)
+- **Per-Check Alerts**: Optional Grafana synthetic monitoring alerts configured after check creation
+
+### Output
+
+Returns the created Grafana synthetic check, including its ID and HTTP configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "HTTPRequestDurationTooHighAvg",
+        "period": "5m",
+        "threshold": 500
+      }
+    ],
+    "check": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "HTTPRequestDurationTooHighAvg",
+          "period": "5m",
+          "threshold": 500
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 60000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        }
+      ],
+      "modified": 1776248430,
+      "probes": [
+        1,
+        2
+      ],
+      "settings": {
+        "http": {
+          "failIfHeaderMatchesRegexp": [
+            {
+              "allowMissing": true,
+              "header": "X-Canary",
+              "regexp": "failed"
+            }
+          ],
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 3000
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101"
+  },
+  "timestamp": "2026-04-15T10:20:30Z",
+  "type": "grafana.syntheticCheck.created"
+}
+```
+
+<a id="create-silence"></a>
+
+## Create Silence
+
+The Create Silence component creates a new Alertmanager silence in Grafana, suppressing alert notifications that match the configured matchers during the specified time window.
+
+### Use Cases
+
+- **Deploy window**: Suppress noisy alerts during a planned maintenance or deployment window
+- **Incident management**: Prevent alert storms from flooding on-call channels while an incident is being worked on
+- **Testing**: Silence alerts during load tests or chaos experiments
+
+### Configuration
+
+- **Matchers**: One or more label matchers that identify which alerts to silence (required). Each matcher uses an operator: equal (=), not equal (!=), regex match (=~), or regex does not match (!~), matching Grafana Alertmanager semantics.
+- **Starts At**: The start of the silence window (required)
+- **Ends At**: The end of the silence window (required)
+- **Comment**: A description of why the silence is being created (required)
+  - The createdBy field sent to Grafana is set automatically to SuperPlane-&lt;org_name&gt; and is not configurable
+
+### Output
+
+Returns the ID of the newly created silence.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "endsAt": "2026-04-01T10:24:30Z",
+    "silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+    "startsAt": "2026-03-31T10:24:30Z"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence.created"
+}
+```
+
+<a id="declare-drill"></a>
+
+## Declare Drill
+
+The Declare Drill component creates a new drill incident in Grafana IRM.
+
+### Use Cases
+
+- **Operational exercises**: Run incident response drills without affecting production metrics
+- **Process validation**: Test runbooks, roles, and integrations in a safe environment
+
+### Configuration
+
+- **Title**: Drill title (required)
+- **Severity**: Pending, Critical, Major, or Minor (required)
+- **Description**: Optional initial status update added to the drill
+- **Labels**: Optional drill labels
+- **Status**: Start the drill as active or resolved
+- **Start Time**: Optional time when the drill began
+
+### Output
+
+Returns the created Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": true,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "drill"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Simulated database failover exercise for the API tier.",
+    "title": "Quarterly response drill"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.declared"
+}
+```
+
+<a id="declare-incident"></a>
+
+## Declare Incident
+
+The Declare Incident component creates a new incident in Grafana IRM.
+
+### Use Cases
+
+- **Automated incident declaration**: Open an incident when a deployment, alert, or workflow detects a production issue
+
+### Configuration
+
+- **Title**: Incident title (required)
+- **Severity**: Pending, Critical, Major, or Minor (required)
+- **Description**: Optional initial status update added to the incident
+- **Labels**: Optional incident labels
+- **Status**: Start the incident as active or resolved
+- **Start Time**: Optional time when the incident began
+
+### Output
+
+Returns the created Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.declared"
+}
+```
+
+<a id="delete-alert-rule"></a>
+
+## Delete Alert Rule
+
+The Delete Alert Rule component deletes a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Alert cleanup**: remove temporary or obsolete rules after a rollout or incident
+- **Service retirement**: delete rules that are no longer needed when an environment is decommissioned
+- **Controlled cleanup**: pair deletions with approvals, notifications, or audit workflows
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule to delete
+
+### Output
+
+Returns a confirmation object with the deleted alert rule UID, title, and deletion status.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRuleDeleted"
+}
+```
+
+<a id="delete-annotation"></a>
+
+## Delete Annotation
+
+The Delete Annotation component removes an annotation from Grafana by ID.
+
+### Use Cases
+
+- **Cleanup incorrect markers**: Remove an annotation that was created with wrong text or tags
+- **Automated lifecycle**: Delete temporary markers (e.g. maintenance window start) once the event is complete
+- **Idempotent workflows**: Allow re-runs to clean up previously created annotations before re-creating them
+
+### Configuration
+
+- **Annotation**: The annotation to delete, chosen from your Grafana instance (required)
+
+### Output
+
+Returns the annotation ID and a confirmation that the annotation was deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": 42
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotation.deleted"
+}
+```
+
+<a id="delete-http-synthetic-check"></a>
+
+## Delete HTTP Synthetic Check
+
+The Delete HTTP Synthetic Check component deletes an existing Grafana synthetic check.
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to delete
+
+### Output
+
+Returns a compact confirmation payload for the deleted check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "job": "API health check",
+    "syntheticCheck": "101",
+    "target": "https://api.example.com/health"
+  },
+  "timestamp": "2026-04-15T10:35:30Z",
+  "type": "grafana.syntheticCheck.deleted"
+}
+```
+
+<a id="delete-silence"></a>
+
+## Delete Silence
+
+The Delete Silence component expires an existing silence in Grafana Alertmanager.
+
+### Use Cases
+
+- **End a maintenance window early**: Remove a silence once deployment or maintenance completes ahead of schedule
+- **Automated cleanup**: Expire silences created by automation after the condition they covered has resolved
+
+### Configuration
+
+- **Silence**: The silence to expire (required)
+
+### Output
+
+Returns the silence ID and a confirmation that the silence was deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence.deleted"
+}
+```
+
+<a id="get-alert-rule"></a>
+
+## Get Alert Rule
+
+The Get Alert Rule component fetches a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Configuration review**: inspect the current source of truth before changing a rule
+- **Workflow enrichment**: include alert rule details in notifications, tickets, or approvals
+- **Drift checks**: compare the current Grafana rule against an expected configuration
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule to retrieve
+
+### Output
+
+Returns the full Grafana alert rule object, including title, folder, group, condition, queries, labels, and annotations.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "C",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
+```
+
+<a id="get-dashboard"></a>
+
+## Get Dashboard
+
+The Get Dashboard component fetches a Grafana dashboard using the Grafana Dashboards HTTP API.
+
+### Use Cases
+
+- **Dashboard inspection**: retrieve current dashboard configuration for review or downstream use
+- **Workflow enrichment**: include dashboard details in notifications, tickets, or approvals
+- **Panel discovery**: list panels available in a dashboard for subsequent rendering or linking
+
+### Configuration
+
+- **Dashboard**: The Grafana dashboard UID to retrieve
+
+### Output
+
+Returns the Grafana dashboard object, including title, slug, URL, folder, tags, and panel summaries.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "folder": "fdg4m1rt63hj8q",
+    "folderTitle": "Platform",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "timeseries"
+      },
+      {
+        "id": 2,
+        "title": "Error Rate",
+        "type": "timeseries"
+      },
+      {
+        "id": 3,
+        "title": "P99 Latency",
+        "type": "gauge"
+      }
+    ],
+    "slug": "production-overview",
+    "tags": [
+      "production",
+      "platform"
+    ],
+    "title": "Production Overview",
+    "uid": "cIBgcSjkk",
+    "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.dashboard"
+}
+```
+
+<a id="get-http-synthetic-check"></a>
+
+## Get HTTP Synthetic Check
+
+The Get HTTP Synthetic Check component fetches a Grafana synthetic check and enriches it with best-effort operational metrics.
+
+### Use Cases
+
+- **Operational inspection**: fetch the current HTTP check configuration
+- **Workflow enrichment**: branch using recent synthetic check health data
+- **Troubleshooting**: pull current latency and run totals into incident workflows
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to retrieve
+
+### Output Channels
+
+- **Up**: All probe locations are passing
+- **Partial**: Some probe locations are passing and some are failing
+- **Down**: All probe locations are failing
+
+### Output
+
+Returns a combined payload containing:
+
+- **configuration**: the Grafana synthetic check definition
+- **alerts**: the configured per-check synthetic alerts when available
+- **metrics**: best-effort operational metrics derived from Grafana synthetic monitoring metrics; when present, **lastOutcome** is one of **Up**, **Partial**, or **Down**, matching the output channels
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "period": "5m",
+        "threshold": 1
+      }
+    ],
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",
+    "configuration": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "period": "5m",
+          "threshold": 1
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 60000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        }
+      ],
+      "modified": 1776248730,
+      "probes": [
+        1,
+        2
+      ],
+      "settings": {
+        "http": {
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 3000
+    },
+    "metrics": {
+      "averageLatencySeconds24h": 0.142,
+      "failureRuns24h": 2,
+      "frequencyMilliseconds": 60000,
+      "lastExecutionAt": "2026-04-15T10:25:00Z",
+      "lastOutcome": "Up",
+      "reachabilityPercent24h": 99.86,
+      "sslEarliestExpiryAt": "2026-05-15T10:25:00Z",
+      "sslEarliestExpiryDays": 30,
+      "successRuns24h": 1438,
+      "totalRuns24h": 1440,
+      "uptimePercent24h": 99.9
+    }
+  },
+  "timestamp": "2026-04-15T10:25:30Z",
+  "type": "grafana.syntheticCheck"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component retrieves a single incident from Grafana IRM.
+
+### Configuration
+
+- **Incident**: The incident to retrieve (required)
+
+### Output
+
+Returns the full Grafana IRM incident object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident"
+}
+```
+
+<a id="get-silence"></a>
+
+## Get Silence
+
+The Get Silence component fetches the details of a single silence from Grafana Alertmanager using its ID.
+
+### Use Cases
+
+- **Inspect a silence**: Retrieve full details of a silence including state, comment, matchers, and times
+- **Verify a silence**: Confirm a silence is still active before taking action in a workflow
+
+### Configuration
+
+- **Silence**: The silence to retrieve (required)
+
+### Output
+
+Returns the silence object including ID, state, comment, matchers, start/end times, and the author.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Deploy window for v2.1.0",
+    "createdBy": "devops-bot",
+    "endsAt": "2026-03-31T11:00:00.000Z",
+    "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "env",
+        "value": "production"
+      }
+    ],
+    "startsAt": "2026-03-31T10:00:00.000Z",
+    "status": {
+      "state": "active"
+    },
+    "updatedAt": "2026-03-31T10:00:00.000Z"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence"
+}
+```
+
+<a id="list-alert-rules"></a>
+
+## List Alert Rules
+
+The List Alert Rules component lists Grafana-managed alert rules using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Alert audits**: review which Grafana alert rules currently exist
+- **Workflow enrichment**: send alert inventories to Slack, Jira, or documentation steps
+- **Follow-up automation**: feed alert rule summaries into downstream review or cleanup workflows
+
+### Configuration
+
+All fields are optional:
+
+- **Folder**: When set, only alert rules in this Grafana folder are listed
+- **Rule Group**: When set, only rules in this Grafana rule group are listed
+
+When both are omitted, the component lists alert rules across the instance (subject to Grafana permissions).
+
+### Output
+
+Returns an object containing the list of Grafana alert rule summaries, including each rule UID and title.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertRules": [
+      {
+        "title": "High error rate",
+        "uid": "cergr5pm79hj4d"
+      },
+      {
+        "title": "High latency",
+        "uid": "aer9k2pm71sh2b"
+      },
+      {
+        "title": "Service unavailable",
+        "uid": "bfg4m1rt63hj8q"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRules"
+}
+```
+
+<a id="list-annotations"></a>
+
+## List Annotations
+
+The List Annotations component retrieves annotations from Grafana, optionally filtered by tag, dashboard, or time range.
+
+### Use Cases
+
+- **Audit operational events**: Review recent deploy, incident, or change markers on a timeline
+- **Correlate incidents**: Retrieve annotations from around an incident time window for post-incident analysis
+- **Workflow branching**: Check for existing markers before creating duplicate annotations
+
+### Configuration
+
+	- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
+	- **Panel**: Optional — filter to annotations on a specific panel within the selected dashboard
+	- **Text**: Optional — filter annotations whose text contains this value
+	- **Tags**: Filter to annotations matching all of the specified tags (optional)
+	- **From / To**: Time range filter values (optional). Examples: `{{ now() - duration("1h") }}` and `{{ now() }}`
+	- **Limit**: Maximum number of annotations to return (optional)
+
+### Output
+
+Returns a list of annotation objects including ID, text, tags, time, and dashboard/panel references.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": [
+      {
+        "dashboardUID": "abc123",
+        "id": 42,
+        "panelId": 3,
+        "tags": [
+          "deploy",
+          "production"
+        ],
+        "text": "Deploy v1.2.3 to production",
+        "time": 1739376000000,
+        "timeEnd": 1739376000000,
+        "type": "annotation"
+      },
+      {
+        "dashboardUID": "abc123",
+        "id": 41,
+        "panelId": 3,
+        "tags": [
+          "rollback",
+          "production"
+        ],
+        "text": "Rollback to v1.2.2",
+        "time": 1739289600000,
+        "timeEnd": 1739289600000,
+        "type": "annotation"
+      }
+    ],
+    "from": "2026-02-12T15:18:03.362582388Z",
+    "to": "2026-02-12T16:18:03.362582388Z"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotations"
+}
+```
+
+<a id="list-silences"></a>
+
+## List Silences
+
+The List Silences component retrieves silences from Grafana Alertmanager.
+
+### Use Cases
+
+- **Audit**: Review all currently active or pending silences in your Grafana instance
+- **Detect if already muted**: Check whether a specific alert or label set is already silenced before creating a duplicate
+- **Workflow logic**: Branch on silence state — e.g. skip escalation if an alert is already silenced
+
+### Configuration
+
+- **Filter**: Optional label matcher string to filter silences (e.g. `alertname=~"High.*"`)
+
+### Output
+
+Returns a list of silence objects, each including ID, state, comment, matchers, start/end times, and the author.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "silences": [
+      {
+        "comment": "Deploy window for v2.1.0",
+        "createdBy": "devops-bot",
+        "endsAt": "2026-03-31T11:00:00.000Z",
+        "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+        "matchers": [
+          {
+            "isEqual": true,
+            "isRegex": false,
+            "name": "env",
+            "value": "production"
+          }
+        ],
+        "startsAt": "2026-03-31T10:00:00.000Z",
+        "status": {
+          "state": "active"
+        },
+        "updatedAt": "2026-03-31T10:00:00.000Z"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silences"
+}
+```
+
 <a id="query-data-source"></a>
 
 ## Query Data Source
@@ -101,8 +1244,7 @@ The Query Data Source component executes a query against a Grafana data source u
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional datetime picker values for the query range
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Time From / Time To**: Optional expressions for the query range (for example `now() - duration("5m")` and `now()`)
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
@@ -150,6 +1292,516 @@ Returns the Grafana query API response JSON.
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.query.result"
+}
+```
+
+<a id="query-logs"></a>
+
+## Query Logs
+
+The Query Logs component executes a LogQL query against a Loki-backed Grafana data source.
+
+### Use Cases
+
+- **Incident investigation**: Search logs for errors or anomalies during an incident response workflow
+- **Deploy validation**: Confirm absence of error patterns following a deployment
+- **Log enrichment**: Pull relevant log lines into a workflow for summarization or downstream notification
+
+### Configuration
+
+		- **Data Source**: The Loki data source to query (required)
+		- **Query**: A LogQL query expression (required), e.g. `{app="myservice"} |= "error"`
+		- **Time From / Time To**: Optional log query range. Supports expr-golang values like `{{ now() + duration("1m") }}`, absolute values like `2026-04-08T15:30Z`, and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
+		- **Limit**: Maximum number of log lines to return (optional)
+
+### Output
+
+Returns the Grafana query API response containing matching log frames.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "results": {
+      "A": {
+        "frames": [
+          {
+            "data": {
+              "values": [
+                [
+                  "2026-02-12T16:17:00Z",
+                  "2026-02-12T16:17:30Z"
+                ],
+                [
+                  "error: connection refused to db",
+                  "error: timeout waiting for response"
+                ],
+                [
+                  {
+                    "app": "myservice",
+                    "level": "error"
+                  },
+                  {
+                    "app": "myservice",
+                    "level": "error"
+                  }
+                ]
+              ]
+            },
+            "schema": {
+              "fields": [
+                {
+                  "name": "Time",
+                  "type": "time"
+                },
+                {
+                  "name": "Line",
+                  "type": "string"
+                },
+                {
+                  "name": "labels",
+                  "type": "other"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.logs.result"
+}
+```
+
+<a id="query-traces"></a>
+
+## Query Traces
+
+The Query Traces component executes a TraceQL query against a Tempo-backed Grafana data source.
+
+### Use Cases
+
+- **Incident triage**: Find traces for a failing service during an incident to identify slow or erroring spans
+- **Deploy validation**: Confirm trace patterns look healthy after a deployment
+- **Latency investigation**: Search for high-latency traces matching a specific service or operation
+
+### Configuration
+
+		- **Data Source**: The Tempo data source to query (required)
+		- **Query**: A TraceQL query expression (required), e.g. `{ .http.status_code = 500 }`
+		- **Time From / Time To**: Optional trace search range. Supports expr-golang values like `{{ now() + duration("1m") }}`, absolute values like `2026-04-08T15:30Z`, and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
+
+### Output
+
+Returns the Grafana query API response containing matching trace frames.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "results": {
+      "A": {
+        "frames": [
+          {
+            "data": {
+              "values": [
+                [
+                  "abc123def456"
+                ],
+                [
+                  "0000000000000001"
+                ],
+                [
+                  "HTTP GET /api/orders"
+                ],
+                [
+                  1523000
+                ],
+                [
+                  "order-service"
+                ]
+              ]
+            },
+            "schema": {
+              "fields": [
+                {
+                  "name": "traceID",
+                  "type": "string"
+                },
+                {
+                  "name": "spanID",
+                  "type": "string"
+                },
+                {
+                  "name": "operationName",
+                  "type": "string"
+                },
+                {
+                  "name": "duration",
+                  "type": "number"
+                },
+                {
+                  "name": "serviceName",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.traces.result"
+}
+```
+
+<a id="render-panel"></a>
+
+## Render Panel
+
+The Render Panel component constructs a Grafana image render URL for a dashboard panel using the Grafana Image Renderer.
+
+### Use Cases
+
+- **Incident snapshots**: attach or link a rendered panel image in tickets or notifications
+- **Scheduled reports**: generate a reusable render URL for panel snapshots
+- **Workflow enrichment**: pass a compact panel image URL through workflow steps
+
+### Configuration
+
+	- **Dashboard**: The Grafana dashboard containing the panel to render
+	- **Panel**: The panel to render
+	- **Width**: Image width in pixels (default 1000)
+	- **Height**: Image height in pixels (default 500)
+	- **From**: Optional start of the time range. Examples: `{{ now() - duration("1h") }}` or `now-1h`
+	- **To**: Optional end of the time range. Examples: `{{ now() }}` or `now`
+
+### Output
+
+Returns the Grafana render URL along with the dashboard UID and panel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dashboard": "cIBgcSjkk",
+    "panel": 2,
+    "url": "https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?panelId=2\u0026width=1000\u0026height=500\u0026tz=UTC"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.panel.image"
+}
+```
+
+<a id="resolve-incident"></a>
+
+## Resolve Incident
+
+The Resolve Incident component marks an existing Grafana IRM incident as resolved.
+
+### Configuration
+
+- **Incident**: The incident to resolve (required)
+- **Summary**: Optional resolution note added to the incident activity before resolving
+
+### Output
+
+Returns the resolved Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "closedTime": "2026-04-20T10:10:00Z",
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:10:00Z",
+    "severity": "minor",
+    "status": "resolved",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:10:00Z",
+  "type": "grafana.incident.resolved"
+}
+```
+
+<a id="update-alert-rule"></a>
+
+## Update Alert Rule
+
+The Update Alert Rule component updates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Threshold tuning**: refine alert conditions after incidents or noisy periods
+- **Ownership changes**: update labels and annotations used for routing and context
+- **Rollout safety**: adjust alert rules during migrations or environment transitions
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule to update
+- **All other fields are optional**: only the values you provide will be changed
+- **Folder / Rule Group**: Optional location changes for the rule in Grafana
+- **Data Source / Query**: Optional query details Grafana evaluates
+- **Lookback / Reducer / Condition / Threshold(s)**: Optional changes to evaluation and thresholds
+- **Contact Point**: Set to a contact point to attach notifications; clear the value to remove notification settings from the rule
+- **Labels / Annotations**: Optional metadata to update alongside the rule
+
+### Output
+
+Returns the updated Grafana alert rule object after the provisioning API applies the change.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "C",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
+```
+
+<a id="update-http-synthetic-check"></a>
+
+## Update HTTP Synthetic Check
+
+The Update HTTP Synthetic Check component updates an existing Grafana Synthetic Monitoring HTTP check.
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to update (required)
+- **Job**, **Labels**, **Request**, **Schedule**, **Response validation**, and **Per-Check Alerts** are **togglable**. Enable a section only when you want to change it; disabled sections keep the values currently stored in Grafana.
+
+### Output
+
+Returns the updated Grafana synthetic check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "period": "5m",
+        "threshold": 2
+      }
+    ],
+    "check": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "period": "5m",
+          "threshold": 2
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 30000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        },
+        {
+          "name": "environment",
+          "value": "prod"
+        }
+      ],
+      "modified": 1776249030,
+      "probes": [
+        1,
+        2,
+        3
+      ],
+      "settings": {
+        "http": {
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 5000
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101"
+  },
+  "timestamp": "2026-04-15T10:30:30Z",
+  "type": "grafana.syntheticCheck.updated"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component updates supported fields on an existing Grafana IRM incident.
+
+### Configuration
+
+- **Incident**: The incident to update (required)
+- **Title**: Optional new incident title
+- **Severity**: Optional new severity: Pending, Critical, Major, or Minor
+- **Labels**: Optional labels to add to the incident
+- **Is Drill**: Optional drill flag
+
+### Output
+
+Returns the updated Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      },
+      {
+        "label": "customer-impacting"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:07:00Z",
+    "severity": "major",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:07:00Z",
+  "type": "grafana.incident.updated"
 }
 ```
 

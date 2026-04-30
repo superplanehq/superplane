@@ -48,7 +48,8 @@ func TestDeleteMemoryExecute(t *testing.T) {
 				map[string]any{"creator": "igor", "sandbox_id": "sbx-001"},
 			},
 		}
-		nodeMetadata := &contexts.MetadataContext{}
+
+		execMetadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -58,8 +59,8 @@ func TestDeleteMemoryExecute(t *testing.T) {
 					{"name": "pull_request", "value": 123},
 				},
 			},
-			Metadata:       &contexts.MetadataContext{},
-			NodeMetadata:   nodeMetadata,
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
 			CanvasMemory:   memoryCtx,
 			ExecutionState: execState,
 		})
@@ -75,7 +76,7 @@ func TestDeleteMemoryExecute(t *testing.T) {
 				"matches":   map[string]any{"creator": "igor", "pull_request": 123},
 				"count":     1,
 			},
-			nodeMetadata.Get(),
+			execMetadata.Get(),
 		)
 	})
 

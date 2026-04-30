@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -70,11 +71,6 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 		return nil, err
 	}
 
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
 	return agents.ResumeAgentChat(
 		ctx,
 		s.authService,
@@ -106,6 +102,7 @@ func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeA
 func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
 	url := config.AgentGRPCURL()
 	if url == "" {
+		log.WithField("canvas_id", req.CanvasId).Warn("agent GRPC URL not configured")
 		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
 	}
 
@@ -116,6 +113,21 @@ func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentCha
 	}
 
 	return agents.ListAgentChats(ctx, url, organizationID, userID, req.CanvasId)
+}
+
+func (s *AgentsService) DeleteAgentChat(ctx context.Context, req *pb.DeleteAgentChatRequest) (*pb.DeleteAgentChatResponse, error) {
+	url := config.AgentGRPCURL()
+	if url == "" {
+		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return agents.DeleteAgentChat(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
 }
 
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {

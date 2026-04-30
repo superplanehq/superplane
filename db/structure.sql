@@ -359,10 +359,10 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    versioning_enabled boolean DEFAULT false NOT NULL,
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
-    usage_limits_synced_at timestamp with time zone
+    usage_limits_synced_at timestamp with time zone,
+    change_management_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -603,19 +603,6 @@ CREATE TABLE public.workflow_nodes (
 
 
 --
--- Name: workflow_user_drafts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.workflow_user_drafts (
-    workflow_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    version_id uuid NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
 -- Name: workflow_versions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -623,12 +610,16 @@ CREATE TABLE public.workflow_versions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     owner_id uuid,
-    is_published boolean DEFAULT false NOT NULL,
     published_at timestamp without time zone,
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    state character varying(32) NOT NULL,
+    name character varying(128) DEFAULT ''::character varying NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    change_management_enabled boolean DEFAULT false NOT NULL,
+    change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -640,15 +631,12 @@ CREATE TABLE public.workflows (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     name character varying(128) NOT NULL,
-    description text,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     created_by uuid,
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
-    live_version_id uuid NOT NULL,
-    versioning_enabled boolean DEFAULT false NOT NULL,
-    change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL
+    live_version_id uuid NOT NULL
 );
 
 
@@ -1036,22 +1024,6 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: workflow_user_drafts workflow_user_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_user_drafts
-    ADD CONSTRAINT workflow_user_drafts_pkey PRIMARY KEY (workflow_id, user_id);
-
-
---
--- Name: workflow_user_drafts workflow_user_drafts_version_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_user_drafts
-    ADD CONSTRAINT workflow_user_drafts_version_id_key UNIQUE (version_id);
-
-
---
 -- Name: workflow_versions workflow_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1195,17 +1167,17 @@ CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USIN
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_casbin_rule_ptype ON public.casbin_rule USING btree (ptype);
-
-
---
--- Name: idx_casbin_rule_unique; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule_unique ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1447,13 +1419,6 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
--- Name: idx_workflow_user_drafts_user_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_user_drafts_user_id ON public.workflow_user_drafts USING btree (user_id);
-
-
---
 -- Name: idx_workflow_versions_owner; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1461,10 +1426,10 @@ CREATE INDEX idx_workflow_versions_owner ON public.workflow_versions USING btree
 
 
 --
--- Name: idx_workflow_versions_published; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_versions_unique_draft; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_versions_published ON public.workflow_versions USING btree (workflow_id, is_published, created_at DESC);
+CREATE UNIQUE INDEX idx_workflow_versions_unique_draft ON public.workflow_versions USING btree (workflow_id, owner_id) WHERE ((state)::text = 'draft'::text);
 
 
 --
@@ -1909,30 +1874,6 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: workflow_user_drafts workflow_user_drafts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_user_drafts
-    ADD CONSTRAINT workflow_user_drafts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- Name: workflow_user_drafts workflow_user_drafts_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_user_drafts
-    ADD CONSTRAINT workflow_user_drafts_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
-
-
---
--- Name: workflow_user_drafts workflow_user_drafts_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_user_drafts
-    ADD CONSTRAINT workflow_user_drafts_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
 -- Name: workflow_versions workflow_versions_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1988,7 +1929,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260402003713	f
+20260422175935	f
 \.
 
 
@@ -2024,7 +1965,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260324120001	f
+20260417035041	f
 \.
 
 

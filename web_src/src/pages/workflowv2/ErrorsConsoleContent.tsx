@@ -1,6 +1,10 @@
 import React, { useMemo } from "react";
 import { CircleX } from "lucide-react";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef, ComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeExecutionRef,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
@@ -16,7 +20,7 @@ function NodeIcon({
   componentIconMap: Record<string, string>;
 }) {
   const name = node?.name || "Unknown";
-  const iconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
+  const iconSrc = getHeaderIconSrc(node?.component);
   const iconSlug = resolveNodeIconSlug(node, componentIconMap);
   if (iconSrc) {
     return <img src={iconSrc} alt={name} className="h-4 w-4 object-contain" />;

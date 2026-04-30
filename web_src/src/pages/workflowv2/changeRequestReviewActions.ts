@@ -1,4 +1,4 @@
-import type { CanvasesCanvasChangeRequest, CanvasesCanvasChangeRequestApprovalConfig } from "@/api-client";
+import type { CanvasChangeManagement, CanvasesCanvasChangeRequest } from "@/api-client";
 
 /** Matches list / detail views: substring checks on API status strings. */
 export function normalizeChangeRequestStatus(status?: string): "open" | "published" | "rejected" | "unknown" {
@@ -35,7 +35,7 @@ export function isChangeRequestConflicted(changeRequest?: CanvasesCanvasChangeRe
  */
 export function getChangeRequestReviewActionFlags(input: {
   changeRequest: CanvasesCanvasChangeRequest | undefined;
-  changeRequestApprovalConfig: CanvasesCanvasChangeRequestApprovalConfig | undefined;
+  changeRequestApprovalConfig: CanvasChangeManagement | undefined;
   canUpdateCanvas: boolean;
   currentUserId?: string;
 }) {
@@ -47,7 +47,7 @@ export function getChangeRequestReviewActionFlags(input: {
     (approval) => normalizeApprovalState(approval.state) === "approved" && !approval.invalidatedAt,
   ).length;
   const itemRequiredApprovalsCount =
-    (changeRequestApprovalConfig?.items?.length || 0) > 0 ? changeRequestApprovalConfig?.items?.length || 0 : 1;
+    (changeRequestApprovalConfig?.approvals?.length || 0) > 0 ? changeRequestApprovalConfig?.approvals?.length || 0 : 1;
   const itemActiveApprovals = itemApprovals.filter((approval) => !approval.invalidatedAt);
   const itemHasCurrentUserActiveApproval = currentUserId
     ? itemActiveApprovals.some(
@@ -110,7 +110,7 @@ export type ChangeRequestReviewPhase =
  */
 export function getChangeRequestReviewPhase(
   changeRequest: CanvasesCanvasChangeRequest | undefined,
-  changeRequestApprovalConfig: CanvasesCanvasChangeRequestApprovalConfig | undefined,
+  changeRequestApprovalConfig: CanvasChangeManagement | undefined,
 ): ChangeRequestReviewPhase {
   if (!changeRequest) {
     return { kind: "none" };

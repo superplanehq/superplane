@@ -10,11 +10,12 @@ import (
 
 func renderOrganization(stdout io.Writer, org openapi_client.OrganizationsOrganization) error {
 	metadata := org.GetMetadata()
+	spec := org.GetSpec()
 
 	_, _ = fmt.Fprintf(stdout, "ID: %s\n", metadata.GetId())
 	_, _ = fmt.Fprintf(stdout, "Name: %s\n", metadata.GetName())
 	_, _ = fmt.Fprintf(stdout, "Description: %s\n", metadata.GetDescription())
-	_, _ = fmt.Fprintf(stdout, "Versioning Enabled: %t\n", metadata.GetVersioningEnabled())
+	_, _ = fmt.Fprintf(stdout, "Change Management Enabled: %t\n", spec.GetChangeManagementEnabled())
 	if metadata.HasCreatedAt() {
 		_, _ = fmt.Fprintf(stdout, "Created At: %s\n", metadata.GetCreatedAt().Format(time.RFC3339))
 	}

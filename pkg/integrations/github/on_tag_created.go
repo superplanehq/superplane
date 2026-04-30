@@ -121,11 +121,11 @@ func (t *OnTagCreated) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnTagCreated) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnTagCreated) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnTagCreated) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnTagCreated) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

@@ -82,6 +82,20 @@ class AgentsServicer:
 
         return agents_pb2.DescribeAgentChatResponse(chat=_serialize_chat(chat))  # type: ignore[attr-defined]
 
+    def DeleteAgentChat(self, request: Any, context: Any) -> Any:  # noqa: N802
+        try:
+            self._store.delete_agent_chat(
+                org_id=request.org_id,
+                user_id=request.user_id,
+                canvas_id=request.canvas_id,
+                chat_id=request.chat_id,
+            )
+        except AgentChatNotFoundError as error:
+            context.abort(grpc.StatusCode.NOT_FOUND, "chat not found")
+            raise error
+
+        return agents_pb2.DeleteAgentChatResponse()  # type: ignore[attr-defined]
+
     def ListAgentChatMessages(self, request: Any, context: Any) -> Any:  # noqa: N802
         try:
             messages = self._store.list_agent_chat_messages(
@@ -96,6 +110,22 @@ class AgentsServicer:
 
         return agents_pb2.ListAgentChatMessagesResponse(  # type: ignore[attr-defined]
             messages=[_serialize_message(message) for message in messages]
+        )
+
+    def DescribeOrganizationAgentUsage(self, request: Any, context: Any) -> Any:  # noqa: N802
+        try:
+            usage = self._store.get_org_usage(org_id=request.org_id)
+        except Exception as error:
+            print(f"[agent] failed to load org usage for org {request.org_id}: {error}", flush=True)
+            context.abort(grpc.StatusCode.UNAVAILABLE, "failed to load organization usage")
+            raise error
+
+        return agents_pb2.DescribeOrganizationAgentUsageResponse(  # type: ignore[attr-defined]
+            usage=agents_pb2.ChatUsage(  # type: ignore[attr-defined]
+                total_input_tokens=usage.total_input_tokens,
+                total_output_tokens=usage.total_output_tokens,
+                total_tokens=usage.total_tokens,
+            )
         )
 
 
@@ -116,10 +146,20 @@ def add_agents_servicer_to_server(servicer: AgentsServicer, server: grpc.Server)
             request_deserializer=agents_pb2.DescribeAgentChatRequest.FromString,  # type: ignore[attr-defined]
             response_serializer=agents_pb2.DescribeAgentChatResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
+        "DeleteAgentChat": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteAgentChat,
+            request_deserializer=agents_pb2.DeleteAgentChatRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.DeleteAgentChatResponse.SerializeToString,  # type: ignore[attr-defined]
+        ),
         "ListAgentChatMessages": grpc.unary_unary_rpc_method_handler(
             servicer.ListAgentChatMessages,
             request_deserializer=agents_pb2.ListAgentChatMessagesRequest.FromString,  # type: ignore[attr-defined]
             response_serializer=agents_pb2.ListAgentChatMessagesResponse.SerializeToString,  # type: ignore[attr-defined]
+        ),
+        "DescribeOrganizationAgentUsage": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeOrganizationAgentUsage,
+            request_deserializer=agents_pb2.DescribeOrganizationAgentUsageRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.DescribeOrganizationAgentUsageResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
     }
 

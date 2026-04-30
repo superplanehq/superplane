@@ -29,11 +29,11 @@ func (c *ConnectCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	organizationResponse, _, err := api.OrganizationAPI.
-		OrganizationsDescribeOrganization(ctx.Context, me.GetOrganizationId()).
+		OrganizationsDescribeOrganization(ctx.Context, me.User.GetOrganizationId()).
 		Execute()
 
 	if err != nil {
-		return fmt.Errorf("failed to describe organization %s: %w", me.GetOrganizationId(), err)
+		return fmt.Errorf("failed to describe organization %s: %w", me.User.GetOrganizationId(), err)
 	}
 
 	orgName := *organizationResponse.Organization.Metadata.Name
@@ -51,6 +51,10 @@ func (c *ConnectCommand) Execute(ctx core.CommandContext) error {
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 			_, err := fmt.Fprintf(stdout, "Connected to %q (%s)\n", orgName, baseURL)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(stdout, "%s\n", core.AgentSkillsHint())
 			return err
 		})
 	}

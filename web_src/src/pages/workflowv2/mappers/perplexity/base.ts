@@ -89,10 +89,6 @@ export const baseMapper: ComponentBaseMapper = {
       }
     }
 
-    if (context.execution.resultMessage) {
-      details["Error"] = context.execution.resultMessage;
-    }
-
     return details;
   },
 

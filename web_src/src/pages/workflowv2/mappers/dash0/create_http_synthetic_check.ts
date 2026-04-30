@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { CreateHttpSyntheticCheckConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -80,10 +81,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as CreateHttpSyntheticCheckConfiguration;
 
   if (configuration?.request?.url) {
-    const urlPreview =
-      configuration.request.url.length > 50
-        ? configuration.request.url.substring(0, 50) + "..."
-        : configuration.request.url;
+    const urlPreview = truncate(configuration.request?.url, 50);
     metadata.push({ icon: "globe", label: urlPreview });
   }
 

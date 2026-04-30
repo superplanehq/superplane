@@ -1,5 +1,5 @@
 {
-    "type": "openai.api.response",
+    "type": "openai.response",
     "data": {
         "id": "cmpl-1234567890",
         "model": "gpt-5.2",

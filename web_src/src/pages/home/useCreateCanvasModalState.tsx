@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useCreateCanvas, useUpdateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
-import type { ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 
 type ModalMode = "create" | "edit";
 
@@ -10,17 +10,21 @@ type WorkflowSummary = {
   id: string;
   name: string;
   description?: string;
-  nodes?: ComponentsNode[];
-  edges?: ComponentsEdge[];
+  nodes?: SuperplaneComponentsNode[];
+  edges?: SuperplaneComponentsEdge[];
 };
 
 type WorkflowTemplateSummary = {
   id: string;
   name: string;
   description?: string;
-  nodes?: ComponentsNode[];
-  edges?: ComponentsEdge[];
+  nodes?: SuperplaneComponentsNode[];
+  edges?: SuperplaneComponentsEdge[];
 };
+
+function getCanvasCreateMethod(templateId?: string): "template" | "ui" {
+  return templateId ? "template" : "ui";
+}
 
 export function useCreateCanvasModalState() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -56,6 +60,8 @@ export function useCreateCanvasModalState() {
       description: data.description,
       nodes: selectedTemplate?.spec?.nodes,
       edges: selectedTemplate?.spec?.edges,
+      method: getCanvasCreateMethod(data.templateId),
+      templateId: data.templateId,
     });
 
     if (result?.data?.canvas?.metadata?.id) {

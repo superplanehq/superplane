@@ -36,7 +36,7 @@ This document captures the architecture principles, patterns, and workflow for d
 1. **Storybook development**: Components are developed and tested in Storybook
 2. **TypeScript checking**: Run `npm run build && npm run test` regularly
 3. **Component stories**: Create comprehensive stories showing all component states
-4. **Auto-formatting**: Claude Code will automatically run Prettier on file edits (configured in `.claude/settings.json`)
+4. **Formatting**: Run `npm run format` before committing file edits to keep Prettier formatting consistent
 
 ### Tips
 

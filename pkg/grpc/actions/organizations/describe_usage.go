@@ -42,9 +42,11 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		log.Warnf("Failed to persist usage sync state for organization %s: %v", orgID, err)
 	}
 
+	go usage.ReconcileCanvasCount(orgID, orgUsage.GetCanvases())
+
 	return &pb.DescribeUsageResponse{
 		Enabled:       true,
-		StatusMessage: "Usage tracking is active.",
+		StatusMessage: "Usage tracking is active and up to date.",
 		Limits:        serializeUsageLimits(limits),
 		Usage:         serializeUsage(orgUsage),
 	}, nil
@@ -124,12 +126,13 @@ func serializeUsageLimits(limits *usagepb.OrganizationLimits) *pb.OrganizationLi
 	}
 
 	return &pb.OrganizationLimits{
-		MaxCanvases:         limits.MaxCanvases,
-		MaxNodesPerCanvas:   limits.MaxNodesPerCanvas,
-		MaxUsers:            limits.MaxUsers,
-		RetentionWindowDays: limits.RetentionWindowDays,
-		MaxEventsPerMonth:   limits.MaxEventsPerMonth,
-		MaxIntegrations:     limits.MaxIntegrations,
+		MaxCanvases:            limits.MaxCanvases,
+		MaxNodesPerCanvas:      limits.MaxNodesPerCanvas,
+		MaxUsers:               limits.MaxUsers,
+		RetentionWindowDays:    limits.RetentionWindowDays,
+		MaxEventsPerMonth:      limits.MaxEventsPerMonth,
+		MaxIntegrations:        limits.MaxIntegrations,
+		MaxAgentTokensPerMonth: limits.MaxAgentTokensPerMonth,
 	}
 }
 
@@ -152,11 +155,29 @@ func serializeUsage(orgUsage *usagepb.OrganizationUsage) *pb.OrganizationUsage {
 		)
 	}
 
+	var agentTokenBucketLastUpdatedAt *timestamppb.Timestamp
+	if orgUsage.AgentTokenBucketLastUpdatedAtUnixSeconds > 0 {
+		agentTokenBucketLastUpdatedAt = timestamppb.New(
+			time.Unix(orgUsage.AgentTokenBucketLastUpdatedAtUnixSeconds, 0).UTC(),
+		)
+	}
+
+	var nextAgentTokenBucketDecreaseAt *timestamppb.Timestamp
+	if orgUsage.NextAgentTokenBucketLeakAtUnixSeconds > 0 {
+		nextAgentTokenBucketDecreaseAt = timestamppb.New(
+			time.Unix(orgUsage.NextAgentTokenBucketLeakAtUnixSeconds, 0).UTC(),
+		)
+	}
+
 	return &pb.OrganizationUsage{
-		Canvases:                  orgUsage.Canvases,
-		EventBucketLevel:          orgUsage.EventBucketLevel,
-		EventBucketCapacity:       orgUsage.EventBucketCapacity,
-		EventBucketLastUpdatedAt:  eventBucketLastUpdatedAt,
-		NextEventBucketDecreaseAt: nextEventBucketDecreaseAt,
+		Canvases:                       orgUsage.Canvases,
+		EventBucketLevel:               orgUsage.EventBucketLevel,
+		EventBucketCapacity:            orgUsage.EventBucketCapacity,
+		EventBucketLastUpdatedAt:       eventBucketLastUpdatedAt,
+		NextEventBucketDecreaseAt:      nextEventBucketDecreaseAt,
+		AgentTokenBucketLevel:          orgUsage.AgentTokenBucketLevel,
+		AgentTokenBucketCapacity:       orgUsage.AgentTokenBucketCapacity,
+		AgentTokenBucketLastUpdatedAt:  agentTokenBucketLastUpdatedAt,
+		NextAgentTokenBucketDecreaseAt: nextAgentTokenBucketDecreaseAt,
 	}
 }

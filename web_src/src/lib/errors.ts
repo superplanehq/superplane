@@ -66,7 +66,7 @@ function getNonEmptyString(value: unknown): string | null {
   }
 
   const trimmed = value.trim();
-  if (!trimmed || looksLikeHtmlDocument(trimmed)) {
+  if (!trimmed || looksLikeHtmlDocument(trimmed) || looksLikeBrowserNetworkError(trimmed)) {
     return null;
   }
 
@@ -80,5 +80,16 @@ function looksLikeHtmlDocument(value: string): boolean {
     normalized.startsWith("<!doctype html") ||
     normalized.startsWith("<html") ||
     (normalized.includes("<html") && normalized.includes("</html>"))
+  );
+}
+
+function looksLikeBrowserNetworkError(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+
+  return (
+    normalized === "failed to fetch" ||
+    normalized === "load failed" ||
+    normalized === "network request failed" ||
+    normalized.includes("networkerror when attempting to fetch resource")
   );
 }

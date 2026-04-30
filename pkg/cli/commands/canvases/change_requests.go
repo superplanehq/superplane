@@ -178,12 +178,12 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if versionID == "" {
-		versioningContext, err := resolveCanvasVersioningContext(ctx, canvasID)
+		cmContext, err := resolveChangeManagementContext(ctx, canvasID)
 		if err != nil {
 			return err
 		}
-		if !versioningContext.versioningEnabled {
-			return fmt.Errorf("effective canvas versioning is disabled for this canvas; use `superplane canvases update` without --draft to update the live canvas directly")
+		if !cmContext.changeManagementEnabled {
+			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
 		}
 
 		versionID, err = findCurrentUserDraftVersionID(ctx, canvasID)
@@ -191,7 +191,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if versionID == "" {
-			return fmt.Errorf("no draft version found; run `superplane canvases update %s --draft ...` first", canvasID)
+			return fmt.Errorf("no draft version found; run `superplane canvases update --draft -f <file>` first")
 		}
 	}
 
@@ -232,7 +232,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 }
 
 type changeRequestActionCommand struct {
-	action openapi_client.ActOnCanvasChangeRequestRequestAction
+	action openapi_client.CanvasesActOnCanvasChangeRequestRequestAction
 }
 
 func (c *changeRequestActionCommand) Execute(ctx core.CommandContext) error {
@@ -454,9 +454,9 @@ func renderCanvasChangeRequestText(ctx core.CommandContext, changeRequest openap
 
 			approverScope := "any user"
 			approver := approval.GetApprover()
-			if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_USER {
+			if approver.GetType() == openapi_client.CHANGEMANAGEMENTAPPROVERTYPE_TYPE_USER {
 				approverScope = "user " + approver.GetUserId()
-			} else if approver.GetType() == openapi_client.CANVASESCANVASCHANGEREQUESTAPPROVERTYPE_TYPE_ROLE {
+			} else if approver.GetType() == openapi_client.CHANGEMANAGEMENTAPPROVERTYPE_TYPE_ROLE {
 				approverScope = "role " + approver.GetRoleName()
 			}
 
@@ -506,17 +506,17 @@ func formatTimeOrDash(value time.Time, hasValue bool) string {
 	return value.Format(time.RFC3339)
 }
 
-func eventLabelForChangeRequestAction(action openapi_client.ActOnCanvasChangeRequestRequestAction) string {
+func eventLabelForChangeRequestAction(action openapi_client.CanvasesActOnCanvasChangeRequestRequestAction) string {
 	switch action {
-	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE:
+	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE:
 		return "approved"
-	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE:
+	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE:
 		return "unapproved"
-	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT:
+	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT:
 		return "rejected"
-	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN:
+	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN:
 		return "reopened"
-	case openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH:
+	case openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH:
 		return "published"
 	default:
 		return strings.ToLower(string(action))

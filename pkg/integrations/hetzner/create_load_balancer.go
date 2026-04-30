@@ -63,14 +63,6 @@ func (c *CreateLoadBalancer) Color() string {
 	return "gray"
 }
 
-func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":     "12345",
-		"name":   "my-load-balancer",
-		"status": "running",
-	}
-}
-
 func (c *CreateLoadBalancer) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
@@ -186,14 +178,6 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateLoadBalancerPayloadType, []any{loadBalancer})
 }
 
-func (c *CreateLoadBalancer) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateLoadBalancer) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateLoadBalancer) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
@@ -203,5 +187,13 @@ func (c *CreateLoadBalancer) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *CreateLoadBalancer) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateLoadBalancer) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateLoadBalancer) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

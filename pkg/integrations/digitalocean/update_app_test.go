@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__UpdateApp__HandleAction(t *testing.T) {
+func Test__UpdateApp__HandleHook(t *testing.T) {
 	component := &UpdateApp{}
 
 	t.Run("deployment active -> emits app output", func(t *testing.T) {
@@ -58,7 +58,7 @@ func Test__UpdateApp__HandleAction(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -111,7 +111,7 @@ func Test__UpdateApp__HandleAction(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -156,7 +156,7 @@ func Test__UpdateApp__HandleAction(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -179,7 +179,7 @@ func Test__UpdateApp__HandleAction(t *testing.T) {
 
 		requestCtx := &contexts.RequestContext{}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			ExecutionState: executionState,
 			Requests:       requestCtx,
@@ -190,11 +190,11 @@ func Test__UpdateApp__HandleAction(t *testing.T) {
 	})
 
 	t.Run("unknown action -> returns error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "unknown",
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action: unknown")
+		assert.Contains(t, err.Error(), "unknown hook: unknown")
 	})
 }

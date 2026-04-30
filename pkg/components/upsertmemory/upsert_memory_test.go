@@ -62,7 +62,7 @@ func TestUpsertMemoryExecute(t *testing.T) {
 				},
 			},
 		}
-		nodeMetadata := &contexts.MetadataContext{}
+		execMetadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -75,8 +75,8 @@ func TestUpsertMemoryExecute(t *testing.T) {
 					{"name": "latest_deployment_source", "value": "manual_run"},
 				},
 			},
-			Metadata:       &contexts.MetadataContext{},
-			NodeMetadata:   nodeMetadata,
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
 			CanvasMemory:   memoryCtx,
 			ExecutionState: execState,
 		})
@@ -95,7 +95,7 @@ func TestUpsertMemoryExecute(t *testing.T) {
 				"operation":    OperationUpdated,
 				"updatedCount": 1,
 			},
-			nodeMetadata.Get(),
+			execMetadata.Get(),
 		)
 	})
 
@@ -103,7 +103,7 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		component := &UpsertMemory{}
 		execState := &contexts.ExecutionStateContext{}
 		memoryCtx := &canvasMemoryContext{updatedValues: []any{}}
-		nodeMetadata := &contexts.MetadataContext{}
+		execMetadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -116,8 +116,8 @@ func TestUpsertMemoryExecute(t *testing.T) {
 					{"name": "latest_deployment_source", "value": "manual_run"},
 				},
 			},
-			Metadata:       &contexts.MetadataContext{},
-			NodeMetadata:   nodeMetadata,
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
 			CanvasMemory:   memoryCtx,
 			ExecutionState: execState,
 		})
@@ -136,7 +136,7 @@ func TestUpsertMemoryExecute(t *testing.T) {
 				"operation":    OperationCreated,
 				"updatedCount": 0,
 			},
-			nodeMetadata.Get(),
+			execMetadata.Get(),
 		)
 	})
 
@@ -150,7 +150,7 @@ func TestUpsertMemoryExecute(t *testing.T) {
 				},
 			},
 		}
-		nodeMetadata := &contexts.MetadataContext{}
+		execMetadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -159,8 +159,8 @@ func TestUpsertMemoryExecute(t *testing.T) {
 					{"name": "value", "value": "new-sha"},
 				},
 			},
-			Metadata:       &contexts.MetadataContext{},
-			NodeMetadata:   nodeMetadata,
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
 			CanvasMemory:   memoryCtx,
 			ExecutionState: execState,
 		})
@@ -169,7 +169,7 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		assert.Equal(t, 1, memoryCtx.updateCalls)
 		assert.Equal(t, core.DefaultOutputChannel.Name, execState.Channel)
 		assert.Equal(t, map[string]any{}, memoryCtx.matches)
-		assert.Equal(t, map[string]any{}, nodeMetadata.Get().(map[string]any)["matches"])
+		assert.Equal(t, map[string]any{}, execMetadata.Get().(map[string]any)["matches"])
 	})
 
 	t.Run("returns error when update fails", func(t *testing.T) {
