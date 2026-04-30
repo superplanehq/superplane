@@ -140,7 +140,11 @@ func resolveDeleteApplicationMetadata(ctx core.SetupContext, applicationID strin
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to create OCI client: %w", err)
+		// Non-fatal: fall back to showing the ID.
+		return ctx.Metadata.Set(DeleteApplicationNodeMetadata{
+			ApplicationID:   applicationID,
+			ApplicationName: applicationID,
+		})
 	}
 
 	app, err := client.GetApplication(applicationID)
