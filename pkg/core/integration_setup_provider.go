@@ -112,6 +112,7 @@ type SetupStepContext struct {
 	OrganizationID  string
 	BaseURL         string
 	WebhooksBaseURL string
+	Logger          *log.Entry
 	HTTP            HTTPContext
 	Secrets         IntegrationSecretStorage
 	Properties      IntegrationPropertyStorage
@@ -176,7 +177,7 @@ type IntegrationSecretDefinition struct {
 	Name        string
 	Label       string
 	Description string
-	Value       []byte
+	Value       string
 	Editable    bool
 }
 
