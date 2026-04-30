@@ -145,6 +145,16 @@ type DeleteFunctionNodeMetadata struct {
 }
 
 func resolveDeleteFunctionMetadata(ctx core.SetupContext, applicationID, functionID string) error {
+	// If either ID is an expression placeholder, store as-is.
+	if strings.Contains(applicationID, "{{") || strings.Contains(functionID, "{{") {
+		return ctx.Metadata.Set(DeleteFunctionNodeMetadata{
+			ApplicationID:   applicationID,
+			ApplicationName: applicationID,
+			FunctionID:      functionID,
+			FunctionName:    functionID,
+		})
+	}
+
 	// Return early if already cached.
 	var existing DeleteFunctionNodeMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil &&
