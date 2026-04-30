@@ -42,11 +42,20 @@ export const NODE_REF_CLASS = "sp-node-ref";
 // template payload; otherwise it renders disabled.
 //
 export const TRIGGER_RUN_CLASS = "sp-trigger-run";
+//
+// Node-status chip: a sibling token to the node-ref chip that renders the
+// latest execution status badge for a (component / blueprint / widget) node.
+// Authored as either `@node:status` or `[[status:node]]`. Always rendered as
+// a non-interactive `<span>`; navigation is handled by the regular
+// `@node-name` chip.
+//
+export const NODE_STATUS_CLASS = "sp-node-status";
 
 // Order matters: longer / more-specific patterns first so the regex prefers
-// the run variant over the bare node reference when both could match.
+// the run / status variants over the bare node reference when both could
+// match.
 const NODE_TOKEN_RE =
-  /(\[\[run:([a-zA-Z0-9][a-zA-Z0-9_-]*):([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|\[\[node:([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*):run\/([a-zA-Z0-9][a-zA-Z0-9_-]*)|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*))/g;
+  /(\[\[run:([a-zA-Z0-9][a-zA-Z0-9_-]*):([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|\[\[node:([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|\[\[status:([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*):run\/([a-zA-Z0-9][a-zA-Z0-9_-]*)|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*):status\b|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*))/g;
 
 type MdastNode = {
   type: string;
@@ -87,11 +96,14 @@ export function remarkNodeRefs() {
             // Capture groups in the regex (1-indexed):
             //  2,3  -> [[run:trigger:template]]
             //  4    -> [[node:slug]]
-            //  5,6  -> @trigger:run/template
-            //  7    -> @slug
-            const runTrigger = match[2] || match[5];
-            const runTemplate = match[3] || match[6];
-            const nodeSlug = match[4] || match[7];
+            //  5    -> [[status:slug]]
+            //  6,7  -> @trigger:run/template
+            //  8    -> @slug:status
+            //  9    -> @slug
+            const runTrigger = match[2] || match[6];
+            const runTemplate = match[3] || match[7];
+            const statusSlug = match[5] || match[8];
+            const nodeSlug = match[4] || match[9];
 
             if (match.index > lastIndex) {
               replacements.push({ type: "text", value: value.slice(lastIndex, match.index) });
@@ -100,6 +112,11 @@ export function remarkNodeRefs() {
               replacements.push({
                 type: "html",
                 value: `<span class="${TRIGGER_RUN_CLASS}" data-trigger="${escapeHtml(runTrigger)}" data-template="${escapeHtml(runTemplate)}">${escapeHtml(`${runTrigger}:run/${runTemplate}`)}</span>`,
+              });
+            } else if (statusSlug) {
+              replacements.push({
+                type: "html",
+                value: `<span class="${NODE_STATUS_CLASS}" data-node="${escapeHtml(statusSlug)}">${escapeHtml(`${statusSlug}:status`)}</span>`,
               });
             } else if (nodeSlug) {
               replacements.push({
@@ -140,7 +157,14 @@ const sanitizeSchema = {
   tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
-    span: [...((defaultSchema.attributes ?? {}).span ?? []), "className", "class", "data-trigger", "data-template"],
+    span: [
+      ...((defaultSchema.attributes ?? {}).span ?? []),
+      "className",
+      "class",
+      "data-trigger",
+      "data-template",
+      "data-node",
+    ],
   },
 };
 
@@ -479,6 +503,15 @@ export interface TriggerTemplateInfo {
   outputChannels?: string[];
 }
 
+export interface NodeStatusInfo {
+  /** Status string from the canvas-runs helpers (e.g. "running", "failed", "approved", or "none" when no executions). */
+  status: string;
+  /** Tailwind background class for the pill (e.g. "bg-blue-500"). Falls back to the default palette if omitted. */
+  badgeColor?: string;
+  /** Display label for the pill (uppercased rendering happens in CSS). */
+  label?: string;
+}
+
 export interface NodeChipContext {
   /** Known node slug -> display name. Slugs not in this map render as "unknown node" chips. */
   nodes?: Record<string, string>;
@@ -494,6 +527,12 @@ export interface NodeChipContext {
   triggerTemplates?: Record<string, Record<string, TriggerTemplateInfo>>;
   /** Click handler for `@trigger:run/template` chips. When undefined, chips render disabled. */
   onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
+  /**
+   * Latest execution status per node slug, used by `@node:status` /
+   * `[[status:node]]` chips. Slugs not present in the map render as a
+   * dashed-grey "unknown status" pill (e.g. for triggers).
+   */
+  nodeStatuses?: Record<string, NodeStatusInfo | undefined>;
 }
 
 interface ChipTheme {
@@ -843,9 +882,51 @@ function defaultLinkFor(slug: string): string {
   }
 }
 
+// Shared classnames for `@node:status` pills. Mirrors the runs-console
+// StatusBadge component so the chip is visually identical to what users see
+// on canvas / runs rows.
+const NODE_STATUS_CHIP_CLASSES =
+  "sp-node-status shrink-0 inline-flex items-center justify-center uppercase text-[10px] py-[1.5px] px-[5px] font-semibold rounded tracking-wide text-white";
+
+const NODE_STATUS_DISABLED_CLASSES =
+  "sp-node-status inline-flex items-center justify-center rounded border border-dashed border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-medium uppercase leading-none tracking-wide text-slate-500";
+
+function NodeStatusChip({ slug, status }: { slug: string; status?: NodeStatusInfo }) {
+  if (!status) {
+    return (
+      <span className={NODE_STATUS_DISABLED_CLASSES} title={`No status available for ${slug}`}>
+        {slug}:status
+      </span>
+    );
+  }
+
+  const badgeColor = status.badgeColor || "bg-gray-400";
+  const label = status.label || status.status || "unknown";
+  return (
+    <span className={`${NODE_STATUS_CHIP_CLASSES} ${badgeColor}`} title={`${slug}: ${label}`}>
+      {label}
+    </span>
+  );
+}
+
 function buildSpanComponent(context: NodeChipContext) {
   return function Span(props: React.HTMLAttributes<HTMLSpanElement> & Record<string, unknown>) {
     const className = typeof props.className === "string" ? props.className : "";
+
+    if (className.includes(NODE_STATUS_CLASS)) {
+      const nodeAttr = (props["data-node"] as string | undefined) ?? (props.dataNode as string | undefined) ?? "";
+      let slug = String(nodeAttr).trim();
+      if (!slug) {
+        // Fallback: parse `<slug>:status` from the text node content.
+        const text = extractTextFromChildren(props.children).trim();
+        const m = text.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*):status$/);
+        if (m) slug = m[1];
+      }
+      if (!slug) return <span {...props} />;
+
+      const status = context.nodeStatuses?.[slug];
+      return <NodeStatusChip slug={slug} status={status} />;
+    }
 
     if (className.includes(TRIGGER_RUN_CLASS)) {
       // rehype/react-markdown converts data-* attributes into camelCase props, but

@@ -29,8 +29,75 @@ async function getMermaid() {
       mermaid.initialize({
         startOnLoad: false,
         securityLevel: "strict",
-        theme: "neutral",
+        theme: "base",
         fontFamily: "inherit",
+        themeVariables: {
+          // Page-level colors. Keep transparent so the wrapper card's gradient
+          // shows through behind the diagram.
+          background: "transparent",
+          fontFamily: "inherit",
+          textColor: "#1e293b",
+
+          // Flowchart / sequence / etc. — soft tinted nodes with a saturated
+          // border so they read clearly on the gradient card.
+          primaryColor: "#dbeafe",
+          primaryBorderColor: "#3b82f6",
+          primaryTextColor: "#0f172a",
+          secondaryColor: "#fef3c7",
+          secondaryBorderColor: "#f59e0b",
+          secondaryTextColor: "#1e293b",
+          tertiaryColor: "#dcfce7",
+          tertiaryBorderColor: "#10b981",
+          tertiaryTextColor: "#1e293b",
+          lineColor: "#94a3b8",
+          mainBkg: "#dbeafe",
+          nodeBorder: "#3b82f6",
+          clusterBkg: "#f8fafc",
+          clusterBorder: "#cbd5e1",
+          edgeLabelBackground: "#ffffff",
+
+          // Pie charts — 12-slot Tailwind-500 palette.
+          pie1: "#3b82f6",
+          pie2: "#f97316",
+          pie3: "#10b981",
+          pie4: "#a855f7",
+          pie5: "#f59e0b",
+          pie6: "#ef4444",
+          pie7: "#06b6d4",
+          pie8: "#ec4899",
+          pie9: "#14b8a6",
+          pie10: "#8b5cf6",
+          pie11: "#84cc16",
+          pie12: "#f43f5e",
+          pieStrokeColor: "#ffffff",
+          pieStrokeWidth: "2px",
+          pieOuterStrokeColor: "transparent",
+          pieTitleTextSize: "16px",
+          pieTitleTextColor: "#0f172a",
+          pieSectionTextSize: "13px",
+          pieSectionTextColor: "#ffffff",
+          pieLegendTextSize: "12px",
+          pieLegendTextColor: "#475569",
+
+          // xychart-beta — same palette so bars, lines, scatter all coordinate.
+          xyChart: {
+            backgroundColor: "transparent",
+            titleColor: "#0f172a",
+            plotColorPalette: "#3b82f6, #f97316, #10b981, #a855f7, #f59e0b, #ef4444",
+            xAxisLabelColor: "#64748b",
+            yAxisLabelColor: "#64748b",
+            xAxisTitleColor: "#334155",
+            yAxisTitleColor: "#334155",
+            xAxisLineColor: "#cbd5e1",
+            yAxisLineColor: "#cbd5e1",
+          },
+
+          // Quadrant chart.
+          quadrant1Fill: "#dbeafe",
+          quadrant2Fill: "#fef3c7",
+          quadrant3Fill: "#dcfce7",
+          quadrant4Fill: "#fce7f3",
+        },
       });
       return mermaid;
     });
@@ -223,7 +290,7 @@ function MermaidViewer({ code, onExpand, fullscreen = false }: MermaidViewerProp
 
   const wrapperClass = fullscreen
     ? "group relative flex min-h-0 flex-1 flex-col bg-white"
-    : "group relative my-2 overflow-hidden rounded-md border border-slate-200 bg-white";
+    : "group relative my-3 overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 via-white to-slate-50 shadow-sm";
 
   // Surface gives the host a concrete width to fill, so Mermaid's SVG
   // (which ships with `width="100%"`) stretches out to the available space

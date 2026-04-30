@@ -15,6 +15,7 @@ import {
   CanvasMarkdown,
   type NodeChipDetails,
   type NodeChipIcon,
+  type NodeStatusInfo,
   type TriggerTemplateInfo,
 } from "@/ui/Markdown/CanvasMarkdown";
 import { useEffect, useMemo, useState } from "react";
@@ -58,6 +59,11 @@ export type CanvasReadmeModalProps = {
    * user lacks permission to run nodes) chips render disabled.
    */
   onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
+  /**
+   * Latest execution status per node slug. Used to render `@node:status`
+   * chips inside the readme markdown.
+   */
+  nodeStatuses?: Record<string, NodeStatusInfo | undefined>;
   onSaveDraft: (content: string) => Promise<void>;
   onCreateChangeRequest: (args: { title: string; description: string }) => Promise<void>;
 };
@@ -70,6 +76,7 @@ type NodeRefs = {
   onNodeClick?: (slug: string) => void;
   triggerTemplates?: Record<string, Record<string, TriggerTemplateInfo>>;
   onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
+  nodeStatuses?: Record<string, NodeStatusInfo | undefined>;
 };
 
 export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
@@ -91,13 +98,23 @@ export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
     onNodeClick,
     triggerTemplates,
     onTriggerTemplateRun,
+    nodeStatuses,
     onSaveDraft,
     onCreateChangeRequest,
   } = props;
 
   const nodeRefs = useMemo(
-    () => ({ nodes, icons, details, linkFor, onNodeClick, triggerTemplates, onTriggerTemplateRun }),
-    [nodes, icons, details, linkFor, onNodeClick, triggerTemplates, onTriggerTemplateRun],
+    () => ({
+      nodes,
+      icons,
+      details,
+      linkFor,
+      onNodeClick,
+      triggerTemplates,
+      onTriggerTemplateRun,
+      nodeStatuses,
+    }),
+    [nodes, icons, details, linkFor, onNodeClick, triggerTemplates, onTriggerTemplateRun, nodeStatuses],
   );
   const subtitle = mode === "edit" ? "Draft" : "Published";
 

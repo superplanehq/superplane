@@ -10,6 +10,7 @@ import type {
   NodeChipDetails,
   NodeChipIcon,
   NodeChipKind,
+  NodeStatusInfo,
   TriggerTemplateInfo,
 } from "@/ui/Markdown/CanvasMarkdown";
 import type { QueryClient } from "@tanstack/react-query";
@@ -129,6 +130,7 @@ import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
+import { getStatusBadgeProps, resolveExecutionBadgeColor, resolveExecutionDisplayStatus } from "./lib/canvas-runs";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import type { User } from "./mappers/types";
@@ -5594,6 +5596,49 @@ export function WorkflowPageV2() {
     availableIntegrations,
   ]);
 
+  //
+  // Live status map used by `@node:status` / `[[status:node]]` chips. Kept in
+  // its own memo (separate from the heavier readme-nodes memo above) so the
+  // expensive details/icon resolution doesn't re-run on every websocket
+  // update of an execution. Triggers are intentionally excluded — they don't
+  // have an "execution" in the same sense, and the chip is presentational.
+  //
+  const nodeExecutionData = useNodeExecutionStore((state) => state.data);
+  const readmeNodeStatusBySlug = useMemo(() => {
+    const out: Record<string, NodeStatusInfo> = {};
+    const sourceNodes = (selectedCanvasVersion ?? liveCanvasVersion)?.spec?.nodes ?? [];
+    const toKebabLocal = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+    for (const node of sourceNodes) {
+      if (!node.id) continue;
+      if (node.type !== "TYPE_COMPONENT" && node.type !== "TYPE_BLUEPRINT" && node.type !== "TYPE_WIDGET") {
+        continue;
+      }
+
+      const exec = nodeExecutionData.get(node.id)?.executions?.[0];
+      let entry: NodeStatusInfo;
+      if (!exec) {
+        entry = { status: "none", badgeColor: "bg-gray-400", label: "no runs" };
+      } else {
+        const status = resolveExecutionDisplayStatus(exec, sourceNodes);
+        const badgeColor = resolveExecutionBadgeColor(exec, sourceNodes);
+        const { label } = getStatusBadgeProps(status, undefined, badgeColor);
+        entry = { status, badgeColor, label };
+      }
+
+      const displayName = node.name || node.id;
+      const aliases = [node.name, node.id, toKebabLocal(displayName)].filter(Boolean) as string[];
+      for (const slug of aliases) {
+        if (!out[slug]) out[slug] = entry;
+      }
+    }
+    return out;
+  }, [selectedCanvasVersion, liveCanvasVersion, nodeExecutionData]);
+
   const linkForReadmeNode = useCallback(
     (slug: string) => {
       const id = readmeNodeIdBySlug[slug] ?? slug;
@@ -6054,6 +6099,7 @@ export function WorkflowPageV2() {
                   triggerTemplates: readmeTriggerTemplatesBySlug,
                   onTriggerTemplateRun:
                     !canUpdateCanvas || isTemplate || runDisabled ? undefined : handleTriggerTemplateRun,
+                  nodeStatuses: readmeNodeStatusBySlug,
                 }}
                 onChange={(next) => updateCanvasLaunchpadMutation.mutate(next)}
               />
@@ -6207,6 +6253,7 @@ export function WorkflowPageV2() {
         onNodeClick={handleReadmeNodeChipClick}
         triggerTemplates={readmeTriggerTemplatesBySlug}
         onTriggerTemplateRun={!canUpdateCanvas || isTemplate || runDisabled ? undefined : handleTriggerTemplateRun}
+        nodeStatuses={readmeNodeStatusBySlug}
         onSaveDraft={handleReadmeSaveDraft}
         onCreateChangeRequest={handleReadmeCreateChangeRequest}
       />

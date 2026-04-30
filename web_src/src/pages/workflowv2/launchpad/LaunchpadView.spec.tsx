@@ -38,9 +38,11 @@ vi.mock("react-grid-layout/legacy", () => ({
 // the markdown layer. The button matches a hardcoded slug pair for tests
 // that opt into the run-chip flow.
 type MockTriggerInfo = { name: string; payload: unknown };
+type MockNodeStatusInfo = { status: string; badgeColor?: string; label?: string };
 type MockNodeRefs = {
   triggerTemplates?: Record<string, Record<string, MockTriggerInfo>>;
   onTriggerTemplateRun?: (input: { nodeSlug: string; templateSlug: string }) => void;
+  nodeStatuses?: Record<string, MockNodeStatusInfo | undefined>;
 };
 
 vi.mock("@/ui/Markdown/CanvasMarkdown", () => ({
@@ -49,8 +51,14 @@ vi.mock("@/ui/Markdown/CanvasMarkdown", () => ({
     const templateKey = "hello-world";
     const hasTemplate = Boolean(nodeRefs?.triggerTemplates?.[triggerKey]?.[templateKey]);
     const canRun = Boolean(nodeRefs?.onTriggerTemplateRun);
+    const statusKeys = nodeRefs?.nodeStatuses ? Object.keys(nodeRefs.nodeStatuses).sort().join(",") : "";
     return (
-      <div data-testid="markdown" data-has-template={hasTemplate ? "yes" : "no"} data-can-run={canRun ? "yes" : "no"}>
+      <div
+        data-testid="markdown"
+        data-has-template={hasTemplate ? "yes" : "no"}
+        data-can-run={canRun ? "yes" : "no"}
+        data-status-keys={statusKeys}
+      >
         <pre>{children}</pre>
         {hasTemplate && canRun ? (
           <button
@@ -180,6 +188,29 @@ describe("LaunchpadView", () => {
     expect(args.panels).toHaveLength(1);
     expect(args.panels[0].id).toBe("p2");
     expect(args.layout.map((l: LaunchpadLayoutItem) => l.i)).toEqual(["p2"]);
+  });
+
+  it("forwards nodeStatuses through nodeRefs into the markdown layer", () => {
+    const nodeRefs = {
+      nodes: { deploy: "Deploy", verify: "Verify" },
+      nodeStatuses: {
+        deploy: { status: "running", badgeColor: "bg-blue-500", label: "RUNNING" },
+        verify: { status: "none", badgeColor: "bg-gray-400", label: "no runs" },
+      },
+    };
+    render(
+      <LaunchpadView
+        panels={[makePanel("p1", "Deploy is @deploy:status")]}
+        layout={[makeLayout("p1")]}
+        isLoading={false}
+        readOnly={false}
+        nodeRefs={nodeRefs}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const markdown = screen.getByTestId("markdown");
+    expect(markdown.getAttribute("data-status-keys")).toBe("deploy,verify");
   });
 
   it("forwards triggerTemplates + onTriggerTemplateRun through nodeRefs into the markdown layer", () => {
