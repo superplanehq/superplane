@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { createComputeInstanceMapper } from "./create_compute_instance";
+import { createApplicationMapper } from "./create_application";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
 
 function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
     id: "node-1",
-    name: "Create Compute Instance",
-    componentName: "oci.createComputeInstance",
+    name: "Create Application",
+    componentName: "oci.createApplication",
     isCollapsed: false,
     configuration: {},
     metadata: {},
@@ -49,10 +49,10 @@ function buildComponentCtx(nodeOverrides?: Partial<NodeInfo>): ComponentBaseCont
     nodes: [node],
     node,
     componentDefinition: {
-      name: "oci.createComputeInstance",
-      label: "Create Compute Instance",
+      name: "oci.createApplication",
+      label: "Create Application",
       description: "",
-      icon: "server",
+      icon: "oci",
       color: "red",
     },
     lastExecutions: [],
@@ -63,52 +63,57 @@ function buildComponentCtx(nodeOverrides?: Partial<NodeInfo>): ComponentBaseCont
 
 // ── props / metadata list ──────────────────────────────────────────────
 
-describe("createComputeInstanceMapper.props", () => {
-  it("includes displayName, shape, and availabilityDomain in metadata", () => {
-    const props = createComputeInstanceMapper.props(
+describe("createApplicationMapper.props", () => {
+  it("includes displayName in metadata", () => {
+    const props = createApplicationMapper.props(buildComponentCtx({ configuration: { displayName: "my-app" } }));
+    expect(props.metadata).toEqual(expect.arrayContaining([expect.objectContaining({ icon: "tag", label: "my-app" })]));
+  });
+
+  it("shows subnetName from node metadata over raw subnet", () => {
+    const props = createApplicationMapper.props(
       buildComponentCtx({
-        configuration: {
-          displayName: "my-instance",
-          shape: "VM.Standard.E4.Flex",
-          availabilityDomain: "EXAMPLE:EU-FRANKFURT-1-AD-1",
-        },
+        configuration: { subnet: "ocid1.subnet.xxx" },
+        metadata: { subnetName: "my-subnet" },
       }),
     );
-
     expect(props.metadata).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ icon: "tag", label: "my-instance" }),
-        expect.objectContaining({ icon: "cpu", label: "VM.Standard.E4.Flex" }),
-        expect.objectContaining({ icon: "map-pin", label: "EXAMPLE:EU-FRANKFURT-1-AD-1" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ icon: "network", label: "my-subnet" })]),
     );
   });
 
-  it("produces empty metadata when configuration is empty", () => {
-    const props = createComputeInstanceMapper.props(buildComponentCtx({ configuration: {} }));
+  it("falls back to subnet when subnetName is absent", () => {
+    const props = createApplicationMapper.props(
+      buildComponentCtx({ configuration: { subnet: "ocid1.subnet.xxx" }, metadata: {} }),
+    );
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ icon: "network", label: "ocid1.subnet.xxx" })]),
+    );
+  });
+
+  it("shows shape from node metadata", () => {
+    const props = createApplicationMapper.props(buildComponentCtx({ metadata: { shape: "GENERIC_X86" } }));
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ icon: "cpu", label: "GENERIC_X86" })]),
+    );
+  });
+
+  it("produces empty metadata when configuration and metadata are empty", () => {
+    const props = createApplicationMapper.props(buildComponentCtx());
     expect(props.metadata).toEqual([]);
-  });
-
-  it("omits metadata items whose values are missing", () => {
-    const props = createComputeInstanceMapper.props(
-      buildComponentCtx({ configuration: { displayName: "my-instance" } }),
-    );
-    expect(props.metadata).toHaveLength(1);
-    expect(props.metadata![0]).toMatchObject({ label: "my-instance" });
   });
 });
 
 // ── getExecutionDetails ────────────────────────────────────────────────
 
-describe("createComputeInstanceMapper.getExecutionDetails", () => {
+describe("createApplicationMapper.getExecutionDetails", () => {
   it("does not throw when outputs is undefined", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => createComputeInstanceMapper.getExecutionDetails(ctx)).not.toThrow();
+    expect(() => createApplicationMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 
   it("does not throw when default output array is empty", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => createComputeInstanceMapper.getExecutionDetails(ctx)).not.toThrow();
+    expect(() => createApplicationMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 
   it("uses metadata.startedAt for Executed At when present", () => {
@@ -120,16 +125,14 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
         outputs: undefined,
       },
     });
-    const details = createComputeInstanceMapper.getExecutionDetails(ctx);
+    const details = createApplicationMapper.getExecutionDetails(ctx);
     expect(new Date(details["Executed At"]).getTime()).toBe(new Date(startedAt).getTime());
   });
 
   it("falls back to execution.createdAt for Executed At when metadata.startedAt is absent", () => {
     const createdAt = new Date("2026-01-01T09:00:00Z").toISOString();
-    const ctx = buildDetailsCtx({
-      execution: { createdAt, metadata: {}, outputs: undefined },
-    });
-    const details = createComputeInstanceMapper.getExecutionDetails(ctx);
+    const ctx = buildDetailsCtx({ execution: { createdAt, metadata: {}, outputs: undefined } });
+    const details = createApplicationMapper.getExecutionDetails(ctx);
     expect(new Date(details["Executed At"]).getTime()).toBe(new Date(createdAt).getTime());
   });
 
@@ -139,39 +142,33 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
         outputs: {
           default: [
             buildOutput({
-              displayName: "my-instance",
-              lifecycleState: "RUNNING",
-              shape: "VM.Standard.E4.Flex",
-              availabilityDomain: "EXAMPLE:EU-FRANKFURT-1-AD-1",
-              region: "eu-frankfurt-1",
-              publicIp: "1.2.3.4",
+              displayName: "my-app",
+              lifecycleState: "ACTIVE",
+              applicationId: "ocid1.fnapp.xxx",
             }),
           ],
         },
       },
     });
 
-    const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(details["Display Name"]).toBe("my-instance");
-    expect(details["State"]).toBe("RUNNING");
-    expect(details["Shape"]).toBe("VM.Standard.E4.Flex");
-    expect(details["Availability Domain"]).toBe("EXAMPLE:EU-FRANKFURT-1-AD-1");
-    expect(details["Region"]).toBe("eu-frankfurt-1");
-    expect(details["Public IP"]).toBe("1.2.3.4");
+    const details = createApplicationMapper.getExecutionDetails(ctx);
+    expect(details["Display Name"]).toBe("my-app");
+    expect(details["State"]).toBe("ACTIVE");
+    expect(details["Application ID"]).toBe("ocid1.fnapp.xxx");
   });
 
   it("omits optional fields that are absent from output", () => {
     const ctx = buildDetailsCtx({
       execution: {
         outputs: {
-          default: [buildOutput({ displayName: "my-instance" })],
+          default: [buildOutput({ displayName: "my-app" })],
         },
       },
     });
 
-    const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(details["Display Name"]).toBe("my-instance");
-    expect(details["Public IP"]).toBeUndefined();
-    expect(details["Region"]).toBeUndefined();
+    const details = createApplicationMapper.getExecutionDetails(ctx);
+    expect(details["Display Name"]).toBe("my-app");
+    expect(details["State"]).toBeUndefined();
+    expect(details["Application ID"]).toBeUndefined();
   });
 });
