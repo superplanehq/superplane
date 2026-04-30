@@ -356,7 +356,7 @@ const EDGE_STYLE = {
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
-const CANVAS_SNAP_GRID: [number, number] = [48, 48];
+const SNAP_GRID_STEP_PX = 24;
 
 type CanvasAnnotationUpdate = {
   text?: string;
@@ -2694,7 +2694,7 @@ function CanvasContent({
             selectionKeyCode={selectionKey}
             multiSelectionKeyCode={selectionKey}
             snapToGrid={isSnapToGridEnabled}
-            snapGrid={CANVAS_SNAP_GRID}
+            snapGrid={[SNAP_GRID_STEP_PX, SNAP_GRID_STEP_PX]}
             panOnScrollSpeed={0.8}
             nodesDraggable={!isReadOnly}
             nodesConnectable={isConnectionEditingEnabled}
