@@ -1,10 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlockData } from "./Block";
 
-const { captureException } = vi.hoisted(() => ({
+const { captureException, reactFlowPropsRef } = vi.hoisted(() => ({
   captureException: vi.fn(),
+  reactFlowPropsRef: { current: null as null | Record<string, (...args: unknown[]) => unknown> },
 }));
 
 vi.mock("@/sentry", () => ({
@@ -21,19 +23,38 @@ vi.mock("@/sentry", () => ({
 vi.mock("@xyflow/react", () => ({
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  ReactFlow: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  ReactFlow: (props: { children?: ReactNode }) => {
+    reactFlowPropsRef.current = props as unknown as Record<string, (...args: unknown[]) => unknown>;
+    return <div>{props.children}</div>;
+  },
   ReactFlowProvider: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ViewportPortal: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   useOnSelectionChange: vi.fn(),
   useReactFlow: vi.fn(() => ({
     fitView: vi.fn(),
-    screenToFlowPosition: vi.fn(),
+    screenToFlowPosition: vi.fn((position) => position),
+    zoomTo: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    getNodes: vi.fn(() => []),
     getZoom: vi.fn(() => 1),
   })),
+  useStore: vi.fn((selector: (state: { minZoom: number; maxZoom: number }) => unknown) =>
+    selector({ minZoom: 0.1, maxZoom: 1.5 }),
+  ),
   useViewport: vi.fn(() => ({ zoom: 1, x: 0, y: 0 })),
 }));
 
-import { CanvasNodeErrorBoundary } from "./index";
+vi.mock("../BuildingBlocksSidebar", () => ({
+  BuildingBlocksSidebar: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? <aside data-testid="building-blocks-sidebar" /> : null,
+}));
+
+vi.mock("./Header", () => ({
+  Header: () => <header data-testid="canvas-header" />,
+}));
+
+import { CanvasNodeErrorBoundary, CanvasPage } from "./index";
 
 function ThrowingNode(): ReactElement {
   throw new Error("render failed");
@@ -116,5 +137,57 @@ describe("CanvasNodeErrorBoundary", () => {
     expect(screen.getByText("unknown fallback")).toBeInTheDocument();
     expect(captureException).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
+  });
+});
+
+describe("CanvasPage connection drop", () => {
+  beforeEach(() => {
+    reactFlowPropsRef.current = null;
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  });
+
+  it("does not close the building blocks sidebar from the pane click that follows a connection drop", () => {
+    const onPlaceholderAdd = vi.fn(() => new Promise<string>(() => {}));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onMemoryOpen={vi.fn()}
+          onYamlOpen={vi.fn()}
+          onEdgeCreate={vi.fn()}
+          onPlaceholderAdd={onPlaceholderAdd}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
+
+    act(() => {
+      reactFlowPropsRef.current?.onConnectStart?.(new MouseEvent("mousedown"), {
+        nodeId: "source",
+        handleId: "default",
+        handleType: "source",
+      });
+      reactFlowPropsRef.current?.onConnectEnd?.(
+        new MouseEvent("mouseup", {
+          clientX: 100,
+          clientY: 100,
+        }),
+      );
+      reactFlowPropsRef.current?.onPaneClick?.();
+    });
+
+    expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
   });
 });

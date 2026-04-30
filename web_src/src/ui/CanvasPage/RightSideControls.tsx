@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Code2, Database, Plus, StickyNote } from "lucide-react";
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 
 export type RightSideControlsProps = {
   mode: "live" | "edit";
@@ -13,13 +13,13 @@ export type RightSideControlsProps = {
   memoryItemCount?: number;
 };
 
-export function RightSideControls(props: RightSideControlsProps) {
+export const RightSideControls = memo(function RightSideControls(props: RightSideControlsProps) {
   return (
     <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
       {props.mode === "live" ? <LiveCanvasButtons {...props} /> : <EditCanvasButtons {...props} />}
     </div>
   );
-}
+});
 
 function LiveCanvasButtons({ onMemoryOpen }: RightSideControlsProps) {
   return (

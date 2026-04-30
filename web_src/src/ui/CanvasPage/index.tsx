@@ -248,8 +248,10 @@ export interface CanvasPageProps {
   onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
-  onToggleView?: (nodeId: string) => void;
+  onToggleView?: (nodeId: string, collapsed: boolean) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
+  onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
+  onLogView?: () => void;
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
@@ -354,6 +356,7 @@ const EDGE_STYLE = {
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
+const CANVAS_SNAP_GRID: [number, number] = [48, 48];
 
 type CanvasAnnotationUpdate = {
   text?: string;
@@ -374,11 +377,11 @@ type CanvasNodeRendererCallbacks = {
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
-  onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
+  onRun: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
-  onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
+  onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
   runDisabled?: boolean;
@@ -388,9 +391,35 @@ type CanvasNodeRendererCallbacks = {
   canvasMode: "live" | "edit";
 };
 
-type CanvasBlockNodeData = CanvasBlockData & {
-  _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
-  nodeName?: string;
+type CanvasBlockNodeData = CanvasBlockData &
+  Record<string, unknown> & {
+    _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
+    nodeName?: string;
+  };
+
+type CanvasConnectionState = {
+  nodeId: string;
+  handleId: string | null;
+  handleType: "source" | "target" | null;
+};
+
+type EnrichedCanvasNodeCacheEntry = {
+  sourceNode: ReactFlowNode;
+  sourceData: ReactFlowNode["data"];
+  node: ReactFlowNode;
+  data: CanvasBlockNodeData;
+  hoveredEdge: CanvasEdge | null;
+  connectingFrom: CanvasConnectionState | null;
+  edges: CanvasEdge[];
+  isHighlighted: boolean;
+  hasHighlightedNodes: boolean;
+};
+
+type CollapsibleNodeData = {
+  type?: unknown;
+  component?: { collapsed?: boolean };
+  trigger?: { collapsed?: boolean };
+  composite?: { collapsed?: boolean };
 };
 
 declare global {
@@ -413,6 +442,20 @@ function createNodeRenderFallbackData(data: BlockData): BlockData {
       message: CANVAS_NODE_FALLBACK_MESSAGE,
     },
   };
+}
+
+function isCanvasNodeCollapsed(node: ReactFlowNode | undefined): boolean {
+  const data = node?.data as CollapsibleNodeData | undefined;
+  if (!data) {
+    return false;
+  }
+
+  const nodeType = data.type;
+  if (nodeType !== "component" && nodeType !== "trigger" && nodeType !== "composite") {
+    return false;
+  }
+
+  return Boolean(data[nodeType]?.collapsed);
 }
 
 function getNonEmptyString(value: unknown): string | undefined {
@@ -574,11 +617,24 @@ export class CanvasNodeErrorBoundary extends Component<CanvasNodeErrorBoundaryPr
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
  */
-const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
+type DefaultNodeRendererProps = {
   data: CanvasBlockNodeData;
   id: string;
   selected?: boolean;
-}) {
+};
+
+function areDefaultNodeRendererPropsEqual(
+  previousProps: DefaultNodeRendererProps,
+  nextProps: DefaultNodeRendererProps,
+): boolean {
+  return (
+    previousProps.id === nextProps.id &&
+    previousProps.selected === nextProps.selected &&
+    previousProps.data === nextProps.data
+  );
+}
+
+const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: DefaultNodeRendererProps) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
   const blockProps = buildDefaultNodeBlockProps({
@@ -593,7 +649,7 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
       <Block {...blockProps} data={blockData} />
     </CanvasNodeErrorBoundary>
   );
-});
+}, areDefaultNodeRendererPropsEqual);
 
 const nodeTypes = {
   default: DefaultNodeRenderer,
@@ -695,7 +751,18 @@ function CanvasPage(props: CanvasPageProps) {
         props.onEdit(nodeId);
       }
     },
-    [props, state.componentSidebar, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, setCurrentTab],
+    [
+      props.workflowNodes,
+      props.getNodeEditData,
+      props.onEdit,
+      state.componentSidebar.isOpen,
+      state.componentSidebar.selectedNodeId,
+      state.componentSidebar.open,
+      state.componentSidebar.close,
+      setTemplateNodeId,
+      setIsBuildingBlocksSidebarOpen,
+      setCurrentTab,
+    ],
   );
 
   // Get editing data for the currently selected node
@@ -713,7 +780,7 @@ function CanvasPage(props: CanvasPageProps) {
         props.onNodeDelete(nodeId);
       }
     },
-    [props],
+    [props.onNodeDelete],
   );
 
   const handleNodeRun = useCallback(
@@ -988,7 +1055,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
-      if (!editingNodeData || !props.onNodeConfigurationSave) {
+      if (!editingNodeData?.nodeId || !props.onNodeConfigurationSave) {
         return;
       }
       const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
@@ -997,15 +1064,20 @@ function CanvasPage(props: CanvasPageProps) {
       }
       return result;
     },
-    [editingNodeData, props, state.componentSidebar],
+    [editingNodeData?.nodeId, props.onNodeConfigurationSave, props.configurationSaveMode, state.componentSidebar.close],
   );
 
+  const canvasNodesForToggle = state.nodes;
+  const toggleNodeCollapse = state.toggleNodeCollapse;
+  const onToggleView = props.onToggleView;
   const handleToggleView = useCallback(
     (nodeId: string) => {
-      state.toggleNodeCollapse(nodeId);
-      props.onToggleView?.(nodeId);
+      const node = canvasNodesForToggle.find((candidate) => candidate.id === nodeId);
+      const collapsed = !isCanvasNodeCollapsed(node);
+      toggleNodeCollapse(nodeId);
+      onToggleView?.(nodeId, collapsed);
     },
-    [state.toggleNodeCollapse, props.onToggleView],
+    [canvasNodesForToggle, toggleNodeCollapse, onToggleView],
   );
 
   const handleCancelQueueItem = (queueId: string) => {
@@ -1107,7 +1179,7 @@ function CanvasPage(props: CanvasPageProps) {
 
         <RightSideControls
           mode={readOnly ? "live" : "edit"}
-          onSidebarOpen={() => handleSidebarToggle(true)}
+          onSidebarOpen={handleBuildingBlocksShortcutOpen}
           onAddNote={handleAddNote}
           onMemoryOpen={props.onMemoryOpen}
           onYamlOpen={props.onYamlOpen}
@@ -1223,6 +1295,7 @@ function CanvasPage(props: CanvasPageProps) {
               missingIntegrations={props.missingIntegrations}
               onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
+              onLogView={props.onLogView}
             />
           </ReactFlowProvider>
 
@@ -1243,6 +1316,7 @@ function CanvasPage(props: CanvasPageProps) {
             getHasMoreQueue={props.getHasMoreQueue}
             getLoadingMoreQueue={props.getLoadingMoreQueue}
             onReEmit={props.onReEmit}
+            onRunItemOpen={props.onRunItemOpen}
             loadExecutionChain={props.loadExecutionChain}
             getExecutionState={props.getExecutionState}
             onSidebarClose={handleSidebarClose}
@@ -1299,6 +1373,7 @@ function Sidebar({
   onCancelQueueItem,
   onCancelExecution,
   onReEmit,
+  onRunItemOpen,
   getAllHistoryEvents,
   onLoadMoreHistory,
   getHasMoreHistory,
@@ -1338,6 +1413,7 @@ function Sidebar({
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
+  onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -1508,6 +1584,15 @@ function Sidebar({
       getHasMoreQueue={() => getHasMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       onReEmit={onReEmit}
+      onEventClick={(event) => {
+        if (event.kind === "trigger" || event.kind === "execution") {
+          onRunItemOpen?.(
+            state.componentSidebar.selectedNodeId ?? undefined,
+            event.state ?? "unknown",
+            event.originalExecution?.resultMessage,
+          );
+        }
+      }}
       loadExecutionChain={loadExecutionChain}
       getExecutionState={getExecutionState}
       showSettingsTab={true}
@@ -1750,6 +1835,7 @@ function CanvasContent({
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
+  onLogView,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1812,6 +1898,7 @@ function CanvasContent({
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
+  onLogView?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
@@ -2112,6 +2199,8 @@ function CanvasContent({
     (isAutoLayoutOnUpdateEnabled
       ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
       : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
+  const suppressNextPaneClickRef = useRef(false);
+  const suppressNextPaneClickTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!focusRequest) {
@@ -2132,7 +2221,37 @@ function CanvasContent({
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
   }, [focusRequest, fitView]);
 
+  useEffect(() => {
+    return () => {
+      if (suppressNextPaneClickTimeoutRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(suppressNextPaneClickTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const suppressNextPaneClick = useCallback(() => {
+    suppressNextPaneClickRef.current = true;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (suppressNextPaneClickTimeoutRef.current !== null) {
+      window.clearTimeout(suppressNextPaneClickTimeoutRef.current);
+    }
+
+    suppressNextPaneClickTimeoutRef.current = window.setTimeout(() => {
+      suppressNextPaneClickRef.current = false;
+      suppressNextPaneClickTimeoutRef.current = null;
+    }, 250);
+  }, []);
+
   const handlePaneClick = useCallback(() => {
+    if (suppressNextPaneClickRef.current) {
+      suppressNextPaneClickRef.current = false;
+      return;
+    }
+
     previouslySelectedRef.current = new Set();
 
     // Clear ReactFlow's selection state and close both sidebars
@@ -2235,19 +2354,22 @@ function CanvasContent({
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const [connectingFrom, setConnectingFrom] = useState<{
-    nodeId: string;
-    handleId: string | null;
-    handleType: "source" | "target" | null;
-  } | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<CanvasConnectionState | null>(null);
 
   // Track connection completion for empty space drop detection
   const connectionCompletedRef = useRef(false);
-  const connectingFromRef = useRef<{
-    nodeId: string;
-    handleId: string | null;
-    handleType: "source" | "target" | null;
-  } | null>(null);
+  const connectingFromRef = useRef<CanvasConnectionState | null>(null);
+  const blockConnectingFrom = useMemo(
+    () =>
+      connectingFrom
+        ? {
+            nodeId: connectingFrom.nodeId,
+            handleId: connectingFrom.handleId,
+            handleType: connectingFrom.handleType ?? undefined,
+          }
+        : undefined,
+    [connectingFrom],
+  );
 
   const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: CanvasEdge) => {
     setHoveredEdgeId(edge.id);
@@ -2288,6 +2410,7 @@ function CanvasContent({
           });
 
           if (onConnectionDropInEmptySpace) {
+            suppressNextPaneClick();
             onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
           }
         }
@@ -2297,30 +2420,77 @@ function CanvasContent({
       connectingFromRef.current = null;
       connectionCompletedRef.current = false;
     },
-    [screenToFlowPosition, onConnectionDropInEmptySpace, isReadOnly],
+    [screenToFlowPosition, onConnectionDropInEmptySpace, suppressNextPaneClick, isReadOnly],
   );
 
   // Find the hovered edge to get its source and target
   const hoveredEdge = useMemo(() => {
     if (!hoveredEdgeId) return null;
-    return state.edges?.find((e) => e.id === hoveredEdgeId);
+    return (state.edges?.find((e) => e.id === hoveredEdgeId) as CanvasEdge | undefined) ?? null;
   }, [hoveredEdgeId, state.edges]);
 
+  const enrichedNodeCacheRef = useRef<Map<string, EnrichedCanvasNodeCacheEntry>>(new Map());
   const nodesWithCallbacks = useMemo(() => {
     const hasHighlightedNodes = highlightedNodeIds.size > 0;
-    return state.nodes.map((node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        _callbacksRef: callbacksRef,
-        _hoveredEdge: hoveredEdge,
-        _connectingFrom: connectingFrom,
-        _allEdges: state.edges,
-        _isHighlighted: highlightedNodeIds.has(node.id),
-        _hasHighlightedNodes: hasHighlightedNodes,
-      },
-    }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
+    const visibleNodeIds = new Set<string>();
+    const enrichedNodes = state.nodes.map((node) => {
+      visibleNodeIds.add(node.id);
+
+      const isHighlighted = highlightedNodeIds.has(node.id);
+      const cachedNode = enrichedNodeCacheRef.current.get(node.id);
+      const canReuseData =
+        cachedNode &&
+        cachedNode.sourceData === node.data &&
+        cachedNode.hoveredEdge === hoveredEdge &&
+        cachedNode.connectingFrom === connectingFrom &&
+        cachedNode.edges === state.edges &&
+        cachedNode.isHighlighted === isHighlighted &&
+        cachedNode.hasHighlightedNodes === hasHighlightedNodes;
+
+      if (canReuseData && cachedNode.sourceNode === node) {
+        return cachedNode.node;
+      }
+
+      const sourceData = node.data as CanvasBlockNodeData;
+      const data = canReuseData
+        ? cachedNode.data
+        : {
+            ...sourceData,
+            _callbacksRef: callbacksRef,
+            _hoveredEdge: hoveredEdge ?? undefined,
+            _connectingFrom: blockConnectingFrom,
+            _allEdges: state.edges,
+            _isHighlighted: isHighlighted,
+            _hasHighlightedNodes: hasHighlightedNodes,
+          };
+      const enrichedNode: ReactFlowNode = {
+        ...node,
+        data: data as ReactFlowNode["data"],
+      };
+
+      enrichedNodeCacheRef.current.set(node.id, {
+        sourceNode: node,
+        sourceData: node.data,
+        node: enrichedNode,
+        data,
+        hoveredEdge,
+        connectingFrom,
+        edges: state.edges,
+        isHighlighted,
+        hasHighlightedNodes,
+      });
+
+      return enrichedNode;
+    });
+
+    for (const nodeId of enrichedNodeCacheRef.current.keys()) {
+      if (!visibleNodeIds.has(nodeId)) {
+        enrichedNodeCacheRef.current.delete(nodeId);
+      }
+    }
+
+    return enrichedNodes;
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -2351,6 +2521,7 @@ function CanvasContent({
   );
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
+  const { onNodesChange, onEdgesChange } = state;
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -2366,31 +2537,31 @@ function CanvasContent({
       }
 
       if (!isReadOnly) {
-        state.onNodesChange(changes);
+        onNodesChange(changes);
         return;
       }
 
       const filteredChanges = changes.filter((change) => change.type === "select" || change.type === "dimensions");
       if (filteredChanges.length > 0) {
-        state.onNodesChange(filteredChanges);
+        onNodesChange(filteredChanges);
       }
     },
-    [isReadOnly, state.onNodesChange],
+    [isReadOnly, onNodesChange],
   );
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       if (!isReadOnly) {
-        state.onEdgesChange(changes);
+        onEdgesChange(changes);
         return;
       }
 
       const filteredChanges = changes.filter((change) => change.type === "select");
       if (filteredChanges.length > 0) {
-        state.onEdgesChange(filteredChanges);
+        onEdgesChange(filteredChanges);
       }
     },
-    [isReadOnly, state.onEdgesChange],
+    [isReadOnly, onEdgesChange],
   );
 
   const logCounts = useMemo(() => {
@@ -2424,9 +2595,88 @@ function CanvasContent({
     );
   }, [logEntries, logSearch]);
 
-  const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
-    setConsoleTab(tab);
-    setIsLogSidebarOpen(true);
+  const handleLogButtonClick = useCallback(
+    (tab: ConsoleTab) => {
+      setConsoleTab(tab);
+      setIsLogSidebarOpen(true);
+      if (tab === "runs") {
+        onLogView?.();
+      }
+    },
+    [onLogView],
+  );
+  const handleSnapToGridToggle = useCallback(() => setIsSnapToGridEnabled((prev) => !prev), []);
+  const handleNodeSearch = useCallback((searchString: string) => {
+    const query = searchString.toLowerCase();
+    return stateRef.current.nodes.filter((node) => {
+      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
+      const label = (nodeData?.label || "").toLowerCase();
+      const nodeName = (nodeData?.nodeName || "").toLowerCase();
+      const id = (node.id || "").toLowerCase();
+      return label.includes(query) || nodeName.includes(query) || id.includes(query);
+    });
+  }, []);
+  const handleNodeSearchSelect = useCallback((node: ReactFlowNode) => {
+    const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
+    const isAnnotationNode = nodeData?.type === "annotation";
+    if (isAnnotationNode) {
+      return;
+    }
+    stateRef.current.componentSidebar.open(node.id);
+  }, []);
+  const autoLayoutToggleControl = useMemo(() => {
+    if (!isEditMode) {
+      return null;
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
+              onClick={handleToggleAutoLayoutOnUpdate}
+              disabled={isAutoLayoutToggleDisabled}
+              aria-pressed={isAutoLayoutOnUpdateEnabled}
+            >
+              {isAutoLayoutOnUpdateEnabled ? (
+                <LayoutGrid className="h-3 w-3" />
+              ) : (
+                <LayoutDashboard className="h-3 w-3" />
+              )}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+      </Tooltip>
+    );
+  }, [
+    autoLayoutTooltipMessage,
+    handleToggleAutoLayoutOnUpdate,
+    isAutoLayoutOnUpdateEnabled,
+    isAutoLayoutToggleDisabled,
+    isEditMode,
+  ]);
+  const zoomSliderContent = useMemo(
+    () => (
+      <>
+        {autoLayoutToggleControl}
+        <NodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
+      </>
+    ),
+    [autoLayoutToggleControl, handleNodeSearch, handleNodeSearchSelect],
+  );
+  const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
+  const handleSelectionStart = useCallback(() => {
+    setIsSelecting(true);
+    const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
+    previouslySelectedRef.current = new Set(selected);
+  }, []);
+  const handleSelectionEnd = useCallback(() => {
+    setIsSelecting(false);
+    previouslySelectedRef.current = new Set();
   }, []);
 
   return (
@@ -2449,11 +2699,12 @@ function CanvasContent({
             selectionKeyCode={selectionKey}
             multiSelectionKeyCode={selectionKey}
             snapToGrid={isSnapToGridEnabled}
-            snapGrid={[48, 48]}
+            snapGrid={CANVAS_SNAP_GRID}
             panOnScrollSpeed={0.8}
             nodesDraggable={!isReadOnly}
             nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
+            onlyRenderVisibleElements={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
@@ -2465,20 +2716,13 @@ function CanvasContent({
             onInit={handleInit}
             deleteKeyCode={null}
             onPaneClick={handlePaneClick}
-            onSelectionStart={() => {
-              setIsSelecting(true);
-              const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
-              previouslySelectedRef.current = new Set(selected);
-            }}
-            onSelectionEnd={() => {
-              setIsSelecting(false);
-              previouslySelectedRef.current = new Set();
-            }}
+            onSelectionStart={handleSelectionStart}
+            onSelectionEnd={handleSelectionEnd}
             onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
             onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
             defaultViewport={viewport}
             fitView={false}
-            style={{ opacity: isInitialized ? 1 : 0 }}
+            style={reactFlowStyle}
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
@@ -2501,51 +2745,9 @@ function CanvasContent({
                   orientation="horizontal"
                   className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
-                  onSnapToGridToggle={isEditMode ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined}
+                  onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                 >
-                  {isEditMode ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
-                            onClick={handleToggleAutoLayoutOnUpdate}
-                            disabled={isAutoLayoutToggleDisabled}
-                            aria-pressed={isAutoLayoutOnUpdateEnabled}
-                          >
-                            {isAutoLayoutOnUpdateEnabled ? (
-                              <LayoutGrid className="h-3 w-3" />
-                            ) : (
-                              <LayoutDashboard className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                  <NodeSearch
-                    onSearch={(searchString) => {
-                      const query = searchString.toLowerCase();
-                      return state.nodes.filter((node) => {
-                        const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-                        const label = (nodeData?.label || "").toLowerCase();
-                        const nodeName = (nodeData?.nodeName || "").toLowerCase();
-                        const id = (node.id || "").toLowerCase();
-                        return label.includes(query) || nodeName.includes(query) || id.includes(query);
-                      });
-                    }}
-                    onSelectNode={(node) => {
-                      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-                      const isAnnotationNode = nodeData?.type === "annotation";
-                      if (isAnnotationNode) {
-                        return;
-                      }
-                      state.componentSidebar.open(node.id);
-                    }}
-                  />
+                  {zoomSliderContent}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">

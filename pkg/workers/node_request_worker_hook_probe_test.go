@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"net/http"
 	"sync"
 	"testing"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -18,11 +16,30 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
 func init() {
-	registry.RegisterAction(testHookProbeComponentName, &testHookProbeAction{})
+	registry.RegisterAction(testHookProbeComponentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name: testHookProbeComponentName,
+		Hooks: []core.Hook{
+			{Name: "probeHook", Type: core.HookTypeInternal},
+		},
+		ProcessQueueFunc: func(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+			return ctx.DefaultProcessing()
+		},
+		ExecuteFunc: func(ctx core.ExecutionContext) error {
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "hook_probe.done", []any{map[string]any{}})
+		},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			testHookProbeConfigMu.Lock()
+			testHookProbeLastCfg = ctx.Configuration
+			testHookProbeConfigMu.Unlock()
+
+			return nil
+		},
+	}))
 }
 
 const testHookProbeComponentName = "hook_probe_cfg_action"
@@ -42,80 +59,6 @@ func testHookProbeLastConfiguration() any {
 	testHookProbeConfigMu.Lock()
 	defer testHookProbeConfigMu.Unlock()
 	return testHookProbeLastCfg
-}
-
-type testHookProbeAction struct{}
-
-func (a *testHookProbeAction) Name() string {
-	return testHookProbeComponentName
-}
-
-func (a *testHookProbeAction) Label() string {
-	return "Hook probe (tests)"
-}
-
-func (a *testHookProbeAction) Description() string {
-	return ""
-}
-
-func (a *testHookProbeAction) Documentation() string {
-	return ""
-}
-
-func (a *testHookProbeAction) Icon() string {
-	return "circle"
-}
-
-func (a *testHookProbeAction) Color() string {
-	return "gray"
-}
-
-func (a *testHookProbeAction) ExampleOutput() map[string]any {
-	return map[string]any{}
-}
-
-func (a *testHookProbeAction) Configuration() []configuration.Field {
-	return []configuration.Field{{Name: "url", Type: configuration.FieldTypeString}}
-}
-
-func (a *testHookProbeAction) OutputChannels(any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
-}
-
-func (a *testHookProbeAction) Setup(core.SetupContext) error {
-	return nil
-}
-
-func (a *testHookProbeAction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
-func (a *testHookProbeAction) Execute(ctx core.ExecutionContext) error {
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "hook_probe.done", []any{map[string]any{}})
-}
-
-func (a *testHookProbeAction) Hooks() []core.Hook {
-	return []core.Hook{{Name: "probeHook", Type: core.HookTypeInternal}}
-}
-
-func (a *testHookProbeAction) HandleHook(ctx core.ActionHookContext) error {
-	testHookProbeConfigMu.Lock()
-	testHookProbeLastCfg = ctx.Configuration
-	testHookProbeConfigMu.Unlock()
-
-	return nil
-}
-
-func (a *testHookProbeAction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return http.StatusOK, nil, nil
-}
-
-func (a *testHookProbeAction) Cancel(core.ExecutionContext) error {
-	return nil
-}
-
-func (a *testHookProbeAction) Cleanup(core.SetupContext) error {
-	return nil
 }
 
 /*
