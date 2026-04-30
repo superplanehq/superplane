@@ -354,7 +354,6 @@ const EDGE_STYLE = {
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
-/** Pixel step when snap-to-grid is enabled (React Flow `snapGrid`). */
 const SNAP_GRID_STEP_PX = 24;
 
 type CanvasAnnotationUpdate = {
@@ -2478,7 +2477,7 @@ function CanvasContent({
             style={{ opacity: isInitialized ? 1 : 0 }}
             className="h-full w-full"
           >
-            <Background gap={SNAP_GRID_STEP_PX} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
             <Panel
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
