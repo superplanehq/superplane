@@ -2,13 +2,11 @@ package oci
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -80,18 +78,6 @@ func displayNameField(required bool) configuration.Field {
 		Description: "Human-readable image name",
 		Placeholder: "app-golden-image",
 	}
-}
-
-func trimImageNodeMetadata(config any, metadata core.MetadataWriter) error {
-	var node imageNodeMetadata
-	if err := mapstructure.WeakDecode(config, &node); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	node.ImageID = strings.TrimSpace(node.ImageID)
-	node.CompartmentID = strings.TrimSpace(node.CompartmentID)
-	node.DisplayName = strings.TrimSpace(node.DisplayName)
-	return metadata.Set(node)
 }
 
 func emitImage(state core.ExecutionStateContext, image *Image) error {

@@ -103,6 +103,23 @@ func Test__DeleteInstance__PollTreats404AsTerminated(t *testing.T) {
 	assert.Equal(t, DeleteInstancePayloadType, executionState.Type)
 }
 
+func Test__DeleteInstance__PollErrorsWhenMetadataMissingInstanceID(t *testing.T) {
+	component := &DeleteInstance{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name:           "poll",
+		HTTP:           &contexts.HTTPContext{},
+		Integration:    ociIntegrationContext(),
+		Metadata:       &contexts.MetadataContext{Metadata: DeleteInstanceMetadata{}},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Logger:         ociLogger(),
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "poll metadata is missing instanceId")
+}
+
 func Test__DeleteInstance__PollHandlesTransientErrors(t *testing.T) {
 	component := &DeleteInstance{}
 	httpCtx := &contexts.HTTPContext{
