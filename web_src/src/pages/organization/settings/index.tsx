@@ -267,7 +267,7 @@ export function OrganizationSettings() {
       description: "Create and manage service accounts for programmatic API access.",
     },
     profile: {
-      title: "Profile",
+      title: "Profile (Personal)",
       description: "Update your personal account information and preferences.",
     },
   };
@@ -434,6 +434,12 @@ export function OrganizationSettings() {
       <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900">
         <div className="px-8 pb-8 w-full max-w-3xl mx-auto">
           <div className="pt-10 pb-8">
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+              <div>
+                <p className="font-medium text-blue-900">You are viewing settings for {organizationName}</p>
+                <p className="text-blue-700">These settings and tokens are scoped to this organization only.</p>
+              </div>
+            </div>
             <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>
             <p className="text-sm mt-2 text-gray-800 dark:text-gray-300">{activeMeta.description}</p>
           </div>
