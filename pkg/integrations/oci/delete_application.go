@@ -179,6 +179,18 @@ func (d *DeleteApplication) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get application: %w", err)
 	}
 
+	// OCI rejects application deletion when functions still exist (409 Conflict).
+	// Enumerate and delete all child functions first.
+	functions, err := client.ListFunctions(spec.ApplicationID)
+	if err != nil {
+		return fmt.Errorf("failed to list functions in application: %w", err)
+	}
+	for _, fn := range functions {
+		if err := client.DeleteFunction(fn.ID); err != nil {
+			return fmt.Errorf("failed to delete function %q: %w", fn.ID, err)
+		}
+	}
+
 	if err := client.DeleteApplication(spec.ApplicationID); err != nil {
 		return fmt.Errorf("failed to delete application: %w", err)
 	}
