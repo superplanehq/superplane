@@ -55,8 +55,7 @@ function getExecutedAt(context: ExecutionDetailsContext): string | undefined {
 function getOutputData(context: ExecutionDetailsContext): CreateComputeInstanceOutputData | undefined {
   const outputs = context.execution.outputs as { default?: CreateComputeInstanceOutputPayload[] } | undefined;
   const payload = outputs?.default?.[0];
-  if (!payload) return undefined;
-  return (payload.data ?? payload) as CreateComputeInstanceOutputData;
+  return payload?.data;
 }
 
 export const createComputeInstanceMapper: ComponentBaseMapper = {
