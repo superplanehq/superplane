@@ -47,6 +47,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
 		steps.assertServiceAccountVisibleInList("list-test-bot")
+		steps.assertCreatorLinkShowsE2EUser()
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
@@ -55,6 +56,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertCreatorLinkShowsE2EUser()
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
@@ -211,6 +213,16 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 
 func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 	s.session.AssertText(name)
+}
+
+func (s *serviceAccountSteps) assertCreatorLinkShowsE2EUser() {
+	page := s.session.Page()
+	link := page.GetByTestId("sa-created-by-link")
+	err := link.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+	text, err := link.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, "E2E User", text)
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {

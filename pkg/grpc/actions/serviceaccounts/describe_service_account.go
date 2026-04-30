@@ -34,7 +34,12 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 		return nil, status.Error(codes.NotFound, "service account not found")
 	}
 
+	sa := serializeServiceAccount(user)
+	if err := attachCreatorUserRef(sa, orgID); err != nil {
+		return nil, status.Error(codes.Internal, "failed to describe service account")
+	}
+
 	return &pb.DescribeServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: sa,
 	}, nil
 }
