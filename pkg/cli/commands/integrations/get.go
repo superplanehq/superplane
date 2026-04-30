@@ -32,12 +32,11 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		metadata := integration.GetMetadata()
-		spec := integration.GetSpec()
 		status := integration.GetStatus()
 
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", metadata.GetName())
-		_, _ = fmt.Fprintf(stdout, "Integration: %s\n", spec.GetIntegrationName())
+		_, _ = fmt.Fprintf(stdout, "Integration: %s\n", metadata.GetIntegrationName())
 		_, err := fmt.Fprintf(stdout, "State: %s\n", status.GetState())
 		return err
 	})
