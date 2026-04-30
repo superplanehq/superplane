@@ -197,7 +197,9 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
                   />
                   <span className="flex flex-col text-sm text-gray-800 dark:text-gray-200">
                     <span className="font-medium">{title}</span>
-                    {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
+                    {subtitle && (
+                      <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>
+                    )}
                   </span>
                 </label>
               );
