@@ -48,7 +48,7 @@ func (h *SemaphoreWebhookHandler) Merge(current, requested any) (any, bool, erro
 }
 
 func (h *SemaphoreWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration, ctx.IntegrationParameters, ctx.IntegrationSecrets)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (h *SemaphoreWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration, ctx.IntegrationParameters, ctx.IntegrationSecrets)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}

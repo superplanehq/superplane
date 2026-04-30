@@ -230,9 +230,9 @@ func (s *OrganizationService) UpdateIntegrationCapabilities(ctx context.Context,
 	return organizations.UpdateIntegrationCapabilities(ctx, s.registry, orgID, req.IntegrationId, req.Capabilities)
 }
 
-func (s *OrganizationService) UpdateIntegrationParameter(ctx context.Context, req *pb.UpdateIntegrationParameterRequest) (*pb.UpdateIntegrationParameterResponse, error) {
+func (s *OrganizationService) UpdateIntegrationProperty(ctx context.Context, req *pb.UpdateIntegrationPropertyRequest) (*pb.UpdateIntegrationPropertyResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateIntegrationParameter(ctx, s.registry, orgID, req.IntegrationId, req.ParameterName, req.Value)
+	return organizations.UpdateIntegrationProperty(ctx, s.registry, orgID, req.IntegrationId, req.PropertyName, req.Value)
 }
 
 func (s *OrganizationService) UpdateIntegrationSecret(ctx context.Context, req *pb.UpdateIntegrationSecretRequest) (*pb.UpdateIntegrationSecretResponse, error) {

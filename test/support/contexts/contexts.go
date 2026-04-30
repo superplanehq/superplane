@@ -218,6 +218,14 @@ func (c *IntegrationContext) LegacySetup() bool {
 	return false
 }
 
+func (c *IntegrationContext) PropertyStorage() core.IntegrationPropertyStorageReader {
+	return nil
+}
+
+func (c *IntegrationContext) SecretStorage() core.IntegrationSecretStorageReader {
+	return nil
+}
+
 type SubscriptionContext struct {
 	config   any
 	messages []any

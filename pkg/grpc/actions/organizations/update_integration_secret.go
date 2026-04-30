@@ -63,7 +63,7 @@ func UpdateIntegrationSecret(
 			Logger:       logrus.WithField("integration_id", integration.ID),
 			HTTP:         registry.HTTPContext(),
 			Secrets:      secretStorage,
-			Parameters:   contexts.NewIntegrationParameterStorage(integration),
+			Properties:   contexts.NewIntegrationPropertyStorage(integration),
 			Capabilities: contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities),
 		})
 

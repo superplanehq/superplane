@@ -312,14 +312,14 @@ service Organizations {
     };
   }
 
-  rpc UpdateIntegrationParameter(UpdateIntegrationParameterRequest) returns (UpdateIntegrationParameterResponse) {
+  rpc UpdateIntegrationProperty(UpdateIntegrationPropertyRequest) returns (UpdateIntegrationPropertyResponse) {
     option (google.api.http) = {
-      put: "/api/v1/organizations/{id}/integrations/{integration_id}/parameters"
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/properties"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update integration parameter";
-      description: "Update integration parameter";
+      summary: "Update integration property";
+      description: "Update integration property";
       tags: "Organization";
     };
   }
@@ -628,14 +628,14 @@ message UpdateIntegrationCapabilitiesResponse {
   Integration integration = 1;
 }
 
-message UpdateIntegrationParameterRequest {
+message UpdateIntegrationPropertyRequest {
   string id = 1;
   string integration_id = 2;
-  string parameter_name = 3;
+  string property_name = 3;
   string value = 4;
 }
 
-message UpdateIntegrationParameterResponse {
+message UpdateIntegrationPropertyResponse {
   Integration integration = 1;
 }
 
@@ -652,11 +652,7 @@ message UpdateIntegrationSecretResponse {
 
 message Integration {
 
-  //
-  // Parameters are how integration implementations expose things to the user
-  // after an integration has been setup. They can be editable or not.
-  //
-  message Parameter {
+  message Property {
     string name = 1;
     string label = 2;
     string description = 3;
@@ -665,10 +661,6 @@ message Integration {
     bool editable = 6;
   }
 
-  //
-  // Secrets are how integration store sensitive values.
-  // If they are included here, then they should be visible to the user.
-  //
   message Secret {
     string name = 1;
     string label = 2;
@@ -701,7 +693,7 @@ message Integration {
     bool legacy_setup = 6;
     repeated CapabilityState capabilities = 7;
     SetupState setup_state = 8;
-    repeated Parameter parameters = 9;
+    repeated Property properties = 9;
     repeated Secret secrets = 10;
   }
 

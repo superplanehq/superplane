@@ -27,13 +27,7 @@ type NodeMetadata struct {
 	Repository *Repository `json:"repository"`
 }
 
-func ensureRepoInMetadata(
-	metadata core.MetadataWriter,
-	integration core.IntegrationContext,
-	parameters core.IntegrationParameterStorageReader,
-	secrets core.IntegrationSecretStorageReader,
-	configuration any,
-) error {
+func ensureRepoInMetadata(metadata core.MetadataWriter, integration core.IntegrationContext, configuration any) error {
 	if integration.LegacySetup() {
 		return legacyEnsureRepoInMetadata(metadata, integration, configuration)
 	}
@@ -47,33 +41,34 @@ func ensureRepoInMetadata(
 		return nil
 	}
 
-	client, err := NewClientFromStorageContexts(parameters, secrets)
+	properties := integration.PropertyStorage()
+	client, err := NewClientFromStorageContexts(properties, integration.SecretStorage())
 	if err != nil {
 		return fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
-	authMethod, err := parameters.GetString(ParameterAuthMethod)
+	authMethod, err := properties.GetString(ParameterAuthMethod)
 	if err != nil {
 		return fmt.Errorf("failed to get authentication method: %w", err)
 	}
 
 	switch authMethod {
 	case AuthMethodPAT:
-		return ensureOwnerRepoInMetadata(parameters, metadata, client, repository)
+		return ensureOwnerRepoInMetadata(properties, metadata, client, repository)
 	case AuthMethodGitHubApp:
-		return ensureAppRepoInMetadata(parameters, metadata, client, repository)
+		return ensureAppRepoInMetadata(properties, metadata, client, repository)
 	}
 
 	return fmt.Errorf("invalid authentication method: %s", authMethod)
 }
 
 func ensureOwnerRepoInMetadata(
-	parameters core.IntegrationParameterStorageReader,
+	properties core.IntegrationPropertyStorageReader,
 	metadata core.MetadataWriter,
 	client *github.Client,
 	repository string,
 ) error {
-	owner, err := parameters.GetString(ParameterOwner)
+	owner, err := properties.GetString(ParameterOwner)
 	if err != nil {
 		return fmt.Errorf("failed to get owner: %w", err)
 	}
@@ -93,7 +88,7 @@ func ensureOwnerRepoInMetadata(
 }
 
 func ensureAppRepoInMetadata(
-	parameters core.IntegrationParameterStorageReader,
+	properties core.IntegrationPropertyStorageReader,
 	metadata core.MetadataWriter,
 	client *github.Client,
 	repository string,

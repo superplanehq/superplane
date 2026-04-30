@@ -95,8 +95,6 @@ func (i *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
-		ctx.IntegrationParameters,
-		ctx.IntegrationSecrets,
 		ctx.Configuration,
 	)
 

@@ -9,31 +9,30 @@ import (
 type IntegrationSetupProvider interface {
 
 	//
-	// The list of available capability groups the integration provides.
+	// All the capability groups supported by the integration.
 	//
 	CapabilityGroups() []CapabilityGroup
 
 	//
-	// First step of the setup flow.
+	// Generate the first step of the setup flow.
 	//
 	FirstStep(ctx SetupStepContext) SetupStep
 
 	//
-	// Called when the user submits the current step.
+	// Called when the user submits the current pending step.
 	//
 	OnStepSubmit(ctx SetupStepContext) (*SetupStep, error)
 
 	//
-	// Called when the user reverts the current step.
-	// It should revert the changes made by the step.
+	// Called when the user reverts the last successfully submitted step.
 	//
 	OnStepRevert(ctx SetupStepContext) error
 
 	//
-	// Called when the user updates a parameter.
-	// A parameter update might trigger a new setup flow.
+	// Called when the user updates a property.
+	// A property update might trigger a new setup flow.
 	//
-	OnParameterUpdate(ctx ParameterUpdateContext) (*SetupStep, error)
+	OnPropertyUpdate(ctx PropertyUpdateContext) (*SetupStep, error)
 
 	//
 	// Called when the user updates a secret.
@@ -65,14 +64,14 @@ type SetupStep struct {
 	RedirectPrompt *RedirectPrompt
 }
 
-type ParameterUpdateContext struct {
-	ParameterName string
-	Value         string
-	Logger        *log.Entry
-	HTTP          HTTPContext
-	Secrets       IntegrationSecretStorage
-	Parameters    IntegrationParameterStorage
-	Capabilities  CapabilityContext
+type PropertyUpdateContext struct {
+	PropertyName string
+	Value        string
+	Logger       *log.Entry
+	HTTP         HTTPContext
+	Secrets      IntegrationSecretStorage
+	Properties   IntegrationPropertyStorage
+	Capabilities CapabilityContext
 }
 
 type SecretUpdateContext struct {
@@ -81,7 +80,7 @@ type SecretUpdateContext struct {
 	Logger       *log.Entry
 	HTTP         HTTPContext
 	Secrets      IntegrationSecretStorage
-	Parameters   IntegrationParameterStorage
+	Properties   IntegrationPropertyStorage
 	Capabilities CapabilityContext
 }
 
@@ -90,7 +89,7 @@ type CapabilityUpdateContext struct {
 	Logger       *log.Entry
 	HTTP         HTTPContext
 	Secrets      IntegrationSecretStorage
-	Parameters   IntegrationParameterStorage
+	Properties   IntegrationPropertyStorage
 	Capabilities CapabilityContext
 }
 
@@ -107,13 +106,52 @@ type SetupStepContext struct {
 	OrganizationID string
 	HTTP           HTTPContext
 	Secrets        IntegrationSecretStorage
-	Parameters     IntegrationParameterStorage
+	Properties     IntegrationPropertyStorage
 	Capabilities   CapabilityContext
+}
+
+//
+// Properties is non-sensitive information exposed by the setup flow to the user.
+// They can be editable or not. If they are editable, OnPropertyUpdate() is called when the user updates it.
+//
+
+type IntegrationPropertyType string
+
+const (
+	IntegrationPropertyTypeString IntegrationPropertyType = "string"
+)
+
+type IntegrationPropertyDefinition struct {
+	Type        IntegrationPropertyType
+	Name        string
+	Label       string
+	Description string
+	Value       any
+	Editable    bool
+}
+
+type IntegrationPropertyStorageReader interface {
+	Get(name string) (any, error)
+	GetString(name string) (string, error)
+}
+
+type IntegrationPropertyStorage interface {
+	IntegrationPropertyStorageReader
+
+	Delete(names ...string) error
+	Create(def IntegrationPropertyDefinition) error
 }
 
 type IntegrationSecretStorageReader interface {
 	Get(name string) (string, error)
 }
+
+//
+// Secrets is sensitive information managed by the integration.
+// Sometimes, this comes from the user, as a step input.
+// Sometimes, this comes from the setup flow itself.
+// They can be editable or not. If they are editable, OnSecretUpdate() is called when the user updates it.
+//
 
 type IntegrationSecretStorage interface {
 	IntegrationSecretStorageReader
@@ -130,26 +168,18 @@ type IntegrationSecretDefinition struct {
 	Editable    bool
 }
 
-type IntegrationParameterStorageReader interface {
-	Get(name string) (any, error)
-	GetString(name string) (string, error)
-}
-
-type IntegrationParameterStorage interface {
-	IntegrationParameterStorageReader
-
-	Delete(names ...string) error
-	Create(def IntegrationParameterDefinition) error
-}
-
-type IntegrationParameterDefinition struct {
-	Name        string
-	Label       string
-	Description string
-	Type        string
-	Value       any
-	Editable    bool
-}
+//
+// Capabilities are the features that the integration provides.
+//
+// CapabilityGroups() returns all of them, but the setup flow is responsible
+// for updating their states for a particular integration.
+//
+// They can be in 4 states:
+// - Requested: the capability was requested, but the setup flow did not yet exposed it.
+// - Enabled: the capability is fully available for use.
+// - Disabled: the capability was made available during the setup flow, but has been manually disabled by the user.
+// - Unavailable: the integration itself has the capability available, but the capability was not requested as part of the setup flow.
+//
 
 type IntegrationCapabilityType string
 type IntegrationCapabilityState string

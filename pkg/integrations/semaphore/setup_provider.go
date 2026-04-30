@@ -165,15 +165,15 @@ func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 }
 
 func (s *SetupProvider) onSelectOrganizationRevert(ctx core.SetupStepContext) error {
-	return ctx.Parameters.Delete("organizationUrl")
+	return ctx.Properties.Delete("organizationUrl")
 }
 
 func (s *SetupProvider) onEnterAPITokenRevert(ctx core.SetupStepContext) error {
 	return ctx.Secrets.Delete("apiToken")
 }
 
-func (s *SetupProvider) OnParameterUpdate(ctx core.ParameterUpdateContext) (*core.SetupStep, error) {
-	return nil, fmt.Errorf("parameter updates are not supported for Semaphore")
+func (s *SetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.SetupStep, error) {
+	return nil, fmt.Errorf("property updates are not supported for Semaphore")
 }
 
 func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
@@ -187,7 +187,7 @@ func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 		//
 		// Validate the connection to Semaphore
 		//
-		client, err := NewClientWithAPIToken(ctx.HTTP, ctx.Parameters, v)
+		client, err := NewClientWithAPIToken(ctx.HTTP, ctx.Properties, v)
 		if err != nil {
 			return nil, fmt.Errorf("error creating client: %v", err)
 		}
@@ -227,7 +227,7 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 	// The organization URL is not something you can change,
 	// so once it's set, you cannot change it.
 	//
-	err := ctx.Parameters.Create(core.IntegrationParameterDefinition{
+	err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
 		Name:        "organizationUrl",
 		Label:       "Organization URL",
 		Description: "The URL of the Semaphore organization you are connected",
@@ -304,7 +304,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	//
 	// Validate the connection to Semaphore
 	//
-	client, err := NewClientWithStorageContexts(ctx.HTTP, ctx.Parameters, ctx.Secrets)
+	client, err := NewClientWithStorageContexts(ctx.HTTP, ctx.Properties, ctx.Secrets)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}
@@ -323,14 +323,9 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error enabling capability group: %v", err)
 	}
 
-	url, err := ctx.Parameters.Get("organizationUrl")
+	url, err := ctx.Properties.GetString("organizationUrl")
 	if err != nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)
-	}
-
-	organizationURL, ok := url.(string)
-	if !ok {
-		return nil, errors.New("organization URL is not a string")
 	}
 
 	tmpl, err := template.New("setupCompleted").Parse(setupCompletedTemplate)
@@ -339,7 +334,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	}
 
 	data := map[string]any{
-		"OrganizationURL": organizationURL,
+		"OrganizationURL": url,
 		"Projects":        projects,
 	}
 

@@ -105,12 +105,10 @@ type WebhookHandler interface {
 }
 
 type WebhookHandlerContext struct {
-	Logger                *logrus.Entry
-	HTTP                  HTTPContext
-	Integration           IntegrationContext
-	IntegrationParameters IntegrationParameterStorageReader
-	IntegrationSecrets    IntegrationSecretStorageReader
-	Webhook               WebhookContext
+	Logger      *logrus.Entry
+	HTTP        HTTPContext
+	Integration IntegrationContext
+	Webhook     WebhookContext
 }
 
 type IntegrationAction interface {
@@ -153,12 +151,10 @@ type IntegrationResource struct {
 }
 
 type ListResourcesContext struct {
-	Parameters       map[string]string
-	Logger           *logrus.Entry
-	HTTP             HTTPContext
-	Integration      IntegrationContext
-	ParameterStorage IntegrationParameterStorageReader
-	Secrets          IntegrationSecretStorageReader
+	Parameters  map[string]string
+	Logger      *logrus.Entry
+	HTTP        HTTPContext
+	Integration IntegrationContext
 }
 
 type WebhookOptions struct {
@@ -199,6 +195,12 @@ type IntegrationContext interface {
 	// Should be removed once all integrations have been migrated to the new setup method.
 	//
 	LegacySetup() bool
+
+	//
+	// Access to properties/secrets.
+	//
+	PropertyStorage() IntegrationPropertyStorageReader
+	SecretStorage() IntegrationSecretStorageReader
 
 	//
 	// Control the metadata and config of the integration

@@ -103,7 +103,7 @@ func submitStep(registry *registry.Registry, integration *models.Integration, se
 			IntegrationID:  integration.ID,
 			OrganizationID: integration.OrganizationID.String(),
 			HTTP:           registry.HTTPContext(),
-			Parameters:     contexts.NewIntegrationParameterStorage(integration),
+			Properties:     contexts.NewIntegrationPropertyStorage(integration),
 			Secrets:        secretStorage,
 			Capabilities:   capabilityCtx,
 		})

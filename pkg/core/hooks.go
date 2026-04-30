@@ -22,38 +22,34 @@ type Hook struct {
  * Context for executing a action hook.
  */
 type ActionHookContext struct {
-	Name                  string
-	Configuration         any
-	Parameters            map[string]any
-	Logger                *log.Entry
-	HTTP                  HTTPContext
-	Metadata              MetadataWriter
-	ExecutionState        ExecutionStateContext
-	Auth                  AuthReader
-	Requests              RequestContext
-	Integration           IntegrationContext
-	IntegrationParameters IntegrationParameterStorageReader
-	IntegrationSecrets    IntegrationSecretStorageReader
-	Notifications         NotificationContext
-	Secrets               SecretsContext
+	Name           string
+	Configuration  any
+	Parameters     map[string]any
+	Logger         *log.Entry
+	HTTP           HTTPContext
+	Metadata       MetadataWriter
+	ExecutionState ExecutionStateContext
+	Auth           AuthReader
+	Requests       RequestContext
+	Integration    IntegrationContext
+	Notifications  NotificationContext
+	Secrets        SecretsContext
 }
 
 /*
  * Context for executing a trigger hook.
  */
 type TriggerHookContext struct {
-	Name                  string
-	Parameters            map[string]any
-	Configuration         any
-	Logger                *log.Entry
-	HTTP                  HTTPContext
-	Metadata              MetadataWriter
-	Requests              RequestContext
-	Events                EventContext
-	Webhook               NodeWebhookContext
-	Integration           IntegrationContext
-	IntegrationParameters IntegrationParameterStorageReader
-	IntegrationSecrets    IntegrationSecretStorageReader
+	Name          string
+	Parameters    map[string]any
+	Configuration any
+	Logger        *log.Entry
+	HTTP          HTTPContext
+	Metadata      MetadataWriter
+	Requests      RequestContext
+	Events        EventContext
+	Webhook       NodeWebhookContext
+	Integration   IntegrationContext
 }
 
 /*

@@ -46,7 +46,7 @@ type Integration struct {
 	// All integrations should use this
 	//
 	SetupState   *datatypes.JSONType[SetupState]
-	Parameters   datatypes.JSONSlice[core.IntegrationParameterDefinition]
+	Properties   datatypes.JSONSlice[core.IntegrationPropertyDefinition]
 	Capabilities datatypes.JSONSlice[CapabilityState]
 }
 

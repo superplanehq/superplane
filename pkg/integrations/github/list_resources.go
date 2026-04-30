@@ -43,12 +43,12 @@ func (g *GitHub) legacyListResources(resourceType string, ctx core.ListResources
 }
 
 func (g *GitHub) listRepositories(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	authMethod, err := ctx.ParameterStorage.GetString(ParameterAuthMethod)
+	authMethod, err := ctx.Integration.PropertyStorage().GetString(ParameterAuthMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get authentication method: %w", err)
 	}
 
-	client, err := NewClientFromStorageContexts(ctx.ParameterStorage, ctx.Secrets)
+	client, err := NewClientFromStorageContexts(ctx.Integration.PropertyStorage(), ctx.Integration.SecretStorage())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}

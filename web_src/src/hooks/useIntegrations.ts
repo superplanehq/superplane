@@ -10,7 +10,7 @@ import {
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
   organizationsUpdateIntegrationCapabilities,
-  organizationsUpdateIntegrationParameter,
+  organizationsUpdateIntegrationProperty,
   organizationsUpdateIntegrationSecret,
 } from "@/api-client/sdk.gen";
 import type {
@@ -338,15 +338,15 @@ function applyIntegrationDescribeCache(
   });
 }
 
-export const useUpdateIntegrationParameter = (organizationId: string, integrationId: string) => {
+export const useUpdateIntegrationProperty = (organizationId: string, integrationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: { parameterName: string; value: string }) => {
-      const response = await organizationsUpdateIntegrationParameter(
+    mutationFn: async (body: { propertyName: string; value: string }) => {
+      const response = await organizationsUpdateIntegrationProperty(
         withOrganizationHeader({
           path: { id: organizationId, integrationId },
-          body: { parameterName: body.parameterName, value: body.value },
+          body: { propertyName: body.propertyName, value: body.value },
         }),
       );
       return response.data?.integration ?? null;

@@ -13,23 +13,23 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func NewClientFromStorageContexts(parameters core.IntegrationParameterStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
-	authMethod, err := parameters.GetString(ParameterAuthMethod)
+func NewClientFromStorageContexts(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
+	authMethod, err := properties.GetString(ParameterAuthMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get authentication method: %v", err)
 	}
 
 	switch authMethod {
 	case AuthMethodPAT:
-		return NewPATClient(parameters, secrets)
+		return NewPATClient(properties, secrets)
 	case AuthMethodGitHubApp:
-		return NewGitHubAppClient(parameters, secrets)
+		return NewGitHubAppClient(properties, secrets)
 	default:
 		return nil, fmt.Errorf("invalid authentication method: %s", authMethod)
 	}
 }
 
-func NewPATClient(parameters core.IntegrationParameterStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
+func NewPATClient(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
 	pat, err := secrets.Get(SecretPAT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PAT: %v", err)
@@ -48,8 +48,8 @@ func NewPATClient(parameters core.IntegrationParameterStorageReader, secrets cor
 	), nil
 }
 
-func NewGitHubAppClient(parameters core.IntegrationParameterStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
-	appID, err := parameters.GetString(ParameterGitHubAppID)
+func NewGitHubAppClient(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
+	appID, err := properties.GetString(ParameterGitHubAppID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub app ID: %v", err)
 	}
@@ -59,7 +59,7 @@ func NewGitHubAppClient(parameters core.IntegrationParameterStorageReader, secre
 		return nil, fmt.Errorf("failed to parse GitHub app ID: %v", err)
 	}
 
-	installationID, err := parameters.GetString(ParameterGitHubAppInstallationID)
+	installationID, err := properties.GetString(ParameterGitHubAppInstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get installation ID: %v", err)
 	}

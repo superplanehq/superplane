@@ -72,7 +72,7 @@ func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 		return nil, errors.New("no requested capabilities")
 	}
 
-	instructions, err := g.instructionsForTokenUpdate(ctx.Parameters, requested)
+	instructions, err := g.instructionsForTokenUpdate(ctx.Properties, requested)
 	if err != nil {
 		return nil, fmt.Errorf("error generating instructions: %v", err)
 	}
@@ -98,8 +98,8 @@ const patUpdateInstructionsTemplate = `
 {{- end }}
 `
 
-func (g *SetupProvider) instructionsForTokenUpdate(parameters core.IntegrationParameterStorage, newCapabilities []string) (string, error) {
-	owner, err := parameters.GetString(ParameterOwner)
+func (g *SetupProvider) instructionsForTokenUpdate(properties core.IntegrationPropertyStorageReader, newCapabilities []string) (string, error) {
+	owner, err := properties.GetString(ParameterOwner)
 	if err != nil {
 		return "", err
 	}
@@ -362,7 +362,7 @@ func (g *SetupProvider) genCapabilities(actions []core.Action, triggers []core.T
 	return capabilities
 }
 
-func (g *SetupProvider) OnParameterUpdate(ctx core.ParameterUpdateContext) (*core.SetupStep, error) {
+func (g *SetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.SetupStep, error) {
 	return nil, fmt.Errorf("TODO")
 }
 
@@ -418,11 +418,11 @@ func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 }
 
 func (g *SetupProvider) onSelectOwnerRevert(ctx core.SetupStepContext) error {
-	return ctx.Parameters.Delete(ParameterOwnerType, ParameterOwner)
+	return ctx.Properties.Delete(ParameterOwnerType, ParameterOwner)
 }
 
 func (g *SetupProvider) onSelectAuthMethodRevert(ctx core.SetupStepContext) error {
-	return ctx.Parameters.Delete(ParameterAuthMethod)
+	return ctx.Properties.Delete(ParameterAuthMethod)
 }
 
 func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {
@@ -470,7 +470,7 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 		return nil, errors.New("owner is required")
 	}
 
-	err := ctx.Parameters.Create(core.IntegrationParameterDefinition{
+	err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
 		Name:     ParameterOwner,
 		Label:    "Owner",
 		Type:     configuration.FieldTypeString,
@@ -521,7 +521,7 @@ func (g *SetupProvider) onSelectAuthMethodSubmit(input any, ctx core.SetupStepCo
 		return nil, errors.New("invalid authentication method")
 	}
 
-	err := ctx.Parameters.Create(core.IntegrationParameterDefinition{
+	err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
 		Name:     ParameterAuthMethod,
 		Label:    "Authentication Method",
 		Type:     configuration.FieldTypeString,
@@ -619,7 +619,7 @@ func (p *PermissionSet) Permissions() map[string]string {
 }
 
 func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (string, error) {
-	owner, err := ctx.Parameters.GetString(ParameterOwner)
+	owner, err := ctx.Properties.GetString(ParameterOwner)
 	if err != nil {
 		return "", err
 	}
@@ -736,7 +736,7 @@ func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (
 		return nil, fmt.Errorf("error enabling capabilities: %v", err)
 	}
 
-	return finishPATSetup(ctx.Parameters, repos)
+	return finishPATSetup(ctx.Properties, repos)
 }
 
 func validatePATConnection(token string) ([]*github.Repository, error) {
@@ -778,8 +778,8 @@ You can now start using the following repositories:
 {{- end }}
 `
 
-func finishPATSetup(parameters core.IntegrationParameterStorage, repos []*github.Repository) (*core.SetupStep, error) {
-	owner, err := parameters.GetString(ParameterOwner)
+func finishPATSetup(properties core.IntegrationPropertyStorageReader, repos []*github.Repository) (*core.SetupStep, error) {
+	owner, err := properties.GetString(ParameterOwner)
 	if err != nil {
 		return nil, fmt.Errorf("error getting connection URL: %v", err)
 	}

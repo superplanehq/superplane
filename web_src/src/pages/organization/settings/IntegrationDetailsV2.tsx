@@ -14,7 +14,7 @@ import {
   useDeleteIntegration,
   useIntegration,
   useUpdateIntegrationCapabilities,
-  useUpdateIntegrationParameter,
+  useUpdateIntegrationProperty,
   useUpdateIntegrationSecret,
 } from "@/hooks/useIntegrations";
 import { Alert, AlertDescription } from "@/ui/alert";
@@ -77,7 +77,7 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
   const { data: integration, isLoading, error } = useIntegration(organizationId, integrationId || "");
   usePageTitle(["Integrations", integration?.metadata?.name]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [activeTab, setActiveTab] = useState("parameters");
+  const [activeTab, setActiveTab] = useState("properties");
   const canUpdateIntegrations = canAct("integrations", "update");
   const canDeleteIntegrations = canAct("integrations", "delete");
 
@@ -88,7 +88,7 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
 
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
   const updateCapabilitiesMutation = useUpdateIntegrationCapabilities(organizationId, integrationId || "");
-  const updateParameterMutation = useUpdateIntegrationParameter(organizationId, integrationId || "");
+  const updatePropertyMutation = useUpdateIntegrationProperty(organizationId, integrationId || "");
   const updateSecretMutation = useUpdateIntegrationSecret(organizationId, integrationId || "");
   const integrationsHref = `/${organizationId}/settings/integrations`;
   const [capabilityStates, setCapabilityStates] = useState<Record<string, IntegrationCapabilityStateState>>({});
@@ -117,30 +117,30 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
     );
   }, [integration?.status?.metadata?.webhookSigningSecretConfigured]);
 
-  const integrationParameters = useMemo(() => integration?.status?.parameters ?? [], [integration?.status?.parameters]);
+  const integrationProperties = useMemo(() => integration?.status?.properties ?? [], [integration?.status?.properties]);
   const integrationSecrets = useMemo(() => integration?.status?.secrets ?? [], [integration?.status?.secrets]);
 
-  const [parameterDrafts, setParameterDrafts] = useState<Record<string, string>>({});
+  const [propertyDrafts, setPropertyDrafts] = useState<Record<string, string>>({});
   const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const next: Record<string, string> = {};
-    integrationParameters.forEach((param, index) => {
-      const key = param.name?.trim() || `__param_${index}`;
-      next[key] = param.value ?? "";
+    integrationProperties.forEach((property, index) => {
+      const key = property.name?.trim() || `__property_${index}`;
+      next[key] = property.value ?? "";
     });
-    setParameterDrafts(next);
-  }, [integration?.metadata?.id, integration?.metadata?.updatedAt, integrationParameters]);
+    setPropertyDrafts(next);
+  }, [integration?.metadata?.id, integration?.metadata?.updatedAt, integrationProperties]);
 
   useEffect(() => {
     setSecretDrafts({});
   }, [integration?.metadata?.id, integration?.metadata?.updatedAt, integrationSecrets]);
 
-  const settingsMutationBusy = updateParameterMutation.isPending || updateSecretMutation.isPending;
+  const settingsMutationBusy = updatePropertyMutation.isPending || updateSecretMutation.isPending;
 
   useEffect(() => {
     if (!webhookUrl && activeTab === "webhook") {
-      setActiveTab("parameters");
+      setActiveTab("properties");
     }
   }, [webhookUrl, activeTab]);
 
@@ -285,13 +285,13 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
     }
   };
 
-  const saveParameter = async (parameterName: string, value: string) => {
+  const saveProperty = async (propertyName: string, value: string) => {
     if (!canUpdateIntegrations || settingsMutationBusy) return;
     try {
-      await updateParameterMutation.mutateAsync({ parameterName, value });
-      showSuccessToast("Parameter saved");
+      await updatePropertyMutation.mutateAsync({ propertyName, value });
+      showSuccessToast("Property saved");
     } catch (_error) {
-      showErrorToast(`Failed to save parameter: ${getApiErrorMessage(_error)}`);
+      showErrorToast(`Failed to save property: ${getApiErrorMessage(_error)}`);
     }
   };
 
@@ -431,13 +431,13 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
             <div className="flex flex-wrap px-4">
               <button
                 type="button"
-                onClick={() => setActiveTab("parameters")}
+                onClick={() => setActiveTab("properties")}
                 className={cn(
                   sidebarTabButtonClass,
-                  activeTab === "parameters" ? sidebarTabActiveClass : sidebarTabInactiveClass,
+                  activeTab === "properties" ? sidebarTabActiveClass : sidebarTabInactiveClass,
                 )}
               >
-                Parameters
+                Properties
               </button>
               <button
                 type="button"
@@ -484,27 +484,27 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
             </div>
           </div>
 
-          <TabsContent value="parameters" className="mt-4">
-            {integrationParameters.length > 0 ? (
+          <TabsContent value="properties" className="mt-4">
+            {integrationProperties.length > 0 ? (
               <div className="space-y-6 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-                {integrationParameters.map((param, index) => {
-                  const fieldKey = param.name?.trim() || `__param_${index}`;
-                  const title = param.label?.trim() || "Parameter";
-                  const isEditable = param.editable === true;
-                  const draft = parameterDrafts[fieldKey] ?? "";
-                  const serverValue = param.value ?? "";
-                  const paramDirty = Boolean(isEditable && param.name?.trim() && draft !== serverValue);
-                  const savingThisParameter =
-                    updateParameterMutation.isPending &&
-                    updateParameterMutation.variables?.parameterName === param.name?.trim();
+                {integrationProperties.map((property, index) => {
+                  const fieldKey = property.name?.trim() || `__property_${index}`;
+                  const title = property.label?.trim() || "Property";
+                  const isEditable = property.editable === true;
+                  const draft = propertyDrafts[fieldKey] ?? "";
+                  const serverValue = property.value ?? "";
+                  const propertyDirty = Boolean(isEditable && property.name?.trim() && draft !== serverValue);
+                  const savingThisProperty =
+                    updatePropertyMutation.isPending &&
+                    updatePropertyMutation.variables?.propertyName === property.name?.trim();
                   return (
                     <div
                       key={fieldKey}
                       className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0 dark:border-gray-800"
                     >
                       <div className="text-sm font-medium text-gray-800 dark:text-gray-100">{title}</div>
-                      {param.description ? (
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{param.description}</p>
+                      {property.description ? (
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{property.description}</p>
                       ) : null}
                       <div className="mt-3">
                         {isEditable ? (
@@ -516,7 +516,7 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
                               <Input
                                 value={draft}
                                 onChange={(event) =>
-                                  setParameterDrafts((previous) => ({
+                                  setPropertyDrafts((previous) => ({
                                     ...previous,
                                     [fieldKey]: event.target.value,
                                   }))
@@ -524,16 +524,16 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
                                 disabled={!canUpdateIntegrations || settingsMutationBusy}
                                 className="w-full sm:max-w-xl sm:flex-1"
                               />
-                              {param.name?.trim() ? (
+                              {property.name?.trim() ? (
                                 <LoadingButton
                                   type="button"
                                   color="blue"
                                   size="sm"
                                   className="shrink-0"
-                                  disabled={!canUpdateIntegrations || !paramDirty || settingsMutationBusy}
-                                  loading={Boolean(savingThisParameter)}
+                                  disabled={!canUpdateIntegrations || !propertyDirty || settingsMutationBusy}
+                                  loading={Boolean(savingThisProperty)}
                                   loadingText="Saving…"
-                                  onClick={() => void saveParameter(param.name!.trim(), draft)}
+                                  onClick={() => void saveProperty(property.name!.trim(), draft)}
                                 >
                                   Save
                                 </LoadingButton>
@@ -551,7 +551,7 @@ export function IntegrationDetailsV2({ organizationId }: IntegrationDetailsV2Pro
                 })}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No parameters for this integration.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">No properties for this integration.</p>
             )}
           </TabsContent>
 

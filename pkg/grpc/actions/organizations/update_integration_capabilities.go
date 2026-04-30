@@ -212,7 +212,7 @@ func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integ
 		Logger:       logging.ForIntegration(*integration),
 		Changes:      map[core.IntegrationCapabilityState][]string{core.IntegrationCapabilityStateRequested: capabilities},
 		HTTP:         registry.HTTPContext(),
-		Parameters:   contexts.NewIntegrationParameterStorage(integration),
+		Properties:   contexts.NewIntegrationPropertyStorage(integration),
 		Secrets:      secretStorage,
 		Capabilities: capabilityCtx,
 	})

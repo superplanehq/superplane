@@ -18,14 +18,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateIntegrationParameter(
+func UpdateIntegrationProperty(
 	ctx context.Context,
 	registry *registry.Registry,
 	orgID string,
 	integrationID string,
-	parameterName string,
+	propertyName string,
 	value string,
-) (*pb.UpdateIntegrationParameterResponse, error) {
+) (*pb.UpdateIntegrationPropertyResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -41,7 +41,7 @@ func UpdateIntegrationParameter(
 		return nil, err
 	}
 
-	_, err = findParameter(integration, parameterName)
+	_, err = findProperty(integration, propertyName)
 	if err != nil {
 		return nil, err
 	}
@@ -57,14 +57,14 @@ func UpdateIntegrationParameter(
 			return err
 		}
 
-		setupStep, err := setupProvider.OnParameterUpdate(core.ParameterUpdateContext{
-			ParameterName: parameterName,
-			Value:         value,
-			Logger:        logrus.WithField("integration_id", integration.ID),
-			HTTP:          registry.HTTPContext(),
-			Secrets:       secretStorage,
-			Parameters:    contexts.NewIntegrationParameterStorage(integration),
-			Capabilities:  contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities),
+		setupStep, err := setupProvider.OnPropertyUpdate(core.PropertyUpdateContext{
+			PropertyName: propertyName,
+			Value:        value,
+			Logger:       logrus.WithField("integration_id", integration.ID),
+			HTTP:         registry.HTTPContext(),
+			Secrets:      secretStorage,
+			Properties:   contexts.NewIntegrationPropertyStorage(integration),
+			Capabilities: contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities),
 		})
 
 		if err != nil {
@@ -89,8 +89,8 @@ func UpdateIntegrationParameter(
 	})
 
 	if err != nil {
-		logrus.WithError(err).Error("failed to update integration parameter")
-		return nil, status.Error(codes.Internal, "failed to update integration parameter")
+		logrus.WithError(err).Error("failed to update integration property")
+		return nil, status.Error(codes.Internal, "failed to update integration property")
 	}
 
 	proto, err := serializeIntegration(registry, integration, []models.CanvasNodeReference{})
@@ -98,17 +98,17 @@ func UpdateIntegrationParameter(
 		return nil, err
 	}
 
-	return &pb.UpdateIntegrationParameterResponse{
+	return &pb.UpdateIntegrationPropertyResponse{
 		Integration: proto,
 	}, nil
 }
 
-func findParameter(integration *models.Integration, parameterName string) (*core.IntegrationParameterDefinition, error) {
-	for _, param := range integration.Parameters {
-		if param.Name == parameterName {
-			return &param, nil
+func findProperty(integration *models.Integration, propertyName string) (*core.IntegrationPropertyDefinition, error) {
+	for _, property := range integration.Properties {
+		if property.Name == propertyName {
+			return &property, nil
 		}
 	}
 
-	return nil, status.Errorf(codes.NotFound, "parameter %s not found", parameterName)
+	return nil, status.Errorf(codes.NotFound, "property %s not found", propertyName)
 }

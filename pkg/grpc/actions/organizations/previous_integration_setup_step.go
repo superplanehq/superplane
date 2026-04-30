@@ -75,7 +75,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 			IntegrationID:  integration.ID,
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),
-			Parameters:     contexts.NewIntegrationParameterStorage(integration),
+			Properties:     contexts.NewIntegrationPropertyStorage(integration),
 			Secrets:        secretStorage,
 			Capabilities:   capabilityCtx,
 		}

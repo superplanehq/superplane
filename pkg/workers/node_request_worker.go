@@ -188,11 +188,6 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		}
 
 		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
-		hookCtx.IntegrationParameters = contexts.NewIntegrationParameterStorage(instance)
-		hookCtx.IntegrationSecrets, err = contexts.NewIntegrationSecretStorage(tx, w.encryptor, instance)
-		if err != nil {
-			return fmt.Errorf("failed to create integration secret storage: %v", err)
-		}
 	}
 
 	_, err = hookProvider.HandleHook(hookCtx)
@@ -249,11 +244,6 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		logger = logging.WithIntegration(logger, *instance)
 		hookCtx.Logger = logger
 		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
-		hookCtx.IntegrationParameters = contexts.NewIntegrationParameterStorage(instance)
-		hookCtx.IntegrationSecrets, err = contexts.NewIntegrationSecretStorage(tx, w.encryptor, instance)
-		if err != nil {
-			return fmt.Errorf("failed to create integration secret storage: %v", err)
-		}
 	}
 
 	err = hookProvider.HandleHook(hookCtx)
@@ -330,11 +320,6 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 
 		logger = logging.WithIntegration(logger, *instance)
 		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
-		hookCtx.IntegrationParameters = contexts.NewIntegrationParameterStorage(instance)
-		hookCtx.IntegrationSecrets, err = contexts.NewIntegrationSecretStorage(tx, w.encryptor, instance)
-		if err != nil {
-			return fmt.Errorf("failed to create integration secret storage: %v", err)
-		}
 	}
 
 	hookCtx.Logger = logger

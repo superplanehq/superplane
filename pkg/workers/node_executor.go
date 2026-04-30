@@ -407,13 +407,6 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 
 		logger = logging.WithIntegration(logger, *instance)
 		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, onNewEvents)
-		ctx.IntegrationParameters = contexts.NewIntegrationParameterStorage(instance)
-
-		ctx.IntegrationSecrets, err = contexts.NewIntegrationSecretStorage(tx, w.encryptor, instance)
-		if err != nil {
-			logger.Errorf("failed to create integration secret storage: %v", err)
-			return fmt.Errorf("failed to create integration secret storage: %w", err)
-		}
 	}
 
 	ctx.Logger = logger

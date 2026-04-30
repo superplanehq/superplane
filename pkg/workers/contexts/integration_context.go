@@ -457,9 +457,18 @@ func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSub
 }
 
 func (c *IntegrationContext) LegacySetup() bool {
-	//
-	// TODO: we might need an actual column just for this.
-	// Implicitly relying on capabilities being empty could be a bad idea.
-	//
 	return len(c.integration.Capabilities) == 0
+}
+
+func (c *IntegrationContext) PropertyStorage() core.IntegrationPropertyStorageReader {
+	return NewIntegrationPropertyStorage(c.integration)
+}
+
+func (c *IntegrationContext) SecretStorage() core.IntegrationSecretStorageReader {
+	secretStorage, err := NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration)
+	if err != nil {
+		return nil
+	}
+
+	return secretStorage
 }

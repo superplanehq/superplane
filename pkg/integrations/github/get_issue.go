@@ -106,8 +106,6 @@ func (c *GetIssue) Setup(ctx core.SetupContext) error {
 	return ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
-		ctx.IntegrationParameters,
-		ctx.IntegrationSecrets,
 		ctx.Configuration,
 	)
 }
@@ -157,12 +155,12 @@ func (c *GetIssue) getIssue(ctx core.ExecutionContext, repository string, issueN
 		)
 	}
 
-	client, err := NewClientFromStorageContexts(ctx.IntegrationParameters, ctx.IntegrationSecrets)
+	client, err := NewClientFromStorageContexts(ctx.Integration.PropertyStorage(), ctx.Integration.SecretStorage())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
-	owner, err := ctx.IntegrationParameters.GetString(ParameterOwner)
+	owner, err := ctx.Integration.PropertyStorage().GetString(ParameterOwner)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get owner: %w", err)
 	}

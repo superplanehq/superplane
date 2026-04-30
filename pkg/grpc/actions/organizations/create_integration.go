@@ -148,7 +148,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),
 			HTTP:           registry.HTTPContext(),
-			Parameters:     contexts.NewIntegrationParameterStorage(newIntegration),
+			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
 			Secrets:        secretStorage,
 		})
@@ -337,14 +337,14 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		}
 	}
 
-	for _, param := range instance.Parameters {
-		proto.Status.Parameters = append(proto.Status.Parameters, &pb.Integration_Parameter{
-			Name:        param.Name,
-			Label:       param.Label,
-			Description: param.Description,
-			Type:        param.Type,
-			Value:       integrationParameterValueToString(param.Value),
-			Editable:    param.Editable,
+	for _, property := range instance.Properties {
+		proto.Status.Properties = append(proto.Status.Properties, &pb.Integration_Property{
+			Name:        property.Name,
+			Label:       property.Label,
+			Description: property.Description,
+			Type:        string(property.Type),
+			Value:       integrationParameterValueToString(property.Value),
+			Editable:    property.Editable,
 		})
 	}
 
