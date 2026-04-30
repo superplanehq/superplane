@@ -657,23 +657,21 @@ The Read Memory component looks up values from canvas-level memory storage.
 ```json
 {
   "data": {
-    "data": {
-      "count": 1,
-      "emitMode": "allAtOnce",
-      "matches": {
+    "count": 1,
+    "emitMode": "allAtOnce",
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines",
+    "resultMode": "latest",
+    "values": [
+      {
         "creator": "igor",
-        "pull_request": 123
-      },
-      "namespace": "machines",
-      "resultMode": "latest",
-      "values": [
-        {
-          "creator": "igor",
-          "pull_request": 123,
-          "sandbox_id": "sbx-001"
-        }
-      ]
-    }
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ]
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
