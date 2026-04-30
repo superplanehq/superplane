@@ -1,22 +1,22 @@
-import type { OrganizationsIntegration } from "@/api-client";
-
-const INTEGRATIONS_WITH_V2_SETUP_FLOW = new Set(["github", "semaphore"]);
+import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
 
 /**
- * Integrations created via the new setup flow expose capability state on the installation.
- * Used to route to the v2 integration details page vs. the legacy configuration-focused page.
+ * Guided setup is available when the integration registers a setup provider (API: legacySetupOnly is false).
  */
-export function integrationUsesNewSetupFlow(integration: OrganizationsIntegration | null | undefined): boolean {
-  const capabilities = integration?.status?.capabilities;
-  return Array.isArray(capabilities) && capabilities.length > 0;
+export function integrationSupportsGuidedSetup(definition?: IntegrationsIntegrationDefinition | null): boolean {
+  return definition?.legacySetupOnly === false;
 }
 
-export function isIntegrationV2SetupEnabled(integrationName?: string | null): boolean {
-  if (!integrationName) {
-    return false;
+/**
+ * Route to the v2 integration details page when the installation was not created via the legacy setup flow.
+ * Prefer `status.legacySetup` from the API; fall back to capability presence for older responses.
+ */
+export function integrationUsesNewSetupFlow(integration: OrganizationsIntegration | null | undefined): boolean {
+  if (integration?.status?.legacySetup !== undefined) {
+    return integration.status.legacySetup === false;
   }
-
-  return INTEGRATIONS_WITH_V2_SETUP_FLOW.has(integrationName);
+  const capabilities = integration?.status?.capabilities;
+  return Array.isArray(capabilities) && capabilities.length > 0;
 }
 
 export function getIntegrationV2SetupPath(organizationId: string, integrationName: string): string {

@@ -23,7 +23,8 @@ import { showErrorToast } from "@/lib/toast";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import { getIntegrationV2SetupPath, isIntegrationV2SetupEnabled } from "@/lib/integrationV2";
+import { getIntegrationV2SetupPath, integrationSupportsGuidedSetup } from "@/lib/integrationV2";
+import { IntegrationSetupFlowChoiceDialog } from "@/ui/IntegrationSetupFlowChoiceDialog";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -37,6 +38,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const [integrationName, setIntegrationName] = useState("");
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [integrationPendingFlowChoice, setIntegrationPendingFlowChoice] =
+    useState<IntegrationsIntegrationDefinition | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
@@ -159,11 +162,28 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
     if (!canCreateIntegrations) return;
 
-    if (integration.name && isIntegrationV2SetupEnabled(integration.name)) {
-      navigate(getIntegrationV2SetupPath(organizationId, integration.name));
+    if (integrationSupportsGuidedSetup(integration)) {
+      setIntegrationPendingFlowChoice(integration);
       return;
     }
 
+    setSelectedIntegration(integration);
+    setIntegrationName(getNextIntegrationName(integration.name));
+    setConfiguration({});
+    setIsModalOpen(true);
+  };
+
+  const handleChooseGuidedSetupFromChoiceModal = () => {
+    const integration = integrationPendingFlowChoice;
+    if (!integration?.name) return;
+    setIntegrationPendingFlowChoice(null);
+    navigate(getIntegrationV2SetupPath(organizationId, integration.name));
+  };
+
+  const handleChooseClassicSetupFromChoiceModal = () => {
+    const integration = integrationPendingFlowChoice;
+    if (!integration) return;
+    setIntegrationPendingFlowChoice(null);
     setSelectedIntegration(integration);
     setIntegrationName(getNextIntegrationName(integration.name));
     setConfiguration({});
@@ -482,6 +502,16 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             </div>
           );
         })()}
+
+      <IntegrationSetupFlowChoiceDialog
+        open={integrationPendingFlowChoice !== null}
+        onOpenChange={(open) => {
+          if (!open) setIntegrationPendingFlowChoice(null);
+        }}
+        integrationDefinition={integrationPendingFlowChoice}
+        onChooseGuided={handleChooseGuidedSetupFromChoiceModal}
+        onChooseClassic={handleChooseClassicSetupFromChoiceModal}
+      />
     </div>
   );
 }

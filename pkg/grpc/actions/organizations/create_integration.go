@@ -29,7 +29,7 @@ import (
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig, nil)
+	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig, nil, false)
 }
 
 func CreateIntegrationWithUsage(
@@ -43,6 +43,7 @@ func CreateIntegrationWithUsage(
 	integrationName, name string,
 	appConfig *structpb.Struct,
 	capabilities []string,
+	useNewFlow bool,
 ) (*pb.CreateIntegrationResponse, error) {
 	integration, err := registry.GetIntegration(integrationName)
 	if err != nil {
@@ -76,45 +77,47 @@ func CreateIntegrationWithUsage(
 	//
 	// We must encrypt the sensitive configuration fields before storing
 	//
-	installationID := uuid.New()
+	integrationID := uuid.New()
 	integrationLogger := logging.ForIntegration(models.Integration{
-		ID:      installationID,
+		ID:      integrationID,
 		AppName: integrationName,
 	})
-	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), installationID, nil)
-	if err != nil {
-		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
-		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
-	}
 
 	//
-	// If the integration implementation does not provide a setup provider,
-	// we fallback to the old sync model. This should be removed once all integrations
-	// are done through setup provider.
+	// If the integration implementation supports the new flow,
+	// and the user has requested to use it, we use the new flow.
 	//
-	setupProvider, err := registry.GetSetupProvider(integrationName)
-	if err != nil {
-		newIntegration, err := models.CreateIntegration(installationID, org, integrationName, name, configuration)
+	if registry.SupportsNewSetupFlow(integrationName) && useNewFlow {
+		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
 			return nil, status.Error(codes.Internal, "failed to create integration")
 		}
 
-		return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
+		setupProvider, err := registry.GetSetupProvider(integrationName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get setup provider: %v", err)
+		}
+
+		return setupIntegration(registry, setupProvider, newIntegration, capabilities)
 	}
 
-	initialCapabilities, err := initialCapabilityStates(allCapabilities(setupProvider), capabilities)
+	//
+	// Otherwise, use the old flow.
+	//
+	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), integrationID, nil)
 	if err != nil {
-		return nil, err
+		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
+		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
 	}
 
-	newIntegration, err := models.CreateIntegration(installationID, org, integrationName, name, configuration)
+	newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, configuration)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to create integration")
 		return nil, status.Error(codes.Internal, "failed to create integration")
 	}
 
-	return setupIntegration(registry, newIntegration, setupProvider, orgID, initialCapabilities)
+	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
 }
 
 func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
@@ -125,10 +128,15 @@ func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capabil
 	return capabilities
 }
 
-func setupIntegration(registry *registry.Registry, newIntegration *models.Integration, setupProvider core.IntegrationSetupProvider, orgID string, initialCapabilities []models.CapabilityState) (*pb.CreateIntegrationResponse, error) {
+func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration, capabilities []string) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	initialCapabilities, err := initialCapabilityStates(allCapabilities(setupProvider), capabilities)
+	if err != nil {
+		return nil, err
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		secretStorage, err := contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration)
 		if err != nil {
 			return err
@@ -138,7 +146,7 @@ func setupIntegration(registry *registry.Registry, newIntegration *models.Integr
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
-			OrganizationID: orgID,
+			OrganizationID: newIntegration.OrganizationID.String(),
 			HTTP:           registry.HTTPContext(),
 			Parameters:     contexts.NewIntegrationParameterStorage(newIntegration),
 			Capabilities:   capabilityCtx,
@@ -270,6 +278,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 	if metadataMap == nil {
 		metadataMap = map[string]any{}
 	}
+
 	metadata, err := structpb.NewStruct(metadataMap)
 	if err != nil {
 		return nil, err
@@ -289,7 +298,8 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			StateDescription: instance.StateDescription,
 			Metadata:         metadata,
 			UsedIn:           []*pb.Integration_NodeRef{},
-			Capabilities:     serializeCapabilities(instance.Capabilities),
+			Capabilities:     serializeCapabilities(registry, instance),
+			LegacySetup:      isLegacySetup(instance),
 		},
 	}
 
@@ -405,14 +415,56 @@ func serializeNextStepType(stepType core.SetupStepType) pb.Integration_SetupStep
 	}
 }
 
-func serializeCapabilities(capabilities []models.CapabilityState) []*pb.Integration_CapabilityState {
+func serializeCapabilities(registry *registry.Registry, integration *models.Integration) []*pb.Integration_CapabilityState {
+	setupProvider, err := registry.GetSetupProvider(integration.AppName)
+
+	//
+	// If this is a legacy integration, all components are enabled.
+	//
+	if err != nil {
+		impl, err := registry.GetIntegration(integration.AppName)
+		if err != nil {
+			return []*pb.Integration_CapabilityState{}
+		}
+
+		return serializeLegacyCapabilities(impl)
+	}
+
+	//
+	// Otherwise, we use the capability states in the database.
+	//
+	capabilities := []core.Capability{}
+	for _, group := range setupProvider.CapabilityGroups() {
+		capabilities = append(capabilities, group.Capabilities...)
+	}
 	protos := make([]*pb.Integration_CapabilityState, len(capabilities))
-	for i, capability := range capabilities {
+	for i, capability := range integration.Capabilities {
 		protos[i] = &pb.Integration_CapabilityState{
 			Name:  capability.Name,
 			State: CapabilityStateToProto(capability.State),
 		}
 	}
+
+	return protos
+}
+
+func serializeLegacyCapabilities(integration core.Integration) []*pb.Integration_CapabilityState {
+	protos := []*pb.Integration_CapabilityState{}
+
+	for _, action := range integration.Actions() {
+		protos = append(protos, &pb.Integration_CapabilityState{
+			Name:  action.Name(),
+			State: pb.Integration_CapabilityState_STATE_ENABLED,
+		})
+	}
+
+	for _, trigger := range integration.Triggers() {
+		protos = append(protos, &pb.Integration_CapabilityState{
+			Name:  trigger.Name(),
+			State: pb.Integration_CapabilityState_STATE_ENABLED,
+		})
+	}
+
 	return protos
 }
 
@@ -506,4 +558,8 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 	}
 
 	return sanitized
+}
+
+func isLegacySetup(integration *models.Integration) bool {
+	return len(integration.Capabilities) == 0
 }

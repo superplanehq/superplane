@@ -35,10 +35,9 @@ func serializeIntegrations(registry *registry.Registry, in []core.Integration) [
 			Description:      integration.Description(),
 			Instructions:     integration.Instructions(),
 			Configuration:    configuration,
-			Actions:          actions.SerializeActions(integration.Actions()),
-			Triggers:         actions.SerializeTriggers(integration.Triggers()),
 			Capabilities:     serializeCapabilities(registry, integration),
 			CapabilityGroups: serializeCapabilityGroups(registry, integration),
+			LegacySetupOnly:  !registry.SupportsNewSetupFlow(integration.Name()),
 		}
 	}
 	return out
@@ -70,13 +69,11 @@ func serializeCapabilityGroups(registry *registry.Registry, integration core.Int
 func serializeCapabilities(registry *registry.Registry, integration core.Integration) []*pb.CapabilityDefinition {
 	setupProvider, err := registry.GetSetupProvider(integration.Name())
 	if err != nil {
-		return []*pb.CapabilityDefinition{}
+		return serializeLegacyCapabilities(integration)
 	}
 
-	capabilityGroups := setupProvider.CapabilityGroups()
-
 	out := []*pb.CapabilityDefinition{}
-	for _, group := range capabilityGroups {
+	for _, group := range setupProvider.CapabilityGroups() {
 		for _, capability := range group.Capabilities {
 			capabilityDef := &pb.CapabilityDefinition{
 				Type:           actions.CapabilityTypeToProto(string(capability.Type)),
@@ -104,4 +101,31 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 	}
 
 	return out
+}
+
+func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityDefinition {
+	capabilities := []*pb.CapabilityDefinition{}
+	for _, action := range integration.Actions() {
+		capabilities = append(capabilities, &pb.CapabilityDefinition{
+			Type:           actions.CapabilityTypeToProto(string(core.IntegrationCapabilityTypeAction)),
+			Name:           action.Name(),
+			Label:          action.Label(),
+			Description:    action.Description(),
+			Configuration:  []*configpb.Field{},
+			OutputChannels: []*actionpb.OutputChannel{},
+		})
+	}
+
+	for _, trigger := range integration.Triggers() {
+		capabilities = append(capabilities, &pb.CapabilityDefinition{
+			Type:           actions.CapabilityTypeToProto(string(core.IntegrationCapabilityTypeTrigger)),
+			Name:           trigger.Name(),
+			Label:          trigger.Label(),
+			Description:    trigger.Description(),
+			Configuration:  []*configpb.Field{},
+			OutputChannels: []*actionpb.OutputChannel{},
+		})
+	}
+
+	return capabilities
 }

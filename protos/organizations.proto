@@ -549,6 +549,7 @@ message CreateIntegrationRequest {
   string integration_name = 3;
   google.protobuf.Struct configuration = 4;
   repeated string capabilities = 5;
+  bool new_setup = 6;
 }
 
 message CreateIntegrationResponse {
@@ -697,10 +698,11 @@ message Integration {
     //
     // New fields used for new setup flow.
     //
-    repeated CapabilityState capabilities = 6;
-    SetupState setup_state = 7;
-    repeated Parameter parameters = 8;
-    repeated Secret secrets = 9;
+    bool legacy_setup = 6;
+    repeated CapabilityState capabilities = 7;
+    SetupState setup_state = 8;
+    repeated Parameter parameters = 9;
+    repeated Secret secrets = 10;
   }
 
   message SetupState {

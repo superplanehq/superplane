@@ -6,7 +6,7 @@ import type {
 } from "@/api-client";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { ArrowLeft, Check, CircleOff, Info, Minus, MoveLeft, MoveRight } from "lucide-react";
+import { ArrowLeft, Check, CircleOff, Info, Loader2, Minus, MoveLeft, MoveRight } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -25,7 +25,7 @@ import {
   buildIntegrationCapabilityGroupSections,
   capabilityDefinitionDisplayName,
 } from "@/lib/integrationCapabilityGroups";
-import { isIntegrationV2SetupEnabled } from "@/lib/integrationV2";
+import { integrationSupportsGuidedSetup } from "@/lib/integrationV2";
 import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
@@ -347,6 +347,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
         integrationName,
         name: trimmedName,
         capabilities: Array.from(selectedCapabilities),
+        newSetup: true,
       });
       const integration = response.data?.integration || null;
       setCreatedIntegration(integration);
@@ -488,7 +489,16 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
     }
   }
 
-  if (!isIntegrationV2SetupEnabled(integrationName)) {
+  if (isAvailableIntegrationsLoading) {
+    return (
+      <div className="flex justify-center items-center gap-2 py-16 text-gray-500 dark:text-gray-400">
+        <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
+        <span className="text-sm">Loading integration metadata...</span>
+      </div>
+    );
+  }
+
+  if (!integrationSupportsGuidedSetup(integrationDefinition)) {
     return (
       <div className="pt-6 space-y-4">
         <div className="flex items-center gap-4">
@@ -504,8 +514,7 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
         <Alert>
           <AlertTitle>Unsupported setup flow</AlertTitle>
           <AlertDescription>
-            This integration is not enabled for the new setup flow. Use the standard connect flow from the integrations
-            list.
+            This integration does not expose guided setup. Use the standard connect flow from the integrations list.
           </AlertDescription>
         </Alert>
       </div>
@@ -775,10 +784,6 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
           onFinish={() => void handleSubmitCurrentStep()}
           isSubmitting={submitStepMutation.isPending}
         />
-      ) : null}
-
-      {isAvailableIntegrationsLoading ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading integration metadata...</p>
       ) : null}
     </div>
   );

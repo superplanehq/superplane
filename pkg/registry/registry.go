@@ -80,6 +80,7 @@ type IntegrationRegistration struct {
 type Registry struct {
 	httpCtx   *HTTPContext
 	Encryptor crypto.Encryptor
+	AppEnv    string
 
 	//
 	// Integration-related registrations
@@ -91,6 +92,35 @@ type Registry struct {
 	Actions  map[string]core.Action
 	Triggers map[string]core.Trigger
 	Widgets  map[string]core.Widget
+}
+
+type RegistryOptions struct {
+	Encryptor crypto.Encryptor
+	HTTP      HTTPOptions
+	AppEnv    string
+}
+
+func NewRegistryWithOptions(options RegistryOptions) (*Registry, error) {
+	httpCtx, err := NewHTTPContext(options.HTTP)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &Registry{
+		Encryptor:       options.Encryptor,
+		AppEnv:          options.AppEnv,
+		httpCtx:         httpCtx,
+		Actions:         map[string]core.Action{},
+		Triggers:        map[string]core.Trigger{},
+		Integrations:    map[string]core.Integration{},
+		WebhookHandlers: map[string]core.WebhookHandler{},
+		SetupProviders:  map[string]core.IntegrationSetupProvider{},
+		Widgets:         map[string]core.Widget{},
+	}
+
+	r.Init()
+
+	return r, nil
 }
 
 func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry, error) {
@@ -279,6 +309,17 @@ func (r *Registry) GetIntegration(name string) (core.Integration, error) {
 	}
 
 	return integration, nil
+}
+
+func (r *Registry) SupportsNewSetupFlow(integrationName string) bool {
+	//
+	// For now, the new setup flow should only be available in development.
+	// We do not want to allow users to use it in production yet.
+	// We will remove this once we are more confident the new setup flow
+	// won't have any major changes.
+	//
+	setupProvider, _ := r.GetSetupProvider(integrationName)
+	return setupProvider != nil && r.AppEnv == "development"
 }
 
 func (r *Registry) GetSetupProvider(name string) (core.IntegrationSetupProvider, error) {

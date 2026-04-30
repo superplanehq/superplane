@@ -4,7 +4,6 @@ package Superplane.Integrations;
 
 import "actions.proto";
 import "configuration.proto";
-import "triggers.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -52,12 +51,15 @@ message IntegrationDefinition {
   string label = 2;
   string icon = 3;
   string description = 4;
-  repeated Configuration.Field configuration = 5;
-  repeated Actions.Action actions = 6;
-  repeated Triggers.Trigger triggers = 7;
-  string instructions = 8;
-  repeated CapabilityDefinition capabilities = 9;
-  repeated CapabilityGroup capability_groups = 10;
+  repeated CapabilityDefinition capabilities = 5;
+  repeated CapabilityGroup capability_groups = 6;
+  bool legacy_setup_only = 7;
+
+  //
+  // NOTE: should be removed once we migrate every integration to the new flow
+  //
+  repeated Configuration.Field configuration = 8;
+  string instructions = 9;
 }
 
 message CapabilityDefinition {

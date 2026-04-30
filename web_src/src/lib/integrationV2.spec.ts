@@ -1,17 +1,22 @@
-import type { OrganizationsIntegration } from "@/api-client";
+import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
 import { describe, expect, it } from "vitest";
-import { getIntegrationV2SetupPath, integrationUsesNewSetupFlow, isIntegrationV2SetupEnabled } from "./integrationV2";
+import {
+  getIntegrationV2SetupPath,
+  integrationSupportsGuidedSetup,
+  integrationUsesNewSetupFlow,
+} from "./integrationV2";
 
-describe("isIntegrationV2SetupEnabled", () => {
-  it("returns true for integrations using the new setup flow", () => {
-    expect(isIntegrationV2SetupEnabled("github")).toBe(true);
-    expect(isIntegrationV2SetupEnabled("semaphore")).toBe(true);
+describe("integrationSupportsGuidedSetup", () => {
+  it("returns true when the catalog marks legacySetupOnly false", () => {
+    const def: IntegrationsIntegrationDefinition = { name: "github", legacySetupOnly: false };
+    expect(integrationSupportsGuidedSetup(def)).toBe(true);
   });
 
-  it("returns false for integrations outside the v2 whitelist", () => {
-    expect(isIntegrationV2SetupEnabled("slack")).toBe(false);
-    expect(isIntegrationV2SetupEnabled(undefined)).toBe(false);
-    expect(isIntegrationV2SetupEnabled(null)).toBe(false);
+  it("returns false when legacy-only, undefined, or absent", () => {
+    expect(integrationSupportsGuidedSetup({ name: "slack", legacySetupOnly: true })).toBe(false);
+    expect(integrationSupportsGuidedSetup({ name: "slack" })).toBe(false);
+    expect(integrationSupportsGuidedSetup(undefined)).toBe(false);
+    expect(integrationSupportsGuidedSetup(null)).toBe(false);
   });
 });
 
@@ -22,14 +27,28 @@ describe("getIntegrationV2SetupPath", () => {
 });
 
 describe("integrationUsesNewSetupFlow", () => {
-  it("returns true when the installation exposes capability state", () => {
+  it("returns true when legacySetup is false (new setup flow)", () => {
+    const integration: OrganizationsIntegration = {
+      status: { legacySetup: false, capabilities: [] },
+    };
+    expect(integrationUsesNewSetupFlow(integration)).toBe(true);
+  });
+
+  it("returns false when legacySetup is true even if capabilities are present", () => {
+    const integration: OrganizationsIntegration = {
+      status: { legacySetup: true, capabilities: [{ name: "foo", state: "STATE_ENABLED" }] },
+    };
+    expect(integrationUsesNewSetupFlow(integration)).toBe(false);
+  });
+
+  it("falls back to capability state when legacySetup is absent (older API)", () => {
     const integration: OrganizationsIntegration = {
       status: { capabilities: [{ name: "foo", state: "STATE_ENABLED" }] },
     };
     expect(integrationUsesNewSetupFlow(integration)).toBe(true);
   });
 
-  it("returns false when capabilities are absent or empty", () => {
+  it("returns false when capabilities are absent or empty and legacySetup is absent", () => {
     expect(integrationUsesNewSetupFlow(undefined)).toBe(false);
     expect(integrationUsesNewSetupFlow(null)).toBe(false);
     expect(integrationUsesNewSetupFlow({})).toBe(false);

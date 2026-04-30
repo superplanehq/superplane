@@ -196,6 +196,7 @@ func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.Cre
 		req.Name,
 		req.Configuration,
 		req.Capabilities,
+		req.NewSetup,
 	)
 }
 

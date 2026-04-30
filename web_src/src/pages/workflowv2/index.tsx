@@ -66,7 +66,6 @@ import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
-import { getIntegrationV2SetupPath, isIntegrationV2SetupEnabled } from "@/lib/integrationV2";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -125,6 +124,7 @@ import {
   getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
+import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -1666,8 +1666,8 @@ export function WorkflowPageV2() {
   const allTriggers = useMemo(() => {
     const merged = [...triggers];
     availableIntegrations.forEach((integration) => {
-      if (integration.triggers) {
-        merged.push(...integration.triggers);
+      if (integration.capabilities) {
+        merged.push(...triggersFromCapabilities(integration.capabilities));
       }
     });
     return merged;
@@ -1676,8 +1676,8 @@ export function WorkflowPageV2() {
   const allComponents = useMemo(() => {
     const merged = [...components];
     availableIntegrations.forEach((integration) => {
-      if (integration.actions) {
-        merged.push(...integration.actions);
+      if (integration.capabilities) {
+        merged.push(...actionsFromCapabilities(integration.capabilities));
       }
     });
     return merged;
@@ -2669,17 +2669,9 @@ export function WorkflowPageV2() {
     }));
   }, [canvas?.spec?.nodes, availableIntegrations, integrations, canReadIntegrations, justConnectedIntegrations]);
 
-  const handleConnectIntegration = useCallback(
-    (integrationName: string) => {
-      if (organizationId && isIntegrationV2SetupEnabled(integrationName)) {
-        navigate(getIntegrationV2SetupPath(organizationId, integrationName));
-        return;
-      }
-
-      setIntegrationDialogName(integrationName);
-    },
-    [navigate, organizationId],
-  );
+  const handleConnectIntegration = useCallback((integrationName: string) => {
+    setIntegrationDialogName(integrationName);
+  }, []);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
