@@ -232,18 +232,18 @@ func (u *UpdateGPUDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (u *UpdateGPUDroplet) Actions() []core.Action {
-	return []core.Action{
+func (u *UpdateGPUDroplet) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (u *UpdateGPUDroplet) HandleAction(ctx core.ActionContext) error {
+func (u *UpdateGPUDroplet) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {
@@ -284,7 +284,7 @@ func (u *UpdateGPUDroplet) HandleAction(ctx core.ActionContext) error {
 }
 
 func (u *UpdateGPUDroplet) handleActionCompleted(
-	ctx core.ActionContext,
+	ctx core.ActionHookContext,
 	client *Client,
 	dropletID int,
 	state string,
