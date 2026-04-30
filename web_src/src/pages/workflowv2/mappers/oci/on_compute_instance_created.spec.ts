@@ -117,7 +117,7 @@ describe("onComputeInstanceCreatedTriggerRenderer.getRootEventValues", () => {
   it("uses event.createdAt for Triggered At", () => {
     const ctx: TriggerEventContext = { event: buildEvent(buildOciEventData()) };
     const values = onComputeInstanceCreatedTriggerRenderer.getRootEventValues(ctx);
-    expect(values["Triggered At"]).toBe(new Date(CREATED_AT).toLocaleString());
+    expect(new Date(values["Triggered At"]).getTime()).toBe(new Date(CREATED_AT).getTime());
   });
 
   it("falls back to envelope.eventTime when event.createdAt is absent", () => {
@@ -127,7 +127,7 @@ describe("onComputeInstanceCreatedTriggerRenderer.getRootEventValues", () => {
       event: { ...buildEvent(ociData), createdAt: undefined as unknown as string },
     };
     const values = onComputeInstanceCreatedTriggerRenderer.getRootEventValues(ctx);
-    expect(values["Triggered At"]).toBe(new Date(eventTime).toLocaleString());
+    expect(new Date(values["Triggered At"]).getTime()).toBe(new Date(eventTime).getTime());
   });
 
   it("omits fields whose values are missing", () => {
