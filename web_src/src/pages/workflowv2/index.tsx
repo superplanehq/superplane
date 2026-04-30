@@ -4910,7 +4910,7 @@ export function WorkflowPageV2() {
 
       return { yamlText, filename };
     },
-    [canvasNodesById],
+    [canvas],
   );
 
   const handleUseTemplateSubmit = useCallback(
