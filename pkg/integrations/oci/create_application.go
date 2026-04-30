@@ -17,9 +17,12 @@ const CreateApplicationPayloadType = "oci.applicationCreated"
 type CreateApplication struct{}
 
 type CreateApplicationSpec struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
-	DisplayName   string `json:"displayName" mapstructure:"displayName"`
-	SubnetIDs     string `json:"subnetIds" mapstructure:"subnetIds"`
+	CompartmentID string    `json:"compartmentId" mapstructure:"compartmentId"`
+	DisplayName   string    `json:"displayName" mapstructure:"displayName"`
+	VcnID         string    `json:"vcnId" mapstructure:"vcnId"`
+	SubnetIDs     string    `json:"subnetIds" mapstructure:"subnetIds"`
+	Shape         string    `json:"shape" mapstructure:"shape"`
+	FreeformTags  []TagItem `json:"freeformTags" mapstructure:"freeformTags"`
 }
 
 func (c *CreateApplication) Name() string {
@@ -98,8 +101,28 @@ func (c *CreateApplication) Configuration() []configuration.Field {
 			Placeholder: "my-functions-app",
 		},
 		{
+			Name:        "vcnId",
+			Label:       "VCN",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The Virtual Cloud Network for the application",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeVCN,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "compartmentId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "compartmentId",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			Name:        "subnetIds",
-			Label:       "Subnet OCIDs",
+			Label:       "Subnet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "Subnet for the application's VCN configuration",
@@ -113,11 +136,59 @@ func (c *CreateApplication) Configuration() []configuration.Field {
 								Field: "compartmentId",
 							},
 						},
+						{
+							Name: "vcnId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "vcnId",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "shape",
+			Label:       "Shape",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "The processor architecture for the application (defaults to GENERIC_X86)",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Generic x86", Value: "GENERIC_X86"},
+						{Label: "Generic ARM", Value: "GENERIC_ARM"},
+						{Label: "Generic x86 & ARM", Value: "GENERIC_X86_ARM"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "freeformTags",
+			Label:       "Tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Free-form tags (key-value pairs) to apply to the application",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{Name: "key", Label: "Key", Type: configuration.FieldTypeString, Required: true},
+							{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true},
+						},
 					},
 				},
 			},
 		},
 	}
+}
+
+type CreateApplicationNodeMetadata struct {
+	SubnetID   string `json:"subnetId" mapstructure:"subnetId"`
+	SubnetName string `json:"subnetName" mapstructure:"subnetName"`
+	Shape      string `json:"shape" mapstructure:"shape"`
 }
 
 func (c *CreateApplication) Setup(ctx core.SetupContext) error {
@@ -132,11 +203,48 @@ func (c *CreateApplication) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(spec.DisplayName) == "" {
 		return errors.New("displayName is required")
 	}
+	if strings.TrimSpace(spec.VcnID) == "" {
+		return errors.New("vcnId is required")
+	}
 	if strings.TrimSpace(spec.SubnetIDs) == "" {
 		return errors.New("subnetIds is required")
 	}
 
-	return nil
+	return resolveCreateApplicationMetadata(ctx, spec)
+}
+
+func resolveCreateApplicationMetadata(ctx core.SetupContext, spec CreateApplicationSpec) error {
+	// Return early if the subnet name is already cached for this subnet.
+	var existing CreateApplicationNodeMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil &&
+		existing.SubnetID == spec.SubnetIDs && existing.SubnetName != "" {
+		// Update shape in case it changed.
+		existing.Shape = spec.Shape
+		return ctx.Metadata.Set(existing)
+	}
+
+	subnetName := spec.SubnetIDs // fallback to OCID
+
+	if !strings.Contains(spec.SubnetIDs, "{{") {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			subnets, err := client.ListSubnets(spec.CompartmentID, spec.VcnID)
+			if err == nil {
+				for _, sn := range subnets {
+					if sn.ID == spec.SubnetIDs {
+						subnetName = sn.DisplayName
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return ctx.Metadata.Set(CreateApplicationNodeMetadata{
+		SubnetID:   spec.SubnetIDs,
+		SubnetName: subnetName,
+		Shape:      spec.Shape,
+	})
 }
 
 func (c *CreateApplication) Execute(ctx core.ExecutionContext) error {
@@ -153,7 +261,7 @@ func (c *CreateApplication) Execute(ctx core.ExecutionContext) error {
 	// Subnet IDs are stored as a single OCID from the resource picker.
 	subnetIDs := []string{spec.SubnetIDs}
 
-	app, err := client.CreateApplication(spec.CompartmentID, spec.DisplayName, subnetIDs)
+	app, err := client.CreateApplication(spec.CompartmentID, spec.DisplayName, spec.Shape, subnetIDs, tagItemsToMap(spec.FreeformTags))
 	if err != nil {
 		return fmt.Errorf("failed to create application: %w", err)
 	}

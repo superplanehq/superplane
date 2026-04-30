@@ -171,7 +171,6 @@ func (o *OCI) Actions() []core.Action {
 func (o *OCI) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnComputeInstanceCreated{},
-		&OnFunctionInvoke{},
 	}
 }
 
@@ -218,7 +217,7 @@ func (o *OCI) Sync(ctx core.SyncContext) error {
 	// avoids cross-compartment IAM issues that arise when the rule and topic are in different compartments.
 	if metadata.EventsRuleID == "" {
 		ruleName := fmt.Sprintf("superplane-%s", ctx.Integration.ID())
-		condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
+		condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end", "com.oraclecloud.functions.invokefunction"]}`
 		rule, err := client.CreateEventsRule(cfg.TenancyOCID, ruleName, condition, metadata.TopicID)
 		if err != nil {
 			return fmt.Errorf("failed to create Events rule: %w", err)

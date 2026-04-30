@@ -45,6 +45,8 @@ func (d *DeleteApplication) Documentation() string {
 
 Emits the deleted application ID on the default output channel:
 - ` + "`applicationId`" + ` — OCID of the deleted application
+- ` + "`deleted`" + ` — boolean confirming deletion
+- ` + "`displayName`" + ` — name of the deleted application
 `
 }
 
@@ -61,12 +63,7 @@ func (d *DeleteApplication) OutputChannels(_ any) []core.OutputChannel {
 }
 
 func (d *DeleteApplication) ExampleOutput() map[string]any {
-	return map[string]any{
-		"type": DeleteApplicationPayloadType,
-		"data": map[string]any{
-			"applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
-		},
-	}
+	return exampleOutputDeleteApplication()
 }
 
 func (d *DeleteApplication) Configuration() []configuration.Field {
@@ -106,17 +103,64 @@ func (d *DeleteApplication) Configuration() []configuration.Field {
 	}
 }
 
+type DeleteApplicationNodeMetadata struct {
+	ApplicationID   string `json:"applicationId" mapstructure:"applicationId"`
+	ApplicationName string `json:"applicationName" mapstructure:"applicationName"`
+}
+
 func (d *DeleteApplication) Setup(ctx core.SetupContext) error {
 	spec := DeleteApplicationSpec{}
 	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if strings.TrimSpace(spec.CompartmentID) == "" {
+		return errors.New("compartmentId is required")
+	}
+
 	if strings.TrimSpace(spec.ApplicationID) == "" {
 		return errors.New("applicationId is required")
 	}
 
-	return nil
+	return resolveDeleteApplicationMetadata(ctx, spec.ApplicationID)
+}
+
+func resolveDeleteApplicationMetadata(ctx core.SetupContext, applicationID string) error {
+	// If it's an expression placeholder, store as-is.
+	if strings.Contains(applicationID, "{{") {
+		return ctx.Metadata.Set(DeleteApplicationNodeMetadata{ApplicationID: applicationID, ApplicationName: applicationID})
+	}
+
+	// Return early if already cached for this application.
+	var existing DeleteApplicationNodeMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil &&
+		existing.ApplicationID == applicationID && existing.ApplicationName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	app, err := client.GetApplication(applicationID)
+	if err != nil {
+		// Non-fatal: fall back to showing the ID.
+		return ctx.Metadata.Set(DeleteApplicationNodeMetadata{
+			ApplicationID:   applicationID,
+			ApplicationName: applicationID,
+		})
+	}
+
+	name := app.DisplayName
+	if name == "" {
+		name = applicationID
+	}
+
+	return ctx.Metadata.Set(DeleteApplicationNodeMetadata{
+		ApplicationID:   applicationID,
+		ApplicationName: name,
+	})
 }
 
 func (d *DeleteApplication) Execute(ctx core.ExecutionContext) error {
@@ -130,12 +174,19 @@ func (d *DeleteApplication) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
+	app, err := client.GetApplication(spec.ApplicationID)
+	if err != nil {
+		return fmt.Errorf("failed to get application: %w", err)
+	}
+
 	if err := client.DeleteApplication(spec.ApplicationID); err != nil {
 		return fmt.Errorf("failed to delete application: %w", err)
 	}
 
 	payload := map[string]any{
 		"applicationId": spec.ApplicationID,
+		"displayName":   app.DisplayName,
+		"deleted":       true,
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteApplicationPayloadType, []any{payload})

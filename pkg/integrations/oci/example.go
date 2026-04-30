@@ -57,12 +57,22 @@ func exampleOutputInvokeFunction() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputInvokeFunctionOnce, exampleOutputInvokeFunctionBytes, &exampleOutputInvokeFunctionCache)
 }
 
-//go:embed example_data_on_function_invoke.json
-var exampleDataOnFunctionInvokeBytes []byte
+//go:embed example_output_delete_application.json
+var exampleOutputDeleteApplicationBytes []byte
 
-var exampleDataOnFunctionInvokeOnce sync.Once
-var exampleDataOnFunctionInvokeCache map[string]any
+var exampleOutputDeleteApplicationOnce sync.Once
+var exampleOutputDeleteApplicationCache map[string]any
 
-func exampleDataOnFunctionInvoke() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnFunctionInvokeOnce, exampleDataOnFunctionInvokeBytes, &exampleDataOnFunctionInvokeCache)
+func exampleOutputDeleteApplication() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteApplicationOnce, exampleOutputDeleteApplicationBytes, &exampleOutputDeleteApplicationCache)
+}
+
+//go:embed example_output_delete_function.json
+var exampleOutputDeleteFunctionBytes []byte
+
+var exampleOutputDeleteFunctionOnce sync.Once
+var exampleOutputDeleteFunctionCache map[string]any
+
+func exampleOutputDeleteFunction() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteFunctionOnce, exampleOutputDeleteFunctionBytes, &exampleOutputDeleteFunctionCache)
 }

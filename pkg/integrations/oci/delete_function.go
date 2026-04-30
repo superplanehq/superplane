@@ -47,6 +47,7 @@ func (d *DeleteFunction) Documentation() string {
 
 Emits the deleted function ID on the default output channel:
 - ` + "`functionId`" + ` — OCID of the deleted function
+- ` + "`deleted`" + ` — boolean confirming deletion
 `
 }
 
@@ -63,12 +64,7 @@ func (d *DeleteFunction) OutputChannels(_ any) []core.OutputChannel {
 }
 
 func (d *DeleteFunction) ExampleOutput() map[string]any {
-	return map[string]any{
-		"type": DeleteFunctionPayloadType,
-		"data": map[string]any{
-			"functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
-		},
-	}
+	return exampleOutputDeleteFunction()
 }
 
 func (d *DeleteFunction) Configuration() []configuration.Field {
@@ -138,7 +134,48 @@ func (d *DeleteFunction) Setup(ctx core.SetupContext) error {
 		return errors.New("functionId is required")
 	}
 
-	return nil
+	return resolveDeleteFunctionMetadata(ctx, spec.ApplicationID, spec.FunctionID)
+}
+
+type DeleteFunctionNodeMetadata struct {
+	ApplicationID   string `json:"applicationId" mapstructure:"applicationId"`
+	ApplicationName string `json:"applicationName" mapstructure:"applicationName"`
+	FunctionID      string `json:"functionId" mapstructure:"functionId"`
+	FunctionName    string `json:"functionName" mapstructure:"functionName"`
+}
+
+func resolveDeleteFunctionMetadata(ctx core.SetupContext, applicationID, functionID string) error {
+	// Return early if already cached.
+	var existing DeleteFunctionNodeMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil &&
+		existing.ApplicationID == applicationID &&
+		existing.FunctionID == functionID && existing.FunctionName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	meta := DeleteFunctionNodeMetadata{
+		ApplicationID: applicationID,
+		FunctionID:    functionID,
+	}
+
+	if app, err := client.GetApplication(applicationID); err == nil && app.DisplayName != "" {
+		meta.ApplicationName = app.DisplayName
+	} else {
+		meta.ApplicationName = applicationID
+	}
+
+	if fn, err := client.GetFunction(functionID); err == nil && fn.DisplayName != "" {
+		meta.FunctionName = fn.DisplayName
+	} else {
+		meta.FunctionName = functionID
+	}
+
+	return ctx.Metadata.Set(meta)
 }
 
 func (d *DeleteFunction) Execute(ctx core.ExecutionContext) error {
@@ -158,6 +195,7 @@ func (d *DeleteFunction) Execute(ctx core.ExecutionContext) error {
 
 	payload := map[string]any{
 		"functionId": spec.FunctionID,
+		"deleted":    true,
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteFunctionPayloadType, []any{payload})

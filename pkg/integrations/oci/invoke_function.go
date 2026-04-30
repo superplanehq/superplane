@@ -152,7 +152,47 @@ func (i *InvokeFunction) Setup(ctx core.SetupContext) error {
 		return errors.New("functionId is required")
 	}
 
-	return nil
+	return resolveInvokeFunctionMetadata(ctx, spec.ApplicationID, spec.FunctionID)
+}
+
+type InvokeFunctionNodeMetadata struct {
+	ApplicationID   string `json:"applicationId" mapstructure:"applicationId"`
+	ApplicationName string `json:"applicationName" mapstructure:"applicationName"`
+	FunctionID      string `json:"functionId" mapstructure:"functionId"`
+	FunctionName    string `json:"functionName" mapstructure:"functionName"`
+}
+
+func resolveInvokeFunctionMetadata(ctx core.SetupContext, applicationID, functionID string) error {
+	// Return early if already cached.
+	var existing InvokeFunctionNodeMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil &&
+		existing.ApplicationID == applicationID && existing.FunctionID == functionID && existing.FunctionName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	meta := InvokeFunctionNodeMetadata{
+		ApplicationID: applicationID,
+		FunctionID:    functionID,
+	}
+
+	if app, err := client.GetApplication(applicationID); err == nil && app.DisplayName != "" {
+		meta.ApplicationName = app.DisplayName
+	} else {
+		meta.ApplicationName = applicationID
+	}
+
+	if fn, err := client.GetFunction(functionID); err == nil && fn.DisplayName != "" {
+		meta.FunctionName = fn.DisplayName
+	} else {
+		meta.FunctionName = functionID
+	}
+
+	return ctx.Metadata.Set(meta)
 }
 
 func (i *InvokeFunction) Execute(ctx core.ExecutionContext) error {
