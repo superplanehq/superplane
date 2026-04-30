@@ -13,9 +13,12 @@ import (
 )
 
 type Organization struct {
-	ID                       uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                     string    `gorm:"uniqueIndex"`
-	Description              string
+	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name        string    `gorm:"uniqueIndex"`
+	Description string
+	// OAuth provider IDs (e.g. github, google) allowed when completing pending *email* invitations
+	// after an OAuth login. Empty or nil means unrestricted for that path. Does not apply to
+	// password/magic sign-in (see authentication) or to shareable invite-link acceptance.
 	AllowedProviders         datatypes.JSONSlice[string]
 	ChangeManagementEnabled  bool
 	UsageSyncedAt            *time.Time
@@ -27,6 +30,9 @@ type Organization struct {
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
+	if len(o.AllowedProviders) == 0 {
+		return true
+	}
 	return slices.Contains(o.AllowedProviders, provider)
 }
 
@@ -168,7 +174,7 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 	organization := Organization{
 		Name:                    name,
 		Description:             description,
-		AllowedProviders:        datatypes.JSONSlice[string]{ProviderGitHub},
+		AllowedProviders:        datatypes.JSONSlice[string]{ProviderGitHub, ProviderGoogle},
 		ChangeManagementEnabled: false,
 		CreatedAt:               &now,
 		UpdatedAt:               &now,

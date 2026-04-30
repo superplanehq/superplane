@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.ResourceRegistry) {
@@ -154,6 +155,107 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, SignupDisabledError, err.Error())
 		assert.Nil(t, resultAccount)
+	})
+}
+
+func TestAcceptPendingInvitations(t *testing.T) {
+	setupInvitation := func(t *testing.T, email string) (*Handler, *support.ResourceRegistry, *models.Account) {
+		t.Helper()
+		handler, r := setupAuthHandler(t, false)
+		account, err := models.CreateAccount("Test User", email)
+		require.NoError(t, err)
+		_, err = models.CreateInvitation(r.Organization.ID, r.User, email, models.InvitationStatePending)
+		require.NoError(t, err)
+		return handler, r, account
+	}
+
+	t.Run("should accept invitation when provider is allowed", func(t *testing.T) {
+		email := "github-user@example.com"
+		handler, r, account := setupInvitation(t, email)
+
+		err := handler.acceptPendingInvitations(account, models.ProviderGitHub)
+		require.NoError(t, err)
+
+		_, err = models.FindPendingInvitation(email, r.Organization.ID.String())
+		assert.Error(t, err, "invitation should no longer be pending")
+	})
+
+	t.Run("should skip invitation when provider is not allowed", func(t *testing.T) {
+		email := "google-user@example.com"
+		handler, r, account := setupInvitation(t, email)
+
+		err := database.Conn().Model(r.Organization).Update("allowed_providers", datatypes.JSONSlice[string]{models.ProviderGitHub}).Error
+		require.NoError(t, err)
+
+		err = handler.acceptPendingInvitations(account, models.ProviderGoogle)
+		require.NoError(t, err)
+
+		invitation, err := models.FindPendingInvitation(email, r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, models.InvitationStatePending, invitation.State)
+	})
+
+	t.Run("should accept invitation when provider is empty (password/magic-code login)", func(t *testing.T) {
+		email := "password-user@example.com"
+		handler, r, account := setupInvitation(t, email)
+
+		err := handler.acceptPendingInvitations(account, "")
+		require.NoError(t, err)
+
+		_, err = models.FindPendingInvitation(email, r.Organization.ID.String())
+		assert.Error(t, err, "invitation should no longer be pending")
+	})
+
+	t.Run("should skip invitation when org no longer exists", func(t *testing.T) {
+		email := "deleted-org-user@example.com"
+		handler, r, account := setupInvitation(t, email)
+
+		err := models.SoftDeleteOrganization(r.Organization.ID.String())
+		require.NoError(t, err)
+
+		err = handler.acceptPendingInvitations(account, models.ProviderGitHub)
+		require.NoError(t, err)
+
+		invitation, err := models.FindPendingInvitation(email, r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, models.InvitationStatePending, invitation.State)
+	})
+
+	t.Run("should accept invitation when org has no provider restriction", func(t *testing.T) {
+		email := "unrestricted-org-user@example.com"
+		handler, r, account := setupInvitation(t, email)
+
+		err := database.Conn().Model(r.Organization).Update("allowed_providers", datatypes.JSONSlice[string]{}).Error
+		require.NoError(t, err)
+
+		err = handler.acceptPendingInvitations(account, models.ProviderGitHub)
+		require.NoError(t, err)
+
+		_, err = models.FindPendingInvitation(email, r.Organization.ID.String())
+		assert.Error(t, err, "invitation should no longer be pending")
+	})
+
+	t.Run("should accept only invitations from orgs that allow the provider", func(t *testing.T) {
+		email := "multi-org-user@example.com"
+		handler, r, account := setupInvitation(t, email)
+
+		// Create a second org that only allows Google.
+		googleOrg, err := models.CreateOrganization(support.RandomName("org"), support.RandomName("org-display"))
+		require.NoError(t, err)
+		err = database.Conn().Model(googleOrg).Update("allowed_providers", datatypes.JSONSlice[string]{models.ProviderGoogle}).Error
+		require.NoError(t, err)
+		_, err = models.CreateInvitation(googleOrg.ID, r.User, email, models.InvitationStatePending)
+		require.NoError(t, err)
+
+		err = handler.acceptPendingInvitations(account, models.ProviderGitHub)
+		require.NoError(t, err)
+
+		_, err = models.FindPendingInvitation(email, r.Organization.ID.String())
+		assert.Error(t, err, "github org invitation should be accepted")
+
+		pending, err := models.FindPendingInvitation(email, googleOrg.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, models.InvitationStatePending, pending.State)
 	})
 }
 
