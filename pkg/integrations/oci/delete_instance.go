@@ -169,7 +169,8 @@ func (c *DeleteInstance) poll(ctx core.ActionHookContext) error {
 
 	instance, err := client.GetInstance(metadata.InstanceID)
 	if err != nil {
-		if strings.Contains(err.Error(), "404") {
+		var apiErr *OCIAPIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			return c.emitTerminated(ctx, metadata.InstanceID)
 		}
 
