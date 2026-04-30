@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { meKeys, useMe } from "@/hooks/useMe";
 import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
 
@@ -18,6 +19,8 @@ export function Profile() {
   usePageTitle(["Profile"]);
   const queryClient = useQueryClient();
   const organizationId = useOrganizationId();
+  const { data: organization } = useOrganization(organizationId || "");
+  const organizationName = organization?.metadata?.name || "Organization";
   const { data: user, isLoading: loading, error: meError } = useMe();
   const [actionError, setActionError] = useState<string | null>(null);
   const [token, setToken] = useState<string>("");
@@ -128,7 +131,8 @@ export function Profile() {
         </div>
 
         <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-0">
-          API Token
+          API Token ({organizationName})
+          <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Organization scoped</span>
         </Heading>
         <Text className="text-gray-800 text-left dark:text-gray-400 text-sm">
           Use this token to authenticate API requests to SuperPlane. Keep your token secure and do not share it.
@@ -161,6 +165,10 @@ export function Profile() {
                   Your current token is hidden for security. Generate a new token to view it.
                 </Text>
               )}
+            </div>
+
+            <div className="mt-3 flex items-start gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
+              This token only works for {organizationName}. Switch organizations to manage tokens for other organizations.
             </div>
 
             {token && (
@@ -197,6 +205,14 @@ export function Profile() {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white px-4 py-4">
+          <p className="text-sm font-semibold text-gray-900">About organization-scoped settings</p>
+          <p className="mt-1 text-sm text-gray-600">
+            Some settings (like API tokens, members, roles, and integrations) are specific to the organization you're
+            currently in. Your personal profile information is shared across all organizations.
+          </p>
         </div>
       </div>
     </div>
