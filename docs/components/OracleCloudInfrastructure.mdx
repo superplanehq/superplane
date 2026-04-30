@@ -18,7 +18,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Application" href="#create-application" description="Create a new OCI Functions application" />
   <LinkCard title="Create Compute Instance" href="#create-compute-instance" description="Provision a new OCI Compute instance and wait for it to reach RUNNING state" />
   <LinkCard title="Create Function" href="#create-function" description="Deploy a new function within an OCI Functions application" />
-  <LinkCard title="Delete Application" href="#delete-application" description="Delete an OCI Functions application and all of its functions" />
+  <LinkCard title="Delete Application" href="#delete-application" description="Delete an OCI Functions application" />
   <LinkCard title="Delete Function" href="#delete-function" description="Remove a function from an OCI Functions application" />
   <LinkCard title="Invoke Function" href="#invoke-function" description="Execute an OCI Function and capture its response" />
 </CardGrid>
@@ -295,12 +295,15 @@ Emits the created function details including:
 
 ## Delete Application
 
-The Delete Application component removes an Oracle Cloud Infrastructure Functions application and all functions it contains.
+The Delete Application component removes an Oracle Cloud Infrastructure Functions application.
+
+> **Important:** OCI will reject the deletion with a 409 Conflict if the application still contains functions.
+> You must delete all functions inside the application (using the **Delete Function** component) before using this component.
 
 ### Configuration
 
 - **Compartment**: The compartment containing the application
-- **Application**: The application to delete
+- **Application**: The application to delete. The application must have no remaining functions.
 
 ### Output
 
