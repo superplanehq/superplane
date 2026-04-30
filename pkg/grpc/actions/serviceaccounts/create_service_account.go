@@ -86,8 +86,17 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, status.Errorf(codes.Internal, "failed to create service account: %v", err)
 	}
 
+	creators, err := models.FindMaybeDeletedUsersByIDs([]uuid.UUID{createdByUUID})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to load service account creator")
+	}
+	var creator *models.User
+	if len(creators) > 0 {
+		creator = &creators[0]
+	}
+
 	return &pb.CreateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(sa),
+		ServiceAccount: serializeServiceAccount(sa, creator),
 		Token:          plainToken,
 	}, nil
 }

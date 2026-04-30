@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/playwright-community/playwright-go"
@@ -47,6 +48,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
 		steps.assertServiceAccountVisibleInList("list-test-bot")
+		steps.assertCreatedByColumnShowsCreator("list-test-bot", "E2E User")
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
@@ -55,6 +57,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertCreatorOnDetailPage("E2E User")
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
@@ -211,6 +214,29 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 
 func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 	s.session.AssertText(name)
+}
+
+func (s *serviceAccountSteps) assertCreatedByColumnShowsCreator(serviceAccountName, creatorDisplayName string) {
+	page := s.session.Page()
+	row := page.GetByRole("row").Filter(pw.LocatorFilterOptions{
+		Has: page.GetByTestId("sa-link").GetByText(serviceAccountName, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)}),
+	})
+	creatorLink := row.Locator(`[data-testid^="sa-created-by-"]`)
+	err := creatorLink.First().WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+	text, err := creatorLink.First().InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, creatorDisplayName, strings.TrimSpace(text))
+}
+
+func (s *serviceAccountSteps) assertCreatorOnDetailPage(creatorDisplayName string) {
+	page := s.session.Page()
+	loc := page.GetByTestId("sa-detail-created-by")
+	err := loc.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+	text, err := loc.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, creatorDisplayName, strings.TrimSpace(text))
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {

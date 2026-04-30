@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -50,7 +51,18 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, status.Error(codes.Internal, "failed to update service account")
 	}
 
+	var creator *models.User
+	if user.CreatedBy != nil {
+		creators, creatorsErr := models.FindMaybeDeletedUsersByIDs([]uuid.UUID{*user.CreatedBy})
+		if creatorsErr != nil {
+			return nil, status.Error(codes.Internal, "failed to load service account creator")
+		}
+		if len(creators) > 0 {
+			creator = &creators[0]
+		}
+	}
+
 	return &pb.UpdateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: serializeServiceAccount(user, creator),
 	}, nil
 }
