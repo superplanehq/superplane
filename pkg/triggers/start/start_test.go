@@ -142,6 +142,28 @@ func TestStart_HandleHook_RejectsNoTemplatesConfigured(t *testing.T) {
 	assert.Contains(t, err.Error(), "no templates configured")
 }
 
+func TestStart_HandleHook_RejectsNilPayloadWithoutOverride(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{"name": "Bad", "payload": nil},
+		},
+	}
+
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
+		Parameters:    map[string]any{"template": "Bad"},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no payload")
+	assert.Empty(t, events.Payloads)
+}
+
 func TestStart_HandleHook_RejectsUnknownHook(t *testing.T) {
 	s := &Start{}
 
