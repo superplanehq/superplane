@@ -22,6 +22,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	var updateName string
 	var updateDescription string
 	var updateChangeManagementEnabled bool
+	var updateAllowedOAuthProviders string
 	updateCmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update the current organization",
@@ -30,10 +31,17 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	updateCmd.Flags().StringVar(&updateName, "name", "", "organization name")
 	updateCmd.Flags().StringVar(&updateDescription, "description", "", "organization description")
 	updateCmd.Flags().BoolVar(&updateChangeManagementEnabled, "change-management-enabled", false, "enable or disable global change management")
+	updateCmd.Flags().StringVar(
+		&updateAllowedOAuthProviders,
+		"allowed-oauth-providers",
+		"",
+		"comma-separated OAuth providers allowed for invitations (github, google); empty string clears restriction",
+	)
 	core.Bind(updateCmd, &updateCommand{
-		name:                    &updateName,
-		description:             &updateDescription,
-		changeManagementEnabled: &updateChangeManagementEnabled,
+		name:                     &updateName,
+		description:              &updateDescription,
+		changeManagementEnabled:  &updateChangeManagementEnabled,
+		allowedOAuthProvidersRaw: &updateAllowedOAuthProviders,
 	}, options)
 
 	root.AddCommand(getCmd)
