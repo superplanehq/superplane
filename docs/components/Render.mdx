@@ -25,6 +25,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Remove Custom Domain" href="#remove-custom-domain" description="Remove a custom domain from a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
+  <LinkCard title="Verify DNS Configuration" href="#verify-dns-configuration" description="Trigger DNS verification for a Render custom domain" />
 </CardGrid>
 
 ## Instructions
@@ -510,6 +511,40 @@ Emits a `render.envVar.updated` payload with `serviceId`, `key`, and a `valueGen
   },
   "timestamp": "2026-02-05T16:25:00.000000Z",
   "type": "render.envVar.updated"
+}
+```
+
+<a id="verify-dns-configuration"></a>
+
+## Verify DNS Configuration
+
+The Verify DNS Configuration component asks Render to verify the DNS configuration for a custom domain.
+
+### Use Cases
+
+- **Custom domain provisioning**: Trigger Render verification after DNS records have been created or updated
+- **Recovery workflows**: Retry verification for a domain that is still unverified after DNS propagation
+
+### Configuration
+
+- **Service**: Render service that owns the custom domain
+- **Domain Name**: The custom domain name or ID to verify (e.g., `app.example.com`)
+
+### Output
+
+Emits a `render.dnsConfiguration.verification.requested` payload with `name`, `serviceId`, and `status`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "app.example.com",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "accepted"
+  },
+  "timestamp": "2026-02-05T16:25:00.000000Z",
+  "type": "render.dnsConfiguration.verification.requested"
 }
 ```
 

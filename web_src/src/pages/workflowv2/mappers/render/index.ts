@@ -9,6 +9,7 @@ import { PURGE_CACHE_STATE_REGISTRY, purgeCacheMapper } from "./purge_cache";
 import { rollbackDeployMapper } from "./rollback_deploy";
 import { updateEnvVarMapper } from "./update_env_var";
 import { addCustomDomainMapper, ADD_CUSTOM_DOMAIN_STATE_REGISTRY } from "./add_custom_domain";
+import { verifyDNSConfigurationMapper, VERIFY_DNS_CONFIGURATION_STATE_REGISTRY } from "./verify_dns_configuration";
 import { removeCustomDomainMapper } from "./remove_custom_domain";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -20,6 +21,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   purgeCache: purgeCacheMapper,
   updateEnvVar: updateEnvVarMapper,
   addCustomDomain: addCustomDomainMapper,
+  verifyDNSConfiguration: verifyDNSConfigurationMapper,
   removeCustomDomain: removeCustomDomainMapper,
 };
 
@@ -34,4 +36,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   rollbackDeploy: DEPLOY_STATE_REGISTRY,
   purgeCache: PURGE_CACHE_STATE_REGISTRY,
   addCustomDomain: ADD_CUSTOM_DOMAIN_STATE_REGISTRY,
+  verifyDNSConfiguration: VERIFY_DNS_CONFIGURATION_STATE_REGISTRY,
 };

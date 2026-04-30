@@ -16,12 +16,17 @@ const (
 	AddCustomDomainPayloadType          = "render.customDomain.added"
 	AddCustomDomainSuccessOutputChannel = "success"
 	AddCustomDomainFailedOutputChannel  = "failed"
-	AddCustomDomainPollInterval         = 5 * time.Minute
+	AddCustomDomainPollInterval         = 15 * time.Second
 	addCustomDomainExecutionKey         = "custom_domain_id"
 
 	customDomainVerificationStatusVerified   = "verified"
 	customDomainVerificationStatusFailed     = "failed"
 	customDomainVerificationStatusUnverified = "unverified"
+)
+
+var (
+	addCustomDomainImmediateVerificationTimeout  = 30 * time.Second
+	addCustomDomainImmediateVerificationInterval = 2 * time.Second
 )
 
 type AddCustomDomain struct{}
@@ -147,8 +152,12 @@ func decodeAddCustomDomainConfiguration(cfg any) (AddCustomDomainConfiguration, 
 }
 
 func (c *AddCustomDomain) Setup(ctx core.SetupContext) error {
-	_, err := decodeAddCustomDomainConfiguration(ctx.Configuration)
-	return err
+	spec, err := decodeAddCustomDomainConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	return setServiceNodeMetadata(ctx, spec.Service)
 }
 
 func (c *AddCustomDomain) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -215,6 +224,18 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
+	if err := client.VerifyCustomDomain(spec.Service, domainID); err != nil {
+		return err
+	}
+
+	completed, err := c.waitForCustomDomainVerification(ctx, client, spec, metadataFromDomain(spec.Service, domain))
+	if err != nil {
+		return err
+	}
+	if completed {
+		return nil
+	}
+
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, AddCustomDomainPollInterval)
 }
 
@@ -235,6 +256,38 @@ func (c *AddCustomDomain) HandleHook(ctx core.ActionHookContext) error {
 	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
+func (c *AddCustomDomain) waitForCustomDomainVerification(
+	ctx core.ExecutionContext,
+	client *Client,
+	spec AddCustomDomainConfiguration,
+	metadata AddCustomDomainExecutionMetadata,
+) (bool, error) {
+	deadline := time.Now().Add(addCustomDomainImmediateVerificationTimeout)
+
+	for {
+		domain, err := client.GetCustomDomain(spec.Service, metadata.CustomDomain.ID)
+		if err != nil {
+			return false, err
+		}
+
+		metadata.CustomDomain.VerificationStatus = domain.VerificationStatus
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return false, err
+		}
+
+		emitted, err := emitCustomDomainVerificationResult(ctx.ExecutionState, spec.Service, domain)
+		if emitted || err != nil {
+			return emitted, err
+		}
+
+		if time.Now().Add(addCustomDomainImmediateVerificationInterval).After(deadline) {
+			return false, nil
+		}
+
+		time.Sleep(addCustomDomainImmediateVerificationInterval)
+	}
+}
+
 func (c *AddCustomDomain) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
@@ -251,7 +304,7 @@ func (c *AddCustomDomain) poll(ctx core.ActionHookContext) error {
 	}
 
 	if metadata.CustomDomain == nil || metadata.CustomDomain.ID == "" {
-		return nil
+		return fmt.Errorf("custom domain metadata missing id")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -270,18 +323,11 @@ func (c *AddCustomDomain) poll(ctx core.ActionHookContext) error {
 	}
 
 	switch domain.VerificationStatus {
-	case customDomainVerificationStatusVerified:
-		return ctx.ExecutionState.Emit(
-			AddCustomDomainSuccessOutputChannel,
-			AddCustomDomainPayloadType,
-			[]any{customDomainPayload(spec.Service, domain)},
-		)
-	case customDomainVerificationStatusFailed:
-		return ctx.ExecutionState.Emit(
-			AddCustomDomainFailedOutputChannel,
-			AddCustomDomainPayloadType,
-			[]any{customDomainPayload(spec.Service, domain)},
-		)
+	case customDomainVerificationStatusVerified, customDomainVerificationStatusFailed:
+		_, err := emitCustomDomainVerificationResult(ctx.ExecutionState, spec.Service, domain)
+		return err
+	case customDomainVerificationStatusUnverified:
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, AddCustomDomainPollInterval)
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, AddCustomDomainPollInterval)
 	}
@@ -307,4 +353,38 @@ func customDomainPayload(serviceID string, domain CustomDomainResponse) map[stri
 		"verificationStatus": domain.VerificationStatus,
 	}
 	return payload
+}
+
+func metadataFromDomain(serviceID string, domain CustomDomainResponse) AddCustomDomainExecutionMetadata {
+	return AddCustomDomainExecutionMetadata{
+		CustomDomain: &CustomDomainMetadata{
+			ID:                 domain.ID,
+			Name:               domain.Name,
+			ServiceID:          serviceID,
+			VerificationStatus: domain.VerificationStatus,
+		},
+	}
+}
+
+func emitCustomDomainVerificationResult(
+	executionState core.ExecutionStateContext,
+	serviceID string,
+	domain CustomDomainResponse,
+) (bool, error) {
+	switch domain.VerificationStatus {
+	case customDomainVerificationStatusVerified:
+		return true, executionState.Emit(
+			AddCustomDomainSuccessOutputChannel,
+			AddCustomDomainPayloadType,
+			[]any{customDomainPayload(serviceID, domain)},
+		)
+	case customDomainVerificationStatusFailed:
+		return true, executionState.Emit(
+			AddCustomDomainFailedOutputChannel,
+			AddCustomDomainPayloadType,
+			[]any{customDomainPayload(serviceID, domain)},
+		)
+	default:
+		return false, nil
+	}
 }

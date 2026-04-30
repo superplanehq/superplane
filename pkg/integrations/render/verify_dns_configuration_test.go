@@ -12,8 +12,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__Render_RemoveCustomDomain__Setup(t *testing.T) {
-	component := &RemoveCustomDomain{}
+func Test__Render_VerifyDNSConfiguration__Setup(t *testing.T) {
+	component := &VerifyDNSConfiguration{}
 
 	t.Run("missing service -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
@@ -64,14 +64,14 @@ func Test__Render_RemoveCustomDomain__Setup(t *testing.T) {
 	})
 }
 
-func Test__Render_RemoveCustomDomain__Execute(t *testing.T) {
-	component := &RemoveCustomDomain{}
+func Test__Render_VerifyDNSConfiguration__Execute(t *testing.T) {
+	component := &VerifyDNSConfiguration{}
 
-	t.Run("valid configuration -> removes domain and emits payload", func(t *testing.T) {
+	t.Run("valid configuration -> triggers verification and emits payload", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
-					StatusCode: http.StatusNoContent,
+					StatusCode: http.StatusAccepted,
 					Body:       io.NopCloser(strings.NewReader("")),
 				},
 			},
@@ -92,17 +92,18 @@ func Test__Render_RemoveCustomDomain__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, core.DefaultOutputChannel.Name, executionState.Channel)
-		assert.Equal(t, RemoveCustomDomainPayloadType, executionState.Type)
+		assert.Equal(t, VerifyDNSConfigurationPayloadType, executionState.Type)
 		require.Len(t, executionState.Payloads, 1)
 
 		emittedPayload := readMap(executionState.Payloads[0])
 		data := readMap(emittedPayload["data"])
 		assert.Equal(t, "app.example.com", data["name"])
 		assert.Equal(t, "srv-123", data["serviceId"])
+		assert.Equal(t, "accepted", data["status"])
 
 		require.Len(t, httpCtx.Requests, 1)
 		request := httpCtx.Requests[0]
-		assert.Equal(t, http.MethodDelete, request.Method)
-		assert.Contains(t, request.URL.Path, "/v1/services/srv-123/custom-domains/app.example.com")
+		assert.Equal(t, http.MethodPost, request.Method)
+		assert.Contains(t, request.URL.Path, "/v1/services/srv-123/custom-domains/app.example.com/verify")
 	})
 }

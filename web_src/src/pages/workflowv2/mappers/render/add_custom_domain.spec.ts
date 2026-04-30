@@ -63,6 +63,17 @@ describe("addCustomDomainMapper.props", () => {
     expect(props.metadata).toEqual(expect.arrayContaining([expect.objectContaining({ label: "Service: srv-123" })]));
   });
 
+  it("prefers service name from node metadata", () => {
+    const ctx = makePropsContext({
+      configuration: { service: "srv-123" },
+      metadata: { service: { id: "srv-123", name: "backend-api" } },
+    });
+    const props = addCustomDomainMapper.props!(ctx);
+    expect(props.metadata).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "Service: backend-api" })]),
+    );
+  });
+
   it("includes domainName metadata when configuration.domainName is set", () => {
     const ctx = makePropsContext({ configuration: { domainName: "app.example.com" } });
     const props = addCustomDomainMapper.props!(ctx);

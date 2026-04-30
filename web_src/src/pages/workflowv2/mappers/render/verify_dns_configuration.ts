@@ -17,22 +17,20 @@ import { serviceMetadataLabel, stringOrDash, type RenderServiceNodeMetadata } fr
 import { baseProps } from "./base";
 import { defaultStateFunction } from "../stateRegistry";
 
-interface AddCustomDomainConfiguration {
+interface VerifyDNSConfigurationConfiguration {
   service?: string;
   domainName?: string;
-  waitForVerification?: boolean;
 }
 
-interface AddCustomDomainOutput {
-  id?: string;
+interface VerifyDNSConfigurationOutput {
   name?: string;
   serviceId?: string;
-  verificationStatus?: string;
+  status?: string;
 }
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as AddCustomDomainConfiguration | undefined;
+  const configuration = node.configuration as VerifyDNSConfigurationConfiguration | undefined;
   const nodeMetadata = node.metadata as RenderServiceNodeMetadata | undefined;
 
   if (configuration?.service) {
@@ -41,40 +39,40 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.domainName) {
     metadata.push({ icon: "globe", label: configuration.domainName });
   }
-  if (configuration?.waitForVerification) {
-    metadata.push({ icon: "shield-check", label: "Wait for verification" });
-  }
 
   return metadata;
 }
 
-export const ADD_CUSTOM_DOMAIN_STATE_MAP: EventStateMap = {
+export const VERIFY_DNS_CONFIGURATION_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
-  failed: {
-    icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
-    badgeColor: "bg-red-500",
+  verificationRequested: {
+    icon: "shield-check",
+    textColor: "text-green-800",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-green-500",
   },
 };
 
-export const addCustomDomainStateFunction: StateFunction = (execution) => {
+export const verifyDNSConfigurationStateFunction: StateFunction = (execution) => {
   if (!execution) return "neutral";
 
-  const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
-  if (outputs?.failed?.length) {
-    return "failed";
+  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  if (outputs?.default?.length) {
+    const result = outputs.default[0]?.data as VerifyDNSConfigurationOutput | undefined;
+    if (result?.status === "accepted") {
+      return "verificationRequested";
+    }
   }
 
   return defaultStateFunction(execution);
 };
 
-export const ADD_CUSTOM_DOMAIN_STATE_REGISTRY: EventStateRegistry = {
-  stateMap: ADD_CUSTOM_DOMAIN_STATE_MAP,
-  getState: addCustomDomainStateFunction,
+export const VERIFY_DNS_CONFIGURATION_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: VERIFY_DNS_CONFIGURATION_STATE_MAP,
+  getState: verifyDNSConfigurationStateFunction,
 };
 
-export const addCustomDomainMapper: ComponentBaseMapper = {
+export const verifyDNSConfigurationMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
     return { ...base, metadata: metadataList(context.node) };
@@ -86,17 +84,14 @@ export const addCustomDomainMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { success?: OutputPayload[]; failed?: OutputPayload[] } | undefined;
-    const result =
-      (outputs?.success?.[0]?.data as AddCustomDomainOutput | undefined) ??
-      (outputs?.failed?.[0]?.data as AddCustomDomainOutput | undefined);
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const result = outputs?.default?.[0]?.data as VerifyDNSConfigurationOutput | undefined;
 
     return {
-      "Added At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
-      "Domain ID": stringOrDash(result?.id),
+      "Requested At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
       "Domain Name": stringOrDash(result?.name),
       "Service ID": stringOrDash(result?.serviceId),
-      "Verification Status": stringOrDash(result?.verificationStatus),
+      Status: stringOrDash(result?.status),
     };
   },
 };

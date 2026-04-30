@@ -118,8 +118,12 @@ func decodeRemoveCustomDomainConfiguration(cfg any) (RemoveCustomDomainConfigura
 }
 
 func (c *RemoveCustomDomain) Setup(ctx core.SetupContext) error {
-	_, err := decodeRemoveCustomDomainConfiguration(ctx.Configuration)
-	return err
+	spec, err := decodeRemoveCustomDomainConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	return setServiceNodeMetadata(ctx, spec.Service)
 }
 
 func (c *RemoveCustomDomain) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

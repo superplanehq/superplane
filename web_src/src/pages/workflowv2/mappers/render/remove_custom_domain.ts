@@ -10,7 +10,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "./common";
+import { serviceMetadataLabel, stringOrDash, type RenderServiceNodeMetadata } from "./common";
 import { baseProps } from "./base";
 
 interface RemoveCustomDomainConfiguration {
@@ -26,9 +26,10 @@ interface RemoveCustomDomainOutput {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as RemoveCustomDomainConfiguration | undefined;
+  const nodeMetadata = node.metadata as RenderServiceNodeMetadata | undefined;
 
   if (configuration?.service) {
-    metadata.push({ icon: "server", label: `Service: ${configuration.service}` });
+    metadata.push({ icon: "server", label: `Service: ${serviceMetadataLabel(nodeMetadata, configuration.service)}` });
   }
   if (configuration?.domainName) {
     metadata.push({ icon: "globe", label: configuration.domainName });

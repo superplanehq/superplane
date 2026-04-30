@@ -664,6 +664,23 @@ func (c *Client) GetCustomDomain(serviceID string, domainNameOrID string) (Custo
 	return response, nil
 }
 
+func (c *Client) VerifyCustomDomain(serviceID string, domainNameOrID string) error {
+	if serviceID == "" {
+		return fmt.Errorf("serviceID is required")
+	}
+	if domainNameOrID == "" {
+		return fmt.Errorf("domainNameOrID is required")
+	}
+
+	_, _, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains/"+url.PathEscape(domainNameOrID)+"/verify",
+		nil,
+		nil,
+	)
+	return err
+}
+
 func (c *Client) RemoveCustomDomain(serviceID string, domainNameOrID string) error {
 	if serviceID == "" {
 		return fmt.Errorf("serviceID is required")
