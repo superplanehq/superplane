@@ -26,7 +26,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	resource, err := parseSecretFile(filePath)
+	resource, err := parseSecretInput(filePath, ctx.Cmd.InOrStdin())
 	if err != nil {
 		return err
 	}
