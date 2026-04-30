@@ -2150,6 +2150,8 @@ function CanvasContent({
     (isAutoLayoutOnUpdateEnabled
       ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
       : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
+  const suppressNextPaneClickRef = useRef(false);
+  const suppressNextPaneClickTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!focusRequest) {
@@ -2170,7 +2172,37 @@ function CanvasContent({
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
   }, [focusRequest, fitView]);
 
+  useEffect(() => {
+    return () => {
+      if (suppressNextPaneClickTimeoutRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(suppressNextPaneClickTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const suppressNextPaneClick = useCallback(() => {
+    suppressNextPaneClickRef.current = true;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (suppressNextPaneClickTimeoutRef.current !== null) {
+      window.clearTimeout(suppressNextPaneClickTimeoutRef.current);
+    }
+
+    suppressNextPaneClickTimeoutRef.current = window.setTimeout(() => {
+      suppressNextPaneClickRef.current = false;
+      suppressNextPaneClickTimeoutRef.current = null;
+    }, 250);
+  }, []);
+
   const handlePaneClick = useCallback(() => {
+    if (suppressNextPaneClickRef.current) {
+      suppressNextPaneClickRef.current = false;
+      return;
+    }
+
     previouslySelectedRef.current = new Set();
 
     // Clear ReactFlow's selection state and close both sidebars
@@ -2329,6 +2361,7 @@ function CanvasContent({
           });
 
           if (onConnectionDropInEmptySpace) {
+            suppressNextPaneClick();
             onConnectionDropInEmptySpace(canvasPosition, currentConnectingFrom);
           }
         }
@@ -2338,7 +2371,7 @@ function CanvasContent({
       connectingFromRef.current = null;
       connectionCompletedRef.current = false;
     },
-    [screenToFlowPosition, onConnectionDropInEmptySpace, isReadOnly],
+    [screenToFlowPosition, onConnectionDropInEmptySpace, suppressNextPaneClick, isReadOnly],
   );
 
   // Find the hovered edge to get its source and target
