@@ -536,7 +536,27 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string; changeManagementEnabled?: boolean }) => {
+    mutationFn: async (params: {
+      name?: string;
+      description?: string;
+      changeManagementEnabled?: boolean;
+      /** When set, replaces stored OAuth allow-list for invitations (empty = no restriction). */
+      allowedOauthProviders?: string[];
+    }) => {
+      const hasSpecUpdate =
+        typeof params.changeManagementEnabled === "boolean" || params.allowedOauthProviders !== undefined;
+
+      const spec = hasSpecUpdate
+        ? {
+            ...(typeof params.changeManagementEnabled === "boolean"
+              ? { changeManagementEnabled: params.changeManagementEnabled }
+              : {}),
+            ...(params.allowedOauthProviders !== undefined
+              ? { allowedOauthProviders: { providers: params.allowedOauthProviders } }
+              : {}),
+          }
+        : undefined;
+
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -546,10 +566,7 @@ export const useUpdateOrganization = (organizationId: string) => {
                 name: params.name,
                 description: params.description,
               },
-              spec:
-                typeof params.changeManagementEnabled === "boolean"
-                  ? { changeManagementEnabled: params.changeManagementEnabled }
-                  : undefined,
+              spec,
             },
           },
         }),

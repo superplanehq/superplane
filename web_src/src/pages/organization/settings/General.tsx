@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { Trash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -10,6 +10,7 @@ import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/use
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Switch } from "@/ui/switch";
+import { Checkbox } from "@/ui/checkbox";
 import { usePermissions } from "@/contexts/usePermissions";
 import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
@@ -30,6 +31,12 @@ export function General({ organization }: GeneralProps) {
   const [changeManagementEnabled, setChangeManagementEnabled] = useState(
     organization.spec?.changeManagementEnabled ?? false,
   );
+  /** When false, pending email invites accept any configured OAuth provider ([] server-side). */
+  const [oauthRestrictProviders, setOauthRestrictProviders] = useState(false);
+  const [oauthGithub, setOauthGithub] = useState(true);
+  const [oauthGoogle, setOauthGoogle] = useState(true);
+  const [oauthMessage, setOauthMessage] = useState<string | null>(null);
+  const [oauthSelectionError, setOauthSelectionError] = useState<string | null>(null);
 
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
   const updateChangeManagementMutation = useUpdateOrganization(organizationId || "");
@@ -40,6 +47,20 @@ export function General({ organization }: GeneralProps) {
   useEffect(() => {
     setChangeManagementEnabled(organization.spec?.changeManagementEnabled ?? false);
   }, [organization.spec?.changeManagementEnabled]);
+
+  useEffect(() => {
+    const list = organization.spec?.allowedOauthProviders?.providers ?? [];
+    if (list.length === 0) {
+      setOauthRestrictProviders(false);
+      setOauthGithub(true);
+      setOauthGoogle(true);
+    } else {
+      setOauthRestrictProviders(true);
+      setOauthGithub(list.includes("github"));
+      setOauthGoogle(list.includes("google"));
+    }
+    setOauthSelectionError(null);
+  }, [organization.spec?.allowedOauthProviders?.providers]);
 
   const handleSave = async () => {
     if (!canUpdateOrg) return;
@@ -83,6 +104,67 @@ export function General({ organization }: GeneralProps) {
     }
   };
 
+  const savedOauthFromServer = organization.spec?.allowedOauthProviders?.providers;
+  const oauthSavedPolicySummary = (() => {
+    const saved = savedOauthFromServer ?? [];
+    if (saved.length === 0) {
+      return "Saved: any OAuth provider can complete pending email invitations.";
+    }
+    const labels = saved.map((p) => (p === "github" ? "GitHub" : p === "google" ? "Google" : p));
+    const joined = labels.length === 2 ? `${labels[0]} and ${labels[1]}` : labels.join(", ");
+    return `Saved: only ${joined} can complete pending email invitations.`;
+  })();
+
+  const oauthProvidersToSave = (): string[] => {
+    if (!oauthRestrictProviders) {
+      return [];
+    }
+    const out: string[] = [];
+    if (oauthGithub) {
+      out.push("github");
+    }
+    if (oauthGoogle) {
+      out.push("google");
+    }
+    return out;
+  };
+
+  const oauthProvidersListEqual = (a: string[], b: string[]) => {
+    if (a.length !== b.length) {
+      return false;
+    }
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((v, i) => v === sortedB[i]);
+  };
+
+  const serverOauthList = organization.spec?.allowedOauthProviders?.providers ?? [];
+  const draftOauthList = oauthProvidersToSave();
+  const oauthHasUnsavedChanges = !oauthProvidersListEqual(serverOauthList, draftOauthList);
+
+  const handleSaveOAuthProviders = async () => {
+    if (!canUpdateOrg || !organizationId) {
+      return;
+    }
+
+    if (oauthRestrictProviders && !oauthGithub && !oauthGoogle) {
+      setOauthSelectionError("Turn off the switch to allow any provider, or select at least one provider.");
+      return;
+    }
+    setOauthSelectionError(null);
+    setOauthMessage(null);
+    try {
+      await updateOrganizationMutation.mutateAsync({
+        allowedOauthProviders: oauthProvidersToSave(),
+      });
+      setOauthMessage("OAuth invitation settings saved");
+      setTimeout(() => setOauthMessage(null), 3000);
+    } catch {
+      setOauthMessage("Failed to save OAuth invitation settings");
+      setTimeout(() => setOauthMessage(null), 3000);
+    }
+  };
+
   const handleChangeManagementToggle = async (enabled: boolean) => {
     if (!canUpdateOrg || !organizationId) {
       return;
@@ -121,7 +203,7 @@ export function General({ organization }: GeneralProps) {
             id="organization-name-input"
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
             className="max-w-sm"
             disabled={!canUpdateOrg}
           />
@@ -149,6 +231,114 @@ export function General({ organization }: GeneralProps) {
           </div>
         </Field>
       </Fieldset>
+
+      <PermissionTooltip
+        allowed={canUpdateOrg || permissionsLoading}
+        message="You don't have permission to update this organization."
+        className="w-full"
+      >
+        <Fieldset
+          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6"
+          data-testid="oauth-invitation-settings-card"
+        >
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <Label
+                htmlFor="organization-oauth-invite-restrict-switch"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                OAuth providers for email invitations
+              </Label>
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-prose">
+                Applies when someone signs in with GitHub or Google and has a <strong>pending email invitation</strong>{" "}
+                to this organization. Turn on the switch to allow only selected providers; turn it off to allow any
+                configured OAuth provider. Password and magic-link sign-in are not affected.
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{oauthSavedPolicySummary}</p>
+              {oauthHasUnsavedChanges ? (
+                <p className="text-xs text-amber-800 dark:text-amber-400 mt-2">
+                  You have unsaved changes. Click Save OAuth settings to apply them.
+                </p>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {oauthRestrictProviders ? "Restricted" : "Any provider"}
+              </span>
+              <Switch
+                id="organization-oauth-invite-restrict-switch"
+                checked={oauthRestrictProviders}
+                onCheckedChange={(checked: boolean) => {
+                  setOauthRestrictProviders(checked);
+                  setOauthSelectionError(null);
+                  if (checked && !oauthGithub && !oauthGoogle) {
+                    setOauthGithub(true);
+                    setOauthGoogle(true);
+                  }
+                }}
+                disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
+                aria-label="Restrict OAuth providers for pending email invitations"
+              />
+            </div>
+          </div>
+
+          {oauthRestrictProviders ? (
+            <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Allowed OAuth providers</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="org-oauth-github"
+                    checked={oauthGithub}
+                    onCheckedChange={(checked: boolean | "indeterminate") => {
+                      setOauthGithub(checked === true);
+                      setOauthSelectionError(null);
+                    }}
+                    disabled={!canUpdateOrg || updateOrganizationMutation.isPending}
+                  />
+                  <Label htmlFor="org-oauth-github" className="text-sm font-normal cursor-pointer">
+                    GitHub
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="org-oauth-google"
+                    checked={oauthGoogle}
+                    onCheckedChange={(checked: boolean | "indeterminate") => {
+                      setOauthGoogle(checked === true);
+                      setOauthSelectionError(null);
+                    }}
+                    disabled={!canUpdateOrg || updateOrganizationMutation.isPending}
+                  />
+                  <Label htmlFor="org-oauth-google" className="text-sm font-normal cursor-pointer">
+                    Google
+                  </Label>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {oauthSelectionError ? <p className="mt-3 text-sm text-red-600">{oauthSelectionError}</p> : null}
+
+          <div className="mt-4 flex items-center gap-4">
+            <LoadingButton
+              type="button"
+              onClick={handleSaveOAuthProviders}
+              disabled={!canUpdateOrg}
+              loading={updateOrganizationMutation.isPending}
+              loadingText="Saving..."
+              className="max-w-48"
+            >
+              Save OAuth settings
+            </LoadingButton>
+            {oauthMessage ? (
+              <span className={`text-sm ${oauthMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
+                {oauthMessage}
+              </span>
+            ) : null}
+          </div>
+        </Fieldset>
+      </PermissionTooltip>
 
       {isChangeManagementSettingsEnabled() ? (
         <PermissionTooltip
@@ -240,7 +430,7 @@ export function General({ organization }: GeneralProps) {
                 id="delete-organization-confirmation-input"
                 type="text"
                 value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setDeleteConfirmation(e.target.value)}
                 placeholder={organization.metadata?.name || "Organization name"}
                 className="max-w-sm"
                 disabled={!canDeleteOrg}
