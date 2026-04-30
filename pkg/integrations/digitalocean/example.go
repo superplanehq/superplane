@@ -417,6 +417,8 @@ var exampleOutputRunEvaluation map[string]any
 
 func (r *RunEvaluation) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunEvaluationOnce, exampleOutputRunEvaluationBytes, &exampleOutputRunEvaluation)
+}
+
 //go:embed example_output_create_gpu_droplet.json
 var exampleOutputCreateGPUDropletBytes []byte
 

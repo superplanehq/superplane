@@ -146,11 +146,11 @@ func (g *GetGPUDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetGPUDroplet) Actions() []core.Action {
-	return []core.Action{}
+func (g *GetGPUDroplet) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (g *GetGPUDroplet) HandleAction(ctx core.ActionContext) error {
+func (g *GetGPUDroplet) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
