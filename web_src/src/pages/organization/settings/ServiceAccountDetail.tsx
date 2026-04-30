@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/lib/errors";
+import { membersHighlightHref } from "@/lib/serviceAccountCreatorLink";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Bot, Copy, ArrowLeft } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { Link } from "@/components/Link/link";
 import {
   useServiceAccount,
   useUpdateServiceAccount,
@@ -137,14 +139,14 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
   return (
     <div className="space-y-6 pt-6">
       {/* Back button */}
-      <Link
+      <RouterLink
         to={serviceAccountsHref}
         className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition"
         aria-label="Back to service accounts"
       >
         <ArrowLeft size={14} />
         Back to service accounts
-      </Link>
+      </RouterLink>
 
       {/* Details */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
@@ -239,6 +241,20 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
             <dl className="grid grid-cols-2 gap-y-4 text-sm">
               <dt className="text-gray-500 dark:text-gray-400">Description</dt>
               <dd className="text-gray-800 dark:text-white">{serviceAccount.description || "—"}</dd>
+              <dt className="text-gray-500 dark:text-gray-400">Created by</dt>
+              <dd className="text-gray-800 dark:text-white">
+                {serviceAccount.createdByUser?.id && serviceAccount.createdByUser?.name ? (
+                  <Link
+                    href={membersHighlightHref(organizationId, serviceAccount.createdByUser.id)}
+                    className="!font-medium !underline underline-offset-2"
+                    data-testid="sa-detail-created-by-link"
+                  >
+                    {serviceAccount.createdByUser.name}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+              </dd>
               <dt className="text-gray-500 dark:text-gray-400">Created</dt>
               <dd className="text-gray-800 dark:text-white">{createdAt}</dd>
               <dt className="text-gray-500 dark:text-gray-400">ID</dt>
