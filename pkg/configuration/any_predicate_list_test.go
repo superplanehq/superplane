@@ -6,6 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test__Predicate_Matches_regex_is_substring(t *testing.T) {
+	p := Predicate{Type: PredicateTypeMatches, Value: "main"}
+	assert.True(t, p.Matches("refs/heads/main"))
+	assert.True(t, MatchesAnyPredicate([]Predicate{p}, "refs/heads/main"))
+	assert.False(t, MatchesAnyPredicateInList([]Predicate{p}, []string{"refs/heads/main"}))
+}
+
 func Test__MatchesAnyPredicateInList(t *testing.T) {
 	t.Run("empty predicates -> always false", func(t *testing.T) {
 		assert.False(t, MatchesAnyPredicateInList([]Predicate{}, []string{"pkg/foo.go"}))
