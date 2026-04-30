@@ -107,7 +107,7 @@ func (c *Client) LaunchInstance(req LaunchInstanceRequest) (*Instance, error) {
 // GetInstance retrieves a Compute instance by OCID.
 func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, instanceID)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -120,6 +120,29 @@ func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 	}
 
 	return &instance, nil
+}
+
+// ListInstances lists Compute instances in a compartment.
+func (c *Client) ListInstances(compartmentID string) ([]Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances?compartmentId=%s&limit=100",
+		host,
+		coreServicesAPIVersion,
+		neturl.QueryEscape(compartmentID),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instances []Instance
+	if err := json.Unmarshal(respBody, &instances); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instances: %w", err)
+	}
+
+	return instances, nil
 }
 
 // ListVNICAttachments lists VNIC attachments for an instance, used to find IP addresses.
@@ -276,8 +299,10 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 		}
 	}
 
+	includeBodyHeaders := method == http.MethodPost || method == http.MethodPut
+
 	var bodyReader io.Reader
-	if len(bodyBytes) > 0 {
+	if len(bodyBytes) > 0 || includeBodyHeaders {
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
@@ -289,14 +314,15 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	req.Header.Set("Host", host)
 
-	if len(bodyBytes) > 0 {
+	if includeBodyHeaders {
 		hash := sha256.Sum256(bodyBytes)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
 		req.Header.Set("x-content-sha256", base64.StdEncoding.EncodeToString(hash[:]))
+		req.ContentLength = int64(len(bodyBytes))
 	}
 
-	if err := c.signRequest(req, len(bodyBytes) > 0); err != nil {
+	if err := c.signRequest(req, includeBodyHeaders); err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
@@ -420,6 +446,11 @@ type InstanceShapeConfig struct {
 	MemoryInGBs *float64 `json:"memoryInGBs,omitempty"`
 }
 
+type UpdateInstanceRequest struct {
+	DisplayName *string              `json:"displayName,omitempty"`
+	ShapeConfig *InstanceShapeConfig `json:"shapeConfig,omitempty"`
+}
+
 type ShieldedInstanceConfig struct {
 	IsSecureBootEnabled            bool `json:"isSecureBootEnabled"`
 	IsMeasuredBootEnabled          bool `json:"isMeasuredBootEnabled"`
@@ -523,6 +554,62 @@ func (c *Client) AttachVolume(instanceID, volumeID string) (*VolumeAttachment, e
 	}
 
 	return &attachment, nil
+}
+
+// UpdateInstance updates mutable Compute instance attributes.
+func (c *Client) UpdateInstance(instanceID string, req UpdateInstanceRequest) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update instance request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// InstanceAction performs a power lifecycle action on a Compute instance.
+func (c *Client) InstanceAction(instanceID, action string) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s?action=%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID), neturl.QueryEscape(action))
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// TerminateInstance terminates a Compute instance, optionally preserving the boot volume.
+func (c *Client) TerminateInstance(instanceID string, preserveBootVolume bool) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances/%s?preserveBootVolume=%t",
+		host,
+		coreServicesAPIVersion,
+		neturl.PathEscape(instanceID),
+		preserveBootVolume,
+	)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
 }
 
 // ONS (Notifications) types
