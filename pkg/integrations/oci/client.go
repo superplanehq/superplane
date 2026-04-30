@@ -107,7 +107,7 @@ func (c *Client) LaunchInstance(req LaunchInstanceRequest) (*Instance, error) {
 // GetInstance retrieves a Compute instance by OCID.
 func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, instanceID)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID))
 
 	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
 	if err != nil {
@@ -559,7 +559,7 @@ func (c *Client) AttachVolume(instanceID, volumeID string) (*VolumeAttachment, e
 // UpdateInstance updates mutable Compute instance attributes.
 func (c *Client) UpdateInstance(instanceID string, req UpdateInstanceRequest) (*Instance, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, instanceID)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID))
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -582,7 +582,7 @@ func (c *Client) UpdateInstance(instanceID string, req UpdateInstanceRequest) (*
 // InstanceAction performs a power lifecycle action on a Compute instance.
 func (c *Client) InstanceAction(instanceID, action string) (*Instance, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
-	url := fmt.Sprintf("https://%s/%s/instances/%s?action=%s", host, coreServicesAPIVersion, instanceID, neturl.QueryEscape(action))
+	url := fmt.Sprintf("https://%s/%s/instances/%s?action=%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID), neturl.QueryEscape(action))
 
 	respBody, err := c.doRequest(http.MethodPost, host, url, nil)
 	if err != nil {
@@ -604,7 +604,7 @@ func (c *Client) TerminateInstance(instanceID string, preserveBootVolume bool) e
 		"https://%s/%s/instances/%s?preserveBootVolume=%t",
 		host,
 		coreServicesAPIVersion,
-		instanceID,
+		neturl.PathEscape(instanceID),
 		preserveBootVolume,
 	)
 
