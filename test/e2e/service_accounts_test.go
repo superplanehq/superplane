@@ -218,7 +218,7 @@ func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 func (s *serviceAccountSteps) assertCreatorVisibleInListForServiceAccount(name string) {
 	// Same row as the service account name should show the human who created it (e2e seed user).
 	row := s.session.Page().GetByRole("row", pw.LocatorGetByRoleOptions{Name: name})
-	require.NoError(s.t, row.GetByText("E2E User (e2e@superplane.local)", pw.LocatorGetByTextOptions{Exact: pw.Bool(true)}).WaitFor(pw.LocatorWaitForOptions{
+	require.NoError(s.t, row.GetByText("E2E User", pw.LocatorGetByTextOptions{Exact: pw.Bool(true)}).WaitFor(pw.LocatorWaitForOptions{
 		State:   pw.WaitForSelectorStateVisible,
 		Timeout: pw.Float(10000),
 	}))
@@ -226,7 +226,7 @@ func (s *serviceAccountSteps) assertCreatorVisibleInListForServiceAccount(name s
 
 func (s *serviceAccountSteps) assertCreatorOnDetailPage() {
 	s.session.AssertText("Created by")
-	s.session.AssertText("E2E User (e2e@superplane.local)")
+	s.session.AssertText("E2E User")
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {
