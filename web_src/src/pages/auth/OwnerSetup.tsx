@@ -8,6 +8,8 @@ import superplaneLogo from "../../assets/superplane.svg";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import OwnerSetupSurvey, { type PostHogSurvey } from "./OwnerSetupSurvey";
 
+const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
+
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -154,13 +156,19 @@ const OwnerSetup: React.FC = () => {
 
       setPendingOrganizationId(orgId);
       posthog.getActiveMatchingSurveys((surveys) => {
-        const survey = surveys[0] as PostHogSurvey | undefined;
-        const hasQuestions = Array.isArray(survey?.questions) && survey.questions.length > 0;
-        if (!hasQuestions) {
+        const usableSurveys = (surveys as PostHogSurvey[]).filter(
+          (survey) => Array.isArray(survey.questions) && survey.questions.length > 0,
+        );
+
+        const selectedSurvey =
+          usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
+
+        if (!selectedSurvey) {
           window.location.href = `/${orgId}`;
           return;
         }
-        setActiveSurvey(survey);
+
+        setActiveSurvey(selectedSurvey);
         setStep("survey");
       });
     } catch {
