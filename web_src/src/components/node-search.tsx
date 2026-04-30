@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { memo, useCallback, useState, useEffect } from "react";
 import { Search } from "lucide-react";
 
 import { useReactFlow, type BuiltInEdge, type Node, type PanelProps } from "@xyflow/react";
@@ -67,7 +67,7 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
         setSearchResults(results);
       }
     },
-    [onSearch, onOpenChange],
+    [onSearch, onOpenChange, defaultOnSearch],
   );
 
   const defaultOnSelectNode = useCallback(
@@ -141,7 +141,7 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
   );
 }
 
-export function NodeSearch({ onSearch, onSelectNode }: NodeSearchProps) {
+export const NodeSearch = memo(function NodeSearch({ onSearch, onSelectNode }: NodeSearchProps) {
   const [open, setOpen] = useState(false);
 
   // Add keyboard shortcut Ctrl+K / Cmd+K
@@ -171,7 +171,7 @@ export function NodeSearch({ onSearch, onSelectNode }: NodeSearchProps) {
       </CommandDialog>
     </>
   );
-}
+});
 
 export interface NodeSearchDialogProps extends NodeSearchProps {
   title?: string;

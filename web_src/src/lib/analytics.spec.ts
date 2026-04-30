@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { init, identify, capture, reset } = vi.hoisted(() => ({
   init: vi.fn(),
@@ -158,18 +158,185 @@ describe("analytics", () => {
     });
   });
 
-  it("captures integration create", () => {
-    analytics.integrationCreate("github", "org-123");
-    expect(capture).toHaveBeenCalledWith("integration:integration_create", {
-      integration_type: "github",
-      organization_id: "org-123",
-    });
-  });
-
   it("captures member accept", () => {
     analytics.memberAccept("org-123");
     expect(capture).toHaveBeenCalledWith("settings:member_accept", {
       organization_id: "org-123",
+    });
+  });
+
+  describe("integration connect events", () => {
+    let dateSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      dateSpy = vi.spyOn(Date, "now");
+    });
+
+    afterEach(() => {
+      dateSpy.mockRestore();
+    });
+
+    it("captures integration connect start from integrations page", () => {
+      analytics.integrationConnectStart("github", "integrations_page", "org-123");
+      expect(capture).toHaveBeenCalledWith("integration:connect_start", {
+        integration: "github",
+        source: "integrations_page",
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures integration connect start from node configuration", () => {
+      analytics.integrationConnectStart("slack", "node_configuration", "org-456");
+      expect(capture).toHaveBeenCalledWith("integration:connect_start", {
+        integration: "slack",
+        source: "node_configuration",
+        organization_id: "org-456",
+      });
+    });
+
+    it("captures integration connect submit with duration when start was recorded", () => {
+      dateSpy.mockReturnValueOnce(0).mockReturnValueOnce(3000);
+      analytics.integrationConnectStart("github", "integrations_page", "org-123");
+      analytics.integrationConnectSubmit("github", "integrations_page", "ready", "org-123");
+      expect(capture).toHaveBeenLastCalledWith("integration:connect_submit", {
+        integration: "github",
+        source: "integrations_page",
+        status: "ready",
+        duration_s: 3,
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures integration connect submit with pending status", () => {
+      dateSpy.mockReturnValueOnce(0).mockReturnValueOnce(5000);
+      analytics.integrationConnectStart("github", "node_configuration", "org-123");
+      analytics.integrationConnectSubmit("github", "node_configuration", "pending", "org-123");
+      expect(capture).toHaveBeenLastCalledWith("integration:connect_submit", {
+        integration: "github",
+        source: "node_configuration",
+        status: "pending",
+        duration_s: 5,
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures integration connect submit with error status", () => {
+      dateSpy.mockReturnValueOnce(0).mockReturnValueOnce(2000);
+      analytics.integrationConnectStart("slack", "integrations_page", "org-456");
+      analytics.integrationConnectSubmit("slack", "integrations_page", "error", "org-456");
+      expect(capture).toHaveBeenLastCalledWith("integration:connect_submit", {
+        integration: "slack",
+        source: "integrations_page",
+        status: "error",
+        duration_s: 2,
+        organization_id: "org-456",
+      });
+    });
+
+    it("captures integration connect submit without duration when no start was recorded", () => {
+      analytics.integrationConnectSubmit("github", "integrations_page", "ready", "org-123");
+      expect(capture).toHaveBeenCalledWith("integration:connect_submit", {
+        integration: "github",
+        source: "integrations_page",
+        status: "ready",
+        duration_s: undefined,
+        organization_id: "org-123",
+      });
+    });
+
+    it("clears the start time after submit so a second submit has no duration", () => {
+      dateSpy.mockReturnValueOnce(0).mockReturnValueOnce(1000).mockReturnValueOnce(2000);
+      analytics.integrationConnectStart("github", "integrations_page", "org-123");
+      analytics.integrationConnectSubmit("github", "integrations_page", "ready", "org-123");
+      capture.mockClear();
+      analytics.integrationConnectSubmit("github", "integrations_page", "ready", "org-123");
+      expect(capture).toHaveBeenCalledWith("integration:connect_submit", {
+        integration: "github",
+        source: "integrations_page",
+        status: "ready",
+        duration_s: undefined,
+        organization_id: "org-123",
+      });
+    });
+  });
+
+  describe("integration configure and delete events", () => {
+    it("captures integration configure open from integrations page with ready status", () => {
+      analytics.integrationConfigureOpen("github", "integrations_page", "ready", "org-123");
+      expect(capture).toHaveBeenCalledWith("integration:configure_open", {
+        integration: "github",
+        source: "integrations_page",
+        previous_status: "ready",
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures integration configure open from node configuration with error status", () => {
+      analytics.integrationConfigureOpen("slack", "node_configuration", "error", "org-456");
+      expect(capture).toHaveBeenCalledWith("integration:configure_open", {
+        integration: "slack",
+        source: "node_configuration",
+        previous_status: "error",
+        organization_id: "org-456",
+      });
+    });
+
+    it("captures integration configure open with pending status", () => {
+      analytics.integrationConfigureOpen("github", "integrations_page", "pending", "org-123");
+      expect(capture).toHaveBeenCalledWith("integration:configure_open", {
+        integration: "github",
+        source: "integrations_page",
+        previous_status: "pending",
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures integration delete", () => {
+      analytics.integrationDelete("github", "org-123");
+      expect(capture).toHaveBeenCalledWith("integration:integration_delete", {
+        integration: "github",
+        organization_id: "org-123",
+      });
+    });
+  });
+
+  describe("run item and error events", () => {
+    it("captures canvas run item open", () => {
+      analytics.canvasRunItemOpen("digitalocean.detachKnowledgeBase", "success", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_open", {
+        node_ref: "digitalocean.detachKnowledgeBase",
+        execution_status: "success",
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures canvas run item tab view - details", () => {
+      analytics.canvasRunItemTabView("details", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_tab_view", { tab: "details", organization_id: "org-123" });
+    });
+
+    it("captures canvas run item tab view - payload", () => {
+      analytics.canvasRunItemTabView("payload", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_tab_view", { tab: "payload", organization_id: "org-123" });
+    });
+
+    it("captures canvas run item tab view - config", () => {
+      analytics.canvasRunItemTabView("config", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:run_item_tab_view", { tab: "config", organization_id: "org-123" });
+    });
+
+    it("captures canvas component error", () => {
+      analytics.canvasComponentError("http.request", "timeout after 30s", "org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:component_error", {
+        node_ref: "http.request",
+        error_message: "timeout after 30s",
+        organization_id: "org-123",
+      });
+    });
+
+    it("captures canvas log view", () => {
+      analytics.canvasLogView("org-123");
+      expect(capture).toHaveBeenCalledWith("canvas:log_view", { organization_id: "org-123" });
     });
   });
 });
