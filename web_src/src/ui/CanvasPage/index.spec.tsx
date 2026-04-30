@@ -55,7 +55,8 @@ vi.mock("./Header", () => ({
   Header: () => <header data-testid="canvas-header" />,
 }));
 
-import { CanvasNodeErrorBoundary, CanvasPage, getCollapsedDescendantNodeIds } from "./index";
+import { getCollapsedDescendantNodeIds } from "./collapsedDescendants";
+import { CanvasNodeErrorBoundary, CanvasPage } from "./index";
 
 function makeCanvasNode(id: string, collapsed = false): Node {
   return {

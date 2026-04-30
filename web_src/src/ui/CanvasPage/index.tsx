@@ -66,6 +66,7 @@ import { EmitEventModal } from "../EmitEventModal";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
+import { getCollapsedDescendantNodeIds, isCanvasNodeCollapsed } from "./collapsedDescendants";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
@@ -450,55 +451,6 @@ function getNodeErrorDisplayName(data: BlockData): string {
   const labelGetter = NODE_ERROR_LABEL_GETTERS[data.type as BlockData["type"]];
 
   return labelGetter?.(data) || getNonEmptyString(data.label) || "unknown";
-}
-
-function isCanvasNodeCollapsed(node: ReactFlowNode | undefined): boolean {
-  const data = node?.data as CanvasBlockNodeData | undefined;
-  const nodeType = data?.type;
-  if (nodeType !== "component" && nodeType !== "trigger" && nodeType !== "composite") {
-    return false;
-  }
-
-  return Boolean(data && (data[nodeType] as { collapsed?: boolean } | undefined)?.collapsed);
-}
-
-export function getCollapsedDescendantNodeIds(nodes: ReactFlowNode[], edges: ReactFlowEdge[]): Set<string> {
-  const nodeIds = new Set(nodes.map((node) => node.id));
-  const collapsedNodeIds = nodes.filter(isCanvasNodeCollapsed).map((node) => node.id);
-
-  if (collapsedNodeIds.length === 0 || edges.length === 0) {
-    return new Set();
-  }
-
-  const outgoingNodeIdsBySourceId = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
-      continue;
-    }
-
-    const targetIds = outgoingNodeIdsBySourceId.get(edge.source) ?? [];
-    targetIds.push(edge.target);
-    outgoingNodeIdsBySourceId.set(edge.source, targetIds);
-  }
-
-  const hiddenNodeIds = new Set<string>();
-  for (const collapsedNodeId of collapsedNodeIds) {
-    const visitedNodeIds = new Set([collapsedNodeId]);
-    const queue = [...(outgoingNodeIdsBySourceId.get(collapsedNodeId) ?? [])];
-
-    while (queue.length > 0) {
-      const nodeId = queue.shift();
-      if (!nodeId || visitedNodeIds.has(nodeId)) {
-        continue;
-      }
-
-      visitedNodeIds.add(nodeId);
-      hiddenNodeIds.add(nodeId);
-      queue.push(...(outgoingNodeIdsBySourceId.get(nodeId) ?? []));
-    }
-  }
-
-  return hiddenNodeIds;
 }
 
 function areOutputChannelsEqual(previous: string[] | undefined, next: string[] | undefined) {
@@ -1090,14 +1042,17 @@ function CanvasPage(props: CanvasPageProps) {
     [editingNodeData?.nodeId, props.onNodeConfigurationSave, props.configurationSaveMode, state.componentSidebar.close],
   );
 
+  const canvasNodesForToggle = state.nodes;
+  const toggleNodeCollapse = state.toggleNodeCollapse;
+  const onToggleView = props.onToggleView;
   const handleToggleView = useCallback(
     (nodeId: string) => {
-      const node = state.nodes.find((candidate) => candidate.id === nodeId);
+      const node = canvasNodesForToggle.find((candidate) => candidate.id === nodeId);
       const collapsed = !isCanvasNodeCollapsed(node);
-      state.toggleNodeCollapse(nodeId);
-      props.onToggleView?.(nodeId, collapsed);
+      toggleNodeCollapse(nodeId);
+      onToggleView?.(nodeId, collapsed);
     },
-    [state.nodes, state.toggleNodeCollapse, props.onToggleView],
+    [canvasNodesForToggle, toggleNodeCollapse, onToggleView],
   );
 
   const handleCancelQueueItem = (queueId: string) => {
@@ -2543,6 +2498,7 @@ function CanvasContent({
   );
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
+  const { onNodesChange, onEdgesChange } = state;
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -2558,31 +2514,31 @@ function CanvasContent({
       }
 
       if (!isReadOnly) {
-        state.onNodesChange(changes);
+        onNodesChange(changes);
         return;
       }
 
       const filteredChanges = changes.filter((change) => change.type === "select" || change.type === "dimensions");
       if (filteredChanges.length > 0) {
-        state.onNodesChange(filteredChanges);
+        onNodesChange(filteredChanges);
       }
     },
-    [isReadOnly, state.onNodesChange],
+    [isReadOnly, onNodesChange],
   );
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       if (!isReadOnly) {
-        state.onEdgesChange(changes);
+        onEdgesChange(changes);
         return;
       }
 
       const filteredChanges = changes.filter((change) => change.type === "select");
       if (filteredChanges.length > 0) {
-        state.onEdgesChange(filteredChanges);
+        onEdgesChange(filteredChanges);
       }
     },
-    [isReadOnly, state.onEdgesChange],
+    [isReadOnly, onEdgesChange],
   );
 
   const logCounts = useMemo(() => {

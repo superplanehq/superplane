@@ -67,7 +67,7 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
         setSearchResults(results);
       }
     },
-    [onSearch, onOpenChange],
+    [onSearch, onOpenChange, defaultOnSearch],
   );
 
   const defaultOnSelectNode = useCallback(
