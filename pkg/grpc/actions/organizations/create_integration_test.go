@@ -285,6 +285,7 @@ func Test__CreateIntegration(t *testing.T) {
 			"github",
 			name,
 			appConfig,
+			[]string{},
 		)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
