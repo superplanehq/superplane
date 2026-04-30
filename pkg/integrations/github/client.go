@@ -14,7 +14,7 @@ import (
 )
 
 func NewClientFromStorageContexts(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
-	authMethod, err := properties.GetString(ParameterAuthMethod)
+	authMethod, err := properties.GetString(PropertyAuthMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get authentication method: %v", err)
 	}
@@ -49,7 +49,7 @@ func NewPATClient(properties core.IntegrationPropertyStorageReader, secrets core
 }
 
 func NewGitHubAppClient(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
-	appID, err := properties.GetString(ParameterGitHubAppID)
+	appID, err := properties.GetString(PropertyAppID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub app ID: %v", err)
 	}
@@ -59,7 +59,7 @@ func NewGitHubAppClient(properties core.IntegrationPropertyStorageReader, secret
 		return nil, fmt.Errorf("failed to parse GitHub app ID: %v", err)
 	}
 
-	installationID, err := properties.GetString(ParameterGitHubAppInstallationID)
+	installationID, err := properties.GetString(PropertyAppInstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get installation ID: %v", err)
 	}
@@ -69,7 +69,7 @@ func NewGitHubAppClient(properties core.IntegrationPropertyStorageReader, secret
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := secrets.Get(SecretGitHubAppPEM)
+	pem, err := secrets.Get(SecretAppPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PEM: %v", err)
 	}

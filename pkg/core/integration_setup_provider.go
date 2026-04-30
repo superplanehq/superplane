@@ -100,14 +100,16 @@ type RedirectPrompt struct {
 }
 
 type SetupStepContext struct {
-	Step           string
-	Inputs         any
-	IntegrationID  uuid.UUID
-	OrganizationID string
-	HTTP           HTTPContext
-	Secrets        IntegrationSecretStorage
-	Properties     IntegrationPropertyStorage
-	Capabilities   CapabilityContext
+	Step            string
+	Inputs          any
+	IntegrationID   uuid.UUID
+	OrganizationID  string
+	BaseURL         string
+	WebhooksBaseURL string
+	HTTP            HTTPContext
+	Secrets         IntegrationSecretStorage
+	Properties      IntegrationPropertyStorage
+	Capabilities    CapabilityContext
 }
 
 //
@@ -140,6 +142,7 @@ type IntegrationPropertyStorage interface {
 
 	Delete(names ...string) error
 	Create(def IntegrationPropertyDefinition) error
+	CreateMany(defs []IntegrationPropertyDefinition) error
 }
 
 type IntegrationSecretStorageReader interface {
@@ -157,11 +160,13 @@ type IntegrationSecretStorage interface {
 	IntegrationSecretStorageReader
 
 	Delete(name string) error
-	Create(name string, def IntegrationSecretDefinition) error
+	Create(def IntegrationSecretDefinition) error
+	CreateMany(defs []IntegrationSecretDefinition) error
 	Update(name string, value string) error
 }
 
 type IntegrationSecretDefinition struct {
+	Name        string
 	Label       string
 	Description string
 	Value       []byte

@@ -152,6 +152,14 @@ func (c *IntegrationContext) Ready() {
 	c.StateDescription = ""
 }
 
+func (c *IntegrationContext) Capabilities() core.CapabilityContext {
+	return nil
+}
+
+func (c *IntegrationContext) ClearSetupState() {
+	// no-op
+}
+
 func (c *IntegrationContext) Error(message string) {
 	c.State = "error"
 	c.StateDescription = message
@@ -218,11 +226,11 @@ func (c *IntegrationContext) LegacySetup() bool {
 	return false
 }
 
-func (c *IntegrationContext) PropertyStorage() core.IntegrationPropertyStorageReader {
+func (c *IntegrationContext) PropertyStorage() core.IntegrationPropertyStorage {
 	return nil
 }
 
-func (c *IntegrationContext) SecretStorage() core.IntegrationSecretStorageReader {
+func (c *IntegrationContext) SecretStorage() core.IntegrationSecretStorage {
 	return nil
 }
 

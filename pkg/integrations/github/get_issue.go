@@ -160,7 +160,7 @@ func (c *GetIssue) getIssue(ctx core.ExecutionContext, repository string, issueN
 		return nil, nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
-	owner, err := ctx.Integration.PropertyStorage().GetString(ParameterOwner)
+	owner, err := ctx.Integration.PropertyStorage().GetString(PropertyOwner)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get owner: %w", err)
 	}

@@ -197,10 +197,16 @@ type IntegrationContext interface {
 	LegacySetup() bool
 
 	//
-	// Access to properties/secrets.
+	// Access to properties/secrets/capabilities.
 	//
-	PropertyStorage() IntegrationPropertyStorageReader
-	SecretStorage() IntegrationSecretStorageReader
+	PropertyStorage() IntegrationPropertyStorage
+	SecretStorage() IntegrationSecretStorage
+	Capabilities() CapabilityContext
+
+	//
+	// Control the setup state of the integration
+	//
+	ClearSetupState()
 
 	//
 	// Control the metadata and config of the integration

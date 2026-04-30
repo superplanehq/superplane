@@ -82,10 +82,14 @@ func (s *IntegrationSecretStorage) Delete(name string) error {
 	return fmt.Errorf("secret %s not found", name)
 }
 
-func (s *IntegrationSecretStorage) Create(name string, def core.IntegrationSecretDefinition) error {
-	_, err := s.Get(name)
+func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) error {
+	if def.Name == "" {
+		return fmt.Errorf("secret name is required")
+	}
+
+	_, err := s.Get(def.Name)
 	if err == nil {
-		return fmt.Errorf("secret %s already exists", name)
+		return fmt.Errorf("secret %s already exists", def.Name)
 	}
 
 	encryptedValue, err := s.encryptor.Encrypt(
@@ -101,7 +105,7 @@ func (s *IntegrationSecretStorage) Create(name string, def core.IntegrationSecre
 	secret := models.IntegrationSecret{
 		OrganizationID: s.integration.OrganizationID,
 		InstallationID: s.integration.ID,
-		Name:           name,
+		Name:           def.Name,
 		Label:          def.Label,
 		Description:    def.Description,
 		Value:          encryptedValue,
@@ -116,6 +120,17 @@ func (s *IntegrationSecretStorage) Create(name string, def core.IntegrationSecre
 	}
 
 	s.secrets = append(s.secrets, secret)
+	return nil
+}
+
+func (s *IntegrationSecretStorage) CreateMany(defs []core.IntegrationSecretDefinition) error {
+	for _, def := range defs {
+		err := s.Create(def)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -290,7 +290,8 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	// API token is something you can change
 	// so we store it as an editable secret.
 	//
-	err := ctx.Secrets.Create("apiToken", core.IntegrationSecretDefinition{
+	err := ctx.Secrets.Create(core.IntegrationSecretDefinition{
+		Name:        "apiToken",
 		Label:       "API Token",
 		Description: "The API token for the Semaphore organization",
 		Value:       []byte(apiToken),

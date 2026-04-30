@@ -3,9 +3,9 @@ package github
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 
@@ -13,6 +13,7 @@ import (
 	gh "github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"golang.org/x/oauth2"
 )
 
@@ -30,25 +31,28 @@ const (
 	// - A user account
 	// - An organization
 	//
-	ParameterOwnerType    = "ownerType"
-	ParameterOwner        = "owner"
+	PropertyOwnerType     = "ownerType"
+	PropertyOwner         = "owner"
 	OwnerTypeUser         = "User Account"
 	OwnerTypeOrganization = "Organization"
 
 	//
 	// When connecting to the owner with a GitHub App,
-	// these are the parameters we get back from GitHub,
+	// these are the properties we get back from GitHub,
 	// through the app creation / installation flow.
 	//
-	ParameterGitHubAppID             = "GitHub App ID"
-	ParameterGitHubAppInstallationID = "GitHub App Installation ID"
+	PropertyAppID             = "GitHub App ID"
+	PropertyAppSlug           = "GitHub App Slug"
+	PropertyAppClientID       = "GitHub App Client ID"
+	PropertyAppInstallationID = "GitHub App Installation ID"
+	PropertyAppState          = "GitHub App State"
 
 	//
 	// Two authentication methods are supported:
 	// - Personal Access Token (PAT)
 	// - GitHub App
 	//
-	ParameterAuthMethod = "Authentication Method"
+	PropertyAuthMethod  = "Authentication Method"
 	AuthMethodPAT       = "Personal Access Token"
 	AuthMethodGitHubApp = "GitHub App"
 
@@ -57,8 +61,10 @@ const (
 	// - Personal Access Token (PAT)
 	// - GitHub App private key (PEM)
 	//
-	SecretPAT          = "Personal Access Token"
-	SecretGitHubAppPEM = "GitHub App Private Key (PEM)"
+	SecretPAT              = "Personal Access Token"
+	SecretAppClientSecret  = "GitHub App Client Secret"
+	SecretAppWebhookSecret = "GitHub App Webhook Secret"
+	SecretAppPEM           = "GitHub App Private Key (PEM)"
 )
 
 func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
@@ -99,16 +105,12 @@ const patUpdateInstructionsTemplate = `
 `
 
 func (g *SetupProvider) instructionsForTokenUpdate(properties core.IntegrationPropertyStorageReader, newCapabilities []string) (string, error) {
-	owner, err := properties.GetString(ParameterOwner)
+	owner, err := properties.GetString(PropertyOwner)
 	if err != nil {
 		return "", err
 	}
 
-	permissions, err := g.getPermissions(newCapabilities)
-	if err != nil {
-		return "", err
-	}
-
+	permissions := NewCapabilityMapper().PermissionsForPAT(newCapabilities)
 	tmpl, err := template.New("patUpdateInstructions").Parse(patUpdateInstructionsTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing template: %v", err)
@@ -128,238 +130,40 @@ func (g *SetupProvider) instructionsForTokenUpdate(properties core.IntegrationPr
 }
 
 func (g *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
-	return []core.CapabilityGroup{
-		{
-			Label:        "Actions",
-			Capabilities: append(g.readActionCapabilities(), g.writeActionCapabilities()...),
-		},
-		{
-			Label:        "Commit Statuses",
-			Capabilities: g.writeCommitStatusCapabilities(),
-		},
-		{
-			Label:        "Contents",
-			Capabilities: append(g.readContentsCapabilities(), g.writeContentsCapabilities()...),
-		},
-		{
-			Label:        "Issues",
-			Capabilities: append(g.readIssueCapabilities(), g.writeIssueCapabilities()...),
-		},
-		{
-			Label:        "Pull Requests",
-			Capabilities: append(g.readPullRequestCapabilities(), g.writePullRequestCapabilities()...),
-		},
-	}
-}
+	mapper := NewCapabilityMapper()
+	groups := []core.CapabilityGroup{}
+	for name, group := range mapper.Groups {
+		capabilities := []core.Capability{}
+		for _, c := range group {
+			if c.Action != nil {
+				capabilities = append(capabilities, core.Capability{
+					Type:           core.IntegrationCapabilityTypeAction,
+					Name:           c.Action.Name(),
+					Label:          c.Action.Label(),
+					Description:    c.Action.Description(),
+					Configuration:  c.Action.Configuration(),
+					OutputChannels: c.Action.OutputChannels(nil),
+				})
+			}
 
-func (g *SetupProvider) isIssueCapability(capabilityName string) (bool, bool) {
-	if slices.ContainsFunc(g.writeIssueCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, true
-	}
+			if c.Trigger != nil {
+				capabilities = append(capabilities, core.Capability{
+					Type:          core.IntegrationCapabilityTypeTrigger,
+					Name:          c.Trigger.Name(),
+					Label:         c.Trigger.Label(),
+					Description:   c.Trigger.Description(),
+					Configuration: c.Trigger.Configuration(),
+				})
+			}
+		}
 
-	if slices.ContainsFunc(g.readIssueCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, false
-	}
-
-	return false, false
-}
-
-func (g *SetupProvider) readIssueCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&GetIssue{},
-		},
-		[]core.Trigger{
-			&OnIssue{},
-			&OnIssueComment{},
-		},
-	)
-}
-
-func (g *SetupProvider) writeIssueCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&CreateIssue{},
-			&CreateIssueComment{},
-			&UpdateIssue{},
-			&RemoveIssueLabel{},
-			&RemoveIssueAssignee{},
-			&AddIssueLabel{},
-			&AddIssueAssignee{},
-		},
-		[]core.Trigger{},
-	)
-}
-
-func (g *SetupProvider) isPullRequestCapability(capabilityName string) (bool, bool) {
-	if slices.ContainsFunc(g.writePullRequestCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, true
-	}
-
-	if slices.ContainsFunc(g.readPullRequestCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, false
-	}
-
-	return false, false
-}
-
-func (g *SetupProvider) readPullRequestCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{},
-		[]core.Trigger{
-			&OnPullRequest{},
-			&OnPRComment{},
-			&OnPRReviewComment{},
-		},
-	)
-}
-
-func (g *SetupProvider) writePullRequestCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&CreateReview{},
-			&AddReaction{},
-		},
-		[]core.Trigger{},
-	)
-}
-
-func (g *SetupProvider) isActionCapability(capabilityName string) (bool, bool) {
-	if slices.ContainsFunc(g.writeActionCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, true
-	}
-
-	if slices.ContainsFunc(g.readActionCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, false
-	}
-
-	return false, false
-}
-
-func (g *SetupProvider) readActionCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&GetWorkflowUsage{},
-		},
-		[]core.Trigger{
-			&OnWorkflowRun{},
-		},
-	)
-}
-
-func (g *SetupProvider) writeActionCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&RunWorkflow{},
-		},
-		[]core.Trigger{},
-	)
-}
-
-func (g *SetupProvider) isCommitStatusCapability(capabilityName string) (bool, bool) {
-	if slices.ContainsFunc(g.writeCommitStatusCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, true
-	}
-
-	return false, false
-}
-
-func (g *SetupProvider) writeCommitStatusCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&PublishCommitStatus{},
-		},
-		[]core.Trigger{},
-	)
-}
-
-func (g *SetupProvider) isContentsCapability(capabilityName string) (bool, bool) {
-	if slices.ContainsFunc(g.writeContentsCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, true
-	}
-
-	if slices.ContainsFunc(g.readContentsCapabilities(), func(capability core.Capability) bool {
-		return capability.Name == capabilityName
-	}) {
-		return true, false
-	}
-
-	return false, false
-}
-
-func (g *SetupProvider) readContentsCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&GetRelease{},
-			&GetRepositoryPermission{},
-		},
-		[]core.Trigger{
-			&OnBranchCreated{},
-			&OnPush{},
-			&OnRelease{},
-			&OnTagCreated{},
-		},
-	)
-}
-
-func (g *SetupProvider) writeContentsCapabilities() []core.Capability {
-	return g.genCapabilities(
-		[]core.Action{
-			&CreateRelease{},
-			&UpdateRelease{},
-			&DeleteRelease{},
-		},
-		[]core.Trigger{},
-	)
-}
-
-func (g *SetupProvider) Capabilities() []core.Capability {
-	capabilities := []core.Capability{}
-	for _, group := range g.CapabilityGroups() {
-		capabilities = append(capabilities, group.Capabilities...)
-	}
-	return capabilities
-}
-
-func (g *SetupProvider) genCapabilities(actions []core.Action, triggers []core.Trigger) []core.Capability {
-	capabilities := []core.Capability{}
-	for _, action := range actions {
-		capabilities = append(capabilities, core.Capability{
-			Type:           core.IntegrationCapabilityTypeAction,
-			Name:           action.Name(),
-			Label:          action.Label(),
-			Description:    action.Description(),
-			Configuration:  action.Configuration(),
-			OutputChannels: action.OutputChannels(nil),
-		})
-	}
-	for _, trigger := range triggers {
-		capabilities = append(capabilities, core.Capability{
-			Type:          core.IntegrationCapabilityTypeTrigger,
-			Name:          trigger.Name(),
-			Label:         trigger.Label(),
-			Description:   trigger.Description(),
-			Configuration: trigger.Configuration(),
+		groups = append(groups, core.CapabilityGroup{
+			Label:        name,
+			Capabilities: capabilities,
 		})
 	}
 
-	return capabilities
+	return groups
 }
 
 func (g *SetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.SetupStep, error) {
@@ -377,7 +181,7 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 		Label: "Select the user account / organization",
 		Inputs: []configuration.Field{
 			{
-				Name:     ParameterOwnerType,
+				Name:     PropertyOwnerType,
 				Label:    "Owner Type",
 				Type:     configuration.FieldTypeSelect,
 				Required: true,
@@ -392,7 +196,7 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 				},
 			},
 			{
-				Name:        ParameterOwner,
+				Name:        PropertyOwner,
 				Label:       "User account / organization name",
 				Type:        configuration.FieldTypeString,
 				Required:    true,
@@ -418,11 +222,11 @@ func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 }
 
 func (g *SetupProvider) onSelectOwnerRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete(ParameterOwnerType, ParameterOwner)
+	return ctx.Properties.Delete(PropertyOwnerType, PropertyOwner)
 }
 
 func (g *SetupProvider) onSelectAuthMethodRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete(ParameterAuthMethod)
+	return ctx.Properties.Delete(PropertyAuthMethod)
 }
 
 func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {
@@ -447,8 +251,13 @@ func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 		}
 
 		return nil, nil
+
+	//
+	// This step is not submitted, since it's a redirect step.
+	// The GitHub App creation flow will clear the setup state, if successful.
+	//
 	case SetupStepSetupApp:
-		return nil, fmt.Errorf("not implemented")
+		return nil, nil
 	}
 
 	return nil, errors.New("unknown step")
@@ -460,7 +269,16 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 		return nil, errors.New("invalid input")
 	}
 
-	owner, ok := m[ParameterOwner].(string)
+	ownerType, ok := m[PropertyOwnerType].(string)
+	if !ok {
+		return nil, errors.New("invalid owner type")
+	}
+
+	if ownerType != OwnerTypeUser && ownerType != OwnerTypeOrganization {
+		return nil, errors.New("invalid owner type")
+	}
+
+	owner, ok := m[PropertyOwner].(string)
 	if !ok {
 		return nil, errors.New("invalid owner")
 	}
@@ -470,12 +288,21 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 		return nil, errors.New("owner is required")
 	}
 
-	err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
-		Name:     ParameterOwner,
-		Label:    "Owner",
-		Type:     configuration.FieldTypeString,
-		Value:    owner,
-		Editable: false,
+	err := ctx.Properties.CreateMany([]core.IntegrationPropertyDefinition{
+		{
+			Name:     PropertyOwnerType,
+			Label:    "Owner Type",
+			Type:     configuration.FieldTypeString,
+			Value:    ownerType,
+			Editable: false,
+		},
+		{
+			Name:     PropertyOwner,
+			Label:    "Owner",
+			Type:     configuration.FieldTypeString,
+			Value:    owner,
+			Editable: false,
+		},
 	})
 
 	if err != nil {
@@ -488,7 +315,7 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 		Label: "Choose authentication method",
 		Inputs: []configuration.Field{
 			{
-				Name:     ParameterAuthMethod,
+				Name:     PropertyAuthMethod,
 				Label:    "Authentication Method",
 				Type:     configuration.FieldTypeSelect,
 				Required: true,
@@ -512,7 +339,7 @@ func (g *SetupProvider) onSelectAuthMethodSubmit(input any, ctx core.SetupStepCo
 		return nil, errors.New("invalid input")
 	}
 
-	authMethod, ok := m[ParameterAuthMethod].(string)
+	authMethod, ok := m[PropertyAuthMethod].(string)
 	if !ok {
 		return nil, errors.New("invalid authentication method")
 	}
@@ -522,7 +349,7 @@ func (g *SetupProvider) onSelectAuthMethodSubmit(input any, ctx core.SetupStepCo
 	}
 
 	err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
-		Name:     ParameterAuthMethod,
+		Name:     PropertyAuthMethod,
 		Label:    "Authentication Method",
 		Type:     configuration.FieldTypeString,
 		Value:    authMethod,
@@ -557,7 +384,24 @@ func (g *SetupProvider) onSelectAuthMethodSubmit(input any, ctx core.SetupStepCo
 		}, nil
 
 	case AuthMethodGitHubApp:
-		return nil, fmt.Errorf("TODO: implement GitHub app authentication")
+		state, err := crypto.Base64String(32)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to generate GitHub App state: %v", err)
+		}
+
+		err = ctx.Properties.Create(core.IntegrationPropertyDefinition{
+			Name:     PropertyAppState,
+			Label:    "GitHub App State",
+			Type:     configuration.FieldTypeString,
+			Value:    state,
+			Editable: false,
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("error creating property: %v", err)
+		}
+
+		return g.generateNextStepForApp(ctx, state)
 
 	default:
 		return nil, fmt.Errorf("not implemented")
@@ -619,7 +463,7 @@ func (p *PermissionSet) Permissions() map[string]string {
 }
 
 func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (string, error) {
-	owner, err := ctx.Properties.GetString(ParameterOwner)
+	owner, err := ctx.Properties.GetString(PropertyOwner)
 	if err != nil {
 		return "", err
 	}
@@ -629,11 +473,7 @@ func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (s
 		return "", fmt.Errorf("no capabilities requested")
 	}
 
-	permissions, err := g.getPermissions(requestedCapabilities)
-	if err != nil {
-		return "", err
-	}
-
+	permissions := NewCapabilityMapper().PermissionsForPAT(requestedCapabilities)
 	tmpl, err := template.New("patInstructions").Parse(patInstructionsTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing template: %v", err)
@@ -652,52 +492,62 @@ func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (s
 	return buf.String(), nil
 }
 
-func (g *SetupProvider) getPermissions(requestedCapabilities []string) (map[string]string, error) {
-	//
-	// TODO: this looks awful, need a better way to build this kind of logic.
-	//
-	permissions := NewPermissionSet()
-	for _, capability := range requestedCapabilities {
-		isRead, isWrite := g.isIssueCapability(capability)
-		if isRead {
-			permissions.Add("Issues", false)
-		}
-		if isWrite {
-			permissions.Add("Issues", true)
-		}
-		isRead, isWrite = g.isPullRequestCapability(capability)
-		if isRead {
-			permissions.Add("Pull Requests", false)
-		}
-		if isWrite {
-			permissions.Add("Pull Requests", true)
-		}
-		isRead, isWrite = g.isActionCapability(capability)
-		if isRead {
-			permissions.Add("Actions", false)
-		}
-		if isWrite {
-			permissions.Add("Actions", true)
-		}
-
-		isRead, isWrite = g.isCommitStatusCapability(capability)
-		if isRead {
-			permissions.Add("Commit Statuses", false)
-		}
-		if isWrite {
-			permissions.Add("Commit Statuses", true)
-		}
-
-		isRead, isWrite = g.isContentsCapability(capability)
-		if isRead {
-			permissions.Add("Contents", false)
-		}
-		if isWrite {
-			permissions.Add("Contents", true)
-		}
+func (g *SetupProvider) generateNextStepForApp(ctx core.SetupStepContext, state string) (*core.SetupStep, error) {
+	ownerType, err := ctx.Properties.GetString(PropertyOwnerType)
+	if err != nil {
+		return nil, err
 	}
 
-	return permissions.Permissions(), nil
+	owner, err := ctx.Properties.GetString(PropertyOwner)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.SetupStep{
+		Type:  core.SetupStepTypeRedirectPrompt,
+		Name:  SetupStepSetupApp,
+		Label: "Setup GitHub App",
+		RedirectPrompt: &core.RedirectPrompt{
+			Method: "POST",
+			URL:    g.createAppURL(ownerType, owner),
+			FormData: map[string]string{
+				"manifest": g.appManifest(ctx),
+				"state":    state,
+			},
+		},
+		Instructions: "",
+	}, nil
+}
+
+func (g *SetupProvider) createAppURL(ownerType string, owner string) string {
+	if ownerType == OwnerTypeOrganization {
+		return fmt.Sprintf("https://github.com/organizations/%s/settings/apps/new", owner)
+	}
+
+	return "https://github.com/settings/apps/new"
+}
+
+func (g *SetupProvider) appManifest(ctx core.SetupStepContext) string {
+	permissions := NewCapabilityMapper().PermissionsForApp(ctx.Capabilities.Requested())
+	manifest := map[string]any{
+		"name":                `SuperPlane GH integration`,
+		"public":              false,
+		"url":                 "https://superplane.com",
+		"default_events":      defaultGitHubAppEvents,
+		"default_permissions": permissions,
+		"setup_url":           fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.IntegrationID),
+		"redirect_url":        fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.IntegrationID),
+		"hook_attributes": map[string]any{
+			"url": fmt.Sprintf(`%s/api/v1/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.IntegrationID),
+		},
+	}
+
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return ""
+	}
+
+	return string(data)
 }
 
 func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (*core.SetupStep, error) {
@@ -716,7 +566,8 @@ func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (
 		return nil, errors.New("personal access token is required")
 	}
 
-	err := ctx.Secrets.Create(SecretPAT, core.IntegrationSecretDefinition{
+	err := ctx.Secrets.Create(core.IntegrationSecretDefinition{
+		Name:     SecretPAT,
 		Value:    []byte(token),
 		Label:    "Personal Access Token",
 		Editable: true,
@@ -779,7 +630,7 @@ You can now start using the following repositories:
 `
 
 func finishPATSetup(properties core.IntegrationPropertyStorageReader, repos []*github.Repository) (*core.SetupStep, error) {
-	owner, err := properties.GetString(ParameterOwner)
+	owner, err := properties.GetString(PropertyOwner)
 	if err != nil {
 		return nil, fmt.Errorf("error getting connection URL: %v", err)
 	}

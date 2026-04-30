@@ -460,15 +460,33 @@ func (c *IntegrationContext) LegacySetup() bool {
 	return len(c.integration.Capabilities) == 0
 }
 
-func (c *IntegrationContext) PropertyStorage() core.IntegrationPropertyStorageReader {
+func (c *IntegrationContext) PropertyStorage() core.IntegrationPropertyStorage {
 	return NewIntegrationPropertyStorage(c.integration)
 }
 
-func (c *IntegrationContext) SecretStorage() core.IntegrationSecretStorageReader {
+func (c *IntegrationContext) SecretStorage() core.IntegrationSecretStorage {
 	secretStorage, err := NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration)
 	if err != nil {
 		return nil
 	}
 
 	return secretStorage
+}
+
+func (c *IntegrationContext) Capabilities() core.CapabilityContext {
+	impl, err := c.registry.GetSetupProvider(c.integration.AppName)
+	if err != nil {
+		return nil
+	}
+
+	capabilities := []core.Capability{}
+	for _, group := range impl.CapabilityGroups() {
+		capabilities = append(capabilities, group.Capabilities...)
+	}
+
+	return NewCapabilityContext(capabilities, c.integration.Capabilities)
+}
+
+func (c *IntegrationContext) ClearSetupState() {
+	c.integration.SetupState = nil
 }

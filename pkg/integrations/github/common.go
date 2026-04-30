@@ -47,7 +47,7 @@ func ensureRepoInMetadata(metadata core.MetadataWriter, integration core.Integra
 		return fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
-	authMethod, err := properties.GetString(ParameterAuthMethod)
+	authMethod, err := properties.GetString(PropertyAuthMethod)
 	if err != nil {
 		return fmt.Errorf("failed to get authentication method: %w", err)
 	}
@@ -56,7 +56,7 @@ func ensureRepoInMetadata(metadata core.MetadataWriter, integration core.Integra
 	case AuthMethodPAT:
 		return ensureOwnerRepoInMetadata(properties, metadata, client, repository)
 	case AuthMethodGitHubApp:
-		return ensureAppRepoInMetadata(properties, metadata, client, repository)
+		return ensureAppRepoInMetadata(metadata, client, repository)
 	}
 
 	return fmt.Errorf("invalid authentication method: %s", authMethod)
@@ -68,7 +68,7 @@ func ensureOwnerRepoInMetadata(
 	client *github.Client,
 	repository string,
 ) error {
-	owner, err := properties.GetString(ParameterOwner)
+	owner, err := properties.GetString(PropertyOwner)
 	if err != nil {
 		return fmt.Errorf("failed to get owner: %w", err)
 	}
@@ -88,7 +88,6 @@ func ensureOwnerRepoInMetadata(
 }
 
 func ensureAppRepoInMetadata(
-	properties core.IntegrationPropertyStorageReader,
 	metadata core.MetadataWriter,
 	client *github.Client,
 	repository string,

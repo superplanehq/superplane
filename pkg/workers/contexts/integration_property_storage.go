@@ -41,15 +41,10 @@ func (s *IntegrationPropertyStorage) GetString(name string) (string, error) {
 }
 
 func (s *IntegrationPropertyStorage) Delete(names ...string) error {
-	newProperties := slices.Clone(s.integration.Properties)
+	s.integration.Properties = slices.DeleteFunc(s.integration.Properties, func(property core.IntegrationPropertyDefinition) bool {
+		return slices.Contains(names, property.Name)
+	})
 
-	for i, property := range s.integration.Properties {
-		if slices.Contains(names, property.Name) {
-			newProperties = append(newProperties[:i], newProperties[i+1:]...)
-		}
-	}
-
-	s.integration.Properties = newProperties
 	return nil
 }
 
@@ -60,5 +55,16 @@ func (s *IntegrationPropertyStorage) Create(def core.IntegrationPropertyDefiniti
 	}
 
 	s.integration.Properties = append(s.integration.Properties, def)
+	return nil
+}
+
+func (s *IntegrationPropertyStorage) CreateMany(defs []core.IntegrationPropertyDefinition) error {
+	for _, def := range defs {
+		err := s.Create(def)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, orgID, id string, inputs *structpb.Struct) (*pb.NextIntegrationSetupStepResponse, error) {
+func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, baseURL, webhooksBaseURL, orgID, id string, inputs *structpb.Struct) (*pb.NextIntegrationSetupStepResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -55,7 +55,7 @@ func NextIntegrationSetupStep(ctx context.Context, registry *registry.Registry, 
 		return clearIntegrationSetupState(registry, integration)
 	}
 
-	return submitStep(registry, integration, &setupState, inputs)
+	return submitStep(registry, integration, baseURL, webhooksBaseURL, &setupState, inputs)
 }
 
 func getStepInputs(inputs *structpb.Struct) map[string]any {
@@ -84,7 +84,7 @@ func clearIntegrationSetupState(registry *registry.Registry, integration *models
 	}, nil
 }
 
-func submitStep(registry *registry.Registry, integration *models.Integration, setupState *models.SetupState, inputs *structpb.Struct) (*pb.NextIntegrationSetupStepResponse, error) {
+func submitStep(registry *registry.Registry, integration *models.Integration, baseURL, webhooksBaseURL string, setupState *models.SetupState, inputs *structpb.Struct) (*pb.NextIntegrationSetupStepResponse, error) {
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get setup provider")
@@ -98,14 +98,16 @@ func submitStep(registry *registry.Registry, integration *models.Integration, se
 
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
-			Step:           setupState.CurrentStep.Name,
-			Inputs:         getStepInputs(inputs),
-			IntegrationID:  integration.ID,
-			OrganizationID: integration.OrganizationID.String(),
-			HTTP:           registry.HTTPContext(),
-			Properties:     contexts.NewIntegrationPropertyStorage(integration),
-			Secrets:        secretStorage,
-			Capabilities:   capabilityCtx,
+			Step:            setupState.CurrentStep.Name,
+			BaseURL:         baseURL,
+			WebhooksBaseURL: webhooksBaseURL,
+			Inputs:          getStepInputs(inputs),
+			IntegrationID:   integration.ID,
+			OrganizationID:  integration.OrganizationID.String(),
+			HTTP:            registry.HTTPContext(),
+			Properties:      contexts.NewIntegrationPropertyStorage(integration),
+			Secrets:         secretStorage,
+			Capabilities:    capabilityCtx,
 		})
 
 		if err != nil {
