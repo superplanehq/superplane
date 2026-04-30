@@ -365,6 +365,10 @@ func listContainerImages(ctx core.ListResourcesContext) ([]core.IntegrationResou
 		if img.LifecycleState != "AVAILABLE" {
 			continue
 		}
+		// Skip untagged images: an empty Version would produce an invalid URI ending with ':'.
+		if img.Version == "" {
+			continue
+		}
 		// Construct the full OCIR image URI required by OCI Functions.
 		// The format is: <region-key>.ocir.io/<namespace>/<repositoryName>:<version>
 		fullImageURI := fmt.Sprintf("%s/%s/%s:%s",

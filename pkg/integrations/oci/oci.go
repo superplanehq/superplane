@@ -28,6 +28,9 @@ type Configuration struct {
 type IntegrationMetadata struct {
 	TopicID      string `json:"topicId" mapstructure:"topicId"`
 	EventsRuleID string `json:"eventsRuleId" mapstructure:"eventsRuleId"`
+	// EventsRuleCondition is the condition string last successfully applied to the Events rule.
+	// Used to skip redundant UpdateEventsRule API calls when the desired condition has not changed.
+	EventsRuleCondition string `json:"eventsRuleCondition,omitempty" mapstructure:"eventsRuleCondition"`
 	// Deprecated: CompartmentRules was used in older versions to track per-compartment rules.
 	// It is kept only for cleanup of legacy resources.
 	CompartmentRules map[string]string `json:"compartmentRules,omitempty" mapstructure:"compartmentRules"`
@@ -227,12 +230,17 @@ func (o *OCI) Sync(ctx core.SyncContext) error {
 			return fmt.Errorf("failed to create Events rule: %w", err)
 		}
 		metadata.EventsRuleID = rule.ID
+		metadata.EventsRuleCondition = condition
 		ctx.Integration.SetMetadata(metadata)
-	} else {
+	} else if metadata.EventsRuleCondition != condition {
 		// Reconcile the condition on pre-existing rules so that any new event types
 		// added in future deploys are picked up without requiring a re-integration.
+		// Skip the API call entirely when the condition is already up to date.
 		if err := client.UpdateEventsRule(metadata.EventsRuleID, condition); err != nil {
 			ctx.Logger.Warnf("failed to reconcile Events rule %q condition: %v", metadata.EventsRuleID, err)
+		} else {
+			metadata.EventsRuleCondition = condition
+			ctx.Integration.SetMetadata(metadata)
 		}
 	}
 
