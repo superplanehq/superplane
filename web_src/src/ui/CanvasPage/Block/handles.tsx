@@ -1,5 +1,10 @@
 import { Handle, Position } from "@xyflow/react";
-import { APPEND_CONNECTOR_COLOR, AppendHandleButton } from "./appendHandle";
+import {
+  APPEND_CONNECTOR_COLOR,
+  AppendHandleButton,
+  AppendHandlePreview,
+  type AppendFromNodeHandler,
+} from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import { getOutputChannels } from "./data";
 import { HANDLE_STYLE } from "./handleStyle";
@@ -132,20 +137,26 @@ function SingleRightHandle({
 }
 
 function EndNodeAppendConnector({
+  nodeId,
   channel,
+  onAppendFromNode,
   hoveredEdge,
   connectingFrom,
-  nodeId,
   allEdges,
   isConnectionInteractive,
 }: {
+  nodeId?: string;
   channel: string;
+  onAppendFromNode?: AppendFromNodeHandler;
   hoveredEdge?: BlockEdgeState;
   connectingFrom?: BlockConnectionState;
-  nodeId?: string;
   allEdges: BlockEdgeState[];
   isConnectionInteractive: boolean;
 }) {
+  if (!nodeId || !onAppendFromNode) {
+    return null;
+  }
+
   const isHighlighted =
     isConnectionInteractive &&
     getSingleChannelHighlight({
@@ -184,11 +195,20 @@ function EndNodeAppendConnector({
       />
       <AppendHandleButton
         label="Add next component"
+        onClick={() => onAppendFromNode(nodeId, channel)}
         style={{
           right: -87,
           top: 6,
           position: "absolute",
         }}
+      />
+      <AppendHandlePreview
+        style={{
+          position: "absolute",
+          left: "calc(100% + 85px)",
+          top: 0,
+        }}
+        connectorTop={18}
       />
     </>
   );
@@ -244,7 +264,8 @@ export function RightHandle({
   data,
   nodeId,
   isConnectionInteractive = true,
-}: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
+  onAppendFromNode,
+}: Pick<BlockProps, "data" | "nodeId" | "onAppendFromNode"> & { isConnectionInteractive?: boolean }) {
   const allEdges = getBlockEdges(data);
   const { hasIncoming, hasOutgoing } = getNodeConnectionStats(allEdges, nodeId);
   const isDisconnected = isDisconnectedNode({ hasIncoming, hasOutgoing });
@@ -259,13 +280,14 @@ export function RightHandle({
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
 
-  if (isConnectionInteractive && !hasOutgoing && channels.length === 1) {
+  if (isConnectionInteractive && !hasOutgoing && channels.length === 1 && onAppendFromNode) {
     return (
       <EndNodeAppendConnector
+        nodeId={nodeId}
         channel={channels[0]}
+        onAppendFromNode={onAppendFromNode}
         hoveredEdge={hoveredEdge}
         connectingFrom={connectingFrom}
-        nodeId={nodeId}
         allEdges={allEdges}
         isConnectionInteractive={isConnectionInteractive}
       />
@@ -293,6 +315,7 @@ export function RightHandle({
       nodeId={nodeId}
       allEdges={allEdges}
       isConnectionInteractive={isConnectionInteractive}
+      onAppendFromNode={onAppendFromNode}
     />
   );
 }
