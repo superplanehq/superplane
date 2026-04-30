@@ -34,7 +34,18 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 		return nil, status.Error(codes.NotFound, "service account not found")
 	}
 
+	var creator *models.User
+	if user.CreatedBy != nil {
+		creator, err = models.FindMaybeDeletedUserByID(orgID, user.CreatedBy.String())
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to describe service account")
+		}
+		if creator.OrganizationID.String() != orgID {
+			creator = nil
+		}
+	}
+
 	return &pb.DescribeServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: serializeServiceAccount(user, creator),
 	}, nil
 }
