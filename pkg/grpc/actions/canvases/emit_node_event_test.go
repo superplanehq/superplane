@@ -118,7 +118,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		assert.Equal(t, float64(42), dataMap["count"])
 	})
 
-	t.Run("custom name is resolved from node configuration", func(t *testing.T) {
+	t.Run("run title template is resolved from node", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
@@ -138,9 +138,8 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		node, err := canvas.FindNode("node-1")
 		require.NoError(t, err)
-		node.Configuration = datatypes.NewJSONType(map[string]any{
-			"customName": "Run: {{ $[\"node-1\"].message }}",
-		})
+		runTitleTemplate := "Run: {{ $[\"node-1\"].message }}"
+		node.RunTitleTemplate = &runTitleTemplate
 		require.NoError(t, database.Conn().Save(node).Error)
 
 		response, err := EmitNodeEvent(

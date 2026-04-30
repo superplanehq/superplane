@@ -126,10 +126,12 @@ interface ComponentSidebarProps {
   blockName?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
+  nodeRunTitleTemplate?: string;
   onNodeConfigSave?: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    runTitleTemplate?: string,
   ) => void | Promise<void>;
   onNodeConfigCancel?: () => void;
   domainId?: string;
@@ -202,6 +204,7 @@ export const ComponentSidebar = ({
   blockName,
   nodeConfiguration = {},
   nodeConfigurationFields = [],
+  nodeRunTitleTemplate,
   onNodeConfigSave,
   onNodeConfigCancel,
   domainId,
@@ -766,6 +769,7 @@ export const ComponentSidebar = ({
                   nodeLabel={nodeLabel}
                   configuration={nodeConfiguration}
                   configurationFields={nodeConfigurationFields}
+                  runTitleTemplate={nodeRunTitleTemplate}
                   onSave={onNodeConfigSave || (() => {})}
                   onCancel={onNodeConfigCancel}
                   domainId={domainId}

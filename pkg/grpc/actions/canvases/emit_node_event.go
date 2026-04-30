@@ -71,10 +71,6 @@ func EmitNodeEvent(
 func resolveRunTitle(node *models.CanvasNode, payload map[string]any) (*string, error) {
 	template := strings.TrimSpace(valueOrEmpty(node.RunTitleTemplate))
 	if template == "" {
-		template = legacyRunTitleTemplate(node.Configuration.Data())
-	}
-
-	if template == "" {
 		return nil, nil
 	}
 
@@ -93,22 +89,4 @@ func resolveRunTitle(node *models.CanvasNode, payload map[string]any) (*string, 
 	}
 
 	return &resolvedTitle, nil
-}
-
-func legacyRunTitleTemplate(config map[string]any) string {
-	if config == nil {
-		return ""
-	}
-
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return ""
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return ""
-	}
-
-	return strings.TrimSpace(template)
 }

@@ -7,6 +7,9 @@ import (
 
 type DummyTriggerOptions struct {
 	Name              string
+	Configuration     []configuration.Field
+	ExampleData       map[string]any
+	DefaultRunTitle   string
 	Hooks             []core.Hook
 	HandleHookFunc    func(ctx core.TriggerHookContext) (map[string]any, error)
 	SetupFunc         func(ctx core.TriggerContext) error
@@ -16,6 +19,9 @@ type DummyTriggerOptions struct {
 
 type DummyTrigger struct {
 	name              string
+	configuration     []configuration.Field
+	exampleData       map[string]any
+	defaultRunTitle   string
 	hooks             []core.Hook
 	handleHookFunc    func(ctx core.TriggerHookContext) (map[string]any, error)
 	setupFunc         func(ctx core.TriggerContext) error
@@ -31,6 +37,9 @@ func NewDummyTrigger(options DummyTriggerOptions) *DummyTrigger {
 
 	return &DummyTrigger{
 		name:              name,
+		configuration:     options.Configuration,
+		exampleData:       options.ExampleData,
+		defaultRunTitle:   options.DefaultRunTitle,
 		hooks:             options.Hooks,
 		handleHookFunc:    options.HandleHookFunc,
 		setupFunc:         options.SetupFunc,
@@ -64,15 +73,15 @@ func (t *DummyTrigger) Color() string {
 }
 
 func (t *DummyTrigger) ExampleData() map[string]any {
-	return nil
+	return t.exampleData
 }
 
 func (t *DummyTrigger) DefaultRunTitle() string {
-	return ""
+	return t.defaultRunTitle
 }
 
 func (t *DummyTrigger) Configuration() []configuration.Field {
-	return nil
+	return t.configuration
 }
 
 func (t *DummyTrigger) Hooks() []core.Hook {

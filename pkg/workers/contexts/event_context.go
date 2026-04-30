@@ -76,10 +76,6 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 func (s *EventContext) resolveRunTitle(payload any, rootPayload any) (*string, error) {
 	template := strings.TrimSpace(valueOrEmpty(s.node.RunTitleTemplate))
 	if template == "" {
-		template = legacyRunTitleTemplate(s.node.Configuration.Data())
-	}
-
-	if template == "" {
 		return nil, nil
 	}
 
@@ -98,24 +94,6 @@ func (s *EventContext) resolveRunTitle(payload any, rootPayload any) (*string, e
 	}
 
 	return &resolvedTitle, nil
-}
-
-func legacyRunTitleTemplate(config map[string]any) string {
-	if config == nil {
-		return ""
-	}
-
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return ""
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return ""
-	}
-
-	return strings.TrimSpace(template)
 }
 
 func valueOrEmpty(value *string) string {
