@@ -103,10 +103,7 @@ export function resolveExecutionEventState(execution: CanvasesCanvasNodeExecutio
 // palette. Falls back to the canonical map via `defaultStateFunction` when
 // the component doesn't define a specific style.
 //
-export function resolveExecutionBadgeColor(
-  execution: CanvasesCanvasNodeExecution,
-  nodes: ComponentsNode[],
-): string {
+export function resolveExecutionBadgeColor(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]): string {
   const node = nodes.find((n) => n.id === execution.nodeId);
   const componentName = node?.component?.name || "";
   const execInfo = buildExecutionInfo(execution);

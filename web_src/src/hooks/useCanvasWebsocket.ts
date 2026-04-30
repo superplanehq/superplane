@@ -123,10 +123,7 @@ export function useCanvasWebsocket(
             // refresh it. Without this the ribbon/Activity stay stale on the
             // queued -> running transition until the user reselects the run.
             //
-            if (
-              selectedRunEventId &&
-              queueItem.rootEvent?.id === selectedRunEventId
-            ) {
+            if (selectedRunEventId && queueItem.rootEvent?.id === selectedRunEventId) {
               queryClient.invalidateQueries({
                 queryKey: canvasKeys.run(canvasId, selectedRunEventId),
               });
@@ -140,10 +137,7 @@ export function useCanvasWebsocket(
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
 
-            if (
-              selectedRunEventId &&
-              queueItem.rootEvent?.id === selectedRunEventId
-            ) {
+            if (selectedRunEventId && queueItem.rootEvent?.id === selectedRunEventId) {
               queryClient.invalidateQueries({
                 queryKey: canvasKeys.run(canvasId, selectedRunEventId),
               });

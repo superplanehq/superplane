@@ -78,6 +78,7 @@
     "react-day-picker": "^9.11.0",
     "react-diff-view": "^3.3.2",
     "react-dom": "^19.1.0",
+    "react-grid-layout": "^2.2.3",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^3.0.6",
     "react-router-dom": "^7.13.0",

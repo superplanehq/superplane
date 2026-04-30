@@ -5,12 +5,7 @@ import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { isUrl } from "@/lib/utils";
-import type {
-  NodeChipConfigField,
-  NodeChipDetails,
-  NodeChipIcon,
-  NodeChipKind,
-} from "@/ui/Markdown/CanvasMarkdown";
+import type { NodeChipConfigField, NodeChipDetails, NodeChipIcon, NodeChipKind } from "@/ui/Markdown/CanvasMarkdown";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
@@ -50,6 +45,7 @@ import {
   useActOnCanvasChangeRequest,
   useCanvas,
   useCanvasChangeRequests,
+  useCanvasLaunchpad,
   useCanvasMemoryEntries,
   useCanvasReadme,
   useCanvasVersion,
@@ -65,6 +61,7 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
+  useUpdateCanvasLaunchpad,
   useUpdateCanvasReadme,
   useUpdateCanvasVersion,
   useWidgets,
@@ -99,6 +96,7 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasReadmeModal } from "./CanvasReadmeModal";
+import { LaunchpadView } from "./launchpad/LaunchpadView";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
@@ -607,6 +605,20 @@ export function WorkflowPageV2() {
   const [isRunsMode, setIsRunsModeState] = useState(() => {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).get("view") === "runs";
+  });
+  /**
+   * Launchpad mode: leftmost tab in the canvas mode toggle. Reads from
+   * `?view=launchpad` on initial load so launchpad links are shareable.
+   * The smart-default bootstrap below auto-opens the launchpad when the
+   * canvas already has at least one panel and the URL didn't pin a view.
+   */
+  const initialUrlViewRef = useRef<string | null>(null);
+  if (initialUrlViewRef.current === null && typeof window !== "undefined") {
+    initialUrlViewRef.current = new URLSearchParams(window.location.search).get("view") ?? "";
+  }
+  const [isLaunchpadMode, setIsLaunchpadModeState] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("view") === "launchpad";
   });
   const [selectedRunEventId, setSelectedRunEventIdState] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -2013,6 +2025,10 @@ export function WorkflowPageV2() {
   const setRunsMode = useCallback(
     (on: boolean) => {
       setIsRunsModeState(on);
+      if (on) {
+        // Switching into Runs leaves Launchpad behind.
+        setIsLaunchpadModeState(false);
+      }
       const next = new URLSearchParams(searchParams);
       if (on) {
         next.set("view", "runs");
@@ -2021,6 +2037,28 @@ export function WorkflowPageV2() {
         next.delete("run");
         setSelectedRunEventIdState(null);
         setRunDetailNodeId(null);
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const setLaunchpadMode = useCallback(
+    (on: boolean) => {
+      setIsLaunchpadModeState(on);
+      if (on) {
+        // Switching into Launchpad clears any Runs selection so flipping
+        // back into Runs starts from a clean state.
+        setIsRunsModeState(false);
+        setSelectedRunEventIdState(null);
+        setRunDetailNodeId(null);
+      }
+      const next = new URLSearchParams(searchParams);
+      if (on) {
+        next.set("view", "launchpad");
+        next.delete("run");
+      } else if (next.get("view") === "launchpad") {
+        next.delete("view");
       }
       setSearchParams(next, { replace: true });
     },
@@ -4910,10 +4948,18 @@ export function WorkflowPageV2() {
     if (isRunsMode) {
       setRunsMode(false);
     }
+    if (isLaunchpadMode) {
+      setLaunchpadMode(false);
+      // When leaving Launchpad to Editor, only toggle edit if we aren't
+      // already in edit mode (otherwise we'd flip Editor -> Live).
+      if (canvasMode === "edit") {
+        return;
+      }
+    }
     await handleToggleEditMode();
-  }, [isRunsMode, setRunsMode, handleToggleEditMode]);
+  }, [isRunsMode, setRunsMode, isLaunchpadMode, setLaunchpadMode, canvasMode, handleToggleEditMode]);
 
-  /** Wrapper for the "Live" mode toggle tab: exits runs mode without toggling edit. */
+  /** Wrapper for the "Live" mode toggle tab: exits runs/launchpad mode without toggling edit. */
   const handleExitEditMode = useCallback(async () => {
     if (isRunsMode) {
       setRunsMode(false);
@@ -4921,8 +4967,17 @@ export function WorkflowPageV2() {
         return;
       }
     }
+    if (isLaunchpadMode) {
+      setLaunchpadMode(false);
+      // Coming from Launchpad to Live: only flip out of edit mode if we're
+      // currently in it. Otherwise we're already on Live conceptually and
+      // toggling would put us in Editor.
+      if (canvasMode !== "edit") {
+        return;
+      }
+    }
     await handleToggleEditMode();
-  }, [isRunsMode, hasEditableVersion, setRunsMode, handleToggleEditMode]);
+  }, [isRunsMode, hasEditableVersion, setRunsMode, isLaunchpadMode, setLaunchpadMode, canvasMode, handleToggleEditMode]);
 
   const handleResetDraftChanges = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -5283,12 +5338,32 @@ export function WorkflowPageV2() {
   const readmeMode: "live" | "edit" = canvasMode === "edit" && canUpdateCanvas ? "edit" : "live";
   const readmeChangeManagementEnabled = liveCanvas?.spec?.changeManagement?.enabled ?? false;
   const liveReadmeQuery = useCanvasReadme(canvasId!, "", isReadmeModalOpen);
-  const draftReadmeQuery = useCanvasReadme(
-    canvasId!,
-    "draft",
-    isReadmeModalOpen && readmeMode === "edit",
-  );
+  const draftReadmeQuery = useCanvasReadme(canvasId!, "draft", isReadmeModalOpen && readmeMode === "edit");
   const updateCanvasReadmeMutation = useUpdateCanvasReadme(canvasId!);
+
+  //
+  // Launchpad: per-canvas dashboard. Always-live (not version-coupled). We
+  // fetch eagerly even when the tab isn't open so the smart-default bootstrap
+  // can decide whether to land on the Launchpad on initial load.
+  //
+  const launchpadQuery = useCanvasLaunchpad(canvasId!);
+  const updateCanvasLaunchpadMutation = useUpdateCanvasLaunchpad(canvasId!);
+  //
+  // Smart default: if the Launchpad has at least one panel and the URL didn't
+  // pin a view explicitly, land on the Launchpad. Guarded by a ref so this
+  // only runs once per page load.
+  //
+  const launchpadSmartDefaultRef = useRef(false);
+  useEffect(() => {
+    if (launchpadSmartDefaultRef.current) return;
+    if (!launchpadQuery.data) return;
+    launchpadSmartDefaultRef.current = true;
+    const initialView = initialUrlViewRef.current ?? "";
+    if (initialView !== "") return;
+    if ((launchpadQuery.data.panels?.length ?? 0) > 0) {
+      setLaunchpadMode(true);
+    }
+  }, [launchpadQuery.data, setLaunchpadMode]);
 
   //
   // Build slug -> display-name + slug -> node-id maps used by the Readme
@@ -5335,14 +5410,7 @@ export function WorkflowPageV2() {
     // being crammed into a tooltip.
     const MAX_CONFIG_FIELDS = 4;
     const MAX_VALUE_CHARS = 56;
-    const CONFIG_SKIP_KEYS = new Set([
-      "reportTemplate",
-      "report_template",
-      "template",
-      "script",
-      "body",
-      "prompt",
-    ]);
+    const CONFIG_SKIP_KEYS = new Set(["reportTemplate", "report_template", "template", "script", "body", "prompt"]);
     const formatConfigValue = (value: unknown): string | undefined => {
       if (value == null || value === "") return undefined;
       if (typeof value === "string") {
@@ -5708,7 +5776,13 @@ export function WorkflowPageV2() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
-  const headerMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
+  const headerMode: "launchpad" | "runs" | "version-edit" | "version-live" = isLaunchpadMode
+    ? "launchpad"
+    : isRunsMode
+      ? "runs"
+      : canvasMode === "edit"
+        ? "version-edit"
+        : "version-live";
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
   const canvasStateMode = hasEditableVersion
@@ -5880,6 +5954,27 @@ export function WorkflowPageV2() {
           onExecutionChainHandled={handleExecutionChainHandled}
           onSelectRuns={() => setRunsMode(true)}
           runsNotificationCount={countActiveRuns(runsEventsData.events)}
+          onSelectLaunchpad={() => setLaunchpadMode(true)}
+          launchpadOverlay={
+            isLaunchpadMode ? (
+              <LaunchpadView
+                panels={launchpadQuery.data?.panels ?? []}
+                layout={launchpadQuery.data?.layout ?? []}
+                isLoading={launchpadQuery.isLoading}
+                errorMessage={launchpadQuery.error instanceof Error ? launchpadQuery.error.message : undefined}
+                isSaving={updateCanvasLaunchpadMutation.isPending}
+                readOnly={!canUpdateCanvas || isTemplate}
+                nodeRefs={{
+                  nodes: readmeNodesBySlug,
+                  icons: readmeIconsBySlug,
+                  details: readmeNodeDetailsBySlug,
+                  linkFor: linkForReadmeNode,
+                  onNodeClick: handleReadmeNodeChipClick,
+                }}
+                onChange={(next) => updateCanvasLaunchpadMutation.mutate(next)}
+              />
+            ) : null
+          }
           runsSidebar={
             <RunsSidebar
               events={runsEventsData.events}

@@ -11,11 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  CanvasMarkdown,
-  type NodeChipDetails,
-  type NodeChipIcon,
-} from "@/ui/Markdown/CanvasMarkdown";
+import { CanvasMarkdown, type NodeChipDetails, type NodeChipIcon } from "@/ui/Markdown/CanvasMarkdown";
 import { useEffect, useMemo, useState } from "react";
 
 //
@@ -177,11 +173,7 @@ export function CanvasReadmeModal(props: CanvasReadmeModalProps) {
 
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
               {mode === "live" ? (
-                <LiveReadmeBody
-                  liveContent={liveContent}
-                  isLoadingLive={isLoadingLive}
-                  nodeRefs={nodeRefs}
-                />
+                <LiveReadmeBody liveContent={liveContent} isLoadingLive={isLoadingLive} nodeRefs={nodeRefs} />
               ) : (
                 <EditReadmeBody
                   editorValue={editorValue}
@@ -331,9 +323,7 @@ function EditReadmeBody({
       </div>
 
       <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3">
-        <span className="text-xs text-slate-500">
-          {isDirty ? "Unsaved changes" : "No unsaved changes"}
-        </span>
+        <span className="text-xs text-slate-500">{isDirty ? "Unsaved changes" : "No unsaved changes"}</span>
         <div className="flex items-center gap-2">
           {changeManagementEnabled && (
             <Button size="sm" variant="default" onClick={onRequestChange}>

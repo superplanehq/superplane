@@ -23,12 +23,7 @@ export type RightSideControlsProps = {
 
 export function RightSideControls(props: RightSideControlsProps) {
   return (
-    <div
-      className={cn(
-        "absolute right-4 z-10 flex flex-col gap-1.5",
-        props.belowOverlayHeader ? "top-14" : "top-4",
-      )}
-    >
+    <div className={cn("absolute right-4 z-10 flex flex-col gap-1.5", props.belowOverlayHeader ? "top-14" : "top-4")}>
       {props.mode === "live" ? <LiveCanvasButtons {...props} /> : <EditCanvasButtons {...props} />}
     </div>
   );
@@ -39,12 +34,7 @@ function LiveCanvasButtons({ onMemoryOpen, onReadmeOpen }: RightSideControlsProp
     <>
       <ControlButton tooltip="Canvas memory" onClick={onMemoryOpen} testId="open-memory-button" icon={<Database />} />
       {onReadmeOpen ? (
-        <ControlButton
-          tooltip="Canvas readme"
-          onClick={onReadmeOpen}
-          testId="open-readme-button"
-          icon={<FileText />}
-        />
+        <ControlButton tooltip="Canvas readme" onClick={onReadmeOpen} testId="open-readme-button" icon={<FileText />} />
       ) : null}
     </>
   );
@@ -57,12 +47,7 @@ function EditCanvasButtons({ onSidebarOpen, onAddNote, onYamlOpen, onReadmeOpen 
       <ControlButton tooltip="Add note" onClick={onAddNote} testId="add-note-button" icon={<StickyNote />} />
       <ControlButton tooltip="YAML" onClick={onYamlOpen} testId="open-yaml-modal-button" icon={<Code2 />} />
       {onReadmeOpen ? (
-        <ControlButton
-          tooltip="Canvas readme"
-          onClick={onReadmeOpen}
-          testId="open-readme-button"
-          icon={<FileText />}
-        />
+        <ControlButton tooltip="Canvas readme" onClick={onReadmeOpen} testId="open-readme-button" icon={<FileText />} />
       ) : null}
     </>
   );

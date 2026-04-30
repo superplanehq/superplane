@@ -23,6 +23,8 @@ import {
   canvasesDeleteCanvasMemory,
   canvasesGetCanvasReadme,
   canvasesUpdateCanvasReadme,
+  canvasesGetCanvasLaunchpad,
+  canvasesUpdateCanvasLaunchpad,
   canvasesListEventExecutions,
   canvasesDescribeRun,
   canvasesListChildExecutions,
@@ -111,6 +113,7 @@ export const canvasKeys = {
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
   canvasReadme: (canvasId: string, versionId: string) =>
     [...canvasKeys.all, "readme", canvasId, versionId || "live"] as const,
+  canvasLaunchpad: (canvasId: string) => [...canvasKeys.all, "launchpad", canvasId] as const,
 };
 
 export const triggerKeys = {
@@ -946,6 +949,123 @@ export const useUpdateCanvasReadme = (canvasId: string) => {
       });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail("", canvasId) });
+    },
+  });
+};
+
+// Launchpad: per-canvas, always-live dashboard of user-authored panels arranged
+// on a draggable grid. The data shape mirrors what react-grid-layout consumes
+// for `layout` and what the panel registry consumes for each `panel.content`.
+
+export interface LaunchpadPanel {
+  id: string;
+  type: string;
+  content: Record<string, unknown>;
+}
+
+export interface LaunchpadLayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+}
+
+export interface CanvasLaunchpad {
+  canvasId: string;
+  panels: LaunchpadPanel[];
+  layout: LaunchpadLayoutItem[];
+  updatedAt?: string;
+}
+
+const EMPTY_LAUNCHPAD = (canvasId: string): CanvasLaunchpad => ({
+  canvasId,
+  panels: [],
+  layout: [],
+});
+
+export const useCanvasLaunchpad = (canvasId: string, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.canvasLaunchpad(canvasId),
+    queryFn: async (): Promise<CanvasLaunchpad> => {
+      const response = await canvasesGetCanvasLaunchpad(withOrganizationHeader({ path: { canvasId } }));
+      const data = response.data?.launchpad;
+      if (!data) return EMPTY_LAUNCHPAD(canvasId);
+      const panels: LaunchpadPanel[] = (data.panels || []).map((p) => ({
+        id: p.id || "",
+        type: p.type || "",
+        content: (p.content as Record<string, unknown> | undefined) ?? {},
+      }));
+      const layout: LaunchpadLayoutItem[] = (data.layout || []).map((l) => ({
+        i: l.i || "",
+        x: l.x ?? 0,
+        y: l.y ?? 0,
+        w: l.w ?? 1,
+        h: l.h ?? 1,
+        minW: l.minW ?? undefined,
+        minH: l.minH ?? undefined,
+      }));
+      return {
+        canvasId: data.canvasId || canvasId,
+        panels,
+        layout,
+        updatedAt: data.updatedAt,
+      };
+    },
+    enabled: !!canvasId && enabled,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useUpdateCanvasLaunchpad = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ panels, layout }: { panels: LaunchpadPanel[]; layout: LaunchpadLayoutItem[] }) => {
+      const response = await canvasesUpdateCanvasLaunchpad(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            panels: panels.map((p) => ({
+              id: p.id,
+              type: p.type,
+              content: p.content as never,
+            })),
+            layout: layout.map((l) => ({
+              i: l.i,
+              x: l.x,
+              y: l.y,
+              w: l.w,
+              h: l.h,
+              ...(l.minW !== undefined ? { minW: l.minW } : {}),
+              ...(l.minH !== undefined ? { minH: l.minH } : {}),
+            })),
+          },
+        }),
+      );
+      return response.data;
+    },
+    // Optimistic update so the grid doesn't snap back during a drag/resize.
+    onMutate: async ({ panels, layout }) => {
+      await queryClient.cancelQueries({ queryKey: canvasKeys.canvasLaunchpad(canvasId) });
+      const previous = queryClient.getQueryData<CanvasLaunchpad>(canvasKeys.canvasLaunchpad(canvasId));
+      queryClient.setQueryData<CanvasLaunchpad>(canvasKeys.canvasLaunchpad(canvasId), {
+        canvasId,
+        panels,
+        layout,
+        updatedAt: previous?.updatedAt,
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(canvasKeys.canvasLaunchpad(canvasId), context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasLaunchpad(canvasId) });
     },
   });
 };

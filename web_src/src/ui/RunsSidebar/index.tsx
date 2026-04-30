@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  CanvasesCanvasEventWithExecutions,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
+import type { CanvasesCanvasEventWithExecutions, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import {
   badgeColorForEventState,
@@ -328,10 +325,7 @@ export function RunsSidebar({
                 type="button"
                 onClick={handleClearStatusFilter}
                 disabled={!hasStatusFilter}
-                className={cn(
-                  "text-[11px]",
-                  hasStatusFilter ? "text-sky-600 hover:text-sky-800" : "text-gray-300",
-                )}
+                className={cn("text-[11px]", hasStatusFilter ? "text-sky-600 hover:text-sky-800" : "text-gray-300")}
               >
                 Clear
               </button>
@@ -362,10 +356,7 @@ export function RunsSidebar({
                 type="button"
                 onClick={handleClearTriggerFilter}
                 disabled={!hasTriggerFilter}
-                className={cn(
-                  "text-[11px]",
-                  hasTriggerFilter ? "text-sky-600 hover:text-sky-800" : "text-gray-300",
-                )}
+                className={cn("text-[11px]", hasTriggerFilter ? "text-sky-600 hover:text-sky-800" : "text-gray-300")}
               >
                 Clear
               </button>
@@ -431,11 +422,7 @@ export function RunsSidebar({
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-xs text-gray-400">
             <span>No runs match your filters</span>
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              className="text-[11px] text-sky-600 hover:text-sky-800"
-            >
+            <button type="button" onClick={handleClearFilters} className="text-[11px] text-sky-600 hover:text-sky-800">
               Clear filters
             </button>
           </div>
@@ -456,8 +443,7 @@ export function RunsSidebar({
               // queue items or a running execution, the run isn't actually
               // done -- the numeric duration would lie.
               //
-              const duration =
-                pendingQueueCount === 0 && status !== "running" ? computeRunDuration(event) : null;
+              const duration = pendingQueueCount === 0 && status !== "running" ? computeRunDuration(event) : null;
 
               return (
                 <div
@@ -534,11 +520,7 @@ export function RunsSidebar({
           <span>
             Showing {filteredEvents.length} of {events.length} loaded
           </span>
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className="shrink-0 text-sky-600 hover:text-sky-800"
-          >
+          <button type="button" onClick={handleClearFilters} className="shrink-0 text-sky-600 hover:text-sky-800">
             Clear filters
           </button>
         </div>

@@ -9,7 +9,7 @@ import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 
-type HeaderMode = "default" | "version-live" | "version-edit" | "runs";
+type HeaderMode = "default" | "launchpad" | "version-live" | "version-edit" | "runs";
 
 interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -47,6 +47,8 @@ interface HeaderProps {
   /** Called when the user clicks the "Runs" tab in the mode toggle. When omitted, the tab is hidden. */
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
+  /** Called when the user clicks the "Launchpad" tab in the mode toggle. When omitted, the tab is hidden. */
+  onSelectLaunchpad?: () => void;
   agentState: AgentState;
 }
 
@@ -119,9 +121,18 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    props.mode === "version-live" || props.mode === "version-edit" || props.mode === "runs";
+    props.mode === "launchpad" ||
+    props.mode === "version-live" ||
+    props.mode === "version-edit" ||
+    props.mode === "runs";
   const canvasViewMode =
-    props.mode === "version-edit" ? "version-edit" : props.mode === "runs" ? "runs" : "version-live";
+    props.mode === "launchpad"
+      ? "launchpad"
+      : props.mode === "version-edit"
+        ? "version-edit"
+        : props.mode === "runs"
+          ? "runs"
+          : "version-live";
 
   return (
     <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
@@ -132,6 +143,7 @@ function SecondaryHeader(props: HeaderProps) {
           {showCanvasViewModeToggle && props.onEnterEditMode && props.onExitEditMode ? (
             <CanvasModeToggle
               mode={canvasViewMode}
+              onSelectLaunchpad={props.onSelectLaunchpad}
               onSelectEditor={props.onEnterEditMode}
               onSelectLive={props.onExitEditMode}
               onSelectRuns={props.onSelectRuns}

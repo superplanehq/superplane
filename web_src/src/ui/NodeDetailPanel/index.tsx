@@ -231,139 +231,141 @@ export function NodeDetailPanel({ nodeId, runData, workflowNodes, onClose, onNav
         aria-modal="true"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-1.5">
-        <div className="flex items-center gap-3 min-w-0">
-          {onNavigateNode ? (
-            <div className="flex items-center gap-0.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => prevNodeId && onNavigateNode(prevNodeId)}
-                disabled={!prevNodeId}
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <span className="text-[11px] text-gray-400 tabular-nums">
-                {currentIndex >= 0 ? `${currentIndex + 1}/${executionChain.length}` : ""}
+          <div className="flex items-center gap-3 min-w-0">
+            {onNavigateNode ? (
+              <div className="flex items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => prevNodeId && onNavigateNode(prevNodeId)}
+                  disabled={!prevNodeId}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-[11px] text-gray-400 tabular-nums">
+                  {currentIndex >= 0 ? `${currentIndex + 1}/${executionChain.length}` : ""}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => nextNodeId && onNavigateNode(nextNodeId)}
+                  disabled={!nextNodeId}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : null}
+            <h3 className="truncate text-sm font-medium text-gray-900">{nodeName}</h3>
+            {isTriggerNode ? (
+              <TriggerStatusBadge />
+            ) : nodeExecution ? (
+              <ExecutionStatusBadge execution={nodeExecution} workflowNodes={workflowNodes || []} />
+            ) : null}
+            {createdAt ? (
+              <span className="text-xs text-gray-400">
+                <TimeAgo date={createdAt} />
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => nextNodeId && onNavigateNode(nextNodeId)}
-                disabled={!nextNodeId}
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ) : null}
-          <h3 className="truncate text-sm font-medium text-gray-900">{nodeName}</h3>
-          {isTriggerNode ? (
-            <TriggerStatusBadge />
-          ) : nodeExecution ? (
-            <ExecutionStatusBadge execution={nodeExecution} workflowNodes={workflowNodes || []} />
-          ) : null}
-          {createdAt ? (
-            <span className="text-xs text-gray-400">
-              <TimeAgo date={createdAt} />
-            </span>
-          ) : null}
-        </div>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {hasAnyTab ? (
-        <>
-          <div className="flex shrink-0 items-center h-8 border-b border-slate-200 px-2">
-            {hasDetails ? (
-              <button
-                type="button"
-                onClick={() => setActiveTab("current")}
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
-                  activeTab === "current"
-                    ? "text-gray-800 border-gray-800"
-                    : "text-gray-500 hover:text-gray-800 border-transparent",
-                )}
-              >
-                {React.createElement(resolveIcon("info"), { size: 14 })}
-                Details
-              </button>
-            ) : null}
-            {hasPayload ? (
-              <button
-                type="button"
-                onClick={() => setActiveTab("payload")}
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
-                  activeTab === "payload"
-                    ? "text-gray-800 border-gray-800"
-                    : "text-gray-500 hover:text-gray-800 border-transparent",
-                )}
-              >
-                {React.createElement(resolveIcon("code"), { size: 14 })}
-                Payload
-              </button>
-            ) : null}
-            {hasConfig ? (
-              <button
-                type="button"
-                onClick={() => setActiveTab("configuration")}
-                className={cn(
-                  "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
-                  activeTab === "configuration"
-                    ? "text-gray-800 border-gray-800"
-                    : "text-gray-500 hover:text-gray-800 border-transparent",
-                )}
-              >
-                {React.createElement(resolveIcon("settings"), { size: 14 })}
-                Config
-              </button>
             ) : null}
           </div>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-3">
-            {activeTab === "current" && tabData?.current ? (
-              <div className="flex flex-col gap-1.5">
-                {Object.entries(tabData.current).map(([key, value]) => {
-                  if (isErrorValue(value)) {
+        {hasAnyTab ? (
+          <>
+            <div className="flex shrink-0 items-center h-8 border-b border-slate-200 px-2">
+              {hasDetails ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("current")}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
+                    activeTab === "current"
+                      ? "text-gray-800 border-gray-800"
+                      : "text-gray-500 hover:text-gray-800 border-transparent",
+                  )}
+                >
+                  {React.createElement(resolveIcon("info"), { size: 14 })}
+                  Details
+                </button>
+              ) : null}
+              {hasPayload ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("payload")}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
+                    activeTab === "payload"
+                      ? "text-gray-800 border-gray-800"
+                      : "text-gray-500 hover:text-gray-800 border-transparent",
+                  )}
+                >
+                  {React.createElement(resolveIcon("code"), { size: 14 })}
+                  Payload
+                </button>
+              ) : null}
+              {hasConfig ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("configuration")}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
+                    activeTab === "configuration"
+                      ? "text-gray-800 border-gray-800"
+                      : "text-gray-500 hover:text-gray-800 border-transparent",
+                  )}
+                >
+                  {React.createElement(resolveIcon("settings"), { size: 14 })}
+                  Config
+                </button>
+              ) : null}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {activeTab === "current" && tabData?.current ? (
+                <div className="flex flex-col gap-1.5">
+                  {Object.entries(tabData.current).map(([key, value]) => {
+                    if (isErrorValue(value)) {
+                      return (
+                        <div key={key} className="flex items-start gap-2">
+                          <span className="shrink-0 text-xs text-gray-500 w-[120px] text-right truncate" title={key}>
+                            {key}:
+                          </span>
+                          <span className="min-w-0 break-all text-xs text-red-600 font-medium">{value.message}</span>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={key} className="flex items-start gap-2">
                         <span className="shrink-0 text-xs text-gray-500 w-[120px] text-right truncate" title={key}>
                           {key}:
                         </span>
-                        <span className="min-w-0 break-all text-xs text-red-600 font-medium">{value.message}</span>
+                        <span className="min-w-0 break-all text-xs text-gray-800">
+                          {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "")}
+                        </span>
                       </div>
                     );
-                  }
-                  return (
-                    <div key={key} className="flex items-start gap-2">
-                      <span className="shrink-0 text-xs text-gray-500 w-[120px] text-right truncate" title={key}>
-                        {key}:
-                      </span>
-                      <span className="min-w-0 break-all text-xs text-gray-800">
-                        {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "")}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
+                  })}
+                </div>
+              ) : null}
 
-            {activeTab === "payload" && tabData?.payload ? (
-              <JsonView value={tabData.payload as object} collapsed={2} style={{ fontSize: 12 }} />
-            ) : null}
+              {activeTab === "payload" && tabData?.payload ? (
+                <JsonView value={tabData.payload as object} collapsed={2} style={{ fontSize: 12 }} />
+              ) : null}
 
-            {activeTab === "configuration" && tabData?.configuration ? (
-              <JsonView value={tabData.configuration as object} collapsed={2} style={{ fontSize: 12 }} />
-            ) : null}
+              {activeTab === "configuration" && tabData?.configuration ? (
+                <JsonView value={tabData.configuration as object} collapsed={2} style={{ fontSize: 12 }} />
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <div className="px-4 py-6 text-center text-xs text-gray-400">
+            No execution data for this node in this run.
           </div>
-        </>
-      ) : (
-        <div className="px-4 py-6 text-center text-xs text-gray-400">No execution data for this node in this run.</div>
-      )}
+        )}
       </div>
     </div>
   );

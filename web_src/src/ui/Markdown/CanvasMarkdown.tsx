@@ -33,8 +33,7 @@ import "highlight.js/styles/github.css";
 
 export const NODE_REF_CLASS = "sp-node-ref";
 
-const NODE_TOKEN_RE =
-  /(\[\[node:([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*))/g;
+const NODE_TOKEN_RE = /(\[\[node:([a-zA-Z0-9][a-zA-Z0-9_-]*)\]\]|(?<![A-Za-z0-9_])@([a-zA-Z][a-zA-Z0-9_-]*))/g;
 
 type MdastNode = {
   type: string;
@@ -514,14 +513,7 @@ function themeFor(kind?: NodeChipKind): ChipTheme {
 
 function NodeChipLeading({ icon, theme }: { icon?: NodeChipIcon; theme: ChipTheme }) {
   if (icon?.iconSrc) {
-    return (
-      <img
-        src={icon.iconSrc}
-        alt=""
-        aria-hidden="true"
-        className="h-3 w-3 shrink-0 object-contain"
-      />
-    );
+    return <img src={icon.iconSrc} alt="" aria-hidden="true" className="h-3 w-3 shrink-0 object-contain" />;
   }
   if (icon?.iconSlug) {
     const Icon = resolveIcon(icon.iconSlug);
@@ -635,10 +627,7 @@ function NodeChipPreview({
             {details.config!.map((field) => (
               <React.Fragment key={field.label}>
                 <dt className="whitespace-nowrap text-slate-500">{field.label}</dt>
-                <dd
-                  className="truncate text-right font-mono text-[11px] text-slate-800"
-                  title={field.value}
-                >
+                <dd className="truncate text-right font-mono text-[11px] text-slate-800" title={field.value}>
                   {field.value}
                 </dd>
               </React.Fragment>
@@ -686,8 +675,7 @@ function UnknownNodeChip({ slug }: { slug: string }) {
       className="sp-node-ref inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-medium leading-none text-slate-500"
       title={`Unknown node: ${slug}`}
     >
-      <CircleHelp className="h-3 w-3" />
-      @{slug}
+      <CircleHelp className="h-3 w-3" />@{slug}
     </span>
   );
 }
@@ -738,9 +726,7 @@ function buildSpanComponent(context: NodeChipContext) {
       );
     }
 
-    return (
-      <KnownNodeChip slug={slug} name={name} icon={icon} details={details} href={linkFor(slug)} />
-    );
+    return <KnownNodeChip slug={slug} name={name} icon={icon} details={details} href={linkFor(slug)} />;
   };
 }
 

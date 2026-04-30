@@ -95,9 +95,7 @@ function findActionableApprovalIndex(
   // don't get another turn. Matches hasUserGivenInputInAnyRecord.
   //
   const hasResponded = records.some(
-    (r) =>
-      r.state !== "pending" &&
-      (r.user?.id === me.id || (!!me.email && r.user?.email === me.email)),
+    (r) => r.state !== "pending" && (r.user?.id === me.id || (!!me.email && r.user?.email === me.email)),
   );
   if (hasResponded) return undefined;
 
@@ -259,9 +257,7 @@ function buildSteps(
   // execution yet, and the run would look "idle" when it isn't.
   //
   const queueItems = runData.queueItems || [];
-  const executedNodeIds = new Set(
-    sorted.map((exec) => exec.nodeId).filter((id): id is string => !!id),
-  );
+  const executedNodeIds = new Set(sorted.map((exec) => exec.nodeId).filter((id): id is string => !!id));
 
   for (const item of queueItems) {
     if (!item.nodeId) continue;
@@ -512,7 +508,9 @@ function ReportEmptyState() {
         <p className="text-sm font-semibold text-gray-800">No report for this run</p>
         <p className="text-xs leading-relaxed text-gray-500">
           Reports surface the most important output of a run at a glance. Add a{" "}
-          <code className="rounded bg-slate-100 px-1 py-[1px] font-mono text-[11px] text-slate-700">reportTemplate</code>{" "}
+          <code className="rounded bg-slate-100 px-1 py-[1px] font-mono text-[11px] text-slate-700">
+            reportTemplate
+          </code>{" "}
           to any trigger or component to populate this section.
         </p>
       </div>
@@ -553,14 +551,9 @@ function ReportEntry({
       <StepIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={step.name} />
       <span className="truncate">{step.name}</span>
       {step.isTrigger ? (
-        <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400">
-          trigger
-        </span>
+        <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400">trigger</span>
       ) : (
-        <span
-          aria-hidden
-          className={cn("inline-block h-1.5 w-1.5 shrink-0 rounded-full", step.badgeColor)}
-        />
+        <span aria-hidden className={cn("inline-block h-1.5 w-1.5 shrink-0 rounded-full", step.badgeColor)} />
       )}
     </>
   );
@@ -653,10 +646,7 @@ export function RunSummary({
   // for approval, held at a push-through gate, whatever. The trigger step
   // is always a terminal "done" in our model, so skip it.
   //
-  const activeSteps = useMemo(
-    () => steps.filter((s) => !s.isTrigger && !s.finished),
-    [steps],
-  );
+  const activeSteps = useMemo(() => steps.filter((s) => !s.isTrigger && !s.finished), [steps]);
 
   const reportSteps = useMemo(() => steps.filter((s) => !!s.reportEntry || !!s.error), [steps]);
   const hasAnyReport = reportSteps.some((s) => !!s.reportEntry);
@@ -706,24 +696,15 @@ export function RunSummary({
                 // endpoint). The two live on different backend paths so
                 // the row needs a different handler depending on which.
                 //
-                const canCancelExec =
-                  !!step.executionId &&
-                  !!onCancelExecution &&
-                  isRunningState(step.eventState);
+                const canCancelExec = !!step.executionId && !!onCancelExecution && isRunningState(step.eventState);
                 const canCancelQueue =
-                  !step.executionId &&
-                  !!step.queueItemId &&
-                  !!onCancelQueueItem &&
-                  step.eventState === "queued";
+                  !step.executionId && !!step.queueItemId && !!onCancelQueueItem && step.eventState === "queued";
                 const canCancel = canCancelExec || canCancelQueue;
 
                 const execution = step.executionId ? executionMap.get(step.executionId) : undefined;
                 const approvalIndex =
-                  step.componentName === "approval"
-                    ? findActionableApprovalIndex(execution, currentUser)
-                    : undefined;
-                const canApprove =
-                  approvalIndex != null && !!step.executionId && !!onApprovalAction;
+                  step.componentName === "approval" ? findActionableApprovalIndex(execution, currentUser) : undefined;
+                const canApprove = approvalIndex != null && !!step.executionId && !!onApprovalAction;
 
                 return (
                   <ActivityRow

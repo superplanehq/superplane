@@ -5,10 +5,7 @@ import { formatDurationSeconds } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 import { TimeAgo } from "@/components/TimeAgo";
-import {
-  getStatusBadgeProps,
-  resolveEventState,
-} from "@/pages/workflowv2/lib/canvas-runs";
+import { getStatusBadgeProps, resolveEventState } from "@/pages/workflowv2/lib/canvas-runs";
 import { AlertTriangle } from "lucide-react";
 
 //
@@ -142,17 +139,11 @@ function formatAbsolute(value: string): string {
 
 function StepHoverCardContent({ step }: { step: RibbonStep }) {
   const eventState = stateFor(step);
-  const badge = getStatusBadgeProps(
-    step.isTrigger ? "triggered" : step.status,
-    eventState,
-    step.badgeColor,
-  );
+  const badge = getStatusBadgeProps(step.isTrigger ? "triggered" : step.status, eventState, step.badgeColor);
   const isRunning = !step.isTrigger && !step.finished && eventState !== "queued";
   const finishedAt = step.finished ? step.finishedAt : undefined;
   const elapsedDisplay =
-    !step.isTrigger && !step.finished && step.elapsedMs && step.elapsedMs > 0
-      ? formatMs(step.elapsedMs)
-      : null;
+    !step.isTrigger && !step.finished && step.elapsedMs && step.elapsedMs > 0 ? formatMs(step.elapsedMs) : null;
   const durationDisplay = step.finished && step.durationMs > 0 ? formatMs(step.durationMs) : null;
   const componentLabel = step.isTrigger ? "Trigger" : step.componentName;
 
@@ -162,9 +153,7 @@ function StepHoverCardContent({ step }: { step: RibbonStep }) {
         <StepIcon iconSrc={step.iconSrc} iconSlug={step.iconSlug} alt={step.name} />
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
           <span className="truncate font-medium text-gray-900">{step.name}</span>
-          {componentLabel ? (
-            <span className="truncate text-[11px] text-gray-500">{componentLabel}</span>
-          ) : null}
+          {componentLabel ? <span className="truncate text-[11px] text-gray-500">{componentLabel}</span> : null}
         </div>
         <span
           className={cn(
@@ -223,7 +212,6 @@ function StepHoverCardContent({ step }: { step: RibbonStep }) {
             <span className="tabular-nums text-gray-700">{elapsedDisplay}</span>
           </div>
         ) : null}
-
       </div>
 
       {step.error ? (
@@ -247,11 +235,7 @@ export function StepRibbon({ steps, totalDurationMs, onStepClick }: StepRibbonPr
         {steps.map((step) => {
           const eventState = stateFor(step);
           const isActive = !step.isTrigger && eventState === "running";
-          const badge = getStatusBadgeProps(
-            step.isTrigger ? "triggered" : step.status,
-            eventState,
-            step.badgeColor,
-          );
+          const badge = getStatusBadgeProps(step.isTrigger ? "triggered" : step.status, eventState, step.badgeColor);
           return (
             <HoverCard key={step.key} openDelay={150} closeDelay={80}>
               <HoverCardTrigger asChild>
@@ -266,9 +250,7 @@ export function StepRibbon({ steps, totalDurationMs, onStepClick }: StepRibbonPr
                     "hover:scale-y-[1.4]",
                   )}
                 >
-                  {isActive ? (
-                    <span className="absolute inset-0 animate-pulse bg-white/30" aria-hidden />
-                  ) : null}
+                  {isActive ? <span className="absolute inset-0 animate-pulse bg-white/30" aria-hidden /> : null}
                 </button>
               </HoverCardTrigger>
               <HoverCardContent align="center" sideOffset={8} className="w-auto p-3">

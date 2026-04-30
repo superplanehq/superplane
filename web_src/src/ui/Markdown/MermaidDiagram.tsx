@@ -49,10 +49,7 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
     <>
       <MermaidViewer code={code} onExpand={() => setIsFullscreen(true)} />
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-        <DialogContent
-          size="large"
-          className="flex max-h-[95vh] h-[95vh] w-[95vw] flex-col gap-0 overflow-hidden p-0"
-        >
+        <DialogContent size="large" className="flex max-h-[95vh] h-[95vh] w-[95vw] flex-col gap-0 overflow-hidden p-0">
           <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
             <span className="font-mono text-xs text-slate-600">Mermaid diagram</span>
           </div>

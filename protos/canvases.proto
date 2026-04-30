@@ -434,6 +434,29 @@ service Canvases {
     };
   }
 
+  rpc GetCanvasLaunchpad(GetCanvasLaunchpadRequest) returns (GetCanvasLaunchpadResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/launchpad"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas launchpad";
+      description: "Returns the launchpad dashboard for a canvas (panels and grid layout)";
+      tags: "Canvas";
+    };
+  }
+
+  rpc UpdateCanvasLaunchpad(UpdateCanvasLaunchpadRequest) returns (UpdateCanvasLaunchpadResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/launchpad"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas launchpad";
+      description: "Replaces the launchpad dashboard for a canvas";
+      tags: "Canvas";
+    };
+  }
+
   rpc ListEventExecutions(ListEventExecutionsRequest) returns (ListEventExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/events/{event_id}/executions"
@@ -1010,6 +1033,53 @@ message UpdateCanvasReadmeResponse {
   string version_id = 2;
   string content = 3;
   google.protobuf.Timestamp updated_at = 4;
+}
+
+message LaunchpadPanel {
+  // Stable client-generated identifier for this panel; referenced by
+  // LaunchpadLayoutItem.i to associate a panel with its grid placement.
+  string id = 1;
+  // Panel renderer type. Only "markdown" is shipped today; the field is
+  // free-form so future panel types can be added without a proto change.
+  string type = 2;
+  // Polymorphic per-type content (e.g. for "markdown": { body: "..." }).
+  google.protobuf.Value content = 3;
+}
+
+message LaunchpadLayoutItem {
+  // Matches LaunchpadPanel.id.
+  string i = 1;
+  int32 x = 2;
+  int32 y = 3;
+  int32 w = 4;
+  int32 h = 5;
+  optional int32 min_w = 6;
+  optional int32 min_h = 7;
+}
+
+message CanvasLaunchpad {
+  string canvas_id = 1;
+  repeated LaunchpadPanel panels = 2;
+  repeated LaunchpadLayoutItem layout = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message GetCanvasLaunchpadRequest {
+  string canvas_id = 1;
+}
+
+message GetCanvasLaunchpadResponse {
+  CanvasLaunchpad launchpad = 1;
+}
+
+message UpdateCanvasLaunchpadRequest {
+  string canvas_id = 1;
+  repeated LaunchpadPanel panels = 2;
+  repeated LaunchpadLayoutItem layout = 3;
+}
+
+message UpdateCanvasLaunchpadResponse {
+  CanvasLaunchpad launchpad = 1;
 }
 
 message CanvasEvent {

@@ -389,6 +389,16 @@ func (s *CanvasService) UpdateCanvasReadme(ctx context.Context, req *pb.UpdateCa
 	return canvases.UpdateCanvasReadme(ctx, organizationID, req.CanvasId, req.VersionId, req.Content)
 }
 
+func (s *CanvasService) GetCanvasLaunchpad(ctx context.Context, req *pb.GetCanvasLaunchpadRequest) (*pb.GetCanvasLaunchpadResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasLaunchpad(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) UpdateCanvasLaunchpad(ctx context.Context, req *pb.UpdateCanvasLaunchpadRequest) (*pb.UpdateCanvasLaunchpadResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasLaunchpad(ctx, organizationID, req.CanvasId, req.Panels, req.Layout)
+}
+
 func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {
 	return canvases.ListEventExecutions(ctx, s.registry, req.CanvasId, req.EventId)
 }

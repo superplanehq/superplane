@@ -152,11 +152,7 @@ export function RunContextHeader({
   const executions = runData?.executions || [];
 
   const aggregate =
-    executionRefs.length > 0
-      ? getAggregateStatus(executionRefs)
-      : executions.length > 0
-        ? "completed"
-        : "queued";
+    executionRefs.length > 0 ? getAggregateStatus(executionRefs) : executions.length > 0 ? "completed" : "queued";
   const status = aggregateToHeaderStatus(aggregate);
 
   const triggerNode = rootEvent?.nodeId ? nodeMap.get(rootEvent.nodeId) : undefined;
@@ -199,7 +195,9 @@ export function RunContextHeader({
           {rootEvent?.createdAt ? (
             <>
               <span className="text-gray-300">&middot;</span>
-              <span className="shrink-0 whitespace-nowrap text-gray-500">{formatAbsoluteTime(rootEvent.createdAt)}</span>
+              <span className="shrink-0 whitespace-nowrap text-gray-500">
+                {formatAbsoluteTime(rootEvent.createdAt)}
+              </span>
               <span className="shrink-0 whitespace-nowrap text-gray-400">
                 (<TimeAgo date={rootEvent.createdAt} />)
               </span>

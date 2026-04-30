@@ -155,14 +155,22 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs";
+  headerMode?: "default" | "launchpad" | "version-live" | "version-edit" | "runs";
   /** Called when the user clicks the "Runs" tab in the mode toggle. When omitted, the tab is hidden. */
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
+  /** Called when the user clicks the "Launchpad" tab in the mode toggle. When omitted, the tab is hidden. */
+  onSelectLaunchpad?: () => void;
   /** Optional left sidebar rendered in runs mode (e.g. RunsSidebar). */
   runsSidebar?: React.ReactNode;
   /** Optional overlay panel rendered on top of the canvas area when a run is selected. */
   runViewOverlay?: React.ReactNode;
+  /**
+   * Optional overlay rendered on top of the canvas area when in Launchpad
+   * mode. The canvas stays mounted underneath so websocket subscriptions and
+   * graph state aren't churned on tab switches.
+   */
+  launchpadOverlay?: React.ReactNode;
   /** Called when a node is double-clicked. Used in runs mode for node drill-down. */
   onNodeDoubleClick?: (nodeId: string) => void;
   /**
@@ -1144,6 +1152,7 @@ function CanvasPage(props: CanvasPageProps) {
           versionControlNotificationCount={props.versionControlNotificationCount}
           onSelectRuns={props.onSelectRuns}
           runsNotificationCount={props.runsNotificationCount}
+          onSelectLaunchpad={props.onSelectLaunchpad}
           agentState={agentState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
@@ -1151,21 +1160,30 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
-        {props.headerMode === "runs" ? props.runsSidebar : props.versionControlSidebar}
+        {props.headerMode === "runs"
+          ? props.runsSidebar
+          : props.headerMode === "launchpad"
+            ? null
+            : props.versionControlSidebar}
 
         <AgentSidebar agentState={agentState} />
 
-        <RightSideControls
-          mode={readOnly ? "live" : "edit"}
-          onSidebarOpen={() => handleSidebarToggle(true)}
-          onAddNote={handleAddNote}
-          onMemoryOpen={props.onMemoryOpen}
-          onReadmeOpen={props.onReadmeOpen}
-          onYamlOpen={props.onYamlOpen}
-          belowOverlayHeader={props.headerMode === "runs" && !!props.runViewOverlay}
-        />
+        {props.headerMode === "launchpad" ? null : (
+          <RightSideControls
+            mode={readOnly ? "live" : "edit"}
+            onSidebarOpen={() => handleSidebarToggle(true)}
+            onAddNote={handleAddNote}
+            onMemoryOpen={props.onMemoryOpen}
+            onReadmeOpen={props.onReadmeOpen}
+            onYamlOpen={props.onYamlOpen}
+            belowOverlayHeader={props.headerMode === "runs" && !!props.runViewOverlay}
+          />
+        )}
 
-        {props.hideAddControls || !isBuildingBlocksSidebarOpen || props.headerMode === "runs" ? null : (
+        {props.hideAddControls ||
+        !isBuildingBlocksSidebarOpen ||
+        props.headerMode === "runs" ||
+        props.headerMode === "launchpad" ? null : (
           <BuildingBlocksSidebar
             isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live"}
             onToggle={handleSidebarToggle}
@@ -1181,6 +1199,9 @@ function CanvasPage(props: CanvasPageProps) {
         <div className="flex-1 relative">
           {props.headerMode === "runs" && props.runViewOverlay ? (
             <div className="absolute inset-0 z-[15] overflow-hidden pointer-events-none">{props.runViewOverlay}</div>
+          ) : null}
+          {props.headerMode === "launchpad" && props.launchpadOverlay ? (
+            <div className="absolute inset-0 z-[15] overflow-hidden bg-slate-50">{props.launchpadOverlay}</div>
           ) : null}
           {props.headerMode === "runs" && props.runDetailPanel ? props.runDetailPanel : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
@@ -1653,6 +1674,7 @@ function CanvasContentHeader({
   versionControlNotificationCount,
   onSelectRuns,
   runsNotificationCount,
+  onSelectLaunchpad,
   agentState,
 }: {
   state: CanvasPageState;
@@ -1669,7 +1691,7 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs";
+  headerMode?: "default" | "launchpad" | "version-live" | "version-edit" | "runs";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1685,6 +1707,7 @@ function CanvasContentHeader({
   versionControlNotificationCount?: number;
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
+  onSelectLaunchpad?: () => void;
   agentState: AgentState;
 }) {
   const stateRef = useRef(state);
@@ -1734,6 +1757,7 @@ function CanvasContentHeader({
       versionControlNotificationCount={versionControlNotificationCount}
       onSelectRuns={onSelectRuns}
       runsNotificationCount={runsNotificationCount}
+      onSelectLaunchpad={onSelectLaunchpad}
       agentState={agentState}
     />
   );
