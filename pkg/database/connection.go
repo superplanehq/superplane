@@ -3,6 +3,8 @@ package database
 import (
 	"fmt"
 	"log"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -12,7 +14,7 @@ import (
 	gormLogger "gorm.io/gorm/logger"
 )
 
-type Config struct {
+type DSNConfig struct {
 	Host            string
 	Port            string
 	Name            string
@@ -43,6 +45,32 @@ func dbPoolSize() int {
 	return size
 }
 
+func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Duration) string {
+	stmtMs := strconv.FormatInt(statementTimeout.Milliseconds(), 10)
+	idleMs := strconv.FormatInt(idleInTxTimeout.Milliseconds(), 10)
+	u := url.URL{
+		Scheme: "postgres",
+		Host:   net.JoinHostPort(c.Host, c.Port),
+		Path:   "/" + c.Name,
+	}
+	u.User = url.UserPassword(c.User, c.Pass)
+
+	q := url.Values{}
+	q.Set("sslmode", c.Ssl)
+	if c.ApplicationName != "" {
+		q.Set("application_name", c.ApplicationName)
+	}
+
+	options := fmt.Sprintf(
+		"-c statement_timeout=%s -c idle_in_transaction_session_timeout=%s",
+		stmtMs,
+		idleMs,
+	)
+	q.Set("options", options)
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
 func connect() *gorm.DB {
 	postgresDbSSL := os.Getenv("POSTGRES_DB_SSL")
 	sslMode := "disable"
@@ -50,7 +78,7 @@ func connect() *gorm.DB {
 		sslMode = "require"
 	}
 
-	c := Config{
+	c := DSNConfig{
 		Host:            os.Getenv("DB_HOST"),
 		Port:            os.Getenv("DB_PORT"),
 		Name:            os.Getenv("DB_NAME"),
@@ -60,15 +88,16 @@ func connect() *gorm.DB {
 		ApplicationName: os.Getenv("APPLICATION_NAME"),
 	}
 
-	dsnTemplate := "host=%s port=%s user=%s password=%s dbname=%s sslmode=%s application_name=%s"
-	dsn := fmt.Sprintf(dsnTemplate, c.Host, c.Port, c.User, c.Pass, c.Name, c.Ssl, c.ApplicationName)
+	cfg := LoadConfig()
+	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 
-	logger := gormLogger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), gormLogger.Config{
+	baseLogger := gormLogger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), gormLogger.Config{
 		SlowThreshold:             200 * time.Millisecond,
 		LogLevel:                  gormLogger.Warn,
 		Colorful:                  true,
 		IgnoreRecordNotFoundError: true,
 	})
+	logger := newGormTimeoutLogger(baseLogger)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger})
 	if err != nil {
@@ -83,6 +112,15 @@ func connect() *gorm.DB {
 	sqlDB.SetMaxOpenConns(dbPoolSize())
 	sqlDB.SetMaxIdleConns(dbPoolSize())
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+
+	log.Printf(
+		"[database] enforced timeouts: max_open=%d DB_STATEMENT_TIMEOUT=%s DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT=%s host=%s dbname=%s",
+		dbPoolSize(),
+		cfg.StatementTimeout,
+		cfg.IdleInTransactionSessionTimeout,
+		c.Host,
+		c.Name,
+	)
 
 	return db
 }
