@@ -171,9 +171,14 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	domainID := strings.TrimSpace(domain.ID)
+	if domainID == "" {
+		return fmt.Errorf("custom domain response missing id")
+	}
+
 	if err := ctx.Metadata.Set(AddCustomDomainExecutionMetadata{
 		CustomDomain: &CustomDomainMetadata{
-			ID:                 domain.ID,
+			ID:                 domainID,
 			Name:               domain.Name,
 			ServiceID:          spec.Service,
 			VerificationStatus: domain.VerificationStatus,
@@ -182,7 +187,7 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := ctx.ExecutionState.SetKV(addCustomDomainExecutionKey, domain.ID); err != nil {
+	if err := ctx.ExecutionState.SetKV(addCustomDomainExecutionKey, domainID); err != nil {
 		return err
 	}
 

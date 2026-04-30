@@ -133,6 +133,38 @@ func Test__Render_AddCustomDomain__Execute(t *testing.T) {
 		assert.Equal(t, "srv-123", data["serviceId"])
 	})
 
+	t.Run("missing domain id -> error", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body: io.NopCloser(strings.NewReader(
+						`{"name":"app.example.com","serviceId":"srv-123","verificationStatus":"unverified"}`,
+					)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		metadataCtx := &contexts.MetadataContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			HTTP:           httpCtx,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			ExecutionState: executionState,
+			Metadata:       metadataCtx,
+			Configuration: map[string]any{
+				"service":             "srv-123",
+				"domainName":          "app.example.com",
+				"waitForVerification": true,
+			},
+		})
+
+		require.ErrorContains(t, err, "custom domain response missing id")
+		assert.Empty(t, executionState.KVs)
+		assert.Empty(t, metadataCtx.Get())
+	})
+
 	t.Run("waitForVerification true, already verified -> emits success immediately", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
