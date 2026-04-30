@@ -3,6 +3,7 @@ package serviceaccounts
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
@@ -34,7 +35,18 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 		return nil, status.Error(codes.NotFound, "service account not found")
 	}
 
+	var creator *models.User
+	if user.CreatedBy != nil {
+		creators, creatorsErr := models.FindMaybeDeletedUsersByIDs([]uuid.UUID{*user.CreatedBy})
+		if creatorsErr != nil {
+			return nil, status.Error(codes.Internal, "failed to load service account creator")
+		}
+		if len(creators) > 0 {
+			creator = &creators[0]
+		}
+	}
+
 	return &pb.DescribeServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: serializeServiceAccount(user, creator),
 	}, nil
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Avatar } from "../../../components/Avatar/avatar";
@@ -95,6 +95,17 @@ export function Members({ organizationId }: MembersProps) {
   const showInviteLinkSection = inviteLinkErrorMessage !== "Not found";
   const inviteLinkEnabled = inviteLink?.enabled ?? false;
   const inviteLinkBusy = updateInviteLinkMutation.isPending || resetInviteLinkMutation.isPending;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (!hash.startsWith("#member-")) return;
+    const id = hash.slice("#member-".length);
+    if (!id) return;
+    requestAnimationFrame(() => {
+      document.getElementById(`member-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [users]);
 
   // Transform users to Member interface format
   const members = useMemo(() => {
@@ -372,7 +383,11 @@ export function Members({ organizationId }: MembersProps) {
               </TableHead>
               <TableBody>
                 {getSortedMembers().map((member) => (
-                  <TableRow key={member.id} className="last:[&>td]:border-b-0">
+                  <TableRow
+                    key={member.id}
+                    id={member.id ? `member-${member.id}` : undefined}
+                    className="last:[&>td]:border-b-0 scroll-mt-24"
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar src={member.avatar} initials={member.initials} className="size-8" />

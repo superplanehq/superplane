@@ -26,9 +26,26 @@ func ListServiceAccounts(ctx context.Context) (*pb.ListServiceAccountsResponse, 
 		return nil, status.Error(codes.Internal, "failed to list service accounts")
 	}
 
+	creatorIDs := distinctCreatedByIDs(users)
+	creators, err := models.FindMaybeDeletedUsersByIDs(creatorIDs)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to load service account creators")
+	}
+
+	creatorsByID := make(map[string]models.User, len(creators))
+	for i := range creators {
+		creatorsByID[creators[i].ID.String()] = creators[i]
+	}
+
 	serviceAccounts := make([]*pb.ServiceAccount, len(users))
 	for i := range users {
-		serviceAccounts[i] = serializeServiceAccount(&users[i])
+		var creator *models.User
+		if users[i].CreatedBy != nil {
+			if u, ok := creatorsByID[users[i].CreatedBy.String()]; ok {
+				creator = &u
+			}
+		}
+		serviceAccounts[i] = serializeServiceAccount(&users[i], creator)
 	}
 
 	return &pb.ListServiceAccountsResponse{
