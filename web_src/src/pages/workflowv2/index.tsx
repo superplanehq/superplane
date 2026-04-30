@@ -1798,7 +1798,7 @@ export function WorkflowPageV2() {
   const readyIntegrationNames = useMemo(() => {
     const names = new Set<string>();
     integrations.forEach((integration) => {
-      const integrationName = integration.spec?.integrationName;
+      const integrationName = integration.metadata?.integrationName;
       if (integrationName && integration.status?.state === "ready") {
         names.add(integrationName);
       }
@@ -1808,7 +1808,7 @@ export function WorkflowPageV2() {
   const nonReadyIntegrationsByName = useMemo(() => {
     const integrationsByName = new Map<string, OrganizationsIntegration>();
     integrations.forEach((integration) => {
-      const integrationName = integration.spec?.integrationName;
+      const integrationName = integration.metadata?.integrationName;
       if (integrationName && integration.status?.state !== "ready" && !integrationsByName.has(integrationName)) {
         integrationsByName.set(integrationName, integration);
       }
@@ -2758,7 +2758,9 @@ export function WorkflowPageV2() {
 
   const integrationDialogPendingInstance = useMemo(() => {
     if (!integrationDialogName) return undefined;
-    return integrations.find((i) => i.spec?.integrationName === integrationDialogName && i.status?.state !== "ready");
+    return integrations.find(
+      (i) => i.metadata?.integrationName === integrationDialogName && i.status?.state !== "ready",
+    );
   }, [integrationDialogName, integrations]);
 
   const initialWebhookSetup = useMemo(() => {

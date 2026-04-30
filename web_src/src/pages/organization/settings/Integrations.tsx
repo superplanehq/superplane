@@ -55,7 +55,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     const groups = new Map<string, typeof organizationIntegrations>();
 
     organizationIntegrations.forEach((integration) => {
-      const provider = integration.spec?.integrationName;
+      const provider = integration.metadata?.integrationName;
       if (!provider) return;
       const current = groups.get(provider) || [];
       current.push(integration);
@@ -131,7 +131,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       }
 
       return item.instances.some((instance) =>
-        (instance.metadata?.name || instance.spec?.integrationName || "").toLowerCase().includes(normalizedQuery),
+        (instance.metadata?.name || instance.metadata?.integrationName || "").toLowerCase().includes(normalizedQuery),
       );
     });
   }, [filterQuery, integrationCatalog]);
@@ -294,8 +294,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     {item.instances.map((integration, index) => {
                       const integrationDisplayName =
                         integration.metadata?.name ||
-                        getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
-                        integration.spec?.integrationName;
+                        getIntegrationTypeDisplayName(undefined, integration.metadata?.integrationName) ||
+                        integration.metadata?.integrationName;
                       const statusLabel = integration.status?.state
                         ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
                         : "Unknown";

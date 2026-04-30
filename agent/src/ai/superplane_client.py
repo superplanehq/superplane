@@ -567,13 +567,14 @@ class SuperplaneClient:
     @staticmethod
     def _serialize_org_integration(integration: OrganizationsIntegration) -> dict[str, Any]:
         metadata = integration.metadata
-        spec = integration.spec
         status = integration.status
+        integration_name = metadata.integration_name if metadata is not None else None
+
         return {
             "id": metadata.id if metadata is not None else None,
             "name": metadata.name if metadata is not None else None,
-            "integration_name": spec.integration_name if spec is not None else None,
-            "provider": spec.integration_name if spec is not None else None,
+            "integration_name": integration_name,
+            "provider": integration_name,
             "state": status.state if status is not None else None,
             "state_description": status.state_description if status is not None else None,
         }
