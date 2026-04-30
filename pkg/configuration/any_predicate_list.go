@@ -50,7 +50,9 @@ func (p *Predicate) Matches(value string) bool {
 		return p.Value != value
 
 	case PredicateTypeMatches:
-		matches, err := regexp.MatchString(p.Value, value)
+		// Match the full string, not a substring (regexp.MatchString searches anywhere).
+		pattern := `\A(?:` + p.Value + `)\z`
+		matches, err := regexp.MatchString(pattern, value)
 		if err != nil {
 			return false
 		}

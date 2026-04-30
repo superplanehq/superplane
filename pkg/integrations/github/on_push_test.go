@@ -216,7 +216,7 @@ func Test__OnPush__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"repository": "test",
 				"refs": []configuration.Predicate{
-					{Type: configuration.PredicateTypeMatches, Value: "refs/heads/feat/*"},
+					{Type: configuration.PredicateTypeMatches, Value: "refs/heads/feat/.*"},
 				},
 			},
 			Webhook: &contexts.NodeWebhookContext{Secret: secret},
@@ -420,6 +420,27 @@ func Test__OnPush__PathFilter(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("path matches predicate does not match pkg as substring -> event is not emitted", func(t *testing.T) {
+		body, sig := makeBody(`{"ref":"refs/heads/main","commits":[{"added":[],"modified":["vendor/pkg/foo.go"],"removed":[]}]}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: makeHeaders(sig),
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+				"refs":       []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "refs/heads/main"}},
+				"paths":      []configuration.Predicate{{Type: configuration.PredicateTypeMatches, Value: "pkg/.*"}},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
 	})
 
 	t.Run("path predicate does not match any file -> event is not emitted", func(t *testing.T) {

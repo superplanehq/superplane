@@ -46,6 +46,13 @@ func Test__MatchesAnyPredicateInList(t *testing.T) {
 		))
 	})
 
+	t.Run("matches predicate does not match path as substring", func(t *testing.T) {
+		assert.False(t, MatchesAnyPredicateInList(
+			[]Predicate{{Type: PredicateTypeMatches, Value: "pkg/.*"}},
+			[]string{"vendor/pkg/foo.go"},
+		))
+	})
+
 	t.Run("multiple predicates, first matches", func(t *testing.T) {
 		assert.True(t, MatchesAnyPredicateInList(
 			[]Predicate{
