@@ -117,9 +117,6 @@ func FindServiceAccountsByOrganizationInTransaction(tx *gorm.DB, orgID string) (
 	return users, err
 }
 
-// FindUsersByIDsInOrganization returns users in the org matching the given IDs,
-// including soft-deleted rows (Unscoped). Used to resolve display names for FKs
-// such as service account created_by.
 func FindUsersByIDsInOrganization(orgID string, ids []string) ([]User, error) {
 	return FindUsersByIDsInOrganizationInTransaction(database.Conn(), orgID, ids)
 }

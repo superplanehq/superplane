@@ -1,4 +1,4 @@
-import type { GoogleRpcStatus } from "@/api-client/types.gen";
+import type { GooglerpcStatus } from "@/api-client/types.gen";
 
 /**
  * Extract error message from API error response
@@ -57,7 +57,7 @@ function getStatusMessage(error: unknown): string | null {
     return null;
   }
 
-  return getNonEmptyString((error as GoogleRpcStatus).message);
+  return getNonEmptyString((error as GooglerpcStatus).message);
 }
 
 function getNonEmptyString(value: unknown): string | null {
