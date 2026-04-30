@@ -3,7 +3,6 @@ package manual
 import (
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -159,6 +158,7 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 
 	var names []string
 	var payload map[string]any
+	found := false
 
 	for _, raw := range rawTemplates {
 		tmpl, ok := raw.(map[string]any)
@@ -169,15 +169,20 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 		names = append(names, name)
 		if name == templateName {
 			payload, _ = tmpl["payload"].(map[string]any)
+			found = true
 		}
 	}
 
-	if payload == nil && !slices.Contains(names, templateName) {
+	if !found {
 		return nil, fmt.Errorf("template %q not found; available: %s", templateName, strings.Join(names, ", "))
 	}
 
 	if override, ok := ctx.Parameters["payload"].(map[string]any); ok {
 		payload = override
+	}
+
+	if payload == nil {
+		return nil, fmt.Errorf("template %q has no payload and no override was provided", templateName)
 	}
 
 	if err := ctx.Events.Emit("manual.run", payload); err != nil {
