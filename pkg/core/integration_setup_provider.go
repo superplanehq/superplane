@@ -111,8 +111,13 @@ type SetupStepContext struct {
 	Capabilities   CapabilityContext
 }
 
-type IntegrationSecretStorage interface {
+type IntegrationSecretStorageReader interface {
 	Get(name string) (string, error)
+}
+
+type IntegrationSecretStorage interface {
+	IntegrationSecretStorageReader
+
 	Delete(name string) error
 	Create(name string, def IntegrationSecretDefinition) error
 	Update(name string, value string) error
@@ -125,9 +130,14 @@ type IntegrationSecretDefinition struct {
 	Editable    bool
 }
 
-type IntegrationParameterStorage interface {
+type IntegrationParameterStorageReader interface {
 	Get(name string) (any, error)
 	GetString(name string) (string, error)
+}
+
+type IntegrationParameterStorage interface {
+	IntegrationParameterStorageReader
+
 	Delete(names ...string) error
 	Create(def IntegrationParameterDefinition) error
 }

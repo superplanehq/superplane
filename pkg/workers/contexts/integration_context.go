@@ -455,3 +455,11 @@ func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSub
 
 	return nil, nil
 }
+
+func (c *IntegrationContext) LegacySetup() bool {
+	//
+	// TODO: we might need an actual column just for this.
+	// Implicitly relying on capabilities being empty could be a bad idea.
+	//
+	return len(c.integration.Capabilities) == 0
+}

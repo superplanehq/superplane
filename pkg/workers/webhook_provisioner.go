@@ -150,11 +150,18 @@ func (w *WebhookProvisioner) runIntegrationSetup(webhook *models.Webhook) (any, 
 		return nil, err
 	}
 
+	secrets, err := contexts.NewIntegrationSecretStorage(db, w.encryptor, instance)
+	if err != nil {
+		return nil, err
+	}
+
 	return handler.Setup(core.WebhookHandlerContext{
-		HTTP:        w.registry.HTTPContext(),
-		Integration: contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil),
-		Webhook:     contexts.NewWebhookContext(db, webhook, w.encryptor, w.baseURL),
-		Logger:      logging.ForIntegration(*instance),
+		HTTP:                  w.registry.HTTPContext(),
+		Integration:           contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil),
+		IntegrationParameters: contexts.NewIntegrationParameterStorage(instance),
+		IntegrationSecrets:    secrets,
+		Webhook:               contexts.NewWebhookContext(db, webhook, w.encryptor, w.baseURL),
+		Logger:                logging.ForIntegration(*instance),
 	})
 }
 

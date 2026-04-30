@@ -81,14 +81,16 @@ type Trigger interface {
 }
 
 type TriggerContext struct {
-	Logger        *log.Entry
-	Configuration any
-	HTTP          HTTPContext
-	Metadata      MetadataWriter
-	Requests      RequestContext
-	Events        EventContext
-	Webhook       NodeWebhookContext
-	Integration   IntegrationContext
+	Logger                *log.Entry
+	Configuration         any
+	HTTP                  HTTPContext
+	Metadata              MetadataWriter
+	Requests              RequestContext
+	Events                EventContext
+	Webhook               NodeWebhookContext
+	Integration           IntegrationContext
+	IntegrationParameters IntegrationParameterStorageReader
+	IntegrationSecrets    IntegrationSecretStorageReader
 }
 
 type EventContext interface {

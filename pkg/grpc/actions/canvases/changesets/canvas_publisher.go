@@ -396,6 +396,13 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Registry,
 			nil,
 		)
+
+		triggerCtx.IntegrationSecrets, err = contexts.NewIntegrationSecretStorage(p.tx, p.options.Encryptor, integration)
+		if err != nil {
+			return fmt.Errorf("failed to create integration secret storage: %v", err)
+		}
+
+		triggerCtx.IntegrationParameters = contexts.NewIntegrationParameterStorage(integration)
 	}
 
 	triggerCtx.Logger = logger
@@ -434,6 +441,13 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 			p.options.Registry,
 			nil,
 		)
+
+		setupCtx.IntegrationSecrets, err = contexts.NewIntegrationSecretStorage(p.tx, p.options.Encryptor, integration)
+		if err != nil {
+			return fmt.Errorf("failed to create integration secret storage: %v", err)
+		}
+
+		setupCtx.IntegrationParameters = contexts.NewIntegrationParameterStorage(integration)
 	}
 
 	setupCtx.Logger = logger

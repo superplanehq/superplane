@@ -16,29 +16,31 @@ var ErrSecretKeyNotFound = errors.New("secret or key not found")
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
-	ID             uuid.UUID
-	WorkflowID     string
-	OrganizationID string
-	CanvasName     string
-	NodeID         string
-	NodeName       string
-	SourceNodeID   string
-	BaseURL        string
-	Data           any
-	Configuration  any
-	Logger         *log.Entry
-	HTTP           HTTPContext
-	Metadata       MetadataWriter
-	NodeMetadata   MetadataReader
-	ExecutionState ExecutionStateContext
-	Requests       RequestContext
-	Auth           AuthReader
-	Integration    IntegrationContext
-	Notifications  NotificationContext
-	Secrets        SecretsContext
-	CanvasMemory   CanvasMemoryContext
-	Webhook        NodeWebhookContext
-	Expressions    ExpressionContext
+	ID                    uuid.UUID
+	WorkflowID            string
+	OrganizationID        string
+	CanvasName            string
+	NodeID                string
+	NodeName              string
+	SourceNodeID          string
+	BaseURL               string
+	Data                  any
+	Configuration         any
+	Logger                *log.Entry
+	HTTP                  HTTPContext
+	Metadata              MetadataWriter
+	NodeMetadata          MetadataReader
+	ExecutionState        ExecutionStateContext
+	Requests              RequestContext
+	Auth                  AuthReader
+	Integration           IntegrationContext
+	IntegrationParameters IntegrationParameterStorageReader
+	IntegrationSecrets    IntegrationSecretStorageReader
+	Notifications         NotificationContext
+	Secrets               SecretsContext
+	CanvasMemory          CanvasMemoryContext
+	Webhook               NodeWebhookContext
+	Expressions           ExpressionContext
 }
 
 type ExpressionContext interface {
@@ -61,14 +63,16 @@ type HTTPContext interface {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Logger        *log.Entry
-	Configuration any
-	HTTP          HTTPContext
-	Metadata      MetadataWriter
-	Requests      RequestContext
-	Auth          AuthReader
-	Integration   IntegrationContext
-	Webhook       NodeWebhookContext
+	Logger                *log.Entry
+	Configuration         any
+	HTTP                  HTTPContext
+	Metadata              MetadataWriter
+	Requests              RequestContext
+	Auth                  AuthReader
+	Integration           IntegrationContext
+	IntegrationParameters IntegrationParameterStorageReader
+	IntegrationSecrets    IntegrationSecretStorageReader
+	Webhook               NodeWebhookContext
 }
 
 type CanvasMemoryContext interface {

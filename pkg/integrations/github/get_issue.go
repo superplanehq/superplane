@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -105,6 +106,8 @@ func (c *GetIssue) Setup(ctx core.SetupContext) error {
 	return ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.IntegrationParameters,
+		ctx.IntegrationSecrets,
 		ctx.Configuration,
 	)
 }
@@ -120,25 +123,7 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
-	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	// Initialize GitHub client
-	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
-	if err != nil {
-		return fmt.Errorf("failed to initialize GitHub client: %w", err)
-	}
-
-	// Get the issue
-	issue, _, err := client.Issues.Get(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		issueNumber,
-	)
-
+	issue, _, err := c.getIssue(ctx, config.Repository, issueNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get issue: %w", err)
 	}
@@ -147,6 +132,46 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 		core.DefaultOutputChannel.Name,
 		"github.issue",
 		[]any{issue},
+	)
+}
+
+func (c *GetIssue) getIssue(ctx core.ExecutionContext, repository string, issueNumber int) (*github.Issue, *github.Response, error) {
+	if ctx.Integration.LegacySetup() {
+		var appMetadata Metadata
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
+			return nil, nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		// Initialize GitHub client
+		client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to initialize GitHub client: %w", err)
+		}
+
+		// Get the issue
+		return client.Issues.Get(
+			context.Background(),
+			appMetadata.Owner,
+			repository,
+			issueNumber,
+		)
+	}
+
+	client, err := NewClientFromStorageContexts(ctx.IntegrationParameters, ctx.IntegrationSecrets)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	owner, err := ctx.IntegrationParameters.GetString(ParameterOwner)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get owner: %w", err)
+	}
+
+	return client.Issues.Get(
+		context.Background(),
+		owner,
+		repository,
+		issueNumber,
 	)
 }
 

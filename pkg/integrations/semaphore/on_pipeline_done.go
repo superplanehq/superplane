@@ -168,7 +168,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := NewClient(ctx.HTTP, ctx.Integration, ctx.IntegrationParameters, ctx.IntegrationSecrets)
 	if err != nil {
 		return err
 	}

@@ -85,7 +85,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := NewClient(ctx.HTTP, ctx.Integration, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}

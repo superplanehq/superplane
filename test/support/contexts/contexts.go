@@ -214,6 +214,10 @@ func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 	return &s.ID, nil
 }
 
+func (c *IntegrationContext) LegacySetup() bool {
+	return false
+}
+
 type SubscriptionContext struct {
 	config   any
 	messages []any

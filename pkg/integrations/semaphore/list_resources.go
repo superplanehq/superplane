@@ -7,7 +7,7 @@ func (s *Semaphore) ListResources(resourceType string, ctx core.ListResourcesCon
 		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := NewClient(ctx.HTTP, ctx.Integration, ctx.ParameterStorage, ctx.Secrets)
 	if err != nil {
 		return nil, err
 	}

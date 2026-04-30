@@ -27,7 +27,98 @@ type NodeMetadata struct {
 	Repository *Repository `json:"repository"`
 }
 
-func ensureRepoInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, configuration any) error {
+func ensureRepoInMetadata(
+	metadata core.MetadataWriter,
+	integration core.IntegrationContext,
+	parameters core.IntegrationParameterStorageReader,
+	secrets core.IntegrationSecretStorageReader,
+	configuration any,
+) error {
+	if integration.LegacySetup() {
+		return legacyEnsureRepoInMetadata(metadata, integration, configuration)
+	}
+
+	repository := getRepositoryFromConfiguration(configuration)
+	if repository == "" {
+		return fmt.Errorf("repository is required")
+	}
+
+	if expressionPlaceholderRegex.MatchString(repository) {
+		return nil
+	}
+
+	client, err := NewClientFromStorageContexts(parameters, secrets)
+	if err != nil {
+		return fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	authMethod, err := parameters.GetString(ParameterAuthMethod)
+	if err != nil {
+		return fmt.Errorf("failed to get authentication method: %w", err)
+	}
+
+	switch authMethod {
+	case AuthMethodPAT:
+		return ensureOwnerRepoInMetadata(parameters, metadata, client, repository)
+	case AuthMethodGitHubApp:
+		return ensureAppRepoInMetadata(parameters, metadata, client, repository)
+	}
+
+	return fmt.Errorf("invalid authentication method: %s", authMethod)
+}
+
+func ensureOwnerRepoInMetadata(
+	parameters core.IntegrationParameterStorageReader,
+	metadata core.MetadataWriter,
+	client *github.Client,
+	repository string,
+) error {
+	owner, err := parameters.GetString(ParameterOwner)
+	if err != nil {
+		return fmt.Errorf("failed to get owner: %w", err)
+	}
+
+	repo, _, err := client.Repositories.Get(context.Background(), owner, repository)
+	if err != nil {
+		return fmt.Errorf("repository %s is not accessible to app installation", repository)
+	}
+
+	live := Repository{
+		ID:   repo.GetID(),
+		Name: repo.GetName(),
+		URL:  repo.GetHTMLURL(),
+	}
+
+	return metadata.Set(NodeMetadata{Repository: &live})
+}
+
+func ensureAppRepoInMetadata(
+	parameters core.IntegrationParameterStorageReader,
+	metadata core.MetadataWriter,
+	client *github.Client,
+	repository string,
+) error {
+	repos, _, err := client.Apps.ListRepos(context.Background(), &github.ListOptions{PerPage: 100})
+	if err != nil {
+		return fmt.Errorf("failed to list repositories: %w", err)
+	}
+
+	repoIndex := slices.IndexFunc(repos.Repositories, func(r *github.Repository) bool {
+		return *r.Name == repository
+	})
+
+	if repoIndex == -1 {
+		return fmt.Errorf("repository %s is not accessible to app installation", repository)
+	}
+
+	return metadata.Set(NodeMetadata{Repository: &Repository{
+		ID:   repos.Repositories[repoIndex].GetID(),
+		Name: *repos.Repositories[repoIndex].Name,
+		URL:  repos.Repositories[repoIndex].GetHTMLURL(),
+	}})
+}
+
+func legacyEnsureRepoInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, configuration any) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {

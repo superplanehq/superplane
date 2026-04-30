@@ -124,6 +124,8 @@ func (c *CreateReview) Setup(ctx core.SetupContext) error {
 	return ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.IntegrationParameters,
+		ctx.IntegrationSecrets,
 		ctx.Configuration,
 	)
 }

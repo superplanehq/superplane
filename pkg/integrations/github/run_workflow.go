@@ -185,6 +185,8 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.IntegrationParameters,
+		ctx.IntegrationSecrets,
 		ctx.Configuration,
 	)
 	if err != nil {

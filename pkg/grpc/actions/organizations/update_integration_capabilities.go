@@ -129,6 +129,9 @@ func handleEnablingCapabilties(tx *gorm.DB, integration *models.Integration, cap
 	//
 	// TODO: move nodes back to ready state? What if the node has another non-capability related error?
 	//
+	if len(capabilities) == 0 {
+		return nil
+	}
 
 	//
 	// Update the current capabilities states.
@@ -158,6 +161,9 @@ func handleDisablingCapabilties(tx *gorm.DB, integration *models.Integration, ca
 	//
 	// TODO: move nodes to error state - only ready nodes, since nodes in error state are already non-functional
 	//
+	if len(capabilities) == 0 {
+		return nil
+	}
 
 	//
 	// Update the current capabilities states.
@@ -187,6 +193,10 @@ func handleDisablingCapabilties(tx *gorm.DB, integration *models.Integration, ca
  * When new capabilities are requested, we need to give the integration implementation a chance to react.
  */
 func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integration *models.Integration, capabilities []string) error {
+	if len(capabilities) == 0 {
+		return nil
+	}
+
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)
 	if err != nil {
 		return fmt.Errorf("failed to get setup provider: %v", err)

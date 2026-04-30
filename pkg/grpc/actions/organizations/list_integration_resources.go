@@ -70,15 +70,22 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		nil,
 	)
 
+	secrets, err := contexts.NewIntegrationSecretStorage(database.Conn(), registry.Encryptor, instance)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to create integration secret storage")
+	}
+
 	listCtx := core.ListResourcesContext{
 		Logger: log.WithFields(log.Fields{
 			"integration_id":   instance.ID.String(),
 			"integration_name": instance.AppName,
 			"resource_type":    resourceType,
 		}),
-		HTTP:        registry.HTTPContext(),
-		Integration: integrationCtx,
-		Parameters:  parameters,
+		HTTP:             registry.HTTPContext(),
+		Integration:      integrationCtx,
+		Parameters:       parameters,
+		ParameterStorage: contexts.NewIntegrationParameterStorage(instance),
+		Secrets:          secrets,
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)

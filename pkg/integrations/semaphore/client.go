@@ -30,7 +30,7 @@ func NewClientWithAPIToken(http core.HTTPContext, parameters core.IntegrationPar
 	}, nil
 }
 
-func NewClientWithStorageContexts(http core.HTTPContext, parameters core.IntegrationParameterStorage, secrets core.IntegrationSecretStorage) (*Client, error) {
+func NewClientWithStorageContexts(http core.HTTPContext, parameters core.IntegrationParameterStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
 	url, err := parameters.GetString("organizationUrl")
 	if err != nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)
@@ -48,7 +48,16 @@ func NewClientWithStorageContexts(http core.HTTPContext, parameters core.Integra
 	}, nil
 }
 
-func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+func NewClient(
+	http core.HTTPContext,
+	ctx core.IntegrationContext,
+	parameters core.IntegrationParameterStorageReader,
+	secrets core.IntegrationSecretStorageReader,
+) (*Client, error) {
+	if !ctx.LegacySetup() {
+		return NewClientWithStorageContexts(http, parameters, secrets)
+	}
+
 	if ctx == nil {
 		return nil, fmt.Errorf("no integration context")
 	}
