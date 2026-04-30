@@ -41,7 +41,7 @@ func (s *fakePublicUsageService) SetupAccount(context.Context, string) (*usagepb
 	return &usagepb.SetupAccountResponse{}, nil
 }
 
-func (s *fakePublicUsageService) SetupOrganization(context.Context, string, string) (*usagepb.SetupOrganizationResponse, error) {
+func (s *fakePublicUsageService) SetupOrganization(context.Context, string, string, usage.SetupOrganizationDetails) (*usagepb.SetupOrganizationResponse, error) {
 	return &usagepb.SetupOrganizationResponse{}, nil
 }
 
