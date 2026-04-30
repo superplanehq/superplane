@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/playwright-community/playwright-go"
@@ -47,6 +48,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
 		steps.assertServiceAccountVisibleInList("list-test-bot")
+		steps.assertServiceAccountCreatorInList("list-test-bot", "E2E User")
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
@@ -55,6 +57,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertCreatorOnDetailPage("E2E User")
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
@@ -211,6 +214,27 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 
 func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 	s.session.AssertText(name)
+}
+
+func (s *serviceAccountSteps) assertServiceAccountCreatorInList(serviceAccountName, creatorName string) {
+	page := s.session.Page()
+	row := page.Locator(`tr:has([data-testid="sa-link"]:has-text("` + serviceAccountName + `"))`)
+	link := row.GetByTestId("sa-created-by-link")
+	err := link.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+	text, err := link.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, creatorName, strings.TrimSpace(text))
+}
+
+func (s *serviceAccountSteps) assertCreatorOnDetailPage(creatorName string) {
+	page := s.session.Page()
+	link := page.GetByTestId("sa-detail-created-by-link")
+	err := link.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(5000)})
+	require.NoError(s.t, err)
+	text, err := link.InnerText()
+	require.NoError(s.t, err)
+	require.Equal(s.t, creatorName, strings.TrimSpace(text))
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {

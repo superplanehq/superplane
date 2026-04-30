@@ -50,7 +50,12 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, status.Error(codes.Internal, "failed to update service account")
 	}
 
+	creatorsByID, err := loadCreatedByUsersByID(collectDistinctCreatedByIDs([]models.User{*user}))
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to load service account creator")
+	}
+
 	return &pb.UpdateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user),
+		ServiceAccount: serializeServiceAccount(user, creatorsByID),
 	}, nil
 }

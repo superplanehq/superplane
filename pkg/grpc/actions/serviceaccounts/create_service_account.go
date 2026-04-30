@@ -86,8 +86,13 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, status.Errorf(codes.Internal, "failed to create service account: %v", err)
 	}
 
+	creatorsByID, err := loadCreatedByUsersByID(collectDistinctCreatedByIDs([]models.User{*sa}))
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to load service account creator")
+	}
+
 	return &pb.CreateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(sa),
+		ServiceAccount: serializeServiceAccount(sa, creatorsByID),
 		Token:          plainToken,
 	}, nil
 }
