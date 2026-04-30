@@ -62,7 +62,7 @@ func (s *triggerRunTitleSteps) whenRunTitleToggleIsEnabled() {
 }
 
 func (s *triggerRunTitleSteps) whenRunTitleIsSetTo(value string) {
-	s.session.FillIn(q.TestID("string-field-customname"), value)
+	s.session.FillIn(q.TestID("string-field-runtitletemplate"), value)
 }
 
 func (s *triggerRunTitleSteps) waitForAutoSave() {
@@ -82,17 +82,17 @@ func (s *triggerRunTitleSteps) runManualTrigger() {
 func (s *triggerRunTitleSteps) thenRunTitleInDBEquals(expected string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		val, exists, found := s.getCustomNameField()
-		if found && exists && val == expected {
+		val, found := s.getRunTitleTemplate()
+		if found && val != nil && *val == expected {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	val, exists, found := s.getCustomNameField()
+	val, found := s.getRunTitleTemplate()
 	require.True(s.t, found, "expected node to exist in DB")
-	require.True(s.t, exists, "expected customName key to exist in DB config")
-	require.Equal(s.t, expected, val, "expected customName=%q in DB but got %v", expected, val)
+	require.NotNil(s.t, val, "expected run title template to exist in DB")
+	require.Equal(s.t, expected, *val, "expected runTitleTemplate=%q in DB but got %v", expected, val)
 }
 
 func (s *triggerRunTitleSteps) thenEventRunTitleEquals(expected string) {
@@ -141,22 +141,21 @@ func (s *triggerRunTitleSteps) waitForNodeID() string {
 	return draft.Nodes[0].ID
 }
 
-func (s *triggerRunTitleSteps) getCustomNameField() (any, bool, bool) {
+func (s *triggerRunTitleSteps) getRunTitleTemplate() (*string, bool) {
 	if s.nodeID == "" {
-		return nil, false, false
+		return nil, false
 	}
 
 	draft := s.canvas.FindCurrentDraft()
 	if draft == nil {
-		return nil, false, false
+		return nil, false
 	}
 
 	for _, node := range draft.Nodes {
 		if node.ID == s.nodeID {
-			val, exists := node.Configuration["customName"]
-			return val, exists, true
+			return node.RunTitleTemplate, true
 		}
 	}
 
-	return nil, false, false
+	return nil, false
 }
