@@ -10,7 +10,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Compute Instance Created" href="#on-compute-instance-created" description="Fires when a new OCI Compute instance reaches RUNNING state (via OCI Events Service)" />
-  <LinkCard title="On Function Invoked" href="#on-function-invoked" description="Fires when an OCI Function is invoked (via OCI Events / Audit trail)" />
 </CardGrid>
 
 ## Actions
@@ -138,61 +137,6 @@ Each event payload includes:
   },
   "timestamp": "2026-01-01T00:00:05Z",
   "type": "oci.onComputeInstanceCreated"
-}
-```
-
-<a id="on-function-invoked"></a>
-
-## On Function Invoked
-
-The On Function Invoked trigger starts a workflow execution whenever an OCI Function invocation is recorded by the OCI Audit trail.
-
-### How It Works
-
-When this trigger is configured, SuperPlane creates an **OCI Events rule** in the specified compartment that routes `com.oraclecloud.functions.invokefunction` audit events to the shared ONS topic. SuperPlane subscribes to that topic via HTTPS and fires the trigger for each matching event.
-
-> **Note**: OCI Audit events may arrive with a short delay relative to the actual invocation.
-
-### Configuration
-
-- **Compartment**: The compartment to monitor for function invocations.
-
-### Event Data
-
-Each event payload includes:
-- `eventType` — `com.oraclecloud.functions.invokefunction`
-- `data.resourceId` — the function OCID
-- `data.resourceName` — the function display name
-- `data.compartmentId` — the compartment OCID
-- `eventTime` — ISO-8601 timestamp of the invocation audit event
-
-### Example Data
-
-```json
-{
-  "cloudEventsVersion": "0.1",
-  "contentType": "application/json",
-  "data": {
-    "additionalDetails": {
-      "X-Content-Sha256": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
-      "X-Oracle-Oci-Request-Id": "B1234567890ABCDEF1234567890ABCDE"
-    },
-    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
-    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
-    "compartmentName": "mytenancy",
-    "definedTags": {},
-    "freeFormTags": {},
-    "resourceId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
-    "resourceName": "my-function"
-  },
-  "eventID": "e1a2b3c4-1234-5678-abcd-ef1234567890",
-  "eventTime": "2026-04-22T20:34:05Z",
-  "eventType": "com.oraclecloud.functions.invokefunction",
-  "eventTypeVersion": "2.0",
-  "extensions": {
-    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890"
-  },
-  "source": "functions"
 }
 ```
 
@@ -324,6 +268,7 @@ Emits the created function details including:
 - `applicationId` — parent application OCID
 - `image` — the container image
 - `invokeEndpoint` — the HTTPS endpoint used to invoke the function
+- `memoryInMBs` — memory allocated in megabytes
 - `lifecycleState` — current state
 - `timeCreated` — ISO-8601 creation timestamp
 
@@ -361,14 +306,19 @@ The Delete Application component removes an Oracle Cloud Infrastructure Function
 
 Emits the deleted application ID on the default output channel:
 - `applicationId` — OCID of the deleted application
+- `deleted` — boolean confirming deletion
+- `displayName` — name of the deleted application
 
 ### Example Output
 
 ```json
 {
   "data": {
-    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz"
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "deleted": true,
+    "displayName": "my-functions-app"
   },
+  "timestamp": "2026-04-22T20:35:00.000000000Z",
   "type": "oci.applicationDeleted"
 }
 ```
@@ -389,14 +339,17 @@ The Delete Function component removes a function from an Oracle Cloud Infrastruc
 
 Emits the deleted function ID on the default output channel:
 - `functionId` — OCID of the deleted function
+- `deleted` — boolean confirming deletion
 
 ### Example Output
 
 ```json
 {
   "data": {
+    "deleted": true,
     "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz"
   },
+  "timestamp": "2026-04-22T20:36:00.000000000Z",
   "type": "oci.functionDeleted"
 }
 ```

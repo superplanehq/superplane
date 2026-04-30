@@ -12,9 +12,15 @@ interface CreateFunctionConfiguration {
   compartmentId?: string;
   applicationId?: string;
   displayName?: string;
+  imageRepository?: string;
   image?: string;
   memoryInMBs?: number;
   timeoutInSeconds?: number;
+}
+
+interface CreateFunctionNodeMetadata {
+  applicationId?: string;
+  applicationName?: string;
 }
 
 interface CreateFunctionOutputData {
@@ -32,11 +38,20 @@ type CreateFunctionOutputPayload = OutputPayload & {
   data?: CreateFunctionOutputData;
 };
 
+interface CreateFunctionExecutionMetadata {
+  startedAt?: string;
+}
+
+function getExecutedAt(context: ExecutionDetailsContext): string | undefined {
+  const metadata = context.execution.metadata as CreateFunctionExecutionMetadata | undefined;
+  const ts = metadata?.startedAt ?? context.execution.createdAt;
+  return ts ? new Date(ts).toLocaleString() : undefined;
+}
+
 function getOutputData(context: ExecutionDetailsContext): CreateFunctionOutputData | undefined {
   const outputs = context.execution.outputs as { default?: CreateFunctionOutputPayload[] } | undefined;
   const payload = outputs?.default?.[0];
-  if (!payload) return undefined;
-  return (payload.data ?? payload) as CreateFunctionOutputData;
+  return payload?.data;
 }
 
 export const createFunctionMapper: ComponentBaseMapper = {
@@ -53,6 +68,12 @@ export const createFunctionMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
+
+    const executedAt = getExecutedAt(context);
+    if (executedAt) {
+      details["Executed At"] = executedAt;
+    }
+
     const data = getOutputData(context);
     if (!data) return details;
 
@@ -78,11 +99,18 @@ export const createFunctionMapper: ComponentBaseMapper = {
 
 function createFunctionMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateFunctionConfiguration | undefined;
+  const nodeMeta = node.metadata as CreateFunctionNodeMetadata | undefined;
   const items: MetadataItem[] = [];
 
   if (config?.displayName) {
     items.push({ icon: "tag", label: config.displayName });
   }
+
+  const appLabel = nodeMeta?.applicationName ?? config?.applicationId;
+  if (appLabel) {
+    items.push({ icon: "layout-grid", label: appLabel });
+  }
+
   if (config?.image) {
     items.push({ icon: "box", label: config.image });
   }

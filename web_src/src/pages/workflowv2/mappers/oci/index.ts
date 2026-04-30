@@ -6,7 +6,6 @@ import { deleteApplicationMapper } from "./delete_application";
 import { createFunctionMapper } from "./create_function";
 import { deleteFunctionMapper } from "./delete_function";
 import { invokeFunctionMapper } from "./invoke_function";
-import { onFunctionInvokeTriggerRenderer } from "./on_function_invoke";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -20,7 +19,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onComputeInstanceCreated: onComputeInstanceCreatedTriggerRenderer,
-  onFunctionInvoke: onFunctionInvokeTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -29,5 +27,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteApplication: buildActionStateRegistry("deleted"),
   createFunction: buildActionStateRegistry("created"),
   deleteFunction: buildActionStateRegistry("deleted"),
-  invokeFunction: buildActionStateRegistry("invoked"),
+  invokeFunction: buildActionStateRegistry("success"),
 };

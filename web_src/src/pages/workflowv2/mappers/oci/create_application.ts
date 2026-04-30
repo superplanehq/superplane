@@ -11,7 +11,9 @@ import { baseMapper } from "./base";
 interface CreateApplicationConfiguration {
   compartmentId?: string;
   displayName?: string;
+  vcnId?: string;
   subnetIds?: string;
+  shape?: string;
 }
 
 interface CreateApplicationOutputData {
@@ -26,11 +28,20 @@ type CreateApplicationOutputPayload = OutputPayload & {
   data?: CreateApplicationOutputData;
 };
 
+interface CreateApplicationExecutionMetadata {
+  startedAt?: string;
+}
+
+function getExecutedAt(context: ExecutionDetailsContext): string | undefined {
+  const metadata = context.execution.metadata as CreateApplicationExecutionMetadata | undefined;
+  const ts = metadata?.startedAt ?? context.execution.createdAt;
+  return ts ? new Date(ts).toLocaleString() : undefined;
+}
+
 function getOutputData(context: ExecutionDetailsContext): CreateApplicationOutputData | undefined {
   const outputs = context.execution.outputs as { default?: CreateApplicationOutputPayload[] } | undefined;
   const payload = outputs?.default?.[0];
-  if (!payload) return undefined;
-  return (payload.data ?? payload) as CreateApplicationOutputData;
+  return payload?.data;
 }
 
 export const createApplicationMapper: ComponentBaseMapper = {
@@ -48,6 +59,12 @@ export const createApplicationMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const data = getOutputData(context);
+
+    const executedAt = getExecutedAt(context);
+    if (executedAt) {
+      details["Executed At"] = executedAt;
+    }
+
     if (!data) return details;
 
     if (data.displayName) {
@@ -64,12 +81,29 @@ export const createApplicationMapper: ComponentBaseMapper = {
   },
 };
 
+interface CreateApplicationNodeMetadata {
+  subnetId?: string;
+  subnetName?: string;
+  shape?: string;
+}
+
 function createApplicationMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateApplicationConfiguration | undefined;
+  const nodeMeta = node.metadata as CreateApplicationNodeMetadata | undefined;
   const items: MetadataItem[] = [];
 
   if (config?.displayName) {
     items.push({ icon: "tag", label: config.displayName });
+  }
+
+  const subnetLabel = nodeMeta?.subnetName ?? config?.subnetIds;
+  if (subnetLabel) {
+    items.push({ icon: "network", label: subnetLabel });
+  }
+
+  const shape = nodeMeta?.shape ?? config?.shape;
+  if (shape) {
+    items.push({ icon: "cpu", label: shape });
   }
 
   return items;

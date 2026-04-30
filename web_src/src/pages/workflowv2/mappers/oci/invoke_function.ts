@@ -15,6 +15,13 @@ interface InvokeFunctionConfiguration {
   payload?: string;
 }
 
+interface InvokeFunctionNodeMetadata {
+  applicationId?: string;
+  applicationName?: string;
+  functionId?: string;
+  functionName?: string;
+}
+
 interface InvokeFunctionOutputData {
   functionId?: string;
   statusCode?: number;
@@ -25,11 +32,20 @@ type InvokeFunctionOutputPayload = OutputPayload & {
   data?: InvokeFunctionOutputData;
 };
 
+interface InvokeFunctionExecutionMetadata {
+  startedAt?: string;
+}
+
+function getExecutedAt(context: ExecutionDetailsContext): string | undefined {
+  const metadata = context.execution.metadata as InvokeFunctionExecutionMetadata | undefined;
+  const ts = metadata?.startedAt ?? context.execution.createdAt;
+  return ts ? new Date(ts).toLocaleString() : undefined;
+}
+
 function getOutputData(context: ExecutionDetailsContext): InvokeFunctionOutputData | undefined {
   const outputs = context.execution.outputs as { default?: InvokeFunctionOutputPayload[] } | undefined;
   const payload = outputs?.default?.[0];
-  if (!payload) return undefined;
-  return (payload.data ?? payload) as InvokeFunctionOutputData;
+  return payload?.data;
 }
 
 export const invokeFunctionMapper: ComponentBaseMapper = {
@@ -46,6 +62,12 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
+
+    const executedAt = getExecutedAt(context);
+    if (executedAt) {
+      details["Executed At"] = executedAt;
+    }
+
     const data = getOutputData(context);
     if (!data) return details;
 
@@ -65,10 +87,17 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
 
 function invokeFunctionMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as InvokeFunctionConfiguration | undefined;
+  const nodeMeta = node.metadata as InvokeFunctionNodeMetadata | undefined;
   const items: MetadataItem[] = [];
 
-  if (config?.functionId) {
-    items.push({ icon: "zap", label: config.functionId });
+  const appLabel = nodeMeta?.applicationName ?? config?.applicationId;
+  if (appLabel) {
+    items.push({ icon: "layout-grid", label: appLabel });
+  }
+
+  const fnLabel = nodeMeta?.functionName ?? config?.functionId;
+  if (fnLabel) {
+    items.push({ icon: "zap", label: fnLabel });
   }
 
   return items;
