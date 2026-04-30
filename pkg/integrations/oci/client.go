@@ -254,6 +254,75 @@ func (c *Client) ListImages(compartmentID, operatingSystem string) ([]Image, err
 	return images, nil
 }
 
+func (c *Client) CreateImage(req CreateImageRequest) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images", host, coreServicesAPIVersion)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) GetImage(imageID string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) UpdateImage(imageID, displayName string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	body, err := json.Marshal(UpdateImageRequest{DisplayName: displayName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) DeleteImage(imageID string) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
 func (c *Client) ListSubnets(compartmentID string) ([]Subnet, error) {
 	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
 	url := fmt.Sprintf("https://%s/%s/subnets?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
@@ -461,6 +530,26 @@ type ConfidentialInstanceOptions struct {
 	IsEnabled bool `json:"isEnabled"`
 }
 
+type CreateImageRequest struct {
+	CompartmentID      string              `json:"compartmentId"`
+	DisplayName        string              `json:"displayName,omitempty"`
+	InstanceID         string              `json:"instanceId,omitempty"`
+	ImageSourceDetails *ImageSourceDetails `json:"imageSourceDetails,omitempty"`
+}
+
+type ImageSourceDetails struct {
+	SourceType      string `json:"sourceType"`
+	SourceImageType string `json:"sourceImageType,omitempty"`
+	SourceURI       string `json:"sourceUri,omitempty"`
+	NamespaceName   string `json:"namespaceName,omitempty"`
+	BucketName      string `json:"bucketName,omitempty"`
+	ObjectName      string `json:"objectName,omitempty"`
+}
+
+type UpdateImageRequest struct {
+	DisplayName string `json:"displayName"`
+}
+
 type Instance struct {
 	ID                 string `json:"id"`
 	DisplayName        string `json:"displayName"`
@@ -500,9 +589,17 @@ type Shape struct {
 }
 
 type Image struct {
-	ID             string `json:"id"`
-	DisplayName    string `json:"displayName"`
-	LifecycleState string `json:"lifecycleState"`
+	ID                     string `json:"id"`
+	DisplayName            string `json:"displayName"`
+	LifecycleState         string `json:"lifecycleState"`
+	CompartmentID          string `json:"compartmentId"`
+	BaseImageID            string `json:"baseImageId"`
+	OperatingSystem        string `json:"operatingSystem"`
+	OperatingSystemVersion string `json:"operatingSystemVersion"`
+	LaunchMode             string `json:"launchMode"`
+	SizeInMBs              int    `json:"sizeInMBs"`
+	TimeCreated            string `json:"timeCreated"`
+	CreateImageAllowed     bool   `json:"createImageAllowed"`
 }
 
 type Subnet struct {
