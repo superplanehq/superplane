@@ -301,9 +301,19 @@ message Organization {
     google.protobuf.Timestamp updated_at = 5;
   }
 
+  // OAuth providers allowed when accepting pending *email* invitations after an OAuth login.
+  // Empty providers means no restriction (all configured OAuth providers allowed).
+  // Does not apply to shareable invite-link acceptance, password, or magic-link flows.
+  message AllowedOAuthProviders {
+    repeated string providers = 1;
+  }
+
   message Spec {
     optional bool change_management_enabled = 1;
     repeated string enabled_experimental_features = 2;
+    // When set on PATCH, replaces the stored list. Omit to leave unchanged.
+    // Empty providers means no restriction (matches empty JSON array in storage).
+    optional AllowedOAuthProviders allowed_oauth_providers = 3;
   }
 
   Metadata metadata = 1;
