@@ -141,32 +141,9 @@ func resolveDeleteApplicationMetadata(ctx core.SetupContext, applicationID strin
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		// Non-fatal: fall back to showing the ID.
-		return ctx.Metadata.Set(DeleteApplicationNodeMetadata{
-			ApplicationID:   applicationID,
-			ApplicationName: applicationID,
-		})
-	}
-
-	app, err := client.GetApplication(applicationID)
-	if err != nil {
-		// Non-fatal: fall back to showing the ID.
-		return ctx.Metadata.Set(DeleteApplicationNodeMetadata{
-			ApplicationID:   applicationID,
-			ApplicationName: applicationID,
-		})
-	}
-
-	name := app.DisplayName
-	if name == "" {
-		name = applicationID
-	}
-
 	return ctx.Metadata.Set(DeleteApplicationNodeMetadata{
 		ApplicationID:   applicationID,
-		ApplicationName: name,
+		ApplicationName: resolveApplicationName(ctx, applicationID),
 	})
 }
 

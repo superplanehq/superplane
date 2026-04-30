@@ -167,35 +167,12 @@ func resolveDeleteFunctionMetadata(ctx core.SetupContext, applicationID, functio
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		// Non-fatal: fall back to showing the IDs.
-		return ctx.Metadata.Set(DeleteFunctionNodeMetadata{
-			ApplicationID:   applicationID,
-			ApplicationName: applicationID,
-			FunctionID:      functionID,
-			FunctionName:    functionID,
-		})
-	}
-
-	meta := DeleteFunctionNodeMetadata{
-		ApplicationID: applicationID,
-		FunctionID:    functionID,
-	}
-
-	if app, err := client.GetApplication(applicationID); err == nil && app.DisplayName != "" {
-		meta.ApplicationName = app.DisplayName
-	} else {
-		meta.ApplicationName = applicationID
-	}
-
-	if fn, err := client.GetFunction(functionID); err == nil && fn.DisplayName != "" {
-		meta.FunctionName = fn.DisplayName
-	} else {
-		meta.FunctionName = functionID
-	}
-
-	return ctx.Metadata.Set(meta)
+	return ctx.Metadata.Set(DeleteFunctionNodeMetadata{
+		ApplicationID:   applicationID,
+		ApplicationName: resolveApplicationName(ctx, applicationID),
+		FunctionID:      functionID,
+		FunctionName:    resolveFunctionName(ctx, functionID),
+	})
 }
 
 func (d *DeleteFunction) Execute(ctx core.ExecutionContext) error {

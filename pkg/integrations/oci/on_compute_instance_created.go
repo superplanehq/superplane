@@ -154,9 +154,12 @@ func (t *OnComputeInstanceCreated) Cleanup(ctx core.TriggerContext) error {
 
 // HandleWebhook processes inbound requests forwarded by OCI Notifications.
 func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	cfg := OnComputeInstanceCreatedConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+	// Read compartment from persisted metadata (written by Setup) so that
+	// pre-existing triggers configured under the old "compartmentId" key
+	// continue to work correctly.
+	var meta OnComputeInstanceCreatedMetadata
+	if err := mapstructure.Decode(ctx.Metadata, &meta); err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode trigger metadata: %w", err)
 	}
 
 	// Handle ONS subscription confirmation handshake before parsing the body.
@@ -176,7 +179,7 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 		return http.StatusOK, nil, nil
 	}
 
-	if !matchesCompartment(envelope, cfg.Compartment) {
+	if !matchesCompartment(envelope, meta.CompartmentID) {
 		return http.StatusOK, nil, nil
 	}
 

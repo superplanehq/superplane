@@ -1160,3 +1160,35 @@ func (c *Client) GetOCIRNamespace(compartmentID string) (string, error) {
 
 	return result.Namespace, nil
 }
+
+// resolveApplicationName returns the display name for an application OCID,
+// falling back to the OCID itself on any error.
+func resolveApplicationName(ctx core.SetupContext, applicationID string) string {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return applicationID
+	}
+
+	app, err := client.GetApplication(applicationID)
+	if err != nil || app.DisplayName == "" {
+		return applicationID
+	}
+
+	return app.DisplayName
+}
+
+// resolveFunctionName returns the display name for a function OCID,
+// falling back to the OCID itself on any error.
+func resolveFunctionName(ctx core.SetupContext, functionID string) string {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return functionID
+	}
+
+	fn, err := client.GetFunction(functionID)
+	if err != nil || fn.DisplayName == "" {
+		return functionID
+	}
+
+	return fn.DisplayName
+}

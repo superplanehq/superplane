@@ -339,24 +339,9 @@ func resolveCreateFunctionMetadata(ctx core.SetupContext, applicationID string) 
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return ctx.Metadata.Set(CreateFunctionNodeMetadata{ApplicationID: applicationID, ApplicationName: applicationID})
-	}
-
-	app, err := client.GetApplication(applicationID)
-	if err != nil {
-		return ctx.Metadata.Set(CreateFunctionNodeMetadata{ApplicationID: applicationID, ApplicationName: applicationID})
-	}
-
-	name := app.DisplayName
-	if name == "" {
-		name = applicationID
-	}
-
 	return ctx.Metadata.Set(CreateFunctionNodeMetadata{
 		ApplicationID:   applicationID,
-		ApplicationName: name,
+		ApplicationName: resolveApplicationName(ctx, applicationID),
 	})
 }
 
