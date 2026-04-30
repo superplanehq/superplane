@@ -1,37 +1,64 @@
-import React from "react";
 import { Handle, Position } from "@xyflow/react";
+import {
+  APPEND_CONNECTOR_COLOR,
+  AppendHandleButton,
+  AppendHandlePreview,
+  type AppendFromNodeHandler,
+} from "./appendHandle";
+import { isAlreadyConnectedToNode } from "./connectionState";
 import { getOutputChannels } from "./data";
+import { HANDLE_STYLE } from "./handleStyle";
+import { MultiRightHandle } from "./multiRightHandle";
 import type { BlockConnectionState, BlockEdgeState, BlockProps, CanvasBlockData } from "./types";
-
-const HANDLE_STYLE = {
-  width: 12,
-  height: 12,
-  borderRadius: 100,
-  border: "3px solid #C9D5E1",
-  background: "transparent",
-};
-
-function isAlreadyConnectedToNode(
-  edges: BlockEdgeState[],
-  connection: BlockConnectionState | undefined,
-  sourceNodeId: string | undefined,
-  targetNodeId: string | undefined,
-  sourceHandle?: string | null,
-) {
-  if (!connection || !sourceNodeId || !targetNodeId) {
-    return false;
-  }
-
-  return edges.some(
-    (edge) =>
-      edge.source === sourceNodeId &&
-      edge.sourceHandle === (sourceHandle ?? connection.handleId) &&
-      edge.target === targetNodeId,
-  );
-}
 
 function getBlockEdges(data: CanvasBlockData): BlockEdgeState[] {
   return data._allEdges || [];
+}
+
+function getNodeConnectionStats(edges: BlockEdgeState[], nodeId?: string) {
+  if (!nodeId) {
+    return { hasIncoming: false, hasOutgoing: false };
+  }
+
+  return {
+    hasIncoming: edges.some((edge) => edge.target === nodeId),
+    hasOutgoing: edges.some((edge) => edge.source === nodeId),
+  };
+}
+
+function isDisconnectedNode(stats: { hasIncoming: boolean; hasOutgoing: boolean }) {
+  return !stats.hasIncoming && !stats.hasOutgoing;
+}
+
+function shouldHideInactiveLeftHandle(
+  isConnectionInteractive: boolean,
+  stats: { hasIncoming: boolean; hasOutgoing: boolean },
+) {
+  return !isConnectionInteractive && isDisconnectedNode(stats);
+}
+
+function getLeftHandleHighlight({
+  isConnectionInteractive,
+  hoveredEdge,
+  connectingFrom,
+  nodeId,
+  isAlreadyConnected,
+}: {
+  isConnectionInteractive: boolean;
+  hoveredEdge?: BlockEdgeState;
+  connectingFrom?: BlockConnectionState;
+  nodeId?: string;
+  isAlreadyConnected: boolean;
+}) {
+  if (!isConnectionInteractive) {
+    return false;
+  }
+
+  if (hoveredEdge && hoveredEdge.target === nodeId) {
+    return true;
+  }
+
+  return connectingFrom?.nodeId !== nodeId && connectingFrom?.handleType === "source" && !isAlreadyConnected;
 }
 
 function shouldHideLeftHandle(data: CanvasBlockData) {
@@ -109,140 +136,81 @@ function SingleRightHandle({
   );
 }
 
-function getChannelHighlightResolver(args: {
-  hoveredEdge?: BlockEdgeState;
-  connectingFrom?: BlockConnectionState;
-  nodeId?: string;
-  allEdges: BlockEdgeState[];
-}) {
-  const { hoveredEdge, connectingFrom, nodeId, allEdges } = args;
-
-  return (channel: string) => {
-    const isAlreadyConnected = isAlreadyConnectedToNode(
-      allEdges,
-      connectingFrom,
-      nodeId,
-      connectingFrom?.nodeId,
-      channel,
-    );
-
-    return (
-      (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
-      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel) ||
-      (connectingFrom &&
-        connectingFrom.nodeId !== nodeId &&
-        connectingFrom.handleType === "target" &&
-        !isAlreadyConnected)
-    );
-  };
-}
-
-function MultiRightHandle({
-  channels,
+function EndNodeAppendConnector({
+  nodeId,
+  channel,
+  onAppendFromNode,
   hoveredEdge,
   connectingFrom,
-  nodeId,
   allEdges,
   isConnectionInteractive,
 }: {
-  channels: string[];
+  nodeId?: string;
+  channel: string;
+  onAppendFromNode?: AppendFromNodeHandler;
   hoveredEdge?: BlockEdgeState;
   connectingFrom?: BlockConnectionState;
-  nodeId?: string;
   allEdges: BlockEdgeState[];
   isConnectionInteractive: boolean;
 }) {
-  const getChannelHighlight = getChannelHighlightResolver({
-    hoveredEdge,
-    connectingFrom,
-    nodeId,
-    allEdges,
-  });
+  if (!nodeId || !onAppendFromNode) {
+    return null;
+  }
 
-  const channelSpacing = 24;
-  const handleSize = 12;
-  const edgeColor = "#C9D5E1";
-  const trunkLength = 16;
-  const branchEndX = trunkLength + 24;
-  const labelStartX = branchEndX + 4;
-  const lineEndX = branchEndX + 62;
-  const handleGap = 4;
-  const handleLeftX = lineEndX + handleGap;
-  const totalHeight = (channels.length - 1) * channelSpacing;
-  const svgHeight = totalHeight + 40;
-  const svgCenterY = svgHeight / 2;
-  const channelPositions = channels.map((channel, index) => ({
-    channel,
-    offsetY: (index - (channels.length - 1) / 2) * channelSpacing,
-    isHighlighted: isConnectionInteractive && getChannelHighlight(channel),
-  }));
+  const isHighlighted =
+    isConnectionInteractive &&
+    getSingleChannelHighlight({
+      hoveredEdge,
+      connectingFrom,
+      nodeId,
+      channel,
+      allEdges,
+    });
 
   return (
-    <div
-      className="absolute"
-      style={{
-        left: "100%",
-        top: 0,
-        bottom: 0,
-        pointerEvents: "none",
-      }}
-    >
-      <svg
-        width={lineEndX}
-        height={svgHeight}
+    <>
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={channel}
+        style={{
+          ...HANDLE_STYLE,
+          right: -21,
+          top: 13,
+          pointerEvents: "auto",
+          transform: "none",
+        }}
+        className={isHighlighted ? "highlighted" : undefined}
+      />
+      <div
         style={{
           position: "absolute",
-          left: 0,
-          top: `calc(50% - ${svgCenterY}px)`,
-          overflow: "visible",
+          right: -63,
+          top: 17,
+          width: 42,
+          height: 3,
+          backgroundColor: APPEND_CONNECTOR_COLOR,
+          pointerEvents: "none",
         }}
-      >
-        <line x1={0} y1={svgCenterY} x2={trunkLength} y2={svgCenterY} stroke={edgeColor} strokeWidth={3} />
-
-        {channelPositions.map(({ channel, offsetY }) => {
-          const y = svgCenterY + offsetY;
-          return (
-            <g key={channel}>
-              <line x1={trunkLength} y1={svgCenterY} x2={branchEndX} y2={y} stroke={edgeColor} strokeWidth={3} />
-              <line x1={branchEndX} y1={y} x2={lineEndX} y2={y} stroke={edgeColor} strokeWidth={3} />
-            </g>
-          );
-        })}
-      </svg>
-
-      {channelPositions.map(({ channel, offsetY, isHighlighted }) => (
-        <React.Fragment key={channel}>
-          <span
-            className="text-xs font-medium whitespace-nowrap absolute bg-slate-100"
-            style={{
-              left: labelStartX,
-              top: `calc(50% + ${offsetY}px)`,
-              transform: "translateY(-50%)",
-              color: "#8B9AAC",
-              lineHeight: `${handleSize}px`,
-              paddingLeft: 4,
-              paddingRight: 4,
-            }}
-          >
-            {channel}
-          </span>
-
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={channel}
-            style={{
-              ...HANDLE_STYLE,
-              left: handleLeftX,
-              top: `calc(50% + ${offsetY}px)`,
-              transform: "translateY(-50%)",
-              pointerEvents: isConnectionInteractive ? "auto" : "none",
-            }}
-            className={isHighlighted ? "highlighted" : undefined}
-          />
-        </React.Fragment>
-      ))}
-    </div>
+      />
+      <AppendHandleButton
+        label="Add next component"
+        onClick={() => onAppendFromNode(nodeId, channel)}
+        style={{
+          right: -87,
+          top: 6,
+          position: "absolute",
+        }}
+      />
+      <AppendHandlePreview
+        style={{
+          position: "absolute",
+          left: "calc(100% + 85px)",
+          top: 0,
+        }}
+        connectorTop={18}
+      />
+    </>
   );
 }
 
@@ -251,24 +219,31 @@ export function LeftHandle({
   nodeId,
   isConnectionInteractive = true,
 }: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
+  const allEdges = getBlockEdges(data);
+  const connectionStats = getNodeConnectionStats(allEdges, nodeId);
+
+  if (shouldHideInactiveLeftHandle(isConnectionInteractive, connectionStats)) {
+    return null;
+  }
+
   if (shouldHideLeftHandle(data)) return null;
 
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
   const isAlreadyConnected = isAlreadyConnectedToNode(
-    getBlockEdges(data),
+    allEdges,
     connectingFrom,
     connectingFrom?.nodeId,
     nodeId,
     connectingFrom?.handleId,
   );
-  const isHighlighted =
-    isConnectionInteractive &&
-    ((hoveredEdge && hoveredEdge.target === nodeId) ||
-      (connectingFrom &&
-        connectingFrom.nodeId !== nodeId &&
-        connectingFrom.handleType === "source" &&
-        !isAlreadyConnected));
+  const isHighlighted = getLeftHandleHighlight({
+    isConnectionInteractive,
+    hoveredEdge,
+    connectingFrom,
+    nodeId,
+    isAlreadyConnected,
+  });
 
   return (
     <Handle
@@ -289,13 +264,35 @@ export function RightHandle({
   data,
   nodeId,
   isConnectionInteractive = true,
-}: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
+  onAppendFromNode,
+}: Pick<BlockProps, "data" | "nodeId" | "onAppendFromNode"> & { isConnectionInteractive?: boolean }) {
+  const allEdges = getBlockEdges(data);
+  const { hasIncoming, hasOutgoing } = getNodeConnectionStats(allEdges, nodeId);
+  const isDisconnected = isDisconnectedNode({ hasIncoming, hasOutgoing });
+
+  if (!isConnectionInteractive && (!hasOutgoing || isDisconnected)) {
+    return null;
+  }
+
   if (shouldHideRightHandle(data)) return null;
 
   const channels = getOutputChannels(data);
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
-  const allEdges = getBlockEdges(data);
+
+  if (isConnectionInteractive && !hasOutgoing && channels.length === 1 && onAppendFromNode) {
+    return (
+      <EndNodeAppendConnector
+        nodeId={nodeId}
+        channel={channels[0]}
+        onAppendFromNode={onAppendFromNode}
+        hoveredEdge={hoveredEdge}
+        connectingFrom={connectingFrom}
+        allEdges={allEdges}
+        isConnectionInteractive={isConnectionInteractive}
+      />
+    );
+  }
 
   if (channels.length === 1) {
     return (
@@ -318,6 +315,7 @@ export function RightHandle({
       nodeId={nodeId}
       allEdges={allEdges}
       isConnectionInteractive={isConnectionInteractive}
+      onAppendFromNode={onAppendFromNode}
     />
   );
 }

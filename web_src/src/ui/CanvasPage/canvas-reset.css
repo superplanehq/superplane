@@ -110,6 +110,16 @@
   border-color: #A1AEC0 !important;
 }
 
+.sp-canvas .sp-append-source-preview {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.sp-canvas .sp-append-source-handle:hover + .sp-append-source-preview {
+  opacity: 1;
+}
+
 .sp-canvas .edge-label {
   opacity: 0;
   pointer-events: none;
