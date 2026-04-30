@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import debounce from "lodash.debounce";
 import { Trash2 } from "lucide-react";
+import { CopyButton } from "../CopyButton";
 import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
@@ -216,6 +217,8 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     [exitEditMode],
   );
 
+  const noteContent = noteId && isEditing ? noteDrafts.get(noteId) ?? annotationText : annotationText;
+
   // Shared text styling for both modes
   const textStyles = "text-sm leading-normal text-gray-800";
 
@@ -265,6 +268,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                     ))}
                   </div>
                 </div>
+                {noteContent && <CopyButton text={noteContent} />}
                 {onDelete && (
                   <button
                     type="button"
@@ -289,7 +293,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                 <textarea
                   ref={textareaRef}
                   data-note-id={noteId || undefined}
-                  defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
+                  defaultValue={noteContent}
                   onInput={(event) => {
                     const value = (event.target as HTMLTextAreaElement).value;
                     if (noteId) {
@@ -318,7 +322,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                   }}
                   onKeyDown={handleKeyDown}
                   className={cn(
-                    "nodrag h-full w-full resize-none bg-transparent outline-none",
+                    "nodrag nowheel h-full w-full resize-none bg-transparent outline-none overflow-x-auto overscroll-contain",
                     textStyles,
                     "placeholder:text-black/50",
                   )}
@@ -331,7 +335,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
               </>
             ) : (
               <div
-                className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
+                className={cn("nodrag nowheel h-full w-full overflow-auto overscroll-contain cursor-text text-left", textStyles)}
                 onDoubleClick={handleDoubleClick}
               >
                 {annotationText ? (
