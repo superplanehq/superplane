@@ -1999,6 +1999,22 @@ export function WorkflowPageV2() {
     [handleSidebarChange],
   );
 
+  const handleRunItemOpen = useCallback(
+    (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => {
+      const node = nodeId ? canvas?.spec?.nodes?.find((n) => n.id === nodeId) : undefined;
+      const { nodeRef } = node ? getNodeAnalyticsProps(node, availableIntegrations) : { nodeRef: undefined };
+      analytics.canvasRunItemOpen(nodeRef, executionStatus, organizationId ?? "");
+      if (errorMessage) {
+        analytics.canvasComponentError(nodeRef, errorMessage, organizationId ?? "");
+      }
+    },
+    [canvas, availableIntegrations, organizationId],
+  );
+
+  const handleLogView = useCallback(() => {
+    analytics.canvasLogView(organizationId ?? "");
+  }, [organizationId]);
+
   const buildLiveRunItemFromExecution = useCallback(
     (execution: CanvasesCanvasNodeExecution): LogRunItem => {
       return buildRunItemFromExecution({
@@ -2731,7 +2747,7 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const createIntegrationMutation = useCreateIntegration(organizationId ?? "");
+  const createIntegrationMutation = useCreateIntegration(organizationId ?? "", "node_configuration");
   const [integrationDialogName, setIntegrationDialogName] = useState<string | null>(null);
   const [justConnectedIntegrations, setJustConnectedIntegrations] = useState<Set<string>>(new Set());
 
@@ -5424,6 +5440,8 @@ export function WorkflowPageV2() {
           getHasMoreQueue={getHasMoreQueue}
           getLoadingMoreQueue={getLoadingMoreQueue}
           onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
+          onRunItemOpen={isViewingLiveVersion ? handleRunItemOpen : undefined}
+          onLogView={handleLogView}
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvasNodes}
