@@ -147,6 +147,35 @@ func Test__DeleteInstance__PollHandlesTransientErrors(t *testing.T) {
 	assert.Equal(t, DeleteInstanceMetadata{InstanceID: testInstanceID, PollErrors: 1}, metadata.Metadata)
 }
 
+func Test__DeleteInstance__PollDoesNotTreatNon404BodyAsTerminated(t *testing.T) {
+	component := &DeleteInstance{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			ociMockResponse(http.StatusInternalServerError, `{"message":"upstream mentioned 404"}`),
+		},
+	}
+	metadata := &contexts.MetadataContext{
+		Metadata: DeleteInstanceMetadata{InstanceID: testInstanceID},
+	}
+	requests := &contexts.RequestContext{}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.HandleHook(core.ActionHookContext{
+		Name:           "poll",
+		HTTP:           httpCtx,
+		Integration:    ociIntegrationContext(),
+		Metadata:       metadata,
+		Requests:       requests,
+		ExecutionState: executionState,
+		Logger:         ociLogger(),
+	})
+
+	require.NoError(t, err)
+	assert.False(t, executionState.Passed)
+	assert.Equal(t, "poll", requests.Action)
+	assert.Equal(t, DeleteInstanceMetadata{InstanceID: testInstanceID, PollErrors: 1}, metadata.Metadata)
+}
+
 func Test__DeleteInstance__PollStopsAfterMaxErrors(t *testing.T) {
 	component := &DeleteInstance{}
 	httpCtx := &contexts.HTTPContext{

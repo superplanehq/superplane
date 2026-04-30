@@ -37,6 +37,15 @@ type Client struct {
 	http        core.HTTPContext
 }
 
+type OCIAPIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *OCIAPIError) Error() string {
+	return fmt.Sprintf("OCI API returned %d: %s", e.StatusCode, e.Body)
+}
+
 func NewClient(httpCtx core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
 	tenancyOCID, err := integration.GetConfig("tenancyOcid")
 	if err != nil {
@@ -360,7 +369,10 @@ func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, er
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("OCI API returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, &OCIAPIError{
+			StatusCode: resp.StatusCode,
+			Body:       string(respBody),
+		}
 	}
 
 	return respBody, nil
