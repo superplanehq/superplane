@@ -373,7 +373,7 @@ type CanvasNodeRendererCallbacks = {
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
-  onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
+  onRun: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
@@ -387,9 +387,28 @@ type CanvasNodeRendererCallbacks = {
   canvasMode: "live" | "edit";
 };
 
-type CanvasBlockNodeData = CanvasBlockData & {
-  _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
-  nodeName?: string;
+type CanvasBlockNodeData = CanvasBlockData &
+  Record<string, unknown> & {
+    _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
+    nodeName?: string;
+  };
+
+type CanvasConnectionState = {
+  nodeId: string;
+  handleId: string | null;
+  handleType: "source" | "target" | null;
+};
+
+type EnrichedCanvasNodeCacheEntry = {
+  sourceNode: ReactFlowNode;
+  sourceData: ReactFlowNode["data"];
+  node: ReactFlowNode;
+  data: CanvasBlockNodeData;
+  hoveredEdge: CanvasEdge | null;
+  connectingFrom: CanvasConnectionState | null;
+  edges: CanvasEdge[];
+  isHighlighted: boolean;
+  hasHighlightedNodes: boolean;
 };
 
 declare global {
@@ -573,11 +592,24 @@ export class CanvasNodeErrorBoundary extends Component<CanvasNodeErrorBoundaryPr
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
  */
-const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
+type DefaultNodeRendererProps = {
   data: CanvasBlockNodeData;
   id: string;
   selected?: boolean;
-}) {
+};
+
+function areDefaultNodeRendererPropsEqual(
+  previousProps: DefaultNodeRendererProps,
+  nextProps: DefaultNodeRendererProps,
+): boolean {
+  return (
+    previousProps.id === nextProps.id &&
+    previousProps.selected === nextProps.selected &&
+    previousProps.data === nextProps.data
+  );
+}
+
+const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: DefaultNodeRendererProps) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
   const blockProps = buildDefaultNodeBlockProps({
@@ -592,7 +624,7 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
       <Block {...blockProps} data={blockData} />
     </CanvasNodeErrorBoundary>
   );
-});
+}, areDefaultNodeRendererPropsEqual);
 
 const nodeTypes = {
   default: DefaultNodeRenderer,
@@ -693,7 +725,18 @@ function CanvasPage(props: CanvasPageProps) {
         props.onEdit(nodeId);
       }
     },
-    [props, state.componentSidebar, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, setCurrentTab],
+    [
+      props.workflowNodes,
+      props.getNodeEditData,
+      props.onEdit,
+      state.componentSidebar.isOpen,
+      state.componentSidebar.selectedNodeId,
+      state.componentSidebar.open,
+      state.componentSidebar.close,
+      setTemplateNodeId,
+      setIsBuildingBlocksSidebarOpen,
+      setCurrentTab,
+    ],
   );
 
   // Get editing data for the currently selected node
@@ -711,7 +754,7 @@ function CanvasPage(props: CanvasPageProps) {
         props.onNodeDelete(nodeId);
       }
     },
-    [props],
+    [props.onNodeDelete],
   );
 
   const handleNodeRun = useCallback(
@@ -984,7 +1027,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
-      if (!editingNodeData || !props.onNodeConfigurationSave) {
+      if (!editingNodeData?.nodeId || !props.onNodeConfigurationSave) {
         return;
       }
       const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
@@ -993,7 +1036,7 @@ function CanvasPage(props: CanvasPageProps) {
       }
       return result;
     },
-    [editingNodeData, props, state.componentSidebar],
+    [editingNodeData?.nodeId, props.onNodeConfigurationSave, props.configurationSaveMode, state.componentSidebar.close],
   );
 
   const handleToggleView = useCallback(
@@ -2230,19 +2273,22 @@ function CanvasContent({
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const [connectingFrom, setConnectingFrom] = useState<{
-    nodeId: string;
-    handleId: string | null;
-    handleType: "source" | "target" | null;
-  } | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<CanvasConnectionState | null>(null);
 
   // Track connection completion for empty space drop detection
   const connectionCompletedRef = useRef(false);
-  const connectingFromRef = useRef<{
-    nodeId: string;
-    handleId: string | null;
-    handleType: "source" | "target" | null;
-  } | null>(null);
+  const connectingFromRef = useRef<CanvasConnectionState | null>(null);
+  const blockConnectingFrom = useMemo(
+    () =>
+      connectingFrom
+        ? {
+            nodeId: connectingFrom.nodeId,
+            handleId: connectingFrom.handleId,
+            handleType: connectingFrom.handleType ?? undefined,
+          }
+        : undefined,
+    [connectingFrom],
+  );
 
   const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: CanvasEdge) => {
     setHoveredEdgeId(edge.id);
@@ -2298,24 +2344,71 @@ function CanvasContent({
   // Find the hovered edge to get its source and target
   const hoveredEdge = useMemo(() => {
     if (!hoveredEdgeId) return null;
-    return state.edges?.find((e) => e.id === hoveredEdgeId);
+    return (state.edges?.find((e) => e.id === hoveredEdgeId) as CanvasEdge | undefined) ?? null;
   }, [hoveredEdgeId, state.edges]);
 
+  const enrichedNodeCacheRef = useRef<Map<string, EnrichedCanvasNodeCacheEntry>>(new Map());
   const nodesWithCallbacks = useMemo(() => {
     const hasHighlightedNodes = highlightedNodeIds.size > 0;
-    return state.nodes.map((node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        _callbacksRef: callbacksRef,
-        _hoveredEdge: hoveredEdge,
-        _connectingFrom: connectingFrom,
-        _allEdges: state.edges,
-        _isHighlighted: highlightedNodeIds.has(node.id),
-        _hasHighlightedNodes: hasHighlightedNodes,
-      },
-    }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
+    const visibleNodeIds = new Set<string>();
+    const enrichedNodes = state.nodes.map((node) => {
+      visibleNodeIds.add(node.id);
+
+      const isHighlighted = highlightedNodeIds.has(node.id);
+      const cachedNode = enrichedNodeCacheRef.current.get(node.id);
+      const canReuseData =
+        cachedNode &&
+        cachedNode.sourceData === node.data &&
+        cachedNode.hoveredEdge === hoveredEdge &&
+        cachedNode.connectingFrom === connectingFrom &&
+        cachedNode.edges === state.edges &&
+        cachedNode.isHighlighted === isHighlighted &&
+        cachedNode.hasHighlightedNodes === hasHighlightedNodes;
+
+      if (canReuseData && cachedNode.sourceNode === node) {
+        return cachedNode.node;
+      }
+
+      const sourceData = node.data as CanvasBlockNodeData;
+      const data = canReuseData
+        ? cachedNode.data
+        : {
+            ...sourceData,
+            _callbacksRef: callbacksRef,
+            _hoveredEdge: hoveredEdge ?? undefined,
+            _connectingFrom: blockConnectingFrom,
+            _allEdges: state.edges,
+            _isHighlighted: isHighlighted,
+            _hasHighlightedNodes: hasHighlightedNodes,
+          };
+      const enrichedNode: ReactFlowNode = {
+        ...node,
+        data: data as ReactFlowNode["data"],
+      };
+
+      enrichedNodeCacheRef.current.set(node.id, {
+        sourceNode: node,
+        sourceData: node.data,
+        node: enrichedNode,
+        data,
+        hoveredEdge,
+        connectingFrom,
+        edges: state.edges,
+        isHighlighted,
+        hasHighlightedNodes,
+      });
+
+      return enrichedNode;
+    });
+
+    for (const nodeId of enrichedNodeCacheRef.current.keys()) {
+      if (!visibleNodeIds.has(nodeId)) {
+        enrichedNodeCacheRef.current.delete(nodeId);
+      }
+    }
+
+    return enrichedNodes;
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -2449,6 +2542,7 @@ function CanvasContent({
             nodesDraggable={!isReadOnly}
             nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
+            onlyRenderVisibleElements={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
