@@ -354,6 +354,7 @@ const EDGE_STYLE = {
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
+const CANVAS_SNAP_GRID: [number, number] = [48, 48];
 
 type CanvasAnnotationUpdate = {
   text?: string;
@@ -1146,7 +1147,7 @@ function CanvasPage(props: CanvasPageProps) {
 
         <RightSideControls
           mode={readOnly ? "live" : "edit"}
-          onSidebarOpen={() => handleSidebarToggle(true)}
+          onSidebarOpen={handleBuildingBlocksShortcutOpen}
           onAddNote={handleAddNote}
           onMemoryOpen={props.onMemoryOpen}
           onYamlOpen={props.onYamlOpen}
@@ -2549,6 +2550,79 @@ function CanvasContent({
     setConsoleTab(tab);
     setIsLogSidebarOpen(true);
   }, []);
+  const handleSnapToGridToggle = useCallback(() => setIsSnapToGridEnabled((prev) => !prev), []);
+  const handleNodeSearch = useCallback((searchString: string) => {
+    const query = searchString.toLowerCase();
+    return stateRef.current.nodes.filter((node) => {
+      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
+      const label = (nodeData?.label || "").toLowerCase();
+      const nodeName = (nodeData?.nodeName || "").toLowerCase();
+      const id = (node.id || "").toLowerCase();
+      return label.includes(query) || nodeName.includes(query) || id.includes(query);
+    });
+  }, []);
+  const handleNodeSearchSelect = useCallback((node: ReactFlowNode) => {
+    const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
+    const isAnnotationNode = nodeData?.type === "annotation";
+    if (isAnnotationNode) {
+      return;
+    }
+    stateRef.current.componentSidebar.open(node.id);
+  }, []);
+  const autoLayoutToggleControl = useMemo(() => {
+    if (!isEditMode) {
+      return null;
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
+              onClick={handleToggleAutoLayoutOnUpdate}
+              disabled={isAutoLayoutToggleDisabled}
+              aria-pressed={isAutoLayoutOnUpdateEnabled}
+            >
+              {isAutoLayoutOnUpdateEnabled ? (
+                <LayoutGrid className="h-3 w-3" />
+              ) : (
+                <LayoutDashboard className="h-3 w-3" />
+              )}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
+      </Tooltip>
+    );
+  }, [
+    autoLayoutTooltipMessage,
+    handleToggleAutoLayoutOnUpdate,
+    isAutoLayoutOnUpdateEnabled,
+    isAutoLayoutToggleDisabled,
+    isEditMode,
+  ]);
+  const zoomSliderContent = useMemo(
+    () => (
+      <>
+        {autoLayoutToggleControl}
+        <NodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
+      </>
+    ),
+    [autoLayoutToggleControl, handleNodeSearch, handleNodeSearchSelect],
+  );
+  const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
+  const handleSelectionStart = useCallback(() => {
+    setIsSelecting(true);
+    const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
+    previouslySelectedRef.current = new Set(selected);
+  }, []);
+  const handleSelectionEnd = useCallback(() => {
+    setIsSelecting(false);
+    previouslySelectedRef.current = new Set();
+  }, []);
 
   return (
     <div className="h-full w-full relative">
@@ -2570,7 +2644,7 @@ function CanvasContent({
             selectionKeyCode={selectionKey}
             multiSelectionKeyCode={selectionKey}
             snapToGrid={isSnapToGridEnabled}
-            snapGrid={[48, 48]}
+            snapGrid={CANVAS_SNAP_GRID}
             panOnScrollSpeed={0.8}
             nodesDraggable={!isReadOnly}
             nodesConnectable={isConnectionEditingEnabled}
@@ -2587,20 +2661,13 @@ function CanvasContent({
             onInit={handleInit}
             deleteKeyCode={null}
             onPaneClick={handlePaneClick}
-            onSelectionStart={() => {
-              setIsSelecting(true);
-              const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
-              previouslySelectedRef.current = new Set(selected);
-            }}
-            onSelectionEnd={() => {
-              setIsSelecting(false);
-              previouslySelectedRef.current = new Set();
-            }}
+            onSelectionStart={handleSelectionStart}
+            onSelectionEnd={handleSelectionEnd}
             onEdgeMouseEnter={isEditMode ? handleEdgeMouseEnter : undefined}
             onEdgeMouseLeave={isEditMode ? handleEdgeMouseLeave : undefined}
             defaultViewport={viewport}
             fitView={false}
-            style={{ opacity: isInitialized ? 1 : 0 }}
+            style={reactFlowStyle}
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
@@ -2623,51 +2690,9 @@ function CanvasContent({
                   orientation="horizontal"
                   className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
-                  onSnapToGridToggle={isEditMode ? () => setIsSnapToGridEnabled((prev) => !prev) : undefined}
+                  onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                 >
-                  {isEditMode ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
-                            onClick={handleToggleAutoLayoutOnUpdate}
-                            disabled={isAutoLayoutToggleDisabled}
-                            aria-pressed={isAutoLayoutOnUpdateEnabled}
-                          >
-                            {isAutoLayoutOnUpdateEnabled ? (
-                              <LayoutGrid className="h-3 w-3" />
-                            ) : (
-                              <LayoutDashboard className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                  <NodeSearch
-                    onSearch={(searchString) => {
-                      const query = searchString.toLowerCase();
-                      return state.nodes.filter((node) => {
-                        const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-                        const label = (nodeData?.label || "").toLowerCase();
-                        const nodeName = (nodeData?.nodeName || "").toLowerCase();
-                        const id = (node.id || "").toLowerCase();
-                        return label.includes(query) || nodeName.includes(query) || id.includes(query);
-                      });
-                    }}
-                    onSelectNode={(node) => {
-                      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-                      const isAnnotationNode = nodeData?.type === "annotation";
-                      if (isAnnotationNode) {
-                        return;
-                      }
-                      state.componentSidebar.open(node.id);
-                    }}
-                  />
+                  {zoomSliderContent}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
