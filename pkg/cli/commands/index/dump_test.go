@@ -80,7 +80,22 @@ func TestDumpIntegrationContainsNestedFields(t *testing.T) {
 	raw, err := os.ReadFile(outFile)
 	require.NoError(t, err)
 
-	// Integration nested data (components, triggers, config) must be present.
+	// Integration nested data (capabilities, setup configuration) must round-trip.
+	var dump indexDump
+	require.NoError(t, json.Unmarshal(raw, &dump))
+	require.Len(t, dump.Integrations, 1)
+
+	integration := dump.Integrations[0]
+	require.NotEmpty(t, integration.GetConfiguration())
+	require.Equal(t, "token", integration.GetConfiguration()[0].GetName())
+
+	capNames := make([]string, 0, len(integration.GetCapabilities()))
+	for _, cap := range integration.GetCapabilities() {
+		capNames = append(capNames, cap.GetName())
+	}
+	require.Contains(t, capNames, "slack.post-message")
+	require.Contains(t, capNames, "slack.message-received")
+
 	rawStr := string(raw)
 	require.Contains(t, rawStr, "post-message")
 	require.Contains(t, rawStr, "message-received")
