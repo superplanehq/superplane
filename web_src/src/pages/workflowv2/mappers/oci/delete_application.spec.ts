@@ -71,16 +71,16 @@ describe("deleteApplicationMapper.props", () => {
     );
   });
 
-  it("falls back to applicationId from configuration when applicationName is absent", () => {
+  it("falls back to application from configuration when applicationName is absent", () => {
     const props = deleteApplicationMapper.props(
-      buildComponentCtx({ configuration: { applicationId: "ocid1.fnapp.xxx" }, metadata: {} }),
+      buildComponentCtx({ configuration: { application: "ocid1.fnapp.xxx" }, metadata: {} }),
     );
     expect(props.metadata).toEqual(
       expect.arrayContaining([expect.objectContaining({ icon: "trash-2", label: "ocid1.fnapp.xxx" })]),
     );
   });
 
-  it("produces empty metadata when both applicationName and applicationId are absent", () => {
+  it("produces empty metadata when both applicationName and application are absent", () => {
     const props = deleteApplicationMapper.props(buildComponentCtx());
     expect(props.metadata).toEqual([]);
   });

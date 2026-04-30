@@ -148,6 +148,10 @@ func (i *InvokeFunction) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if strings.TrimSpace(spec.Application) == "" {
+		return errors.New("application is required")
+	}
+
 	if strings.TrimSpace(spec.Function) == "" {
 		return errors.New("function is required")
 	}

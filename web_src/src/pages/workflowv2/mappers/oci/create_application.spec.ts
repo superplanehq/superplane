@@ -69,10 +69,10 @@ describe("createApplicationMapper.props", () => {
     expect(props.metadata).toEqual(expect.arrayContaining([expect.objectContaining({ icon: "tag", label: "my-app" })]));
   });
 
-  it("shows subnetName from node metadata over raw subnetIds", () => {
+  it("shows subnetName from node metadata over raw subnet", () => {
     const props = createApplicationMapper.props(
       buildComponentCtx({
-        configuration: { subnetIds: "ocid1.subnet.xxx" },
+        configuration: { subnet: "ocid1.subnet.xxx" },
         metadata: { subnetName: "my-subnet" },
       }),
     );
@@ -81,9 +81,9 @@ describe("createApplicationMapper.props", () => {
     );
   });
 
-  it("falls back to subnetIds when subnetName is absent", () => {
+  it("falls back to subnet when subnetName is absent", () => {
     const props = createApplicationMapper.props(
-      buildComponentCtx({ configuration: { subnetIds: "ocid1.subnet.xxx" }, metadata: {} }),
+      buildComponentCtx({ configuration: { subnet: "ocid1.subnet.xxx" }, metadata: {} }),
     );
     expect(props.metadata).toEqual(
       expect.arrayContaining([expect.objectContaining({ icon: "network", label: "ocid1.subnet.xxx" })]),

@@ -9,8 +9,8 @@ import type {
 import { baseMapper } from "./base";
 
 interface CreateFunctionConfiguration {
-  compartmentId?: string;
-  applicationId?: string;
+  compartment?: string;
+  application?: string;
   displayName?: string;
   imageRepository?: string;
   image?: string;
@@ -106,7 +106,7 @@ function createFunctionMetadataList(node: ComponentBaseContext["node"]): Metadat
     items.push({ icon: "tag", label: config.displayName });
   }
 
-  const appLabel = nodeMeta?.applicationName ?? config?.applicationId;
+  const appLabel = nodeMeta?.applicationName ?? config?.application;
   if (appLabel) {
     items.push({ icon: "layout-grid", label: appLabel });
   }

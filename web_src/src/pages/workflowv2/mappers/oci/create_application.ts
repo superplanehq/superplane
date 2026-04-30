@@ -9,10 +9,10 @@ import type {
 import { baseMapper } from "./base";
 
 interface CreateApplicationConfiguration {
-  compartmentId?: string;
+  compartment?: string;
   displayName?: string;
-  vcnId?: string;
-  subnetIds?: string;
+  vcn?: string;
+  subnet?: string;
   shape?: string;
 }
 
@@ -96,7 +96,7 @@ function createApplicationMetadataList(node: ComponentBaseContext["node"]): Meta
     items.push({ icon: "tag", label: config.displayName });
   }
 
-  const subnetLabel = nodeMeta?.subnetName ?? config?.subnetIds;
+  const subnetLabel = nodeMeta?.subnetName ?? config?.subnet;
   if (subnetLabel) {
     items.push({ icon: "network", label: subnetLabel });
   }

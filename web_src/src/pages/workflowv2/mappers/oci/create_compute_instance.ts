@@ -9,20 +9,20 @@ import type {
 import { baseMapper } from "./base";
 
 interface CreateComputeInstanceConfiguration {
-  compartmentId?: string;
+  compartment?: string;
   availabilityDomain?: string;
   displayName?: string;
   shape?: string;
   imageOs?: string;
-  imageId?: string;
-  subnetId?: string;
+  image?: string;
+  subnet?: string;
   sshPublicKey?: string;
   ocpus?: number;
   memoryInGBs?: number;
   bootVolumeSizeGB?: number;
   bootVolumeVpusPerGB?: string;
   attachBlockVolume?: boolean;
-  blockVolumeId?: string;
+  blockVolume?: string;
   enableShieldedInstance?: boolean;
   enableConfidentialComputing?: boolean;
 }

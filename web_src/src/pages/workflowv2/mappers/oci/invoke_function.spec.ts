@@ -64,10 +64,10 @@ function buildComponentCtx(nodeOverrides?: Partial<NodeInfo>): ComponentBaseCont
 // ── props / metadata list ──────────────────────────────────────────────
 
 describe("invokeFunctionMapper.props", () => {
-  it("shows applicationName from node metadata over raw applicationId", () => {
+  it("shows applicationName from node metadata over raw application", () => {
     const props = invokeFunctionMapper.props(
       buildComponentCtx({
-        configuration: { applicationId: "ocid1.fnapp.xxx" },
+        configuration: { application: "ocid1.fnapp.xxx" },
         metadata: { applicationName: "my-app" },
       }),
     );
@@ -76,28 +76,28 @@ describe("invokeFunctionMapper.props", () => {
     );
   });
 
-  it("falls back to applicationId when applicationName is absent", () => {
+  it("falls back to application when applicationName is absent", () => {
     const props = invokeFunctionMapper.props(
-      buildComponentCtx({ configuration: { applicationId: "ocid1.fnapp.xxx" }, metadata: {} }),
+      buildComponentCtx({ configuration: { application: "ocid1.fnapp.xxx" }, metadata: {} }),
     );
     expect(props.metadata).toEqual(
       expect.arrayContaining([expect.objectContaining({ icon: "layout-grid", label: "ocid1.fnapp.xxx" })]),
     );
   });
 
-  it("shows functionName from node metadata over raw functionId", () => {
+  it("shows functionName from node metadata over raw function", () => {
     const props = invokeFunctionMapper.props(
       buildComponentCtx({
-        configuration: { functionId: "ocid1.fnfunc.xxx" },
+        configuration: { function: "ocid1.fnfunc.xxx" },
         metadata: { functionName: "my-fn" },
       }),
     );
     expect(props.metadata).toEqual(expect.arrayContaining([expect.objectContaining({ icon: "zap", label: "my-fn" })]));
   });
 
-  it("falls back to functionId when functionName is absent", () => {
+  it("falls back to function when functionName is absent", () => {
     const props = invokeFunctionMapper.props(
-      buildComponentCtx({ configuration: { functionId: "ocid1.fnfunc.xxx" }, metadata: {} }),
+      buildComponentCtx({ configuration: { function: "ocid1.fnfunc.xxx" }, metadata: {} }),
     );
     expect(props.metadata).toEqual(
       expect.arrayContaining([expect.objectContaining({ icon: "zap", label: "ocid1.fnfunc.xxx" })]),

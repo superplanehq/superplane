@@ -9,9 +9,9 @@ import type {
 import { baseMapper } from "./base";
 
 interface InvokeFunctionConfiguration {
-  compartmentId?: string;
-  applicationId?: string;
-  functionId?: string;
+  compartment?: string;
+  application?: string;
+  function?: string;
   payload?: string;
 }
 
@@ -90,12 +90,12 @@ function invokeFunctionMetadataList(node: ComponentBaseContext["node"]): Metadat
   const nodeMeta = node.metadata as InvokeFunctionNodeMetadata | undefined;
   const items: MetadataItem[] = [];
 
-  const appLabel = nodeMeta?.applicationName ?? config?.applicationId;
+  const appLabel = nodeMeta?.applicationName ?? config?.application;
   if (appLabel) {
     items.push({ icon: "layout-grid", label: appLabel });
   }
 
-  const fnLabel = nodeMeta?.functionName ?? config?.functionId;
+  const fnLabel = nodeMeta?.functionName ?? config?.function;
   if (fnLabel) {
     items.push({ icon: "zap", label: fnLabel });
   }

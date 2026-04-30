@@ -76,12 +76,12 @@ interface DeleteApplicationNodeMetadata {
 function deleteApplicationMetadataList(context: ComponentBaseContext): MetadataItem[] {
   const items: MetadataItem[] = [];
   const nodeMetadata = context.node.metadata as DeleteApplicationNodeMetadata | undefined;
-  const configuration = context.node.configuration as { applicationId?: string } | undefined;
+  const configuration = context.node.configuration as { application?: string } | undefined;
 
   if (nodeMetadata?.applicationName) {
     items.push({ icon: "trash-2", label: nodeMetadata.applicationName });
-  } else if (configuration?.applicationId) {
-    items.push({ icon: "trash-2", label: configuration.applicationId });
+  } else if (configuration?.application) {
+    items.push({ icon: "trash-2", label: configuration.application });
   }
 
   return items;

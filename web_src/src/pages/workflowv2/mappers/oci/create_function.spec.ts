@@ -69,10 +69,10 @@ describe("createFunctionMapper.props", () => {
     expect(props.metadata).toEqual(expect.arrayContaining([expect.objectContaining({ icon: "tag", label: "my-fn" })]));
   });
 
-  it("shows applicationName from node metadata over raw applicationId", () => {
+  it("shows applicationName from node metadata over raw application", () => {
     const props = createFunctionMapper.props(
       buildComponentCtx({
-        configuration: { applicationId: "ocid1.fnapp.xxx" },
+        configuration: { application: "ocid1.fnapp.xxx" },
         metadata: { applicationName: "my-app" },
       }),
     );
@@ -81,9 +81,9 @@ describe("createFunctionMapper.props", () => {
     );
   });
 
-  it("falls back to applicationId when applicationName is absent", () => {
+  it("falls back to application when applicationName is absent", () => {
     const props = createFunctionMapper.props(
-      buildComponentCtx({ configuration: { applicationId: "ocid1.fnapp.xxx" }, metadata: {} }),
+      buildComponentCtx({ configuration: { application: "ocid1.fnapp.xxx" }, metadata: {} }),
     );
     expect(props.metadata).toEqual(
       expect.arrayContaining([expect.objectContaining({ icon: "layout-grid", label: "ocid1.fnapp.xxx" })]),
