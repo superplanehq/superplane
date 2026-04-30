@@ -26,13 +26,13 @@ const (
 type CreateComputeInstance struct{}
 
 type CreateComputeInstanceSpec struct {
-	CompartmentID               string   `json:"compartmentId" mapstructure:"compartmentId"`
+	Compartment                 string   `json:"compartment" mapstructure:"compartment"`
 	AvailabilityDomain          string   `json:"availabilityDomain" mapstructure:"availabilityDomain"`
 	DisplayName                 string   `json:"displayName" mapstructure:"displayName"`
 	ImageOs                     string   `json:"imageOs" mapstructure:"imageOs"`
 	Shape                       string   `json:"shape" mapstructure:"shape"`
-	ImageID                     string   `json:"imageId" mapstructure:"imageId"`
-	SubnetID                    string   `json:"subnetId" mapstructure:"subnetId"`
+	Image                       string   `json:"image" mapstructure:"image"`
+	Subnet                      string   `json:"subnet" mapstructure:"subnet"`
 	SSHPublicKey                string   `json:"sshPublicKey" mapstructure:"sshPublicKey"`
 	OCPUs                       *float64 `json:"ocpus" mapstructure:"ocpus"`
 	MemoryInGBs                 *float64 `json:"memoryInGBs" mapstructure:"memoryInGBs"`
@@ -41,7 +41,7 @@ type CreateComputeInstanceSpec struct {
 	BootVolumeSizeGB            *float64 `json:"bootVolumeSizeGB" mapstructure:"bootVolumeSizeGB"`
 	BootVolumeVpusPerGB         *float64 `json:"bootVolumeVpusPerGB" mapstructure:"bootVolumeVpusPerGB"`
 	AttachBlockVolume           bool     `json:"attachBlockVolume" mapstructure:"attachBlockVolume"`
-	BlockVolumeID               string   `json:"blockVolumeId" mapstructure:"blockVolumeId"`
+	BlockVolumeID               string   `json:"blockVolume" mapstructure:"blockVolume"`
 }
 
 type CreateInstanceExecutionMetadata struct {
@@ -121,7 +121,7 @@ func (c *CreateComputeInstance) ExampleOutput() map[string]any {
 func (c *CreateComputeInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -145,7 +145,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -173,7 +173,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -227,7 +227,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "imageId",
+			Name:        "image",
 			Label:       "Image",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -239,7 +239,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 						{
@@ -253,7 +253,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "subnetId",
+			Name:        "subnet",
 			Label:       "Subnet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -265,7 +265,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -322,7 +322,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 			Description: "Attach an existing block volume to the instance after launch",
 		},
 		{
-			Name:        "blockVolumeId",
+			Name:        "blockVolume",
 			Label:       "Block Volume",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -340,7 +340,7 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -374,8 +374,8 @@ func (c *CreateComputeInstance) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(spec.CompartmentID) == "" {
-		return errors.New("compartmentId is required")
+	if strings.TrimSpace(spec.Compartment) == "" {
+		return errors.New("compartment is required")
 	}
 	if strings.TrimSpace(spec.AvailabilityDomain) == "" {
 		return errors.New("availabilityDomain is required")
@@ -383,11 +383,11 @@ func (c *CreateComputeInstance) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(spec.Shape) == "" {
 		return errors.New("shape is required")
 	}
-	if strings.TrimSpace(spec.ImageID) == "" {
-		return errors.New("imageId is required")
+	if strings.TrimSpace(spec.Image) == "" {
+		return errors.New("image is required")
 	}
-	if strings.TrimSpace(spec.SubnetID) == "" {
-		return errors.New("subnetId is required")
+	if strings.TrimSpace(spec.Subnet) == "" {
+		return errors.New("subnet is required")
 	}
 	if strings.TrimSpace(spec.ImageOs) == "" {
 		return errors.New("imageOs is required")
@@ -408,18 +408,18 @@ func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := LaunchInstanceRequest{
-		CompartmentID:      spec.CompartmentID,
+		CompartmentID:      spec.Compartment,
 		AvailabilityDomain: spec.AvailabilityDomain,
 		DisplayName:        spec.DisplayName,
 		Shape:              spec.Shape,
 		SourceDetails: InstanceSourceDetails{
 			SourceType:          "image",
-			ImageID:             spec.ImageID,
+			ImageID:             spec.Image,
 			BootVolumeSizeInGBs: spec.BootVolumeSizeGB,
 			BootVolumeVpusPerGB: spec.BootVolumeVpusPerGB,
 		},
 		CreateVnicDetails: &CreateVnicDetails{
-			SubnetID: spec.SubnetID,
+			SubnetID: spec.Subnet,
 		},
 	}
 
@@ -457,7 +457,7 @@ func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
 
 	if err := ctx.Metadata.Set(CreateInstanceExecutionMetadata{
 		InstanceID:    instance.ID,
-		CompartmentID: spec.CompartmentID,
+		CompartmentID: spec.Compartment,
 		BlockVolumeID: spec.BlockVolumeID,
 		StartedAt:     time.Now().UTC().Format(time.RFC3339),
 	}); err != nil {
