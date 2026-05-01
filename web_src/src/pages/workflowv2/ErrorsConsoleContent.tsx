@@ -118,7 +118,7 @@ function ErrorItemRow({
           <span>{label}</span>
         </div>
         {item.execution.resultMessage && (
-          <span className="text-xs text-red-600 truncate max-w-[300px]">{item.execution.resultMessage}</span>
+          <span className="text-xs text-red-600 break-words min-w-0">{item.execution.resultMessage}</span>
         )}
       </div>
       {onAcknowledgeErrors && item.execution.id && (

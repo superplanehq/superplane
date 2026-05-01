@@ -53,7 +53,7 @@ export function ExecutionRow({
         <span className="text-xs text-gray-700 truncate">{nodeName}</span>
         {duration && <span className="text-xs text-gray-500 tabular-nums">{duration}</span>}
       </div>
-      {errorMessage && <span className="text-xs text-red-600 truncate max-w-[300px]">{errorMessage}</span>}
+      {errorMessage && <span className="text-xs text-red-600 break-words min-w-0">{errorMessage}</span>}
       {execution.createdAt && (
         <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
           <TimeAgo date={execution.createdAt} />
