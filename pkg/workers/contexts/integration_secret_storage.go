@@ -34,9 +34,9 @@ func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integr
 }
 
 func (s *IntegrationSecretStorage) findSecret(name string) (*models.IntegrationSecret, error) {
-	for _, secret := range s.secrets {
-		if secret.Name == name {
-			return &secret, nil
+	for i := range s.secrets {
+		if s.secrets[i].Name == name {
+			return &s.secrets[i], nil
 		}
 	}
 
