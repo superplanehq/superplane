@@ -41,9 +41,13 @@ func UpdateIntegrationProperty(
 		return nil, err
 	}
 
-	_, err = findProperty(integration, propertyName)
+	property, err := findProperty(integration, propertyName)
 	if err != nil {
 		return nil, err
+	}
+
+	if !property.Editable {
+		return nil, status.Errorf(codes.InvalidArgument, "property %s is not editable", propertyName)
 	}
 
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)

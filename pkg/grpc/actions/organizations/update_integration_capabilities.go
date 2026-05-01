@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -33,7 +34,12 @@ func UpdateIntegrationCapabilities(ctx context.Context, registry *registry.Regis
 
 	integration, err := models.FindIntegration(org, id)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "integration not found")
+		}
+
+		log.WithError(err).Error("failed to find integration")
+		return nil, status.Error(codes.Internal, "failed to find integration")
 	}
 
 	changes := findChanges(integration.Capabilities, capabilities)

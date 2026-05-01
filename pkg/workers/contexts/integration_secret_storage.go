@@ -63,7 +63,12 @@ func (s *IntegrationSecretStorage) Get(name string) (string, error) {
 }
 
 func (s *IntegrationSecretStorage) Delete(name string) error {
-	err := s.tx.
+	_, err := s.findSecret(name)
+	if err != nil {
+		return err
+	}
+
+	err = s.tx.
 		Where("installation_id = ? AND name = ?", s.integration.ID, name).
 		Delete(&models.IntegrationSecret{}).
 		Error

@@ -18,7 +18,13 @@ import (
 func Test__UpdateIntegrationSecret(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registerDevelopmentSetupFlowIntegration(t, r, impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
+
+	//
+	// Register dummy integration and setup provider
+	//
+	r.Registry.AppEnv = "development"
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 		CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},
 		FirstStep: func(_ core.SetupStepContext) core.SetupStep {
 			return core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_one"}
@@ -26,15 +32,16 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 		OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
 			switch ctx.Step {
 			case "step_one":
-				next := core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}
-				return &next, nil
+				return &core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}, nil
+
 			case "step_two":
 				return nil, nil
+
 			default:
 				return nil, nil
 			}
 		},
-	}))
+	})
 
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
 		_, err := UpdateIntegrationSecret(ctx, r.Registry, "not-a-uuid", uuid.NewString(), "token", "x")
@@ -45,8 +52,21 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 	})
 
 	t.Run("secret not found -> not found", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
-		_, err := UpdateIntegrationSecret(ctx, r.Registry, r.Organization.ID.String(), idStr, "missing_secret", "v")
+		resp, err := CreateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			"http://localhost",
+			"http://localhost",
+			r.Organization.ID.String(),
+			"dummy",
+			support.RandomName("installation"),
+			nil,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, resp.Integration)
+
+		_, err = UpdateIntegrationSecret(ctx, r.Registry, r.Organization.ID.String(), resp.Integration.Metadata.Id, "missing_secret", "v")
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -54,11 +74,24 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 	})
 
 	t.Run("existing secret -> success", func(t *testing.T) {
-		idStr := createSetupFlowIntegration(ctx, t, r, support.RandomName("installation"))
-		integrationID := uuid.MustParse(idStr)
+		resp, err := CreateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			"http://localhost",
+			"http://localhost",
+			r.Organization.ID.String(),
+			"dummy",
+			support.RandomName("installation"),
+			nil,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, resp.Integration)
+
+		integrationID := uuid.MustParse(resp.Integration.Metadata.Id)
 		seedIntegrationSecret(t, r, integrationID, "api_token", "secret-value")
 
-		resp, err := UpdateIntegrationSecret(ctx, r.Registry, r.Organization.ID.String(), idStr, "api_token", "new-secret")
+		_, err = UpdateIntegrationSecret(ctx, r.Registry, r.Organization.ID.String(), resp.Integration.Metadata.Id, "api_token", "new-secret")
 		require.NoError(t, err)
 		require.NotNil(t, resp.Integration)
 	})
