@@ -56,17 +56,12 @@ func UpdateIntegrationProperty(
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		secretStorage, err := contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration)
-		if err != nil {
-			return err
-		}
-
 		setupStep, err := setupProvider.OnPropertyUpdate(core.PropertyUpdateContext{
 			PropertyName: propertyName,
 			Value:        value,
 			Logger:       logrus.WithField("integration_id", integration.ID),
 			HTTP:         registry.HTTPContext(),
-			Secrets:      secretStorage,
+			Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Properties:   contexts.NewIntegrationPropertyStorage(integration),
 			Capabilities: contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities),
 		})

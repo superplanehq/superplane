@@ -161,7 +161,7 @@ func Test__GitLab__Sync(t *testing.T) {
 				"clientId":     "id",
 				"clientSecret": "secret",
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				OAuthAccessToken:  {Name: OAuthAccessToken, Value: []byte("access-token")},
 				OAuthRefreshToken: {Name: OAuthRefreshToken, Value: []byte("refresh-token")},
 			},
@@ -204,7 +204,7 @@ func Test__GitLab__Sync(t *testing.T) {
 				"clientId":     "id",
 				"clientSecret": "secret",
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("existing-access-token")},
 			},
 		}
@@ -274,7 +274,7 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 				"baseUrl":      "https://gitlab.com",
 				"authType":     AuthTypeAppOAuth,
 			},
-			Secrets: make(map[string]core.IntegrationSecret),
+			CurrentSecrets: make(map[string]core.IntegrationSecret),
 		}
 
 		recorder := httptest.NewRecorder()
@@ -342,7 +342,7 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 					"clientSecret": "secret",
 					"baseUrl":      "https://gitlab.com",
 				},
-				Secrets: make(map[string]core.IntegrationSecret),
+				CurrentSecrets: make(map[string]core.IntegrationSecret),
 			}
 
 			mockHTTP := &contexts.HTTPContext{

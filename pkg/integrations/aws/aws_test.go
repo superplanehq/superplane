@@ -74,7 +74,6 @@ func Test__AWS__Sync(t *testing.T) {
 				"region":                 "us-east-1",
 				"sessionDurationSeconds": 3600,
 			},
-			Secrets:       map[string]core.IntegrationSecret{},
 			BrowserAction: &core.BrowserAction{},
 		}
 
@@ -91,12 +90,15 @@ func Test__AWS__Sync(t *testing.T) {
 		assert.Equal(t, "ready", integrationCtx.State)
 		assert.Nil(t, integrationCtx.BrowserAction)
 
-		require.Contains(t, integrationCtx.Secrets, "accessKeyId")
-		require.Contains(t, integrationCtx.Secrets, "secretAccessKey")
-		require.Contains(t, integrationCtx.Secrets, "sessionToken")
-		assert.Equal(t, []byte("AKIA_TEST"), integrationCtx.Secrets["accessKeyId"].Value)
-		assert.Equal(t, []byte("secret"), integrationCtx.Secrets["secretAccessKey"].Value)
-		assert.Equal(t, []byte("token"), integrationCtx.Secrets["sessionToken"].Value)
+		secret, err := integrationCtx.Secrets().Get("accessKeyId")
+		require.NoError(t, err)
+		assert.Equal(t, "AKIA_TEST", secret)
+		secret, err = integrationCtx.Secrets().Get("secretAccessKey")
+		require.NoError(t, err)
+		assert.Equal(t, "secret", secret)
+		secret, err = integrationCtx.Secrets().Get("sessionToken")
+		require.NoError(t, err)
+		assert.Equal(t, "token", secret)
 
 		metadata, ok := integrationCtx.Metadata.(common.IntegrationMetadata)
 		require.True(t, ok)
@@ -142,7 +144,7 @@ func Test__AWS__Sync(t *testing.T) {
 				"region":                 "us-east-1",
 				"sessionDurationSeconds": 3600,
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("AKIA_TEST")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token1")},
@@ -194,12 +196,15 @@ func Test__AWS__Sync(t *testing.T) {
 		//
 		// Session token is refreshed.
 		//
-		require.Contains(t, integrationCtx.Secrets, "accessKeyId")
-		require.Contains(t, integrationCtx.Secrets, "secretAccessKey")
-		require.Contains(t, integrationCtx.Secrets, "sessionToken")
-		assert.Equal(t, []byte("AKIA_TEST"), integrationCtx.Secrets["accessKeyId"].Value)
-		assert.Equal(t, []byte("secret"), integrationCtx.Secrets["secretAccessKey"].Value)
-		assert.Equal(t, []byte("token2"), integrationCtx.Secrets["sessionToken"].Value)
+		secret, err := integrationCtx.Secrets().Get("accessKeyId")
+		require.NoError(t, err)
+		assert.Equal(t, "AKIA_TEST", secret)
+		secret, err = integrationCtx.Secrets().Get("secretAccessKey")
+		require.NoError(t, err)
+		assert.Equal(t, "secret", secret)
+		secret, err = integrationCtx.Secrets().Get("sessionToken")
+		require.NoError(t, err)
+		assert.Equal(t, "token2", secret)
 
 		metadata, ok := integrationCtx.Metadata.(common.IntegrationMetadata)
 		require.True(t, ok)
@@ -226,10 +231,8 @@ func Test__AWS__ListResources(t *testing.T) {
 
 	t.Run("lambda.function without credentials returns error", func(t *testing.T) {
 		_, err := a.ListResources("lambda.function", core.ListResourcesContext{
-			Logger: logrus.NewEntry(logrus.New()),
-			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{},
-			},
+			Logger:      logrus.NewEntry(logrus.New()),
+			Integration: &contexts.IntegrationContext{},
 		})
 
 		require.ErrorContains(t, err, "AWS session credentials are missing")
@@ -237,7 +240,7 @@ func Test__AWS__ListResources(t *testing.T) {
 
 	t.Run("lambda.function without region returns error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -272,7 +275,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -317,7 +320,7 @@ func Test__AWS__ListResources(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -358,7 +361,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -399,7 +402,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -443,7 +446,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -471,7 +474,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		_, err := a.ListResources("ec2.image", core.ListResourcesContext{
 			Integration: &contexts.IntegrationContext{
 				Metadata: common.IntegrationMetadata{},
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -512,7 +515,7 @@ func Test__AWS__ListResources(t *testing.T) {
 					AccountID: "123456789012",
 				},
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -562,7 +565,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

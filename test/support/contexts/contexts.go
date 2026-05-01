@@ -91,7 +91,7 @@ type IntegrationContext struct {
 	State            string
 	StateDescription string
 	BrowserAction    *core.BrowserAction
-	Secrets          map[string]core.IntegrationSecret
+	CurrentSecrets   map[string]core.IntegrationSecret
 	WebhookRequests  []any
 	ResyncRequests   []time.Duration
 	ActionRequests   []ActionRequest
@@ -114,7 +114,8 @@ func (c *IntegrationContext) ID() uuid.UUID {
 		return uuid.MustParse(c.IntegrationID)
 	}
 
-	return uuid.New()
+	c.IntegrationID = uuid.New().String()
+	return uuid.MustParse(c.IntegrationID)
 }
 
 func (c *IntegrationContext) GetMetadata() any {
@@ -166,16 +167,16 @@ func (c *IntegrationContext) RemoveBrowserAction() {
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {
-	if c.Secrets == nil {
-		c.Secrets = make(map[string]core.IntegrationSecret)
+	if c.CurrentSecrets == nil {
+		c.CurrentSecrets = make(map[string]core.IntegrationSecret)
 	}
-	c.Secrets[name] = core.IntegrationSecret{Name: name, Value: value}
+	c.CurrentSecrets[name] = core.IntegrationSecret{Name: name, Value: value}
 	return nil
 }
 
 func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
-	secrets := make([]core.IntegrationSecret, 0, len(c.Secrets))
-	for _, secret := range c.Secrets {
+	secrets := make([]core.IntegrationSecret, 0, len(c.CurrentSecrets))
+	for _, secret := range c.CurrentSecrets {
 		secrets = append(secrets, secret)
 	}
 	return secrets, nil
@@ -212,6 +213,18 @@ func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 	s := Subscription{ID: uuid.New(), Configuration: subscription}
 	c.Subscriptions = append(c.Subscriptions, s)
 	return &s.ID, nil
+}
+
+func (c *IntegrationContext) LegacySetup() bool {
+	return false
+}
+
+func (c *IntegrationContext) Properties() core.IntegrationPropertyStorage {
+	return nil
+}
+
+func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
+	return &IntegrationSecretStorage{parentContext: c}
 }
 
 type SubscriptionContext struct {
@@ -416,5 +429,51 @@ func (c *NotificationContext) IsAvailable() bool {
 
 func (c *NotificationContext) Send(title, body, url, urlLabel string, receivers core.NotificationReceivers) error {
 	c.Messages = append(c.Messages, Notification{Title: title, Body: body, URL: url, URLLabel: urlLabel, Receivers: receivers})
+	return nil
+}
+
+type IntegrationSecretStorage struct {
+	parentContext *IntegrationContext
+}
+
+func (s *IntegrationSecretStorage) Get(name string) (string, error) {
+	v, ok := s.parentContext.CurrentSecrets[name]
+	if !ok {
+		return "", fmt.Errorf("secret not found: %s", name)
+	}
+
+	return string(v.Value), nil
+}
+
+func (s *IntegrationSecretStorage) Delete(name string) error {
+	delete(s.parentContext.CurrentSecrets, name)
+	return nil
+}
+
+func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) error {
+	if len(s.parentContext.CurrentSecrets) == 0 {
+		s.parentContext.CurrentSecrets = make(map[string]core.IntegrationSecret)
+	}
+
+	s.parentContext.CurrentSecrets[def.Name] = core.IntegrationSecret{Name: def.Name, Value: []byte(def.Value)}
+	return nil
+}
+
+func (s *IntegrationSecretStorage) CreateMany(defs []core.IntegrationSecretDefinition) error {
+	for _, def := range defs {
+		err := s.Create(def)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *IntegrationSecretStorage) Update(name string, value string) error {
+	if len(s.parentContext.CurrentSecrets) == 0 {
+		s.parentContext.CurrentSecrets = make(map[string]core.IntegrationSecret)
+	}
+
+	s.parentContext.CurrentSecrets[name] = core.IntegrationSecret{Name: name, Value: []byte(value)}
 	return nil
 }
