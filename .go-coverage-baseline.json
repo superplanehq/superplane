@@ -1,10 +1,10 @@
 {
-  "minTotalCoverage": 43.6,
+  "minTotalCoverage": 44.5,
   "minCoverageByPackage": {
     "pkg/authentication": 6.3,
     "pkg/authorization": 52.4,
     "pkg/cli": 27.8,
-    "pkg/cli/commands/canvases": 34.7,
+    "pkg/cli/commands/canvases": 35.9,
     "pkg/cli/commands/canvases/models": 100,
     "pkg/cli/commands/events": 39.1,
     "pkg/cli/commands/executions": 0,
@@ -15,7 +15,7 @@
     "pkg/cli/commands/organizations": 0,
     "pkg/cli/commands/queue": 0,
     "pkg/cli/commands/roles": 66.5,
-    "pkg/cli/commands/secrets": 5.6,
+    "pkg/cli/commands/secrets": 9.5,
     "pkg/cli/commands/usage": 81.4,
     "pkg/cli/core": 46.1,
     "pkg/config": 0,
@@ -31,11 +31,11 @@
     "pkg/grpc/actions/blueprints": 0,
     "pkg/grpc/actions/canvases": 62.1,
     "pkg/grpc/actions/canvases/changesets": 84.7,
-    "pkg/grpc/actions/canvases/layout": 63.4,
+    "pkg/grpc/actions/canvases/layout": 63.1,
     "pkg/grpc/actions/integrations": 0,
     "pkg/grpc/actions/me": 54.2,
     "pkg/grpc/actions/messages": 0,
-    "pkg/grpc/actions/organizations": 64.3,
+    "pkg/grpc/actions/organizations": 67.1,
     "pkg/grpc/actions/secrets": 42.6,
     "pkg/grpc/actions/serviceaccounts": 0,
     "pkg/grpc/actions/triggers": 84.6,
@@ -44,7 +44,7 @@
     "pkg/jwt": 55.3,
     "pkg/lint/examplepayloads": 84.6,
     "pkg/logging": 0,
-    "pkg/models": 9.9,
+    "pkg/models": 9.8,
     "pkg/networkpolicy": 82.1,
     "pkg/oidc": 70.4,
     "pkg/public": 51.9,
@@ -62,7 +62,7 @@
     "pkg/web": 82.1,
     "pkg/widgets/annotation": 0,
     "pkg/workers": 41,
-    "pkg/workers/contexts": 41.8,
+    "pkg/workers/contexts": 46.7,
     "pkg/workers/eventdistributer": 0
   },
   "ignoredPackagePrefixes": [
@@ -73,5 +73,5 @@
     "pkg/triggers",
     "pkg/web/assets"
   ],
-  "updatedAt": "2026-04-30T19:38:52Z"
+  "updatedAt": "2026-05-01T21:00:58Z"
 }
