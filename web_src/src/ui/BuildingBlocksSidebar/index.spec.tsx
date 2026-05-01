@@ -117,4 +117,24 @@ describe("BuildingBlocksSidebar", () => {
       expect(onEnterSubmit).not.toHaveBeenCalled();
     });
   });
+
+  it("opens integrations modal and triggers connection flow", () => {
+    const onConnectIntegration = vi.fn();
+    render(
+      <BuildingBlocksSidebar
+        {...defaultProps}
+        onConnectIntegration={onConnectIntegration}
+        availableIntegrations={[
+          { name: "github", label: "GitHub" },
+          { name: "slack", label: "Slack" },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "+ Integrations" }));
+    expect(screen.getByText("Connect Integrations")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "GitHub" }));
+    expect(onConnectIntegration).toHaveBeenCalledWith("github");
+  });
 });
