@@ -347,7 +347,6 @@ export function IntegrationSetupPage({ organizationId }: IntegrationSetupPagePro
         integrationName,
         name: trimmedName,
         capabilities: Array.from(selectedCapabilities),
-        newSetup: true,
       });
       const integration = response.data?.integration || null;
       setCreatedIntegration(integration);

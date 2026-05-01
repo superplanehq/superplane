@@ -24,7 +24,6 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { getIntegrationV2SetupPath, integrationSupportsGuidedSetup } from "@/lib/integrationV2";
-import { IntegrationSetupFlowChoiceDialog } from "@/ui/IntegrationSetupFlowChoiceDialog";
 import { analytics } from "@/lib/analytics";
 
 interface IntegrationsProps {
@@ -39,8 +38,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const [integrationName, setIntegrationName] = useState("");
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [integrationPendingFlowChoice, setIntegrationPendingFlowChoice] =
-    useState<IntegrationsIntegrationDefinition | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
@@ -164,7 +161,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     if (!canCreateIntegrations) return;
 
     if (integrationSupportsGuidedSetup(integration)) {
-      setIntegrationPendingFlowChoice(integration);
+      if (!integration.name) return;
+      analytics.integrationConnectStart(integration.name, "integrations_page", organizationId);
+      navigate(getIntegrationV2SetupPath(organizationId, integration.name));
       return;
     }
 
@@ -174,23 +173,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     setIsModalOpen(true);
   };
 
-  const handleChooseGuidedSetupFromChoiceModal = () => {
-    const integration = integrationPendingFlowChoice;
-    if (!integration?.name) return;
-    setIntegrationPendingFlowChoice(null);
-    navigate(getIntegrationV2SetupPath(organizationId, integration.name));
-  };
-
-  const handleChooseClassicSetupFromChoiceModal = () => {
-    const integration = integrationPendingFlowChoice;
-    if (!integration) return;
-    setIntegrationPendingFlowChoice(null);
-    setSelectedIntegration(integration);
-    setIntegrationName(getNextIntegrationName(integration.name));
-    setConfiguration({});
-    setIsModalOpen(true);
-    analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
-  };
   const handleConnect = async () => {
     if (!canCreateIntegrations) return;
     if (!selectedIntegration?.name) return;
@@ -504,16 +486,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             </div>
           );
         })()}
-
-      <IntegrationSetupFlowChoiceDialog
-        open={integrationPendingFlowChoice !== null}
-        onOpenChange={(open) => {
-          if (!open) setIntegrationPendingFlowChoice(null);
-        }}
-        integrationDefinition={integrationPendingFlowChoice}
-        onChooseGuided={handleChooseGuidedSetupFromChoiceModal}
-        onChooseClassic={handleChooseClassicSetupFromChoiceModal}
-      />
     </div>
   );
 }

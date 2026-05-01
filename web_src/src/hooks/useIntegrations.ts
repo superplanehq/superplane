@@ -143,8 +143,6 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
       name: string;
       configuration?: Record<string, unknown>;
       capabilities?: string[];
-      /** When true, the server records this installation as the guided (v2) setup flow. */
-      newSetup?: boolean;
     }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
@@ -154,7 +152,6 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
             name: data.name,
             configuration: data.configuration,
             capabilities: data.capabilities,
-            ...(data.newSetup !== undefined ? { newSetup: data.newSetup } : {}),
           },
         }),
       );
