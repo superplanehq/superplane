@@ -185,6 +185,7 @@ func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.Cre
 		req.IntegrationName,
 		req.Name,
 		req.Configuration,
+		req.Capabilities,
 	)
 }
 
@@ -211,6 +212,31 @@ func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.Upd
 func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.DeleteIntegrationRequest) (*pb.DeleteIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.DeleteIntegration(ctx, orgID, req.IntegrationId)
+}
+
+func (s *OrganizationService) NextIntegrationSetupStep(ctx context.Context, req *pb.NextIntegrationSetupStepRequest) (*pb.NextIntegrationSetupStepResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.NextIntegrationSetupStep(ctx, s.registry, s.baseURL, s.webhooksBaseURL, orgID, req.IntegrationId, req.Inputs)
+}
+
+func (s *OrganizationService) PreviousIntegrationSetupStep(ctx context.Context, req *pb.PreviousIntegrationSetupStepRequest) (*pb.PreviousIntegrationSetupStepResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.PreviousIntegrationSetupStep(ctx, s.registry, orgID, req.IntegrationId)
+}
+
+func (s *OrganizationService) UpdateIntegrationCapabilities(ctx context.Context, req *pb.UpdateIntegrationCapabilitiesRequest) (*pb.UpdateIntegrationCapabilitiesResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateIntegrationCapabilities(ctx, s.registry, orgID, req.IntegrationId, req.Capabilities)
+}
+
+func (s *OrganizationService) UpdateIntegrationProperty(ctx context.Context, req *pb.UpdateIntegrationPropertyRequest) (*pb.UpdateIntegrationPropertyResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateIntegrationProperty(ctx, s.registry, orgID, req.IntegrationId, req.PropertyName, req.Value)
+}
+
+func (s *OrganizationService) UpdateIntegrationSecret(ctx context.Context, req *pb.UpdateIntegrationSecretRequest) (*pb.UpdateIntegrationSecretResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateIntegrationSecret(ctx, s.registry, orgID, req.IntegrationId, req.SecretName, req.Value)
 }
 
 func accountIDFromContext(ctx context.Context) (string, error) {
