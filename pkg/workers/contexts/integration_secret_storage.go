@@ -3,6 +3,7 @@ package contexts
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -16,6 +17,7 @@ type IntegrationSecretStorage struct {
 	encryptor   crypto.Encryptor
 	integration *models.Integration
 	secrets     []models.IntegrationSecret
+	loaded      bool
 }
 
 func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration) *IntegrationSecretStorage {
@@ -28,7 +30,7 @@ func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integr
 }
 
 func (s *IntegrationSecretStorage) loadSecrets() error {
-	if len(s.secrets) > 0 {
+	if s.loaded {
 		return nil
 	}
 
@@ -39,6 +41,7 @@ func (s *IntegrationSecretStorage) loadSecrets() error {
 	}
 
 	s.secrets = secrets
+	s.loaded = true
 	return nil
 }
 
@@ -87,14 +90,20 @@ func (s *IntegrationSecretStorage) Delete(name string) error {
 		return err
 	}
 
-	for i, secret := range s.secrets {
-		if secret.Name == name {
-			s.secrets = append(s.secrets[:i], s.secrets[i+1:]...)
-			return nil
-		}
+	err = s.tx.
+		Where("installation_id = ? AND name = ?", s.integration.ID, name).
+		Delete(&models.IntegrationSecret{}).
+		Error
+
+	if err != nil {
+		return err
 	}
 
-	return fmt.Errorf("secret %s not found", name)
+	s.secrets = slices.DeleteFunc(s.secrets, func(secret models.IntegrationSecret) bool {
+		return secret.Name == name
+	})
+
+	return nil
 }
 
 func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) error {
