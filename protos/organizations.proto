@@ -289,6 +289,66 @@ service Organizations {
     };
   }
 
+  rpc NextIntegrationSetupStep(NextIntegrationSetupStepRequest) returns (NextIntegrationSetupStepResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/integrations/{integration_id}/next"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Submit an integration setup step and go to the next";
+      description: "Submit an integration setup step and go to the next";
+      tags: "Organization";
+    };
+  }
+
+  rpc PreviousIntegrationSetupStep(PreviousIntegrationSetupStepRequest) returns (PreviousIntegrationSetupStepResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/integrations/{integration_id}/previous"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revert the current integration setup step and go to the previous";
+      description: "Revert the current integration setup step and go to the previous";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateIntegrationCapabilities(UpdateIntegrationCapabilitiesRequest) returns (UpdateIntegrationCapabilitiesResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/capabilities"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration capabilities";
+      description: "Update integration capabilities";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateIntegrationProperty(UpdateIntegrationPropertyRequest) returns (UpdateIntegrationPropertyResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/properties"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration property";
+      description: "Update integration property";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateIntegrationSecret(UpdateIntegrationSecretRequest) returns (UpdateIntegrationSecretResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/secrets"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration secret";
+      description: "Update integration secret";
+      tags: "Organization";
+    };
+  }
+
   rpc DeleteIntegration(DeleteIntegrationRequest) returns (DeleteIntegrationResponse) {
     option (google.api.http) = {
       delete: "/api/v1/organizations/{id}/integrations/{integration_id}"
@@ -549,7 +609,6 @@ message CreateIntegrationRequest {
   string integration_name = 3;
   google.protobuf.Struct configuration = 4;
   repeated string capabilities = 5;
-  bool new_setup = 6;
 }
 
 message CreateIntegrationResponse {
@@ -677,7 +736,7 @@ message Integration {
   }
 
   message Spec {
-    google.protobuf.Struct configuration = 2;
+    google.protobuf.Struct configuration = 1;
   }
 
   message Status {
@@ -686,15 +745,11 @@ message Integration {
     google.protobuf.Struct metadata = 3;
     BrowserAction browser_action = 4;
     repeated NodeRef used_in = 5;
-
-    //
-    // New fields used for new setup flow.
-    //
-    bool legacy_setup = 6;
-    repeated CapabilityState capabilities = 7;
-    SetupState setup_state = 8;
-    repeated Property properties = 9;
-    repeated Secret secrets = 10;
+    repeated CapabilityState capabilities = 6;
+    SetupState setup_state = 7;
+    repeated Property properties = 8;
+    repeated Secret secrets = 9;
+    bool legacy_setup = 10;
   }
 
   message SetupState {
@@ -717,26 +772,9 @@ message Integration {
     }
 
     Type type = 1;
-
-    //
-    // Unique machine-readable step name
-    //
     string name = 2;
-
-    //
-    // Human-readable label for the step
-    //
     string label = 3;
-
-    //
-    // Markdown-based instructions to display to the user
-    // while going through this step.
-    //
     string instructions = 4;
-
-    //
-    // Specific fields for each step type
-    //
     repeated Configuration.Field inputs = 5;
     RedirectPrompt redirect_prompt = 6;
   }

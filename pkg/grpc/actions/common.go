@@ -13,6 +13,7 @@ import (
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -1114,9 +1115,9 @@ func SerializeActions(in []core.Action) []*actionpb.Action {
 
 func CapabilityTypeToProto(t string) integrationpb.CapabilityDefinition_Type {
 	switch t {
-	case models.IntegrationCapabilityTypeAction:
+	case string(core.IntegrationCapabilityTypeAction):
 		return integrationpb.CapabilityDefinition_TYPE_ACTION
-	case models.IntegrationCapabilityTypeTrigger:
+	case string(core.IntegrationCapabilityTypeTrigger):
 		return integrationpb.CapabilityDefinition_TYPE_TRIGGER
 	}
 	return integrationpb.CapabilityDefinition_TYPE_UNKNOWN
@@ -1125,10 +1126,34 @@ func CapabilityTypeToProto(t string) integrationpb.CapabilityDefinition_Type {
 func ProtoToCapabilityType(t integrationpb.CapabilityDefinition_Type) string {
 	switch t {
 	case integrationpb.CapabilityDefinition_TYPE_ACTION:
-		return models.IntegrationCapabilityTypeAction
+		return string(core.IntegrationCapabilityTypeAction)
 	case integrationpb.CapabilityDefinition_TYPE_TRIGGER:
-		return models.IntegrationCapabilityTypeTrigger
+		return string(core.IntegrationCapabilityTypeTrigger)
 	}
 
+	return ""
+}
+
+func CapabilityStateToProto(t string) organizationpb.Integration_CapabilityState_State {
+	switch t {
+	case string(core.IntegrationCapabilityStateRequested):
+		return organizationpb.Integration_CapabilityState_STATE_REQUESTED
+	case string(core.IntegrationCapabilityStateEnabled):
+		return organizationpb.Integration_CapabilityState_STATE_ENABLED
+	case string(core.IntegrationCapabilityStateDisabled):
+		return organizationpb.Integration_CapabilityState_STATE_DISABLED
+	}
+	return organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE
+}
+
+func ProtoToCapabilityState(t organizationpb.Integration_CapabilityState_State) string {
+	switch t {
+	case organizationpb.Integration_CapabilityState_STATE_REQUESTED:
+		return string(core.IntegrationCapabilityStateRequested)
+	case organizationpb.Integration_CapabilityState_STATE_ENABLED:
+		return string(core.IntegrationCapabilityStateEnabled)
+	case organizationpb.Integration_CapabilityState_STATE_DISABLED:
+		return string(core.IntegrationCapabilityStateDisabled)
+	}
 	return ""
 }

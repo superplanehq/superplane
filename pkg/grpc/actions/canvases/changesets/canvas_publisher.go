@@ -19,6 +19,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var errNoChangesToPublish = fmt.Errorf("no changes between live and draft version being applied")
+
 /*
  * CanvasPublisher takes the live version and the proposed version,
  * calculates the changeset to go from the live version to the proposed version,
@@ -37,6 +39,7 @@ type CanvasPublisher struct {
 	draft      *models.CanvasVersion
 	changeset  *pb.CanvasChangeset
 	finalNodes map[string]models.Node
+	renamedIDs map[string]string
 
 	//
 	// All nodes in the workflow, including deleted ones.
@@ -88,9 +91,8 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	if err != nil {
 		return nil, err
 	}
-
-	if changeset == nil || len(changeset.Changes) == 0 {
-		return nil, fmt.Errorf("no changes between live and draft version being applied")
+	if len(changeset.GetChanges()) == 0 {
+		return nil, errNoChangesToPublish
 	}
 
 	allNodes, err := models.FindCanvasNodesUnscopedInTransaction(tx, liveVersion.WorkflowID)
@@ -121,6 +123,7 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 		draft:      draft,
 		changeset:  changeset,
 		allNodes:   allNodesMap,
+		renamedIDs: make(map[string]string),
 	}, nil
 }
 
@@ -136,13 +139,34 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 		finalNodes = append(finalNodes, node)
 	}
 
-	finalEdges := p.filterEdgesForExistingNodes(p.draft.Edges)
+	finalEdges := p.filterEdgesForExistingNodes(p.edgesWithRenamedNodeIDs(p.draft.Edges))
 	err := models.PromoteToLiveInTransaction(p.tx, p.draft, finalNodes, finalEdges)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (p *CanvasPublisher) edgesWithRenamedNodeIDs(edges []models.Edge) []models.Edge {
+	if len(p.renamedIDs) == 0 {
+		return edges
+	}
+
+	updatedEdges := make([]models.Edge, len(edges))
+	copy(updatedEdges, edges)
+
+	for i := range updatedEdges {
+		if renamedSource, ok := p.renamedIDs[updatedEdges[i].SourceID]; ok {
+			updatedEdges[i].SourceID = renamedSource
+		}
+
+		if renamedTarget, ok := p.renamedIDs[updatedEdges[i].TargetID]; ok {
+			updatedEdges[i].TargetID = renamedTarget
+		}
+	}
+
+	return updatedEdges
 }
 
 func (p *CanvasPublisher) filterEdgesForExistingNodes(edges []models.Edge) []models.Edge {
@@ -461,6 +485,7 @@ func (p *CanvasPublisher) ensureNewNodeID(node models.Node) string {
 	//
 	newNodeID := models.GenerateUniqueNodeID(node, reservedIDs)
 	delete(p.finalNodes, node.ID)
+	p.renamedIDs[node.ID] = newNodeID
 	node.ID = newNodeID
 	p.finalNodes[newNodeID] = node
 	return newNodeID

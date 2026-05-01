@@ -48,7 +48,6 @@ export const STORY_INTEGRATIONS: OrganizationsIntegration[] = [
       createdAt: "2026-03-30T10:00:00Z",
       updatedAt: "2026-03-30T10:00:00Z",
     },
-    spec: {},
     status: {
       state: "ready",
       stateDescription: "The connection is ready to list repositories and other resources.",

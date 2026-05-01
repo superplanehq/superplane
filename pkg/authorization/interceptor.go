@@ -134,11 +134,11 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_ListIntegrations_FullMethodName:              {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DescribeIntegration_FullMethodName:           {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_ListIntegrationResources_FullMethodName:      {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_NextIntegrationSetupStep_FullMethodName:      {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_PreviousIntegrationSetupStep_FullMethodName:  {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateIntegrationCapabilities_FullMethodName: {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateIntegrationProperty_FullMethodName:     {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateIntegrationSecret_FullMethodName:       {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_NextIntegrationSetupStep_FullMethodName:      {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_PreviousIntegrationSetupStep_FullMethodName:  {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
 
 		// Blueprints rules
 		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:    {Resource: "blueprints", Action: "read", DomainType: models.DomainTypeOrganization},

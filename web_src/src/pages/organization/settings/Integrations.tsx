@@ -25,6 +25,7 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { getIntegrationV2SetupPath, integrationSupportsGuidedSetup } from "@/lib/integrationV2";
 import { IntegrationSetupFlowChoiceDialog } from "@/ui/IntegrationSetupFlowChoiceDialog";
+import { analytics } from "@/lib/analytics";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -46,7 +47,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   const { data: availableIntegrations = [], isLoading: loadingAvailable } = useAvailableIntegrations();
   const { data: organizationIntegrations = [], isLoading: loadingInstalled } = useConnectedIntegrations(organizationId);
-  const createIntegrationMutation = useCreateIntegration(organizationId);
+  const createIntegrationMutation = useCreateIntegration(organizationId, "integrations_page");
 
   const isLoading = loadingAvailable || loadingInstalled;
   const integrationNames = useMemo(() => {
@@ -188,6 +189,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     setIntegrationName(getNextIntegrationName(integration.name));
     setConfiguration({});
     setIsModalOpen(true);
+    analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
   };
   const handleConnect = async () => {
     if (!canCreateIntegrations) return;

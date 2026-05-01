@@ -6,10 +6,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
+/*
+ * IntegrationSetupProvider is the contract for an integration to provide its setup flow.
+ * Any changes to this interface should be documented in docs/design/integration-setup-flow.md.
+ */
 type IntegrationSetupProvider interface {
 
 	//
-	// All the capability groups supported by the integration.
+	// All the capabilities supported by the integration.
+	// The grouping is a presentation matter, and per-integration states
+	// are still tracked per capability.
 	//
 	CapabilityGroups() []CapabilityGroup
 
@@ -106,17 +112,18 @@ type SetupStepContext struct {
 	OrganizationID  string
 	BaseURL         string
 	WebhooksBaseURL string
+	Logger          *log.Entry
 	HTTP            HTTPContext
 	Secrets         IntegrationSecretStorage
 	Properties      IntegrationPropertyStorage
 	Capabilities    CapabilityContext
 }
 
-//
-// Properties is non-sensitive information exposed by the setup flow to the user.
-// They can be editable or not. If they are editable, OnPropertyUpdate() is called when the user updates it.
-//
-
+/*
+ * Properties is non-sensitive information exposed by the setup flow to the user.
+ * They can be editable or not. If they are editable, OnPropertyUpdate() is called when the user updates it.
+ * They are also typed, so the display layers (UI, CLI) can render them accordingly.
+ */
 type IntegrationPropertyType string
 
 const (
@@ -124,12 +131,12 @@ const (
 )
 
 type IntegrationPropertyDefinition struct {
-	Type        IntegrationPropertyType
-	Name        string
-	Label       string
-	Description string
-	Value       any
-	Editable    bool
+	Type        IntegrationPropertyType `json:"type"`
+	Name        string                  `json:"name"`
+	Label       string                  `json:"label"`
+	Description string                  `json:"description"`
+	Value       any                     `json:"value"`
+	Editable    bool                    `json:"editable"`
 }
 
 type IntegrationPropertyStorageReader interface {
@@ -149,13 +156,14 @@ type IntegrationSecretStorageReader interface {
 	Get(name string) (string, error)
 }
 
-//
-// Secrets is sensitive information managed by the integration.
-// Sometimes, this comes from the user, as a step input.
-// Sometimes, this comes from the setup flow itself.
-// They can be editable or not. If they are editable, OnSecretUpdate() is called when the user updates it.
-//
-
+/*
+ * Secrets are sensitive information managed by the integration.
+ * In some cases, this comes from the user, as a step input.
+ * In other cases, this comes from the setup flow itself.
+ * Secrets can be editable or not. If they are editable, OnSecretUpdate() is called when the user updates it.
+ *
+ * This is context that the integration receives as part of the setup flow for managing them.
+ */
 type IntegrationSecretStorage interface {
 	IntegrationSecretStorageReader
 
@@ -169,23 +177,20 @@ type IntegrationSecretDefinition struct {
 	Name        string
 	Label       string
 	Description string
-	Value       []byte
+	Value       string
 	Editable    bool
 }
 
-//
-// Capabilities are the features that the integration provides.
-//
-// CapabilityGroups() returns all of them, but the setup flow is responsible
-// for updating their states for a particular integration.
-//
-// They can be in 4 states:
-// - Requested: the capability was requested, but the setup flow did not yet exposed it.
-// - Enabled: the capability is fully available for use.
-// - Disabled: the capability was made available during the setup flow, but has been manually disabled by the user.
-// - Unavailable: the integration itself has the capability available, but the capability was not requested as part of the setup flow.
-//
-
+/*
+ * Capabilities are the "features" that the integration provides.
+ * They are typed so the different parts of the system can take only the ones they need.
+ *
+ * They can be in 4 states:
+ * - Requested: the capability was requested, but the setup flow did not yet exposed it.
+ * - Enabled: the capability is fully available for use.
+ * - Disabled: the capability was made available during the setup flow, but has been manually disabled by the user.
+ * - Unavailable: the integration itself has the capability available, but the capability was not requested as part of the setup flow.
+ */
 type IntegrationCapabilityType string
 type IntegrationCapabilityState string
 

@@ -34,9 +34,9 @@ func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integr
 }
 
 func (s *IntegrationSecretStorage) findSecret(name string) (*models.IntegrationSecret, error) {
-	for _, secret := range s.secrets {
-		if secret.Name == name {
-			return &secret, nil
+	for i := range s.secrets {
+		if s.secrets[i].Name == name {
+			return &s.secrets[i], nil
 		}
 	}
 
@@ -63,7 +63,12 @@ func (s *IntegrationSecretStorage) Get(name string) (string, error) {
 }
 
 func (s *IntegrationSecretStorage) Delete(name string) error {
-	err := s.tx.
+	_, err := s.findSecret(name)
+	if err != nil {
+		return err
+	}
+
+	err = s.tx.
 		Where("installation_id = ? AND name = ?", s.integration.ID, name).
 		Delete(&models.IntegrationSecret{}).
 		Error
@@ -94,7 +99,7 @@ func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) 
 
 	encryptedValue, err := s.encryptor.Encrypt(
 		context.Background(),
-		def.Value,
+		[]byte(def.Value),
 		[]byte(s.integration.ID.String()),
 	)
 	if err != nil {

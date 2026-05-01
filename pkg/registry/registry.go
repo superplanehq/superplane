@@ -82,9 +82,6 @@ type Registry struct {
 	Encryptor crypto.Encryptor
 	AppEnv    string
 
-	//
-	// Integration-related registrations
-	//
 	Integrations    map[string]core.Integration
 	WebhookHandlers map[string]core.WebhookHandler
 	SetupProviders  map[string]core.IntegrationSetupProvider

@@ -65,12 +65,12 @@ func (c *CapabilityContext) Disable(capabilities ...string) error {
 
 func (c *CapabilityContext) IsRequested(capabilities ...string) (bool, error) {
 	for _, capability := range capabilities {
-		c, ok := c.states[capability]
+		v, ok := c.states[capability]
 		if !ok {
 			return false, fmt.Errorf("capability %s not found", capability)
 		}
 
-		if c.State != core.IntegrationCapabilityStateRequested {
+		if v.State != core.IntegrationCapabilityStateRequested {
 			return false, nil
 		}
 	}

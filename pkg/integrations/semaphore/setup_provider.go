@@ -294,7 +294,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		Name:        "apiToken",
 		Label:       "API Token",
 		Description: "The API token for the Semaphore organization",
-		Value:       []byte(apiToken),
+		Value:       apiToken,
 		Editable:    true,
 	})
 

@@ -400,19 +400,19 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 		{
 			Name:     SecretAppClientSecret,
 			Label:    "GitHub App Client Secret",
-			Value:    []byte(appData.ClientSecret),
+			Value:    appData.ClientSecret,
 			Editable: false,
 		},
 		{
 			Name:     SecretAppWebhookSecret,
 			Label:    "GitHub App Webhook Secret",
-			Value:    []byte(appData.WebhookSecret),
+			Value:    appData.WebhookSecret,
 			Editable: false,
 		},
 		{
 			Name:     SecretAppPEM,
 			Label:    "GitHub App Private Key (PEM)",
-			Value:    []byte(appData.PEM),
+			Value:    appData.PEM,
 			Editable: false,
 		},
 	})

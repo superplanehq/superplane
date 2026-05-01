@@ -657,23 +657,21 @@ The Read Memory component looks up values from canvas-level memory storage.
 ```json
 {
   "data": {
-    "data": {
-      "count": 1,
-      "emitMode": "allAtOnce",
-      "matches": {
+    "count": 1,
+    "emitMode": "allAtOnce",
+    "matches": {
+      "creator": "igor",
+      "pull_request": 123
+    },
+    "namespace": "machines",
+    "resultMode": "latest",
+    "values": [
+      {
         "creator": "igor",
-        "pull_request": 123
-      },
-      "namespace": "machines",
-      "resultMode": "latest",
-      "values": [
-        {
-          "creator": "igor",
-          "pull_request": 123,
-          "sandbox_id": "sbx-001"
-        }
-      ]
-    }
+        "pull_request": 123,
+        "sandbox_id": "sbx-001"
+      }
+    ]
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
@@ -935,12 +933,12 @@ The Wait component pauses workflow execution for a specified duration or until a
 
 - **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
   - Supports expressions for dynamic wait times
-  - Example: `{{$.retry_delay}}` or `{{$.status == "urgent" ? 0 : 30}}`
+  - Example: `{{$['Node Name'].data.retry_delay}}` or `{{$['Node Name'].data.status == "urgent" ? 0 : 30}}`
   
 - **Countdown**: Wait until a specific date/time is reached
   - Supports ISO 8601 date formats
   - Supports expressions for dynamic target times
-  - Example: `{{$.release_date}}` or `{{$.run_time + duration("48h")}}`
+  - Example: `{{$['Node Name'].data.release_date}}` or `{{$['Node Name'].data.run_time + duration("48h")}}`
 
 ### Behavior
 

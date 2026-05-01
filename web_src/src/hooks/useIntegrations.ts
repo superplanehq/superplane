@@ -44,10 +44,6 @@ export const integrationKeys = {
     ] as const,
 };
 
-function hasCurrentSetupStep(integration?: OrganizationsIntegration | null): boolean {
-  return Boolean(integration?.status?.setupState?.currentStep);
-}
-
 // Hook to fetch available integrations (catalog).
 // Normalizes each integration's label (e.g. "github" -> "GitHub") so consumers get correct display names.
 export const useAvailableIntegrations = (options?: { enabled?: boolean }) => {
@@ -138,7 +134,7 @@ export const useIntegrationResources = (
 };
 
 // Hook to create an integration
-export const useCreateIntegration = (organizationId: string) => {
+export const useCreateIntegration = (organizationId: string, source: "node_configuration" | "integrations_page") => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -163,15 +159,12 @@ export const useCreateIntegration = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: (response, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
-
-      const hasNextStep = hasCurrentSetupStep(response.data?.integration);
-      if (!hasNextStep) {
-        analytics.integrationConnected(variables.integrationName, organizationId);
-      }
+      const status = (data.data?.integration?.status?.state || "pending") as "ready" | "error" | "pending";
+      analytics.integrationConnectSubmit(variables.integrationName, source, status, organizationId);
     },
   });
 };
@@ -194,19 +187,12 @@ export const useNextIntegrationSetupStep = (organizationId: string) => {
     onSuccess: (response) => {
       const integration = response.data?.integration;
       const integrationId = integration?.metadata?.id;
-      const integrationName = integration?.metadata?.integrationName;
-      const hasNextStep = hasCurrentSetupStep(integration);
-
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
 
       if (integrationId) {
         queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
-      }
-
-      if (!hasNextStep && integrationName) {
-        analytics.integrationConnected(integrationName, organizationId);
       }
     },
   });
@@ -272,20 +258,22 @@ export const useDeleteIntegration = (organizationId: string, integrationId: stri
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      return await organizationsDeleteIntegration(
+    mutationFn: async (data: { integrationName: string }) => {
+      await organizationsDeleteIntegration(
         withOrganizationHeader({
           path: { id: organizationId, integrationId },
         }),
       );
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
       queryClient.removeQueries({
         queryKey: integrationKeys.integration(organizationId, integrationId),
       });
+      analytics.integrationDelete(variables.integrationName, organizationId);
     },
   });
 };

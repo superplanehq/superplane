@@ -2,10 +2,12 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -32,7 +34,12 @@ func UpdateIntegrationCapabilities(ctx context.Context, registry *registry.Regis
 
 	integration, err := models.FindIntegration(org, id)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "integration not found")
+		}
+
+		log.WithError(err).Error("failed to find integration")
+		return nil, status.Error(codes.Internal, "failed to find integration")
 	}
 
 	changes := findChanges(integration.Capabilities, capabilities)
@@ -57,8 +64,13 @@ func UpdateIntegrationCapabilities(ctx context.Context, registry *registry.Regis
 		//
 		now := time.Now()
 		integration.UpdatedAt = &now
-		return database.Conn().Save(integration).Error
+		return tx.Save(integration).Error
 	})
+
+	if err != nil {
+		log.WithError(err).Error("failed to update integration capabilities")
+		return nil, status.Error(codes.Internal, "failed to update integration capabilities")
+	}
 
 	proto, err := serializeIntegration(registry, integration, []models.CanvasNodeReference{})
 	if err != nil {

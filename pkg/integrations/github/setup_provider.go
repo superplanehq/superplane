@@ -568,7 +568,7 @@ func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (
 
 	err := ctx.Secrets.Create(core.IntegrationSecretDefinition{
 		Name:     SecretPAT,
-		Value:    []byte(token),
+		Value:    token,
 		Label:    "Personal Access Token",
 		Editable: true,
 	})

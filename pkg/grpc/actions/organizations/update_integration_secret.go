@@ -41,9 +41,13 @@ func UpdateIntegrationSecret(
 		return nil, err
 	}
 
-	_, err = findSecret(integration, secretName)
+	secret, err := findSecret(integration, secretName)
 	if err != nil {
 		return nil, err
+	}
+
+	if !secret.Editable {
+		return nil, status.Errorf(codes.InvalidArgument, "secret %s is not editable", secretName)
 	}
 
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)

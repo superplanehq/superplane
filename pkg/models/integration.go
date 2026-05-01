@@ -50,10 +50,6 @@ type Integration struct {
 	Capabilities datatypes.JSONSlice[CapabilityState]
 }
 
-func (a *Integration) TableName() string {
-	return "app_installations"
-}
-
 type SetupState struct {
 	CurrentStep   *core.SetupStep  `json:"current_step,omitempty"`
 	PreviousSteps []core.SetupStep `json:"previous_steps,omitempty"`
@@ -62,6 +58,10 @@ type SetupState struct {
 type CapabilityState struct {
 	Name  string                          `json:"name"`
 	State core.IntegrationCapabilityState `json:"state"`
+}
+
+func (a *Integration) TableName() string {
+	return "app_installations"
 }
 
 type IntegrationSecret struct {
@@ -180,8 +180,6 @@ type CanvasNodeReference struct {
 	CanvasName string
 	NodeID     string
 	NodeName   string
-	NodeType   string
-	NodeRef    datatypes.JSONType[NodeRef]
 }
 
 func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReference, error) {
@@ -189,7 +187,8 @@ func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReferen
 	err := database.Conn().
 		Table("workflow_nodes AS wn").
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
-		Select("w.id as canvas_id, w.name as canvas_name, wn.node_id as node_id, wn.name as node_name, wn.type as node_type, wn.ref as node_ref").
+		Joins("JOIN workflow_versions AS live_version ON live_version.id = w.live_version_id").
+		Select("w.id as canvas_id, live_version.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
 		Where("wn.app_installation_id = ?", integrationID).
 		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).

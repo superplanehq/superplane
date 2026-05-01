@@ -301,7 +301,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 	logger := logging.ForExecution(execution, nil)
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
-		Configuration:  node.Configuration.Data(),
+		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
 		HTTP:           w.registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),

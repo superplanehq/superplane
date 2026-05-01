@@ -44,6 +44,10 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 	//
 	// Verify that we are in a revertable state
 	//
+	if integration.SetupState == nil {
+		return nil, status.Error(codes.InvalidArgument, "current step is not set, cannot revert")
+	}
+
 	setupState := integration.SetupState.Data()
 	if setupState.CurrentStep == nil {
 		return nil, status.Error(codes.InvalidArgument, "current step is not set, cannot revert")

@@ -29,7 +29,7 @@ import (
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig, nil, false)
+	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig, nil)
 }
 
 func CreateIntegrationWithUsage(
@@ -43,7 +43,6 @@ func CreateIntegrationWithUsage(
 	integrationName, name string,
 	appConfig *structpb.Struct,
 	capabilities []string,
-	useNewFlow bool,
 ) (*pb.CreateIntegrationResponse, error) {
 	integration, err := registry.GetIntegration(integrationName)
 	if err != nil {
@@ -84,10 +83,9 @@ func CreateIntegrationWithUsage(
 	})
 
 	//
-	// If the integration implementation supports the new flow,
-	// and the user has requested to use it, we use the new flow.
+	// If the integration implementation supports the new flow, use it.
 	//
-	if registry.SupportsNewSetupFlow(integrationName) && useNewFlow {
+	if registry.SupportsNewSetupFlow(integrationName) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
@@ -437,12 +435,12 @@ func serializeCapabilities(registry *registry.Registry, integration *models.Inte
 	for _, group := range setupProvider.CapabilityGroups() {
 		capabilities = append(capabilities, group.Capabilities...)
 	}
-	protos := make([]*pb.Integration_CapabilityState, len(capabilities))
-	for i, capability := range integration.Capabilities {
-		protos[i] = &pb.Integration_CapabilityState{
+	protos := []*pb.Integration_CapabilityState{}
+	for _, capability := range integration.Capabilities {
+		protos = append(protos, &pb.Integration_CapabilityState{
 			Name:  capability.Name,
 			State: CapabilityStateToProto(capability.State),
-		}
+		})
 	}
 
 	return protos

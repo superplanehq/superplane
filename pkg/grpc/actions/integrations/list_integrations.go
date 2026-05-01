@@ -105,24 +105,44 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 
 func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityDefinition {
 	capabilities := []*pb.CapabilityDefinition{}
+
 	for _, action := range integration.Actions() {
+		configFields := action.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = actions.ConfigurationFieldToProto(field)
+		}
+
+		outputChannels := []*actionpb.OutputChannel{}
+		for _, channel := range action.OutputChannels(nil) {
+			outputChannels = append(outputChannels, &actionpb.OutputChannel{
+				Name:        channel.Name,
+				Label:       channel.Label,
+				Description: channel.Description,
+			})
+		}
 		capabilities = append(capabilities, &pb.CapabilityDefinition{
 			Type:           actions.CapabilityTypeToProto(string(core.IntegrationCapabilityTypeAction)),
 			Name:           action.Name(),
 			Label:          action.Label(),
 			Description:    action.Description(),
-			Configuration:  []*configpb.Field{},
-			OutputChannels: []*actionpb.OutputChannel{},
+			Configuration:  configuration,
+			OutputChannels: outputChannels,
 		})
 	}
 
 	for _, trigger := range integration.Triggers() {
+		configFields := trigger.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = actions.ConfigurationFieldToProto(field)
+		}
 		capabilities = append(capabilities, &pb.CapabilityDefinition{
 			Type:           actions.CapabilityTypeToProto(string(core.IntegrationCapabilityTypeTrigger)),
 			Name:           trigger.Name(),
 			Label:          trigger.Label(),
 			Description:    trigger.Description(),
-			Configuration:  []*configpb.Field{},
+			Configuration:  configuration,
 			OutputChannels: []*actionpb.OutputChannel{},
 		})
 	}

@@ -41,6 +41,7 @@ import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { analytics, useIntegrationConfigureOpen } from "@/lib/analytics";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -271,7 +272,7 @@ export const ComponentSidebar = ({
     configureIntegrationId ?? "",
   );
   const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
-  const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const createIntegrationMutation = useCreateIntegration(domainId ?? "", "node_configuration");
   const configureIntegrationDefinition = useMemo(
     () =>
       configureIntegration?.metadata?.integrationName
@@ -280,6 +281,14 @@ export const ComponentSidebar = ({
     [availableIntegrationDefinitions, configureIntegration?.metadata?.integrationName],
   );
   const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
+
+  useIntegrationConfigureOpen(
+    configureIntegration ?? undefined,
+    configureIntegrationId,
+    "node_configuration",
+    domainId,
+  );
+
   const createIntegrationDefinition = useMemo(
     () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
     [availableIntegrationDefinitions, integrationName],
@@ -307,7 +316,10 @@ export const ComponentSidebar = ({
 
   const handleOpenCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(true);
-  }, []);
+    if (integrationName && domainId) {
+      analytics.integrationConnectStart(integrationName, "node_configuration", domainId);
+    }
+  }, [integrationName, domainId]);
 
   const handleCloseCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(false);
@@ -603,7 +615,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
+      className="ph-no-capture border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -866,6 +878,7 @@ export const ComponentSidebar = ({
                       actions={actions}
                       triggers={triggers}
                       onHighlightedNodesChange={onHighlightedNodesChange}
+                      organizationId={domainId}
                     />
                   )}
                 </div>
