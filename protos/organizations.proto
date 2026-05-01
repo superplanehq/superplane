@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane.Organizations;
 
+import "configuration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -264,6 +265,66 @@ service Organizations {
     };
   }
 
+  rpc NextIntegrationSetupStep(NextIntegrationSetupStepRequest) returns (NextIntegrationSetupStepResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/integrations/{integration_id}/next"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Submit an integration setup step and go to the next";
+      description: "Submit an integration setup step and go to the next";
+      tags: "Organization";
+    };
+  }
+
+  rpc PreviousIntegrationSetupStep(PreviousIntegrationSetupStepRequest) returns (PreviousIntegrationSetupStepResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/integrations/{integration_id}/previous"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revert the current integration setup step and go to the previous";
+      description: "Revert the current integration setup step and go to the previous";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateIntegrationCapabilities(UpdateIntegrationCapabilitiesRequest) returns (UpdateIntegrationCapabilitiesResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/capabilities"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration capabilities";
+      description: "Update integration capabilities";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateIntegrationProperty(UpdateIntegrationPropertyRequest) returns (UpdateIntegrationPropertyResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/properties"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration property";
+      description: "Update integration property";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateIntegrationSecret(UpdateIntegrationSecretRequest) returns (UpdateIntegrationSecretResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/integrations/{integration_id}/secrets"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update integration secret";
+      description: "Update integration secret";
+      tags: "Organization";
+    };
+  }
+
   rpc DeleteIntegration(DeleteIntegrationRequest) returns (DeleteIntegrationResponse) {
     option (google.api.http) = {
       delete: "/api/v1/organizations/{id}/integrations/{integration_id}"
@@ -488,6 +549,7 @@ message CreateIntegrationRequest {
   string name = 2;
   string integration_name = 3;
   google.protobuf.Struct configuration = 4;
+  repeated string capabilities = 5;
 }
 
 message CreateIntegrationResponse {
@@ -537,7 +599,75 @@ message DeleteIntegrationRequest {
 
 message DeleteIntegrationResponse {}
 
+message NextIntegrationSetupStepRequest {
+  string id = 1;
+  string integration_id = 2;
+  google.protobuf.Struct inputs = 3;
+}
+
+message NextIntegrationSetupStepResponse {
+  Integration integration = 1;
+}
+
+message PreviousIntegrationSetupStepRequest {
+  string id = 1;
+  string integration_id = 2;
+}
+
+message PreviousIntegrationSetupStepResponse {
+  Integration integration = 1;
+}
+
+message UpdateIntegrationCapabilitiesRequest {
+  string id = 1;
+  string integration_id = 2;
+  repeated Integration.CapabilityState capabilities = 3;
+}
+
+message UpdateIntegrationCapabilitiesResponse {
+  Integration integration = 1;
+}
+
+message UpdateIntegrationPropertyRequest {
+  string id = 1;
+  string integration_id = 2;
+  string property_name = 3;
+  string value = 4;
+}
+
+message UpdateIntegrationPropertyResponse {
+  Integration integration = 1;
+}
+
+message UpdateIntegrationSecretRequest {
+  string id = 1;
+  string integration_id = 2;
+  string secret_name = 3;
+  string value = 4;
+}
+
+message UpdateIntegrationSecretResponse {
+  Integration integration = 1;
+}
+
 message Integration {
+
+  message Property {
+    string name = 1;
+    string label = 2;
+    string description = 3;
+    string type = 4;
+    string value = 5;
+    bool editable = 6;
+  }
+
+  message Secret {
+    string name = 1;
+    string label = 2;
+    string description = 3;
+    bool editable = 4;
+  }
+
   message Metadata {
     string id = 1;
     string name = 2;
@@ -556,6 +686,68 @@ message Integration {
     google.protobuf.Struct metadata = 3;
     BrowserAction browser_action = 4;
     repeated NodeRef used_in = 5;
+    repeated CapabilityState capabilities = 6;
+    SetupState setup_state = 7;
+    repeated Property properties = 8;
+    repeated Secret secrets = 9;
+    bool legacy_setup = 10;
+  }
+
+  message SetupState {
+    SetupStepDefinition current_step = 1;
+    repeated SetupStepDefinition previous_steps = 2;
+  }
+
+  message SetupStepDefinition {
+    enum Type {
+      UNKNOWN = 0;
+      INPUTS = 1;
+      REDIRECT_PROMPT = 2;
+      DONE = 3;
+    }
+
+    message RedirectPrompt {
+      string url = 1;
+      string method = 2;
+      map<string, string> form_fields = 3;
+    }
+
+    Type type = 1;
+    string name = 2;
+    string label = 3;
+    string instructions = 4;
+    repeated Configuration.Field inputs = 5;
+    RedirectPrompt redirect_prompt = 6;
+  }
+
+  message CapabilityState {
+    enum State {
+      //
+      // The integration itself has the capability available,
+      // but the capability was not requested as part of the setup flow.
+      //
+      STATE_UNAVAILABLE = 0;
+
+      //
+      // The capability was requested,
+      // but the setup flow did not yet exposed the capability requested.
+      //
+      STATE_REQUESTED = 1;
+
+      //
+      // The capability is fully available for use.
+      //
+      STATE_ENABLED = 2;
+
+      //
+      // The capability was made available during the setup flow,
+      // but has been manually disabled by the user.
+      //
+      STATE_DISABLED = 3;
+    }
+
+    string name = 1;
+    State state = 2;
   }
 
   message NodeRef {
