@@ -83,7 +83,7 @@ func Test__GetPipelineExecution__Execute(t *testing.T) {
 				"pipeline":  "my-pipeline",
 				"execution": "a1b2c3d4-5678-90ab-cdef-111122223333",
 			},
-			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
+			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		})
 		require.ErrorContains(t, err, "AWS session credentials are missing")
@@ -129,7 +129,7 @@ func Test__GetPipelineExecution__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			ExecutionState: execState,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

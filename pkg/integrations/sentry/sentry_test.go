@@ -134,9 +134,9 @@ func Test__Sentry__Sync(t *testing.T) {
 		assert.Equal(t, "https://sentry.io/api/0/sentry-apps/superplane/", httpContext.Requests[5].URL.String())
 
 		// Sentry rotates the client secret on PUT — verify the new secret was stored automatically.
-		secret, ok := integrationCtx.Secrets["clientSecret"]
-		require.True(t, ok)
-		assert.Equal(t, "new-rotated-secret", string(secret.Value))
+		secret, err := integrationCtx.Secrets().Get("clientSecret")
+		require.NoError(t, err)
+		assert.Equal(t, "new-rotated-secret", secret)
 	})
 
 	t.Run("multiple apps without integration name -> ready with manual webhook prompt", func(t *testing.T) {
