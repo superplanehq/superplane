@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+import { Fragment } from "react";
 import { Trash2 } from "lucide-react";
 
 export type CanvasMemoryModalProps = {
@@ -108,8 +109,24 @@ function ZeroState() {
   );
 }
 
-function formatValue(value: unknown): string {
+function isUrl(value: string): boolean {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+function formatValue(value: unknown): string | React.ReactElement {
   if (typeof value === "string") {
+    if (isUrl(value)) {
+      return (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline"
+        >
+          {value}
+        </a>
+      );
+    }
     return value;
   }
 
@@ -162,11 +179,14 @@ function renderNamespaceTable(
               const item = objectValues[index];
               return (
                 <tr key={entry.id || index} className="border-b border-slate-950/15">
-                  {columns.map((column) => (
-                    <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
-                      {formatValue(item[column])}
-                    </td>
-                  ))}
+                  {columns.map((column) => {
+                    const formatted = formatValue(item[column]);
+                    return (
+                      <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
+                        {typeof formatted === "string" ? formatted : <Fragment key={column}>{formatted}</Fragment>}
+                      </td>
+                    );
+                  })}
                   <td className="px-3 py-2 text-right align-middle">
                     <Button
                       type="button"
