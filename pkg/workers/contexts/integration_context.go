@@ -474,11 +474,6 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 		return c.secretStorage
 	}
 
-	secretStorage, err := NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration)
-	if err != nil {
-		return nil
-	}
-
-	c.secretStorage = secretStorage
-	return secretStorage
+	c.secretStorage = NewIntegrationSecretStorage(c.tx, c.encryptor, c.integration)
+	return c.secretStorage
 }

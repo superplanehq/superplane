@@ -95,11 +95,6 @@ func submitStep(registry *registry.Registry, integration *models.Integration, ba
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		secretStorage, err := contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration)
-		if err != nil {
-			return err
-		}
-
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
 			Step:            setupState.CurrentStep.Name,
@@ -110,7 +105,7 @@ func submitStep(registry *registry.Registry, integration *models.Integration, ba
 			OrganizationID:  integration.OrganizationID.String(),
 			HTTP:            registry.HTTPContext(),
 			Properties:      contexts.NewIntegrationPropertyStorage(integration),
-			Secrets:         secretStorage,
+			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:    capabilityCtx,
 		})
 

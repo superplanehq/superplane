@@ -18,19 +18,28 @@ type IntegrationSecretStorage struct {
 	secrets     []models.IntegrationSecret
 }
 
-func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration) (*IntegrationSecretStorage, error) {
-	var secrets []models.IntegrationSecret
-	err := tx.Where("installation_id = ?", integration.ID).Find(&secrets).Error
-	if err != nil {
-		return nil, err
-	}
-
+func NewIntegrationSecretStorage(tx *gorm.DB, encryptor crypto.Encryptor, integration *models.Integration) *IntegrationSecretStorage {
 	return &IntegrationSecretStorage{
 		tx:          tx,
 		encryptor:   encryptor,
 		integration: integration,
-		secrets:     secrets,
-	}, nil
+		secrets:     []models.IntegrationSecret{},
+	}
+}
+
+func (s *IntegrationSecretStorage) loadSecrets() error {
+	if len(s.secrets) > 0 {
+		return nil
+	}
+
+	var secrets []models.IntegrationSecret
+	err := s.tx.Where("installation_id = ?", s.integration.ID).Find(&secrets).Error
+	if err != nil {
+		return err
+	}
+
+	s.secrets = secrets
+	return nil
 }
 
 func (s *IntegrationSecretStorage) findSecret(name string) (*models.IntegrationSecret, error) {
@@ -44,6 +53,11 @@ func (s *IntegrationSecretStorage) findSecret(name string) (*models.IntegrationS
 }
 
 func (s *IntegrationSecretStorage) Get(name string) (string, error) {
+	err := s.loadSecrets()
+	if err != nil {
+		return "", err
+	}
+
 	secret, err := s.findSecret(name)
 	if err != nil {
 		return "", err
@@ -63,16 +77,12 @@ func (s *IntegrationSecretStorage) Get(name string) (string, error) {
 }
 
 func (s *IntegrationSecretStorage) Delete(name string) error {
-	_, err := s.findSecret(name)
+	err := s.loadSecrets()
 	if err != nil {
 		return err
 	}
 
-	err = s.tx.
-		Where("installation_id = ? AND name = ?", s.integration.ID, name).
-		Delete(&models.IntegrationSecret{}).
-		Error
-
+	_, err = s.findSecret(name)
 	if err != nil {
 		return err
 	}
@@ -92,7 +102,12 @@ func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) 
 		return fmt.Errorf("secret name is required")
 	}
 
-	_, err := s.Get(def.Name)
+	err := s.loadSecrets()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Get(def.Name)
 	if err == nil {
 		return fmt.Errorf("secret %s already exists", def.Name)
 	}
@@ -140,6 +155,11 @@ func (s *IntegrationSecretStorage) CreateMany(defs []core.IntegrationSecretDefin
 }
 
 func (s *IntegrationSecretStorage) Update(name string, value string) error {
+	err := s.loadSecrets()
+	if err != nil {
+		return err
+	}
+
 	secret, err := s.findSecret(name)
 	if err != nil {
 		return err

@@ -451,6 +451,10 @@ func (s *IntegrationSecretStorage) Delete(name string) error {
 }
 
 func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) error {
+	if len(s.parentContext.CurrentSecrets) == 0 {
+		s.parentContext.CurrentSecrets = make(map[string]core.IntegrationSecret)
+	}
+
 	s.parentContext.CurrentSecrets[def.Name] = core.IntegrationSecret{Name: def.Name, Value: []byte(def.Value)}
 	return nil
 }
@@ -466,6 +470,10 @@ func (s *IntegrationSecretStorage) CreateMany(defs []core.IntegrationSecretDefin
 }
 
 func (s *IntegrationSecretStorage) Update(name string, value string) error {
+	if len(s.parentContext.CurrentSecrets) == 0 {
+		s.parentContext.CurrentSecrets = make(map[string]core.IntegrationSecret)
+	}
+
 	s.parentContext.CurrentSecrets[name] = core.IntegrationSecret{Name: name, Value: []byte(value)}
 	return nil
 }
