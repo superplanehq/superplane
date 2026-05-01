@@ -1,7 +1,6 @@
 import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
-import { cn } from "@/lib/utils";
-import { handleKeyboardActivation } from "@/lib/utils";
+import { cn, handleKeyboardActivation } from "@/lib/utils";
 import { RUNS_CONSOLE_BADGE_COL } from "./constants";
 import { StatusBadge } from "./StatusBadge";
 import { NodeIcon } from "./NodeIcon";
@@ -10,6 +9,7 @@ import {
   resolveExecutionDisplayStatus,
   resolveNodeIconSlug,
 } from "@/pages/workflowv2/lib/canvas-runs";
+import { WORKFLOW_CONSOLE_FAILED_MESSAGE_CLASSNAME } from "@/pages/workflowv2/constants";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 
 export function ExecutionRow({
@@ -35,7 +35,7 @@ export function ExecutionRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
+        "flex items-start gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
         onSelect && "cursor-pointer hover:bg-gray-100 transition-colors",
       )}
       role={onSelect ? "button" : undefined}
@@ -43,19 +43,23 @@ export function ExecutionRow({
       onClick={onSelect}
       onKeyDown={onSelect ? (e) => handleKeyboardActivation(e, onSelect) : undefined}
     >
-      <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+      <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center pt-0.5">
         <NodeIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={nodeName} size={13} className="text-gray-400" />
       </div>
-      <div className="flex flex-1 items-center gap-2 min-w-0">
+      <div className="flex flex-1 items-start gap-2 min-w-0 pt-0.5">
         <div className={RUNS_CONSOLE_BADGE_COL}>
           <StatusBadge status={status} />
         </div>
         <span className="text-xs text-gray-700 truncate">{nodeName}</span>
         {duration && <span className="text-xs text-gray-500 tabular-nums">{duration}</span>}
       </div>
-      {errorMessage && <span className="text-xs text-red-600 truncate max-w-[300px]">{errorMessage}</span>}
+      {errorMessage && (
+        <span className={WORKFLOW_CONSOLE_FAILED_MESSAGE_CLASSNAME} title={errorMessage}>
+          {errorMessage}
+        </span>
+      )}
       {execution.createdAt && (
-        <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+        <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap pt-0.5">
           <TimeAgo date={execution.createdAt} />
         </span>
       )}
