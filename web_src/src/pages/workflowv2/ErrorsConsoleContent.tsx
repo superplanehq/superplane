@@ -10,6 +10,7 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
+import { WORKFLOW_CONSOLE_FAILED_MESSAGE_CLASSNAME } from "@/pages/workflowv2/constants";
 import { buildTriggerSidebarEvent } from "./utils";
 
 function NodeIcon({
@@ -94,7 +95,7 @@ function ErrorItemRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-4 py-1.5 min-h-8",
+        "flex items-start gap-2 px-4 py-1.5 min-h-8",
         isClickable && "cursor-pointer hover:bg-gray-50 transition-colors",
       )}
       role={isClickable ? "button" : undefined}
@@ -107,10 +108,10 @@ function ErrorItemRow({
         }
       }}
     >
-      <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+      <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center pt-0.5">
         <NodeIcon node={item.node} componentIconMap={componentIconMap} />
       </div>
-      <div className="flex flex-1 items-center gap-2 min-w-0">
+      <div className="flex flex-1 items-start gap-2 min-w-0">
         <span className="text-xs text-gray-700 truncate">{nodeName}</span>
         <div
           className={`uppercase text-[10px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${badgeColor}`}
@@ -118,13 +119,15 @@ function ErrorItemRow({
           <span>{label}</span>
         </div>
         {item.execution.resultMessage && (
-          <span className="text-xs text-red-600 truncate max-w-[300px]">{item.execution.resultMessage}</span>
+          <span className={WORKFLOW_CONSOLE_FAILED_MESSAGE_CLASSNAME} title={item.execution.resultMessage}>
+            {item.execution.resultMessage}
+          </span>
         )}
       </div>
       {onAcknowledgeErrors && item.execution.id && (
         <AcknowledgeButton executionId={item.execution.id} onAcknowledgeErrors={onAcknowledgeErrors} />
       )}
-      <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+      <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap pt-0.5">
         {item.execution.createdAt ? <TimeAgo date={item.execution.createdAt} /> : ""}
       </span>
     </div>
