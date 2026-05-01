@@ -67,7 +67,7 @@ func TestHandleEnsureCloudBuildCreatesTopicAndSubscription(t *testing.T) {
 			ProjectID:  "demo-project",
 			AuthMethod: gcpcommon.AuthMethodWIF,
 		},
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			gcpcommon.SecretNameAccessToken: {
 				Name:  gcpcommon.SecretNameAccessToken,
 				Value: []byte("test-access-token"),
@@ -90,13 +90,13 @@ func TestHandleEnsureCloudBuildCreatesTopicAndSubscription(t *testing.T) {
 	require.NoError(t, mapstructure.Decode(integrationCtx.GetMetadata(), &metadata))
 	assert.Equal(t, expectedSubscriptionID, metadata.CloudBuildSubscription)
 
-	secret, ok := integrationCtx.Secrets[CloudBuildSecretName]
-	require.True(t, ok)
-	assert.NotEmpty(t, secret.Value)
+	secret, err := integrationCtx.Secrets().Get(CloudBuildSecretName)
+	require.NoError(t, err)
+	assert.NotEmpty(t, secret)
 	assert.Equal(t, "projects/demo-project/topics/cloud-builds", subscriptionRequestBody.Topic)
 	assert.Equal(
 		t,
-		"https://superplane.example/api/v1/integrations/"+integrationID+"/cloud-build-events?token="+string(secret.Value),
+		"https://superplane.example/api/v1/integrations/"+integrationID+"/cloud-build-events?token="+secret,
 		subscriptionRequestBody.PushConfig.PushEndpoint,
 	)
 }

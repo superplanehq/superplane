@@ -159,7 +159,6 @@ func Test__Pagerduty__Sync(t *testing.T) {
 				"subdomain": "example",
 				"authType":  AuthTypeAppOAuth,
 			},
-			Secrets: map[string]core.IntegrationSecret{},
 		}
 
 		err := p.Sync(core.SyncContext{
@@ -244,7 +243,6 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"region":       "us",
 				"subdomain":    "example",
@@ -297,7 +295,6 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"region":       "us",
 				"subdomain":    "example",
@@ -318,9 +315,9 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://identity.pagerduty.com/oauth/token", httpContext.Requests[0].URL.String())
 		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[1].URL.String())
-		secret, ok := integrationCtx.Secrets[AppAccessToken]
-		require.True(t, ok)
-		assert.Equal(t, []byte("access-123"), secret.Value)
+		secret, err := integrationCtx.Secrets().Get(AppAccessToken)
+		require.NoError(t, err)
+		assert.Equal(t, "access-123", secret)
 
 		metadata := integrationCtx.Metadata.(Metadata)
 		assert.Len(t, metadata.Services, 1)
