@@ -56,10 +56,7 @@ var defaultGitHubAppEvents = []string{
 }
 
 func init() {
-	registry.RegisterIntegrationWithOptions("github", &GitHub{}, registry.IntegrationRegistrationOptions{
-		WebhookHandler: &GitHubWebhookHandler{},
-		SetupProvider:  &SetupProvider{},
-	})
+	registry.RegisterIntegrationWithWebhookHandler("github", &GitHub{}, &GitHubWebhookHandler{})
 }
 
 type GitHub struct {

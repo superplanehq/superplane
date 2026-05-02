@@ -1,92 +1,14 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/core"
-	"golang.org/x/oauth2"
 )
-
-func NewClientFromStorageContexts(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
-	authMethod, err := properties.GetString(PropertyAuthMethod)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get authentication method: %v", err)
-	}
-
-	switch authMethod {
-	case AuthMethodPAT:
-		return NewPATClient(properties, secrets)
-	case AuthMethodGitHubApp:
-		return NewGitHubAppClient(properties, secrets)
-	default:
-		return nil, fmt.Errorf("invalid authentication method: %s", authMethod)
-	}
-}
-
-func NewPATClient(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
-	pat, err := secrets.Get(SecretPAT)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get PAT: %v", err)
-	}
-
-	pat = strings.TrimSpace(string(pat))
-	if pat == "" {
-		return nil, fmt.Errorf("PAT is required")
-	}
-
-	return github.NewClient(
-		oauth2.NewClient(
-			context.Background(),
-			oauth2.StaticTokenSource(&oauth2.Token{AccessToken: string(pat)}),
-		),
-	), nil
-}
-
-func NewGitHubAppClient(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*github.Client, error) {
-	appID, err := properties.GetString(PropertyAppID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get GitHub app ID: %v", err)
-	}
-
-	appNumber, err := strconv.ParseInt(appID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse GitHub app ID: %v", err)
-	}
-
-	installationID, err := properties.GetString(PropertyAppInstallationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get installation ID: %v", err)
-	}
-
-	installationNumber, err := strconv.ParseInt(installationID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
-	}
-
-	pem, err := secrets.Get(SecretAppPEM)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get PEM: %v", err)
-	}
-
-	itr, err := ghinstallation.New(
-		http.DefaultTransport,
-		appNumber,
-		installationNumber,
-		[]byte(pem),
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create apps transport: %v", err)
-	}
-
-	return github.NewClient(&http.Client{Transport: itr}), nil
-}
 
 func NewClient(ctx core.IntegrationContext, ghAppID int64, installationID string) (*github.Client, error) {
 	ID, err := strconv.Atoi(installationID)
