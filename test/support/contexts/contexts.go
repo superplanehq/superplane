@@ -3,6 +3,7 @@ package contexts
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -477,4 +478,90 @@ func (s *IntegrationSecretStorage) Update(name string, value string) error {
 
 	s.parentContext.CurrentSecrets[name] = core.IntegrationSecret{Name: name, Value: []byte(value)}
 	return nil
+}
+
+type IntegrationPropertyStorage struct {
+	values map[string]any
+}
+
+func NewIntegrationPropertyStorage() *IntegrationPropertyStorage {
+	return &IntegrationPropertyStorage{values: make(map[string]any)}
+}
+
+func (s *IntegrationPropertyStorage) Get(name string) (any, error) {
+	v, ok := s.values[name]
+	if !ok {
+		return nil, fmt.Errorf("property not found: %s", name)
+	}
+
+	return v, nil
+}
+
+func (s *IntegrationPropertyStorage) GetString(name string) (string, error) {
+	property, err := s.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	v, ok := property.(string)
+	if !ok {
+		return "", fmt.Errorf("property is not a string: %s", name)
+	}
+
+	return v, nil
+}
+
+func (s *IntegrationPropertyStorage) Delete(names ...string) error {
+	for _, n := range names {
+		delete(s.values, n)
+	}
+
+	return nil
+}
+
+func (s *IntegrationPropertyStorage) Create(def core.IntegrationPropertyDefinition) error {
+	s.values[def.Name] = def.Value
+
+	return nil
+}
+
+func (s *IntegrationPropertyStorage) CreateMany(defs []core.IntegrationPropertyDefinition) error {
+	for _, def := range defs {
+		err := s.Create(def)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type CapabilityContext struct {
+	RequestedCapabilties []string
+	EnabledCapabilities  []string
+	DisabledCapabilities []string
+}
+
+func (c *CapabilityContext) Enable(capabilities ...string) error {
+	c.EnabledCapabilities = append(c.EnabledCapabilities, capabilities...)
+	return nil
+}
+
+func (c *CapabilityContext) Disable(capabilities ...string) error {
+	c.DisabledCapabilities = append(c.DisabledCapabilities, capabilities...)
+	return nil
+}
+
+func (c *CapabilityContext) IsRequested(capabilities ...string) (bool, error) {
+	for _, capability := range capabilities {
+		if !slices.Contains(c.RequestedCapabilties, capability) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (c *CapabilityContext) Requested() []string {
+	return c.RequestedCapabilties
 }
