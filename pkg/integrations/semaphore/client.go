@@ -17,9 +17,40 @@ type Client struct {
 	http     core.HTTPContext
 }
 
+func NewClientWithAPIToken(http core.HTTPContext, parameters core.IntegrationPropertyStorageReader, apiToken string) (*Client, error) {
+	url, err := parameters.GetString("organizationUrl")
+	if err != nil {
+		return nil, fmt.Errorf("error getting organization URL: %v", err)
+	}
+
+	return &Client{
+		OrgURL:   url,
+		APIToken: string(apiToken),
+		http:     http,
+	}, nil
+}
+
+func NewClientWithStorageContexts(http core.HTTPContext, parameters core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+	url, err := parameters.GetString("organizationUrl")
+	if err != nil {
+		return nil, fmt.Errorf("error getting organization URL: %v", err)
+	}
+
+	apiToken, err := secrets.Get("apiToken")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		OrgURL:   url,
+		APIToken: string(apiToken),
+		http:     http,
+	}, nil
+}
+
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("no integration context")
+	if !ctx.LegacySetup() {
+		return NewClientWithStorageContexts(http, ctx.Properties(), ctx.Secrets())
 	}
 
 	orgURL, err := ctx.GetConfig("organizationUrl")
@@ -41,11 +72,18 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 
 type ProjectResponse struct {
 	Metadata *ProjectMetadata `json:"metadata"`
+	Spec     *ProjectSpec     `json:"spec"`
 }
 
 type ProjectMetadata struct {
 	ProjectName string `json:"name"`
 	ProjectID   string `json:"id"`
+}
+
+type ProjectSpec struct {
+	Repository struct {
+		URL string `json:"url"`
+	} `json:"repository"`
 }
 
 func (c *Client) GetProject(idOrName string) (*ProjectResponse, error) {

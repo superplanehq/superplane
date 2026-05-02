@@ -1,16 +1,11 @@
-import type { ConfigurationField } from "@/api-client";
+import type { ConfigurationField, OrganizationsIntegration } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import {
-  useAvailableIntegrations,
-  useDeleteIntegration,
-  useIntegration,
-  useUpdateIntegration,
-} from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -19,23 +14,23 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
+import { ArrowLeft, CircleX, ExternalLink, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { renderIntegrationMetadata } from "./integrationMetadataRenderers";
+import { Link, useNavigate } from "react-router-dom";
+import { renderIntegrationMetadata } from "./metadataRenderers";
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
 
-interface IntegrationDetailsProps {
+interface LegacyIntegrationDetailsProps {
   organizationId: string;
+  integration: OrganizationsIntegration;
 }
 
-export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) {
+export function LegacyIntegrationDetails({ organizationId, integration }: LegacyIntegrationDetailsProps) {
   const navigate = useNavigate();
-  const { integrationId } = useParams<{ integrationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
-  const { data: integration, isLoading, error } = useIntegration(organizationId, integrationId || "");
   usePageTitle(["Integrations", integration?.metadata?.name]);
+
   const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
   const [integrationName, setIntegrationName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -47,8 +42,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     ? availableIntegrations.find((i) => i.name === integration.metadata?.integrationName)
     : undefined;
 
-  const updateMutation = useUpdateIntegration(organizationId, integrationId || "");
-  const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
+  const updateMutation = useUpdateIntegration(organizationId, integration.metadata?.id || "");
+  const deleteMutation = useDeleteIntegration(organizationId, integration.metadata?.id || "");
   const integrationsHref = `/${organizationId}/settings/integrations`;
 
   // Initialize config values when installation loads
@@ -110,7 +105,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         </div>
       </div>
     );
-  }, [integration?.status?.metadata?.webhookUrl, integration?.status?.metadata?.webhookSigningSecretConfigured]);
+  }, [integration?.status?.metadata]);
 
   // Group usedIn nodes by workflow
   const workflowGroups = useMemo(() => {
@@ -204,46 +199,6 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
       showErrorToast("Failed to delete integration");
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="pt-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Link
-            to={integrationsHref}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
-            aria-label="Back to integrations"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h4 className="text-2xl font-semibold">Integration Details</h4>
-        </div>
-        <div className="flex justify-center items-center h-32">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-500 dark:text-gray-400" />
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !integration) {
-    return (
-      <div className="pt-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Link
-            to={integrationsHref}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
-            aria-label="Back to integrations"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h4 className="text-2xl font-semibold">Integration Details</h4>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-          <p className="text-gray-500 dark:text-gray-400">Integration not found</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="pt-6">
