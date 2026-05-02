@@ -203,14 +203,19 @@ func ListExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime t
 	return events, nil
 }
 
-func ListPendingCanvasEvents() ([]CanvasEvent, error) {
+func ListPendingCanvasEvents(limit int) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	err := database.Conn().
+	query := database.Conn().
 		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
 		Where("workflow_events.state = ?", CanvasEventStatePending).
 		Where("workflows.deleted_at IS NULL").
-		Find(&events).
-		Error
+		Order("workflow_events.created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&events).Error
 
 	if err != nil {
 		return nil, err

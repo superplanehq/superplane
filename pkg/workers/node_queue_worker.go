@@ -26,9 +26,10 @@ import (
 )
 
 type NodeQueueWorker struct {
-	registry  *registry.Registry
-	semaphore *semaphore.Weighted
-	logger    *log.Entry
+	registry            *registry.Registry
+	semaphore           *semaphore.Weighted
+	logger              *log.Entry
+	maxResourcesPerTick int
 
 	rabbitMQURL string
 	consumer    *tackle.Consumer
@@ -36,10 +37,11 @@ type NodeQueueWorker struct {
 
 func NewNodeQueueWorker(registry *registry.Registry, rabbitMQURL string) *NodeQueueWorker {
 	return &NodeQueueWorker{
-		registry:    registry,
-		rabbitMQURL: rabbitMQURL,
-		semaphore:   semaphore.NewWeighted(25),
-		logger:      log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
+		registry:            registry,
+		rabbitMQURL:         rabbitMQURL,
+		semaphore:           semaphore.NewWeighted(defaultWorkerConcurrency),
+		logger:              log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
+		maxResourcesPerTick: defaultWorkerConcurrency,
 	}
 }
 
@@ -69,7 +71,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			nodes, err := models.ListCanvasNodesReady()
+			nodes, err := models.ListCanvasNodesReady(w.maxResourcesPerTick)
 			if err != nil {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
@@ -78,7 +80,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 
 			for _, node := range nodes {
 				logger := logging.WithNode(w.logger, node)
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -86,7 +88,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 				go func(node models.CanvasNode) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessNode(logger, node); err != nil {
+					if _, err := w.LockAndProcessNode(logger, node); err != nil {
 						logger.Errorf("Error processing: %v", err)
 					}
 				}(node)
@@ -116,12 +118,16 @@ func (w *NodeQueueWorker) StartRabbitMQConsumer(ctx context.Context) {
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
 			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasQueueItemCreatedRoutingKey, err)
-			time.Sleep(5 * time.Second)
+			if !sleepWithContext(ctx, 5*time.Second) {
+				return
+			}
 			continue
 		}
 
 		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasQueueItemCreatedRoutingKey)
-		time.Sleep(5 * time.Second)
+		if !sleepWithContext(ctx, 5*time.Second) {
+			return
+		}
 	}
 }
 
@@ -157,10 +163,11 @@ func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
 	// Node is ready for processing, let's lock it and process it.
 	//
 	logger := logging.WithNode(w.logger, *node)
-	return w.LockAndProcessNode(logger, *node)
+	_, err = w.LockAndProcessNode(logger, *node)
+	return err
 }
 
-func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {
+func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) (bool, error) {
 	var executionIDs []*uuid.UUID
 	var queueItem *models.CanvasNodeQueueItem
 
@@ -169,6 +176,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		newEvents = append(newEvents, events...)
 	}
 
+	processed := false
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
@@ -176,11 +184,16 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 			return nil
 		}
 
+		processed = true
 		executionIDs, queueItem, err = w.processNode(tx, logger, n, onNewEvents)
 		return err
 	})
 
-	if err == nil {
+	if err != nil {
+		return false, err
+	}
+
+	if processed {
 		if len(executionIDs) > 0 {
 			for _, executionID := range executionIDs {
 				if executionID == nil {
@@ -208,7 +221,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		}
 	}
 
-	return err
+	return processed, nil
 }
 
 func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, *models.CanvasNodeQueueItem, error) {

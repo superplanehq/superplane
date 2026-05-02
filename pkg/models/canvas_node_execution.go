@@ -129,11 +129,15 @@ func CreatePendingChildExecution(tx *gorm.DB, parent *CanvasNodeExecution, child
 	return &execution, nil
 }
 
-func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
+func ListPendingNodeExecutions(limit int) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	query := database.Conn().
 		Where("state = ?", CanvasNodeExecutionStatePending).
-		Order("created_at DESC")
+		Order("created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
 
 	err := query.Find(&executions).Error
 	if err != nil {

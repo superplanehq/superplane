@@ -46,9 +46,12 @@ type InvokeAction struct {
 func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 	var request CanvasNodeRequest
 
+	now := time.Now()
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Where("run_at <= ?", now).
 		First(&request).
 		Error
 
@@ -59,19 +62,24 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 	return &request, nil
 }
 
-func ListNodeRequests() ([]CanvasNodeRequest, error) {
+func ListNodeRequests(limit int) ([]CanvasNodeRequest, error) {
 	var requests []CanvasNodeRequest
 
 	now := time.Now()
-	err := database.Conn().
+	query := database.Conn().
 		Joins("JOIN workflow_nodes ON workflow_node_requests.workflow_id = workflow_nodes.workflow_id AND workflow_node_requests.node_id = workflow_nodes.node_id").
 		Joins("JOIN workflows ON workflow_node_requests.workflow_id = workflows.id").
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
 		Where("workflow_node_requests.run_at <= ?", now).
 		Where("workflow_nodes.deleted_at IS NULL").
 		Where("workflows.deleted_at IS NULL").
-		Find(&requests).
-		Error
+		Order("workflow_node_requests.run_at ASC, workflow_node_requests.created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&requests).Error
 
 	if err != nil {
 		return nil, err

@@ -47,8 +47,9 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	// Create the root event for the trigger node, and process it.
 	//
 	event := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
-	err := router.LockAndProcessEvent(logger, *event)
+	processed, err := router.LockAndProcessEvent(logger, *event)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	//
 	// Verify event was marked as routed and
@@ -112,8 +113,9 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	outputEvent := events[0]
-	err = router.LockAndProcessEvent(logger, outputEvent)
+	processed, err := router.LockAndProcessEvent(logger, outputEvent)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	updatedEvent, err := models.FindCanvasEvent(outputEvent.ID)
 	require.NoError(t, err)
@@ -217,8 +219,9 @@ func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(logger, childOutputEvent)
+	processed, err := router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	parent, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
@@ -319,8 +322,9 @@ func TestEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 5)
 	childOutputEvent := events[0]
-	err = router.LockAndProcessEvent(logger, childOutputEvent)
+	processed, err := router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
+	assert.True(t, processed)
 
 	parent, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
