@@ -254,7 +254,6 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
                   renderValidationDecorations: "off",
                   overflowWidgetsDomNode: document.body,
                 }}
-
               />
             </div>
           </DialogContent>
