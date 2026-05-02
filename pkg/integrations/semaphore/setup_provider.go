@@ -2,6 +2,7 @@ package semaphore
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,50 +10,20 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/components"
 )
 
 type SetupProvider struct{}
 
-const organizationURLInstructions = `You can find the URL in the address bar of your browser when you are on the Semaphore organization page. It follows the format:
-~~~text
-https://<organization-name>.semaphoreci.com
-~~~
-For example, if your organization name is **superplane**, the URL would be:
-~~~text
-https://superplane.semaphoreci.com
-~~~`
+//go:embed templates/organization-url-instructions.tpl
+var organizationURLInstructionsTemplate []byte
 
-const apiTokenTemplate = `
-There are two ways to provide a Semaphore API token:
-1. Use a service account - **recommended**
-2. Use a personal API token
----
-## 1. Use a service account
-If your organization has access to service accounts, you can use one of them to connect to SuperPlane.
-- Go to {{ .OrganizationURL }}/people
-- Create a service account, with the **Admin** role
-- Copy its API token and paste below
----
-## 2. Use a personal API token
-If your organization does not have access to service accounts, you can use a personal API token to connect to SuperPlane:
-- Go to {{ .OrganizationURL }}
-- On the top right corner, click on your avatar and select **Profile Settings**
-- Reset the API token, copy it and paste below
-> **Warning:**
-> This will revoke the current token and generate a new one, so any existing workflows that use this token will stop working.
-`
+//go:embed templates/api-token-instructions.tpl
+var apiTokenInstructionsTemplate []byte
 
-const setupCompletedTemplate = `
-{{- $organizationURL := .OrganizationURL }}
-You are now connected to {{ $organizationURL }}
----
-You can now start using the following projects:
-| Project | Repository |
-|---------|------------|
-{{- range .Projects }}
-| [{{ .Metadata.ProjectName }}]({{ $organizationURL }}/projects/{{ .Metadata.ProjectName }}) | ` + "`{{ .Spec.Repository.URL }}`" + ` |
-{{- end }}
-`
+//go:embed templates/setup-complete.tpl
+var setupCompleteTemplate []byte
 
 func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.Trigger) []core.Capability {
 	capabilities := []core.Capability{}
@@ -85,11 +56,11 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 			Label: "All",
 			Capabilities: s.genCapabilities(
 				[]core.Action{
-					&RunWorkflow{},
-					&GetPipeline{},
+					&components.RunWorkflow{},
+					&components.GetPipeline{},
 				},
 				[]core.Trigger{
-					&OnPipelineDone{},
+					&components.OnPipelineDone{},
 				},
 			),
 		},
@@ -124,7 +95,7 @@ func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 				Default:  "https://hello.semaphoreci.com",
 			},
 		},
-		Instructions: organizationURLInstructions,
+		Instructions: string(organizationURLInstructionsTemplate),
 	}
 }
 
@@ -173,7 +144,7 @@ func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 		//
 		// Validate the connection to Semaphore
 		//
-		client, err := NewClientWithAPIToken(ctx.HTTP, ctx.Properties, v)
+		client, err := common.NewClientWithAPIToken(ctx.HTTP, ctx.Properties, v)
 		if err != nil {
 			return nil, fmt.Errorf("error creating client: %v", err)
 		}
@@ -182,7 +153,7 @@ func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 		// Semaphore doesn't have a whoami endpoint, so
 		// we list projects just to verify that the connection is working.
 		//
-		_, err = client.listProjects()
+		_, err = client.ListProjects()
 		if err != nil {
 			return nil, fmt.Errorf("error listing projects: %v", err)
 		}
@@ -226,7 +197,7 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 		return nil, fmt.Errorf("error creating configuration: %v", err)
 	}
 
-	tmpl, err := template.New("apiToken").Parse(apiTokenTemplate)
+	tmpl, err := template.New("apiToken").Parse(string(apiTokenInstructionsTemplate))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing template: %v", err)
 	}
@@ -291,7 +262,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	//
 	// Validate the connection to Semaphore
 	//
-	client, err := NewClientWithStorageContexts(ctx.HTTP, ctx.Properties, ctx.Secrets)
+	client, err := common.NewClientWithStorageContexts(ctx.HTTP, ctx.Properties, ctx.Secrets)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}
@@ -300,7 +271,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	// Semaphore doesn't have a whoami endpoint, so
 	// we list projects just to verify that the connection is working.
 	//
-	projects, err := client.listProjects()
+	projects, err := client.ListProjects()
 	if err != nil {
 		return nil, fmt.Errorf("error listing projects: %v", err)
 	}
@@ -315,7 +286,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error getting organization URL: %v", err)
 	}
 
-	tmpl, err := template.New("setupCompleted").Parse(setupCompletedTemplate)
+	tmpl, err := template.New("setupCompleted").Parse(string(setupCompleteTemplate))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing template: %v", err)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
 )
 
 func Test__SemaphoreWebhookHandler__CompareConfig(t *testing.T) {
@@ -19,10 +20,10 @@ func Test__SemaphoreWebhookHandler__CompareConfig(t *testing.T) {
 	}{
 		{
 			name: "identical configurations",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				Project: "my-project",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				Project: "my-project",
 			},
 			expectEqual: true,
@@ -30,10 +31,10 @@ func Test__SemaphoreWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "different projects",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				Project: "my-project",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				Project: "other-project",
 			},
 			expectEqual: false,
@@ -53,7 +54,7 @@ func Test__SemaphoreWebhookHandler__CompareConfig(t *testing.T) {
 		{
 			name:    "invalid first configuration",
 			configA: "invalid",
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				Project: "my-project",
 			},
 			expectEqual: false,
@@ -61,7 +62,7 @@ func Test__SemaphoreWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "invalid second configuration",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				Project: "my-project",
 			},
 			configB:     "invalid",
