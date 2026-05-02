@@ -31,7 +31,7 @@ export function CapabilityIntegrationPropertiesTab({
 
   return (
     <div className="space-y-6 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-      {integrationProperties.map(property => {
+      {integrationProperties.map((property) => {
         const propertyName = property.name!;
         const title = property.label!;
         const isEditable = property.editable === true;
@@ -41,7 +41,10 @@ export function CapabilityIntegrationPropertiesTab({
         const savingThisProperty = isSavingProperty(propertyName);
 
         return (
-          <div key={propertyName} className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0 dark:border-gray-800">
+          <div
+            key={propertyName}
+            className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0 dark:border-gray-800"
+          >
             <div className="text-sm font-medium text-gray-800 dark:text-gray-100">{title}</div>
             {property.description ? (
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{property.description}</p>

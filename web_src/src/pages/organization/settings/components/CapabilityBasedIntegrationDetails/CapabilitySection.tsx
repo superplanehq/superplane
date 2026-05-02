@@ -18,10 +18,7 @@ export interface CapabilitySectionProps {
   canUpdateIntegrations: boolean;
   permissionsLoading: boolean;
   capabilitiesMutationPending: boolean;
-  onQueueCapabilityStateChange: (
-    capability: DisplayCapability,
-    nextState: IntegrationCapabilityStateState,
-  ) => void;
+  onQueueCapabilityStateChange: (capability: DisplayCapability, nextState: IntegrationCapabilityStateState) => void;
 }
 
 export function CapabilitySection({
@@ -68,20 +65,13 @@ export function CapabilitySection({
                 >
                   <td className="px-4 py-3 align-middle">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)}
-                        aria-hidden
-                      />
-                      <span className="font-mono text-sm text-gray-800 dark:text-gray-100">
-                        {capability.name}
-                      </span>
+                      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", statusDotClass)} aria-hidden />
+                      <span className="font-mono text-sm text-gray-800 dark:text-gray-100">{capability.name}</span>
                       <CopyButton text={capability.name} />
                     </div>
                   </td>
                   <td className="px-4 py-3 align-middle">
-                    {description ? (
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div>
-                    ) : null}
+                    {description ? <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div> : null}
                   </td>
                   <td className="px-4 py-3 align-middle text-right">
                     <PermissionTooltip

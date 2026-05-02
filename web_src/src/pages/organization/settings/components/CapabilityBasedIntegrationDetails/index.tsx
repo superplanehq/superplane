@@ -59,9 +59,7 @@ export function CapabilityBasedIntegrationDetails({
   const canDeleteIntegrations = canAct("integrations", "delete");
 
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
-  const integrationDef = integration
-    ? availableIntegrations.find((i) => i.name === providerName)
-    : undefined;
+  const integrationDef = integration ? availableIntegrations.find((i) => i.name === providerName) : undefined;
 
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
   const updateCapabilitiesMutation = useUpdateIntegrationCapabilities(organizationId, integrationId || "");
@@ -198,9 +196,7 @@ export function CapabilityBasedIntegrationDetails({
                 (integration.status?.state || "unknown").slice(1)
               }
             ></span>
-            <span>
-              {integration.metadata?.name}
-            </span>
+            <span>{integration.metadata?.name}</span>
           </h4>
           {integration.metadata?.id ? (
             <div className="mt-1.5 flex max-w-full items-center gap-1.5">

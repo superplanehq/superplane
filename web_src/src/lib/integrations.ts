@@ -1,4 +1,8 @@
-import type { IntegrationSetupStepDefinition, IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
+import type {
+  IntegrationSetupStepDefinition,
+  IntegrationsIntegrationDefinition,
+  OrganizationsIntegration,
+} from "@/api-client";
 
 export function isCapabilityBasedIntegration(integration: OrganizationsIntegration) {
   if (!integration) return false;
