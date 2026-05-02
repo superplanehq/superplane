@@ -214,18 +214,13 @@ func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integ
 		return fmt.Errorf("failed to get setup provider: %v", err)
 	}
 
-	secretStorage, err := contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration)
-	if err != nil {
-		return err
-	}
-
 	capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
 	nextStep, err := setupProvider.OnCapabilityUpdate(core.CapabilityUpdateContext{
 		Logger:       logging.ForIntegration(*integration),
 		Changes:      map[core.IntegrationCapabilityState][]string{core.IntegrationCapabilityStateRequested: capabilities},
 		HTTP:         registry.HTTPContext(),
 		Properties:   contexts.NewIntegrationPropertyStorage(integration),
-		Secrets:      secretStorage,
+		Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 		Capabilities: capabilityCtx,
 	})
 

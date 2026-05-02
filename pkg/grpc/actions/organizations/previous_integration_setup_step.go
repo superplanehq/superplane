@@ -66,13 +66,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		secretStorage, err := contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration)
-		if err != nil {
-			return err
-		}
-
 		stepToRevert := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
-
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
 		ctx := core.SetupStepContext{
 			Step:           stepToRevert.Name,
@@ -80,7 +74,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),
 			Properties:     contexts.NewIntegrationPropertyStorage(integration),
-			Secrets:        secretStorage,
+			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:   capabilityCtx,
 		}
 
