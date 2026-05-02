@@ -1,4 +1,4 @@
-package semaphore
+package components
 
 import (
 	"crypto/hmac"

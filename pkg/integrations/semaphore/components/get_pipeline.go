@@ -1,4 +1,4 @@
-package semaphore
+package components
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
 )
 
 type GetPipeline struct{}
@@ -94,7 +95,7 @@ func (c *GetPipeline) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

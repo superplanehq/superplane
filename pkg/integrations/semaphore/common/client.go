@@ -1,4 +1,4 @@
-package semaphore
+package common
 
 import (
 	"bytes"
@@ -92,7 +92,7 @@ func (c *Client) GetProject(idOrName string) (*ProjectResponse, error) {
 		return c.getProjectByName(idOrName)
 	}
 
-	projects, err := c.listProjects()
+	projects, err := c.ListProjects()
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (c *Client) getProjectByName(name string) (*ProjectResponse, error) {
 	return &project, nil
 }
 
-func (c *Client) listProjects() ([]ProjectResponse, error) {
+func (c *Client) ListProjects() ([]ProjectResponse, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/projects", c.OrgURL)
 	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
