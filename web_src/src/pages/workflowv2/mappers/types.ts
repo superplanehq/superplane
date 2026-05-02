@@ -178,6 +178,8 @@ export interface EventStateRegistry {
  */
 export interface CustomFieldRendererContext {
   onRun?: (initialData?: string) => void;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
   integration?: OrganizationsIntegration;
 }

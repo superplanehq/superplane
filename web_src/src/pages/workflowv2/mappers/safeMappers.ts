@@ -1,5 +1,5 @@
 import React from "react";
-import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps, CustomFieldRunContext } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
   ComponentBaseContext,
@@ -10,6 +10,7 @@ import type {
 } from "./types";
 
 type UnknownRecord = Record<string, unknown>;
+type CustomFieldFunction = (onRun?: () => void, context?: CustomFieldRunContext) => React.ReactNode;
 
 export const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 
@@ -84,9 +85,9 @@ function sanitizeCustomField(
   mapperName: string,
 ): ComponentBaseProps["customField"] {
   if (typeof customField === "function") {
-    return (onRun, nodeId) => {
+    return (onRun, context) => {
       try {
-        return sanitizeReactNodeValue(customField(onRun, nodeId));
+        return sanitizeReactNodeValue(customField(onRun, context));
       } catch (error) {
         console.error(`[SafeMapper] Component mapper "${mapperName}" threw in customField():`, error);
         return null;
@@ -225,10 +226,10 @@ function buildLastEventData(lastEventData: unknown, fallbackTitle: string): Trig
 
 function normalizeTriggerCustomField(customField: unknown): ComponentBaseProps["customField"] {
   if (typeof customField === "function") {
-    return (onRun, nodeId) => {
+    return (onRun, context) => {
       try {
-        const fn = customField as (onRun?: () => void, nodeId?: string) => React.ReactNode;
-        return sanitizeReactNodeValue(fn(onRun, nodeId));
+        const fn = customField as CustomFieldFunction;
+        return sanitizeReactNodeValue(fn(onRun, context));
       } catch (error) {
         console.error("[SafeMapper] Trigger customField() threw:", error);
         return null;
