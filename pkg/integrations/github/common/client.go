@@ -16,7 +16,7 @@ func NewClient(ctx core.IntegrationContext, ghAppID int64, installationID string
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := FindSecret(ctx, SecretAppPEM)
+	pem, err := FindSecret(ctx, GitHubAppPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find PEM: %v", err)
 	}

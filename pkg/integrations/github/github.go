@@ -25,10 +25,6 @@ import (
 )
 
 const (
-	GitHubAppPEM           = "pem"
-	GitHubAppClientSecret  = "clientSecret"
-	GitHubAppWebhookSecret = "webhookSecret"
-
 	appBootstrapDescription = `
 To complete the GitHub app setup:
 
@@ -209,7 +205,7 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata common.Metadata) {
-	webhookSecret, err := common.FindSecret(ctx.Integration, GitHubAppWebhookSecret)
+	webhookSecret, err := common.FindSecret(ctx.Integration, common.GitHubAppWebhookSecret)
 	if err != nil {
 		ctx.Logger.Errorf("Error finding webhook secret: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
@@ -350,21 +346,21 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata common.M
 	//
 	// Save installation secrets
 	//
-	err = ctx.Integration.SetSecret(GitHubAppClientSecret, []byte(appData.ClientSecret))
+	err = ctx.Integration.SetSecret(common.GitHubAppClientSecret, []byte(appData.ClientSecret))
 	if err != nil {
 		ctx.Logger.Errorf("failed to save client secret: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	err = ctx.Integration.SetSecret(GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
+	err = ctx.Integration.SetSecret(common.GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
 	if err != nil {
 		ctx.Logger.Errorf("failed to save webhook secret: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	err = ctx.Integration.SetSecret(GitHubAppPEM, []byte(appData.PEM))
+	err = ctx.Integration.SetSecret(common.GitHubAppPEM, []byte(appData.PEM))
 	if err != nil {
 		ctx.Logger.Errorf("failed to save PEM: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
