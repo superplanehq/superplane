@@ -53,7 +53,7 @@ func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.T
 func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 	return []core.CapabilityGroup{
 		{
-			Label: "All",
+			Label: "Workflows",
 			Capabilities: s.genCapabilities(
 				[]core.Action{
 					&components.RunWorkflow{},
