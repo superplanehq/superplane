@@ -10,7 +10,10 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("semaphore", &Semaphore{}, &SemaphoreWebhookHandler{})
+	registry.RegisterIntegrationWithOptions("semaphore", &Semaphore{}, registry.IntegrationRegistrationOptions{
+		WebhookHandler: &SemaphoreWebhookHandler{},
+		SetupProvider:  &SetupProvider{},
+	})
 }
 
 type Semaphore struct{}
