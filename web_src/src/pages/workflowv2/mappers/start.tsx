@@ -7,6 +7,7 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
+import type { CustomFieldRunContext } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -22,6 +23,14 @@ interface StartTemplate {
 
 interface StartConfiguration {
   templates?: StartTemplate[];
+}
+
+function runWithPendingData(nodeId: string, initialData: string | undefined, onRun: () => void): void {
+  window.__pendingRunData = { nodeId, initialData };
+  onRun();
+  setTimeout(() => {
+    delete window.__pendingRunData;
+  }, 100);
 }
 
 /**
@@ -40,26 +49,11 @@ export const startTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const nodeId = node.id;
 
-    const customField = (
-      onRunBase?: () => void,
-      runContext?: { runDisabled?: boolean; runDisabledTooltip?: string },
-    ) => {
-      const onRun = onRunBase
-        ? (initialData?: string) => {
-            (window as any).__pendingRunData = { nodeId, initialData };
-            onRunBase();
-            setTimeout(() => {
-              delete (window as any).__pendingRunData;
-            }, 100);
-          }
-        : undefined;
-
-      return startCustomFieldRenderer.render(node, {
-        onRun,
-        runDisabled: runContext?.runDisabled,
-        runDisabledTooltip: runContext?.runDisabledTooltip,
+    const customField = (onRunBase?: () => void, runContext?: CustomFieldRunContext) =>
+      startCustomFieldRenderer.render(node, {
+        onRun: onRunBase ? (initialData?: string) => runWithPendingData(nodeId, initialData, onRunBase) : undefined,
+        ...runContext,
       });
-    };
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
