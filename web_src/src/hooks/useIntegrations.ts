@@ -13,7 +13,11 @@ import {
   organizationsUpdateIntegrationProperty,
   organizationsUpdateIntegrationCapabilities,
 } from "@/api-client/sdk.gen";
-import type { IntegrationCapabilityState, IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client/types.gen";
+import type {
+  IntegrationCapabilityState,
+  IntegrationsIntegrationDefinition,
+  OrganizationsIntegration,
+} from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { analytics } from "@/lib/analytics";
@@ -134,7 +138,12 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { integrationName: string; name: string; configuration?: Record<string, unknown>, capabilities?: string[] }) => {
+    mutationFn: async (data: {
+      integrationName: string;
+      name: string;
+      configuration?: Record<string, unknown>;
+      capabilities?: string[];
+    }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
           path: { id: organizationId },

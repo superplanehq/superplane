@@ -5,11 +5,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import {
-  useAvailableIntegrations,
-  useDeleteIntegration,
-  useUpdateIntegration,
-} from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -109,7 +105,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
         </div>
       </div>
     );
-  }, [integration?.status?.metadata?.webhookUrl, integration?.status?.metadata?.webhookSigningSecretConfigured]);
+  }, [integration?.status?.metadata]);
 
   // Group usedIn nodes by workflow
   const workflowGroups = useMemo(() => {

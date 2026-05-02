@@ -9,12 +9,7 @@ interface StepHistoryProps {
   discardDisabled?: boolean;
 }
 
-export function StepHistory({
-  previousSteps,
-  currentStep,
-  onDiscard,
-  discardDisabled = false,
-}: StepHistoryProps) {
+export function StepHistory({ previousSteps, currentStep, onDiscard, discardDisabled = false }: StepHistoryProps) {
   const hasTrail = previousSteps.length > 0 || Boolean(currentStep);
 
   return (

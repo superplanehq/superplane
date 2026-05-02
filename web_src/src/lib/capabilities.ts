@@ -1,4 +1,9 @@
-import type { IntegrationsCapabilityDefinition, IntegrationsIntegrationDefinition, SuperplaneActionsAction, TriggersTrigger } from "@/api-client";
+import type {
+  IntegrationsCapabilityDefinition,
+  IntegrationsIntegrationDefinition,
+  SuperplaneActionsAction,
+  TriggersTrigger,
+} from "@/api-client";
 
 export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefinition[]): SuperplaneActionsAction[] {
   return capabilities

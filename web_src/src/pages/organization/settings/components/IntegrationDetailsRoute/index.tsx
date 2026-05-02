@@ -2,15 +2,15 @@ import { useIntegration } from "@/hooks/useIntegrations";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { LegacyIntegrationDetails } from "./LegacyIntegrationDetails";
-import { CapabilityBasedIntegrationDetails } from "./CapabilityBasedIntegrationDetails";
-import { OrganizationsIntegration } from "@/api-client";
+import { CapabilityBasedIntegrationDetails } from "../CapabilityBasedIntegrationDetails";
+import type { OrganizationsIntegration } from "@/api-client";
 
 interface IntegrationDetailsRouteProps {
   organizationId: string;
 }
 
 function isCapabilityBasedIntegration(integration: OrganizationsIntegration) {
-  return integration.status?.legacySetup === false
+  return integration.status?.legacySetup === false;
 }
 
 export function IntegrationDetailsRoute({ organizationId }: IntegrationDetailsRouteProps) {

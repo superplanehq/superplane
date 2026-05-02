@@ -1,14 +1,15 @@
 import type { IntegrationSetupStepDefinition } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
+import { getMissingRequiredFields } from "./integrationSetupHelpers";
 import { Instructions } from "./Instructions";
 import { ArrowLeft, MoveRight } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface InputsStepProps {
   organizationId: string;
   step: IntegrationSetupStepDefinition;
   values: Record<string, unknown>;
-  validationErrors?: Set<string>;
   onBack?: () => void;
   onChange: (fieldName: string, value: unknown) => void;
   onSubmit: () => void;
@@ -20,13 +21,39 @@ export function InputsStep({
   organizationId,
   step,
   values,
-  validationErrors,
   onBack,
   onChange,
   onSubmit,
   isReverting,
   isSubmitting,
 }: InputsStepProps) {
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setValidationErrors(new Set());
+  }, [step.name, step.type]);
+
+  const handleFieldChange = (fieldName: string, value: unknown) => {
+    setValidationErrors((current) => {
+      if (!current.has(fieldName)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.delete(fieldName);
+      return next;
+    });
+    onChange(fieldName, value);
+  };
+
+  const handleSubmitClick = () => {
+    const missingRequiredFields = getMissingRequiredFields(step.inputs, values);
+    if (missingRequiredFields.size > 0) {
+      setValidationErrors(missingRequiredFields);
+      return;
+    }
+    onSubmit();
+  };
+
   const fields = (step.inputs || []).filter((field) => Boolean(field.name));
   const hasInstructions = Boolean(step.instructions?.trim());
 
@@ -39,7 +66,7 @@ export function InputsStep({
             key={fieldName}
             field={field}
             value={values[fieldName]}
-            onChange={(value) => onChange(fieldName, value)}
+            onChange={(value) => handleFieldChange(fieldName, value)}
             allValues={values}
             domainId={organizationId}
             domainType="DOMAIN_TYPE_ORGANIZATION"
@@ -66,7 +93,7 @@ export function InputsStep({
           </Button>
         ) : null}
         <Button
-          onClick={onSubmit}
+          onClick={handleSubmitClick}
           disabled={Boolean(isSubmitting || isReverting)}
           className="group justify-center gap-2 text-sm !px-7 hover:!bg-primary"
         >
