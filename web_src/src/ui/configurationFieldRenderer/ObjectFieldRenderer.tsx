@@ -252,7 +252,9 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
                   ...editorOptions,
                   automaticLayout: true,
                   renderValidationDecorations: "off",
+                  overflowWidgetsDomNode: document.body,
                 }}
+
               />
             </div>
           </DialogContent>
