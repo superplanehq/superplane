@@ -53,10 +53,6 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		return NewClientWithStorageContexts(http, ctx.Properties(), ctx.Secrets())
 	}
 
-	if ctx == nil {
-		return nil, fmt.Errorf("no integration context")
-	}
-
 	orgURL, err := ctx.GetConfig("organizationUrl")
 	if err != nil {
 		return nil, err
