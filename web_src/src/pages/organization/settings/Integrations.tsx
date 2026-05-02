@@ -301,10 +301,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       {connectedCount} connected instance{connectedCount === 1 ? "" : "s"}
                     </p>
                     {item.instances.map((integration, index) => {
-                      const integrationDisplayName =
-                        integration.metadata?.name ||
-                        getIntegrationTypeDisplayName(undefined, integration.metadata?.integrationName) ||
-                        integration.metadata?.integrationName;
+                      const integrationDisplayName = integration.metadata?.name;
                       const statusLabel = integration.status?.state
                         ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
                         : "Unknown";

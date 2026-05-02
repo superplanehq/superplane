@@ -11,7 +11,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useMemo } from "react";
 import { DEFAULT_CAPABILITY_STATE, type DisplayCapability, getCapabilityLabel } from "./lib";
 
-export interface CapabilityIntegrationCapabilitiesTabProps {
+export interface CapabilitiesTabProps {
   integration: OrganizationsIntegration;
   integrationDef: IntegrationsIntegrationDefinition | undefined;
   capabilityStates: Record<string, IntegrationCapabilityStateState>;
@@ -22,7 +22,7 @@ export interface CapabilityIntegrationCapabilitiesTabProps {
   onApplyCapabilityChanges: (updates: IntegrationCapabilityState[]) => void | Promise<void>;
 }
 
-export function CapabilityIntegrationCapabilitiesTab({
+export function CapabilitiesTab({
   integration,
   integrationDef,
   capabilityStates,
@@ -31,7 +31,7 @@ export function CapabilityIntegrationCapabilitiesTab({
   permissionsLoading,
   capabilitiesMutationPending,
   onApplyCapabilityChanges,
-}: CapabilityIntegrationCapabilitiesTabProps) {
+}: CapabilitiesTabProps) {
   const capabilities = useMemo(() => {
     const byName = new Map<string, DisplayCapability>();
 

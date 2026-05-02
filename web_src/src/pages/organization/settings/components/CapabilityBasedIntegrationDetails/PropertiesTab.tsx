@@ -4,7 +4,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import type { Dispatch, SetStateAction } from "react";
 
-export interface CapabilityIntegrationPropertiesTabProps {
+export interface PropertiesTabProps {
   integrationProperties: IntegrationProperty[];
   propertyDrafts: Record<string, string>;
   setPropertyDrafts: Dispatch<SetStateAction<Record<string, string>>>;
@@ -15,7 +15,7 @@ export interface CapabilityIntegrationPropertiesTabProps {
   isSavingProperty: (propertyName: string | undefined) => boolean;
 }
 
-export function CapabilityIntegrationPropertiesTab({
+export function PropertiesTab({
   integrationProperties,
   propertyDrafts,
   setPropertyDrafts,
@@ -24,7 +24,7 @@ export function CapabilityIntegrationPropertiesTab({
   settingsMutationBusy,
   saveProperty,
   isSavingProperty,
-}: CapabilityIntegrationPropertiesTabProps) {
+}: PropertiesTabProps) {
   if (integrationProperties.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">No properties for this integration.</p>;
   }

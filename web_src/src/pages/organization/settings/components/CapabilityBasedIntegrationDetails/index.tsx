@@ -1,6 +1,7 @@
 import type {
   IntegrationCapabilityState,
   IntegrationCapabilityStateState,
+  IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
 } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -23,11 +24,11 @@ import { Alert, AlertDescription } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { CopyButton } from "@/ui/CopyButton";
 import { ArrowLeft, CircleX, Plug, Trash2 } from "lucide-react";
-import { CapabilityIntegrationCapabilitiesTab } from "./CapabilitiesTab";
-import { CapabilityIntegrationPropertiesTab } from "./PropertiesTab";
-import { CapabilityIntegrationSecretsTab } from "./SecretsTab";
-import { CapabilityIntegrationUsageTab } from "./UsageTab";
-import { DEFAULT_CAPABILITY_STATE } from "./lib";
+import { CapabilitiesTab } from "./CapabilitiesTab";
+import { PropertiesTab } from "./PropertiesTab";
+import { SecretsTab } from "./SecretsTab";
+import { UsageTab } from "./UsageTab";
+import { DEFAULT_CAPABILITY_STATE, getActiveTabClass } from "./lib";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -35,12 +36,6 @@ interface CapabilityBasedIntegrationDetailsProps {
   organizationId: string;
   integration: OrganizationsIntegration;
 }
-
-const getActiveTabClass = (activeTab?: boolean) => {
-  return activeTab
-    ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300";
-};
 
 export function CapabilityBasedIntegrationDetails({
   organizationId,
@@ -65,8 +60,6 @@ export function CapabilityBasedIntegrationDetails({
   const updateCapabilitiesMutation = useUpdateIntegrationCapabilities(organizationId, integrationId || "");
   const updatePropertyMutation = useUpdateIntegrationProperty(organizationId, integrationId || "");
   const updateSecretMutation = useUpdateIntegrationSecret(organizationId, integrationId || "");
-  const integrationsHref = `/${organizationId}/settings/integrations`;
-
   const integrationProperties = useMemo(() => integration?.status?.properties ?? [], [integration?.status?.properties]);
   const integrationSecrets = useMemo(() => integration?.status?.secrets ?? [], [integration?.status?.secrets]);
 
@@ -174,71 +167,14 @@ export function CapabilityBasedIntegrationDetails({
 
   return (
     <div className="pt-6">
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <Link
-          to={integrationsHref}
-          className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
-          aria-label="Back to integrations"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <IntegrationIcon
-          integrationName={integration?.metadata?.integrationName}
-          iconSlug={integrationDef?.icon}
-          className="w-6 h-6"
-        />
-        <div className="flex-1 min-w-[200px]">
-          <h4 className="flex items-center text-2xl font-medium">
-            <span
-              className="inline-flex shrink-0"
-              title={
-                (integration.status?.state || "unknown").charAt(0).toUpperCase() +
-                (integration.status?.state || "unknown").slice(1)
-              }
-            ></span>
-            <span>{integration.metadata?.name}</span>
-          </h4>
-          {integration.metadata?.id ? (
-            <div className="mt-1.5 flex max-w-full items-center gap-1.5">
-              <span className="min-w-0 truncate font-mono text-xs text-gray-700 dark:text-gray-300">
-                {integration.metadata.id}
-              </span>
-              <CopyButton text={integration.metadata.id} />
-            </div>
-          ) : null}
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Plug
-            className={`h-5 w-5 ${
-              integration.status?.state === "ready"
-                ? "text-green-500"
-                : integration.status?.state === "error"
-                  ? "text-red-600"
-                  : "text-amber-600"
-            }`}
-            aria-label={`Integration status: ${integration.status?.state || "unknown"}`}
-          />
-          <PermissionTooltip
-            allowed={canDeleteIntegrations || permissionsLoading}
-            message="You don't have permission to delete integrations."
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
-              aria-label="Delete integration"
-              disabled={!canDeleteIntegrations}
-              onClick={() => {
-                if (!canDeleteIntegrations) return;
-                setShowDeleteConfirm(true);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </PermissionTooltip>
-        </div>
-      </div>
+      <Header
+        organizationId={organizationId}
+        integration={integration}
+        integrationDef={integrationDef}
+        canDeleteIntegrations={canDeleteIntegrations}
+        permissionsLoading={permissionsLoading}
+        setShowDeleteConfirm={setShowDeleteConfirm}
+      />
 
       <div className="space-y-6">
         {integration.status?.state === "error" && integration.status?.stateDescription && (
@@ -295,7 +231,7 @@ export function CapabilityBasedIntegrationDetails({
           </div>
 
           <TabsContent value="properties" className="mt-4">
-            <CapabilityIntegrationPropertiesTab
+            <PropertiesTab
               integrationProperties={integrationProperties}
               propertyDrafts={propertyDrafts}
               setPropertyDrafts={setPropertyDrafts}
@@ -312,7 +248,7 @@ export function CapabilityBasedIntegrationDetails({
           </TabsContent>
 
           <TabsContent value="secrets" className="mt-4">
-            <CapabilityIntegrationSecretsTab
+            <SecretsTab
               integrationSecrets={integrationSecrets}
               secretDrafts={secretDrafts}
               setSecretDrafts={setSecretDrafts}
@@ -327,7 +263,7 @@ export function CapabilityBasedIntegrationDetails({
           </TabsContent>
 
           <TabsContent value="capabilities" className="mt-4">
-            <CapabilityIntegrationCapabilitiesTab
+            <CapabilitiesTab
               integration={integration}
               integrationDef={integrationDef}
               capabilityStates={capabilityStates}
@@ -340,7 +276,7 @@ export function CapabilityBasedIntegrationDetails({
           </TabsContent>
 
           <TabsContent value="usage" className="mt-4">
-            <CapabilityIntegrationUsageTab organizationId={organizationId} workflowGroups={workflowGroups} />
+            <UsageTab organizationId={organizationId} workflowGroups={workflowGroups} />
           </TabsContent>
         </Tabs>
       </div>
@@ -386,6 +322,92 @@ export function CapabilityBasedIntegrationDetails({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface HeaderProps {
+  organizationId: string;
+  integration: OrganizationsIntegration;
+  integrationDef?: IntegrationsIntegrationDefinition;
+  canDeleteIntegrations: boolean;
+  permissionsLoading: boolean;
+  setShowDeleteConfirm: (show: boolean) => void;
+}
+
+function Header({
+  organizationId,
+  integration,
+  integrationDef,
+  canDeleteIntegrations,
+  permissionsLoading,
+  setShowDeleteConfirm,
+}: HeaderProps) {
+  const integrationsHref = `/${organizationId}/settings/integrations`;
+  const integrationId = integration.metadata?.id;
+  const integrationName = integration.metadata?.name;
+  const integrationStatus = integration.status?.state || "unknown";
+
+  return (
+    <div className="flex flex-wrap items-center gap-4 mb-6">
+      <Link
+        to={integrationsHref}
+        className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+        aria-label="Back to integrations"
+      >
+        <ArrowLeft className="w-5 h-5" />
+      </Link>
+      <IntegrationIcon
+        integrationName={integration?.metadata?.integrationName}
+        iconSlug={integrationDef?.icon}
+        className="w-6 h-6"
+      />
+      <div className="flex-1 min-w-[200px]">
+        <h4 className="flex items-center text-2xl font-medium">
+          <span
+            className="inline-flex shrink-0"
+            title={integrationStatus.charAt(0).toUpperCase() + integrationStatus.slice(1)}
+          ></span>
+          <span>{integrationName}</span>
+        </h4>
+        {integrationId ? (
+          <div className="mt-1.5 flex max-w-full items-center gap-1.5">
+            <span className="min-w-0 truncate font-mono text-xs text-gray-700 dark:text-gray-300">{integrationId}</span>
+            <CopyButton text={integrationId} />
+          </div>
+        ) : null}
+      </div>
+      <div className="ml-auto flex items-center gap-2">
+        <Plug
+          className={`h-5 w-5 ${
+            integrationStatus === "ready"
+              ? "text-green-500"
+              : integrationStatus === "error"
+                ? "text-red-600"
+                : "text-amber-600"
+          }`}
+          aria-label={`Integration status: ${integrationStatus}`}
+        />
+        <PermissionTooltip
+          allowed={canDeleteIntegrations || permissionsLoading}
+          message="You don't have permission to delete integrations."
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+            aria-label="Delete integration"
+            disabled={!canDeleteIntegrations}
+            onClick={() => {
+              if (!canDeleteIntegrations) return;
+              setShowDeleteConfirm(true);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </PermissionTooltip>
+      </div>
     </div>
   );
 }

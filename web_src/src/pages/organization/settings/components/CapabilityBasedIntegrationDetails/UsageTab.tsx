@@ -6,12 +6,12 @@ export type CapabilityIntegrationUsageGroup = {
   nodes: Array<{ nodeId: string; nodeName: string }>;
 };
 
-export interface CapabilityIntegrationUsageTabProps {
+export interface UsageTabProps {
   organizationId: string;
   workflowGroups: CapabilityIntegrationUsageGroup[];
 }
 
-export function CapabilityIntegrationUsageTab({ organizationId, workflowGroups }: CapabilityIntegrationUsageTabProps) {
+export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
   return (
     <div className="rounded-lg border border-gray-300 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
       {workflowGroups.length > 0 ? (

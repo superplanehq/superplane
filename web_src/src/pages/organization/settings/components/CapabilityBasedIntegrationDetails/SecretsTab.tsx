@@ -4,7 +4,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import type { Dispatch, SetStateAction } from "react";
 
-export interface CapabilityIntegrationSecretsTabProps {
+export interface SecretsTabProps {
   integrationSecrets: OrganizationsIntegrationSecret[];
   secretDrafts: Record<string, string>;
   setSecretDrafts: Dispatch<SetStateAction<Record<string, string>>>;
@@ -15,7 +15,7 @@ export interface CapabilityIntegrationSecretsTabProps {
   isSavingSecret: (secretName: string | undefined) => boolean;
 }
 
-export function CapabilityIntegrationSecretsTab({
+export function SecretsTab({
   integrationSecrets,
   secretDrafts,
   setSecretDrafts,
@@ -24,7 +24,7 @@ export function CapabilityIntegrationSecretsTab({
   settingsMutationBusy,
   saveSecret,
   isSavingSecret,
-}: CapabilityIntegrationSecretsTabProps) {
+}: SecretsTabProps) {
   return (
     <>
       <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
