@@ -238,7 +238,7 @@ func Test__CopyImage__OnIntegrationMessage(t *testing.T) {
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
 			Logger: log.NewEntry(log.New()),
 			Integration: &contexts.IntegrationContext{
-				Secrets: testIntegrationWithCredentials().Secrets,
+				CurrentSecrets: testIntegrationWithCredentials().CurrentSecrets,
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{

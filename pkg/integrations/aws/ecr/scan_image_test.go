@@ -81,7 +81,7 @@ func Test__ScanImage__Execute(t *testing.T) {
 				"repository": "backend",
 				"imageTag":   "latest",
 			},
-			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
+			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		})
 
@@ -117,7 +117,7 @@ func Test__ScanImage__Execute(t *testing.T) {
 			Requests:       requests,
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -171,7 +171,7 @@ func Test__ScanImage__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			ExecutionState: execState,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -230,7 +230,7 @@ func Test__ScanImage__HandleHook(t *testing.T) {
 				},
 			},
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -271,7 +271,7 @@ func Test__ScanImage__HandleHook(t *testing.T) {
 				},
 			},
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

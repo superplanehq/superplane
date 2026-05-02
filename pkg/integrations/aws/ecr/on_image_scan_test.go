@@ -45,7 +45,7 @@ func Test__OnImageScan__Setup(t *testing.T) {
 					Rules: map[string]common.EventBridgeRuleMetadata{},
 				},
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -104,7 +104,7 @@ func Test__OnImageScan__Setup(t *testing.T) {
 					},
 				},
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

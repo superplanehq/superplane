@@ -83,8 +83,7 @@ func CreateIntegrationWithUsage(
 	})
 
 	//
-	// If the integration implementation supports the new flow,
-	// and the user has requested to use it, we use the new flow.
+	// If the integration implementation supports the new flow, use it.
 	//
 	if registry.SupportsNewSetupFlow(integrationName) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
@@ -136,11 +135,6 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		secretStorage, err := contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration)
-		if err != nil {
-			return err
-		}
-
 		newIntegration.Capabilities = initialCapabilities
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
@@ -149,7 +143,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 			HTTP:           registry.HTTPContext(),
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
-			Secrets:        secretStorage,
+			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
 		})
 
 		setupState := datatypes.NewJSONType(models.SetupState{
