@@ -16,6 +16,42 @@ import type { BuildingBlock, BuildingBlockCategory } from "./types";
 export type { AgentContext, AgentMode } from "@/components/AgentSidebar/agentChat";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
+export const BUILDING_BLOCKS_SIDEBAR_SETTINGS_STORAGE_KEY = "buildingBlocksSidebarSettings";
+
+const DEFAULT_BUILDING_BLOCKS_SIDEBAR_SETTINGS = {
+  showIntegrationSetupStatus: true,
+  showConnectedIntegrationsOnTop: false,
+};
+
+function readBuildingBlocksSidebarSettings() {
+  if (typeof window === "undefined") {
+    return DEFAULT_BUILDING_BLOCKS_SIDEBAR_SETTINGS;
+  }
+
+  const stored = window.localStorage.getItem(BUILDING_BLOCKS_SIDEBAR_SETTINGS_STORAGE_KEY);
+  if (stored === null) {
+    return DEFAULT_BUILDING_BLOCKS_SIDEBAR_SETTINGS;
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return DEFAULT_BUILDING_BLOCKS_SIDEBAR_SETTINGS;
+    }
+
+    const settings = parsed as Record<string, unknown>;
+    return {
+      showIntegrationSetupStatus:
+        typeof settings.showIntegrationSetupStatus === "boolean" ? settings.showIntegrationSetupStatus : true,
+      showConnectedIntegrationsOnTop:
+        typeof settings.showConnectedIntegrationsOnTop === "boolean" ? settings.showConnectedIntegrationsOnTop : false,
+    };
+  } catch (error) {
+    console.warn("Failed to parse building blocks sidebar settings from local storage:", error);
+    return DEFAULT_BUILDING_BLOCKS_SIDEBAR_SETTINGS;
+  }
+}
+
 export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
@@ -102,12 +138,26 @@ function OpenBuildingBlocksSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
-  const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
-  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(
+    () => readBuildingBlocksSidebarSettings().showIntegrationSetupStatus,
+  );
+  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(
+    () => readBuildingBlocksSidebarSettings().showConnectedIntegrationsOnTop,
+  );
 
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      BUILDING_BLOCKS_SIDEBAR_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        showIntegrationSetupStatus,
+        showConnectedIntegrationsOnTop,
+      }),
+    );
+  }, [showIntegrationSetupStatus, showConnectedIntegrationsOnTop]);
 
   useEffect(() => {
     if (!searchInputRef.current) {

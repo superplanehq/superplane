@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BuildingBlocksSidebar } from "./index";
 import type { BuildingBlockCategory } from "./types";
 
@@ -19,7 +20,19 @@ const coreCategory: BuildingBlockCategory = {
   ],
 };
 
+async function openSidebarSettings(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByLabelText("Sidebar settings"));
+}
+
+function getSidebarSetting(name: string) {
+  return screen.getByRole("menuitemcheckbox", { name });
+}
+
 describe("BuildingBlocksSidebar", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("calls onToggle(false) when close button is clicked while disabled", () => {
     const onToggle = vi.fn();
     render(
@@ -63,6 +76,24 @@ describe("BuildingBlocksSidebar", () => {
     const { container } = render(<BuildingBlocksSidebar {...defaultProps} isOpen={false} />);
 
     expect(container.querySelector('[data-testid="building-blocks-sidebar"]')).not.toBeInTheDocument();
+  });
+
+  it("persists display settings after remounting", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<BuildingBlocksSidebar {...defaultProps} blocks={[coreCategory]} />);
+
+    await openSidebarSettings(user);
+    await user.click(getSidebarSetting("Show integration setup status"));
+    await openSidebarSettings(user);
+    await user.click(getSidebarSetting("Connected integrations on top"));
+
+    unmount();
+
+    render(<BuildingBlocksSidebar {...defaultProps} blocks={[coreCategory]} />);
+
+    await openSidebarSettings(user);
+    expect(getSidebarSetting("Show integration setup status")).toHaveAttribute("aria-checked", "false");
+    expect(getSidebarSetting("Connected integrations on top")).toHaveAttribute("aria-checked", "true");
   });
 
   describe("Enter-to-submit", () => {
