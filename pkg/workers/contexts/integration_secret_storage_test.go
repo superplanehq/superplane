@@ -129,10 +129,9 @@ func Test__IntegrationSecretStorage(t *testing.T) {
 
 	t.Run("deletes cached and persisted secrets", func(t *testing.T) {
 		storage := NewIntegrationSecretStorage(database.Conn(), crypto.NewNoOpEncryptor(), integration)
-		require.NoError(t, err)
 		require.NoError(t, storage.Delete("many-two"))
 
-		_, err = storage.Get("many-two")
+		_, err := storage.Get("many-two")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "secret many-two not found")
 
