@@ -62,7 +62,7 @@ export function CapabilitiesTab({
   const definitionCapabilitiesSortedForGroups = useMemo(() => {
     return [...(integrationDef?.capabilities || [])]
       .filter((definition) => Boolean(definition.name))
-      .sort((left, right) => left.label!.localeCompare(right.label!));
+      .sort((left, right) => left.label?.localeCompare(right.label ?? "") ?? 0);
   }, [integrationDef?.capabilities]);
 
   const capabilityGroupSections = useMemo(() => {

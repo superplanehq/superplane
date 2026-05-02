@@ -56,7 +56,7 @@ export function CapabilityBasedIntegrationDetails({
       const updated = response.data?.integration ?? null;
 
       if (updated?.status?.setupState?.currentStep) {
-        navigate(`/${organizationId}/settings/integrations/${integrationId}/setup`, {
+        navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
           state: { integrationId },
         });
         return;

@@ -3,14 +3,10 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { LegacyIntegrationDetails } from "./LegacyIntegrationDetails";
 import { CapabilityBasedIntegrationDetails } from "../CapabilityBasedIntegrationDetails";
-import type { OrganizationsIntegration } from "@/api-client";
+import { isCapabilityBasedIntegration } from "@/lib/integrations";
 
 interface IntegrationDetailsRouteProps {
   organizationId: string;
-}
-
-function isCapabilityBasedIntegration(integration: OrganizationsIntegration) {
-  return integration.status?.legacySetup === false;
 }
 
 export function IntegrationDetailsRoute({ organizationId }: IntegrationDetailsRouteProps) {
