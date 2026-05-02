@@ -54,7 +54,7 @@ You can now start using the following projects:
 {{- end }}
 `
 
-func (g *SetupProvider) genCapabilities(actions []core.Action, triggers []core.Trigger) []core.Capability {
+func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.Trigger) []core.Capability {
 	capabilities := []core.Capability{}
 	for _, action := range actions {
 		capabilities = append(capabilities, core.Capability{
