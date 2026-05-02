@@ -333,6 +333,21 @@ export const useUpdateIntegrationSecret = (organizationId: string, integrationId
   });
 };
 
+export const useIntegrationMutations = (organizationId: string, integrationId: string) => {
+  const deleteMutation = useDeleteIntegration(organizationId, integrationId);
+  const updateCapabilitiesMutation = useUpdateIntegrationCapabilities(organizationId, integrationId);
+  const updatePropertyMutation = useUpdateIntegrationProperty(organizationId, integrationId);
+  const updateSecretMutation = useUpdateIntegrationSecret(organizationId, integrationId);
+
+  return {
+    deleteMutation,
+    updateCapabilitiesMutation,
+    updatePropertyMutation,
+    updateSecretMutation,
+    settingsMutationBusy: updatePropertyMutation.isPending || updateSecretMutation.isPending,
+  };
+};
+
 // Hook to delete an integration
 export const useDeleteIntegration = (organizationId: string, integrationId: string) => {
   const queryClient = useQueryClient();

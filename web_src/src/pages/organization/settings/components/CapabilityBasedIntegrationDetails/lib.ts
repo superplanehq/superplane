@@ -1,4 +1,8 @@
-import type { IntegrationCapabilityStateState, IntegrationNodeRef, IntegrationsCapabilityDefinition } from "@/api-client";
+import type {
+  IntegrationCapabilityStateState,
+  IntegrationNodeRef,
+  IntegrationsCapabilityDefinition,
+} from "@/api-client";
 
 export const DEFAULT_CAPABILITY_STATE: IntegrationCapabilityStateState = "STATE_UNAVAILABLE";
 
@@ -58,4 +62,4 @@ export const groupNodeRefsByCanvas = (nodeRefs: IntegrationNodeRef[]): WorkflowG
     canvasName: data.canvasName,
     nodes: data.nodes,
   }));
-}
+};

@@ -1,31 +1,16 @@
-import type {
-  IntegrationCapabilityState,
-  IntegrationCapabilityStateState,
-  OrganizationsIntegration,
-} from "@/api-client";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import type { IntegrationCapabilityState, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import {
-  useAvailableIntegrations,
-  useDeleteIntegration,
-  useUpdateIntegrationCapabilities,
-  useUpdateIntegrationProperty,
-  useUpdateIntegrationSecret,
-} from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useIntegrationMutations } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
-import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { CircleX } from "lucide-react";
-import { CapabilitiesTab } from "./CapabilitiesTab";
 import { DeleteModal } from "./DeleteModal";
 import { Header } from "./Header";
-import { PropertiesTab } from "./PropertiesTab";
-import { SecretsTab } from "./SecretsTab";
-import { UsageTab } from "./UsageTab";
-import { DEFAULT_CAPABILITY_STATE, getActiveTabClass, groupNodeRefsByCanvas } from "./lib";
-import { useEffect, useMemo, useState } from "react";
+import { IntegrationTabs } from "./IntegrationTabs";
+import { useIntegrationDetailsState } from "./useIntegrationDetailsState";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 interface CapabilityBasedIntegrationDetailsProps {
@@ -46,56 +31,18 @@ export function CapabilityBasedIntegrationDetails({
   usePageTitle(["Integrations", integrationName]);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [activeTab, setActiveTab] = useState("properties");
+  const [activeTab, setActiveTab] = useState<"properties" | "secrets" | "capabilities" | "usage">("properties");
   const canUpdateIntegrations = canAct("integrations", "update");
   const canDeleteIntegrations = canAct("integrations", "delete");
-
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const integrationDef = integration ? availableIntegrations.find((i) => i.name === providerName) : undefined;
-
-  const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
-  const updateCapabilitiesMutation = useUpdateIntegrationCapabilities(organizationId, integrationId || "");
-  const updatePropertyMutation = useUpdateIntegrationProperty(organizationId, integrationId || "");
-  const updateSecretMutation = useUpdateIntegrationSecret(organizationId, integrationId || "");
-  const integrationProperties = useMemo(() => integration?.status?.properties ?? [], [integration?.status?.properties]);
-  const integrationSecrets = useMemo(() => integration?.status?.secrets ?? [], [integration?.status?.secrets]);
-
-  const [propertyDrafts, setPropertyDrafts] = useState<Record<string, string>>({});
-  const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({});
-  const [capabilityStates, setCapabilityStates] = useState<Record<string, IntegrationCapabilityStateState>>({});
-
-  useEffect(() => {
-    const nextStates: Record<string, IntegrationCapabilityStateState> = {};
-    (integration?.status?.capabilities || []).forEach((capability) => {
-      if (!capability.name) return;
-      nextStates[capability.name] = capability.state || DEFAULT_CAPABILITY_STATE;
-    });
-    setCapabilityStates(nextStates);
-  }, [integration?.status?.capabilities]);
-
-  useEffect(() => {
-    const next: Record<string, string> = {};
-    integrationProperties.forEach((property, index) => {
-      const key = property.name?.trim() || `__property_${index}`;
-      next[key] = property.value ?? "";
-    });
-    setPropertyDrafts(next);
-  }, [integration?.metadata?.id, integration?.metadata?.updatedAt, integrationProperties]);
-
-  useEffect(() => {
-    setSecretDrafts({});
-  }, [integration?.metadata?.id, integration?.metadata?.updatedAt, integrationSecrets]);
-
-  const settingsMutationBusy = updatePropertyMutation.isPending || updateSecretMutation.isPending;
-
-  const workflowGroups = useMemo(() => {
-    return groupNodeRefsByCanvas(integration?.status?.usedIn ?? []);
-  }, [integration?.status?.usedIn]);
+  const detailsState = useIntegrationDetailsState(integration);
+  const integrationMutations = useIntegrationMutations(organizationId, integrationId || "");
 
   const handleDelete = async () => {
     if (!canDeleteIntegrations) return;
     try {
-      await deleteMutation.mutateAsync({ integrationName: providerName });
+      await integrationMutations.deleteMutation.mutateAsync({ integrationName: providerName });
       navigate(`/${organizationId}/settings/integrations`);
     } catch {
       showErrorToast("Failed to delete integration");
@@ -105,7 +52,7 @@ export function CapabilityBasedIntegrationDetails({
   const handleCapabilitiesSubmit = async (newStates: IntegrationCapabilityState[]) => {
     if (!canUpdateIntegrations || newStates.length === 0) return;
     try {
-      const response = await updateCapabilitiesMutation.mutateAsync(newStates);
+      const response = await integrationMutations.updateCapabilitiesMutation.mutateAsync(newStates);
       const updated = response.data?.integration ?? null;
 
       if (updated?.status?.setupState?.currentStep) {
@@ -122,9 +69,9 @@ export function CapabilityBasedIntegrationDetails({
   };
 
   const saveProperty = async (propertyName: string, value: string) => {
-    if (!canUpdateIntegrations || settingsMutationBusy) return;
+    if (!canUpdateIntegrations || integrationMutations.settingsMutationBusy) return;
     try {
-      await updatePropertyMutation.mutateAsync({ propertyName, value });
+      await integrationMutations.updatePropertyMutation.mutateAsync({ propertyName, value });
       showSuccessToast("Property saved");
     } catch (_error) {
       showErrorToast(`Failed to save property: ${getApiErrorMessage(_error)}`);
@@ -132,10 +79,10 @@ export function CapabilityBasedIntegrationDetails({
   };
 
   const saveSecret = async (secretName: string, value: string, draftFieldKey: string) => {
-    if (!canUpdateIntegrations || settingsMutationBusy || value.trim() === "") return;
+    if (!canUpdateIntegrations || integrationMutations.settingsMutationBusy || value.trim() === "") return;
     try {
-      await updateSecretMutation.mutateAsync({ secretName, value });
-      setSecretDrafts((previous) => ({ ...previous, [draftFieldKey]: "" }));
+      await integrationMutations.updateSecretMutation.mutateAsync({ secretName, value });
+      detailsState.setSecretDrafts((previous) => ({ ...previous, [draftFieldKey]: "" }));
       showSuccessToast("Secret saved");
     } catch (_error) {
       showErrorToast(`Failed to save secret: ${getApiErrorMessage(_error)}`);
@@ -161,109 +108,40 @@ export function CapabilityBasedIntegrationDetails({
           </Alert>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="border-border border-b-1">
-            <div className="flex flex-wrap px-4">
-              <button
-                type="button"
-                onClick={() => setActiveTab("properties")}
-                className={cn(
-                  "py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors",
-                  getActiveTabClass(activeTab === "properties"),
-                )}
-              >
-                Properties
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("secrets")}
-                className={cn(
-                  "py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors",
-                  getActiveTabClass(activeTab === "secrets"),
-                )}
-              >
-                Secrets
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("capabilities")}
-                className={cn(
-                  "py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors",
-                  getActiveTabClass(activeTab === "capabilities"),
-                )}
-              >
-                Capabilities
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("usage")}
-                className={cn(
-                  "py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors",
-                  getActiveTabClass(activeTab === "usage"),
-                )}
-              >
-                Usage
-              </button>
-            </div>
-          </div>
-
-          <TabsContent value="properties" className="mt-4">
-            <PropertiesTab
-              integrationProperties={integrationProperties}
-              propertyDrafts={propertyDrafts}
-              setPropertyDrafts={setPropertyDrafts}
-              canUpdateIntegrations={canUpdateIntegrations}
-              permissionsLoading={permissionsLoading}
-              settingsMutationBusy={settingsMutationBusy}
-              saveProperty={saveProperty}
-              isSavingProperty={(propertyName) =>
-                Boolean(
-                  updatePropertyMutation.isPending && updatePropertyMutation.variables?.propertyName === propertyName,
-                )
-              }
-            />
-          </TabsContent>
-
-          <TabsContent value="secrets" className="mt-4">
-            <SecretsTab
-              integrationSecrets={integrationSecrets}
-              secretDrafts={secretDrafts}
-              setSecretDrafts={setSecretDrafts}
-              canUpdateIntegrations={canUpdateIntegrations}
-              permissionsLoading={permissionsLoading}
-              settingsMutationBusy={settingsMutationBusy}
-              saveSecret={saveSecret}
-              isSavingSecret={(secretName) =>
-                Boolean(updateSecretMutation.isPending && updateSecretMutation.variables?.secretName === secretName)
-              }
-            />
-          </TabsContent>
-
-          <TabsContent value="capabilities" className="mt-4">
-            <CapabilitiesTab
-              integration={integration}
-              integrationDef={integrationDef}
-              capabilityStates={capabilityStates}
-              setCapabilityStates={setCapabilityStates}
-              canUpdateIntegrations={canUpdateIntegrations}
-              permissionsLoading={permissionsLoading}
-              capabilitiesMutationPending={updateCapabilitiesMutation.isPending}
-              onApplyCapabilityChanges={handleCapabilitiesSubmit}
-            />
-          </TabsContent>
-
-          <TabsContent value="usage" className="mt-4">
-            <UsageTab organizationId={organizationId} workflowGroups={workflowGroups} />
-          </TabsContent>
-        </Tabs>
+        <IntegrationTabs
+          activeTab={activeTab}
+          onActiveTabChange={setActiveTab}
+          integration={integration}
+          integrationDef={integrationDef}
+          detailsState={detailsState}
+          integrationMutations={integrationMutations}
+          organizationId={organizationId}
+          canUpdateIntegrations={canUpdateIntegrations}
+          permissionsLoading={permissionsLoading}
+          saveProperty={saveProperty}
+          saveSecret={saveSecret}
+          isSavingProperty={(propertyName) =>
+            Boolean(
+              integrationMutations.updatePropertyMutation.isPending &&
+                integrationMutations.updatePropertyMutation.variables?.propertyName === propertyName,
+            )
+          }
+          isSavingSecret={(secretName) =>
+            Boolean(
+              integrationMutations.updateSecretMutation.isPending &&
+                integrationMutations.updateSecretMutation.variables?.secretName === secretName,
+            )
+          }
+          onApplyCapabilityChanges={handleCapabilitiesSubmit}
+        />
       </div>
 
       <DeleteModal
         open={showDeleteConfirm}
         integrationName={integrationName}
         canDeleteIntegrations={canDeleteIntegrations}
-        isDeleting={deleteMutation.isPending}
-        hasDeleteError={deleteMutation.isError}
+        isDeleting={integrationMutations.deleteMutation.isPending}
+        hasDeleteError={integrationMutations.deleteMutation.isError}
         onDelete={handleDelete}
         onClose={() => setShowDeleteConfirm(false)}
       />

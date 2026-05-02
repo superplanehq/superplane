@@ -92,7 +92,6 @@ export function CapabilitiesTab({
 
   const stagedCapabilityUpdates = useMemo(() => {
     return capabilities.reduce<IntegrationCapabilityState[]>((updates, capability) => {
-      if (!capability.name) return updates;
       const serverState = capability.state || DEFAULT_CAPABILITY_STATE;
       const effectiveState = capabilityStates[capability.name] ?? serverState;
       if (effectiveState === serverState) return updates;
