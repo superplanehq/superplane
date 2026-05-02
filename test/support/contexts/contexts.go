@@ -85,6 +85,7 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type IntegrationContext struct {
+	NewSetupFlow     bool
 	IntegrationID    string
 	Configuration    map[string]any
 	Metadata         any
@@ -216,7 +217,7 @@ func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 }
 
 func (c *IntegrationContext) LegacySetup() bool {
-	return false
+	return !c.NewSetupFlow
 }
 
 func (c *IntegrationContext) Properties() core.IntegrationPropertyStorage {
