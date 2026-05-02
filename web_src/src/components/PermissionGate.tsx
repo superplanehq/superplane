@@ -49,3 +49,26 @@ export function RequirePermission({ resource, action, children }: RequirePermiss
 
   return <>{children}</>;
 }
+
+interface RequireAnyPermissionProps {
+  checks: Array<{ resource: string; action: string }>;
+  children: React.ReactNode;
+}
+
+export function RequireAnyPermission({ checks, children }: RequireAnyPermissionProps) {
+  const { canAct, isLoading } = usePermissions();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Checking permissions...</p>
+      </div>
+    );
+  }
+
+  if (!checks.some((check) => canAct(check.resource, check.action))) {
+    return <NotFoundPage />;
+  }
+
+  return <>{children}</>;
+}
