@@ -3,7 +3,7 @@ import type { CapabilityGroupSection } from "@/lib/capabilities";
 import { cn } from "@/lib/utils";
 import { CopyButton } from "@/ui/CopyButton";
 import { Check, CircleOff, Minus } from "lucide-react";
-import { getGroupToggleState } from "./integrationSetupHelpers";
+import { getGroupToggleState } from "./lib";
 
 function getCapabilitySelectionDotClass(selected: boolean) {
   return selected ? "bg-green-500" : "bg-gray-400 dark:bg-gray-500";

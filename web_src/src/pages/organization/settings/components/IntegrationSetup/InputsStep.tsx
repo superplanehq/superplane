@@ -1,7 +1,7 @@
 import type { IntegrationSetupStepDefinition } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { getMissingRequiredFields } from "./integrationSetupHelpers";
+import { getMissingRequiredFields } from "./lib";
 import { Instructions } from "./Instructions";
 import { ArrowLeft, MoveRight } from "lucide-react";
 import { useEffect, useState } from "react";

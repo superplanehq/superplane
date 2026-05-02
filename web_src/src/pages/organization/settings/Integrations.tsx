@@ -346,12 +346,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                                   if (!canUpdateIntegrations) return;
                                   const providerName = integration.metadata?.integrationName;
                                   if (providerName && integration.status?.setupState?.currentStep) {
-                                    navigate(
-                                      `/${organizationId}/settings/integrations/${integration.metadata?.id}/setup`,
-                                      {
-                                        state: { integrationId: integration.metadata?.id },
-                                      },
-                                    );
+                                    navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
+                                      state: { integrationId: integration.metadata?.id },
+                                    });
                                     return;
                                   }
 

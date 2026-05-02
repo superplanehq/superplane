@@ -82,11 +82,7 @@ export function IntegrationTabs({
   onApplyCapabilityChanges,
 }: IntegrationTabsProps) {
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(value) => onActiveTabChange(value as IntegrationTab)}
-      className="w-full"
-    >
+    <Tabs value={activeTab} onValueChange={(value) => onActiveTabChange(value as IntegrationTab)} className="w-full">
       <div className="border-border border-b-1">
         <div className="flex flex-wrap px-4">
           {TABS.map((tab) => (
