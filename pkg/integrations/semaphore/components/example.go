@@ -1,4 +1,4 @@
-package semaphore
+package components
 
 import (
 	_ "embed"
@@ -7,13 +7,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
-//go:embed example_output_run_workflow.json
+//go:embed payloads/run_workflow.json
 var exampleOutputRunWorkflowBytes []byte
 
-//go:embed example_data_on_pipeline_done.json
+//go:embed payloads/on_pipeline_done.json
 var exampleDataOnPipelineDoneBytes []byte
 
-//go:embed example_output_get_pipeline.json
+//go:embed payloads/get_pipeline.json
 var exampleOutputGetPipelineBytes []byte
 
 var exampleOutputOnce sync.Once

@@ -1,4 +1,4 @@
-package semaphore
+package components
 
 import (
 	"encoding/json"
@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
 )
 
 const PayloadType = "semaphore.workflow.finished"
@@ -224,7 +225,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -246,7 +247,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	ctx.Integration.RequestWebhook(WebhookConfiguration{
+	ctx.Integration.RequestWebhook(common.WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
 	})
 
@@ -266,7 +267,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -471,7 +472,7 @@ func (r *RunWorkflow) poll(ctx core.ActionHookContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}

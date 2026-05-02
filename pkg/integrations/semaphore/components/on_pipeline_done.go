@@ -1,4 +1,4 @@
-package semaphore
+package components
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
 )
 
 type OnPipelineDone struct{}
@@ -168,7 +169,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -190,7 +191,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(common.WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
 	})
 }
