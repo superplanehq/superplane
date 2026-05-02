@@ -1,12 +1,8 @@
 import type {
   IntegrationCapabilityState,
   IntegrationCapabilityStateState,
-  IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
 } from "@/api-client";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
@@ -21,16 +17,16 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Alert, AlertDescription } from "@/ui/alert";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { CopyButton } from "@/ui/CopyButton";
-import { ArrowLeft, CircleX, Plug, Trash2 } from "lucide-react";
+import { CircleX } from "lucide-react";
 import { CapabilitiesTab } from "./CapabilitiesTab";
+import { DeleteModal } from "./DeleteModal";
+import { Header } from "./Header";
 import { PropertiesTab } from "./PropertiesTab";
 import { SecretsTab } from "./SecretsTab";
 import { UsageTab } from "./UsageTab";
-import { DEFAULT_CAPABILITY_STATE, getActiveTabClass } from "./lib";
+import { DEFAULT_CAPABILITY_STATE, getActiveTabClass, groupNodeRefsByCanvas } from "./lib";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 interface CapabilityBasedIntegrationDetailsProps {
   organizationId: string;
@@ -43,11 +39,12 @@ export function CapabilityBasedIntegrationDetails({
 }: CapabilityBasedIntegrationDetailsProps) {
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-
-  usePageTitle(["Integrations", integration?.metadata?.name]);
-
   const integrationId = integration.metadata?.id;
+  const integrationName = integration.metadata?.name;
   const providerName = integration.metadata?.integrationName ?? "";
+
+  usePageTitle(["Integrations", integrationName]);
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState("properties");
   const canUpdateIntegrations = canAct("integrations", "update");
@@ -91,28 +88,8 @@ export function CapabilityBasedIntegrationDetails({
 
   const settingsMutationBusy = updatePropertyMutation.isPending || updateSecretMutation.isPending;
 
-  // Group usedIn nodes by workflow
   const workflowGroups = useMemo(() => {
-    if (!integration?.status?.usedIn) return [];
-
-    const groups = new Map<string, { canvasName: string; nodes: Array<{ nodeId: string; nodeName: string }> }>();
-    integration.status.usedIn.forEach((nodeRef) => {
-      const canvasId = nodeRef.canvasId || "";
-      const canvasName = nodeRef.canvasName || canvasId;
-      const nodeId = nodeRef.nodeId || "";
-      const nodeName = nodeRef.nodeName || nodeId;
-
-      if (!groups.has(canvasId)) {
-        groups.set(canvasId, { canvasName, nodes: [] });
-      }
-      groups.get(canvasId)?.nodes.push({ nodeId, nodeName });
-    });
-
-    return Array.from(groups.entries()).map(([canvasId, data]) => ({
-      canvasId,
-      canvasName: data.canvasName,
-      nodes: data.nodes,
-    }));
+    return groupNodeRefsByCanvas(integration?.status?.usedIn ?? []);
   }, [integration?.status?.usedIn]);
 
   const handleDelete = async () => {
@@ -173,7 +150,7 @@ export function CapabilityBasedIntegrationDetails({
         integrationDef={integrationDef}
         canDeleteIntegrations={canDeleteIntegrations}
         permissionsLoading={permissionsLoading}
-        setShowDeleteConfirm={setShowDeleteConfirm}
+        onRequestDelete={() => setShowDeleteConfirm(true)}
       />
 
       <div className="space-y-6">
@@ -281,133 +258,15 @@ export function CapabilityBasedIntegrationDetails({
         </Tabs>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
-                Delete {integration?.metadata?.name || "integration"}?
-              </h3>
-              <p className="text-sm text-gray-800 dark:text-gray-100 mb-6">
-                This cannot be undone. All data will be permanently deleted.
-              </p>
-              <div className="flex justify-start gap-3">
-                <LoadingButton
-                  color="blue"
-                  onClick={handleDelete}
-                  disabled={!canDeleteIntegrations}
-                  loading={deleteMutation.isPending}
-                  loadingText="Deleting..."
-                  className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
-                >
-                  Delete
-                </LoadingButton>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={deleteMutation.isPending}
-                >
-                  Cancel
-                </Button>
-              </div>
-              {deleteMutation.isError && (
-                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    Failed to delete integration. Please try again.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface HeaderProps {
-  organizationId: string;
-  integration: OrganizationsIntegration;
-  integrationDef?: IntegrationsIntegrationDefinition;
-  canDeleteIntegrations: boolean;
-  permissionsLoading: boolean;
-  setShowDeleteConfirm: (show: boolean) => void;
-}
-
-function Header({
-  organizationId,
-  integration,
-  integrationDef,
-  canDeleteIntegrations,
-  permissionsLoading,
-  setShowDeleteConfirm,
-}: HeaderProps) {
-  const integrationsHref = `/${organizationId}/settings/integrations`;
-  const integrationId = integration.metadata?.id;
-  const integrationName = integration.metadata?.name;
-  const integrationStatus = integration.status?.state || "unknown";
-
-  return (
-    <div className="flex flex-wrap items-center gap-4 mb-6">
-      <Link
-        to={integrationsHref}
-        className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
-        aria-label="Back to integrations"
-      >
-        <ArrowLeft className="w-5 h-5" />
-      </Link>
-      <IntegrationIcon
-        integrationName={integration?.metadata?.integrationName}
-        iconSlug={integrationDef?.icon}
-        className="w-6 h-6"
+      <DeleteModal
+        open={showDeleteConfirm}
+        integrationName={integrationName}
+        canDeleteIntegrations={canDeleteIntegrations}
+        isDeleting={deleteMutation.isPending}
+        hasDeleteError={deleteMutation.isError}
+        onDelete={handleDelete}
+        onClose={() => setShowDeleteConfirm(false)}
       />
-      <div className="flex-1 min-w-[200px]">
-        <h4 className="flex items-center text-2xl font-medium">
-          <span
-            className="inline-flex shrink-0"
-            title={integrationStatus.charAt(0).toUpperCase() + integrationStatus.slice(1)}
-          ></span>
-          <span>{integrationName}</span>
-        </h4>
-        {integrationId ? (
-          <div className="mt-1.5 flex max-w-full items-center gap-1.5">
-            <span className="min-w-0 truncate font-mono text-xs text-gray-700 dark:text-gray-300">{integrationId}</span>
-            <CopyButton text={integrationId} />
-          </div>
-        ) : null}
-      </div>
-      <div className="ml-auto flex items-center gap-2">
-        <Plug
-          className={`h-5 w-5 ${
-            integrationStatus === "ready"
-              ? "text-green-500"
-              : integrationStatus === "error"
-                ? "text-red-600"
-                : "text-amber-600"
-          }`}
-          aria-label={`Integration status: ${integrationStatus}`}
-        />
-        <PermissionTooltip
-          allowed={canDeleteIntegrations || permissionsLoading}
-          message="You don't have permission to delete integrations."
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
-            aria-label="Delete integration"
-            disabled={!canDeleteIntegrations}
-            onClick={() => {
-              if (!canDeleteIntegrations) return;
-              setShowDeleteConfirm(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </PermissionTooltip>
-      </div>
     </div>
   );
 }
