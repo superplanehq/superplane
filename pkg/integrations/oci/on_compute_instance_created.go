@@ -22,12 +22,11 @@ const (
 )
 
 type OnComputeInstanceCreatedConfiguration struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
+	Compartment string `json:"compartment" mapstructure:"compartment"`
 }
 
 type OnComputeInstanceCreatedMetadata struct {
 	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
-	EventsRuleID  string `json:"eventsRuleId" mapstructure:"eventsRuleId"`
 }
 
 func (t *OnComputeInstanceCreated) Name() string {
@@ -76,7 +75,7 @@ func (t *OnComputeInstanceCreated) Color() string {
 func (t *OnComputeInstanceCreated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -95,102 +94,39 @@ func (t *OnComputeInstanceCreated) ExampleData() map[string]any {
 }
 
 func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
-	config, integrationMetadata, metadata, err := decodeSetupInputs(ctx)
-	if err != nil {
-		return err
-	}
-
-	// If the Events rule already exists for this compartment, skip re-creation but
-	// still call RequestWebhook so the subscription is retried if it previously
-	// failed or was never provisioned.
-	if metadata.CompartmentID == config.CompartmentID && metadata.EventsRuleID != "" {
-		return requestWebhook(ctx, config.CompartmentID, integrationMetadata.TopicID)
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create OCI client: %w", err)
-	}
-
-	if err := cleanupOldRule(ctx, client, metadata, config.CompartmentID); err != nil {
-		return err
-	}
-
-	ruleID, err := ensureEventsRule(ctx, client, config.CompartmentID, integrationMetadata.TopicID)
+	config, integrationMetadata, err := decodeSetupInputs(ctx)
 	if err != nil {
 		return err
 	}
 
 	if err := ctx.Metadata.Set(OnComputeInstanceCreatedMetadata{
-		CompartmentID: config.CompartmentID,
-		EventsRuleID:  ruleID,
+		CompartmentID: config.Compartment,
 	}); err != nil {
 		return fmt.Errorf("failed to persist trigger metadata: %w", err)
 	}
 
-	return requestWebhook(ctx, config.CompartmentID, integrationMetadata.TopicID)
+	return requestWebhook(ctx, config.Compartment, integrationMetadata.TopicID)
 }
 
 // decodeSetupInputs decodes and validates all inputs needed by Setup.
-func decodeSetupInputs(ctx core.TriggerContext) (OnComputeInstanceCreatedConfiguration, IntegrationMetadata, OnComputeInstanceCreatedMetadata, error) {
+func decodeSetupInputs(ctx core.TriggerContext) (OnComputeInstanceCreatedConfiguration, IntegrationMetadata, error) {
 	var config OnComputeInstanceCreatedConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("failed to decode trigger configuration: %w", err)
+		return config, IntegrationMetadata{}, fmt.Errorf("failed to decode trigger configuration: %w", err)
 	}
-	if config.CompartmentID == "" {
-		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("compartmentId is required")
+	if config.Compartment == "" {
+		return config, IntegrationMetadata{}, fmt.Errorf("compartmentId is required")
 	}
 
 	var integrationMetadata IntegrationMetadata
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("failed to decode integration metadata: %w", err)
+		return config, IntegrationMetadata{}, fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 	if integrationMetadata.TopicID == "" {
-		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("integration topic not ready yet; ensure the OCI integration has been fully set up")
+		return config, IntegrationMetadata{}, fmt.Errorf("integration topic not ready yet; ensure the OCI integration has been fully set up")
 	}
 
-	var metadata OnComputeInstanceCreatedMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return config, IntegrationMetadata{}, OnComputeInstanceCreatedMetadata{}, fmt.Errorf("failed to decode trigger metadata: %w", err)
-	}
-
-	return config, integrationMetadata, metadata, nil
-}
-
-// cleanupOldRule deletes the previous Events rule when the compartment changes.
-func cleanupOldRule(ctx core.TriggerContext, client *Client, metadata OnComputeInstanceCreatedMetadata, newCompartmentID string) error {
-	if metadata.EventsRuleID == "" || metadata.CompartmentID == newCompartmentID {
-		return nil
-	}
-	if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
-		ctx.Logger.Warnf("failed to delete old Events rule %q: %v", metadata.EventsRuleID, err)
-	}
-	return nil
-}
-
-// ensureEventsRule creates the OCI Events rule that routes compute-launch events
-// to the shared ONS topic and returns its ID.
-func ensureEventsRule(ctx core.TriggerContext, client *Client, compartmentID, topicID string) (string, error) {
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return "", fmt.Errorf("failed to set up webhook URL: %w", err)
-	}
-
-	parsedURL, err := url.Parse(webhookURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse webhook URL: %w", err)
-	}
-	segments := strings.Split(strings.TrimRight(parsedURL.Path, "/"), "/")
-	webhookID := segments[len(segments)-1]
-	ruleName := fmt.Sprintf("superplane-compute-instance-created-%s", webhookID)
-
-	condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
-	rule, err := client.CreateEventsRule(compartmentID, ruleName, condition, topicID)
-	if err != nil {
-		return "", fmt.Errorf("failed to create Events rule: %w", err)
-	}
-
-	return rule.ID, nil
+	return config, integrationMetadata, nil
 }
 
 // requestWebhook asks the integration to provision a per-trigger HTTPS
@@ -211,33 +147,19 @@ func (t *OnComputeInstanceCreated) HandleHook(ctx core.TriggerHookContext) (map[
 }
 
 func (t *OnComputeInstanceCreated) Cleanup(ctx core.TriggerContext) error {
-	var metadata OnComputeInstanceCreatedMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		ctx.Logger.Warnf("failed to decode trigger metadata during cleanup: %v", err)
-		return nil
-	}
-
-	if metadata.EventsRuleID == "" {
-		return nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create OCI client during cleanup: %w", err)
-	}
-
-	if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
-		ctx.Logger.Warnf("failed to delete Events rule %q during cleanup: %v", metadata.EventsRuleID, err)
-	}
-
+	// Events rules are shared across triggers for the same integration+compartment.
+	// They are cleaned up when the integration itself is deleted (see OCI.Cleanup).
 	return nil
 }
 
 // HandleWebhook processes inbound requests forwarded by OCI Notifications.
 func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	cfg := OnComputeInstanceCreatedConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+	// Read compartment from persisted metadata (written by Setup) so that
+	// pre-existing triggers configured under the old "compartmentId" key
+	// continue to work correctly.
+	var meta OnComputeInstanceCreatedMetadata
+	if err := mapstructure.Decode(ctx.Metadata, &meta); err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode trigger metadata: %w", err)
 	}
 
 	// Handle ONS subscription confirmation handshake before parsing the body.
@@ -257,7 +179,7 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 		return http.StatusOK, nil, nil
 	}
 
-	if !matchesCompartment(envelope, cfg.CompartmentID) {
+	if !matchesCompartment(envelope, meta.CompartmentID) {
 		return http.StatusOK, nil, nil
 	}
 

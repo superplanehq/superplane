@@ -155,12 +155,12 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 
 	proto := &pb.Integration{
 		Metadata: &pb.Integration_Metadata{
-			Id:   instance.ID.String(),
-			Name: instance.InstallationName,
+			Id:              instance.ID.String(),
+			Name:            instance.InstallationName,
+			IntegrationName: instance.AppName,
 		},
 		Spec: &pb.Integration_Spec{
-			IntegrationName: instance.AppName,
-			Configuration:   config,
+			Configuration: config,
 		},
 		Status: &pb.Integration_Status{
 			State:            instance.State,

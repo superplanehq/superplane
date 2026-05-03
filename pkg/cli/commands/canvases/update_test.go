@@ -8,9 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -58,6 +61,350 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 	t.Helper()
 	require.Equal(t, calls, s.calls)
 	require.Len(t, s.expectations, 0, "unused request expectations")
+}
+
+func TestUpdateWithoutFileReturnsError(t *testing.T) {
+	server := newAPITestServer(t)
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	err := (&updateCommand{}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "file")
+}
+
+func writeTestCanvasFileWithoutMetadataID(t *testing.T, name string) string {
+	t.Helper()
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	content := []byte(
+		"apiVersion: v1\nkind: Canvas\nmetadata:\n  name: " + name + "\nspec:\n  nodes: []\n  edges: []\n",
+	)
+	require.NoError(t, os.WriteFile(filePath, content, 0o644))
+	return filePath
+}
+
+func writeTestCanvasFileWithMetadataID(t *testing.T, name, canvasID string) string {
+	t.Helper()
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	content := []byte(
+		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: " + canvasID + "\n  name: " + name + "\nspec:\n  nodes: []\n  edges: []\n",
+	)
+	require.NoError(t, os.WriteFile(filePath, content, 0o644))
+	return filePath
+}
+
+func TestResolveCanvasForFileUpdateWithoutIDReturnsError(t *testing.T) {
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "parse-check")
+	_, _, err := resolveCanvasForFileUpdate(filePath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "metadata.id is required")
+}
+
+func TestResolveCanvasForFileUpdateWithIDSucceeds(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	filePath := writeTestCanvasFileWithMetadataID(t, "my-canvas", canvasID)
+	gotID, canvas, err := resolveCanvasForFileUpdate(filePath)
+	require.NoError(t, err)
+	require.Equal(t, canvasID, gotID)
+	md := canvas.GetMetadata()
+	require.Equal(t, canvasID, (&md).GetId())
+}
+
+func TestResolveCanvasForFileUpdateWhitespaceIDReturnsError(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	content := []byte(
+		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: \"   \"\n  name: x\nspec:\n  nodes: []\n  edges: []\n",
+	)
+	require.NoError(t, os.WriteFile(filePath, content, 0o644))
+
+	_, _, err := resolveCanvasForFileUpdate(filePath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "metadata.id is required")
+}
+
+func TestAutoLayoutFlagsWereSet(t *testing.T) {
+	t.Run("nil command", func(t *testing.T) {
+		require.False(t, autoLayoutFlagsWereSet(core.CommandContext{}))
+	})
+	t.Run("auto-layout flag changed", func(t *testing.T) {
+		cmd := cobra.Command{}
+		cmd.Flags().String("auto-layout", "", "")
+		cmd.Flags().String("auto-layout-scope", "", "")
+		cmd.Flags().StringArray("auto-layout-node", nil, "")
+		require.NoError(t, cmd.ParseFlags([]string{"--auto-layout=horizontal"}))
+		require.True(t, autoLayoutFlagsWereSet(core.CommandContext{Cmd: &cmd}))
+	})
+	t.Run("auto-layout-scope flag changed", func(t *testing.T) {
+		cmd := cobra.Command{}
+		cmd.Flags().String("auto-layout", "", "")
+		cmd.Flags().String("auto-layout-scope", "", "")
+		cmd.Flags().StringArray("auto-layout-node", nil, "")
+		require.NoError(t, cmd.ParseFlags([]string{"--auto-layout-scope=full-canvas"}))
+		require.True(t, autoLayoutFlagsWereSet(core.CommandContext{Cmd: &cmd}))
+	})
+	t.Run("auto-layout-node flag changed", func(t *testing.T) {
+		cmd := cobra.Command{}
+		cmd.Flags().String("auto-layout", "", "")
+		cmd.Flags().String("auto-layout-scope", "", "")
+		cmd.Flags().StringArray("auto-layout-node", nil, "")
+		require.NoError(t, cmd.ParseFlags([]string{"--auto-layout-node=a"}))
+		require.True(t, autoLayoutFlagsWereSet(core.CommandContext{Cmd: &cmd}))
+	})
+	t.Run("no auto-layout flags parsed", func(t *testing.T) {
+		cmd := cobra.Command{}
+		cmd.Flags().String("auto-layout", "", "")
+		require.NoError(t, cmd.ParseFlags(nil))
+		require.False(t, autoLayoutFlagsWereSet(core.CommandContext{Cmd: &cmd}))
+	})
+}
+
+func TestParseAutoLayoutRejectsInvalidAlgorithm(t *testing.T) {
+	_, err := parseAutoLayout("vertical", "", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported auto layout")
+}
+
+func TestParseAutoLayoutRejectsInvalidScope(t *testing.T) {
+	_, err := parseAutoLayout("horizontal", "whole-world", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported auto layout scope")
+}
+
+func TestParseAutoLayoutScopeFullAlias(t *testing.T) {
+	autoLayout, err := parseAutoLayout("horizontal", "full", nil)
+	require.NoError(t, err)
+	require.NotNil(t, autoLayout)
+	require.Equal(t, openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS, autoLayout.GetScope())
+}
+
+func TestParseAutoLayoutDisableAcceptsOffAndNone(t *testing.T) {
+	for _, v := range []string{"off", "none", "NONE"} {
+		t.Run(v, func(t *testing.T) {
+			al, err := parseAutoLayout(v, "", nil)
+			require.NoError(t, err)
+			require.Nil(t, al)
+		})
+	}
+}
+
+func TestUpdateFromFileJSONOutputWhenDraft(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
+			},
+		},
+	)
+
+	filePath := writeTestCanvasFileWithMetadataID(t, "json-out", canvasID)
+	file := filePath
+	draft := true
+	ctx, stdout := newCreateCommandContextForTest(t, server.server, "json")
+
+	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), `"metadata"`)
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+	})
+}
+
+func TestUpdateFromFileWhenPublishFailsReturnsWrappedError(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[]}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPatch,
+			path:   "/api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"message":"publish failed"}`))
+			},
+		},
+	)
+
+	filePath := writeTestCanvasFileWithMetadataID(t, "pub-fail", canvasID)
+	file := filePath
+	draft := false
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+
+	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	require.Error(t, err)
+	require.True(t, strings.Contains(err.Error(), "draft was updated but publish failed"), err.Error())
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPost + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPatch + " /api/v1/canvases/" + canvasID + "/versions/ver-1/publish",
+	})
+}
+
+func TestUpdateFromFileWhenCanvasesUpdateFailsReturnsError(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusConflict)
+				_, _ = w.Write([]byte(`{"message":"version conflict"}`))
+			},
+		},
+	)
+
+	filePath := writeTestCanvasFileWithMetadataID(t, "put-fail", canvasID)
+	file := filePath
+	draft := true
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+
+	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	require.Error(t, err)
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+	})
+}
+
+func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check"},"spec":{"changeManagement":{"enabled":false}}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","state":"STATE_DRAFT"}}]}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(
+					`{"version":{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `"},` +
+						`"spec":{"nodes":[{"id":"n1","integration":{"id":"int-1"}}],` +
+						`"edges":[]}}}`,
+				))
+			},
+		},
+	)
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "canvas.yaml")
+	yaml := "" +
+		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: " + canvasID + "\n  name: integ\nspec:\n  nodes: []\n  edges: []\n"
+	require.NoError(t, os.WriteFile(filePath, []byte(yaml), 0o644))
+
+	file := filePath
+	draft := true
+	ctx, stdout := newCreateCommandContextForTest(t, server.server, "text")
+
+	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), "Integrations: 1")
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + canvasID,
+		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
+		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+	})
 }
 
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {

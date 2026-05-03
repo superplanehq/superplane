@@ -15,6 +15,7 @@ import type { EventState, EventStateMap } from "../../componentBase";
 import type { ChildExecution } from "@/ui/chainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { analytics } from "@/lib/analytics";
 
 function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,
@@ -142,6 +143,7 @@ interface ExecutionChainPageProps {
   actions?: SuperplaneActionsAction[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
+  organizationId?: string;
 }
 
 export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
@@ -157,6 +159,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   actions = [],
   triggers = [],
   onHighlightedNodesChange,
+  organizationId,
 }) => {
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,6 +205,18 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   }, [triggerEvent, chainItems]);
 
   // Load execution chain data function
+  const handleTabClickCapture = useCallback(
+    (e: React.MouseEvent) => {
+      const button = (e.target as HTMLElement).closest("button");
+      if (!button) return;
+      const text = button.textContent?.trim().toLowerCase();
+      if (["details", "payload", "config"].includes(text ?? "")) {
+        analytics.canvasRunItemTabView(text as "details" | "payload" | "config", organizationId ?? "");
+      }
+    },
+    [organizationId],
+  );
+
   const loadChainData = useCallback(async () => {
     if (!eventId || !loadExecutionChain) {
       setLoading(false);
@@ -421,7 +436,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     <div className="flex flex-col h-full">
       {/* Scrollable Section with Event and Executions */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto p-4">
+        <div ref={executionsScrollRef} className="flex-1 overflow-y-auto p-4" onClickCapture={handleTabClickCapture}>
           <div className="pb-15">
             {triggerEvent && (
               <div className="mb-6 border-b-1 border-border pb-4">

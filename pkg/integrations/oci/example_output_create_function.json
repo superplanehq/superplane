@@ -1,0 +1,14 @@
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "displayName": "my-function",
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "image": "phx.ocir.io/mynamespace/myrepo/myfunction:0.0.1",
+    "invokeEndpoint": "https://aabbccddeeff.call.eu-frankfurt-1.oci.oraclecloud.com",
+    "lifecycleState": "ACTIVE",
+    "memoryInMBs": 256,
+    "timeCreated": "2026-04-22T20:33:10.512Z"
+  },
+  "timestamp": "2026-04-22T20:33:11.102345678Z",
+  "type": "oci.functionCreated"
+}

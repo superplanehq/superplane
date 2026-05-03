@@ -7,12 +7,17 @@ import (
 )
 
 const (
-	ResourceTypeCompartment        = "compartment"
-	ResourceTypeAvailabilityDomain = "availabilityDomain"
-	ResourceTypeShape              = "shape"
-	ResourceTypeImage              = "image"
-	ResourceTypeSubnet             = "subnet"
-	ResourceTypeBlockVolume        = "blockVolume"
+	ResourceTypeCompartment         = "compartment"
+	ResourceTypeAvailabilityDomain  = "availabilityDomain"
+	ResourceTypeShape               = "shape"
+	ResourceTypeImage               = "image"
+	ResourceTypeVCN                 = "vcn"
+	ResourceTypeSubnet              = "subnet"
+	ResourceTypeBlockVolume         = "blockVolume"
+	ResourceTypeFunctionApplication = "functionApplication"
+	ResourceTypeFunction            = "function"
+	ResourceTypeContainerRepository = "containerRepository"
+	ResourceTypeContainerImage      = "containerImage"
 )
 
 func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -25,10 +30,20 @@ func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return listShapes(ctx)
 	case ResourceTypeImage:
 		return listImages(ctx)
+	case ResourceTypeVCN:
+		return listVCNs(ctx)
 	case ResourceTypeSubnet:
 		return listSubnets(ctx)
 	case ResourceTypeBlockVolume:
 		return listBlockVolumes(ctx)
+	case ResourceTypeFunctionApplication:
+		return listFunctionApplications(ctx)
+	case ResourceTypeFunction:
+		return listFunctions(ctx)
+	case ResourceTypeContainerRepository:
+		return listContainerRepositories(ctx)
+	case ResourceTypeContainerImage:
+		return listContainerImages(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
@@ -153,7 +168,7 @@ func listImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 	return resources, nil
 }
 
-func listSubnets(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+func listVCNs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OCI client: %w", err)
@@ -164,7 +179,43 @@ func listSubnets(ctx core.ListResourcesContext) ([]core.IntegrationResource, err
 		compartmentID = client.tenancyOCID
 	}
 
-	subnets, err := client.ListSubnets(compartmentID)
+	vcns, err := client.ListVCNs(compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list VCNs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(vcns))
+	for _, v := range vcns {
+		if v.LifecycleState != "AVAILABLE" {
+			continue
+		}
+		name := v.DisplayName
+		if v.CIDRBlock != "" {
+			name = v.DisplayName + " (" + v.CIDRBlock + ")"
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeVCN,
+			Name: name,
+			ID:   v.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listSubnets(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+	vcnID := ctx.Parameters["vcnId"]
+
+	subnets, err := client.ListSubnets(compartmentID, vcnID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list subnets: %w", err)
 	}
@@ -213,6 +264,150 @@ func listBlockVolumes(ctx core.ListResourcesContext) ([]core.IntegrationResource
 			Type: ResourceTypeBlockVolume,
 			Name: v.DisplayName,
 			ID:   v.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listFunctionApplications(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+
+	apps, err := client.ListApplications(compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list function applications: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(apps))
+	for _, app := range apps {
+		if app.LifecycleState != "ACTIVE" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeFunctionApplication,
+			Name: app.DisplayName,
+			ID:   app.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listContainerRepositories(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+
+	repos, err := client.ListContainerRepositories(compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list container repositories: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(repos))
+	for _, r := range repos {
+		if r.LifecycleState != "AVAILABLE" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeContainerRepository,
+			Name: r.DisplayName,
+			ID:   r.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listContainerImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+	repositoryID := ctx.Parameters["repositoryId"]
+	if repositoryID == "" {
+		return nil, fmt.Errorf("repositoryId parameter is required to list container images")
+	}
+
+	// Get the OCIR namespace so we can construct the full image URI.
+	// OCI Functions requires the image in the format:
+	//   <region>.ocir.io/<namespace>/<repositoryName>:<version>
+	namespace, err := client.GetOCIRNamespace(compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OCIR namespace: %w", err)
+	}
+
+	images, err := client.ListContainerImages(compartmentID, repositoryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list container images: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(images))
+	for _, img := range images {
+		if img.LifecycleState != "AVAILABLE" {
+			continue
+		}
+		// Skip untagged images: an empty Version would produce an invalid URI ending with ':'.
+		if img.Version == "" {
+			continue
+		}
+		// Construct the full OCIR image URI required by OCI Functions.
+		// The format is: <region-key>.ocir.io/<namespace>/<repositoryName>:<version>
+		fullImageURI := fmt.Sprintf("%s/%s/%s:%s",
+			client.ocirRegistryHost(), namespace, img.RepositoryName, img.Version)
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeContainerImage,
+			Name: fullImageURI,
+			ID:   fullImageURI,
+		})
+	}
+
+	return resources, nil
+}
+
+func listFunctions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	applicationID := ctx.Parameters["applicationId"]
+	if applicationID == "" {
+		return nil, fmt.Errorf("applicationId parameter is required to list functions")
+	}
+
+	fns, err := client.ListFunctions(applicationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list functions: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(fns))
+	for _, fn := range fns {
+		if fn.LifecycleState != "ACTIVE" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeFunction,
+			Name: fn.DisplayName,
+			ID:   fn.ID,
 		})
 	}
 
