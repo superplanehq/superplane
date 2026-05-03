@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
@@ -89,6 +90,52 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		stored, err := models.FindIntegration(r.Organization.ID, uuid.MustParse(resp.Integration.Metadata.Id))
 		require.NoError(t, err)
 		assert.Nil(t, stored.SetupState)
+	})
+
+	t.Run("capability selection with invalid capability -> invalid argument", func(t *testing.T) {
+		r4 := support.Setup(t)
+		ctx4 := authentication.SetUserIdInMetadata(context.Background(), r4.User.String())
+		onStepSubmitCalled := false
+
+		r4.Registry.AppEnv = "development"
+		r4.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+		r4.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
+			CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},
+			FirstStep: func(ctx core.SetupStepContext) core.SetupStep {
+				return core.SetupStep{Type: core.SetupStepTypeCapabilitySelection, Name: "select_capabilities", Capabilities: []string{"feat"}}
+			},
+			OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
+				onStepSubmitCalled = true
+				return nil, nil
+			},
+		})
+
+		resp, err := CreateIntegration(
+			ctx4,
+			r4.Registry,
+			nil,
+			"http://localhost",
+			"http://localhost",
+			r4.Organization.ID.String(),
+			"dummy",
+			support.RandomName("installation"),
+			nil,
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, resp.Integration)
+		require.NotNil(t, resp.Integration.Status.SetupState)
+		require.NotNil(t, resp.Integration.Status.SetupState.CurrentStep)
+		assert.Equal(t, "select_capabilities", resp.Integration.Status.SetupState.CurrentStep.Name)
+		assert.Equal(t, pb.Integration_SetupStepDefinition_CAPABILITY_SELECTION, resp.Integration.Status.SetupState.CurrentStep.Type)
+
+		_, err = NextIntegrationSetupStep(ctx4, r4.Registry, baseURL, baseURL, r4.Organization.ID.String(), resp.Integration.Metadata.Id, nil, []string{"invalid-capability"})
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "invalid capability: invalid-capability", s.Message())
+		assert.False(t, onStepSubmitCalled)
 	})
 
 	t.Run("done step clears setup and marks ready", func(t *testing.T) {
