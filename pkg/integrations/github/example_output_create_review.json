@@ -4,14 +4,27 @@
     "body": "LGTM. Approving after successful CI.",
     "state": "APPROVED",
     "submitted_at": "2026-01-25T12:34:56Z",
-    "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9001",
+    "html_url": "https://github.com/example-org/example-repo/pull/42#pullrequestreview-9001",
     "user": {
-      "login": "octocat",
+      "login": "example-user",
       "id": 1,
-      "html_url": "https://github.com/octocat"
+      "html_url": "https://github.com/example-user"
+    },
+    "organization": {
+      "login": "example-org",
+      "id": 1234567,
+      "node_id": "MDEyOk9yZ2FuaXphdGlvbjEyMzQ1Njc=",
+      "url": "https://api.github.com/orgs/example-org",
+      "repos_url": "https://api.github.com/orgs/example-org/repos",
+      "events_url": "https://api.github.com/orgs/example-org/events",
+      "hooks_url": "https://api.github.com/orgs/example-org/hooks",
+      "issues_url": "https://api.github.com/orgs/example-org/issues",
+      "members_url": "https://api.github.com/orgs/example-org/members{/member}",
+      "public_members_url": "https://api.github.com/orgs/example-org/public_members{/member}",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1234567?v=4",
+      "description": ""
     }
   },
   "timestamp": "2026-01-25T12:34:56.000000000Z",
   "type": "github.pullRequestReview"
 }
-

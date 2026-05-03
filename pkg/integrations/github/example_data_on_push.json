@@ -64,18 +64,18 @@
       "url": "https://github.com/example-org/example-repo/commit/4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01"
     },
     "organization": {
-      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
-      "description": "Example organization for demo data",
+      "login": "example-org",
+      "id": 1234567,
+      "node_id": "MDEyOk9yZ2FuaXphdGlvbjEyMzQ1Njc=",
+      "url": "https://api.github.com/orgs/example-org",
+      "repos_url": "https://api.github.com/orgs/example-org/repos",
       "events_url": "https://api.github.com/orgs/example-org/events",
       "hooks_url": "https://api.github.com/orgs/example-org/hooks",
-      "id": 12345678,
       "issues_url": "https://api.github.com/orgs/example-org/issues",
-      "login": "example-org",
       "members_url": "https://api.github.com/orgs/example-org/members{/member}",
-      "node_id": "O_kgDOBb1AaA",
       "public_members_url": "https://api.github.com/orgs/example-org/public_members{/member}",
-      "repos_url": "https://api.github.com/orgs/example-org/repos",
-      "url": "https://api.github.com/orgs/example-org"
+      "avatar_url": "https://avatars.githubusercontent.com/u/1234567?v=4",
+      "description": ""
     },
     "pusher": {
       "email": "alex.doe@example.com",
