@@ -658,6 +658,11 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		newEvents = append(newEvents, events...)
 	}
 
+	capabilityCtx := contexts.NewCapabilityContext(
+		s.registry.AllCapabilities(integrationInstance.AppName),
+		integrationInstance.Capabilities,
+	)
+
 	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:          logging.ForIntegration(*integrationInstance),
 		Request:         r,
@@ -666,6 +671,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  integrationInstance.OrganizationID.String(),
 		HTTP:            s.registry.HTTPContext(),
+		Capabilities:    capabilityCtx,
 		Integration: contexts.NewIntegrationContext(
 			database.Conn(),
 			nil,
@@ -676,6 +682,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		),
 	})
 
+	integrationInstance.Capabilities = capabilityCtx.States()
 	err = database.Conn().Save(&integrationInstance).Error
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)

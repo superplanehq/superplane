@@ -118,25 +118,17 @@ func CreateIntegrationWithUsage(
 	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
 }
 
-func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
-	capabilities := []core.Capability{}
-	for _, group := range setupProvider.CapabilityGroups() {
-		capabilities = append(capabilities, group.Capabilities...)
-	}
-	return capabilities
-}
-
 func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration, capabilities []string) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
-	initialCapabilities, err := initialCapabilityStates(allCapabilities(setupProvider), capabilities)
+	initialCapabilities, err := initialCapabilityStates(registry.AllCapabilities(newIntegration.AppName), capabilities)
 	if err != nil {
 		return nil, err
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		newIntegration.Capabilities = initialCapabilities
-		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
+		capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(newIntegration.AppName), newIntegration.Capabilities)
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),

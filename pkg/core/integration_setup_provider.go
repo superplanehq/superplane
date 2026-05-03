@@ -209,6 +209,7 @@ type CapabilityContext interface {
 	Disable(capabilities ...string) error
 	IsRequested(capabilities ...string) (bool, error)
 	Requested() []string
+	Enabled() []string
 }
 
 type CapabilityGroup struct {

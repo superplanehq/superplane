@@ -50,7 +50,6 @@ export function CurrentStep({
         step={currentStep}
         onBack={onBack}
         onOpenRedirect={() => openRedirectPrompt(currentStep)}
-        onSubmit={onSubmit}
         isSubmitting={isSubmitting}
         isReverting={isReverting}
       />

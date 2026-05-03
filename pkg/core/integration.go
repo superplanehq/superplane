@@ -278,6 +278,7 @@ type HTTPRequestContext struct {
 	WebhooksBaseURL string
 	HTTP            HTTPContext
 	Integration     IntegrationContext
+	Capabilities    CapabilityContext
 }
 
 /*

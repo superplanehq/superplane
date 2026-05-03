@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -95,8 +96,9 @@ func submitStep(registry *registry.Registry, integration *models.Integration, ba
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
+		capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
 		nextStep, err := setupProvider.OnStepSubmit(core.SetupStepContext{
+			Logger:          logging.ForIntegration(*integration),
 			Step:            setupState.CurrentStep.Name,
 			BaseURL:         baseURL,
 			WebhooksBaseURL: webhooksBaseURL,

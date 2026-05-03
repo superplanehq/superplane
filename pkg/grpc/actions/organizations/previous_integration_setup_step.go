@@ -67,7 +67,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		stepToRevert := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
-		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
+		capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
 		ctx := core.SetupStepContext{
 			Step:           stepToRevert.Name,
 			IntegrationID:  integration.ID,
