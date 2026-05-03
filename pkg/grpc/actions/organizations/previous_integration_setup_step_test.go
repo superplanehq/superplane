@@ -31,7 +31,7 @@ func Test__PreviousIntegrationSetupStep(t *testing.T) {
 			return core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_one"}
 		},
 		OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
-			switch ctx.Step {
+			switch ctx.Step.Name {
 			case "step_one":
 				return &core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}, nil
 
@@ -85,7 +85,7 @@ func Test__PreviousIntegrationSetupStep(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Integration)
 
-		_, err = NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		_, err = NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 
 		back, err := PreviousIntegrationSetupStep(ctx, r.Registry, r.Organization.ID.String(), resp.Integration.Metadata.Id)

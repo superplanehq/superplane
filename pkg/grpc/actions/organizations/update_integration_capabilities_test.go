@@ -32,7 +32,7 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 			return core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_one"}
 		},
 		OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
-			switch ctx.Step {
+			switch ctx.Step.Name {
 			case "step_one":
 				return &core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}, nil
 
