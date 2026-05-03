@@ -135,7 +135,7 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 
 	t.Run("unknown step", func(t *testing.T) {
 		_, err := s.OnStepSubmit(core.SetupStepContext{
-			Step:   "nope",
+			Step:   core.StepInfo{Name: "nope"},
 			Logger: logger,
 		})
 		require.Error(t, err)
@@ -143,35 +143,26 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 	})
 
 	t.Run("selectOrganization validation", func(t *testing.T) {
-		base := core.SetupStepContext{
-			Step:       "selectOrganization",
+		_, err := s.OnStepSubmit(core.SetupStepContext{
+			Step:       core.StepInfo{Name: SetupStepSelectOrganization, Inputs: "not-a-map"},
 			Logger:     logger,
 			Properties: &contexts.IntegrationPropertyStorage{},
-		}
-
-		_, err := s.OnStepSubmit(core.SetupStepContext{
-			Step:       base.Step,
-			Logger:     base.Logger,
-			Properties: base.Properties,
-			Inputs:     "not-a-map",
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid input")
 
 		_, err = s.OnStepSubmit(core.SetupStepContext{
-			Step:       base.Step,
-			Logger:     base.Logger,
-			Properties: base.Properties,
-			Inputs:     map[string]any{"organizationUrl": 42},
+			Step:       core.StepInfo{Name: SetupStepSelectOrganization, Inputs: map[string]any{"organizationUrl": 42}},
+			Logger:     logger,
+			Properties: &contexts.IntegrationPropertyStorage{},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid organization URL")
 
 		_, err = s.OnStepSubmit(core.SetupStepContext{
-			Step:       base.Step,
-			Logger:     base.Logger,
-			Properties: base.Properties,
-			Inputs:     map[string]any{"organizationUrl": ""},
+			Step:       core.StepInfo{Name: SetupStepSelectOrganization, Inputs: map[string]any{"organizationUrl": ""}},
+			Logger:     logger,
+			Properties: &contexts.IntegrationPropertyStorage{},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "organization URL is required")
@@ -181,10 +172,9 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 		props := contexts.NewIntegrationPropertyStorage()
 		orgURL := "https://org.semaphoreci.com"
 		next, err := s.OnStepSubmit(core.SetupStepContext{
-			Step:       "selectOrganization",
+			Step:       core.StepInfo{Name: SetupStepSelectOrganization, Inputs: map[string]any{"organizationUrl": orgURL}},
 			Logger:     logger,
 			Properties: props,
-			Inputs:     map[string]any{"organizationUrl": orgURL},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, next)
@@ -205,47 +195,35 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 			Value: "https://example.semaphoreci.com",
 		}))
 
-		base := core.SetupStepContext{
-			Step:         "enterAPIToken",
+		_, err := s.OnStepSubmit(core.SetupStepContext{
+			Step:         core.StepInfo{Name: SetupStepEnterAPIToken, Inputs: 123},
 			Logger:       logger,
 			Properties:   props,
 			Secrets:      intCtx.Secrets(),
 			Capabilities: &contexts.CapabilityContext{},
 			HTTP:         &contexts.HTTPContext{},
-		}
-
-		_, err := s.OnStepSubmit(core.SetupStepContext{
-			Step:         base.Step,
-			Logger:       base.Logger,
-			Properties:   base.Properties,
-			Secrets:      base.Secrets,
-			Capabilities: base.Capabilities,
-			HTTP:         base.HTTP,
-			Inputs:       123,
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid input")
 
 		_, err = s.OnStepSubmit(core.SetupStepContext{
-			Step:         base.Step,
-			Logger:       base.Logger,
-			Properties:   base.Properties,
-			Secrets:      base.Secrets,
-			Capabilities: base.Capabilities,
-			HTTP:         base.HTTP,
-			Inputs:       map[string]any{"apiToken": 1},
+			Step:         core.StepInfo{Name: SetupStepEnterAPIToken, Inputs: map[string]any{"apiToken": 1}},
+			Logger:       logger,
+			Properties:   props,
+			Secrets:      intCtx.Secrets(),
+			Capabilities: &contexts.CapabilityContext{},
+			HTTP:         &contexts.HTTPContext{},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid API token")
 
 		_, err = s.OnStepSubmit(core.SetupStepContext{
-			Step:         base.Step,
-			Logger:       base.Logger,
-			Properties:   base.Properties,
-			Secrets:      base.Secrets,
-			Capabilities: base.Capabilities,
-			HTTP:         base.HTTP,
-			Inputs:       map[string]any{"apiToken": ""},
+			Step:         core.StepInfo{Name: SetupStepEnterAPIToken, Inputs: map[string]any{"apiToken": ""}},
+			Logger:       logger,
+			Properties:   props,
+			Secrets:      intCtx.Secrets(),
+			Capabilities: &contexts.CapabilityContext{},
+			HTTP:         &contexts.HTTPContext{},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "API token is required")
@@ -268,13 +246,12 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 		}
 
 		_, err := s.OnStepSubmit(core.SetupStepContext{
-			Step:         "enterAPIToken",
+			Step:         core.StepInfo{Name: SetupStepEnterAPIToken, Inputs: map[string]any{"apiToken": "t"}},
 			Logger:       logger,
 			Properties:   props,
 			Secrets:      intCtx.Secrets(),
 			Capabilities: &contexts.CapabilityContext{},
 			HTTP:         httpCtx,
-			Inputs:       map[string]any{"apiToken": "t"},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "error listing projects")
@@ -301,13 +278,12 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 		}
 
 		next, err := s.OnStepSubmit(core.SetupStepContext{
-			Step:         "enterAPIToken",
+			Step:         core.StepInfo{Name: SetupStepEnterAPIToken, Inputs: map[string]any{"apiToken": "final-token"}},
 			Logger:       logger,
 			Properties:   props,
 			Secrets:      intCtx.Secrets(),
 			Capabilities: capCtx,
 			HTTP:         httpCtx,
-			Inputs:       map[string]any{"apiToken": "final-token"},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, next)
@@ -327,7 +303,10 @@ func Test__Semaphore__SetupProvider__OnStepRevert(t *testing.T) {
 	logger := logger.DiscardLogger()
 
 	t.Run("unknown step", func(t *testing.T) {
-		err := s.OnStepRevert(core.SetupStepContext{Step: "x", Logger: logger})
+		err := s.OnStepRevert(core.SetupStepContext{
+			Step:   core.StepInfo{Name: "x"},
+			Logger: logger,
+		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown step")
 	})
@@ -339,7 +318,7 @@ func Test__Semaphore__SetupProvider__OnStepRevert(t *testing.T) {
 			Value: "https://example.semaphoreci.com",
 		}))
 		require.NoError(t, s.OnStepRevert(core.SetupStepContext{
-			Step:       "selectOrganization",
+			Step:       core.StepInfo{Name: SetupStepSelectOrganization},
 			Logger:     logger,
 			Properties: props,
 		}))
@@ -352,7 +331,7 @@ func Test__Semaphore__SetupProvider__OnStepRevert(t *testing.T) {
 		require.NoError(t, intCtx.SetSecret("apiToken", []byte("sek")))
 
 		require.NoError(t, s.OnStepRevert(core.SetupStepContext{
-			Step:    "enterAPIToken",
+			Step:    core.StepInfo{Name: SetupStepEnterAPIToken},
 			Logger:  logger,
 			Secrets: intCtx.Secrets(),
 		}))
