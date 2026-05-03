@@ -1,9 +1,9 @@
 import type {
   IntegrationSetupStepDefinition,
   IntegrationsCapabilityDefinition,
+  IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
 } from "@/api-client";
-import type { CapabilityGroupSection } from "@/lib/capabilities";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { getApiErrorMessage } from "@/lib/errors";
 import { CurrentStep } from "./CurrentStep";
@@ -18,9 +18,8 @@ interface SetupCardProps {
   showSetupStepBack: boolean;
   instanceName: string;
   integrationName: string;
+  integrationDefinition: IntegrationsIntegrationDefinition | undefined;
   integrationCapabilities: IntegrationsCapabilityDefinition[];
-  capabilitySections: CapabilityGroupSection[];
-  capabilityByName: Map<string, IntegrationsCapabilityDefinition>;
   selectedCapabilities: ReadonlySet<string>;
   isCreatePending: boolean;
   isSubmitting: boolean;
@@ -43,9 +42,8 @@ export function SetupCard({
   showSetupStepBack,
   instanceName,
   integrationName,
+  integrationDefinition,
   integrationCapabilities,
-  capabilitySections,
-  capabilityByName,
   selectedCapabilities,
   isCreatePending,
   isSubmitting,
@@ -72,12 +70,6 @@ export function SetupCard({
           instanceName={instanceName}
           onInstanceNameChange={onInstanceNameChange}
           integrationName={integrationName}
-          integrationCapabilities={integrationCapabilities}
-          capabilitySections={capabilitySections}
-          capabilityByName={capabilityByName}
-          selectedCapabilities={selectedCapabilities}
-          onToggleCapability={onToggleCapability}
-          onToggleCapabilityGroup={onToggleCapabilityGroup}
           isCreatePending={isCreatePending}
           onCreate={onCreate}
         />
@@ -91,6 +83,11 @@ export function SetupCard({
           onBack={showSetupStepBack ? onSetupStepBack : undefined}
           isSubmitting={isSubmitting}
           isReverting={isReverting}
+          integrationDefinition={integrationDefinition}
+          integrationCapabilities={integrationCapabilities}
+          selectedCapabilities={selectedCapabilities}
+          onToggleCapability={onToggleCapability}
+          onToggleCapabilityGroup={onToggleCapabilityGroup}
         />
       )}
     </div>

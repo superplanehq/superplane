@@ -28,7 +28,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 			return core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_one"}
 		},
 		OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
-			switch ctx.Step {
+			switch ctx.Step.Name {
 			case "step_one":
 				return &core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}, nil
 
@@ -44,7 +44,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	baseURL := "http://localhost"
 
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
-		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, "not-a-uuid", uuid.NewString(), nil)
+		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, "not-a-uuid", uuid.NewString(), nil, nil)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -52,7 +52,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	})
 
 	t.Run("integration not found -> not found", func(t *testing.T) {
-		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), nil)
+		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), nil, nil)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -75,14 +75,14 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Integration)
 
-		afterOne, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		afterOne, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, afterOne.Integration)
 		require.NotNil(t, afterOne.Integration.Status.SetupState)
 		require.NotNil(t, afterOne.Integration.Status.SetupState.CurrentStep)
 		assert.Equal(t, "step_two", afterOne.Integration.Status.SetupState.CurrentStep.Name)
 
-		afterTwo, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		afterTwo, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, afterTwo.Integration)
 
@@ -118,7 +118,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Integration)
 
-		nextResponse, err := NextIntegrationSetupStep(ctx3, r3.Registry, baseURL, baseURL, r3.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		nextResponse, err := NextIntegrationSetupStep(ctx3, r3.Registry, baseURL, baseURL, r3.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, nextResponse.Integration)
 

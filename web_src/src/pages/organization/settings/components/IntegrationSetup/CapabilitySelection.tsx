@@ -1,26 +1,26 @@
 import type { IntegrationsCapabilityDefinition } from "@/api-client";
 import type { CapabilityGroupSection } from "@/lib/capabilities";
-import { PreCreateCapabilitySection } from "./PreCreateCapabilitySection";
+import { CapabilitySection } from "./CapabilitySection";
 
-export interface PreCreateCapabilitySelectionProps {
+export interface CapabilitySelectionProps {
   integrationCapabilities: IntegrationsCapabilityDefinition[];
   capabilitySections: CapabilityGroupSection[];
   capabilityByName: Map<string, IntegrationsCapabilityDefinition>;
   selectedCapabilities: ReadonlySet<string>;
   onToggleCapability: (capabilityName: string) => void;
   onToggleCapabilityGroup: (capabilityNames: string[]) => void;
-  isCreatePending: boolean;
+  selectionDisabled: boolean;
 }
 
-export function PreCreateCapabilitySelection({
+export function CapabilitySelection({
   integrationCapabilities,
   capabilitySections,
   capabilityByName,
   selectedCapabilities,
   onToggleCapability,
   onToggleCapabilityGroup,
-  isCreatePending,
-}: PreCreateCapabilitySelectionProps) {
+  selectionDisabled,
+}: CapabilitySelectionProps) {
   if (integrationCapabilities.length === 0) {
     return null;
   }
@@ -34,14 +34,14 @@ export function PreCreateCapabilitySelection({
       </p>
       <div className="space-y-4">
         {capabilitySections.map((section) => (
-          <PreCreateCapabilitySection
+          <CapabilitySection
             key={section.key}
             section={section}
             capabilityByName={capabilityByName}
             selectedCapabilities={selectedCapabilities}
             onToggleCapability={onToggleCapability}
             onToggleCapabilityGroup={onToggleCapabilityGroup}
-            isCreatePending={isCreatePending}
+            selectionDisabled={selectionDisabled}
           />
         ))}
       </div>
