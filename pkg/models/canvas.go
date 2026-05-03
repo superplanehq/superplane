@@ -23,6 +23,7 @@ type Canvas struct {
 	LiveVersionID  *uuid.UUID
 	IsTemplate     bool
 	Name           string
+	Paused         bool
 	// The `->` tag marks fields as read-only in GORM. These values are projected
 	// from the live version via SELECT aliases; they are not stored on workflows.
 	Description             string                                           `gorm:"column:description;->"`
@@ -367,6 +368,7 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 			"workflows.live_version_id",
 			"workflows.is_template",
 			"workflows.name",
+			"workflows.paused",
 			"workflows.created_by",
 			"workflows.created_at",
 			"workflows.updated_at",

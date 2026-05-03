@@ -2,8 +2,9 @@ import type { AgentState } from "@/components/AgentSidebar/useAgentState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Pause, Play, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
@@ -43,6 +44,10 @@ interface HeaderProps {
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
+  paused?: boolean;
+  onToggleCanvasPause?: (paused: boolean) => void;
+  canvasPauseDisabled?: boolean;
+  canvasPauseDisabledTooltip?: string;
   agentState: AgentState;
 }
 
@@ -154,11 +159,24 @@ function SecondaryHeaderActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  paused,
+  onToggleCanvasPause,
+  canvasPauseDisabled,
+  canvasPauseDisabledTooltip,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
+      {mode === "version-live" && onToggleCanvasPause ? (
+        <PauseCanvasButton
+          paused={!!paused}
+          onToggle={onToggleCanvasPause}
+          disabled={canvasPauseDisabled}
+          disabledTooltip={canvasPauseDisabledTooltip}
+        />
+      ) : null}
+
       {showVersionControlTrigger ? (
         <VersionControlButton
           onToggle={onOpenVersionControl}
@@ -345,5 +363,53 @@ function PublishVersionButton({
     <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
       {label}
     </UIButton>
+  );
+}
+
+function PauseCanvasButton({
+  paused,
+  onToggle,
+  disabled,
+  disabledTooltip,
+}: {
+  paused: boolean;
+  onToggle: (paused: boolean) => void;
+  disabled?: boolean;
+  disabledTooltip?: string;
+}) {
+  const content = (
+    <UIButton
+      type="button"
+      variant="outline"
+      size="sm"
+      className={cn("gap-1.5", paused ? "text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100" : "")}
+      onClick={() => onToggle(!paused)}
+      disabled={disabled}
+    >
+      {paused ? <Play className="h-3.5 w-3.5 fill-current" /> : <Pause className="h-3.5 w-3.5" />}
+      {paused ? "Resume Canvas" : "Pause Canvas"}
+    </UIButton>
+  );
+
+  if (disabled && disabledTooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">{content}</div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="inline-flex">{content}</div>
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        {paused ? "Resume processing for all triggers" : "Pause all triggers for this canvas"}
+      </TooltipContent>
+    </Tooltip>
   );
 }

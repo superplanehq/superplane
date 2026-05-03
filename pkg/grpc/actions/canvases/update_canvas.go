@@ -139,6 +139,7 @@ func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*mo
 			"live_version_id",
 			"is_template",
 			"name",
+			"paused",
 			"created_by",
 			"created_at",
 			"updated_at",

@@ -29,6 +29,10 @@ func EmitNodeEvent(
 		return nil, fmt.Errorf("canvas not found: %w", err)
 	}
 
+	if canvas.Paused {
+		return nil, fmt.Errorf("canvas is paused")
+	}
+
 	node, err := canvas.FindNode(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("canvas node not found: %w", err)

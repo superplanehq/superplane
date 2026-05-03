@@ -273,6 +273,18 @@ service Canvases {
     };
   }
 
+  rpc UpdateCanvasPause(UpdateCanvasPauseRequest) returns (UpdateCanvasPauseResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/pause"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Pause or resume canvas triggers";
+      description: "Pauses or resumes all triggers for a canvas";
+      tags: "Canvas";
+    };
+  }
+
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions"
@@ -632,6 +644,7 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     bool is_template = 8;
+    bool paused = 9;
   }
 
   message ChangeManagement {
@@ -797,6 +810,15 @@ message UpdateNodePauseRequest {
 
 message UpdateNodePauseResponse {
   Components.Node node = 1;
+}
+
+message UpdateCanvasPauseRequest {
+  string canvas_id = 1;
+  bool paused = 2;
+}
+
+message UpdateCanvasPauseResponse {
+  Canvas canvas = 1;
 }
 
 message ListNodeExecutionsRequest {

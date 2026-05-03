@@ -202,8 +202,10 @@ func ListCanvasNodesReady() ([]CanvasNode, error) {
 func ListReadyTriggers() ([]CanvasNode, error) {
 	var nodes []CanvasNode
 	err := database.Conn().
-		Where("state = ?", CanvasNodeStateReady).
-		Where("type = ?", NodeTypeTrigger).
+		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
+		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
+		Where("workflow_nodes.type = ?", NodeTypeTrigger).
+		Where("workflows.paused = ?", false).
 		Find(&nodes).
 		Error
 

@@ -70,6 +70,7 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 		Where("workflow_node_requests.run_at <= ?", now).
 		Where("workflow_nodes.deleted_at IS NULL").
 		Where("workflows.deleted_at IS NULL").
+		Where("workflows.paused = ?", false).
 		Find(&requests).
 		Error
 
