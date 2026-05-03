@@ -2,44 +2,81 @@ package impl
 
 import "github.com/superplanehq/superplane/pkg/core"
 
-// StubIntegrationSetupProvider is a no-op IntegrationSetupProvider for tests that only need a
-// registered provider instance (e.g. registry setup-flow coverage).
-type StubIntegrationSetupProvider struct{}
+// DummyIntegrationSetupProviderOptions configures a DummyIntegrationSetupProvider for tests.
+// Nil function fields fall back to stub behavior (empty step, nil next step, nil errors).
+type DummyIntegrationSetupProviderOptions struct {
+	CapabilityGroups []core.CapabilityGroup
 
-func NewStubIntegrationSetupProvider() *StubIntegrationSetupProvider {
-	return &StubIntegrationSetupProvider{}
+	FirstStep func(core.SetupStepContext) core.SetupStep
+
+	OnStepSubmit func(core.SetupStepContext) (*core.SetupStep, error)
+
+	OnStepRevert func(core.SetupStepContext) error
+
+	OnPropertyUpdate func(core.PropertyUpdateContext) (*core.SetupStep, error)
+
+	OnSecretUpdate func(core.SecretUpdateContext) (*core.SetupStep, error)
+
+	OnCapabilityUpdate func(core.CapabilityUpdateContext) (*core.SetupStep, error)
 }
 
-func (StubIntegrationSetupProvider) CapabilityGroups() []core.CapabilityGroup {
-	return nil
+// DummyIntegrationSetupProvider is a configurable IntegrationSetupProvider for tests.
+type DummyIntegrationSetupProvider struct {
+	opts DummyIntegrationSetupProviderOptions
 }
 
-func (StubIntegrationSetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
-	_ = ctx
+func NewDummyIntegrationSetupProvider(opts DummyIntegrationSetupProviderOptions) *DummyIntegrationSetupProvider {
+	return &DummyIntegrationSetupProvider{opts: opts}
+}
+
+// NewStubIntegrationSetupProvider returns an IntegrationSetupProvider with empty defaults
+// (same behavior as the historical StubIntegrationSetupProvider).
+func NewStubIntegrationSetupProvider() *DummyIntegrationSetupProvider {
+	return NewDummyIntegrationSetupProvider(DummyIntegrationSetupProviderOptions{})
+}
+
+func (p *DummyIntegrationSetupProvider) CapabilityGroups() []core.CapabilityGroup {
+	return p.opts.CapabilityGroups
+}
+
+func (p *DummyIntegrationSetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
+	if p.opts.FirstStep != nil {
+		return p.opts.FirstStep(ctx)
+	}
 	return core.SetupStep{}
 }
 
-func (StubIntegrationSetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	_ = ctx
+func (p *DummyIntegrationSetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	if p.opts.OnStepSubmit != nil {
+		return p.opts.OnStepSubmit(ctx)
+	}
 	return nil, nil
 }
 
-func (StubIntegrationSetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
-	_ = ctx
+func (p *DummyIntegrationSetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
+	if p.opts.OnStepRevert != nil {
+		return p.opts.OnStepRevert(ctx)
+	}
 	return nil
 }
 
-func (StubIntegrationSetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.SetupStep, error) {
-	_ = ctx
+func (p *DummyIntegrationSetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.SetupStep, error) {
+	if p.opts.OnPropertyUpdate != nil {
+		return p.opts.OnPropertyUpdate(ctx)
+	}
 	return nil, nil
 }
 
-func (StubIntegrationSetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
-	_ = ctx
+func (p *DummyIntegrationSetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
+	if p.opts.OnSecretUpdate != nil {
+		return p.opts.OnSecretUpdate(ctx)
+	}
 	return nil, nil
 }
 
-func (StubIntegrationSetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
-	_ = ctx
+func (p *DummyIntegrationSetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
+	if p.opts.OnCapabilityUpdate != nil {
+		return p.opts.OnCapabilityUpdate(ctx)
+	}
 	return nil, nil
 }
