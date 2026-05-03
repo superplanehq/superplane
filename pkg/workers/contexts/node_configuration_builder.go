@@ -1,9 +1,11 @@
 package contexts
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -234,7 +236,7 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 			return ""
 		}
 
-		return fmt.Sprintf("%v", value)
+		return formatTemplateExpressionValue(value)
 	})
 
 	if err != nil {
@@ -242,6 +244,19 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 	}
 
 	return result, nil
+}
+
+func formatTemplateExpressionValue(value any) string {
+	switch v := value.(type) {
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case json.Number:
+		return v.String()
+	default:
+		return fmt.Sprintf("%v", value)
+	}
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
