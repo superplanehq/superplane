@@ -804,7 +804,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "alice", result["username"])
 	assert.Equal(t, "alice@example.com", result["email"])
-	assert.Equal(t, "30", result["age"])
+	assert.Equal(t, float64(30), result["age"])
 }
 
 func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
@@ -1015,8 +1015,8 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "secret-key-123", result["key"])
 	assert.Equal(t, "https://api.example.com", result["url"])
-	assert.Equal(t, "30", result["timeout"])
-	assert.Equal(t, "3", result["retries"])
+	assert.Equal(t, float64(30), result["timeout"])
+	assert.Equal(t, float64(3), result["retries"])
 	assert.Equal(t, "nested-data", result["nested"])
 	assert.Equal(t, "API: https://api.example.com, Key: secret-key-123", result["combined"])
 }
@@ -1625,4 +1625,61 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	assert.Equal(t, "https://api.example.com", result["api_url"])
 	assert.Equal(t, "https://api.example.com", result["prev_api_url"])
 	assert.Equal(t, "ok", result["output_status"])
+}
+
+// Test_NodeConfigurationBuilder_SingleExpression_PreservesNativeType validates that when an
+// entire configuration field value is a single expression (e.g. "{{ expr }}"), the resolved
+// value retains its native Go type instead of being coerced to a string via fmt.Sprintf.
+// This is required so that HTTP action JSON bodies containing numeric or boolean fields
+// are serialized correctly (fixes issue #4499).
+func Test_NodeConfigurationBuilder_SingleExpression_PreservesNativeType(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	inputData := map[string]any{
+		"count":   float64(42),
+		"ratio":   float64(3.14),
+		"enabled": true,
+		"label":   "hello",
+	}
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, inputData)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: inputData})
+
+	configuration := map[string]any{
+		// Single expressions — must preserve native type
+		"count":   "{{ $[\"" + triggerNode + "\"].count }}",
+		"ratio":   "{{ $[\"" + triggerNode + "\"].ratio }}",
+		"enabled": "{{ $[\"" + triggerNode + "\"].enabled }}",
+		// String value — must stay a string
+		"label": "{{ $[\"" + triggerNode + "\"].label }}",
+		// Mixed expression (interpolated) — must remain a string
+		"summary": "count={{ $[\"" + triggerNode + "\"].count }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, float64(42), result["count"])
+	assert.Equal(t, float64(3.14), result["ratio"])
+	assert.Equal(t, true, result["enabled"])
+	assert.Equal(t, "hello", result["label"])
+	assert.Equal(t, "count=42", result["summary"])
 }

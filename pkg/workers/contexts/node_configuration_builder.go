@@ -220,6 +220,13 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 		return expression, nil
 	}
 
+	// If the entire field value is a single expression, return the raw resolved value
+	// to preserve native types (number, bool, object, array) for JSON serialization.
+	// Without this, fmt.Sprintf coerces everything to a string, breaking numeric/bool APIs.
+	if matches := expressionRegex.FindStringSubmatch(expression); len(matches) == 2 && strings.TrimSpace(expression) == matches[0] {
+		return b.ResolveExpression(matches[1])
+	}
+
 	var err error
 
 	result := expressionRegex.ReplaceAllStringFunc(expression, func(match string) string {
