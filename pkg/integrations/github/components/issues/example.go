@@ -1,6 +1,7 @@
 package issues
 
 import (
+	_ "embed"
 	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
@@ -41,9 +42,6 @@ var exampleOutputCreateIssue map[string]any
 
 var exampleOutputCreateIssueCommentOnce sync.Once
 var exampleOutputCreateIssueComment map[string]any
-
-var exampleOutputAddReactionOnce sync.Once
-var exampleOutputAddReaction map[string]any
 
 var exampleOutputGetIssueOnce sync.Once
 var exampleOutputGetIssue map[string]any

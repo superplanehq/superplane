@@ -1,12 +1,13 @@
 package admin
 
 import (
+	_ "embed"
 	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
-//go:embed example_output_get_workflow_usage.json
+//go:embed payloads/get_workflow_usage.json
 var exampleOutputGetWorkflowUsageBytes []byte
 
 var exampleOutputGetWorkflowUsageOnce sync.Once

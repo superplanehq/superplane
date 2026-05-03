@@ -1,15 +1,16 @@
 package actions
 
 import (
+	_ "embed"
 	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
-//go:embed example_output_run_workflow.json
+//go:embed payloads/run_workflow.json
 var exampleOutputRunWorkflowBytes []byte
 
-//go:embed example_data_on_workflow_run.json
+//go:embed payloads/on_workflow_run.json
 var exampleDataOnWorkflowRunBytes []byte
 
 var exampleOutputRunWorkflowOnce sync.Once

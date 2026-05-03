@@ -1,6 +1,7 @@
 package contents
 
 import (
+	_ "embed"
 	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
