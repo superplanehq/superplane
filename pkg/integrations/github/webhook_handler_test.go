@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
@@ -19,11 +20,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 	}{
 		{
 			name: "identical configurations",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
@@ -32,11 +33,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "different event types",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "pull_request",
 				Repository: "superplane",
 			},
@@ -45,11 +46,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "different repositories",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "other-repo",
 			},
@@ -58,11 +59,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "both fields different",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "issues",
 				Repository: "other-repo",
 			},
@@ -85,7 +86,7 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		{
 			name:    "invalid first configuration",
 			configA: "invalid",
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
@@ -94,7 +95,7 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "invalid second configuration",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
