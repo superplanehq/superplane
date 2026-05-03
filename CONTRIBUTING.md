@@ -76,6 +76,7 @@ When the process completes, you can access SuperPlane at [http://localhost:8000]
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
+- **[Running on Windows with WSL2](docs/contributing/windows-wsl2.md)** - Prerequisites, recommended layout, and troubleshooting for Windows contributors
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
 - **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 
