@@ -8,6 +8,7 @@ import type {
 } from "./useIntegrationSetupController";
 import { showErrorToast } from "@/lib/toast";
 import { getGroupToggleState } from "./lib";
+import type { IntegrationSetupStepDefinitionType } from "@/api-client";
 
 interface SetupActionsParams {
   route: IntegrationSetupRoute;
@@ -150,6 +151,19 @@ interface CurrentStepActionParams {
   mutations: Pick<IntegrationSetupMutations, "submitStepMutation" | "revertStepMutation">;
 }
 
+function submitStepBody(type: IntegrationSetupStepDefinitionType, state: IntegrationSetupState) {
+  switch (type) {
+    case "INPUTS":
+      return {
+        inputs: state.stepInputs,
+      };
+  }
+
+  return {
+    capabilities: Array.from(state.selectedCapabilities),
+  };
+}
+
 function useSubmitCurrentStepAction({ state, progress, mutations }: CurrentStepActionParams) {
   return useCallback(async () => {
     const integrationId = state.createdIntegration?.metadata?.id;
@@ -172,9 +186,7 @@ function useSubmitCurrentStepAction({ state, progress, mutations }: CurrentStepA
     try {
       const response = await mutations.submitStepMutation.mutateAsync({
         integrationId,
-        inputs: progress.currentStep.type === "INPUTS" ? state.stepInputs : undefined,
-        capabilities:
-          progress.currentStep.type === "CAPABILITY_SELECTION" ? Array.from(state.selectedCapabilities) : undefined,
+        ...submitStepBody(progress.currentStep.type!, state),
       });
       state.setCreatedIntegration(response.data?.integration || null);
       state.setStepInputs({});

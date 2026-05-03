@@ -178,18 +178,30 @@ function useSyncSelectedCapabilitiesForStep(
   currentStep: IntegrationSetupStepDefinition | null,
   setSelectedCapabilities: Dispatch<SetStateAction<Set<string>>>,
 ) {
-  const offerKey =
-    currentStep?.type === "CAPABILITY_SELECTION"
-      ? `${currentStep.name ?? ""}:${(currentStep.capabilities ?? []).join(",")}`
-      : "";
+  const offerKey = getCapabilitySelectionOfferKey(currentStep);
 
   useEffect(() => {
-    if (!offerKey || currentStep?.type !== "CAPABILITY_SELECTION") {
+    if (!offerKey) {
       return;
     }
-    const names = (currentStep.capabilities ?? []).filter((n): n is string => Boolean(n));
+    const names = getCapabilitiesFromOfferKey(offerKey);
     setSelectedCapabilities(new Set(names));
-  }, [offerKey, currentStep, setSelectedCapabilities]);
+  }, [offerKey, setSelectedCapabilities]);
+}
+
+function getCapabilitySelectionOfferKey(currentStep: IntegrationSetupStepDefinition | null) {
+  if (currentStep?.type !== "CAPABILITY_SELECTION") {
+    return "";
+  }
+
+  return JSON.stringify({
+    name: currentStep.name ?? "",
+    capabilities: (currentStep.capabilities ?? []).filter((name): name is string => Boolean(name)),
+  });
+}
+
+function getCapabilitiesFromOfferKey(offerKey: string) {
+  return (JSON.parse(offerKey) as { capabilities: string[] }).capabilities;
 }
 
 function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegration | null, integrationLabel: string) {
