@@ -8,13 +8,23 @@ expose it via a tunnel so external services can deliver webhooks.
 
 Install [ngrok](https://ngrok.com/):
 
-```bash
-# Install (macOS)
-brew install ngrok
+# Install ngrok (choose your OS)
 
-# Authenticate
+# macOS
+brew install ngrok/ngrok/ngrok
+
+# Linux (Debian/Ubuntu)
+curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+  && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list \
+  && sudo apt update && sudo apt install ngrok
+
+# Windows (via Chocolatey)
+choco install ngrok
+
+# Authenticate (all platforms)
 ngrok config add-authtoken YOUR_AUTH_TOKEN
-```
 
 ### 2. Start ngrok Tunnel
 
