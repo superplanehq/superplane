@@ -101,7 +101,7 @@ export function CapabilitySection({
                             Enable
                           </Button>
                         ) : null}
-                        {effectiveState === "STATE_UNAVAILABLE" ? (
+                        {effectiveState === "STATE_AVAILABLE" ? (
                           <Button
                             type="button"
                             variant="outline"
