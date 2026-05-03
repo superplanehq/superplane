@@ -9,23 +9,23 @@ function getCapabilitySelectionDotClass(selected: boolean) {
   return selected ? "bg-green-500" : "bg-gray-400 dark:bg-gray-500";
 }
 
-export interface PreCreateCapabilitySectionProps {
+export interface CapabilitySectionProps {
   section: CapabilityGroupSection;
   capabilityByName: Map<string, IntegrationsCapabilityDefinition>;
   selectedCapabilities: ReadonlySet<string>;
   onToggleCapability: (capabilityName: string) => void;
   onToggleCapabilityGroup: (capabilityNames: string[]) => void;
-  isCreatePending: boolean;
+  selectionDisabled: boolean;
 }
 
-export function PreCreateCapabilitySection({
+export function CapabilitySection({
   section,
   capabilityByName,
   selectedCapabilities,
   onToggleCapability,
   onToggleCapabilityGroup,
-  isCreatePending,
-}: PreCreateCapabilitySectionProps) {
+  selectionDisabled,
+}: CapabilitySectionProps) {
   const groupState = section.label ? getGroupToggleState(section.names, selectedCapabilities) : undefined;
   const selectedInSection = section.names.filter((name) => selectedCapabilities.has(name)).length;
   const groupIcon =
@@ -46,7 +46,7 @@ export function PreCreateCapabilitySection({
       {section.label ? (
         <button
           type="button"
-          disabled={isCreatePending}
+          disabled={selectionDisabled}
           aria-label={
             groupState === "all"
               ? `Remove all selections from ${section.label}`
@@ -54,11 +54,11 @@ export function PreCreateCapabilitySection({
           }
           className={cn(
             "flex w-full cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800/50 dark:hover:bg-gray-800",
-            isCreatePending && "!cursor-not-allowed opacity-70 hover:bg-gray-50 dark:hover:bg-gray-800/50",
+            selectionDisabled && "!cursor-not-allowed opacity-70 hover:bg-gray-50 dark:hover:bg-gray-800/50",
           )}
           onClick={() => onToggleCapabilityGroup(section.names)}
           onKeyDown={(event) => {
-            if (isCreatePending) {
+            if (selectionDisabled) {
               return;
             }
             if (event.key === "Enter" || event.key === " ") {
@@ -93,13 +93,13 @@ export function PreCreateCapabilitySection({
                   key={capabilityName}
                   className={cn(
                     "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-gray-900",
-                    isCreatePending
+                    selectionDisabled
                       ? "cursor-not-allowed opacity-70"
                       : "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60",
                   )}
                   onClick={() => onToggleCapability(capabilityName)}
                   onKeyDown={(event) => {
-                    if (isCreatePending) {
+                    if (selectionDisabled) {
                       return;
                     }
                     if (event.key === "Enter" || event.key === " ") {
@@ -107,7 +107,7 @@ export function PreCreateCapabilitySection({
                       onToggleCapability(capabilityName);
                     }
                   }}
-                  tabIndex={isCreatePending ? -1 : 0}
+                  tabIndex={selectionDisabled ? -1 : 0}
                   aria-selected={checked}
                   aria-label={`${checked ? "Selected" : "Not selected"}: ${capabilityName}. Press Enter or Space to toggle.`}
                 >
