@@ -12,6 +12,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
+import { PayloadTooltip } from "@/ui/componentBase/PayloadTooltip";
 
 interface StartTemplate {
   name: string;
@@ -109,12 +110,14 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
       <div className="px-2 py-1.5 flex flex-col gap-1.5">
         {templates.map((template, index) => (
           <div key={index} className="flex items-center justify-between min-w-0">
-            <div className="flex items-center min-w-0 flex-1">
-              <div className="w-4 h-4 mr-2 flex-shrink-0">
-                <Play size={16} className="text-gray-500" />
+            <PayloadTooltip title={template.name || "Payload"} value={template.payload}>
+              <div className="flex items-center min-w-0 flex-1 cursor-help" data-testid="start-template-row">
+                <div className="w-4 h-4 mr-2 flex-shrink-0">
+                  <Play size={16} className="text-gray-500" />
+                </div>
+                <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
               </div>
-              <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
-            </div>
+            </PayloadTooltip>
             {context?.onRun && (
               <Button
                 size="sm"
