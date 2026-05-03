@@ -157,11 +157,14 @@ function submitStepBody(type: IntegrationSetupStepDefinitionType, state: Integra
       return {
         inputs: state.stepInputs,
       };
+
+    case "CAPABILITY_SELECTION":
+      return {
+        capabilities: Array.from(state.selectedCapabilities),
+      };
   }
 
-  return {
-    capabilities: Array.from(state.selectedCapabilities),
-  };
+  return {};
 }
 
 function useSubmitCurrentStepAction({ state, progress, mutations }: CurrentStepActionParams) {

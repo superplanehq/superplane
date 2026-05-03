@@ -438,6 +438,8 @@ func ProtoToCapabilityState(s pb.Integration_CapabilityState_State) core.Integra
 		return core.IntegrationCapabilityStateDisabled
 	case pb.Integration_CapabilityState_STATE_REQUESTED:
 		return core.IntegrationCapabilityStateRequested
+	case pb.Integration_CapabilityState_STATE_AVAILABLE:
+		return core.IntegrationCapabilityStateAvailable
 	}
 	return core.IntegrationCapabilityStateUnavailable
 }
