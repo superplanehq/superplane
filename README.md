@@ -1,4 +1,4 @@
-# SuperPlane
+ # SuperPlane
 
 SuperPlane is an **open source control plane for platform engineering**.
 It lets you define and run event-based workflows across the tools you already
