@@ -4,27 +4,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 )
-
-func extractWebhookID(webhookURL string) (string, error) {
-	parsedURL, err := url.Parse(webhookURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse webhook URL: %w", err)
-	}
-
-	webhookID := strings.Trim(strings.TrimRight(parsedURL.Path, "/"), "/")
-	if webhookID == "" {
-		return "", fmt.Errorf("webhook URL path is empty")
-	}
-
-	segments := strings.Split(webhookID, "/")
-	return segments[len(segments)-1], nil
-}
 
 func enrichInstanceWithVNICIPs(logger *log.Entry, client *Client, instance *Instance, payload map[string]any) {
 	attachments, err := client.ListVNICAttachments(instance.CompartmentID, instance.ID)
