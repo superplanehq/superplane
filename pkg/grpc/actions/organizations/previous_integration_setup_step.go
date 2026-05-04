@@ -69,7 +69,7 @@ func PreviousIntegrationSetupStep(ctx context.Context, registry *registry.Regist
 		stepToRevert := setupState.PreviousSteps[len(setupState.PreviousSteps)-1]
 		capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
 		ctx := core.SetupStepContext{
-			Step:           stepToRevert.Name,
+			Step:           core.StepInfo{Name: stepToRevert.Name},
 			IntegrationID:  integration.ID,
 			OrganizationID: orgID,
 			HTTP:           registry.HTTPContext(),

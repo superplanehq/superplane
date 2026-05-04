@@ -53,8 +53,9 @@ type SetupState struct {
 }
 
 type CapabilityState struct {
-	Name  string                          `json:"name"`
-	State core.IntegrationCapabilityState `json:"state"`
+	Name   string                          `json:"name"`
+	State  core.IntegrationCapabilityState `json:"state"`
+	Reason *string                         `json:"reason,omitempty"`
 }
 
 func (a *Integration) TableName() string {

@@ -537,29 +537,49 @@ func (s *IntegrationPropertyStorage) CreateMany(defs []core.IntegrationPropertyD
 }
 
 type CapabilityContext struct {
-	RequestedCapabilties []string
-	EnabledCapabilities  []string
-	DisabledCapabilities []string
+	RequestedCapabilties    []string
+	EnabledCapabilities     []string
+	DisabledCapabilities    []string
+	AvailableCapabilities   []string
+	UnavailableCapabilities []string
 }
 
-func (c *CapabilityContext) Enable(capabilities ...string) error {
+func (c *CapabilityContext) Request(capabilities ...string) {
+	c.RequestedCapabilties = append(c.RequestedCapabilties, capabilities...)
+}
+
+func (c *CapabilityContext) Enable(capabilities ...string) {
 	c.EnabledCapabilities = append(c.EnabledCapabilities, capabilities...)
-	return nil
 }
 
-func (c *CapabilityContext) Disable(capabilities ...string) error {
+func (c *CapabilityContext) Disable(capabilities ...string) {
 	c.DisabledCapabilities = append(c.DisabledCapabilities, capabilities...)
-	return nil
 }
 
-func (c *CapabilityContext) IsRequested(capabilities ...string) (bool, error) {
+func (c *CapabilityContext) Available(capabilities ...string) {
+	c.AvailableCapabilities = append(c.AvailableCapabilities, capabilities...)
+}
+
+func (c *CapabilityContext) Unavailable(capabilities ...string) {
+	c.UnavailableCapabilities = append(c.UnavailableCapabilities, capabilities...)
+}
+
+func (c *CapabilityContext) Clear() {
+	c.RequestedCapabilties = []string{}
+	c.EnabledCapabilities = []string{}
+	c.DisabledCapabilities = []string{}
+	c.AvailableCapabilities = []string{}
+	c.UnavailableCapabilities = []string{}
+}
+
+func (c *CapabilityContext) IsRequested(capabilities ...string) bool {
 	for _, capability := range capabilities {
 		if !slices.Contains(c.RequestedCapabilties, capability) {
-			return false, nil
+			return false
 		}
 	}
 
-	return true, nil
+	return true
 }
 
 func (c *CapabilityContext) Requested() []string {

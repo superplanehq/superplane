@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -34,11 +35,12 @@ var patUpdateInstructionsTemplate []byte
 type SetupProvider struct{}
 
 const (
-	SetupStepSelectOwner       = "selectOwner"
-	SetupStepSelectAuthMethod  = "selectAuthMethod"
-	SetupStepEnterPAT          = "enterPAT"
-	SetupStepUpdatePermissions = "updatePermissions"
-	SetupStepSetupApp          = "setupApp"
+	SetupStepSelectOwner         = "selectOwner"
+	SetupStepCapabilitySelection = "capabilitySelection"
+	SetupStepSelectAuthMethod    = "selectAuthMethod"
+	SetupStepEnterPAT            = "enterPAT"
+	SetupStepUpdatePermissions   = "updatePermissions"
+	SetupStepSetupApp            = "setupApp"
 )
 
 func mapContains(map1 map[string]string, map2 map[string]string) bool {
@@ -72,7 +74,8 @@ func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 	requestedRepoPermissions, requestedOrgPermissions := mapper.PermissionsForPAT(requested)
 	existingRepoPermissions, existingOrgPermissions := mapper.PermissionsForPAT(ctx.Capabilities.Enabled())
 	if mapContains(requestedRepoPermissions, existingRepoPermissions) && mapContains(requestedOrgPermissions, existingOrgPermissions) {
-		return nil, ctx.Capabilities.Enable(requested...)
+		ctx.Capabilities.Enable(requested...)
+		return nil, nil
 	}
 
 	owner, err := ctx.Properties.GetString(common.PropertyOwner)
@@ -182,50 +185,22 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	}
 }
 
-func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
-	switch ctx.Step {
-	case SetupStepSelectOwner:
-		return g.onSelectOwnerRevert(ctx)
-	case SetupStepSelectAuthMethod:
-		return g.onSelectAuthMethodRevert(ctx)
-	case SetupStepEnterPAT:
-		return g.onEnterPATRevert(ctx)
-	case SetupStepSetupApp:
-		return nil
-	}
-
-	return errors.New("unknown step")
-}
-
-func (g *SetupProvider) onSelectOwnerRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete(common.PropertyOwnerType, common.PropertyOwner)
-}
-
-func (g *SetupProvider) onSelectAuthMethodRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete(common.PropertyAuthMethod)
-}
-
-func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {
-	return ctx.Secrets.Delete(common.SecretPAT)
-}
-
 func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	switch ctx.Step {
+	switch ctx.Step.Name {
 	case SetupStepSelectOwner:
-		return g.onSelectOwnerSubmit(ctx.Inputs, ctx)
+		return g.onSelectOwnerSubmit(ctx.Step.Inputs, ctx)
+
+	case SetupStepCapabilitySelection:
+		return g.onCapabilitySelectionSubmit(ctx)
 
 	case SetupStepSelectAuthMethod:
-		return g.onSelectAuthMethodSubmit(ctx.Inputs, ctx)
+		return g.onSelectAuthMethodSubmit(ctx.Step.Inputs, ctx)
 
 	case SetupStepEnterPAT:
-		return g.onEnterPATSubmit(ctx.Inputs, ctx)
+		return g.onEnterPATSubmit(ctx.Step.Inputs, ctx)
 
 	case SetupStepUpdatePermissions:
-		err := ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
-		if err != nil {
-			return nil, fmt.Errorf("error enabling capabilities: %v", err)
-		}
-
+		ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 		return nil, nil
 
 	//
@@ -284,6 +259,50 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 	if err != nil {
 		return nil, fmt.Errorf("error creating parameter: %v", err)
 	}
+
+	//
+	// TODO: only expose the capabilities for the owner type selected
+	//
+	capabilities := []string{}
+	for _, group := range g.CapabilityGroups() {
+		for _, capability := range group.Capabilities {
+			capabilities = append(capabilities, capability.Name)
+		}
+	}
+
+	return &core.SetupStep{
+		Type:         core.SetupStepTypeCapabilitySelection,
+		Name:         SetupStepCapabilitySelection,
+		Label:        "Select capabilities",
+		Capabilities: capabilities,
+	}, nil
+}
+
+/*
+ * Returns all the capabilities, minus the ones being passed in.
+ */
+func (g *SetupProvider) capabilityDiff(capabilities []string) []string {
+	groups := g.CapabilityGroups()
+
+	diff := []string{}
+	for _, group := range groups {
+		for _, capability := range group.Capabilities {
+			if !slices.Contains(capabilities, capability.Name) {
+				diff = append(diff, capability.Name)
+			}
+		}
+	}
+
+	return diff
+}
+
+func (g *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	//
+	// TODO: we should move only the owner type related capabilities to AVAILABLE
+	// The other ones should be moved to UNAVAILABLE
+	//
+	ctx.Capabilities.Request(ctx.Step.Capabilities...)
+	ctx.Capabilities.Available(g.capabilityDiff(ctx.Step.Capabilities)...)
 
 	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
@@ -533,12 +552,42 @@ func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (
 		return nil, err
 	}
 
-	err = ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
-	if err != nil {
-		return nil, fmt.Errorf("error enabling capabilities: %v", err)
+	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+	return finishPATSetup(ctx.Properties, repos)
+}
+
+func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
+	switch ctx.Step.Name {
+	case SetupStepSelectOwner:
+		return g.onSelectOwnerRevert(ctx)
+	case SetupStepCapabilitySelection:
+		return g.onCapabilitySelectionRevert(ctx)
+	case SetupStepSelectAuthMethod:
+		return g.onSelectAuthMethodRevert(ctx)
+	case SetupStepEnterPAT:
+		return g.onEnterPATRevert(ctx)
+	case SetupStepSetupApp:
+		return nil
 	}
 
-	return finishPATSetup(ctx.Properties, repos)
+	return errors.New("unknown step")
+}
+
+func (g *SetupProvider) onSelectOwnerRevert(ctx core.SetupStepContext) error {
+	return ctx.Properties.Delete(common.PropertyOwnerType, common.PropertyOwner)
+}
+
+func (g *SetupProvider) onCapabilitySelectionRevert(ctx core.SetupStepContext) error {
+	ctx.Capabilities.Clear()
+	return nil
+}
+
+func (g *SetupProvider) onSelectAuthMethodRevert(ctx core.SetupStepContext) error {
+	return ctx.Properties.Delete(common.PropertyAuthMethod)
+}
+
+func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {
+	return ctx.Secrets.Delete(common.SecretPAT)
 }
 
 func validatePATConnection(ctx core.SetupStepContext, token string) ([]*github.Repository, error) {

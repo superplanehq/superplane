@@ -29,7 +29,7 @@ import (
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig, nil)
+	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig)
 }
 
 func CreateIntegrationWithUsage(
@@ -42,7 +42,6 @@ func CreateIntegrationWithUsage(
 	orgID string,
 	integrationName, name string,
 	appConfig *structpb.Struct,
-	capabilities []string,
 ) (*pb.CreateIntegrationResponse, error) {
 	integration, err := registry.GetIntegration(integrationName)
 	if err != nil {
@@ -97,7 +96,7 @@ func CreateIntegrationWithUsage(
 			return nil, status.Errorf(codes.Internal, "failed to get setup provider: %v", err)
 		}
 
-		return setupIntegration(registry, setupProvider, newIntegration, capabilities)
+		return setupIntegration(registry, setupProvider, newIntegration)
 	}
 
 	//
@@ -118,17 +117,19 @@ func CreateIntegrationWithUsage(
 	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
 }
 
-func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration, capabilities []string) (*pb.CreateIntegrationResponse, error) {
+func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
+	capabilities := []core.Capability{}
+	for _, group := range setupProvider.CapabilityGroups() {
+		capabilities = append(capabilities, group.Capabilities...)
+	}
+	return capabilities
+}
+
+func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
-	initialCapabilities, err := initialCapabilityStates(registry.AllCapabilities(newIntegration.AppName), capabilities)
-	if err != nil {
-		return nil, err
-	}
-
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		newIntegration.Capabilities = initialCapabilities
-		capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(newIntegration.AppName), newIntegration.Capabilities)
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),
@@ -158,36 +159,6 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 	}
 
 	return &pb.CreateIntegrationResponse{Integration: proto}, nil
-}
-
-func initialCapabilityStates(definitions []core.Capability, requestedCapabilities []string) ([]models.CapabilityState, error) {
-	definitionsByName := map[string]core.Capability{}
-	for _, definition := range definitions {
-		definitionsByName[definition.Name] = definition
-	}
-
-	requested := map[string]bool{}
-	for _, capability := range requestedCapabilities {
-		if _, ok := definitionsByName[capability]; !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "capability %s not found", capability)
-		}
-		requested[capability] = true
-	}
-
-	states := make([]models.CapabilityState, 0, len(definitions))
-	for _, definition := range definitions {
-		state := core.IntegrationCapabilityStateUnavailable
-		if requested[definition.Name] {
-			state = core.IntegrationCapabilityStateRequested
-		}
-
-		states = append(states, models.CapabilityState{
-			Name:  definition.Name,
-			State: state,
-		})
-	}
-
-	return states, nil
 }
 
 func syncIntegration(
@@ -314,11 +285,11 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		}
 
 		if state.CurrentStep != nil {
-			proto.Status.SetupState.CurrentStep = serializeNextStep(*state.CurrentStep)
+			proto.Status.SetupState.CurrentStep = serializeStep(*state.CurrentStep)
 		}
 
 		for _, step := range state.PreviousSteps {
-			proto.Status.SetupState.PreviousSteps = append(proto.Status.SetupState.PreviousSteps, serializeNextStep(step))
+			proto.Status.SetupState.PreviousSteps = append(proto.Status.SetupState.PreviousSteps, serializeStep(step))
 		}
 	}
 
@@ -363,9 +334,9 @@ func integrationParameterValueToString(value any) string {
 	return string(encoded)
 }
 
-func serializeNextStep(step core.SetupStep) *pb.Integration_SetupStepDefinition {
+func serializeStep(step core.SetupStep) *pb.Integration_SetupStepDefinition {
 	def := &pb.Integration_SetupStepDefinition{
-		Type:         serializeNextStepType(step.Type),
+		Type:         serializeStepType(step.Type),
 		Name:         step.Name,
 		Label:        step.Label,
 		Instructions: step.Instructions,
@@ -384,15 +355,21 @@ func serializeNextStep(step core.SetupStep) *pb.Integration_SetupStepDefinition 
 		}
 	}
 
+	if len(step.Capabilities) > 0 {
+		def.Capabilities = step.Capabilities
+	}
+
 	return def
 }
 
-func serializeNextStepType(stepType core.SetupStepType) pb.Integration_SetupStepDefinition_Type {
+func serializeStepType(stepType core.SetupStepType) pb.Integration_SetupStepDefinition_Type {
 	switch stepType {
 	case core.SetupStepTypeInputs:
 		return pb.Integration_SetupStepDefinition_INPUTS
 	case core.SetupStepTypeRedirectPrompt:
 		return pb.Integration_SetupStepDefinition_REDIRECT_PROMPT
+	case core.SetupStepTypeCapabilitySelection:
+		return pb.Integration_SetupStepDefinition_CAPABILITY_SELECTION
 	case core.SetupStepTypeDone:
 		return pb.Integration_SetupStepDefinition_DONE
 	default:
@@ -461,6 +438,8 @@ func ProtoToCapabilityState(s pb.Integration_CapabilityState_State) core.Integra
 		return core.IntegrationCapabilityStateDisabled
 	case pb.Integration_CapabilityState_STATE_REQUESTED:
 		return core.IntegrationCapabilityStateRequested
+	case pb.Integration_CapabilityState_STATE_AVAILABLE:
+		return core.IntegrationCapabilityStateAvailable
 	}
 	return core.IntegrationCapabilityStateUnavailable
 }
@@ -473,8 +452,8 @@ func CapabilityStateToProto(t core.IntegrationCapabilityState) pb.Integration_Ca
 		return pb.Integration_CapabilityState_STATE_DISABLED
 	case core.IntegrationCapabilityStateRequested:
 		return pb.Integration_CapabilityState_STATE_REQUESTED
-	case core.IntegrationCapabilityStateUnavailable:
-		return pb.Integration_CapabilityState_STATE_UNAVAILABLE
+	case core.IntegrationCapabilityStateAvailable:
+		return pb.Integration_CapabilityState_STATE_AVAILABLE
 	}
 	return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 }
@@ -546,5 +525,9 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 }
 
 func isLegacySetup(integration *models.Integration) bool {
+	if integration.SetupState != nil {
+		return false
+	}
+
 	return len(integration.Capabilities) == 0
 }
