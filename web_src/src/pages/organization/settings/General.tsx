@@ -35,6 +35,15 @@ interface GeneralProps {
   organization: OrganizationsOrganization;
 }
 
+/** Local OAuth-invite controls derived from API `allowedOauthProviders` (must match useEffect sync logic). */
+function oauthDraftFromAllowedProviders(providers: string[] | undefined) {
+  const list = providers ?? [];
+  if (list.length === 0) {
+    return { restrict: false, github: true, google: true };
+  }
+  return { restrict: true, github: list.includes("github"), google: list.includes("google") };
+}
+
 export function General({ organization }: GeneralProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -77,16 +86,10 @@ export function General({ organization }: GeneralProps) {
   }, [organization.spec?.changeManagementEnabled]);
 
   useEffect(() => {
-    const list = organization.spec?.allowedOauthProviders?.providers ?? [];
-    if (list.length === 0) {
-      setOauthRestrictProviders(false);
-      setOauthGithub(true);
-      setOauthGoogle(true);
-    } else {
-      setOauthRestrictProviders(true);
-      setOauthGithub(list.includes("github"));
-      setOauthGoogle(list.includes("google"));
-    }
+    const d = oauthDraftFromAllowedProviders(organization.spec?.allowedOauthProviders?.providers);
+    setOauthRestrictProviders(d.restrict);
+    setOauthGithub(d.github);
+    setOauthGoogle(d.google);
     setOauthSelectionError(null);
   }, [organization.spec?.allowedOauthProviders?.providers]);
 
