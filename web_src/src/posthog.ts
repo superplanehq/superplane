@@ -15,3 +15,4 @@ if (key) {
 }
 
 export { posthog };
+export const isPostHogEnabled = !!key;
