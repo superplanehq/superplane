@@ -1,12 +1,15 @@
 import type { OrganizationsIntegration } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
-import { CategorySection } from "./CategorySection";
+import { CategorySection, normalizeIntegrationName } from "./CategorySection";
 import { findFirstVisibleBlock } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
+import { useSidebarSettings } from "./useSidebarSettings";
 
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
@@ -71,7 +74,7 @@ interface OpenBuildingBlocksSidebarProps {
 function OpenBuildingBlocksSidebar({
   onToggle,
   blocks,
-  integrations: _integrations,
+  integrations,
   disabled,
   disabledTooltip,
   onBlockClick,
@@ -81,6 +84,12 @@ function OpenBuildingBlocksSidebar({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeResizePointerIdRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const {
+    showIntegrationSetupStatus,
+    setShowIntegrationSetupStatus,
+    showConnectedIntegrationsOnTop,
+    setShowConnectedIntegrationsOnTop,
+  } = useSidebarSettings();
 
   const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
   const isResizing = useSidebarLayoutStore((state) => state.isRightResizing);
@@ -164,6 +173,17 @@ function OpenBuildingBlocksSidebar({
       Memory: 3,
     };
 
+    const isConnectedCategory = (category: BuildingBlockCategory) => {
+      const integrationName = category.blocks.find((block) => block.integrationName)?.integrationName;
+      if (!integrationName) {
+        return false;
+      }
+      return integrations.some(
+        (integration) =>
+          normalizeIntegrationName(integration.metadata?.integrationName) === normalizeIntegrationName(integrationName),
+      );
+    };
+
     return [...blocks].sort((a, b) => {
       const aOrder = categoryOrder[a.name] ?? Infinity;
       const bOrder = categoryOrder[b.name] ?? Infinity;
@@ -171,9 +191,18 @@ function OpenBuildingBlocksSidebar({
       if (aOrder !== bOrder) {
         return aOrder - bOrder;
       }
+
+      if (showConnectedIntegrationsOnTop && aOrder === Infinity && bOrder === Infinity) {
+        const aConnected = isConnectedCategory(a);
+        const bConnected = isConnectedCategory(b);
+        if (aConnected !== bConnected) {
+          return aConnected ? -1 : 1;
+        }
+      }
+
       return a.name.localeCompare(b.name);
     });
-  }, [blocks]);
+  }, [blocks, integrations, showConnectedIntegrationsOnTop]);
 
   return (
     <div
@@ -239,6 +268,27 @@ function OpenBuildingBlocksSidebar({
                 }}
               />
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon-sm" className="h-8 w-8 shrink-0" aria-label="Sidebar settings">
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuCheckboxItem
+                  checked={showIntegrationSetupStatus}
+                  onCheckedChange={(checked) => setShowIntegrationSetupStatus(Boolean(checked))}
+                >
+                  Show integration setup status
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={showConnectedIntegrationsOnTop}
+                  onCheckedChange={(checked) => setShowConnectedIntegrationsOnTop(Boolean(checked))}
+                >
+                  Connected integrations on top
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="relative flex-1 min-h-0 gap-2 py-6">
@@ -246,6 +296,8 @@ function OpenBuildingBlocksSidebar({
               <CategorySection
                 key={category.name}
                 category={category}
+                integrations={integrations}
+                showIntegrationSetupStatus={showIntegrationSetupStatus}
                 searchTerm={searchTerm}
                 onBlockClick={onBlockClick}
               />
