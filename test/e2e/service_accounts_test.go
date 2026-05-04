@@ -47,6 +47,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
 		steps.assertServiceAccountVisibleInList("list-test-bot")
+		steps.assertCreatorVisibleInListForServiceAccount("list-test-bot")
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
@@ -55,6 +56,7 @@ func TestServiceAccounts(t *testing.T) {
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertCreatorOnDetailPage()
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
@@ -211,6 +213,20 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 
 func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 	s.session.AssertText(name)
+}
+
+func (s *serviceAccountSteps) assertCreatorVisibleInListForServiceAccount(name string) {
+	// Same row as the service account name should show the human who created it (e2e seed user).
+	row := s.session.Page().GetByRole("row", pw.PageGetByRoleOptions{Name: name})
+	require.NoError(s.t, row.GetByText("E2E User", pw.LocatorGetByTextOptions{Exact: pw.Bool(true)}).WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(10000),
+	}))
+}
+
+func (s *serviceAccountSteps) assertCreatorOnDetailPage() {
+	s.session.AssertText("Created by")
+	s.session.AssertText("E2E User")
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {

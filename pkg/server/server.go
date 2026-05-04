@@ -430,6 +430,7 @@ func Start() {
 		panic("OIDC_KEYS_PATH must be set")
 	}
 
+	appEnv := os.Getenv("APP_ENV")
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
@@ -437,20 +438,24 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
-	registry, err := registry.NewRegistry(encryptorInstance, registry.HTTPOptions{
-		MaxResponseBytes: DefaultMaxHTTPResponseBytes,
-		PolicyResolver: func() (registry.HTTPPolicy, error) {
-			policy, err := networkpolicy.ResolveHTTPPolicy()
-			if err != nil {
-				return registry.HTTPPolicy{}, err
-			}
+	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
+		Encryptor: encryptorInstance,
+		AppEnv:    appEnv,
+		HTTP: registry.HTTPOptions{
+			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
+			PolicyResolver: func() (registry.HTTPPolicy, error) {
+				policy, err := networkpolicy.ResolveHTTPPolicy()
+				if err != nil {
+					return registry.HTTPPolicy{}, err
+				}
 
-			return registry.HTTPPolicy{
-				BlockedHosts:    policy.BlockedHosts,
-				PrivateIPRanges: policy.PrivateIPRanges,
-			}, nil
+				return registry.HTTPPolicy{
+					BlockedHosts:    policy.BlockedHosts,
+					PrivateIPRanges: policy.PrivateIPRanges,
+				}, nil
+			},
+			PolicyCacheTTL: 5 * time.Second,
 		},
-		PolicyCacheTTL: 5 * time.Second,
 	})
 
 	if err != nil {

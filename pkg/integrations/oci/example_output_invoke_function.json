@@ -1,0 +1,9 @@
+{
+  "data": {
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "response": "{\"result\": \"ok\", \"processed\": 42}",
+    "statusCode": 200
+  },
+  "timestamp": "2026-04-22T20:34:05.987654321Z",
+  "type": "oci.functionInvoked"
+}

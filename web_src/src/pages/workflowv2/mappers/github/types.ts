@@ -107,6 +107,7 @@ export interface GitRef {
 
 export interface Comment {
   id?: number;
+  node_id?: string;
   body?: string;
   html_url?: string;
   path?: string;

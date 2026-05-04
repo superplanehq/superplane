@@ -22,7 +22,7 @@ const (
 )
 
 type OnComputeInstanceCreatedConfiguration struct {
-	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
+	Compartment string `json:"compartment" mapstructure:"compartment"`
 }
 
 type OnComputeInstanceCreatedMetadata struct {
@@ -79,7 +79,7 @@ func (t *OnComputeInstanceCreated) DefaultRunTitle() string {
 func (t *OnComputeInstanceCreated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -104,12 +104,12 @@ func (t *OnComputeInstanceCreated) Setup(ctx core.TriggerContext) error {
 	}
 
 	if err := ctx.Metadata.Set(OnComputeInstanceCreatedMetadata{
-		CompartmentID: config.CompartmentID,
+		CompartmentID: config.Compartment,
 	}); err != nil {
 		return fmt.Errorf("failed to persist trigger metadata: %w", err)
 	}
 
-	return requestWebhook(ctx, config.CompartmentID, integrationMetadata.TopicID)
+	return requestWebhook(ctx, config.Compartment, integrationMetadata.TopicID)
 }
 
 // decodeSetupInputs decodes and validates all inputs needed by Setup.
@@ -118,7 +118,7 @@ func decodeSetupInputs(ctx core.TriggerContext) (OnComputeInstanceCreatedConfigu
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return config, IntegrationMetadata{}, fmt.Errorf("failed to decode trigger configuration: %w", err)
 	}
-	if config.CompartmentID == "" {
+	if config.Compartment == "" {
 		return config, IntegrationMetadata{}, fmt.Errorf("compartmentId is required")
 	}
 
@@ -158,9 +158,12 @@ func (t *OnComputeInstanceCreated) Cleanup(ctx core.TriggerContext) error {
 
 // HandleWebhook processes inbound requests forwarded by OCI Notifications.
 func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	cfg := OnComputeInstanceCreatedConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &cfg); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+	// Read compartment from persisted metadata (written by Setup) so that
+	// pre-existing triggers configured under the old "compartmentId" key
+	// continue to work correctly.
+	var meta OnComputeInstanceCreatedMetadata
+	if err := mapstructure.Decode(ctx.Metadata, &meta); err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode trigger metadata: %w", err)
 	}
 
 	// Handle ONS subscription confirmation handshake before parsing the body.
@@ -180,7 +183,7 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 		return http.StatusOK, nil, nil
 	}
 
-	if !matchesCompartment(envelope, cfg.CompartmentID) {
+	if !matchesCompartment(envelope, meta.CompartmentID) {
 		return http.StatusOK, nil, nil
 	}
 

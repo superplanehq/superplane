@@ -6,8 +6,10 @@ describe("getNodeIntegrationName", () => {
   const availableIntegrations = [
     {
       name: "github",
-      actions: [{ name: "github.create_issue" }],
-      triggers: [{ name: "github.on_push" }],
+      capabilities: [
+        { type: "TYPE_ACTION" as const, name: "github.create_issue" },
+        { type: "TYPE_TRIGGER" as const, name: "github.on_push" },
+      ],
     },
   ];
 
