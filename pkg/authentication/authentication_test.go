@@ -206,6 +206,21 @@ func TestAcceptPendingInvitations(t *testing.T) {
 		assert.Error(t, err, "invitation should no longer be pending")
 	})
 
+	t.Run("should skip invitation when non-OAuth invite completion disabled for org", func(t *testing.T) {
+		email := "no-non-oauth-invite@example.com"
+		handler, r, account := setupInvitation(t, email)
+
+		err := database.Conn().Model(r.Organization).Update("allow_direct_email_invite_completion", false).Error
+		require.NoError(t, err)
+
+		err = handler.acceptPendingInvitations(account, "")
+		require.NoError(t, err)
+
+		invitation, err := models.FindPendingInvitation(email, r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, models.InvitationStatePending, invitation.State)
+	})
+
 	t.Run("should skip invitation when org no longer exists", func(t *testing.T) {
 		email := "deleted-org-user@example.com"
 		handler, r, account := setupInvitation(t, email)

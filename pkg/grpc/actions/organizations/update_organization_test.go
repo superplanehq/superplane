@@ -86,6 +86,36 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.ElementsMatch(t, []string{models.ProviderGoogle}, []string(organization.AllowedProviders))
 	})
 
+	t.Run("update allow direct email invite completion -> success", func(t *testing.T) {
+		disabled := false
+		updatedOrg := &protos.Organization{
+			Metadata: &protos.Organization_Metadata{
+				Name: r.Organization.Name,
+			},
+			Spec: &protos.Organization_Spec{
+				AllowDirectEmailInviteCompletion: &disabled,
+			},
+		}
+
+		response, err := UpdateOrganization(context.Background(), r.Organization.ID.String(), updatedOrg)
+		require.NoError(t, err)
+		assert.False(t, response.Organization.Spec.GetAllowDirectEmailInviteCompletion())
+
+		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.False(t, organization.AllowDirectEmailInviteCompletion)
+
+		enabled := true
+		restore := &protos.Organization{
+			Metadata: &protos.Organization_Metadata{Name: r.Organization.Name},
+			Spec: &protos.Organization_Spec{
+				AllowDirectEmailInviteCompletion: &enabled,
+			},
+		}
+		_, err = UpdateOrganization(context.Background(), r.Organization.ID.String(), restore)
+		require.NoError(t, err)
+	})
+
 	t.Run("invalid OAuth provider -> error", func(t *testing.T) {
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{

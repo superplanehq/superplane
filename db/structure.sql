@@ -362,8 +362,16 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    change_management_enabled boolean DEFAULT false NOT NULL
+    change_management_enabled boolean DEFAULT false NOT NULL,
+    allow_direct_email_invite_completion boolean DEFAULT true NOT NULL
 );
+
+
+--
+-- Name: COLUMN organizations.allow_direct_email_invite_completion; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.allow_direct_email_invite_completion IS 'When false, pending email invitations are not auto-accepted after non-OAuth sign-in (e.g. email and password).';
 
 
 --
@@ -1929,7 +1937,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260422175935	f
+20260504220000	f
 \.
 
 

@@ -49,6 +49,10 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		organization.AllowedProviders = datatypes.JSONSlice[string](list)
 	}
 
+	if pbOrganization.Spec != nil && pbOrganization.Spec.AllowDirectEmailInviteCompletion != nil {
+		organization.AllowDirectEmailInviteCompletion = *pbOrganization.Spec.AllowDirectEmailInviteCompletion
+	}
+
 	now := time.Now()
 	organization.UpdatedAt = &now
 	err = database.Conn().Save(organization).Error

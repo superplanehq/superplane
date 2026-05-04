@@ -288,7 +288,7 @@ message Organization {
 
   // OAuth providers allowed when accepting pending *email* invitations after an OAuth login.
   // Empty providers means no restriction (all configured OAuth providers allowed).
-  // Does not apply to shareable invite-link acceptance, password, or magic-link flows.
+  // Does not apply to shareable invite-link acceptance. Non-OAuth flows use allow_direct_email_invite_completion.
   message AllowedOAuthProviders {
     repeated string providers = 1;
   }
@@ -298,6 +298,10 @@ message Organization {
     // When set on PATCH, replaces the stored list. Omit to leave unchanged.
     // Empty providers means no restriction (matches empty JSON array in storage).
     optional AllowedOAuthProviders allowed_oauth_providers = 2;
+    // When false, pending email invitations are not auto-accepted after magic-link,
+    // password, or other non-OAuth sign-in. When true (default), those flows may
+    // accept invites. OAuth invitation rules still use allowed_oauth_providers.
+    optional bool allow_direct_email_invite_completion = 3;
   }
 
   Metadata metadata = 1;

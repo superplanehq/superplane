@@ -18,9 +18,12 @@ type Organization struct {
 	Description string
 	// OAuth provider IDs (e.g. github, google) allowed when completing pending *email* invitations
 	// after an OAuth login. Empty or nil means unrestricted for that path. Does not apply to
-	// password/magic sign-in (see authentication) or to shareable invite-link acceptance.
-	AllowedProviders         datatypes.JSONSlice[string]
-	ChangeManagementEnabled  bool
+	// shareable invite-link acceptance.
+	AllowedProviders datatypes.JSONSlice[string]
+	// When false, pending email invitations are not auto-accepted after magic-link, password,
+	// or other non-OAuth sign-in (see authentication.Handler.acceptInvitation).
+	AllowDirectEmailInviteCompletion bool `gorm:"column:allow_direct_email_invite_completion;not null;default:true"`
+	ChangeManagementEnabled          bool
 	UsageSyncedAt            *time.Time
 	UsageRetentionWindowDays *int32
 	UsageLimitsSyncedAt      *time.Time
@@ -172,12 +175,13 @@ func CreateOrganization(name, description string) (*Organization, error) {
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:                    name,
-		Description:             description,
-		AllowedProviders:        datatypes.JSONSlice[string]{ProviderGitHub, ProviderGoogle},
-		ChangeManagementEnabled: false,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		Name:                             name,
+		Description:                      description,
+		AllowedProviders:                 datatypes.JSONSlice[string]{ProviderGitHub, ProviderGoogle},
+		AllowDirectEmailInviteCompletion: true,
+		ChangeManagementEnabled:          false,
+		CreatedAt:                        &now,
+		UpdatedAt:                        &now,
 	}
 
 	err := tx.

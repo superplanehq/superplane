@@ -44,5 +44,6 @@ func Test__DescribeOrganization(t *testing.T) {
 			[]string{models.ProviderGitHub, models.ProviderGoogle},
 			response.Organization.Spec.AllowedOauthProviders.GetProviders(),
 		)
+		assert.True(t, response.Organization.Spec.GetAllowDirectEmailInviteCompletion())
 	})
 }
