@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import type * as SdkGen from "@/api-client/sdk.gen";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { canvasesListCanvasMemories } = vi.hoisted(() => ({
+const { canvasesListCanvasMemories, canvasesListCanvasEvents } = vi.hoisted(() => ({
   canvasesListCanvasMemories: vi.fn(),
+  canvasesListCanvasEvents: vi.fn(),
 }));
 
 vi.mock("@/api-client/sdk.gen", async (importOriginal) => {
   const actual = await importOriginal<typeof SdkGen>();
-  return { ...actual, canvasesListCanvasMemories };
+  return { ...actual, canvasesListCanvasMemories, canvasesListCanvasEvents };
 });
 
 const showSuccessToast = vi.fn();
@@ -20,7 +21,11 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-import { QueryBlock } from "./QueryBlock";
+vi.mock("./MermaidDiagram", () => ({
+  MermaidDiagram: ({ code }: { code: string }) => <pre data-testid="mermaid-mock">{code}</pre>,
+}));
+
+import { WidgetBlock } from "./WidgetBlock";
 
 function renderWithClient(ui: ReactNode) {
   const queryClient = new QueryClient({
@@ -37,11 +42,12 @@ namespace: environments`;
 
 beforeEach(() => {
   canvasesListCanvasMemories.mockReset();
+  canvasesListCanvasEvents.mockReset();
   showSuccessToast.mockReset();
   showErrorToast.mockReset();
 });
 
-describe("QueryBlock", () => {
+describe("WidgetBlock", () => {
   it("renders a table with sorted column union from filtered entries", async () => {
     canvasesListCanvasMemories.mockResolvedValue({
       data: {
@@ -53,10 +59,10 @@ describe("QueryBlock", () => {
       },
     });
 
-    renderWithClient(<QueryBlock body={baseBody} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={baseBody} canvasId="canvas-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
@@ -86,10 +92,10 @@ describe("QueryBlock", () => {
       },
     });
 
-    renderWithClient(<QueryBlock body={baseBody} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={baseBody} canvasId="canvas-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     expect(screen.getByText("42")).toBeInTheDocument();
@@ -103,37 +109,37 @@ describe("QueryBlock", () => {
       },
     });
 
-    renderWithClient(<QueryBlock body={baseBody} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={baseBody} canvasId="canvas-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-empty")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-empty")).toBeInTheDocument();
     });
     expect(screen.getByText(/No entries in/)).toBeInTheDocument();
     expect(screen.getByText(/environments/)).toBeInTheDocument();
   });
 
   it("renders an inline error for invalid YAML", () => {
-    renderWithClient(<QueryBlock body={"source: memory\n  namespace: bad: indent"} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={"source: memory\n  namespace: bad: indent"} canvasId="canvas-1" />);
 
-    const error = screen.getByTestId("canvas-query-block-error");
+    const error = screen.getByTestId("canvas-widget-block-error");
     expect(error).toBeInTheDocument();
-    expect(error.textContent).toMatch(/Invalid query block/);
+    expect(error.textContent).toMatch(/Invalid widget block/);
     expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
   });
 
   it("renders an inline error when namespace is missing", () => {
-    renderWithClient(<QueryBlock body={"source: memory"} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={"source: memory"} canvasId="canvas-1" />);
 
-    const error = screen.getByTestId("canvas-query-block-error");
+    const error = screen.getByTestId("canvas-widget-block-error");
     expect(error).toBeInTheDocument();
     expect(error.textContent).toMatch(/missing `namespace`/);
     expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
   });
 
   it("renders an inline error for unsupported source", () => {
-    renderWithClient(<QueryBlock body={"source: runs\nnamespace: x"} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={"source: runs\nnamespace: x"} canvasId="canvas-1" />);
 
-    const error = screen.getByTestId("canvas-query-block-error");
+    const error = screen.getByTestId("canvas-widget-block-error");
     expect(error).toBeInTheDocument();
     expect(error.textContent).toMatch(/unsupported source/);
     expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
@@ -142,22 +148,22 @@ describe("QueryBlock", () => {
   it("renders the loading skeleton while the query is in flight", () => {
     canvasesListCanvasMemories.mockReturnValue(new Promise(() => {}));
 
-    renderWithClient(<QueryBlock body={baseBody} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={baseBody} canvasId="canvas-1" />);
 
-    expect(screen.getByTestId("canvas-query-block-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("canvas-widget-block-skeleton")).toBeInTheDocument();
   });
 
   it("renders an inline error when the API call fails", async () => {
     canvasesListCanvasMemories.mockRejectedValue(new Error("boom"));
 
-    renderWithClient(<QueryBlock body={baseBody} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={baseBody} canvasId="canvas-1" />);
 
-    const error = await screen.findByTestId("canvas-query-block-error");
+    const error = await screen.findByTestId("canvas-widget-block-error");
     expect(error.textContent).toMatch(/Failed to load memory: boom/);
   });
 });
 
-describe("QueryBlock custom columns", () => {
+describe("WidgetBlock custom columns", () => {
   function bodyWithColumns(columnsYaml: string): string {
     return `source: memory\nnamespace: environments\ncolumns:\n${columnsYaml}`;
   }
@@ -176,14 +182,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: PR\n    field: pr_number\n  - label: Title\n    field: pr_title\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
@@ -202,14 +208,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: Name\n    field: name\n  - label: Region\n    field: region\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const cells = screen.getAllByRole("cell");
@@ -225,11 +231,11 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock body={bodyWithColumns("  - label: URL\n    field: url\n    format: link\n")} canvasId="canvas-1" />,
+      <WidgetBlock body={bodyWithColumns("  - label: URL\n    field: url\n    format: link\n")} canvasId="canvas-1" />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const link = screen.getByRole("link");
@@ -248,14 +254,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: Preview\n    field: url\n    format: link:Open\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const link = screen.getByRole("link");
@@ -270,14 +276,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: Created\n    field: created_at\n    format: relative\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const cell = screen.getAllByRole("cell")[0];
@@ -293,14 +299,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: Created\n    field: created_at\n    format: relative\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     expect(screen.getByText("not-a-date")).toBeInTheDocument();
@@ -314,14 +320,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: Created\n    field: created_at\n    format: date\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     expect(screen.getByText("2026-04-30 07:09 UTC")).toBeInTheDocument();
@@ -333,14 +339,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: Status\n    field: status\n    format: badge\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const badge = screen.getByText("active");
@@ -355,11 +361,11 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock body={bodyWithColumns("  - label: SHA\n    field: sha\n    format: code\n")} canvasId="canvas-1" />,
+      <WidgetBlock body={bodyWithColumns("  - label: SHA\n    field: sha\n    format: code\n")} canvasId="canvas-1" />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const code = screen.getByText("abc123");
@@ -373,14 +379,14 @@ describe("QueryBlock custom columns", () => {
     });
 
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithColumns("  - label: Name\n    field: name\n    format: bogus\n")}
         canvasId="canvas-1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     expect(screen.getByText("alpha")).toBeInTheDocument();
@@ -392,16 +398,16 @@ describe("QueryBlock custom columns", () => {
 
   it("rejects malformed columns with an inline error", () => {
     renderWithClient(
-      <QueryBlock body={"source: memory\nnamespace: env\ncolumns:\n  - label: PR\n"} canvasId="canvas-1" />,
+      <WidgetBlock body={"source: memory\nnamespace: env\ncolumns:\n  - label: PR\n"} canvasId="canvas-1" />,
     );
 
-    const error = screen.getByTestId("canvas-query-block-error");
+    const error = screen.getByTestId("canvas-widget-block-error");
     expect(error.textContent).toMatch(/columns\[0\] missing `field`/);
     expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
   });
 });
 
-describe("QueryBlock filters", () => {
+describe("WidgetBlock filters", () => {
   function bodyWithWhere(whereYaml: string): string {
     return `source: memory\nnamespace: environments\nwhere:\n${whereYaml}`;
   }
@@ -419,11 +425,11 @@ describe("QueryBlock filters", () => {
   it("filters with op: eq", async () => {
     canvasesListCanvasMemories.mockResolvedValue(sample);
     renderWithClient(
-      <QueryBlock body={bodyWithWhere("  - field: repo\n    op: eq\n    value: core\n")} canvasId="c1" />,
+      <WidgetBlock body={bodyWithWhere("  - field: repo\n    op: eq\n    value: core\n")} canvasId="c1" />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     expect(screen.getByText("beta")).toBeInTheDocument();
@@ -434,11 +440,11 @@ describe("QueryBlock filters", () => {
   it("filters with op: neq", async () => {
     canvasesListCanvasMemories.mockResolvedValue(sample);
     renderWithClient(
-      <QueryBlock body={bodyWithWhere("  - field: repo\n    op: neq\n    value: core\n")} canvasId="c1" />,
+      <WidgetBlock body={bodyWithWhere("  - field: repo\n    op: neq\n    value: core\n")} canvasId="c1" />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     expect(screen.getByText("alpha")).toBeInTheDocument();
@@ -450,7 +456,7 @@ describe("QueryBlock filters", () => {
   it("filters with op: contains and not_contains", async () => {
     canvasesListCanvasMemories.mockResolvedValue(sample);
     const { rerender } = renderWithClient(
-      <QueryBlock body={bodyWithWhere("  - field: repo\n    op: contains\n    value: store\n")} canvasId="c1" />,
+      <WidgetBlock body={bodyWithWhere("  - field: repo\n    op: contains\n    value: store\n")} canvasId="c1" />,
     );
 
     await waitFor(() => {
@@ -460,7 +466,7 @@ describe("QueryBlock filters", () => {
 
     rerender(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <QueryBlock body={bodyWithWhere("  - field: repo\n    op: not_contains\n    value: store\n")} canvasId="c1" />
+        <WidgetBlock body={bodyWithWhere("  - field: repo\n    op: not_contains\n    value: store\n")} canvasId="c1" />
       </QueryClientProvider>,
     );
 
@@ -472,7 +478,9 @@ describe("QueryBlock filters", () => {
 
   it("filters with op: gt and lt on numeric strings", async () => {
     canvasesListCanvasMemories.mockResolvedValue(sample);
-    renderWithClient(<QueryBlock body={bodyWithWhere("  - field: count\n    op: gt\n    value: 7\n")} canvasId="c1" />);
+    renderWithClient(
+      <WidgetBlock body={bodyWithWhere("  - field: count\n    op: gt\n    value: 7\n")} canvasId="c1" />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("beta")).toBeInTheDocument();
@@ -490,7 +498,7 @@ describe("QueryBlock filters", () => {
       },
     });
     renderWithClient(
-      <QueryBlock body={bodyWithWhere("  - field: count\n    op: lt\n    value: 100\n")} canvasId="c1" />,
+      <WidgetBlock body={bodyWithWhere("  - field: count\n    op: lt\n    value: 100\n")} canvasId="c1" />,
     );
 
     await waitFor(() => {
@@ -502,7 +510,7 @@ describe("QueryBlock filters", () => {
   it("filters with op: exists / not_exists treating empty string as missing", async () => {
     canvasesListCanvasMemories.mockResolvedValue(sample);
     const { rerender } = renderWithClient(
-      <QueryBlock body={bodyWithWhere("  - field: repo\n    op: exists\n")} canvasId="c1" />,
+      <WidgetBlock body={bodyWithWhere("  - field: repo\n    op: exists\n")} canvasId="c1" />,
     );
 
     await waitFor(() => {
@@ -513,7 +521,7 @@ describe("QueryBlock filters", () => {
 
     rerender(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <QueryBlock body={bodyWithWhere("  - field: count\n    op: not_exists\n")} canvasId="c1" />
+        <WidgetBlock body={bodyWithWhere("  - field: count\n    op: not_exists\n")} canvasId="c1" />
       </QueryClientProvider>,
     );
 
@@ -527,7 +535,7 @@ describe("QueryBlock filters", () => {
   it("ANDs multiple where conditions together", async () => {
     canvasesListCanvasMemories.mockResolvedValue(sample);
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={bodyWithWhere(
           "  - field: repo\n    op: eq\n    value: core\n  - field: count\n    op: gt\n    value: 5\n",
         )}
@@ -544,24 +552,24 @@ describe("QueryBlock filters", () => {
 
   it("renders an inline error for an unknown operator", () => {
     renderWithClient(
-      <QueryBlock body={bodyWithWhere("  - field: repo\n    op: weirdop\n    value: x\n")} canvasId="c1" />,
+      <WidgetBlock body={bodyWithWhere("  - field: repo\n    op: weirdop\n    value: x\n")} canvasId="c1" />,
     );
 
-    const error = screen.getByTestId("canvas-query-block-error");
+    const error = screen.getByTestId("canvas-widget-block-error");
     expect(error.textContent).toMatch(/Unknown filter operator: "weirdop"/);
     expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
   });
 
   it("renders an inline error when value is missing for an op that requires it", () => {
-    renderWithClient(<QueryBlock body={bodyWithWhere("  - field: repo\n    op: eq\n")} canvasId="c1" />);
+    renderWithClient(<WidgetBlock body={bodyWithWhere("  - field: repo\n    op: eq\n")} canvasId="c1" />);
 
-    const error = screen.getByTestId("canvas-query-block-error");
+    const error = screen.getByTestId("canvas-widget-block-error");
     expect(error.textContent).toMatch(/where\[0\] missing `value`/);
     expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
   });
 });
 
-describe("QueryBlock backward compatibility", () => {
+describe("WidgetBlock backward compatibility", () => {
   it("omitting columns and where reproduces increment-1 auto-column behavior", async () => {
     canvasesListCanvasMemories.mockResolvedValue({
       data: {
@@ -572,10 +580,10 @@ describe("QueryBlock backward compatibility", () => {
       },
     });
 
-    renderWithClient(<QueryBlock body={baseBody} canvasId="canvas-1" />);
+    renderWithClient(<WidgetBlock body={baseBody} canvasId="canvas-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
@@ -583,7 +591,7 @@ describe("QueryBlock backward compatibility", () => {
   });
 });
 
-describe("QueryBlock actions", () => {
+describe("WidgetBlock actions", () => {
   function bodyWithActions(actionsYaml: string, columnsYaml = "  - label: PR\n    field: pr_number\n"): string {
     return `source: memory\nnamespace: environments\ncolumns:\n${columnsYaml}actions:\n${actionsYaml}`;
   }
@@ -608,7 +616,7 @@ describe("QueryBlock actions", () => {
     const onEmitEvent: EmitEventFn = opts?.onEmitEvent ?? vi.fn(async () => undefined);
     const nodeIds = opts?.nodeIds ?? { destroy: "node-1" };
     const result = renderWithClient(
-      <QueryBlock body={body} canvasId="c1" nodeRefs={{ nodes: { destroy: "Destroy" }, nodeIds, onEmitEvent }} />,
+      <WidgetBlock body={body} canvasId="c1" nodeRefs={{ nodes: { destroy: "Destroy" }, nodeIds, onEmitEvent }} />,
     );
     return { onEmitEvent, ...result };
   }
@@ -618,13 +626,13 @@ describe("QueryBlock actions", () => {
     renderWithActions(body);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
     expect(headers).toEqual(["PR", "Actions"]);
 
-    const button = screen.getByTestId("canvas-query-block-action-destroy");
+    const button = screen.getByTestId("canvas-widget-block-action-destroy");
     expect(button).toBeInTheDocument();
     expect(button.textContent).toContain("Destroy");
     expect(button.getAttribute("data-variant")).toBe("danger");
@@ -638,14 +646,14 @@ describe("QueryBlock actions", () => {
       },
     });
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={"source: memory\nnamespace: environments\ncolumns:\n  - label: PR\n    field: pr_number\n"}
         canvasId="c1"
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
     });
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
@@ -659,10 +667,10 @@ describe("QueryBlock actions", () => {
     const { onEmitEvent } = renderWithActions(body);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-destroy"));
 
     await waitFor(() => {
       expect(onEmitEvent).toHaveBeenCalledTimes(1);
@@ -681,10 +689,10 @@ describe("QueryBlock actions", () => {
     const { onEmitEvent } = renderWithActions(body);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-destroy"));
     await waitFor(() => {
       expect(onEmitEvent).toHaveBeenCalled();
     });
@@ -698,10 +706,10 @@ describe("QueryBlock actions", () => {
     const { onEmitEvent } = renderWithActions(body);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-destroy"));
 
     // Dialog body has the interpolated text.
     await screen.findByText("Destroy PR #69?");
@@ -715,9 +723,9 @@ describe("QueryBlock actions", () => {
     expect(onEmitEvent).not.toHaveBeenCalled();
 
     // Reopen and confirm.
-    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-destroy"));
     await screen.findByText("Destroy PR #69?");
-    fireEvent.click(screen.getByTestId("canvas-query-block-action-confirm-destroy"));
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-confirm-destroy"));
 
     await waitFor(() => {
       expect(onEmitEvent).toHaveBeenCalledTimes(1);
@@ -729,9 +737,9 @@ describe("QueryBlock actions", () => {
     renderWithActions(body);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-destroy"));
 
     await waitFor(() => {
       expect(showSuccessToast).toHaveBeenCalledWith("Triggered: Destroy");
@@ -746,11 +754,11 @@ describe("QueryBlock actions", () => {
     renderWithActions(body, { onEmitEvent });
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-destroy"));
 
-    const err = await screen.findByTestId("canvas-query-block-action-error-destroy");
+    const err = await screen.findByTestId("canvas-widget-block-action-error-destroy");
     expect(err.textContent).toContain("nope");
     expect(showSuccessToast).not.toHaveBeenCalled();
   });
@@ -760,9 +768,9 @@ describe("QueryBlock actions", () => {
     renderWithActions(body, { nodeIds: {} });
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-ghost")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-ghost")).toBeInTheDocument();
     });
-    const button = screen.getByTestId("canvas-query-block-action-ghost") as HTMLButtonElement;
+    const button = screen.getByTestId("canvas-widget-block-action-ghost") as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(button.getAttribute("title")).toMatch(/Trigger "ghost" not found/);
   });
@@ -774,11 +782,11 @@ describe("QueryBlock actions", () => {
     renderWithActions(body, { nodeIds: { destroy: "node-1", deploy: "node-2" } });
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
 
-    const open = screen.getByTestId("canvas-query-block-action-deploy");
-    const destroy = screen.getByTestId("canvas-query-block-action-destroy");
+    const open = screen.getByTestId("canvas-widget-block-action-deploy");
+    const destroy = screen.getByTestId("canvas-widget-block-action-destroy");
     expect(open.className).toContain("bg-blue-50");
     expect(destroy.className).toContain("bg-red-50");
   });
@@ -789,7 +797,7 @@ describe("QueryBlock actions", () => {
     renderWithActions(body);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
     expect(warn).toHaveBeenCalled();
     expect(warn.mock.calls.some((c) => String(c[0]).includes('Unknown action icon "bogus"'))).toBe(true);
@@ -802,9 +810,9 @@ describe("QueryBlock actions", () => {
     renderWithActions(body);
 
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
     });
-    const button = screen.getByTestId("canvas-query-block-action-destroy");
+    const button = screen.getByTestId("canvas-widget-block-action-destroy");
     expect(button.getAttribute("data-variant")).toBe("default");
     expect(button.className).toContain("bg-white");
     expect(warn).toHaveBeenCalled();
@@ -813,20 +821,33 @@ describe("QueryBlock actions", () => {
 
   it("renders a parse error for a malformed action (missing trigger)", () => {
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
+        body={"source: memory\nnamespace: env\nactions:\n  - label: Destroy\n    kind: trigger\n"}
+        canvasId="c1"
+        nodeRefs={{ nodes: {}, nodeIds: {}, onEmitEvent: vi.fn(async () => undefined) }}
+      />,
+    );
+    const error = screen.getByTestId("canvas-widget-block-error");
+    expect(error.textContent).toMatch(/actions\[0\] missing `trigger`/);
+    expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
+  });
+
+  it("renders a parse error when both `kind` and `trigger` are missing", () => {
+    renderWithClient(
+      <WidgetBlock
         body={"source: memory\nnamespace: env\nactions:\n  - label: Destroy\n"}
         canvasId="c1"
         nodeRefs={{ nodes: {}, nodeIds: {}, onEmitEvent: vi.fn(async () => undefined) }}
       />,
     );
-    const error = screen.getByTestId("canvas-query-block-error");
-    expect(error.textContent).toMatch(/actions\[0\] missing `trigger`/);
+    const error = screen.getByTestId("canvas-widget-block-error");
+    expect(error.textContent).toMatch(/actions\[0\] missing `kind`/);
     expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
   });
 
   it("renders a parse error when fill has a non-string value", () => {
     renderWithClient(
-      <QueryBlock
+      <WidgetBlock
         body={
           "source: memory\nnamespace: env\nactions:\n  - label: Destroy\n    trigger: destroy\n    fill:\n      data.issue.number: 42\n"
         }
@@ -834,7 +855,647 @@ describe("QueryBlock actions", () => {
         nodeRefs={{ nodes: {}, nodeIds: {}, onEmitEvent: vi.fn(async () => undefined) }}
       />,
     );
-    const error = screen.getByTestId("canvas-query-block-error");
+    const error = screen.getByTestId("canvas-widget-block-error");
     expect(error.textContent).toMatch(/actions\[0\]\.fill\.data\.issue\.number must be a string/);
   });
 });
+
+//
+// v5: Executions data source.
+//
+
+type EventsPage = {
+  events: Array<{
+    id: string;
+    nodeId: string;
+    createdAt: string;
+    data?: unknown;
+    executions?: Array<{
+      id: string;
+      nodeId: string;
+      state: string;
+      result?: string;
+      createdAt?: string;
+      updatedAt?: string;
+    }>;
+    queueItems?: unknown[];
+  }>;
+  totalCount: number;
+};
+
+function mockEventsResponse(events: EventsPage["events"]) {
+  canvasesListCanvasEvents.mockResolvedValue({
+    data: { events, totalCount: events.length },
+  });
+}
+
+const sampleRunningEvent: EventsPage["events"][number] = {
+  id: "run-1",
+  nodeId: "deploy-cmd",
+  createdAt: "2026-01-01T10:00:00Z",
+  data: { data: { issue: { number: 42 } } },
+  executions: [
+    {
+      id: "exec-1",
+      nodeId: "deploy-cmd",
+      state: "STATE_STARTED",
+      createdAt: "2026-01-01T10:00:00Z",
+      updatedAt: "2026-01-01T10:00:30Z",
+    },
+  ],
+  queueItems: [],
+};
+
+const samplePassedEvent: EventsPage["events"][number] = {
+  id: "run-2",
+  nodeId: "deploy-cmd",
+  createdAt: "2026-01-01T09:00:00Z",
+  data: { data: { issue: { number: 41 } } },
+  executions: [
+    {
+      id: "exec-2",
+      nodeId: "deploy-cmd",
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      createdAt: "2026-01-01T09:00:00Z",
+      updatedAt: "2026-01-01T09:00:45Z",
+    },
+  ],
+  queueItems: [],
+};
+
+const sampleFailedEvent: EventsPage["events"][number] = {
+  id: "run-3",
+  nodeId: "deploy-cmd",
+  createdAt: "2026-01-01T08:00:00Z",
+  data: { data: { issue: { number: 40 } } },
+  executions: [
+    {
+      id: "exec-3",
+      nodeId: "deploy-cmd",
+      state: "STATE_FINISHED",
+      result: "RESULT_FAILED",
+      createdAt: "2026-01-01T08:00:00Z",
+      updatedAt: "2026-01-01T08:01:00Z",
+    },
+  ],
+  queueItems: [],
+};
+
+const sampleCancelledEvent: EventsPage["events"][number] = {
+  id: "run-4",
+  nodeId: "deploy-cmd",
+  createdAt: "2026-01-01T07:00:00Z",
+  data: { data: { issue: { number: 39 } } },
+  executions: [
+    {
+      id: "exec-4",
+      nodeId: "deploy-cmd",
+      state: "STATE_FINISHED",
+      result: "RESULT_CANCELLED",
+      createdAt: "2026-01-01T07:00:00Z",
+      updatedAt: "2026-01-01T07:00:30Z",
+    },
+  ],
+  queueItems: [],
+};
+
+describe("WidgetBlock executions source", () => {
+  it("renders rows from useInfiniteCanvasEvents and computes status correctly", async () => {
+    mockEventsResponse([sampleRunningEvent, samplePassedEvent, sampleFailedEvent, sampleCancelledEvent]);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: PR\n    field: root.data.data.issue.number\n  - label: Status\n    field: status\n    format: badge\n"
+        }
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.getByText("41")).toBeInTheDocument();
+    expect(screen.getByText("40")).toBeInTheDocument();
+    expect(screen.getByText("39")).toBeInTheDocument();
+
+    expect(screen.getByText("running").className).toContain("bg-blue-100");
+    expect(screen.getByText("passed").className).toContain("bg-emerald-100");
+    expect(screen.getByText("failed").className).toContain("bg-red-100");
+    expect(screen.getByText("cancelled").className).toContain("bg-slate-100");
+  });
+
+  it("filters by trigger", async () => {
+    mockEventsResponse([sampleRunningEvent, { ...samplePassedEvent, id: "run-other", nodeId: "other-trigger" }]);
+
+    renderWithClient(
+      <WidgetBlock
+        body={"source: executions\ntrigger: deploy-cmd\ncolumns:\n  - label: ID\n    field: root.id\n"}
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.getByText("run-1")).toBeInTheDocument();
+    expect(screen.queryByText("run-other")).toBeNull();
+  });
+
+  it("filters by status (after normalization)", async () => {
+    mockEventsResponse([sampleRunningEvent, samplePassedEvent]);
+
+    renderWithClient(
+      <WidgetBlock
+        body={"source: executions\nstatus: passed\ncolumns:\n  - label: ID\n    field: root.id\n"}
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("run-1")).toBeNull();
+    expect(screen.getByText("run-2")).toBeInTheDocument();
+  });
+
+  it("truncates rows with limit", async () => {
+    mockEventsResponse([sampleRunningEvent, samplePassedEvent, sampleFailedEvent, sampleCancelledEvent]);
+
+    renderWithClient(
+      <WidgetBlock
+        body={"source: executions\nlimit: 2\ncolumns:\n  - label: ID\n    field: root.id\n"}
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.getByText("run-1")).toBeInTheDocument();
+    expect(screen.getByText("run-2")).toBeInTheDocument();
+    expect(screen.queryByText("run-3")).toBeNull();
+    expect(screen.queryByText("run-4")).toBeNull();
+  });
+
+  it("renders the empty state when no events match", async () => {
+    mockEventsResponse([sampleRunningEvent]);
+
+    renderWithClient(<WidgetBlock body={"source: executions\ntrigger: nope\n"} canvasId="c1" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-empty")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("canvas-widget-block-empty").textContent).toContain("No runs");
+  });
+
+  it("rejects an unsupported status", () => {
+    renderWithClient(<WidgetBlock body={"source: executions\nstatus: weird\n"} canvasId="c1" />);
+    const err = screen.getByTestId("canvas-widget-block-error");
+    expect(err.textContent).toMatch(/unsupported status "weird"/);
+  });
+
+  it("auto-derives default columns when none are specified", async () => {
+    mockEventsResponse([samplePassedEvent]);
+    renderWithClient(<WidgetBlock body={"source: executions\n"} canvasId="c1" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
+    expect(headers).toContain("Run");
+    expect(headers).toContain("Status");
+    expect(headers).toContain("Started");
+  });
+});
+
+//
+// v5: Execution actions
+//
+
+describe("WidgetBlock execution actions", () => {
+  it("kind: cancel resolves the running execution and calls onExecutionAction", async () => {
+    mockEventsResponse([sampleRunningEvent]);
+    const onExecutionAction = vi.fn(async () => undefined);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Cancel\n    kind: cancel\n    variant: danger\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ onExecutionAction }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-action-cancel")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-cancel"));
+
+    await waitFor(() => {
+      expect(onExecutionAction).toHaveBeenCalledWith({
+        kind: "cancel",
+        nodeId: "deploy-cmd",
+        executionId: "exec-1",
+      });
+    });
+  });
+
+  it("kind: cancel button is hidden when no execution is running", async () => {
+    mockEventsResponse([samplePassedEvent]);
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Cancel\n    kind: cancel\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ onExecutionAction: vi.fn(async () => undefined) }}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("canvas-widget-block-action-cancel")).toBeNull();
+  });
+
+  it("kind: approve resolves the matching node execution and dispatches", async () => {
+    const evt: EventsPage["events"][number] = {
+      ...sampleRunningEvent,
+      executions: [
+        ...(sampleRunningEvent.executions ?? []),
+        {
+          id: "exec-approval",
+          nodeId: "approval-gate",
+          state: "STATE_STARTED",
+          createdAt: "2026-01-01T10:00:30Z",
+          updatedAt: "2026-01-01T10:00:30Z",
+        },
+      ],
+    };
+    mockEventsResponse([evt]);
+    const onExecutionAction = vi.fn(async () => undefined);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Approve\n    kind: approve\n    node: approval-gate\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ onExecutionAction }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-action-approve-approval-gate")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-approve-approval-gate"));
+
+    await waitFor(() => {
+      expect(onExecutionAction).toHaveBeenCalledWith({
+        kind: "approve",
+        nodeId: "approval-gate",
+        executionId: "exec-approval",
+      });
+    });
+  });
+
+  it("kind: push-through dispatches with push-through kind", async () => {
+    const evt: EventsPage["events"][number] = {
+      ...sampleRunningEvent,
+      executions: [
+        ...(sampleRunningEvent.executions ?? []),
+        {
+          id: "exec-gate",
+          nodeId: "approval-gate",
+          state: "STATE_STARTED",
+          createdAt: "2026-01-01T10:00:30Z",
+          updatedAt: "2026-01-01T10:00:30Z",
+        },
+      ],
+    };
+    mockEventsResponse([evt]);
+    const onExecutionAction = vi.fn(async () => undefined);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Force\n    kind: push-through\n    node: approval-gate\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ onExecutionAction }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-action-push-through-approval-gate")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-push-through-approval-gate"));
+
+    await waitFor(() => {
+      expect(onExecutionAction).toHaveBeenCalledWith({
+        kind: "push-through",
+        nodeId: "approval-gate",
+        executionId: "exec-gate",
+      });
+    });
+  });
+
+  it("hides approve when no matching execution exists", async () => {
+    mockEventsResponse([samplePassedEvent]);
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Approve\n    kind: approve\n    node: approval-gate\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ onExecutionAction: vi.fn(async () => undefined) }}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId(/canvas-widget-block-action-approve/)).toBeNull();
+  });
+
+  it('uses `show: status == "running"` to gate the button per row', async () => {
+    mockEventsResponse([sampleRunningEvent, samplePassedEvent]);
+    renderWithClient(
+      <WidgetBlock
+        body={
+          'source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Cancel\n    kind: cancel\n    show: status == "running"\n'
+        }
+        canvasId="c1"
+        nodeRefs={{ onExecutionAction: vi.fn(async () => undefined) }}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    // Only one button should be rendered (for the running row).
+    const buttons = screen.getAllByTestId("canvas-widget-block-action-cancel");
+    expect(buttons).toHaveLength(1);
+  });
+
+  it("renders trigger and approve actions side-by-side", async () => {
+    const evt: EventsPage["events"][number] = {
+      ...sampleRunningEvent,
+      executions: [
+        ...(sampleRunningEvent.executions ?? []),
+        {
+          id: "exec-gate",
+          nodeId: "approval-gate",
+          state: "STATE_STARTED",
+          createdAt: "2026-01-01T10:00:30Z",
+          updatedAt: "2026-01-01T10:00:30Z",
+        },
+      ],
+    };
+    mockEventsResponse([evt]);
+    const onEmitEvent = vi.fn(async () => undefined);
+    const onExecutionAction = vi.fn(async () => undefined);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Reprovision\n    kind: trigger\n    trigger: redeploy\n  - label: Approve\n    kind: approve\n    node: approval-gate\n"
+        }
+        canvasId="c1"
+        nodeRefs={{
+          nodeIds: { redeploy: "node-redeploy" },
+          onEmitEvent,
+          onExecutionAction,
+        }}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-action-redeploy")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("canvas-widget-block-action-approve-approval-gate")).toBeInTheDocument();
+  });
+});
+
+//
+// v5: Render: chart
+//
+
+describe("WidgetBlock render: chart", () => {
+  it("emits xychart-beta source with bar series for memory rows", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { name: "alpha", duration: 30 } },
+          { id: "b", namespace: "envs", values: { name: "beta", duration: 60 } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: chart\n  chart:\n    type: bar\n    x: name\n    y: duration\n    label: Provisioning\n"
+        }
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
+    });
+    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
+    expect(code).toContain("xychart-beta");
+    expect(code).toContain('x-axis ["alpha", "beta"]');
+    expect(code).toContain("bar [30, 60]");
+    expect(code).toContain('title "Provisioning"');
+  });
+
+  it("emits xychart-beta source with line series for executions rows", async () => {
+    mockEventsResponse([
+      { ...samplePassedEvent, id: "ev-a", data: { metric: 10 } },
+      { ...samplePassedEvent, id: "ev-b", data: { metric: 20 } },
+    ]);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\nrender:\n  kind: chart\n  chart:\n    type: line\n    x: root.id\n    y: root.data.metric\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
+    });
+    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
+    expect(code).toContain("line [10, 20]");
+  });
+
+  it("collapses duplicate x values with chart.aggregate: avg", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { region: "us", duration: 10 } },
+          { id: "b", namespace: "envs", values: { region: "us", duration: 30 } },
+          { id: "c", namespace: "envs", values: { region: "eu", duration: 50 } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: chart\n  chart:\n    type: bar\n    x: region\n    y: duration\n    aggregate: avg\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
+    });
+    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
+    expect(code).toContain("bar [20, 50]");
+  });
+
+  it("drops non-numeric Y values before grouping", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { name: "alpha", duration: 30 } },
+          { id: "b", namespace: "envs", values: { name: "beta", duration: "n/a" } },
+          { id: "c", namespace: "envs", values: { name: "gamma", duration: 90 } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: chart\n  chart:\n    type: bar\n    x: name\n    y: duration\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
+    });
+    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
+    expect(code).toContain('x-axis ["alpha", "gamma"]');
+    expect(code).toContain("bar [30, 90]");
+  });
+});
+
+//
+// v5: Render: number
+//
+
+describe("WidgetBlock render: number", () => {
+  it("aggregate: avg renders the mean", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { dur: 10 } },
+          { id: "b", namespace: "envs", values: { dur: 30 } },
+          { id: "c", namespace: "envs", values: { dur: 50 } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: dur\n    aggregate: avg\n    label: Avg duration\n"
+        }
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
+    });
+    expect(screen.getByText("30")).toBeInTheDocument();
+    expect(screen.getByText("Avg duration")).toBeInTheDocument();
+  });
+
+  it("aggregate: count ignores the field", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: {} },
+          { id: "b", namespace: "envs", values: {} },
+          { id: "c", namespace: "envs", values: {} },
+        ],
+      },
+    });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: anything\n    aggregate: count\n    label: Total\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
+    });
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("format: duration renders human-friendly seconds", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { dur: 4980 } }, // 4980 / 1 = 4980 -> 1h 23m
+        ],
+      },
+    });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: dur\n    aggregate: avg\n    label: Avg\n    format: duration\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
+    });
+    expect(screen.getByText("1h 23m")).toBeInTheDocument();
+  });
+
+  it("format: percent renders as fraction × 100", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: { items: [{ id: "a", namespace: "envs", values: { ratio: 0.123 } }] },
+    });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: ratio\n    aggregate: avg\n    label: Pass rate\n    format: percent\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
+    });
+    expect(screen.getByText("12.3%")).toBeInTheDocument();
+  });
+
+  it("renders a dash when no rows are available", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({ data: { items: [] } });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: dur\n    aggregate: avg\n    label: Avg\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
+    });
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+});
+
+//
+// v5: ```query alias backward compatibility — the alias-routing test lives in
+// CanvasMarkdown.spec.tsx; here we just verify that v4 behavior keeps working
+// against the renamed component, which the rest of this file already does.
+//

@@ -5717,6 +5717,38 @@ export function WorkflowPageV2() {
     [canvasId, readmeNodeIdBySlug],
   );
 
+  //
+  // Execution-scoped action callback used by Apps widget-block executions
+  // rows (`kind: approve | cancel | push-through`). The widget resolves
+  // the right `executionId` from the row before invoking; here we just
+  // dispatch to the existing platform handlers.
+  //
+  const handleWidgetExecutionAction = useCallback(
+    async ({
+      kind,
+      nodeId,
+      executionId,
+    }: {
+      kind: "approve" | "cancel" | "push-through";
+      nodeId: string;
+      executionId: string;
+    }) => {
+      if (kind === "approve") {
+        await handleApprovalAction(nodeId, executionId, "approve", { index: 0 });
+        return;
+      }
+      if (kind === "cancel") {
+        await onCancelExecution(nodeId, executionId);
+        return;
+      }
+      if (kind === "push-through") {
+        await handlePushThrough(nodeId, executionId);
+        return;
+      }
+    },
+    [handleApprovalAction, onCancelExecution, handlePushThrough],
+  );
+
   const handleReadmeSaveDraft = useCallback(
     async (content: string) => {
       await updateCanvasReadmeMutation.mutateAsync({ content });
@@ -6128,6 +6160,8 @@ export function WorkflowPageV2() {
                   nodeStatuses: readmeNodeStatusBySlug,
                   nodeIds: readmeNodeIdBySlug,
                   onEmitEvent: !canUpdateCanvas || isTemplate || runDisabled ? undefined : handleEmitEventBySlug,
+                  onExecutionAction:
+                    !canUpdateCanvas || isTemplate || runDisabled ? undefined : handleWidgetExecutionAction,
                 }}
                 onChange={(next) => updateCanvasLaunchpadMutation.mutate(next)}
               />

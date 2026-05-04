@@ -19,7 +19,7 @@ import { resolveIcon } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
 import { MermaidDiagram } from "./MermaidDiagram";
-import { QueryBlock } from "./QueryBlock";
+import { WidgetBlock } from "./WidgetBlock";
 
 import "highlight.js/styles/github.css";
 
@@ -215,12 +215,13 @@ function buildInlineCodeComponent({ canvasId, nodeRefs }: InlineCodeContext) {
       return <MermaidDiagram code={source} />;
     }
 
-    // Fenced ```query block → render as a memory-backed table when canvasId is
-    // available. In surfaces that don't supply canvasId (e.g. Readme modal)
-    // the block falls through to the regular highlighted code rendering.
-    if (/(^|\s)language-query(\s|$)/.test(classes) && canvasId) {
+    // Fenced ```widget block (or the deprecated ```query alias) → render as a
+    // table / chart / number widget when canvasId is available. In surfaces
+    // that don't supply canvasId (e.g. Readme modal) the block falls through
+    // to the regular highlighted code rendering.
+    if ((/(^|\s)language-widget(\s|$)/.test(classes) || /(^|\s)language-query(\s|$)/.test(classes)) && canvasId) {
       const source = extractCodeString(children).replace(/\n$/, "");
-      return <QueryBlock body={source} canvasId={canvasId} nodeRefs={nodeRefs} />;
+      return <WidgetBlock body={source} canvasId={canvasId} nodeRefs={nodeRefs} />;
     }
 
     const text = String(children ?? "");
@@ -549,14 +550,25 @@ export interface NodeChipContext {
    * dashed-grey "unknown status" pill (e.g. for triggers).
    */
   nodeStatuses?: Record<string, NodeStatusInfo | undefined>;
-  /** Node slug -> node ID. Used by query-block row actions to fire events. */
+  /** Node slug -> node ID. Used by widget-block row actions to fire events. */
   nodeIds?: Record<string, string>;
   /**
-   * Direct event-emit callback used by query-block row actions. The caller is
+   * Direct event-emit callback used by widget-block row actions. The caller is
    * responsible for resolving `nodeSlug` to a node ID and posting the event.
    * When undefined, action buttons render disabled.
    */
   onEmitEvent?: (input: { nodeSlug: string; channel: string; data: unknown }) => Promise<void>;
+  /**
+   * Execution-scoped action callback used by widget-block executions rows
+   * (`kind: approve | cancel | push-through`). The widget resolves the right
+   * `executionId` for the row before invoking. When undefined, action buttons
+   * render disabled.
+   */
+  onExecutionAction?: (input: {
+    kind: "approve" | "cancel" | "push-through";
+    nodeId: string;
+    executionId: string;
+  }) => Promise<void>;
 }
 
 interface ChipTheme {

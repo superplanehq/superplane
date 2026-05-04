@@ -1,21 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
-vi.mock("./QueryBlock", () => ({
-  QueryBlock: ({
+vi.mock("./WidgetBlock", () => ({
+  WidgetBlock: ({
     body,
     canvasId,
     nodeRefs,
   }: {
     body: string;
     canvasId: string;
-    nodeRefs?: { nodeIds?: Record<string, string>; onEmitEvent?: unknown };
+    nodeRefs?: { nodeIds?: Record<string, string>; onEmitEvent?: unknown; onExecutionAction?: unknown };
   }) => (
     <div
-      data-testid="canvas-query-block-mock"
+      data-testid="canvas-widget-block-mock"
       data-canvas-id={canvasId}
       data-node-ids={nodeRefs?.nodeIds ? Object.keys(nodeRefs.nodeIds).join(",") : ""}
       data-has-emit={nodeRefs?.onEmitEvent ? "yes" : "no"}
+      data-has-exec-action={nodeRefs?.onExecutionAction ? "yes" : "no"}
     >
       {body}
     </div>
@@ -396,40 +397,56 @@ describe("CanvasMarkdown node-status chip", () => {
   });
 });
 
-describe("CanvasMarkdown query block routing", () => {
+describe("CanvasMarkdown widget block routing", () => {
+  const widgetMarkdown = "```widget\nsource: memory\nnamespace: environments\n```";
   const queryMarkdown = "```query\nsource: memory\nnamespace: environments\n```";
 
-  it("routes a fenced ```query block to QueryBlock when canvasId is provided", () => {
-    render(<CanvasMarkdown canvasId="canvas-1">{queryMarkdown}</CanvasMarkdown>);
+  it("routes a fenced ```widget block to WidgetBlock when canvasId is provided", () => {
+    render(<CanvasMarkdown canvasId="canvas-1">{widgetMarkdown}</CanvasMarkdown>);
 
-    const block = screen.getByTestId("canvas-query-block-mock");
+    const block = screen.getByTestId("canvas-widget-block-mock");
     expect(block).toBeInTheDocument();
     expect(block.getAttribute("data-canvas-id")).toBe("canvas-1");
     expect(block.textContent).toContain("source: memory");
     expect(block.textContent).toContain("namespace: environments");
   });
 
-  it("falls back to a regular code block when canvasId is missing", () => {
-    const { container } = render(<CanvasMarkdown>{queryMarkdown}</CanvasMarkdown>);
+  it("routes a fenced ```query block (deprecated alias) to WidgetBlock when canvasId is provided", () => {
+    render(<CanvasMarkdown canvasId="canvas-1">{queryMarkdown}</CanvasMarkdown>);
 
-    expect(screen.queryByTestId("canvas-query-block-mock")).toBeNull();
-    const code = container.querySelector("code.language-query");
+    const block = screen.getByTestId("canvas-widget-block-mock");
+    expect(block).toBeInTheDocument();
+    expect(block.getAttribute("data-canvas-id")).toBe("canvas-1");
+  });
+
+  it("falls back to a regular code block when canvasId is missing", () => {
+    const { container } = render(<CanvasMarkdown>{widgetMarkdown}</CanvasMarkdown>);
+
+    expect(screen.queryByTestId("canvas-widget-block-mock")).toBeNull();
+    const code = container.querySelector("code.language-widget");
     expect(code).not.toBeNull();
   });
 
-  it("forwards nodeRefs (nodeIds + onEmitEvent) into QueryBlock", () => {
+  it("forwards nodeRefs (nodeIds + onEmitEvent + onExecutionAction) into WidgetBlock", () => {
     const onEmitEvent = vi.fn();
+    const onExecutionAction = vi.fn();
     render(
       <CanvasMarkdown
         canvasId="canvas-1"
-        nodeRefs={{ nodes: { destroy: "Destroy" }, nodeIds: { destroy: "node-1" }, onEmitEvent }}
+        nodeRefs={{
+          nodes: { destroy: "Destroy" },
+          nodeIds: { destroy: "node-1" },
+          onEmitEvent,
+          onExecutionAction,
+        }}
       >
-        {queryMarkdown}
+        {widgetMarkdown}
       </CanvasMarkdown>,
     );
 
-    const block = screen.getByTestId("canvas-query-block-mock");
+    const block = screen.getByTestId("canvas-widget-block-mock");
     expect(block.getAttribute("data-node-ids")).toBe("destroy");
     expect(block.getAttribute("data-has-emit")).toBe("yes");
+    expect(block.getAttribute("data-has-exec-action")).toBe("yes");
   });
 });
