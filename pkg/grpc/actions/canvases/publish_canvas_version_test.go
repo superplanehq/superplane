@@ -129,6 +129,32 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Contains(t, s.Message(), "version not found")
 	})
 
+	t.Run("draft version with no changes -> succeeds (regression for Sentry 500)", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-no-changes")
+
+		createResp, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+		require.NoError(t, err)
+		draftVersionID := createResp.Version.Metadata.Id
+
+		resp, err := PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvasID, draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+
+		require.NoError(t, err, "publishing a draft with no changes must not return Internal/500")
+		require.NotNil(t, resp.Version)
+		assert.Equal(t, draftVersionID, resp.Version.Metadata.Id)
+		assert.Equal(t, pb.CanvasVersion_STATE_PUBLISHED, resp.Version.Metadata.State)
+
+		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
+		require.NoError(t, err)
+		require.NotNil(t, canvas.LiveVersionID)
+		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
+	})
+
 	t.Run("draft version -> publishes and deletes draft", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-draft")
