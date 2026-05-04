@@ -17,12 +17,12 @@ import { serviceMetadataLabel, stringOrDash, type RenderServiceNodeMetadata } fr
 import { baseProps } from "./base";
 import { defaultStateFunction } from "../stateRegistry";
 
-interface VerifyDNSConfigurationConfiguration {
+interface TriggerDNSConfigurationConfiguration {
   service?: string;
   domainName?: string;
 }
 
-interface VerifyDNSConfigurationOutput {
+interface TriggerDNSConfigurationOutput {
   name?: string;
   serviceId?: string;
   status?: string;
@@ -30,7 +30,7 @@ interface VerifyDNSConfigurationOutput {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as VerifyDNSConfigurationConfiguration | undefined;
+  const configuration = node.configuration as TriggerDNSConfigurationConfiguration | undefined;
   const nodeMetadata = node.metadata as RenderServiceNodeMetadata | undefined;
 
   if (configuration?.service) {
@@ -43,7 +43,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-export const VERIFY_DNS_CONFIGURATION_STATE_MAP: EventStateMap = {
+export const TRIGGER_DNS_CONFIGURATION_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   verificationRequested: {
     icon: "shield-check",
@@ -53,12 +53,12 @@ export const VERIFY_DNS_CONFIGURATION_STATE_MAP: EventStateMap = {
   },
 };
 
-export const verifyDNSConfigurationStateFunction: StateFunction = (execution) => {
+export const triggerDNSConfigurationStateFunction: StateFunction = (execution) => {
   if (!execution) return "neutral";
 
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   if (outputs?.default?.length) {
-    const result = outputs.default[0]?.data as VerifyDNSConfigurationOutput | undefined;
+    const result = outputs.default[0]?.data as TriggerDNSConfigurationOutput | undefined;
     if (result?.status === "accepted") {
       return "verificationRequested";
     }
@@ -67,12 +67,12 @@ export const verifyDNSConfigurationStateFunction: StateFunction = (execution) =>
   return defaultStateFunction(execution);
 };
 
-export const VERIFY_DNS_CONFIGURATION_STATE_REGISTRY: EventStateRegistry = {
-  stateMap: VERIFY_DNS_CONFIGURATION_STATE_MAP,
-  getState: verifyDNSConfigurationStateFunction,
+export const TRIGGER_DNS_CONFIGURATION_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: TRIGGER_DNS_CONFIGURATION_STATE_MAP,
+  getState: triggerDNSConfigurationStateFunction,
 };
 
-export const verifyDNSConfigurationMapper: ComponentBaseMapper = {
+export const triggerDNSConfigurationMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
     return { ...base, metadata: metadataList(context.node) };
@@ -85,7 +85,7 @@ export const verifyDNSConfigurationMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as VerifyDNSConfigurationOutput | undefined;
+    const result = outputs?.default?.[0]?.data as TriggerDNSConfigurationOutput | undefined;
 
     return {
       "Requested At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",

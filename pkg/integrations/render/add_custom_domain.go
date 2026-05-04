@@ -13,20 +13,12 @@ import (
 )
 
 const (
-	AddCustomDomainPayloadType          = "render.customDomain.added"
-	AddCustomDomainSuccessOutputChannel = "success"
-	AddCustomDomainFailedOutputChannel  = "failed"
-	AddCustomDomainPollInterval         = 15 * time.Second
-	addCustomDomainExecutionKey         = "custom_domain_id"
+	AddCustomDomainPayloadType  = "render.customDomain.added"
+	AddCustomDomainPollInterval = time.Minute
+	addCustomDomainExecutionKey = "custom_domain_id"
 
-	customDomainVerificationStatusVerified   = "verified"
-	customDomainVerificationStatusFailed     = "failed"
-	customDomainVerificationStatusUnverified = "unverified"
-)
-
-var (
-	addCustomDomainImmediateVerificationTimeout  = 30 * time.Second
-	addCustomDomainImmediateVerificationInterval = 2 * time.Second
+	customDomainVerificationStatusVerified = "verified"
+	customDomainVerificationStatusFailed   = "failed"
 )
 
 type AddCustomDomain struct{}
@@ -74,11 +66,6 @@ func (c *AddCustomDomain) Documentation() string {
 - **Domain Name**: The custom domain name (e.g., ` + "`app.example.com`" + `)
 - **Wait For Verification**: When enabled, waits for DNS verification before completing
 
-## Output Channels
-
-- **Success**: Emitted when the domain is added (and verified, if ` + "`waitForVerification`" + ` is enabled)
-- **Failed**: Emitted when DNS verification fails
-
 ## Output
 
 Emits a ` + "`render.customDomain.added`" + ` payload with ` + "`id`" + `, ` + "`name`" + `, ` + "`serviceId`" + `, and ` + "`verificationStatus`" + `.`
@@ -93,10 +80,7 @@ func (c *AddCustomDomain) Color() string {
 }
 
 func (c *AddCustomDomain) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{
-		{Name: AddCustomDomainSuccessOutputChannel, Label: "Success"},
-		{Name: AddCustomDomainFailedOutputChannel, Label: "Failed"},
-	}
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *AddCustomDomain) Configuration() []configuration.Field {
@@ -202,7 +186,7 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 
 	if !spec.WaitForVerification {
 		return ctx.ExecutionState.Emit(
-			AddCustomDomainSuccessOutputChannel,
+			core.DefaultOutputChannel.Name,
 			AddCustomDomainPayloadType,
 			[]any{customDomainPayload(spec.Service, domain)},
 		)
@@ -210,7 +194,7 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 
 	if domain.VerificationStatus == customDomainVerificationStatusVerified {
 		return ctx.ExecutionState.Emit(
-			AddCustomDomainSuccessOutputChannel,
+			core.DefaultOutputChannel.Name,
 			AddCustomDomainPayloadType,
 			[]any{customDomainPayload(spec.Service, domain)},
 		)
@@ -218,22 +202,25 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 
 	if domain.VerificationStatus == customDomainVerificationStatusFailed {
 		return ctx.ExecutionState.Emit(
-			AddCustomDomainFailedOutputChannel,
+			core.DefaultOutputChannel.Name,
 			AddCustomDomainPayloadType,
 			[]any{customDomainPayload(spec.Service, domain)},
 		)
 	}
 
-	if err := client.VerifyCustomDomain(spec.Service, domainID); err != nil {
-		return err
-	}
-
-	completed, err := c.waitForCustomDomainVerification(ctx, client, spec, metadataFromDomain(spec.Service, domain))
+	latestDomain, err := triggerAndRetrieveCustomDomainVerification(client, spec.Service, domainID)
 	if err != nil {
 		return err
 	}
-	if completed {
-		return nil
+
+	metadata := metadataFromDomain(spec.Service, latestDomain)
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return err
+	}
+
+	emitted, err := emitCustomDomainVerificationResult(ctx.ExecutionState, spec.Service, latestDomain)
+	if emitted || err != nil {
+		return err
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, AddCustomDomainPollInterval)
@@ -254,38 +241,6 @@ func (c *AddCustomDomain) HandleHook(ctx core.ActionHookContext) error {
 		return c.poll(ctx)
 	}
 	return fmt.Errorf("unknown hook: %s", ctx.Name)
-}
-
-func (c *AddCustomDomain) waitForCustomDomainVerification(
-	ctx core.ExecutionContext,
-	client *Client,
-	spec AddCustomDomainConfiguration,
-	metadata AddCustomDomainExecutionMetadata,
-) (bool, error) {
-	deadline := time.Now().Add(addCustomDomainImmediateVerificationTimeout)
-
-	for {
-		domain, err := client.GetCustomDomain(spec.Service, metadata.CustomDomain.ID)
-		if err != nil {
-			return false, err
-		}
-
-		metadata.CustomDomain.VerificationStatus = domain.VerificationStatus
-		if err := ctx.Metadata.Set(metadata); err != nil {
-			return false, err
-		}
-
-		emitted, err := emitCustomDomainVerificationResult(ctx.ExecutionState, spec.Service, domain)
-		if emitted || err != nil {
-			return emitted, err
-		}
-
-		if time.Now().Add(addCustomDomainImmediateVerificationInterval).After(deadline) {
-			return false, nil
-		}
-
-		time.Sleep(addCustomDomainImmediateVerificationInterval)
-	}
 }
 
 func (c *AddCustomDomain) poll(ctx core.ActionHookContext) error {
@@ -312,7 +267,7 @@ func (c *AddCustomDomain) poll(ctx core.ActionHookContext) error {
 		return err
 	}
 
-	domain, err := client.GetCustomDomain(spec.Service, metadata.CustomDomain.ID)
+	domain, err := triggerAndRetrieveCustomDomainVerification(client, spec.Service, metadata.CustomDomain.ID)
 	if err != nil {
 		return err
 	}
@@ -322,15 +277,13 @@ func (c *AddCustomDomain) poll(ctx core.ActionHookContext) error {
 		return err
 	}
 
-	switch domain.VerificationStatus {
-	case customDomainVerificationStatusVerified, customDomainVerificationStatusFailed:
+	if domain.VerificationStatus == customDomainVerificationStatusVerified ||
+		domain.VerificationStatus == customDomainVerificationStatusFailed {
 		_, err := emitCustomDomainVerificationResult(ctx.ExecutionState, spec.Service, domain)
 		return err
-	case customDomainVerificationStatusUnverified:
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, AddCustomDomainPollInterval)
-	default:
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, AddCustomDomainPollInterval)
 	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, AddCustomDomainPollInterval)
 }
 
 func (c *AddCustomDomain) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -372,19 +325,26 @@ func emitCustomDomainVerificationResult(
 	domain CustomDomainResponse,
 ) (bool, error) {
 	switch domain.VerificationStatus {
-	case customDomainVerificationStatusVerified:
+	case customDomainVerificationStatusVerified, customDomainVerificationStatusFailed:
 		return true, executionState.Emit(
-			AddCustomDomainSuccessOutputChannel,
-			AddCustomDomainPayloadType,
-			[]any{customDomainPayload(serviceID, domain)},
-		)
-	case customDomainVerificationStatusFailed:
-		return true, executionState.Emit(
-			AddCustomDomainFailedOutputChannel,
+			core.DefaultOutputChannel.Name,
 			AddCustomDomainPayloadType,
 			[]any{customDomainPayload(serviceID, domain)},
 		)
 	default:
 		return false, nil
 	}
+}
+
+func triggerAndRetrieveCustomDomainVerification(client *Client, serviceID string, domainNameOrID string) (CustomDomainResponse, error) {
+	if _, err := client.VerifyCustomDomain(serviceID, domainNameOrID); err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	domain, err := client.GetCustomDomain(serviceID, domainNameOrID)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	return domain, nil
 }

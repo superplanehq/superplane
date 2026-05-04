@@ -11,29 +11,29 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const VerifyDNSConfigurationPayloadType = "render.dnsConfiguration.verification.requested"
+const TriggerDNSConfigurationPayloadType = "render.dnsConfiguration.verification.requested"
 
-type VerifyDNSConfiguration struct{}
+type TriggerDNSConfiguration struct{}
 
-type VerifyDNSConfigurationConfiguration struct {
+type TriggerDNSConfigurationConfiguration struct {
 	Service    string `json:"service" mapstructure:"service"`
 	DomainName string `json:"domainName" mapstructure:"domainName"`
 }
 
-func (c *VerifyDNSConfiguration) Name() string {
-	return "render.verifyDNSConfiguration"
+func (c *TriggerDNSConfiguration) Name() string {
+	return "render.triggerDNSConfiguration"
 }
 
-func (c *VerifyDNSConfiguration) Label() string {
-	return "Verify DNS Configuration"
+func (c *TriggerDNSConfiguration) Label() string {
+	return "Trigger DNS Configuration"
 }
 
-func (c *VerifyDNSConfiguration) Description() string {
+func (c *TriggerDNSConfiguration) Description() string {
 	return "Trigger DNS verification for a Render custom domain"
 }
 
-func (c *VerifyDNSConfiguration) Documentation() string {
-	return `The Verify DNS Configuration component asks Render to verify the DNS configuration for a custom domain.
+func (c *TriggerDNSConfiguration) Documentation() string {
+	return `The Trigger DNS Configuration component asks Render to verify the DNS configuration for a custom domain.
 
 ## Use Cases
 
@@ -50,19 +50,19 @@ func (c *VerifyDNSConfiguration) Documentation() string {
 Emits a ` + "`render.dnsConfiguration.verification.requested`" + ` payload with ` + "`name`" + `, ` + "`serviceId`" + `, and ` + "`status`" + `.`
 }
 
-func (c *VerifyDNSConfiguration) Icon() string {
+func (c *TriggerDNSConfiguration) Icon() string {
 	return "shield-check"
 }
 
-func (c *VerifyDNSConfiguration) Color() string {
+func (c *TriggerDNSConfiguration) Color() string {
 	return "gray"
 }
 
-func (c *VerifyDNSConfiguration) OutputChannels(configuration any) []core.OutputChannel {
+func (c *TriggerDNSConfiguration) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *VerifyDNSConfiguration) Configuration() []configuration.Field {
+func (c *TriggerDNSConfiguration) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "service",
@@ -98,27 +98,27 @@ func (c *VerifyDNSConfiguration) Configuration() []configuration.Field {
 	}
 }
 
-func decodeVerifyDNSConfigurationConfiguration(cfg any) (VerifyDNSConfigurationConfiguration, error) {
-	spec := VerifyDNSConfigurationConfiguration{}
+func decodeTriggerDNSConfigurationConfiguration(cfg any) (TriggerDNSConfigurationConfiguration, error) {
+	spec := TriggerDNSConfigurationConfiguration{}
 	if err := mapstructure.Decode(cfg, &spec); err != nil {
-		return VerifyDNSConfigurationConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
+		return TriggerDNSConfigurationConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	spec.Service = strings.TrimSpace(spec.Service)
 	spec.DomainName = strings.TrimSpace(spec.DomainName)
 
 	if spec.Service == "" {
-		return VerifyDNSConfigurationConfiguration{}, fmt.Errorf("service is required")
+		return TriggerDNSConfigurationConfiguration{}, fmt.Errorf("service is required")
 	}
 	if spec.DomainName == "" {
-		return VerifyDNSConfigurationConfiguration{}, fmt.Errorf("domainName is required")
+		return TriggerDNSConfigurationConfiguration{}, fmt.Errorf("domainName is required")
 	}
 
 	return spec, nil
 }
 
-func (c *VerifyDNSConfiguration) Setup(ctx core.SetupContext) error {
-	spec, err := decodeVerifyDNSConfigurationConfiguration(ctx.Configuration)
+func (c *TriggerDNSConfiguration) Setup(ctx core.SetupContext) error {
+	spec, err := decodeTriggerDNSConfigurationConfiguration(ctx.Configuration)
 	if err != nil {
 		return err
 	}
@@ -126,12 +126,12 @@ func (c *VerifyDNSConfiguration) Setup(ctx core.SetupContext) error {
 	return setServiceNodeMetadata(ctx, spec.Service)
 }
 
-func (c *VerifyDNSConfiguration) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *TriggerDNSConfiguration) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *VerifyDNSConfiguration) Execute(ctx core.ExecutionContext) error {
-	spec, err := decodeVerifyDNSConfigurationConfiguration(ctx.Configuration)
+func (c *TriggerDNSConfiguration) Execute(ctx core.ExecutionContext) error {
+	spec, err := decodeTriggerDNSConfigurationConfiguration(ctx.Configuration)
 	if err != nil {
 		return err
 	}
@@ -141,13 +141,13 @@ func (c *VerifyDNSConfiguration) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := client.VerifyCustomDomain(spec.Service, spec.DomainName); err != nil {
+	if _, err := client.VerifyCustomDomain(spec.Service, spec.DomainName); err != nil {
 		return err
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		VerifyDNSConfigurationPayloadType,
+		TriggerDNSConfigurationPayloadType,
 		[]any{
 			map[string]any{
 				"name":      spec.DomainName,
@@ -158,22 +158,22 @@ func (c *VerifyDNSConfiguration) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *VerifyDNSConfiguration) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *TriggerDNSConfiguration) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
-func (c *VerifyDNSConfiguration) Cancel(ctx core.ExecutionContext) error {
+func (c *TriggerDNSConfiguration) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *VerifyDNSConfiguration) Cleanup(ctx core.SetupContext) error {
+func (c *TriggerDNSConfiguration) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *VerifyDNSConfiguration) Hooks() []core.Hook {
+func (c *TriggerDNSConfiguration) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
-func (c *VerifyDNSConfiguration) HandleHook(ctx core.ActionHookContext) error {
+func (c *TriggerDNSConfiguration) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

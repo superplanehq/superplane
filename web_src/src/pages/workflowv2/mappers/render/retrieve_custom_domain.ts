@@ -13,13 +13,12 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { serviceMetadataLabel, stringOrDash, type RenderServiceNodeMetadata } from "./common";
 import { baseProps } from "./base";
 
-interface AddCustomDomainConfiguration {
+interface RetrieveCustomDomainConfiguration {
   service?: string;
   domainName?: string;
-  waitForVerification?: boolean;
 }
 
-interface AddCustomDomainOutput {
+interface RetrieveCustomDomainOutput {
   id?: string;
   name?: string;
   serviceId?: string;
@@ -28,7 +27,7 @@ interface AddCustomDomainOutput {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as AddCustomDomainConfiguration | undefined;
+  const configuration = node.configuration as RetrieveCustomDomainConfiguration | undefined;
   const nodeMetadata = node.metadata as RenderServiceNodeMetadata | undefined;
 
   if (configuration?.service) {
@@ -37,14 +36,11 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.domainName) {
     metadata.push({ icon: "globe", label: configuration.domainName });
   }
-  if (configuration?.waitForVerification) {
-    metadata.push({ icon: "shield-check", label: "Wait for verification" });
-  }
 
   return metadata;
 }
 
-export const addCustomDomainMapper: ComponentBaseMapper = {
+export const retrieveCustomDomainMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
     return { ...base, metadata: metadataList(context.node) };
@@ -57,10 +53,10 @@ export const addCustomDomainMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as AddCustomDomainOutput | undefined;
+    const result = outputs?.default?.[0]?.data as RetrieveCustomDomainOutput | undefined;
 
     return {
-      "Added At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
+      "Retrieved At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
       "Domain ID": stringOrDash(result?.id),
       "Domain Name": stringOrDash(result?.name),
       "Service ID": stringOrDash(result?.serviceId),

@@ -39,7 +39,7 @@ function makeDetailsContext(outputData?: Record<string, unknown>): ExecutionDeta
     metadata: {},
     configuration: {},
     rootEvent: undefined,
-    outputs: outputData ? { success: [{ data: outputData, type: "render.customDomain.added" }] } : undefined,
+    outputs: outputData ? { default: [{ data: outputData, type: "render.customDomain.added" }] } : undefined,
   };
   return { nodes: [], node: NODE, execution };
 }
@@ -99,7 +99,7 @@ describe("addCustomDomainMapper.getExecutionDetails", () => {
     expect(details["Verification Status"]).toBe("-");
   });
 
-  it("returns domain details from success output", () => {
+  it("returns domain details from default output", () => {
     const ctx = makeDetailsContext({
       id: "cdm-abc123",
       name: "app.example.com",

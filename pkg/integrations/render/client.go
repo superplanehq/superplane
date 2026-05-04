@@ -656,29 +656,46 @@ func (c *Client) GetCustomDomain(serviceID string, domainNameOrID string) (Custo
 		return CustomDomainResponse{}, err
 	}
 
-	response := CustomDomainResponse{}
-	if err := json.Unmarshal(body, &response); err != nil {
+	response, err := parseCustomDomain(body, domainNameOrID)
+	if err != nil {
 		return CustomDomainResponse{}, fmt.Errorf("failed to unmarshal custom domain response: %w", err)
 	}
 
 	return response, nil
 }
 
-func (c *Client) VerifyCustomDomain(serviceID string, domainNameOrID string) error {
+// VerifyCustomDomain triggers DNS verification for a custom domain. Render's
+// /verify endpoint normally returns 202 Accepted with an empty body because
+// verification runs asynchronously. If Render ever returns a domain body, parse
+// and return it; otherwise callers should retrieve the domain after triggering.
+func (c *Client) VerifyCustomDomain(serviceID string, domainNameOrID string) (CustomDomainResponse, error) {
 	if serviceID == "" {
-		return fmt.Errorf("serviceID is required")
+		return CustomDomainResponse{}, fmt.Errorf("serviceID is required")
 	}
 	if domainNameOrID == "" {
-		return fmt.Errorf("domainNameOrID is required")
+		return CustomDomainResponse{}, fmt.Errorf("domainNameOrID is required")
 	}
 
-	_, _, err := c.execRequestWithResponse(
+	_, body, err := c.execRequestWithResponse(
 		http.MethodPost,
 		"/services/"+url.PathEscape(serviceID)+"/custom-domains/"+url.PathEscape(domainNameOrID)+"/verify",
 		nil,
 		nil,
 	)
-	return err
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	if len(bytes.TrimSpace(body)) == 0 {
+		return CustomDomainResponse{}, nil
+	}
+
+	response, err := parseCustomDomain(body, domainNameOrID)
+	if err != nil {
+		return CustomDomainResponse{}, nil
+	}
+
+	return response, nil
 }
 
 func (c *Client) RemoveCustomDomain(serviceID string, domainNameOrID string) error {
@@ -724,10 +741,15 @@ func parseCustomDomains(body []byte) ([]CustomDomainResponse, error) {
 	return compactCustomDomains(domains), nil
 }
 
-func parseCustomDomain(body []byte, domainName string) (CustomDomainResponse, error) {
+func parseCustomDomain(body []byte, domainNameOrID string) (CustomDomainResponse, error) {
 	var domain CustomDomainResponse
-	if err := json.Unmarshal(body, &domain); err == nil {
+	if err := json.Unmarshal(body, &domain); err == nil && (domain.ID != "" || domain.Name != "") {
 		return domain, nil
+	}
+
+	wrapper := customDomainWithCursor{}
+	if err := json.Unmarshal(body, &wrapper); err == nil && (wrapper.CustomDomain.ID != "" || wrapper.CustomDomain.Name != "") {
+		return wrapper.CustomDomain, nil
 	}
 
 	domains, err := parseCustomDomains(body)
@@ -736,7 +758,7 @@ func parseCustomDomain(body []byte, domainName string) (CustomDomainResponse, er
 	}
 
 	for _, domain := range domains {
-		if domain.Name == domainName {
+		if domain.ID == domainNameOrID || domain.Name == domainNameOrID {
 			return domain, nil
 		}
 	}

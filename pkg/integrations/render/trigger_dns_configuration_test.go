@@ -12,8 +12,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__Render_VerifyDNSConfiguration__Setup(t *testing.T) {
-	component := &VerifyDNSConfiguration{}
+func Test__Render_TriggerDNSConfiguration__Setup(t *testing.T) {
+	component := &TriggerDNSConfiguration{}
 
 	t.Run("missing service -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
@@ -64,8 +64,8 @@ func Test__Render_VerifyDNSConfiguration__Setup(t *testing.T) {
 	})
 }
 
-func Test__Render_VerifyDNSConfiguration__Execute(t *testing.T) {
-	component := &VerifyDNSConfiguration{}
+func Test__Render_TriggerDNSConfiguration__Execute(t *testing.T) {
+	component := &TriggerDNSConfiguration{}
 
 	t.Run("valid configuration -> triggers verification and emits payload", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
@@ -92,7 +92,7 @@ func Test__Render_VerifyDNSConfiguration__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, core.DefaultOutputChannel.Name, executionState.Channel)
-		assert.Equal(t, VerifyDNSConfigurationPayloadType, executionState.Type)
+		assert.Equal(t, TriggerDNSConfigurationPayloadType, executionState.Type)
 		require.Len(t, executionState.Payloads, 1)
 
 		emittedPayload := readMap(executionState.Payloads[0])

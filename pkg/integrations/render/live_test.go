@@ -48,10 +48,10 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 		_ = client.RemoveCustomDomain(addServiceID, waitDomain)
 	})
 
-	t.Run("verify DNS configuration -> accepted", func(t *testing.T) {
+	t.Run("trigger DNS configuration -> accepted", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		err := (&VerifyDNSConfiguration{}).Execute(core.ExecutionContext{
+		err := (&TriggerDNSConfiguration{}).Execute(core.ExecutionContext{
 			HTTP:           httpCtx,
 			Integration:    integration,
 			ExecutionState: executionState,
@@ -63,7 +63,7 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, core.DefaultOutputChannel.Name, executionState.Channel)
-		assert.Equal(t, VerifyDNSConfigurationPayloadType, executionState.Type)
+		assert.Equal(t, TriggerDNSConfigurationPayloadType, executionState.Type)
 		require.Len(t, executionState.Payloads, 1)
 
 		payload := readMap(executionState.Payloads[0])
@@ -73,7 +73,7 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 		assert.Equal(t, "accepted", data["status"])
 	})
 
-	t.Run("add custom domain with wait disabled -> emits success", func(t *testing.T) {
+	t.Run("add custom domain with wait disabled -> emits payload", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		t.Cleanup(func() {
 			_ = client.RemoveCustomDomain(addServiceID, noWaitDomain)
@@ -92,7 +92,7 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, AddCustomDomainSuccessOutputChannel, executionState.Channel)
+		assert.Equal(t, core.DefaultOutputChannel.Name, executionState.Channel)
 		assert.Equal(t, AddCustomDomainPayloadType, executionState.Type)
 		require.NotEmpty(t, executionState.KVs[addCustomDomainExecutionKey])
 	})

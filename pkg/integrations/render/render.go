@@ -107,7 +107,8 @@ func (r *Render) Actions() []core.Action {
 		&PurgeCache{},
 		&UpdateEnvVar{},
 		&AddCustomDomain{},
-		&VerifyDNSConfiguration{},
+		&TriggerDNSConfiguration{},
+		&RetrieveCustomDomain{},
 		&RemoveCustomDomain{},
 	}
 }
