@@ -3,7 +3,6 @@ package oci
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -191,30 +190,7 @@ func (t *OnComputeInstanceCreated) HandleWebhook(ctx core.WebhookRequestContext)
 }
 
 func (t *OnComputeInstanceCreated) handleONSConfirmation(ctx core.WebhookRequestContext, confirmURL string) (int, *core.WebhookResponseBody, error) {
-	if err := validateONSConfirmationURL(confirmURL); err != nil {
-		return http.StatusBadRequest, nil, fmt.Errorf("refusing ONS confirmation URL: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, confirmURL, nil)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to build ONS confirmation request: %w", err)
-	}
-
-	resp, err := ctx.HTTP.Do(req)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("failed to confirm ONS subscription: %w", err)
-	}
-
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
-	}()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return http.StatusInternalServerError, nil, fmt.Errorf("ONS confirmation returned %d", resp.StatusCode)
-	}
-
-	return http.StatusOK, nil, nil
+	return confirmONSSubscription(ctx, confirmURL)
 }
 
 func parseEventEnvelope(body []byte) (map[string]any, error) {
