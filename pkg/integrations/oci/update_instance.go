@@ -17,7 +17,7 @@ const UpdateInstancePayloadType = "oci.updateInstance"
 type UpdateInstance struct{}
 
 type UpdateInstanceSpec struct {
-	InstanceID  string   `json:"instanceId" mapstructure:"instanceId"`
+	Instance    string   `json:"instance" mapstructure:"instance"`
 	DisplayName string   `json:"displayName" mapstructure:"displayName"`
 	OCPUs       *float64 `json:"ocpus" mapstructure:"ocpus"`
 	MemoryInGBs *float64 `json:"memoryInGBs" mapstructure:"memoryInGBs"`
@@ -86,7 +86,7 @@ func (c *UpdateInstance) ExampleOutput() map[string]any {
 func (c *UpdateInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "instance",
 			Label:       "Instance",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -140,8 +140,8 @@ func (c *UpdateInstance) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(spec.InstanceID) == "" {
-		return errors.New("instanceId is required")
+	if strings.TrimSpace(spec.Instance) == "" {
+		return errors.New("instance is required")
 	}
 	return nil
 }
@@ -168,7 +168,7 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	instance, err := client.UpdateInstance(spec.InstanceID, req)
+	instance, err := client.UpdateInstance(spec.Instance, req)
 	if err != nil {
 		return fmt.Errorf("failed to update instance: %w", err)
 	}

@@ -14,11 +14,11 @@ func Test__GetInstance__Setup(t *testing.T) {
 	component := &GetInstance{}
 
 	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{"instanceId": ""},
+		Configuration: map[string]any{"instance": ""},
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "instanceId is required")
+	assert.Contains(t, err.Error(), "instance is required")
 }
 
 func Test__GetInstance__Execute(t *testing.T) {
@@ -33,7 +33,7 @@ func Test__GetInstance__Execute(t *testing.T) {
 	executionState := &contexts.ExecutionStateContext{}
 
 	err := component.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"instanceId": testInstanceID},
+		Configuration:  map[string]any{"instance": testInstanceID},
 		HTTP:           httpCtx,
 		Integration:    ociIntegrationContext(),
 		ExecutionState: executionState,

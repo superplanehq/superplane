@@ -24,7 +24,7 @@ func Test__InstanceComponents__ConfigurationUsesInstanceResource(t *testing.T) {
 			require.NotEmpty(t, component.fields)
 			field := component.fields[0]
 
-			assert.Equal(t, "instanceId", field.Name)
+			assert.Equal(t, "instance", field.Name)
 			assert.Equal(t, "Instance", field.Label)
 			assert.Equal(t, configuration.FieldTypeIntegrationResource, field.Type)
 			require.NotNil(t, field.TypeOptions)

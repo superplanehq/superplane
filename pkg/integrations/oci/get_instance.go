@@ -17,7 +17,7 @@ const GetInstancePayloadType = "oci.getInstance"
 type GetInstance struct{}
 
 type GetInstanceSpec struct {
-	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
+	Instance string `json:"instance" mapstructure:"instance"`
 }
 
 func (c *GetInstance) Name() string {
@@ -80,7 +80,7 @@ func (c *GetInstance) ExampleOutput() map[string]any {
 func (c *GetInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "instance",
 			Label:       "Instance",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -99,8 +99,8 @@ func (c *GetInstance) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(spec.InstanceID) == "" {
-		return errors.New("instanceId is required")
+	if strings.TrimSpace(spec.Instance) == "" {
+		return errors.New("instance is required")
 	}
 	return nil
 }
@@ -116,7 +116,7 @@ func (c *GetInstance) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	instance, err := client.GetInstance(spec.InstanceID)
+	instance, err := client.GetInstance(spec.Instance)
 	if err != nil {
 		return fmt.Errorf("failed to get instance: %w", err)
 	}

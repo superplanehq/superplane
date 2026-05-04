@@ -45,7 +45,7 @@ func Test__OnInstanceStateChange__Setup_UsesWebhookPathIDForRuleName(t *testing.
 	}
 
 	err := trigger.Setup(core.TriggerContext{
-		Configuration: map[string]any{"compartmentId": testCompartmentID},
+		Configuration: map[string]any{"compartment": testCompartmentID},
 		HTTP:          httpCtx,
 		Integration:   ociIntegrationContext(),
 		Metadata:      &contexts.MetadataContext{},
@@ -67,8 +67,8 @@ func Test__OnInstanceStateChange__Setup_RejectsUnsupportedStateChanges(t *testin
 
 	err := trigger.Setup(core.TriggerContext{
 		Configuration: map[string]any{
-			"compartmentId": testCompartmentID,
-			"stateChanges":  []string{"hibernate"},
+			"compartment":  testCompartmentID,
+			"stateChanges": []string{"hibernate"},
 		},
 		Integration: ociIntegrationContext(),
 		Metadata:    &contexts.MetadataContext{},
@@ -114,7 +114,7 @@ func Test__OnInstanceStateChange__HandleWebhook_IgnoresUnknownEventTypes(t *test
 		Events:  events,
 		Headers: http.Header{},
 		Configuration: map[string]any{
-			"compartmentId": testCompartmentID,
+			"compartment": testCompartmentID,
 		},
 	})
 
@@ -132,7 +132,7 @@ func Test__OnInstanceStateChange__HandleWebhook_IgnoresUnknownInstanceActionType
 		Events:  events,
 		Headers: http.Header{},
 		Configuration: map[string]any{
-			"compartmentId": testCompartmentID,
+			"compartment": testCompartmentID,
 		},
 	})
 
@@ -150,8 +150,8 @@ func Test__OnInstanceStateChange__HandleWebhook_FiltersUnselectedStateChanges(t 
 		Events:  events,
 		Headers: http.Header{},
 		Configuration: map[string]any{
-			"compartmentId": testCompartmentID,
-			"stateChanges":  []string{"start"},
+			"compartment":  testCompartmentID,
+			"stateChanges": []string{"start"},
 		},
 	})
 
@@ -169,8 +169,8 @@ func Test__OnInstanceStateChange__HandleWebhook_EmitsSelectedStateChanges(t *tes
 		Events:  events,
 		Headers: http.Header{},
 		Configuration: map[string]any{
-			"compartmentId": testCompartmentID,
-			"stateChanges":  []string{"softstop"},
+			"compartment":  testCompartmentID,
+			"stateChanges": []string{"softstop"},
 		},
 	})
 
@@ -189,8 +189,8 @@ func Test__OnInstanceStateChange__HandleWebhook_FiltersTerminate(t *testing.T) {
 		Events:  events,
 		Headers: http.Header{},
 		Configuration: map[string]any{
-			"compartmentId": testCompartmentID,
-			"stateChanges":  []string{"stop"},
+			"compartment":  testCompartmentID,
+			"stateChanges": []string{"stop"},
 		},
 	})
 
@@ -208,7 +208,7 @@ func Test__OnInstanceStateChange__HandleWebhook_FiltersDifferentCompartment(t *t
 		Events:  events,
 		Headers: http.Header{},
 		Configuration: map[string]any{
-			"compartmentId": testCompartmentID,
+			"compartment": testCompartmentID,
 		},
 	})
 
@@ -241,7 +241,7 @@ func Test__OnInstanceStateChange__HandleWebhook_EmitsValidEventTypes(t *testing.
 				Events:  events,
 				Headers: http.Header{},
 				Configuration: map[string]any{
-					"compartmentId": testCompartmentID,
+					"compartment": testCompartmentID,
 				},
 			})
 

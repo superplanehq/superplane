@@ -16,11 +16,11 @@ func Test__UpdateInstance__Setup(t *testing.T) {
 	component := &UpdateInstance{}
 
 	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{"instanceId": ""},
+		Configuration: map[string]any{"instance": ""},
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "instanceId is required")
+	assert.Contains(t, err.Error(), "instance is required")
 }
 
 func Test__UpdateInstance__Execute(t *testing.T) {
@@ -36,7 +36,7 @@ func Test__UpdateInstance__Execute(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"instanceId":  testInstanceID,
+			"instance":    testInstanceID,
 			"displayName": "renamed",
 			"ocpus":       2.0,
 			"memoryInGBs": 16.0,

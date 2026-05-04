@@ -17,7 +17,7 @@ const DeleteInstancePayloadType = "oci.deleteInstance"
 type DeleteInstance struct{}
 
 type DeleteInstanceSpec struct {
-	InstanceID         string `json:"instanceId" mapstructure:"instanceId"`
+	Instance           string `json:"instance" mapstructure:"instance"`
 	PreserveBootVolume bool   `json:"preserveBootVolume" mapstructure:"preserveBootVolume"`
 }
 
@@ -80,7 +80,7 @@ func (c *DeleteInstance) ExampleOutput() map[string]any {
 func (c *DeleteInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "instance",
 			Label:       "Instance",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -108,8 +108,8 @@ func (c *DeleteInstance) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(spec.InstanceID) == "" {
-		return errors.New("instanceId is required")
+	if strings.TrimSpace(spec.Instance) == "" {
+		return errors.New("instance is required")
 	}
 	return nil
 }
@@ -125,11 +125,11 @@ func (c *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	if err := client.TerminateInstance(spec.InstanceID, spec.PreserveBootVolume); err != nil {
+	if err := client.TerminateInstance(spec.Instance, spec.PreserveBootVolume); err != nil {
 		return fmt.Errorf("failed to terminate instance: %w", err)
 	}
 
-	if err := ctx.Metadata.Set(DeleteInstanceMetadata{InstanceID: spec.InstanceID}); err != nil {
+	if err := ctx.Metadata.Set(DeleteInstanceMetadata{InstanceID: spec.Instance}); err != nil {
 		return err
 	}
 

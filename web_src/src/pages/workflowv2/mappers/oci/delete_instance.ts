@@ -9,7 +9,7 @@ import type {
 import { baseMapper } from "./base";
 
 interface DeleteInstanceConfiguration {
-  instanceId?: string;
+  instance?: string;
   preserveBootVolume?: boolean;
 }
 
@@ -39,8 +39,8 @@ export const deleteInstanceMapper: ComponentBaseMapper = {
     const config = context.node.configuration as DeleteInstanceConfiguration | undefined;
     const metadata: MetadataItem[] = [];
 
-    if (config?.instanceId) {
-      metadata.push({ icon: "trash-2", label: config.instanceId });
+    if (config?.instance) {
+      metadata.push({ icon: "trash-2", label: config.instance });
     }
     if (config?.preserveBootVolume) {
       metadata.push({ icon: "archive", label: "Preserve boot volume" });

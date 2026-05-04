@@ -28,8 +28,8 @@ var instancePowerTargetStates = map[string]string{
 type ManageInstancePower struct{}
 
 type ManageInstancePowerSpec struct {
-	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
-	Action     string `json:"action" mapstructure:"action"`
+	Instance string `json:"instance" mapstructure:"instance"`
+	Action   string `json:"action" mapstructure:"action"`
 }
 
 type ManageInstancePowerMetadata struct {
@@ -99,7 +99,7 @@ func (c *ManageInstancePower) ExampleOutput() map[string]any {
 func (c *ManageInstancePower) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "instanceId",
+			Name:        "instance",
 			Label:       "Instance",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -136,8 +136,8 @@ func (c *ManageInstancePower) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if strings.TrimSpace(spec.InstanceID) == "" {
-		return errors.New("instanceId is required")
+	if strings.TrimSpace(spec.Instance) == "" {
+		return errors.New("instance is required")
 	}
 	if strings.TrimSpace(spec.Action) == "" {
 		return errors.New("action is required")
@@ -159,13 +159,13 @@ func (c *ManageInstancePower) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create OCI client: %w", err)
 	}
 
-	if _, err := client.InstanceAction(spec.InstanceID, spec.Action); err != nil {
+	if _, err := client.InstanceAction(spec.Instance, spec.Action); err != nil {
 		return fmt.Errorf("failed to run instance action: %w", err)
 	}
 
 	targetState := instancePowerTargetStates[spec.Action]
 	if err := ctx.Metadata.Set(ManageInstancePowerMetadata{
-		InstanceID:  spec.InstanceID,
+		InstanceID:  spec.Instance,
 		Action:      spec.Action,
 		TargetState: targetState,
 	}); err != nil {

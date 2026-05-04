@@ -14,11 +14,11 @@ func Test__DeleteInstance__Setup(t *testing.T) {
 	component := &DeleteInstance{}
 
 	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{"instanceId": ""},
+		Configuration: map[string]any{"instance": ""},
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "instanceId is required")
+	assert.Contains(t, err.Error(), "instance is required")
 }
 
 func Test__DeleteInstance__Execute(t *testing.T) {
@@ -32,7 +32,7 @@ func Test__DeleteInstance__Execute(t *testing.T) {
 	requests := &contexts.RequestContext{}
 
 	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{"instanceId": testInstanceID, "preserveBootVolume": true},
+		Configuration: map[string]any{"instance": testInstanceID, "preserveBootVolume": true},
 		HTTP:          httpCtx,
 		Integration:   ociIntegrationContext(),
 		Metadata:      metadata,

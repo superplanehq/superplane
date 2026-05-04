@@ -9,7 +9,7 @@ import type {
 import { baseMapper } from "./base";
 
 interface GetInstanceConfiguration {
-  instanceId?: string;
+  instance?: string;
 }
 
 interface InstanceOutputData {
@@ -44,7 +44,7 @@ export const getInstanceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext) {
     const props = baseMapper.props(context);
     const config = context.node.configuration as GetInstanceConfiguration | undefined;
-    const metadata: MetadataItem[] = config?.instanceId ? [{ icon: "server", label: config.instanceId }] : [];
+    const metadata: MetadataItem[] = config?.instance ? [{ icon: "server", label: config.instance }] : [];
 
     return {
       ...props,

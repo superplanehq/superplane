@@ -109,7 +109,7 @@ const componentCases: Array<{
   {
     name: "getInstance",
     mapper: getInstanceMapper,
-    config: { instanceId: "ocid1.instance.oc1.eu-frankfurt-1.example" },
+    config: { instance: "ocid1.instance.oc1.eu-frankfurt-1.example" },
     metadata: [{ icon: "server", label: "ocid1.instance.oc1.eu-frankfurt-1.example" }],
     minimalMetadata: [],
     emptyFields: ["Instance ID", "Display Name", "State", "Shape", "Region"],
@@ -124,7 +124,7 @@ const componentCases: Array<{
   {
     name: "updateInstance",
     mapper: updateInstanceMapper,
-    config: { instanceId: "ocid1.instance.oc1.eu-frankfurt-1.example", displayName: "renamed" },
+    config: { instance: "ocid1.instance.oc1.eu-frankfurt-1.example", displayName: "renamed" },
     metadata: [
       { icon: "server", label: "ocid1.instance.oc1.eu-frankfurt-1.example" },
       { icon: "tag", label: "renamed" },
@@ -142,7 +142,7 @@ const componentCases: Array<{
   {
     name: "manageInstancePower",
     mapper: manageInstancePowerMapper,
-    config: { instanceId: "ocid1.instance.oc1.eu-frankfurt-1.example", action: "STOP" },
+    config: { instance: "ocid1.instance.oc1.eu-frankfurt-1.example", action: "STOP" },
     metadata: [
       { icon: "server", label: "ocid1.instance.oc1.eu-frankfurt-1.example" },
       { icon: "zap", label: "STOP" },
@@ -160,7 +160,7 @@ const componentCases: Array<{
   {
     name: "deleteInstance",
     mapper: deleteInstanceMapper,
-    config: { instanceId: "ocid1.instance.oc1.eu-frankfurt-1.example", preserveBootVolume: true },
+    config: { instance: "ocid1.instance.oc1.eu-frankfurt-1.example", preserveBootVolume: true },
     metadata: [
       { icon: "trash-2", label: "ocid1.instance.oc1.eu-frankfurt-1.example" },
       { icon: "archive", label: "Preserve boot volume" },

@@ -47,8 +47,8 @@ var ociInstanceStateChangeOptions = []configuration.FieldOption{
 }
 
 type OnInstanceStateChangeConfiguration struct {
-	CompartmentID string   `json:"compartmentId" mapstructure:"compartmentId"`
-	StateChanges  []string `json:"stateChanges" mapstructure:"stateChanges"`
+	Compartment  string   `json:"compartment" mapstructure:"compartment"`
+	StateChanges []string `json:"stateChanges" mapstructure:"stateChanges"`
 }
 
 type OnInstanceStateChangeMetadata struct {
@@ -105,7 +105,7 @@ func (t *OnInstanceStateChange) Color() string {
 func (t *OnInstanceStateChange) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "compartmentId",
+			Name:        "compartment",
 			Label:       "Compartment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -149,8 +149,8 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode trigger configuration: %w", err)
 	}
 
-	if config.CompartmentID == "" {
-		return fmt.Errorf("compartmentId is required")
+	if config.Compartment == "" {
+		return fmt.Errorf("compartment is required")
 	}
 	if err := validateStateChanges(config.StateChanges); err != nil {
 		return err
@@ -171,9 +171,9 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 
 	condition := `{"eventType": ["com.oraclecloud.computeapi.instanceaction.end","com.oraclecloud.computeapi.terminateinstance.end"]}`
 
-	if metadata.CompartmentID == config.CompartmentID && metadata.EventsRuleID != "" && metadata.Condition == condition {
+	if metadata.CompartmentID == config.Compartment && metadata.EventsRuleID != "" && metadata.Condition == condition {
 		return ctx.Integration.RequestWebhook(WebhookConfiguration{
-			CompartmentID: config.CompartmentID,
+			CompartmentID: config.Compartment,
 			TopicID:       integrationMetadata.TopicID,
 		})
 	}
@@ -199,7 +199,7 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 	}
 	ruleName := fmt.Sprintf("superplane-instance-state-change-%s", webhookID)
 	rule, err := client.CreateEventsRule(
-		config.CompartmentID,
+		config.Compartment,
 		ruleName,
 		condition,
 		integrationMetadata.TopicID,
@@ -209,7 +209,7 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 	}
 
 	if err := ctx.Metadata.Set(OnInstanceStateChangeMetadata{
-		CompartmentID: config.CompartmentID,
+		CompartmentID: config.Compartment,
 		EventsRuleID:  rule.ID,
 		Condition:     condition,
 	}); err != nil {
@@ -217,7 +217,7 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		CompartmentID: config.CompartmentID,
+		CompartmentID: config.Compartment,
 		TopicID:       integrationMetadata.TopicID,
 	})
 }
@@ -291,9 +291,9 @@ func (t *OnInstanceStateChange) HandleWebhook(ctx core.WebhookRequestContext) (i
 		}
 	}
 
-	if cfg.CompartmentID != "" {
+	if cfg.Compartment != "" {
 		compartmentID, _ := data["compartmentId"].(string)
-		if compartmentID != cfg.CompartmentID {
+		if compartmentID != cfg.Compartment {
 			return http.StatusOK, nil, nil
 		}
 	}

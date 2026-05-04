@@ -9,7 +9,7 @@ import type {
 import { baseMapper } from "./base";
 
 interface UpdateInstanceConfiguration {
-  instanceId?: string;
+  instance?: string;
   displayName?: string;
 }
 
@@ -47,8 +47,8 @@ export const updateInstanceMapper: ComponentBaseMapper = {
     const config = context.node.configuration as UpdateInstanceConfiguration | undefined;
     const metadata: MetadataItem[] = [];
 
-    if (config?.instanceId) {
-      metadata.push({ icon: "server", label: config.instanceId });
+    if (config?.instance) {
+      metadata.push({ icon: "server", label: config.instance });
     }
     if (config?.displayName) {
       metadata.push({ icon: "tag", label: config.displayName });
