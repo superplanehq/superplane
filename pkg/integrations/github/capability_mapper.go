@@ -2,6 +2,7 @@ package github
 
 import (
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/actions"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
@@ -12,35 +13,35 @@ import (
 )
 
 const (
-	PermissionScopeRepository   = "repository"
-	PermissionScopeOrganization = "organization"
+	PermissionScopeRepository   = "Repository"
+	PermissionScopeOrganization = "Organization"
 
 	//
 	// Repository-scoped permissions
 	//
-	ResourceIssues         = "Issues"
-	ResourceContents       = "Contents"
-	ResourcePullRequests   = "Pull Requests"
-	ResourceActions        = "Actions"
-	ResourceCommitStatuses = "Commit Statuses"
-	ResourceMetadata       = "Metadata"
+	PermissionIssues         = "Issues"
+	PermissionContents       = "Contents"
+	PermissionPullRequests   = "Pull Requests"
+	PermissionActions        = "Actions"
+	PermissionCommitStatuses = "Commit Statuses"
+	PermissionMetadata       = "Metadata"
 
 	//
 	// Organization-scoped permissions
 	//
-	ResourceAdministration = "Administration"
+	PermissionAdministration = "Organization Administration"
 )
 
 type CapabilityMapper struct {
-	Groups map[string]X
+	Groups map[string]GroupDef
 }
 
-type X struct {
+type GroupDef struct {
 	PermissionScope string
-	Capabilities    []C
+	Capabilities    []CapabilityDef
 }
 
-type C struct {
+type CapabilityDef struct {
 	ReadOnly bool
 	Action   core.Action
 	Trigger  core.Trigger
@@ -48,23 +49,23 @@ type C struct {
 
 func NewCapabilityMapper() *CapabilityMapper {
 	return &CapabilityMapper{
-		Groups: map[string]X{
-			ResourceActions: X{
+		Groups: map[string]GroupDef{
+			PermissionActions: {
 				PermissionScope: PermissionScopeRepository,
-				Capabilities: []C{
+				Capabilities: []CapabilityDef{
 					{ReadOnly: false, Action: &actions.RunWorkflow{}},
 					{ReadOnly: true, Trigger: &actions.OnWorkflowRun{}},
 				},
 			},
-			ResourceCommitStatuses: X{
+			PermissionCommitStatuses: {
 				PermissionScope: PermissionScopeRepository,
-				Capabilities: []C{
+				Capabilities: []CapabilityDef{
 					{ReadOnly: false, Action: &statuses.PublishCommitStatus{}},
 				},
 			},
-			ResourceContents: X{
+			PermissionContents: {
 				PermissionScope: PermissionScopeRepository,
-				Capabilities: []C{
+				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Action: &contents.GetRelease{}},
 					{ReadOnly: true, Trigger: &contents.OnBranchCreated{}},
 					{ReadOnly: true, Trigger: &contents.OnPush{}},
@@ -75,9 +76,9 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &contents.DeleteRelease{}},
 				},
 			},
-			ResourceIssues: X{
+			PermissionIssues: {
 				PermissionScope: PermissionScopeRepository,
-				Capabilities: []C{
+				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Action: &issues.GetIssue{}},
 					{ReadOnly: true, Trigger: &issues.OnIssue{}},
 					{ReadOnly: true, Trigger: &issues.OnIssueComment{}},
@@ -90,21 +91,21 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &issues.AddIssueAssignee{}},
 				},
 			},
-			ResourceMetadata: X{
+			PermissionMetadata: {
 				PermissionScope: PermissionScopeRepository,
-				Capabilities: []C{
+				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Action: &metadata.GetRepositoryPermission{}},
 				},
 			},
-			ResourceAdministration: X{
+			PermissionAdministration: {
 				PermissionScope: PermissionScopeOrganization,
-				Capabilities: []C{
+				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Action: &admin.GetWorkflowUsage{}},
 				},
 			},
-			ResourcePullRequests: X{
+			PermissionPullRequests: {
 				PermissionScope: PermissionScopeRepository,
-				Capabilities: []C{
+				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Trigger: &pulls.OnPullRequest{}},
 					{ReadOnly: true, Trigger: &pulls.OnPRComment{}},
 					{ReadOnly: true, Trigger: &pulls.OnPRReviewComment{}},
@@ -116,55 +117,29 @@ func NewCapabilityMapper() *CapabilityMapper {
 	}
 }
 
-/*
- * Returns two sets of permissions: permissions for the repository and permissions for the organization.
- */
-func (m *CapabilityMapper) PermissionsForPAT(capabilities []string) (map[string]string, map[string]string) {
-	lookup := m.buildLookup()
-	repoPermissions := map[string]string{}
-	orgPermissions := map[string]string{}
-
-	for _, capability := range capabilities {
-		if c, ok := lookup[capability]; ok {
-			var x map[string]string
-			if m.Groups[c.Resource].PermissionScope == PermissionScopeRepository {
-				x = repoPermissions
-			} else {
-				x = orgPermissions
-			}
-
-			if !c.ReadOnly {
-				x[c.Resource] = "Read & Write"
-				continue
-			}
-
-			//
-			// Do not override the permission if it already exists and is "Read & Write"
-			//
-			if c.ReadOnly && x[c.Resource] != "Read & Write" {
-				x[c.Resource] = "Read"
-			}
+func (m *CapabilityMapper) AllNames() []string {
+	out := []string{}
+	for _, group := range m.Groups {
+		for _, capability := range group.Capabilities {
+			out = append(out, m.capabilityName(capability))
 		}
 	}
-
-	return repoPermissions, orgPermissions
+	return out
 }
 
-func (m *CapabilityMapper) PermissionsForApp(capabilities []string) map[string]string {
-	lookup := m.buildLookup()
-	out := map[string]string{}
-	for _, capability := range capabilities {
-		if c, ok := lookup[capability]; ok {
-			if !c.ReadOnly {
-				out[m.lookupResourceForApp(c.Resource)] = "write"
-				continue
-			}
+func (m *CapabilityMapper) ForOwnerType(ownerType string) []string {
+	if ownerType == common.OwnerTypeUser {
+		return m.ForUserAccount()
+	}
+	return m.ForOrg()
+}
 
-			//
-			// Do not override the permission if it already exists and is "Read & Write"
-			//
-			if c.ReadOnly && out[c.Resource] != "Read & Write" {
-				out[m.lookupResourceForApp(c.Resource)] = "read"
+func (m *CapabilityMapper) ForOrg() []string {
+	out := []string{}
+	for _, group := range m.Groups {
+		if group.PermissionScope == PermissionScopeOrganization || group.PermissionScope == PermissionScopeRepository {
+			for _, capability := range group.Capabilities {
+				out = append(out, m.capabilityName(capability))
 			}
 		}
 	}
@@ -172,21 +147,178 @@ func (m *CapabilityMapper) PermissionsForApp(capabilities []string) map[string]s
 	return out
 }
 
-func (m *CapabilityMapper) lookupResourceForApp(r string) string {
+func (m *CapabilityMapper) ForUserAccount() []string {
+	out := []string{}
+	for _, group := range m.Groups {
+		if group.PermissionScope == PermissionScopeRepository {
+			for _, capability := range group.Capabilities {
+				out = append(out, m.capabilityName(capability))
+			}
+		}
+	}
+	return out
+}
+
+func (m *CapabilityMapper) capabilityName(capability CapabilityDef) string {
+	if capability.Action != nil {
+		return capability.Action.Name()
+	}
+
+	if capability.Trigger != nil {
+		return capability.Trigger.Name()
+	}
+
+	return ""
+}
+
+type PermissionSet struct {
+	Repository   map[string]uint8
+	Organization map[string]uint8
+}
+
+/*
+ * Compares one permission set with another and returns a new permission set.
+ */
+func FindPermissionUpdates(existing PermissionSet, requested PermissionSet) PermissionSet {
+	diff := PermissionSet{
+		Repository:   map[string]uint8{},
+		Organization: map[string]uint8{},
+	}
+
+	for resource, requestedAccess := range requested.Repository {
+		existingAccess, ok := existing.Repository[resource]
+		if !ok {
+			diff.Repository[resource] = requestedAccess
+			continue
+		}
+
+		if requestedAccess > existingAccess {
+			diff.Repository[resource] = requestedAccess
+		}
+	}
+
+	for resource, requestedAccess := range requested.Organization {
+		existingAccess, ok := existing.Organization[resource]
+		if !ok {
+			diff.Organization[resource] = requestedAccess
+			continue
+		}
+
+		if requestedAccess > existingAccess {
+			diff.Organization[resource] = requestedAccess
+		}
+	}
+
+	return diff
+}
+
+func (p *PermissionSet) IsEmpty() bool {
+	return len(p.Repository) == 0 && len(p.Organization) == 0
+}
+
+func (m *CapabilityMapper) NewPermissionSet(capabilities []string) PermissionSet {
+	lookup := m.buildLookup()
+	out := PermissionSet{
+		Repository:   map[string]uint8{},
+		Organization: map[string]uint8{},
+	}
+
+	for _, capability := range capabilities {
+		c, ok := lookup[capability]
+		if !ok {
+			continue
+		}
+
+		var x map[string]uint8
+		if m.Groups[c.Permission].PermissionScope == PermissionScopeRepository {
+			x = out.Repository
+		} else {
+			x = out.Organization
+		}
+
+		if _, ok := x[c.Permission]; !ok {
+			x[c.Permission] = c.Access
+		} else {
+			if c.Access > x[c.Permission] {
+				x[c.Permission] = c.Access
+			}
+		}
+	}
+
+	return out
+}
+
+type Permission struct {
+	Name   string
+	Scope  string
+	Access string
+}
+
+func (s *PermissionSet) ForHuman() []Permission {
+	permissions := []Permission{}
+
+	for resource, permission := range s.Repository {
+		permissions = append(permissions, Permission{
+			Name:   resource,
+			Scope:  PermissionScopeRepository,
+			Access: s.accessString(permission),
+		})
+	}
+
+	for resource, permission := range s.Organization {
+		permissions = append(permissions, Permission{
+			Name:   resource,
+			Scope:  PermissionScopeOrganization,
+			Access: s.accessString(permission),
+		})
+	}
+
+	return permissions
+}
+
+func (s *PermissionSet) accessString(permission uint8) string {
+	if permission == 1 {
+		return "Read & Write"
+	}
+	return "Read"
+}
+
+func (s *PermissionSet) ForAppManifest() map[string]string {
+	permissions := map[string]string{}
+
+	for resource, permission := range s.Repository {
+		permissions[s.permissionForAppManifest(resource)] = s.accessForAppManifest(permission)
+	}
+
+	for resource, permission := range s.Organization {
+		permissions[s.permissionForAppManifest(resource)] = s.accessForAppManifest(permission)
+	}
+
+	return permissions
+}
+
+func (s *PermissionSet) accessForAppManifest(level uint8) string {
+	if level == 1 {
+		return "write"
+	}
+	return "read"
+}
+
+func (s *PermissionSet) permissionForAppManifest(r string) string {
 	switch r {
-	case ResourceIssues:
+	case PermissionIssues:
 		return "issues"
-	case ResourcePullRequests:
+	case PermissionPullRequests:
 		return "pull_requests"
-	case ResourceContents:
+	case PermissionContents:
 		return "contents"
-	case ResourceActions:
+	case PermissionActions:
 		return "actions"
-	case ResourceCommitStatuses:
+	case PermissionCommitStatuses:
 		return "statuses"
-	case ResourceAdministration:
+	case PermissionAdministration:
 		return "organization_administration"
-	case ResourceMetadata:
+	case PermissionMetadata:
 		return "metadata"
 	default:
 		return ""
@@ -194,8 +326,12 @@ func (m *CapabilityMapper) lookupResourceForApp(r string) string {
 }
 
 type LookupEntry struct {
-	Resource string
-	ReadOnly bool
+	Permission string
+
+	// Using uint8 here to easily compare if an access level is greater than another.
+	// 0. Read
+	// 1. Read & Write
+	Access uint8
 }
 
 func (m CapabilityMapper) buildLookup() map[string]LookupEntry {
@@ -209,7 +345,12 @@ func (m CapabilityMapper) buildLookup() map[string]LookupEntry {
 				name = c.Trigger.Name()
 			}
 
-			out[name] = LookupEntry{Resource: resourceName, ReadOnly: c.ReadOnly}
+			level := uint8(0)
+			if !c.ReadOnly {
+				level = 1
+			}
+
+			out[name] = LookupEntry{Permission: resourceName, Access: level}
 		}
 	}
 

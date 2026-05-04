@@ -1,5 +1,4 @@
-- Go to https://github.com/settings/personal-access-tokens
-- Find the token with access to {{ .Owner }} for update
+- Go to {{ .AppURL }}
 - Edit the permissions to include the following:
 
 | Permission | Scope | Access |

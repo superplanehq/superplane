@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 
@@ -32,25 +31,24 @@ var appCreateInstructionsTemplate []byte
 //go:embed templates/pat-update-instructions.tpl
 var patUpdateInstructionsTemplate []byte
 
+//go:embed templates/app-update-instructions.tpl
+var appUpdateInstructionsTemplate []byte
+
+//go:embed templates/app-accept-new-permissions.tpl
+var appAcceptNewPermissionsTemplate []byte
+
 type SetupProvider struct{}
 
 const (
-	SetupStepSelectOwner         = "selectOwner"
-	SetupStepCapabilitySelection = "capabilitySelection"
-	SetupStepSelectAuthMethod    = "selectAuthMethod"
-	SetupStepEnterPAT            = "enterPAT"
-	SetupStepUpdatePermissions   = "updatePermissions"
-	SetupStepSetupApp            = "setupApp"
+	SetupStepSelectOwner               = "selectOwner"
+	SetupStepCapabilitySelection       = "capabilitySelection"
+	SetupStepSelectAuthMethod          = "selectAuthMethod"
+	SetupStepEnterPAT                  = "enterPAT"
+	SetupStepUpdatePATPermissions      = "updatePATPermissions"
+	SetupStepUpdateAppPermissions      = "updateAppPermissions"
+	SetupStepAcceptAppPermissionUpdate = "acceptAppPermissionUpdate"
+	SetupStepSetupApp                  = "setupApp"
 )
-
-func mapContains(map1 map[string]string, map2 map[string]string) bool {
-	for key, value := range map1 {
-		if map2[key] != value {
-			return false
-		}
-	}
-	return true
-}
 
 func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
 	changes := ctx.Changes
@@ -63,21 +61,37 @@ func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 		return nil, errors.New("no requested capabilities")
 	}
 
+	authMethod, err := ctx.Properties.GetString(common.PropertyAuthMethod)
+	if err != nil {
+		return nil, fmt.Errorf("error getting authentication method: %v", err)
+	}
+
 	//
 	// Calculate permissions for the new requested set, and the existing enabled set.
 	// If the capabilities being requested are in the capabilities that are already enabled,
 	// we can skip the update permissions step.
 	//
-	// TODO: verify if this logic is correct
-	//
 	mapper := NewCapabilityMapper()
-	requestedRepoPermissions, requestedOrgPermissions := mapper.PermissionsForPAT(requested)
-	existingRepoPermissions, existingOrgPermissions := mapper.PermissionsForPAT(ctx.Capabilities.Enabled())
-	if mapContains(requestedRepoPermissions, existingRepoPermissions) && mapContains(requestedOrgPermissions, existingOrgPermissions) {
+	requestedSet := mapper.NewPermissionSet(requested)
+	existingSet := mapper.NewPermissionSet(ctx.Capabilities.Enabled())
+	newPermissions := FindPermissionUpdates(existingSet, requestedSet)
+	if newPermissions.IsEmpty() {
 		ctx.Capabilities.Enable(requested...)
 		return nil, nil
 	}
 
+	switch authMethod {
+	case common.AuthMethodPAT:
+		return g.onCapabilityUpdateForPAT(ctx, requested, newPermissions.ForHuman())
+	case common.AuthMethodGitHubApp:
+		return g.onCapabilityUpdateForGitHubApp(ctx, requested, newPermissions.ForHuman())
+	default:
+		return nil, fmt.Errorf("invalid authentication method: %s", authMethod)
+	}
+}
+
+func (g *SetupProvider) onCapabilityUpdateForPAT(ctx core.CapabilityUpdateContext, requested []string, newPermissions []Permission) (*core.SetupStep, error) {
+	ctx.Capabilities.Request(requested...)
 	owner, err := ctx.Properties.GetString(common.PropertyOwner)
 	if err != nil {
 		return nil, fmt.Errorf("error getting owner: %v", err)
@@ -89,9 +103,8 @@ func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 	}
 
 	data := map[string]any{
-		"Owner":           owner,
-		"RepoPermissions": requestedRepoPermissions,
-		"OrgPermissions":  requestedOrgPermissions,
+		"Owner":       owner,
+		"Permissions": newPermissions,
 	}
 
 	var buf bytes.Buffer
@@ -101,8 +114,68 @@ func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 
 	return &core.SetupStep{
 		Type:         core.SetupStepTypeInputs,
-		Name:         SetupStepUpdatePermissions,
+		Name:         SetupStepUpdatePATPermissions,
 		Label:        "Update the permissions on your personal access token",
+		Inputs:       []configuration.Field{},
+		Instructions: buf.String(),
+	}, nil
+}
+
+func (g *SetupProvider) appURL(properties core.IntegrationPropertyStorageReader) (string, error) {
+	ownerType, err := properties.GetString(common.PropertyOwnerType)
+	if err != nil {
+		return "", fmt.Errorf("error getting owner type: %v", err)
+	}
+
+	appSlug, err := properties.GetString(common.PropertyAppSlug)
+	if err != nil {
+		return "", fmt.Errorf("error getting app slug: %v", err)
+	}
+
+	if ownerType == common.OwnerTypeOrganization {
+		owner, err := properties.GetString(common.PropertyOwner)
+		if err != nil {
+			return "", fmt.Errorf("error getting owner: %v", err)
+		}
+
+		return fmt.Sprintf("https://github.com/organizations/%s/settings/apps/%s/permissions", owner, appSlug), nil
+	}
+
+	return fmt.Sprintf("https://github.com/settings/apps/%s/permissions", appSlug), nil
+}
+
+func (g *SetupProvider) onCapabilityUpdateForGitHubApp(ctx core.CapabilityUpdateContext, requested []string, newPermissions []Permission) (*core.SetupStep, error) {
+	ctx.Capabilities.Request(requested...)
+	owner, err := ctx.Properties.GetString(common.PropertyOwner)
+	if err != nil {
+		return nil, fmt.Errorf("error getting owner: %v", err)
+	}
+
+	tmpl, err := template.New("appUpdateInstructions").Parse(string(appUpdateInstructionsTemplate))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing template: %v", err)
+	}
+
+	appURL, err := g.appURL(ctx.Properties)
+	if err != nil {
+		return nil, fmt.Errorf("error getting app URL: %v", err)
+	}
+
+	data := map[string]any{
+		"Owner":       owner,
+		"AppURL":      appURL,
+		"Permissions": newPermissions,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("error executing template: %v", err)
+	}
+
+	return &core.SetupStep{
+		Type:         core.SetupStepTypeInputs,
+		Name:         SetupStepUpdateAppPermissions,
+		Label:        "Update the permissions on your GitHub App",
 		Inputs:       []configuration.Field{},
 		Instructions: buf.String(),
 	}, nil
@@ -146,11 +219,27 @@ func (g *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 }
 
 func (g *SetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.SetupStep, error) {
-	return nil, fmt.Errorf("TODO")
+	return nil, fmt.Errorf("no property updates are supported for GitHub")
 }
 
 func (g *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
-	return nil, fmt.Errorf("TODO")
+	switch ctx.SecretName {
+	case common.SecretPAT:
+		token := strings.TrimSpace(ctx.Value)
+		if token == "" {
+			return nil, fmt.Errorf("value is required")
+		}
+
+		_, err := validatePATConnection(ctx.Properties, token)
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, ctx.Secrets.Update(common.SecretPAT, token)
+
+	default:
+		return nil, fmt.Errorf("unknown secret: %s", ctx.SecretName)
+	}
 }
 
 func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
@@ -199,7 +288,14 @@ func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	case SetupStepEnterPAT:
 		return g.onEnterPATSubmit(ctx.Step.Inputs, ctx)
 
-	case SetupStepUpdatePermissions:
+	case SetupStepUpdatePATPermissions:
+		ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+		return nil, nil
+
+	case SetupStepUpdateAppPermissions:
+		return g.onUpdateAppPermissionsSubmit(ctx)
+
+	case SetupStepAcceptAppPermissionUpdate:
 		ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 		return nil, nil
 
@@ -212,6 +308,43 @@ func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	}
 
 	return nil, errors.New("unknown step")
+}
+
+func (g *SetupProvider) appPermissionAcceptURL(properties core.IntegrationPropertyStorageReader) (string, error) {
+	installationID, err := properties.GetString(common.PropertyAppInstallationID)
+	if err != nil {
+		return "", fmt.Errorf("error getting app slug: %v", err)
+	}
+
+	return fmt.Sprintf("https://github.com/settings/installations/%s/permissions/update", installationID), nil
+}
+
+func (g *SetupProvider) onUpdateAppPermissionsSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	acceptURL, err := g.appPermissionAcceptURL(ctx.Properties)
+	if err != nil {
+		return nil, fmt.Errorf("error getting app permission accept URL: %v", err)
+	}
+
+	tmpl, err := template.New("appAcceptNewPermissions").Parse(string(appAcceptNewPermissionsTemplate))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing template: %v", err)
+	}
+
+	data := map[string]any{
+		"AcceptURL": acceptURL,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("error executing template: %v", err)
+	}
+
+	return &core.SetupStep{
+		Type:         core.SetupStepTypeInputs,
+		Name:         SetupStepAcceptAppPermissionUpdate,
+		Label:        "Accept the permissions update",
+		Instructions: buf.String(),
+	}, nil
 }
 
 func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext) (*core.SetupStep, error) {
@@ -260,49 +393,29 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 		return nil, fmt.Errorf("error creating parameter: %v", err)
 	}
 
-	//
-	// TODO: only expose the capabilities for the owner type selected
-	//
-	capabilities := []string{}
-	for _, group := range g.CapabilityGroups() {
-		for _, capability := range group.Capabilities {
-			capabilities = append(capabilities, capability.Name)
-		}
-	}
-
 	return &core.SetupStep{
 		Type:         core.SetupStepTypeCapabilitySelection,
 		Name:         SetupStepCapabilitySelection,
 		Label:        "Select capabilities",
-		Capabilities: capabilities,
+		Capabilities: NewCapabilityMapper().ForOwnerType(ownerType),
 	}, nil
 }
 
-/*
- * Returns all the capabilities, minus the ones being passed in.
- */
-func (g *SetupProvider) capabilityDiff(capabilities []string) []string {
-	groups := g.CapabilityGroups()
-
-	diff := []string{}
-	for _, group := range groups {
-		for _, capability := range group.Capabilities {
-			if !slices.Contains(capabilities, capability.Name) {
-				diff = append(diff, capability.Name)
-			}
-		}
+func (g *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	ownerType, err := ctx.Properties.GetString(common.PropertyOwnerType)
+	if err != nil {
+		return nil, fmt.Errorf("error getting owner type: %v", err)
 	}
 
-	return diff
-}
-
-func (g *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
 	//
-	// TODO: we should move only the owner type related capabilities to AVAILABLE
-	// The other ones should be moved to UNAVAILABLE
+	// We move the requested capabilities to the REQUESTED state,
+	// the owner type related capabilities to AVAILABLE,
+	// and the other ones to UNAVAILABLE.
 	//
+	mapper := NewCapabilityMapper()
+	ctx.Capabilities.Unavailable(mapper.AllNames()...)
+	ctx.Capabilities.Available(mapper.ForOwnerType(ownerType)...)
 	ctx.Capabilities.Request(ctx.Step.Capabilities...)
-	ctx.Capabilities.Available(g.capabilityDiff(ctx.Step.Capabilities)...)
 
 	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
@@ -418,8 +531,13 @@ func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (s
 	// We always include the webhooks permission,
 	// since it's required for SuperPlane to create webhooks.
 	//
-	repositoryPermissions, organizationPermissions := NewCapabilityMapper().PermissionsForPAT(requestedCapabilities)
-	repositoryPermissions["Webhooks"] = "Read & Write"
+	permissionSet := NewCapabilityMapper().NewPermissionSet(requestedCapabilities)
+	permissions := permissionSet.ForHuman()
+	permissions = append(permissions, Permission{
+		Name:   "Webhooks",
+		Scope:  PermissionScopeRepository,
+		Access: "Read & Write",
+	})
 
 	tmpl, err := template.New("patInstructions").Parse(string(patInstructionsTemplate))
 	if err != nil {
@@ -427,9 +545,8 @@ func (g *SetupProvider) generateInstructionsForPAT(ctx core.SetupStepContext) (s
 	}
 
 	data := map[string]any{
-		"Owner":           owner,
-		"RepoPermissions": repositoryPermissions,
-		"OrgPermissions":  organizationPermissions,
+		"Owner":       owner,
+		"Permissions": permissions,
 	}
 
 	var buf bytes.Buffer
@@ -497,7 +614,8 @@ func (g *SetupProvider) appManifest(ctx core.SetupStepContext) string {
 	// We always include the repository_hooks permission,
 	// so SuperPlane can create webhooks for components.
 	//
-	permissions := NewCapabilityMapper().PermissionsForApp(ctx.Capabilities.Requested())
+	permissionSet := NewCapabilityMapper().NewPermissionSet(ctx.Capabilities.Requested())
+	permissions := permissionSet.ForAppManifest()
 	permissions["repository_hooks"] = "write"
 
 	manifest := map[string]any{
@@ -547,7 +665,7 @@ func (g *SetupProvider) onEnterPATSubmit(input any, ctx core.SetupStepContext) (
 		return nil, fmt.Errorf("error creating secret: %v", err)
 	}
 
-	repos, err := validatePATConnection(ctx, token)
+	repos, err := validatePATConnection(ctx.Properties, token)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +708,7 @@ func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {
 	return ctx.Secrets.Delete(common.SecretPAT)
 }
 
-func validatePATConnection(ctx core.SetupStepContext, token string) ([]*github.Repository, error) {
+func validatePATConnection(properties core.IntegrationPropertyStorageReader, token string) ([]*github.Repository, error) {
 	client := gh.NewClient(
 		oauth2.NewClient(
 			context.Background(),
@@ -598,24 +716,25 @@ func validatePATConnection(ctx core.SetupStepContext, token string) ([]*github.R
 		),
 	)
 
-	ownerType, err := ctx.Properties.GetString(common.PropertyOwnerType)
+	ownerType, err := properties.GetString(common.PropertyOwnerType)
 	if err != nil {
 		return nil, fmt.Errorf("error getting owner type: %v", err)
 	}
 
-	owner, err := ctx.Properties.GetString(common.PropertyOwner)
+	owner, err := properties.GetString(common.PropertyOwner)
 	if err != nil {
 		return nil, fmt.Errorf("error getting owner: %v", err)
 	}
 
 	var repos []*github.Repository
 	if ownerType == common.OwnerTypeUser {
-		repos, _, err = client.Repositories.ListByOrg(context.Background(), owner, &gh.RepositoryListByOrgOptions{
+		repos, _, err = client.Repositories.ListByAuthenticatedUser(context.Background(), &gh.RepositoryListByAuthenticatedUserOptions{
+			Affiliation: "owner",
 			Sort:        "updated",
 			ListOptions: gh.ListOptions{PerPage: 50},
 		})
 	} else {
-		repos, _, err = client.Repositories.ListByUser(context.Background(), owner, &gh.RepositoryListByUserOptions{
+		repos, _, err = client.Repositories.ListByOrg(context.Background(), owner, &gh.RepositoryListByOrgOptions{
 			Sort:        "updated",
 			ListOptions: gh.ListOptions{PerPage: 50},
 		})
