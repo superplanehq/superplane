@@ -98,6 +98,10 @@ func (w *Webhook) Color() string {
 	return "black"
 }
 
+func (w *Webhook) DefaultRunTitle() string {
+	return "Webhook request"
+}
+
 func (w *Webhook) Configuration() []configuration.Field {
 	return []configuration.Field{
 

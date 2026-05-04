@@ -75,6 +75,7 @@ message CapabilityDefinition {
   string description = 4;
   repeated Configuration.Field configuration = 5;
   repeated Actions.OutputChannel output_channels = 6;
+  string default_run_title = 7;
 }
 
 message CapabilityGroup {

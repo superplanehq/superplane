@@ -76,6 +76,10 @@ func (t *OnBuildComplete) Color() string {
 	return "gray"
 }
 
+func (t *OnBuildComplete) DefaultRunTitle() string {
+	return "Cloud Build event"
+}
+
 func (t *OnBuildComplete) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

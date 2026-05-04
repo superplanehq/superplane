@@ -84,6 +84,10 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 				OutputChannels: []*actionpb.OutputChannel{},
 			}
 
+			if capability.Type == core.IntegrationCapabilityTypeTrigger {
+				capabilityDef.DefaultRunTitle = defaultRunTitleForTrigger(integration, capability.Name)
+			}
+
 			for _, field := range capability.Configuration {
 				capabilityDef.Configuration = append(capabilityDef.Configuration, actions.ConfigurationFieldToProto(field))
 			}
@@ -138,14 +142,25 @@ func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityD
 			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}
 		capabilities = append(capabilities, &pb.CapabilityDefinition{
-			Type:           actions.CapabilityTypeToProto(string(core.IntegrationCapabilityTypeTrigger)),
-			Name:           trigger.Name(),
-			Label:          trigger.Label(),
-			Description:    trigger.Description(),
-			Configuration:  configuration,
-			OutputChannels: []*actionpb.OutputChannel{},
+			Type:            actions.CapabilityTypeToProto(string(core.IntegrationCapabilityTypeTrigger)),
+			Name:            trigger.Name(),
+			Label:           trigger.Label(),
+			Description:     trigger.Description(),
+			Configuration:   configuration,
+			OutputChannels:  []*actionpb.OutputChannel{},
+			DefaultRunTitle: trigger.DefaultRunTitle(),
 		})
 	}
 
 	return capabilities
+}
+
+func defaultRunTitleForTrigger(integration core.Integration, name string) string {
+	for _, trigger := range integration.Triggers() {
+		if trigger.Name() == name {
+			return trigger.DefaultRunTitle()
+		}
+	}
+
+	return ""
 }
