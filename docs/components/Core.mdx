@@ -477,6 +477,15 @@ The component emits the response with:
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
 
+### Payload Size Limits
+
+Event payloads have a maximum size of **64KB (65,536 bytes)**. If an HTTP response body exceeds this limit, the event will fail with a  error and will not be able to traverse the event graph.
+
+For large data (e.g., GitHub diffs, file contents), consider these alternatives:
+- **Use commit metadata** available in the event context instead of fetching large bodies
+- **Store large data in canvas memory** using the Add Memory component first, then reference it
+- **Delegate to external agents** that can process large payloads independently
+
 ### Example Output
 
 ```json
