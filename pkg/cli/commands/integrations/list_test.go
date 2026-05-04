@@ -26,10 +26,10 @@ const meResponse = `{
 // to prove the CLI sorts them by integrationName then metadata.name.
 const connectedIntegrationsResponse = `{
 	"integrations": [
-		{"metadata": {"id": "1", "name": "github-superplanehq"}, "spec": {"integrationName": "github"}, "status": {"state": "ready"}},
-		{"metadata": {"id": "2", "name": "daytona-staging"},     "spec": {"integrationName": "daytona"}, "status": {"state": "ready"}},
-		{"metadata": {"id": "3", "name": "github-acme"},         "spec": {"integrationName": "github"}, "status": {"state": "ready"}},
-		{"metadata": {"id": "4", "name": "daytona-prod"},        "spec": {"integrationName": "daytona"}, "status": {"state": "ready"}}
+		{"metadata": {"id": "1", "name": "alpha-github",  "integrationName": "github"},  "status": {"state": "ready"}},
+		{"metadata": {"id": "2", "name": "zeta-daytona",  "integrationName": "daytona"}, "status": {"state": "ready"}},
+		{"metadata": {"id": "3", "name": "zeta-github",   "integrationName": "github"},  "status": {"state": "ready"}},
+		{"metadata": {"id": "4", "name": "alpha-daytona", "integrationName": "daytona"}, "status": {"state": "ready"}}
 	]
 }`
 
@@ -89,24 +89,25 @@ func TestListCommandSortsByIntegrationNameThenName(t *testing.T) {
 	require.NoError(t, (&listCommand{}).Execute(ctx))
 
 	var result []struct {
-		Metadata struct{ ID, Name string } `json:"metadata"`
-		Spec     struct {
+		Metadata struct {
+			ID              string `json:"id"`
+			Name            string `json:"name"`
 			IntegrationName string `json:"integrationName"`
-		} `json:"spec"`
+		} `json:"metadata"`
 	}
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
 	require.Len(t, result, 4)
 
 	// Expected order: daytona group first (alphabetical by integrationName),
 	// each group internally sorted by metadata.name.
-	require.Equal(t, "daytona", result[0].Spec.IntegrationName)
-	require.Equal(t, "daytona-prod", result[0].Metadata.Name)
-	require.Equal(t, "daytona", result[1].Spec.IntegrationName)
-	require.Equal(t, "daytona-staging", result[1].Metadata.Name)
-	require.Equal(t, "github", result[2].Spec.IntegrationName)
-	require.Equal(t, "github-acme", result[2].Metadata.Name)
-	require.Equal(t, "github", result[3].Spec.IntegrationName)
-	require.Equal(t, "github-superplanehq", result[3].Metadata.Name)
+	require.Equal(t, "daytona", result[0].Metadata.IntegrationName)
+	require.Equal(t, "alpha-daytona", result[0].Metadata.Name)
+	require.Equal(t, "daytona", result[1].Metadata.IntegrationName)
+	require.Equal(t, "zeta-daytona", result[1].Metadata.Name)
+	require.Equal(t, "github", result[2].Metadata.IntegrationName)
+	require.Equal(t, "alpha-github", result[2].Metadata.Name)
+	require.Equal(t, "github", result[3].Metadata.IntegrationName)
+	require.Equal(t, "zeta-github", result[3].Metadata.Name)
 }
 
 func TestListCommandTextOutputGroupsSameProvider(t *testing.T) {
@@ -119,8 +120,8 @@ func TestListCommandTextOutputGroupsSameProvider(t *testing.T) {
 	require.Len(t, lines, 5) // header + 4 rows
 
 	// The two daytona rows must appear before the two github rows.
-	require.Contains(t, lines[1], "daytona-prod")
-	require.Contains(t, lines[2], "daytona-staging")
-	require.Contains(t, lines[3], "github-acme")
-	require.Contains(t, lines[4], "github-superplanehq")
+	require.Contains(t, lines[1], "alpha-daytona")
+	require.Contains(t, lines[2], "zeta-daytona")
+	require.Contains(t, lines[3], "alpha-github")
+	require.Contains(t, lines[4], "zeta-github")
 }

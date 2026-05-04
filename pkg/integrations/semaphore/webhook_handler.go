@@ -6,6 +6,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
 )
 
 type WebhookMetadata struct {
@@ -23,19 +24,15 @@ type WebhookNotificationMetadata struct {
 	Name string `json:"name"`
 }
 
-type WebhookConfiguration struct {
-	Project string `json:"project"`
-}
-
 type SemaphoreWebhookHandler struct{}
 
 func (h *SemaphoreWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	configA := WebhookConfiguration{}
+	configA := common.WebhookConfiguration{}
 	if err := mapstructure.Decode(a, &configA); err != nil {
 		return false, err
 	}
 
-	configB := WebhookConfiguration{}
+	configB := common.WebhookConfiguration{}
 	if err := mapstructure.Decode(b, &configB); err != nil {
 		return false, err
 	}
@@ -48,12 +45,12 @@ func (h *SemaphoreWebhookHandler) Merge(current, requested any) (any, bool, erro
 }
 
 func (h *SemaphoreWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
 
-	configuration := WebhookConfiguration{}
+	configuration := common.WebhookConfiguration{}
 	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &configuration)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding configuration: %v", err)
@@ -102,7 +99,7 @@ func (h *SemaphoreWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -115,7 +112,7 @@ func (h *SemaphoreWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 	return client.DeleteSecret(metadata.Secret.Name)
 }
 
-func upsertSecret(client *Client, name string, key []byte) (*Secret, error) {
+func upsertSecret(client *common.Client, name string, key []byte) (*common.Secret, error) {
 	//
 	// Check if secret already exists.
 	//
@@ -135,7 +132,7 @@ func upsertSecret(client *Client, name string, key []byte) (*Secret, error) {
 	return secret, nil
 }
 
-func upsertNotification(client *Client, name, URL, project string) (*Notification, error) {
+func upsertNotification(client *common.Client, name, URL, project string) (*common.Notification, error) {
 	//
 	// Check if notification already exists.
 	//
@@ -147,22 +144,22 @@ func upsertNotification(client *Client, name, URL, project string) (*Notificatio
 	//
 	// Notification does not exist, create it.
 	//
-	notification, err = client.CreateNotification(&Notification{
-		Metadata: NotificationMetadata{
+	notification, err = client.CreateNotification(&common.Notification{
+		Metadata: common.NotificationMetadata{
 			Name: name,
 		},
-		Spec: NotificationSpec{
-			Rules: []NotificationRule{
+		Spec: common.NotificationSpec{
+			Rules: []common.NotificationRule{
 				{
 					Name: fmt.Sprintf("webhook-for-%s", project),
-					Filter: NotificationRuleFilter{
+					Filter: common.NotificationRuleFilter{
 						Branches:  []string{},
 						Pipelines: []string{},
 						Projects:  []string{project},
 						Results:   []string{},
 					},
-					Notify: NotificationRuleNotify{
-						Webhook: NotificationNotifyWebhook{
+					Notify: common.NotificationRuleNotify{
+						Webhook: common.NotificationNotifyWebhook{
 							Endpoint: URL,
 							Secret:   name,
 						},

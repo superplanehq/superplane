@@ -2,9 +2,8 @@ syntax = "proto3";
 
 package Superplane.Integrations;
 
-import "configuration.proto";
 import "actions.proto";
-import "triggers.proto";
+import "configuration.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -52,8 +51,33 @@ message IntegrationDefinition {
   string label = 2;
   string icon = 3;
   string description = 4;
+  repeated CapabilityDefinition capabilities = 5;
+  repeated CapabilityGroup capability_groups = 6;
+  bool legacy_setup_only = 7;
+
+  //
+  // NOTE: should be removed once we migrate every integration to the new flow
+  //
+  repeated Configuration.Field configuration = 8;
+  string instructions = 9;
+}
+
+message CapabilityDefinition {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    TYPE_ACTION = 1;
+    TYPE_TRIGGER = 2;
+  }
+
+  Type type = 1;
+  string name = 2;
+  string label = 3;
+  string description = 4;
   repeated Configuration.Field configuration = 5;
-  repeated Actions.Action actions = 6;
-  repeated Triggers.Trigger triggers = 7;
-  string instructions = 8;
+  repeated Actions.OutputChannel output_channels = 6;
+}
+
+message CapabilityGroup {
+  string label = 1;
+  repeated string capabilities = 2;
 }
