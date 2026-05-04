@@ -49,7 +49,6 @@ func Test__SendGrid__Setup_EnablesSignedWebhook(t *testing.T) {
 
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{"apiKey": "sg-test"},
-		Secrets:       map[string]core.IntegrationSecret{},
 	}
 
 	webhookCtx := &testWebhookContext{
@@ -65,9 +64,9 @@ func Test__SendGrid__Setup_EnablesSignedWebhook(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "public-key-from-api", string(webhookCtx.secret))
-	secret, ok := integrationCtx.Secrets[webhookVerificationKeySecret]
-	require.True(t, ok)
-	assert.Equal(t, "public-key-from-api", string(secret.Value))
+	secret, err := integrationCtx.Secrets().Get(webhookVerificationKeySecret)
+	require.NoError(t, err)
+	assert.Equal(t, "public-key-from-api", secret)
 }
 
 func Test__SendGrid__CleanupWebhook_DisablesWebhook(t *testing.T) {
@@ -101,7 +100,6 @@ func Test__SendGrid__CleanupWebhook_DisablesWebhook(t *testing.T) {
 		Webhook: webhookCtx,
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{"apiKey": "sg-test"},
-			Secrets:       map[string]core.IntegrationSecret{},
 		},
 	})
 
@@ -149,7 +147,6 @@ func Test__SendGrid__CleanupWebhook_SkipsNonHTTPS(t *testing.T) {
 		Webhook: webhookCtx,
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{"apiKey": "sg-test"},
-			Secrets:       map[string]core.IntegrationSecret{},
 		},
 	})
 

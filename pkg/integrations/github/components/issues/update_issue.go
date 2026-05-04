@@ -1,0 +1,271 @@
+package issues
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strconv"
+
+	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+)
+
+type UpdateIssue struct{}
+
+type UpdateIssueConfiguration struct {
+	Repository  string   `json:"repository" mapstructure:"repository"`
+	IssueNumber string   `json:"issueNumber" mapstructure:"issueNumber"`
+	Title       string   `json:"title" mapstructure:"title"`
+	Body        string   `json:"body" mapstructure:"body"`
+	State       string   `json:"state" mapstructure:"state"`
+	Assignees   []string `json:"assignees" mapstructure:"assignees"`
+	Labels      []string `json:"labels" mapstructure:"labels"`
+}
+
+func (c *UpdateIssue) Name() string {
+	return "github.updateIssue"
+}
+
+func (c *UpdateIssue) Label() string {
+	return "Update Issue"
+}
+
+func (c *UpdateIssue) Description() string {
+	return "Update a GitHub issue"
+}
+
+func (c *UpdateIssue) Documentation() string {
+	return `The Update Issue component modifies an existing GitHub issue with new information.
+
+## Use Cases
+
+- **Status updates**: Change issue state (open/closed) based on workflow results
+- **Label management**: Add or update labels on issues
+- **Assignee updates**: Assign issues to team members automatically
+- **Content updates**: Update issue title or body with new information
+
+## Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+	- **Issue Number**: The issue number to update (supports expressions)
+- **Title**: New title for the issue (optional, supports expressions)
+- **Body**: New body/description for the issue (optional, supports expressions)
+- **State**: Change issue state to "open" or "closed" (optional)
+- **Assignees**: List of GitHub usernames to assign the issue to (optional)
+- **Labels**: List of labels to apply to the issue (optional)
+
+## Output
+
+Returns the updated issue object with all current information.`
+}
+
+func (c *UpdateIssue) Icon() string {
+	return "github"
+}
+
+func (c *UpdateIssue) Color() string {
+	return "gray"
+}
+
+func (c *UpdateIssue) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+
+func (c *UpdateIssue) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "repository",
+					UseNameAsValue: true,
+				},
+			},
+		},
+		{
+			Name:     "issueNumber",
+			Label:    "Issue Number",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+		},
+		{
+			Name:     "title",
+			Label:    "Title",
+			Type:     configuration.FieldTypeString,
+			Required: false,
+		},
+		{
+			Name:     "body",
+			Label:    "Body",
+			Type:     configuration.FieldTypeText,
+			Required: false,
+		},
+		{
+			Name:     "state",
+			Label:    "State",
+			Type:     configuration.FieldTypeSelect,
+			Required: false,
+			Default:  "open",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{
+							Label: "Open",
+							Value: "open",
+						},
+						{
+							Label: "Closed",
+							Value: "closed",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "assignees",
+			Label:    "Assignees",
+			Type:     configuration.FieldTypeList,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Assignee",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
+		{
+			Name:     "labels",
+			Label:    "Labels",
+			Type:     configuration.FieldTypeList,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Label",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
+	}
+}
+
+func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
+	var config UpdateIssueConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Repository == "" {
+		return errors.New("repository is required")
+	}
+
+	if config.IssueNumber == "" {
+		return errors.New("issue number is required")
+	}
+
+	return common.EnsureRepoInMetadata(
+		ctx.Metadata,
+		ctx.Integration,
+		ctx.Configuration,
+	)
+}
+
+func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
+	var config UpdateIssueConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	issueNumber, err := strconv.Atoi(config.IssueNumber)
+	if err != nil {
+		return fmt.Errorf("issue number is not a number: %v", err)
+	}
+
+	var appMetadata common.Metadata
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+
+	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize GitHub client: %w", err)
+	}
+
+	//
+	// Prepare the update request based on configuration
+	//
+	issueRequest := &github.IssueRequest{}
+
+	if config.Title != "" {
+		issueRequest.Title = &config.Title
+	}
+
+	if config.Body != "" {
+		issueRequest.Body = &config.Body
+	}
+
+	if config.State != "" {
+		issueRequest.State = &config.State
+	}
+
+	if len(config.Assignees) > 0 {
+		issueRequest.Assignees = &config.Assignees
+	}
+
+	if len(config.Labels) > 0 {
+		issueRequest.Labels = &config.Labels
+	}
+
+	// Update the issue
+	issue, _, err := client.Issues.Edit(
+		context.Background(),
+		appMetadata.Owner,
+		config.Repository,
+		issueNumber,
+		issueRequest,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to update issue: %w", err)
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		"github.issue",
+		[]any{issue},
+	)
+}
+
+func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return ctx.DefaultProcessing()
+}
+
+func (c *UpdateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+
+func (c *UpdateIssue) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (c *UpdateIssue) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpdateIssue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateIssue) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
