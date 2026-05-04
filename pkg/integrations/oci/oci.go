@@ -168,12 +168,17 @@ func (o *OCI) Actions() []core.Action {
 		&CreateFunction{},
 		&DeleteFunction{},
 		&InvokeFunction{},
+		&GetInstance{},
+		&UpdateInstance{},
+		&ManageInstancePower{},
+		&DeleteInstance{},
 	}
 }
 
 func (o *OCI) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnComputeInstanceCreated{},
+		&OnInstanceStateChange{},
 	}
 }
 
