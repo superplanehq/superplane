@@ -21,13 +21,13 @@ func Test__GetImage__Setup(t *testing.T) {
 	})
 
 	t.Run("missing image ID -> error", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{Configuration: map[string]any{"imageId": " "}, Metadata: &contexts.MetadataContext{}})
-		require.ErrorContains(t, err, "imageId is required")
+		err := component.Setup(core.SetupContext{Configuration: map[string]any{"image": " "}, Metadata: &contexts.MetadataContext{}})
+		require.ErrorContains(t, err, "image is required")
 	})
 
 	t.Run("valid configuration stores node metadata", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
-		err := component.Setup(core.SetupContext{Configuration: map[string]any{"imageId": "ocid1.image.oc1..example"}, Metadata: metadata})
+		err := component.Setup(core.SetupContext{Configuration: map[string]any{"image": "ocid1.image.oc1..example"}, Metadata: metadata})
 		require.NoError(t, err)
 		stored := metadata.Get().(imageNodeMetadata)
 		assert.Equal(t, "ocid1.image.oc1..example", stored.ImageID)
@@ -64,7 +64,7 @@ func Test__GetImage__Execute(t *testing.T) {
 	metadata := &contexts.MetadataContext{}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	err := component.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"imageId": "ocid1.image.oc1..example"},
+		Configuration:  map[string]any{"image": "ocid1.image.oc1..example"},
 		HTTP:           httpContext,
 		Metadata:       metadata,
 		ExecutionState: execState,
@@ -103,7 +103,7 @@ func Test__GetImage__Execute__PlatformImage(t *testing.T) {
 	}
 
 	err := component.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"imageId": "ocid1.image.oc1..platform"},
+		Configuration:  map[string]any{"image": "ocid1.image.oc1..platform"},
 		HTTP:           httpContext,
 		Metadata:       &contexts.MetadataContext{},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},

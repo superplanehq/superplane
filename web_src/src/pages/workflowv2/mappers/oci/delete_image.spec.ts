@@ -8,7 +8,7 @@ describe("deleteImageMapper", () => {
     const props = deleteImageMapper.props(
       buildImageComponentCtx({
         componentName: "oci.deleteImage",
-        configuration: { imageId: "ocid1.image.oc1..example" },
+        configuration: { image: "ocid1.image.oc1..example" },
         metadata: { imageName: "golden-image" },
       }),
     );

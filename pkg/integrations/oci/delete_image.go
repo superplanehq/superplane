@@ -14,7 +14,7 @@ import (
 type DeleteImage struct{}
 
 type DeleteImageConfiguration struct {
-	ImageID string `json:"imageId" mapstructure:"imageId"`
+	ImageID string `json:"image" mapstructure:"image"`
 }
 
 func (c *DeleteImage) Name() string        { return "oci.deleteImage" }

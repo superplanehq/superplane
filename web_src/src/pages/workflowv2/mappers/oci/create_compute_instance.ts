@@ -10,20 +10,20 @@ import { baseMapper } from "./base";
 import { isMetadataItem, MAX_NODE_METADATA_ITEMS, metadataItem } from "./image_common";
 
 interface CreateComputeInstanceConfiguration {
-  compartmentId?: string;
+  compartment?: string;
   availabilityDomain?: string;
   displayName?: string;
   shape?: string;
   imageOs?: string;
-  imageId?: string;
-  subnetId?: string;
+  image?: string;
+  subnet?: string;
   sshPublicKey?: string;
   ocpus?: number;
   memoryInGBs?: number;
   bootVolumeSizeGB?: number;
   bootVolumeVpusPerGB?: string;
   attachBlockVolume?: boolean;
-  blockVolumeId?: string;
+  blockVolume?: string;
   enableShieldedInstance?: boolean;
   enableConfidentialComputing?: boolean;
 }
@@ -65,8 +65,7 @@ function getExecutedAt(context: ExecutionDetailsContext): string | undefined {
 function getOutputData(context: ExecutionDetailsContext): CreateComputeInstanceOutputData | undefined {
   const outputs = context.execution.outputs as { default?: CreateComputeInstanceOutputPayload[] } | undefined;
   const payload = outputs?.default?.[0];
-  if (!payload) return undefined;
-  return (payload.data ?? payload) as CreateComputeInstanceOutputData;
+  return payload?.data;
 }
 
 export const createComputeInstanceMapper: ComponentBaseMapper = {

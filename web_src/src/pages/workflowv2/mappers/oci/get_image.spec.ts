@@ -8,7 +8,7 @@ describe("getImageMapper", () => {
     const props = getImageMapper.props(
       buildImageComponentCtx({
         componentName: "oci.getImage",
-        configuration: { imageId: "ocid1.image.oc1..example" },
+        configuration: { image: "ocid1.image.oc1..example" },
         metadata: { imageName: "golden-image" },
       }),
     );

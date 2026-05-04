@@ -22,15 +22,15 @@ type CreateImage struct{}
 
 type CreateImageConfiguration struct {
 	SourceType      string `json:"sourceType" mapstructure:"sourceType"`
-	CompartmentID   string `json:"compartmentId" mapstructure:"compartmentId"`
+	CompartmentID   string `json:"compartment" mapstructure:"compartment"`
 	Instance        string `json:"instance" mapstructure:"instance"`
 	InstanceID      string `json:"instanceId" mapstructure:"instanceId"`
 	DisplayName     string `json:"displayName" mapstructure:"displayName"`
 	SourceImageType string `json:"sourceImageType" mapstructure:"sourceImageType"`
 	SourceURI       string `json:"sourceUri" mapstructure:"sourceUri"`
-	NamespaceName   string `json:"namespaceName" mapstructure:"namespaceName"`
-	BucketName      string `json:"bucketName" mapstructure:"bucketName"`
-	ObjectName      string `json:"objectName" mapstructure:"objectName"`
+	NamespaceName   string `json:"namespace" mapstructure:"namespace"`
+	BucketName      string `json:"bucket" mapstructure:"bucket"`
+	ObjectName      string `json:"object" mapstructure:"object"`
 	Tags            []Tag  `json:"tags" mapstructure:"tags"`
 }
 
@@ -122,7 +122,7 @@ func (c *CreateImage) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 					},
@@ -162,7 +162,7 @@ func (c *CreateImage) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "namespaceName",
+			Name:        "namespace",
 			Label:       "Namespace",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -180,7 +180,7 @@ func (c *CreateImage) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "bucketName",
+			Name:        "bucket",
 			Label:       "Bucket",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -198,13 +198,13 @@ func (c *CreateImage) Configuration() []configuration.Field {
 						{
 							Name: "compartmentId",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "compartmentId",
+								Field: "compartment",
 							},
 						},
 						{
 							Name: "namespaceName",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "namespaceName",
+								Field: "namespace",
 							},
 						},
 					},
@@ -212,7 +212,7 @@ func (c *CreateImage) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "objectName",
+			Name:        "object",
 			Label:       "Object",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -230,13 +230,13 @@ func (c *CreateImage) Configuration() []configuration.Field {
 						{
 							Name: "namespaceName",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "namespaceName",
+								Field: "namespace",
 							},
 						},
 						{
 							Name: "bucketName",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "bucketName",
+								Field: "bucket",
 							},
 						},
 					},
@@ -438,7 +438,7 @@ func decodeCreateImageConfiguration(input any) (CreateImageConfiguration, error)
 
 func validateCreateImageConfiguration(config CreateImageConfiguration) error {
 	if config.CompartmentID == "" {
-		return errors.New("compartmentId is required")
+		return errors.New("compartment is required")
 	}
 	if config.DisplayName == "" {
 		return errors.New("displayName is required")
@@ -461,13 +461,13 @@ func validateCreateImageConfiguration(config CreateImageConfiguration) error {
 			return errors.New("sourceImageType is required")
 		}
 		if config.NamespaceName == "" {
-			return errors.New("namespaceName is required")
+			return errors.New("namespace is required")
 		}
 		if config.BucketName == "" {
-			return errors.New("bucketName is required")
+			return errors.New("bucket is required")
 		}
 		if config.ObjectName == "" {
-			return errors.New("objectName is required")
+			return errors.New("object is required")
 		}
 	default:
 		return fmt.Errorf("unsupported sourceType: %s", config.SourceType)

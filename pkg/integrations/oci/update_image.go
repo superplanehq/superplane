@@ -15,7 +15,7 @@ import (
 type UpdateImage struct{}
 
 type UpdateImageConfiguration struct {
-	ImageID     string `json:"imageId" mapstructure:"imageId"`
+	ImageID     string `json:"image" mapstructure:"image"`
 	DisplayName string `json:"displayName" mapstructure:"displayName"`
 }
 

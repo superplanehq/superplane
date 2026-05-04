@@ -4,14 +4,14 @@ import type { ComponentBaseContext, ExecutionDetailsContext, OutputPayload } fro
 export const MAX_NODE_METADATA_ITEMS = 3;
 
 export interface OCIImageConfiguration {
-  imageId?: string;
-  compartmentId?: string;
+  image?: string;
+  compartment?: string;
   displayName?: string;
   instance?: string;
   instanceId?: string;
   sourceType?: string;
-  bucketName?: string;
-  objectName?: string;
+  bucket?: string;
+  object?: string;
 }
 
 interface OCIImageNodeMetadata {
@@ -75,8 +75,8 @@ export function imageMetadataList(node: ComponentBaseContext["node"]): MetadataI
     metadataItem("disc", nodeMetadata?.imageName),
     metadataItem("folder", nodeMetadata?.compartmentName),
     metadataItem("server", nodeMetadata?.instanceName),
-    metadataItem("archive", config?.bucketName),
-    metadataItem("file", config?.objectName),
+    metadataItem("archive", config?.bucket),
+    metadataItem("file", config?.object),
     metadataItem("hard-drive", sourceType),
   ]
     .filter(isMetadataItem)

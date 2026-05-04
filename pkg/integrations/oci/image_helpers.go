@@ -49,7 +49,7 @@ func customImageIDField(required bool) configuration.Field {
 
 func imageResourceField(required bool, resourceType string) configuration.Field {
 	return configuration.Field{
-		Name:        "imageId",
+		Name:        "image",
 		Label:       "Image",
 		Type:        configuration.FieldTypeIntegrationResource,
 		Required:    required,
@@ -64,7 +64,7 @@ func imageResourceField(required bool, resourceType string) configuration.Field 
 
 func compartmentField() configuration.Field {
 	return configuration.Field{
-		Name:        "compartmentId",
+		Name:        "compartment",
 		Label:       "Compartment",
 		Type:        configuration.FieldTypeIntegrationResource,
 		Required:    true,
@@ -199,7 +199,7 @@ func imageToMap(image *Image) map[string]any {
 
 func validateImageID(imageID string) error {
 	if strings.TrimSpace(imageID) == "" {
-		return errors.New("imageId is required")
+		return errors.New("image is required")
 	}
 	return nil
 }

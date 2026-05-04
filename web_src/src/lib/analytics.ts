@@ -195,7 +195,7 @@ export function useIntegrationConfigureOpen(
   useEffect(() => {
     if (!integration || !integrationId || !organizationId) return;
     if (firedRef.current === integrationId) return;
-    const integrationTypeName = integration.spec?.integrationName;
+    const integrationTypeName = integration.metadata?.integrationName;
     if (!integrationTypeName) return;
     const previousStatus = (integration.status?.state || "pending") as "ready" | "error" | "pending";
     analytics.integrationConfigureOpen(integrationTypeName, source, previousStatus, organizationId);

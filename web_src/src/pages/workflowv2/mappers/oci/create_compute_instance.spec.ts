@@ -140,7 +140,7 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
       },
     });
     const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(details["Executed At"]).toBe(new Date(startedAt).toLocaleString());
+    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(startedAt).getTime());
   });
 
   it("falls back to execution.createdAt for Executed At when metadata.startedAt is absent", () => {
@@ -149,7 +149,7 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
       execution: { createdAt, metadata: {}, outputs: undefined },
     });
     const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(details["Executed At"]).toBe(new Date(createdAt).toLocaleString());
+    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(createdAt).getTime());
   });
 
   it("maps output fields to display labels", () => {

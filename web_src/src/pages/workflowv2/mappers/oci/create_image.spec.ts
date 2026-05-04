@@ -10,7 +10,7 @@ describe("createImageMapper.props", () => {
         componentName: "oci.createImage",
         configuration: {
           displayName: "golden-image",
-          compartmentId: "ocid1.compartment.oc1..example",
+          compartment: "ocid1.compartment.oc1..example",
           sourceType: "instance",
         },
         metadata: {
@@ -36,8 +36,8 @@ describe("createImageMapper.props", () => {
         componentName: "oci.createImage",
         configuration: {
           displayName: "golden-image",
-          bucketName: "images",
-          objectName: "golden-image.qcow2",
+          bucket: "images",
+          object: "golden-image.qcow2",
           sourceType: "objectStorageObject",
         },
         metadata: {

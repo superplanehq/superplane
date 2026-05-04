@@ -14,7 +14,7 @@ import (
 type GetImage struct{}
 
 type GetImageConfiguration struct {
-	ImageID string `json:"imageId" mapstructure:"imageId"`
+	ImageID string `json:"image" mapstructure:"image"`
 }
 
 func (c *GetImage) Name() string        { return "oci.getImage" }
