@@ -149,6 +149,10 @@ func (t *DummyIntegrationTrigger) ExampleData() map[string]any {
 	return map[string]any{}
 }
 
+func (t *DummyIntegrationTrigger) DefaultRunTitle() string {
+	return ""
+}
+
 func (t *DummyIntegrationTrigger) Configuration() []configuration.Field {
 	return []configuration.Field{}
 }

@@ -185,10 +185,11 @@ func triggersFromCapabilities(capabilities []openapi_client.IntegrationsCapabili
 			continue
 		}
 		triggers = append(triggers, openapi_client.TriggersTrigger{
-			Name:          capability.Name,
-			Label:         capability.Label,
-			Description:   capability.Description,
-			Configuration: capability.Configuration,
+			Name:            capability.Name,
+			Label:           capability.Label,
+			Description:     capability.Description,
+			Configuration:   capability.Configuration,
+			DefaultRunTitle: capability.DefaultRunTitle,
 		})
 	}
 	return triggers

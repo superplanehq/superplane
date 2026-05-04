@@ -228,6 +228,10 @@ func changeNodeRefForAdd(proposedNode models.Node) (*pb.CanvasChangeset_Change_N
 		n.Configuration = configuration
 	}
 
+	if proposedNode.RunTitleTemplate != nil {
+		n.RunTitleTemplate = proposedNode.RunTitleTemplate
+	}
+
 	return n, nil
 }
 
@@ -250,6 +254,10 @@ func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (
 		n.Configuration = configuration
 	}
 
+	if !sameStringPointer(currentNode.RunTitleTemplate, proposedNode.RunTitleTemplate) {
+		n.RunTitleTemplate = proposedNode.RunTitleTemplate
+	}
+
 	//
 	// If the position is different, we set position in the change.
 	//
@@ -268,6 +276,14 @@ func changeNodeRefForUpdate(currentNode models.Node, proposedNode models.Node) (
 	}
 
 	return n, nil
+}
+
+func sameStringPointer(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+
+	return *a == *b
 }
 
 func buildNodeMap(nodes []models.Node) map[string]models.Node {

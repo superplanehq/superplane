@@ -73,6 +73,10 @@ func (t *OnAlertReceived) Color() string {
 	return "gray"
 }
 
+func (t *OnAlertReceived) DefaultRunTitle() string {
+	return "{{ root().data.alertName }}"
+}
+
 func (t *OnAlertReceived) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
