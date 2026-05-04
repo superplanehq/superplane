@@ -480,9 +480,14 @@ const OwnerSetup: React.FC = () => {
               Use TLS (STARTTLS)
             </Label>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Saving..." : "Finish setup"}
-            </Button>
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" className="flex-1" disabled={loading} onClick={handleSkipSMTP}>
+                Skip
+              </Button>
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading ? "Saving..." : "Finish setup"}
+              </Button>
+            </div>
           </form>
         )}
       </div>
