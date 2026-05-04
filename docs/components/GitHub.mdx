@@ -1899,6 +1899,13 @@ Returns the created pull request object with details including:
 - Head and base branch information
 - Created timestamp
 
+### Limitations
+
+- Only same-repository pull requests are supported. Cross-repository
+  (fork) pull requests using GitHub's owner:branch head syntax are not
+  currently supported - both the head and base branch must live in the
+  selected repository.
+
 ### Example Output
 
 ```json
