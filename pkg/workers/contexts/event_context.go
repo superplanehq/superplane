@@ -53,12 +53,12 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload, structuredPayload)
+	runTitle, err := s.resolveRunTitle(wrappedPayload, structuredPayload)
 	if err != nil {
 		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
-		event.CustomName = &failed
-	} else if customName != nil {
-		event.CustomName = customName
+		event.RunTitle = &failed
+	} else if runTitle != nil {
+		event.RunTitle = runTitle
 	}
 
 	err = s.tx.Create(&event).Error
@@ -73,23 +73,8 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string, error) {
-	config := s.node.Configuration.Data()
-	if config == nil {
-		return nil, nil
-	}
-
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return nil, nil
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return nil, nil
-	}
-
-	template = strings.TrimSpace(template)
+func (s *EventContext) resolveRunTitle(payload any, rootPayload any) (*string, error) {
+	template := strings.TrimSpace(valueOrEmpty(s.node.RunTitleTemplate))
 	if template == "" {
 		return nil, nil
 	}
@@ -103,10 +88,18 @@ func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string,
 		return nil, err
 	}
 
-	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedName == "" {
+	resolvedTitle := strings.TrimSpace(fmt.Sprintf("%v", resolved))
+	if resolvedTitle == "" {
 		return nil, nil
 	}
 
-	return &resolvedName, nil
+	return &resolvedTitle, nil
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
 }

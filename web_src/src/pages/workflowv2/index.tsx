@@ -2714,6 +2714,7 @@ export function WorkflowPageV2() {
             color: node.configuration?.color || "yellow",
           },
           configurationFields,
+          runTitleTemplate: node.runTitleTemplate,
           integrationName,
           integrationLabel,
           blockName,
@@ -2727,6 +2728,7 @@ export function WorkflowPageV2() {
         displayLabel,
         configuration: node.configuration || {},
         configurationFields,
+        runTitleTemplate: node.runTitleTemplate,
         integrationName,
         integrationLabel,
         blockName,
@@ -2880,6 +2882,7 @@ export function WorkflowPageV2() {
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
       integrationRef?: ComponentsIntegrationRef,
+      runTitleTemplate?: string,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
@@ -2911,6 +2914,7 @@ export function WorkflowPageV2() {
             configuration: updatedConfiguration,
             name: updatedNodeName,
             integration: integrationRef,
+            runTitleTemplate,
           };
         }
         return node;

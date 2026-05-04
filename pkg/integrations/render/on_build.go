@@ -67,6 +67,10 @@ func (t *OnBuild) Color() string {
 	return "gray"
 }
 
+func (t *OnBuild) DefaultRunTitle() string {
+	return "{{ root().data.serviceName }}"
+}
+
 func (t *OnBuild) Configuration() []configuration.Field {
 	return onResourceEventConfigurationFields(buildEventTypeOptions, buildDefaultEventTypes)
 }

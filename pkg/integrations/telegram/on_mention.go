@@ -70,6 +70,10 @@ func (t *OnMention) Color() string {
 	return "gray"
 }
 
+func (t *OnMention) DefaultRunTitle() string {
+	return "{{ root().data.text }}"
+}
+
 func (t *OnMention) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

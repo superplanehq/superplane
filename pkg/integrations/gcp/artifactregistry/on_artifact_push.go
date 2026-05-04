@@ -71,6 +71,10 @@ Each event contains:
 func (t *OnArtifactPush) Icon() string  { return "gcp" }
 func (t *OnArtifactPush) Color() string { return "gray" }
 
+func (t *OnArtifactPush) DefaultRunTitle() string {
+	return "Pushed {{ root().data.image }}"
+}
+
 func (t *OnArtifactPush) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
