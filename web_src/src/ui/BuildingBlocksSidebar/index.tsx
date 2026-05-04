@@ -12,6 +12,7 @@ import { ComponentBase } from "../componentBase";
 import { CategorySection } from "./CategorySection";
 import { findFirstVisibleBlock, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
+import { useSidebarSettings } from "./useSidebarSettings";
 
 export type { AgentContext, AgentMode } from "@/components/AgentSidebar/agentChat";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
@@ -102,8 +103,12 @@ function OpenBuildingBlocksSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
-  const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
-  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const {
+    showIntegrationSetupStatus,
+    setShowIntegrationSetupStatus,
+    showConnectedIntegrationsOnTop,
+    setShowConnectedIntegrationsOnTop,
+  } = useSidebarSettings();
 
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
