@@ -12,7 +12,7 @@ spec:
       expression: previous().data.values[0].key == 'blue'
     position:
       x: 2040
-      y: 1540
+      "y": 1540
     component: if
     isCollapsed: false
   - id: canary-fork
@@ -22,7 +22,7 @@ spec:
       expression: $["Read Live Env"].data.values[0].key == "blue"
     position:
       x: 3960
-      y: 1540
+      "y": 1540
     component: if
     isCollapsed: false
   - id: on-push-main
@@ -35,7 +35,7 @@ spec:
       repository: webapp
     position:
       x: 120
-      y: 1540
+      "y": 1540
     isCollapsed: false
     metadata:
       repository:
@@ -58,7 +58,7 @@ spec:
       url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 4600
-      y: 1720
+      "y": 1720
     component: http
     isCollapsed: false
   - id: annotation-canary
@@ -79,7 +79,7 @@ spec:
       width: 412
     position:
       x: 4560
-      y: 1032
+      "y": 1032
     component: annotation
     isCollapsed: false
   - id: save-state
@@ -105,7 +105,7 @@ spec:
         value: '{{ $["Deploy Worker"].data.deployId }}'
     position:
       x: 9080
-      y: 1360
+      "y": 1360
     component: upsertMemory
     isCollapsed: false
   - id: annotation-overview
@@ -129,7 +129,7 @@ spec:
       width: 568
     position:
       x: 24
-      y: 1200
+      "y": 1200
     component: annotation
     isCollapsed: false
   - id: revert-worker
@@ -141,7 +141,7 @@ spec:
         : "srv-worker-green-def456" }}'
     position:
       x: 9720
-      y: 2260
+      "y": 2260
     component: render.rollbackDeploy
     isCollapsed: false
   - id: health-check
@@ -152,7 +152,7 @@ spec:
         == "Healthy" && float($["Canary Error Rate"].data.result[0].value[1]) <= 1
     position:
       x: 7160
-      y: 1540
+      "y": 1540
     component: if
     isCollapsed: false
   - id: annotation-deploy
@@ -173,7 +173,7 @@ spec:
       width: 532
     position:
       x: 2616
-      y: 864
+      "y": 864
     component: annotation
     isCollapsed: false
   - id: rollback-to-blue
@@ -192,7 +192,7 @@ spec:
       url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
-      y: 1720
+      "y": 1720
     component: http
     isCollapsed: false
   - id: merge-deploys
@@ -206,7 +206,7 @@ spec:
         value: 15
     position:
       x: 3320
-      y: 1540
+      "y": 1540
     component: merge
     isCollapsed: false
   - id: notify-success
@@ -225,7 +225,7 @@ spec:
       embedUrl: '{{ root().data.head_commit.url }}'
     position:
       x: 9720
-      y: 820
+      "y": 820
     component: discord.sendTextMessage
     isCollapsed: false
     metadata:
@@ -240,7 +240,7 @@ spec:
       expression: $["Read Live Env"].data.values[0].key == "blue"
     position:
       x: 7800
-      y: 1360
+      "y": 1360
     component: if
     isCollapsed: false
   - id: promote-blue
@@ -259,7 +259,7 @@ spec:
       url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
-      y: 1360
+      "y": 1360
     component: http
     isCollapsed: false
   - id: deploy-api
@@ -271,7 +271,7 @@ spec:
         : "srv-api-green-def456" }}'
     position:
       x: 2680
-      y: 1180
+      "y": 1180
     component: render.deploy
     isCollapsed: false
   - id: read-state
@@ -285,7 +285,7 @@ spec:
       resultMode: latest
     position:
       x: 760
-      y: 1540
+      "y": 1540
     component: readMemory
     isCollapsed: false
   - id: rollback-fork
@@ -295,7 +295,7 @@ spec:
       expression: $["Read Live Env"].data.values[0].key == "blue"
     position:
       x: 7800
-      y: 1720
+      "y": 1720
     component: if
     isCollapsed: false
   - id: verify-health
@@ -309,7 +309,7 @@ spec:
         value: 15
     position:
       x: 6520
-      y: 1540
+      "y": 1540
     component: merge
     isCollapsed: false
   - id: read-deploy-ids
@@ -324,7 +324,7 @@ spec:
       resultMode: latest
     position:
       x: 9080
-      y: 1720
+      "y": 1720
     component: readMemory
     isCollapsed: false
   - id: canary-30-green
@@ -343,7 +343,7 @@ spec:
       url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 4600
-      y: 1360
+      "y": 1360
     component: http
     isCollapsed: false
   - id: init-state
@@ -361,7 +361,7 @@ spec:
         value: 'true'
     position:
       x: 1400
-      y: 1630
+      "y": 1630
     component: upsertMemory
     isCollapsed: false
   - id: annotation-decision
@@ -383,7 +383,7 @@ spec:
       width: 536
     position:
       x: 7728
-      y: 1008
+      "y": 1008
     component: annotation
     isCollapsed: false
   - id: run-smoke
@@ -402,7 +402,7 @@ spec:
       workflowFile: .github/workflows/smoke-test.yml
     position:
       x: 5240
-      y: 1180
+      "y": 1180
     component: github.runWorkflow
     isCollapsed: false
     metadata:
@@ -431,7 +431,7 @@ spec:
         value: '{{ $["Read Live Env"].data.values[0].worker_deploy }}'
     position:
       x: 9720
-      y: 1180
+      "y": 1180
     component: upsertMemory
     isCollapsed: false
   - id: promote-green
@@ -450,7 +450,7 @@ spec:
       url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
-      y: 1000
+      "y": 1000
     component: http
     isCollapsed: false
   - id: dash0-check
@@ -462,7 +462,7 @@ spec:
         : "aaaaaaaa-bbbb-cccc-dddd-222222222222" }}'
     position:
       x: 5240
-      y: 1540
+      "y": 1540
     component: dash0.getHttpSyntheticCheck
     isCollapsed: false
   - id: deploy-worker
@@ -474,7 +474,7 @@ spec:
         : "srv-worker-green-def456" }}'
     position:
       x: 2680
-      y: 1900
+      "y": 1900
     component: render.deploy
     isCollapsed: false
   - id: revert-web
@@ -486,7 +486,7 @@ spec:
         : "srv-web-green-def456" }}'
     position:
       x: 9720
-      y: 1900
+      "y": 1900
     component: render.rollbackDeploy
     isCollapsed: false
   - id: annotation-verify
@@ -515,7 +515,7 @@ spec:
       width: 696
     position:
       x: 5088
-      y: 888
+      "y": 888
     component: annotation
     isCollapsed: false
   - id: deploy-web
@@ -527,7 +527,7 @@ spec:
         : "srv-web-green-def456" }}'
     position:
       x: 2680
-      y: 1540
+      "y": 1540
     component: render.deploy
     isCollapsed: false
   - id: revert-api
@@ -539,7 +539,7 @@ spec:
         : "srv-api-green-def456" }}'
     position:
       x: 9720
-      y: 1540
+      "y": 1540
     component: render.rollbackDeploy
     isCollapsed: false
   - id: canary-error-check
@@ -553,7 +553,7 @@ spec:
       type: instant
     position:
       x: 5880
-      y: 1720
+      "y": 1720
     component: dash0.queryPrometheus
     isCollapsed: false
   - id: canary-wait
@@ -565,7 +565,7 @@ spec:
       waitFor: '5'
     position:
       x: 5240
-      y: 1900
+      "y": 1900
     component: wait
     isCollapsed: false
   - id: rollback-to-green
@@ -584,7 +584,7 @@ spec:
       url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
-      y: 2080
+      "y": 2080
     component: http
     isCollapsed: false
   - id: annotation-env-detection
@@ -604,7 +604,7 @@ spec:
       width: 568
     position:
       x: 1296
-      y: 1200
+      "y": 1200
     component: annotation
     isCollapsed: false
   edges:
