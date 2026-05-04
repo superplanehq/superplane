@@ -7,6 +7,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import { baseMapper } from "./base";
+import { isMetadataItem, MAX_NODE_METADATA_ITEMS, metadataItem } from "./image_common";
 
 interface CreateComputeInstanceConfiguration {
   compartment?: string;
@@ -25,6 +26,15 @@ interface CreateComputeInstanceConfiguration {
   blockVolume?: string;
   enableShieldedInstance?: boolean;
   enableConfidentialComputing?: boolean;
+}
+
+interface CreateComputeInstanceNodeMetadata {
+  displayName?: string;
+  shape?: string;
+  availabilityDomain?: string;
+  imageName?: string;
+  subnetName?: string;
+  blockVolumeName?: string;
 }
 
 interface CreateComputeInstanceOutputData {
@@ -112,19 +122,20 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 
 function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateComputeInstanceConfiguration | undefined;
-  const items: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as CreateComputeInstanceNodeMetadata | undefined;
 
-  if (config?.displayName) {
-    items.push({ icon: "tag", label: config.displayName });
-  }
+  const displayName = nodeMetadata?.displayName ?? config?.displayName;
+  const shape = nodeMetadata?.shape ?? config?.shape;
+  const availabilityDomain = nodeMetadata?.availabilityDomain ?? config?.availabilityDomain;
 
-  if (config?.shape) {
-    items.push({ icon: "cpu", label: config.shape });
-  }
-
-  if (config?.availabilityDomain) {
-    items.push({ icon: "map-pin", label: config.availabilityDomain });
-  }
-
-  return items;
+  return [
+    metadataItem("tag", displayName),
+    metadataItem("cpu", shape),
+    metadataItem("map-pin", availabilityDomain),
+    metadataItem("disc", nodeMetadata?.imageName),
+    metadataItem("network", nodeMetadata?.subnetName),
+    metadataItem("database", nodeMetadata?.blockVolumeName),
+  ]
+    .filter(isMetadataItem)
+    .slice(0, MAX_NODE_METADATA_ITEMS);
 }

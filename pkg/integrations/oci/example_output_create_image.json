@@ -1,0 +1,19 @@
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-2026-04-28",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:15:12.000Z",
+  "type": "oci.image"
+}
