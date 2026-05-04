@@ -34,7 +34,7 @@ service Blueprints {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List blueprints";
       description: "Returns a list of all blueprints";
-      tags: "Blueprint";
+      tags: "Blueprints";
     };
   }
 
@@ -85,10 +85,16 @@ service Blueprints {
   }
 }
 
-message ListBlueprintsRequest {}
+message ListBlueprintsRequest {
+  int32 page_size = 1;
+
+  string page_token = 2;
+}
 
 message ListBlueprintsResponse {
   repeated Blueprint blueprints = 1;
+
+  string next_page_token = 2;
 }
 
 message DescribeBlueprintRequest {
