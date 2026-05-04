@@ -116,6 +116,7 @@ describe("workflow v2 edit-mode action affordances", () => {
     const props = startTriggerRenderer.getTriggerProps({
       ...makeTriggerContext(),
       canvasMode: "live",
+      actions: { invokeNodeTriggerHook: vi.fn().mockResolvedValue(undefined) },
     });
 
     render(<Trigger {...props} canvasMode="live" onRun={vi.fn()} />);
