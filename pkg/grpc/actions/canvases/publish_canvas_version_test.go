@@ -132,6 +132,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 	t.Run("draft version with no changes -> succeeds (regression for Sentry 500)", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-no-changes")
+		disableChangeManagementForCanvas(t, r, canvasID)
 
 		createResp, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
 		require.NoError(t, err)
