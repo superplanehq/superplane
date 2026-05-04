@@ -319,18 +319,18 @@ func (c *UpdateCheckRule) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateCheckRule) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateCheckRule) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateCheckRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *UpdateCheckRule) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpdateCheckRule) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateCheckRule) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

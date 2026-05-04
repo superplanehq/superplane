@@ -193,18 +193,18 @@ func (c *GetTestMetrics) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetTestMetrics) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetTestMetrics) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetTestMetrics) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *GetTestMetrics) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetTestMetrics) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetTestMetrics) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

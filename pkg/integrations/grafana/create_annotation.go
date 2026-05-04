@@ -255,14 +255,6 @@ func (c *CreateAnnotation) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateAnnotation) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateAnnotation) HandleAction(_ core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateAnnotation) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -580,4 +572,12 @@ func annotationURLTimeRangeMS(timeMS, timeEndMS int64) (int64, int64, bool) {
 	}
 
 	return 0, 0, false
+}
+
+func (c *CreateAnnotation) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateAnnotation) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

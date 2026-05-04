@@ -231,14 +231,6 @@ func (c *DeletePackageVersions) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DeletePackageVersions) Actions() []core.Action {
-	return nil
-}
-
-func (c *DeletePackageVersions) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeletePackageVersions) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -261,4 +253,12 @@ func (c *DeletePackageVersions) normalizeConfig(config DeletePackageVersionsConf
 	config.Versions = strings.TrimSpace(config.Versions)
 	config.ExpectedStatus = strings.TrimSpace(config.ExpectedStatus)
 	return config
+}
+
+func (c *DeletePackageVersions) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeletePackageVersions) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

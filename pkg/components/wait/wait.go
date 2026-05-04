@@ -18,7 +18,7 @@ import (
 const PayloadType = "wait.finished"
 
 func init() {
-	registry.RegisterComponent("wait", &Wait{})
+	registry.RegisterAction("wait", &Wait{})
 }
 
 type Wait struct{}
@@ -66,12 +66,12 @@ func (w *Wait) Documentation() string {
 
 - **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
   - Supports expressions for dynamic wait times
-  - Example: ` + "`{{$.retry_delay}}`" + ` or ` + "`{{$.status == \"urgent\" ? 0 : 30}}`" + `
+  - Example: ` + "`{{$['Node Name'].data.retry_delay}}`" + ` or ` + "`{{$['Node Name'].data.status == \"urgent\" ? 0 : 30}}`" + `
   
 - **Countdown**: Wait until a specific date/time is reached
   - Supports ISO 8601 date formats
   - Supports expressions for dynamic target times
-  - Example: ` + "`{{$.release_date}}`" + ` or ` + "`{{$.run_time + duration(\"48h\")}}`" + `
+  - Example: ` + "`{{$['Node Name'].data.release_date}}`" + ` or ` + "`{{$['Node Name'].data.run_time + duration(\"48h\")}}`" + `
 
 ## Behavior
 
@@ -128,7 +128,7 @@ func (w *Wait) Configuration() []configuration.Field {
 			Name:        "waitFor",
 			Label:       "Wait for...",
 			Type:        configuration.FieldTypeString,
-			Description: "Component will wait for a fixed amount of time before emitting the event forward.\n\nSupports expressions and expects integer.\n\nExample expressions:\n{{$.wait_time}}\n{{$.wait_time + 5}}\n{{$.status == \"urgent\" ? 0 : 30}}",
+			Description: "Component will wait for a fixed amount of time before emitting the event forward.\n\nSupports expressions and expects integer.\n\nExample expressions:\n{{$['Node Name'].data.wait_time}}\n{{$['Node Name'].data.wait_time + 5}}\n{{$['Node Name'].data.status == \"urgent\" ? 0 : 30}}",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "mode", Values: []string{ModeInterval}},
 			},
@@ -172,7 +172,7 @@ func (w *Wait) Configuration() []configuration.Field {
 			Name:        "waitUntil",
 			Label:       "Wait until",
 			Type:        configuration.FieldTypeString,
-			Description: "Component will countdown until the provided date/time before emitting an event forward.\n\nSupports expressions and expects date in [ISO 8601](https://www.timestamp-converter.com/) format.\n\nExample expressions:\n{{$.run_time}}\n{{$.run_time.In(timezone(\"UTC\"))}}\n{{$.run_time + duration(\"48h\")}}",
+			Description: "Component will countdown until the provided date/time before emitting an event forward.\n\nSupports expressions and expects date in [ISO 8601](https://www.timestamp-converter.com/) format.\n\nExample expressions:\n{{$['Node Name'].data.run_time}}\n{{$['Node Name'].data.run_time.In(timezone(\"UTC\"))}}\n{{$['Node Name'].data.run_time + duration(\"48h\")}}",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "mode", Values: []string{ModeCountdown}},
 			},
@@ -353,20 +353,20 @@ func (w *Wait) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("timeReached", map[string]any{}, interval)
 }
 
-func (w *Wait) Actions() []core.Action {
-	return []core.Action{
+func (w *Wait) Hooks() []core.Hook {
+	return []core.Hook{
 		{
 			Name: "timeReached",
+			Type: core.HookTypeInternal,
 		},
 		{
-			Name:           "pushThrough",
-			Description:    "Push Through",
-			UserAccessible: true,
+			Name: "pushThrough",
+			Type: core.HookTypeUser,
 		},
 	}
 }
 
-func (w *Wait) HandleAction(ctx core.ActionContext) error {
+func (w *Wait) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "timeReached":
 		return w.HandleTimeReached(ctx)
@@ -374,11 +374,11 @@ func (w *Wait) HandleAction(ctx core.ActionContext) error {
 		return w.HandlePushThrough(ctx)
 
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
+func (w *Wait) HandleTimeReached(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -398,7 +398,7 @@ func (w *Wait) HandleTimeReached(ctx core.ActionContext) error {
 	)
 }
 
-func (w *Wait) HandlePushThrough(ctx core.ActionContext) error {
+func (w *Wait) HandlePushThrough(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

@@ -126,7 +126,7 @@ export type ComponentBaseContext = {
 };
 
 export type ActionContext = {
-  invokeNodeExecutionAction: (executionId: string, action: string, parameters: unknown) => Promise<void>;
+  invokeNodeExecutionHook: (executionId: string, hook: string, parameters: unknown) => Promise<void>;
 };
 
 export type SubtitleContext = {

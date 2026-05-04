@@ -125,9 +125,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 				"values":       []string{"1.2.3.4"},
 			},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{},
-			},
+			Integration:    &contexts.IntegrationContext{},
 		})
 
 		require.Error(t, err)
@@ -169,7 +167,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 			Metadata:       metadata,
 			Requests:       requests,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -222,7 +220,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 			ExecutionState: execState,
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -273,7 +271,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -315,7 +313,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -330,15 +328,15 @@ func TestCreateRecord_Execute(t *testing.T) {
 	})
 }
 
-func TestCreateRecord_HandleAction(t *testing.T) {
+func TestCreateRecord_HandleHook(t *testing.T) {
 	component := &CreateRecord{}
 
 	t.Run("unknown action -> error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "unknown",
 		})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "unknown action")
+		require.Contains(t, err.Error(), "unknown hook")
 	})
 
 	t.Run("pollChange status still PENDING -> schedules poll again", func(t *testing.T) {
@@ -359,7 +357,7 @@ func TestCreateRecord_HandleAction(t *testing.T) {
 			},
 		}
 		requests := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:     pollChangeActionName,
 			HTTP:     httpContext,
 			Requests: requests,
@@ -372,7 +370,7 @@ func TestCreateRecord_HandleAction(t *testing.T) {
 				},
 			},
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -402,7 +400,7 @@ func TestCreateRecord_HandleAction(t *testing.T) {
 			},
 		}
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           pollChangeActionName,
 			HTTP:           httpContext,
 			ExecutionState: execState,
@@ -415,7 +413,7 @@ func TestCreateRecord_HandleAction(t *testing.T) {
 				},
 			},
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

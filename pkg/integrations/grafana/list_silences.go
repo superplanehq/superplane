@@ -112,14 +112,6 @@ func (l *ListSilences) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (l *ListSilences) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *ListSilences) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (l *ListSilences) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -142,4 +134,12 @@ func decodeListSilencesSpec(config any) (ListSilencesSpec, error) {
 		return ListSilencesSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
 	return spec, nil
+}
+
+func (l *ListSilences) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *ListSilences) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

@@ -137,15 +137,15 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 		return fmt.Errorf("failed to find app installation: %v", err)
 	}
 
-	integrationImpl, err := w.registry.GetIntegration(integration.AppName)
+	spec := request.Spec.Data()
+	hookProvider, _, err := w.registry.FindIntegrationHook(integration.AppName, spec.InvokeAction.ActionName)
 	if err != nil {
-		return fmt.Errorf("integration %s not found", integration.AppName)
+		return fmt.Errorf("failed to find hook: %v", err)
 	}
 
-	spec := request.Spec.Data()
 	logger := logging.ForIntegration(*integration)
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil)
-	actionCtx := core.IntegrationActionContext{
+	hookCtx := core.IntegrationHookContext{
 		WebhooksBaseURL: w.webhooksBaseURL,
 		Name:            spec.InvokeAction.ActionName,
 		Parameters:      spec.InvokeAction.Parameters,
@@ -155,7 +155,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 		HTTP:            w.registry.HTTPContext(),
 	}
 
-	err = integrationImpl.HandleAction(actionCtx)
+	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		logger.Errorf("error handling action: %v", err)
 	}

@@ -71,7 +71,7 @@ function resolveExecutionRowData(
 ) {
   return {
     nodeName: node?.name || execution.nodeId || "Unknown",
-    iconSrc: getHeaderIconSrc(node?.component?.name || node?.trigger?.name),
+    iconSrc: getHeaderIconSrc(node?.component),
     iconSlug: resolveNodeIconSlug(node, componentIconMap),
     status: resolveExecutionDisplayStatus(execution, nodes),
     duration: computeDuration(execution),

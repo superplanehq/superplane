@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
-	"github.com/expr-lang/expr/ast"
-	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -25,6 +24,7 @@ type NodeConfigurationBuilder struct {
 	nodeID              string
 	previousExecutionID *uuid.UUID
 	rootEventID         *uuid.UUID
+	rootPayload         any
 	input               any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
@@ -49,6 +49,11 @@ func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationB
 
 func (b *NodeConfigurationBuilder) WithRootEvent(rootEventID *uuid.UUID) *NodeConfigurationBuilder {
 	b.rootEventID = rootEventID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurationBuilder {
+	b.rootPayload = payload
 	return b
 }
 
@@ -240,7 +245,7 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
-	referencedNodes, err := parseReferencedNodes(expression)
+	referencedNodes, err := expressionvalidation.ParseReferencedNodes(expression)
 	if err != nil {
 		return "", err
 	}
@@ -491,7 +496,11 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if rootEvent == nil {
+		if b.rootPayload != nil {
+			return b.rootPayload, nil
+		}
 		return nil, fmt.Errorf("no root event found")
 	}
 
@@ -1011,56 +1020,4 @@ func (b *NodeConfigurationBuilder) listUpstreamNodeIDs() ([]string, error) {
 	}
 	sort.Strings(ids)
 	return ids, nil
-}
-
-func parseReferencedNodes(expression string) ([]string, error) {
-	tree, err := parser.Parse(expression)
-	if err != nil {
-		return nil, err
-	}
-
-	collector := &nodeReferenceCollector{
-		seen: make(map[string]struct{}),
-	}
-
-	ast.Walk(&tree.Node, collector)
-
-	return collector.identifiers, nil
-}
-
-type nodeReferenceCollector struct {
-	identifiers []string
-	seen        map[string]struct{}
-}
-
-func (c *nodeReferenceCollector) Visit(node *ast.Node) {
-	member, ok := (*node).(*ast.MemberNode)
-	if !ok {
-		return
-	}
-
-	root, ok := member.Node.(*ast.IdentifierNode)
-	if !ok || root.Value != "$" {
-		return
-	}
-
-	switch property := member.Property.(type) {
-	case *ast.StringNode:
-		c.add(property.Value)
-	case *ast.IdentifierNode:
-		c.add(property.Value)
-	}
-}
-
-func (c *nodeReferenceCollector) add(value string) {
-	if value == "" {
-		return
-	}
-
-	if _, ok := c.seen[value]; ok {
-		return
-	}
-
-	c.seen[value] = struct{}{}
-	c.identifiers = append(c.identifiers, value)
 }

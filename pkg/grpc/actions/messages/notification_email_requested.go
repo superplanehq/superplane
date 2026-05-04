@@ -1,7 +1,7 @@
 package messages
 
 import (
-	pb "github.com/superplanehq/superplane/pkg/protos/components"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

@@ -143,7 +143,7 @@ function getWaitCustomField(context: ComponentBaseContext): React.ReactNode {
   return React.createElement(PushThroughHandler, {
     onPushThrough: async () => {
       if (!lastExecution?.id) return;
-      return context.actions.invokeNodeExecutionAction(lastExecution.id, "pushThrough", null);
+      return context.actions.invokeNodeExecutionHook(lastExecution.id, "pushThrough", null);
     },
   });
 }

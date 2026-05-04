@@ -79,6 +79,10 @@ spec:
               value: superplane
             - name: DB_POOL_SIZE
               value: "{{ .Values.workers.dbPoolSize }}"
+            - name: DB_STATEMENT_TIMEOUT
+              value: "{{ .Values.database.statementTimeout }}"
+            - name: DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
+              value: "{{ .Values.database.idleInTransactionSessionTimeout }}"
             - name: EMAIL_FROM_NAME
               value: "{{ .Values.email.fromName }}"
             - name: EMAIL_FROM_ADDRESS

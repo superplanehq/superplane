@@ -172,40 +172,18 @@ func Test__LaunchAgent__HandleWebhook__ExecutionNotFound(t *testing.T) {
 	})
 }
 
-func Test__LaunchAgent__Actions(t *testing.T) {
-	c := &LaunchAgent{}
-
-	t.Run("returns poll action", func(t *testing.T) {
-		actions := c.Actions()
-		require.Len(t, actions, 1)
-		assert.Equal(t, "poll", actions[0].Name)
-		assert.False(t, actions[0].UserAccessible)
-	})
-}
-
-func Test__LaunchAgent__HandleAction(t *testing.T) {
-	c := &LaunchAgent{}
-
-	t.Run("unknown action -> error", func(t *testing.T) {
-		ctx := core.ActionContext{Name: "unknown"}
-		err := c.HandleAction(ctx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
-	})
-}
-
 func Test__LaunchAgent__Poll(t *testing.T) {
 	c := &LaunchAgent{}
 
 	t.Run("execution already finished -> no-op", func(t *testing.T) {
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: true}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			ExecutionState: executionStateCtx,
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 	})
 
@@ -215,14 +193,14 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			Metadata:       metadataCtx,
 			ExecutionState: executionStateCtx,
 			Parameters:     map[string]any{},
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 	})
 
@@ -234,14 +212,14 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			Metadata:       metadataCtx,
 			ExecutionState: executionStateCtx,
 			Parameters:     map[string]any{},
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 	})
 
@@ -254,7 +232,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			Metadata:       metadataCtx,
 			ExecutionState: executionStateCtx,
@@ -262,7 +240,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.True(t, executionStateCtx.Finished)
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
@@ -295,7 +273,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -305,7 +283,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.True(t, executionStateCtx.Finished)
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
@@ -419,7 +397,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 		requestsCtx := &contexts.RequestContext{}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -430,7 +408,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, "poll", requestsCtx.Action)
 		assert.Equal(t, 2, requestsCtx.Params["attempt"])
@@ -459,7 +437,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{Finished: false, KVs: map[string]string{}}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -469,7 +447,7 @@ func Test__LaunchAgent__Poll(t *testing.T) {
 			Logger:         logrus.NewEntry(logrus.New()),
 		}
 
-		err := c.HandleAction(ctx)
+		err := c.HandleHook(ctx)
 		require.NoError(t, err)
 		assert.True(t, executionStateCtx.Finished)
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
@@ -482,7 +460,7 @@ func Test__LaunchAgent__ScheduleNextPoll(t *testing.T) {
 	t.Run("calculates exponential backoff", func(t *testing.T) {
 		requestsCtx := &contexts.RequestContext{}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Requests: requestsCtx,
 		}
 
@@ -498,7 +476,7 @@ func Test__LaunchAgent__ScheduleNextPoll(t *testing.T) {
 	t.Run("caps at max poll interval", func(t *testing.T) {
 		requestsCtx := &contexts.RequestContext{}
 
-		ctx := core.ActionContext{
+		ctx := core.ActionHookContext{
 			Requests: requestsCtx,
 		}
 

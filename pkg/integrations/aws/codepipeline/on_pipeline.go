@@ -197,25 +197,25 @@ func (p *OnPipeline) subscriptionPattern(region string) *common.EventBridgeEvent
 	}
 }
 
-func (p *OnPipeline) Actions() []core.Action {
-	return []core.Action{
+func (p *OnPipeline) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "checkRuleAvailability",
-			Description: "Check if the EventBridge rule is available",
+			Name: "checkRuleAvailability",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (p *OnPipeline) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPipeline) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
 	case "checkRuleAvailability":
 		return p.checkRuleAvailability(ctx)
 	default:
-		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (p *OnPipeline) checkRuleAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnPipeline) checkRuleAvailability(ctx core.TriggerHookContext) (map[string]any, error) {
 	metadata := OnPipelineMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)

@@ -142,11 +142,11 @@ func (t *OnArtifactUploaded) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	return http.StatusOK, nil, nil
 }
 
-func (t *OnArtifactUploaded) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnArtifactUploaded) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnArtifactUploaded) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnArtifactUploaded) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

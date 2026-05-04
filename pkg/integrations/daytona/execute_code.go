@@ -224,20 +224,20 @@ func (e *ExecuteCode) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (e *ExecuteCode) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (e *ExecuteCode) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (e *ExecuteCode) HandleAction(ctx core.ActionContext) error {
+func (e *ExecuteCode) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return e.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (e *ExecuteCode) poll(ctx core.ActionContext) error {
+func (e *ExecuteCode) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

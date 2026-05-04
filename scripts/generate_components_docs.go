@@ -37,7 +37,7 @@ func main() {
 		return integrations[i].Label() < integrations[j].Label()
 	})
 
-	if err := writeCoreComponentsDoc(reg.ListComponents(), reg.ListTriggers()); err != nil {
+	if err := writeCoreComponentsDoc(reg.ListActions(), reg.ListTriggers()); err != nil {
 		exitWithError(err)
 	}
 
@@ -55,32 +55,32 @@ func createOutputDirectory() {
 }
 
 func writeIntegrationDocs(integration core.Integration) error {
-	components := integration.Components()
+	actions := integration.Actions()
 	triggers := integration.Triggers()
 
-	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
+	sort.Slice(actions, func(i, j int) bool { return actions[i].Name() < actions[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers)
+	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, actions, triggers)
 }
 
-func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
-	if len(components) == 0 && len(triggers) == 0 {
+func writeCoreComponentsDoc(actions []core.Action, triggers []core.Trigger) error {
+	if len(actions) == 0 && len(triggers) == 0 {
 		return nil
 	}
 
-	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
+	sort.Slice(actions, func(i, j int) bool { return actions[i].Name() < actions[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
 	var buf bytes.Buffer
 	coreOrder := 1
 	writeFrontMatter(&buf, "Core", &coreOrder)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
-	writeCardGridImport(&buf, triggers, components)
+	writeCardGridImport(&buf, triggers, actions)
 	writeCardGridTriggers(&buf, triggers)
-	writeCardGridComponents(&buf, components)
+	writeCardGridActions(&buf, actions)
 	writeTriggerSection(&buf, triggers)
-	writeComponentSection(&buf, components)
+	writeActionSection(&buf, actions)
 
 	return writeFile(filepath.Join(docsRoot, "Core.mdx"), buf.Bytes())
 }
@@ -88,16 +88,16 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 func writeIntegrationIndex(
 	path string,
 	integration core.Integration,
-	components []core.Component,
+	actions []core.Action,
 	triggers []core.Trigger,
 ) error {
 	var buf bytes.Buffer
 	writeFrontMatter(&buf, integration.Label(), nil)
 
 	writeOverviewSection(&buf, sanitizeHTMLTags(integration.Description()))
-	writeCardGridImport(&buf, triggers, components)
+	writeCardGridImport(&buf, triggers, actions)
 	writeCardGridTriggers(&buf, triggers)
-	writeCardGridComponents(&buf, components)
+	writeCardGridActions(&buf, actions)
 
 	if instructions := strings.TrimSpace(integration.Instructions()); instructions != "" {
 		buf.WriteString("## Instructions\n\n")
@@ -106,7 +106,7 @@ func writeIntegrationIndex(
 	}
 
 	writeTriggerSection(&buf, triggers)
-	writeComponentSection(&buf, components)
+	writeActionSection(&buf, actions)
 
 	return writeFile(path, buf.Bytes())
 }
@@ -121,25 +121,25 @@ func writeFrontMatter(buf *bytes.Buffer, title string, order *int) {
 	buf.WriteString("---\n\n")
 }
 
-func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
-	if len(components) == 0 {
+func writeActionSection(buf *bytes.Buffer, actions []core.Action) {
+	if len(actions) == 0 {
 		return
 	}
 
-	for _, component := range components {
-		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
-		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
+	for _, action := range actions {
+		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(action.Label())))
+		buf.WriteString(fmt.Sprintf("## %s\n\n", action.Label()))
 
 		// Write documentation if available, otherwise fall back to description
-		doc := component.Documentation()
+		doc := action.Documentation()
 		if doc != "" {
 			adjustedDoc := adjustHeadingLevels(doc)
 			writeParagraph(buf, adjustedDoc)
 		} else {
-			writeParagraph(buf, component.Description())
+			writeParagraph(buf, action.Description())
 		}
 
-		writeExampleSection("Example Output", component.ExampleOutput(), buf)
+		writeExampleSection("Example Output", action.ExampleOutput(), buf)
 	}
 }
 
@@ -165,26 +165,26 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	}
 }
 
-func writeCardGridImport(buf *bytes.Buffer, triggers []core.Trigger, components []core.Component) {
-	if len(triggers) == 0 && len(components) == 0 {
+func writeCardGridImport(buf *bytes.Buffer, triggers []core.Trigger, actions []core.Action) {
+	if len(triggers) == 0 && len(actions) == 0 {
 		return
 	}
 
 	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
 }
 
-func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
-	if len(components) == 0 {
+func writeCardGridActions(buf *bytes.Buffer, actions []core.Action) {
+	if len(actions) == 0 {
 		return
 	}
 
 	buf.WriteString("## Actions\n\n")
 	buf.WriteString("<CardGrid>\n")
-	for _, component := range components {
-		description := strings.TrimSpace(component.Description())
+	for _, action := range actions {
+		description := strings.TrimSpace(action.Description())
 		buf.WriteString(fmt.Sprintf("  <LinkCard title=\"%s\" href=\"#%s\" description=\"%s\" />\n",
-			escapeQuotes(component.Label()),
-			slugify(component.Label()),
+			escapeQuotes(action.Label()),
+			slugify(action.Label()),
 			escapeQuotes(description),
 		))
 	}

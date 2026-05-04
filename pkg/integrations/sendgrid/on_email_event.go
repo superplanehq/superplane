@@ -141,11 +141,11 @@ func (t *OnEmailEvent) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(struct{}{})
 }
 
-func (t *OnEmailEvent) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnEmailEvent) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnEmailEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnEmailEvent) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

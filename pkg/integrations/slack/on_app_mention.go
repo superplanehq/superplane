@@ -164,11 +164,11 @@ func (t *OnAppMention) validateChannel(ctx core.TriggerContext, config OnAppMent
 	}, nil
 }
 
-func (t *OnAppMention) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnAppMention) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnAppMention) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnAppMention) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

@@ -59,8 +59,8 @@ func (i *IncidentIO) Configuration() []configuration.Field {
 	}
 }
 
-func (i *IncidentIO) Components() []core.Component {
-	return []core.Component{
+func (i *IncidentIO) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 	}
 }
@@ -103,14 +103,6 @@ func (i *IncidentIO) Sync(ctx core.SyncContext) error {
 
 func (i *IncidentIO) HandleRequest(ctx core.HTTPRequestContext) {}
 
-func (i *IncidentIO) Actions() []core.Action {
-	return nil
-}
-
-func (i *IncidentIO) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 func (i *IncidentIO) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "severity" {
 		return []core.IntegrationResource{}, nil
@@ -135,4 +127,12 @@ func (i *IncidentIO) ListResources(resourceType string, ctx core.ListResourcesCo
 		})
 	}
 	return resources, nil
+}
+
+func (i *IncidentIO) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (i *IncidentIO) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

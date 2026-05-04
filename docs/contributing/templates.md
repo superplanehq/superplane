@@ -89,7 +89,7 @@ spec:
   nodes:
     - id: "unique-node-id"
       name: "Display Name"
-      type: "TYPE_TRIGGER" # or TYPE_COMPONENT, TYPE_WIDGET
+      type: "TYPE_TRIGGER" # or TYPE_ACTION, TYPE_WIDGET
       configuration: {}
       position:
         x: 100
@@ -106,7 +106,7 @@ spec:
 **Nodes** define the individual steps in the workflow:
 - `id`: Unique identifier for the node (used in edges)
 - `name`: Display name shown in the UI
-- `type`: Node type (`TYPE_TRIGGER`, `TYPE_COMPONENT`, or `TYPE_WIDGET`)
+- `type`: Node type (`TYPE_TRIGGER`, `TYPE_ACTION`, or `TYPE_WIDGET`)
 - `configuration`: Component-specific configuration
 - `position`: X and Y coordinates for canvas layout
 - `trigger`, `component`, or `widget`: Type-specific configuration

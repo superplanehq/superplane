@@ -1,5 +1,6 @@
+import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
-import type { TriggersTrigger, ComponentsComponent, IntegrationsIntegrationDefinition } from "@/api-client";
+import type { TriggersTrigger, SuperplaneActionsAction, IntegrationsIntegrationDefinition } from "@/api-client";
 
 const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory", "upsertmemory"]);
 
@@ -10,7 +11,7 @@ function isMemoryBlock(block: BuildingBlock): boolean {
 // Build categories of building blocks from live data
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
-  components: ComponentsComponent[],
+  components: SuperplaneActionsAction[],
   availableIntegrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
   const deprecatedTriggerNames = new Set(["github", "semaphore"]);
@@ -59,10 +60,13 @@ export function buildBuildingBlockCategories(
   // Add a category for each available application with its components and triggers
   availableIntegrations.forEach((integration) => {
     const blocks: BuildingBlock[] = [];
+    if (!integration.capabilities) {
+      return;
+    }
 
-    // Add triggers from this integration
-    if (integration.triggers) {
-      integration.triggers.forEach((t) => {
+    const triggers = triggersFromCapabilities(integration.capabilities);
+    if (triggers) {
+      triggers.forEach((t) => {
         const block: BuildingBlock = {
           name: t.name!,
           label: t.label,
@@ -78,9 +82,9 @@ export function buildBuildingBlockCategories(
       });
     }
 
-    // Add components from this application
-    if (integration.components) {
-      integration.components.forEach((c) => {
+    const actions = actionsFromCapabilities(integration.capabilities);
+    if (actions) {
+      actions.forEach((c) => {
         const block: BuildingBlock = {
           name: c.name!,
           label: c.label,

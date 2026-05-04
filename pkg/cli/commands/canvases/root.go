@@ -10,6 +10,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "canvases",
 		Short:   "Manage canvases",
+		Long:    core.AgentSkillsHelp(),
 		Aliases: []string{"canvas"},
 	}
 
@@ -46,7 +47,12 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create [canvas-name]",
 		Short: "Create a canvas",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Create a canvas by name or from a file.
+
+AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
+- ` + core.SkillsInstallCommand("superplane-canvas-builder") + `
+- ` + core.SkillsInstallCommand("superplane-cli"),
+		Args: cobra.MaximumNArgs(1),
 	}
 	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
 	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
@@ -65,11 +71,13 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
-		Use:   "update [name-or-id]",
-		Short: "Update a canvas from a file",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "update",
+		Short: "Update a canvas from a YAML file",
+		Long:  "Updates the canvas using --file. The file must include metadata.id to identify the target canvas.",
+		Args:  cobra.NoArgs,
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
+	_ = updateCmd.MarkFlagRequired("file")
 	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
@@ -142,7 +150,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsApproveCmd, &changeRequestActionCommand{
-		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
 	}, options)
 
 	changeRequestsUnapproveCmd := &cobra.Command{
@@ -151,7 +159,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsUnapproveCmd, &changeRequestActionCommand{
-		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
 	}, options)
 
 	changeRequestsRejectCmd := &cobra.Command{
@@ -160,7 +168,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsRejectCmd, &changeRequestActionCommand{
-		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
 	}, options)
 
 	changeRequestsReopenCmd := &cobra.Command{
@@ -169,7 +177,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsReopenCmd, &changeRequestActionCommand{
-		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
 	}, options)
 
 	changeRequestsPublishCmd := &cobra.Command{
@@ -178,7 +186,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 	}
 	core.Bind(changeRequestsPublishCmd, &changeRequestActionCommand{
-		action: openapi_client.ACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
 	}, options)
 
 	var changeRequestsResolveFile string

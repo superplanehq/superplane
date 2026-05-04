@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -24,12 +25,37 @@ type Integration struct {
 	InstallationName string
 	State            string
 	StateDescription string
-	Configuration    datatypes.JSONType[map[string]any]
-	Metadata         datatypes.JSONType[map[string]any]
-	BrowserAction    *datatypes.JSONType[BrowserAction]
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
+
+	//
+	// These are fields used by the old integrations.
+	// Should be removed once all integration implementations
+	// are migrated to use core.IntegrationSetupProvider
+	//
+	Configuration datatypes.JSONType[map[string]any]
+	Metadata      datatypes.JSONType[map[string]any]
+	BrowserAction *datatypes.JSONType[BrowserAction]
+
+	//
+	// Fields required for integrations set up using core.IntegrationSetupProvider
+	// All integrations should use this
+	//
+	SetupState   *datatypes.JSONType[SetupState]
+	Properties   datatypes.JSONSlice[core.IntegrationPropertyDefinition]
+	Capabilities datatypes.JSONSlice[CapabilityState]
+}
+
+type SetupState struct {
+	CurrentStep   *core.SetupStep  `json:"current_step,omitempty"`
+	PreviousSteps []core.SetupStep `json:"previous_steps,omitempty"`
+}
+
+type CapabilityState struct {
+	Name   string                          `json:"name"`
+	State  core.IntegrationCapabilityState `json:"state"`
+	Reason *string                         `json:"reason,omitempty"`
 }
 
 func (a *Integration) TableName() string {
@@ -41,13 +67,29 @@ type IntegrationSecret struct {
 	OrganizationID uuid.UUID
 	InstallationID uuid.UUID
 	Name           string
+	Label          string
+	Description    string
 	Value          []byte
+	Editable       bool
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
 }
 
 func (a *IntegrationSecret) TableName() string {
 	return "app_installation_secrets"
+}
+
+func ListIntegrationSecrets(installationID uuid.UUID) ([]IntegrationSecret, error) {
+	return ListIntegrationSecretsInTransaction(database.Conn(), installationID)
+}
+
+func ListIntegrationSecretsInTransaction(tx *gorm.DB, installationID uuid.UUID) ([]IntegrationSecret, error) {
+	var secrets []IntegrationSecret
+	err := tx.Where("installation_id = ?", installationID).Find(&secrets).Error
+	if err != nil {
+		return nil, err
+	}
+	return secrets, nil
 }
 
 type BrowserAction struct {
@@ -143,7 +185,8 @@ func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReferen
 	err := database.Conn().
 		Table("workflow_nodes AS wn").
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
-		Select("w.id as canvas_id, w.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
+		Joins("JOIN workflow_versions AS live_version ON live_version.id = w.live_version_id").
+		Select("w.id as canvas_id, live_version.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
 		Where("wn.app_installation_id = ?", integrationID).
 		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).

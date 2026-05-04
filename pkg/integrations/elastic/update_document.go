@@ -184,13 +184,19 @@ func (c *UpdateDocument) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpdateDocument) Actions() []core.Action                  { return nil }
-func (c *UpdateDocument) HandleAction(_ core.ActionContext) error { return nil }
-func (c *UpdateDocument) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *UpdateDocument) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *UpdateDocument) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *UpdateDocument) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *UpdateDocument) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 func (c *UpdateDocument) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *UpdateDocument) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateDocument) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

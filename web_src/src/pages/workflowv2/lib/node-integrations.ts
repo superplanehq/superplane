@@ -1,9 +1,8 @@
 import type {
-  ComponentsComponent,
   SuperplaneComponentsNode as ComponentsNode,
   IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
-  TriggersTrigger,
+  IntegrationsCapabilityDefinition,
 } from "@/api-client";
 import type { CanvasNode } from "@/ui/CanvasPage";
 
@@ -11,16 +10,22 @@ export function getNodeIntegrationName(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
 ): string | undefined {
-  if (node.type === "TYPE_COMPONENT") {
+  if (node.type === "TYPE_ACTION") {
     const match = availableIntegrations.find((integration) =>
-      integration.components?.some((component: ComponentsComponent) => component.name === node.component?.name),
+      integration.capabilities?.some(
+        (capability: IntegrationsCapabilityDefinition) =>
+          capability.type === "TYPE_ACTION" && capability.name === node.component,
+      ),
     );
     return match?.name;
   }
 
   if (node.type === "TYPE_TRIGGER") {
     const match = availableIntegrations.find((integration) =>
-      integration.triggers?.some((trigger: TriggersTrigger) => trigger.name === node.trigger?.name),
+      integration.capabilities?.some(
+        (capability: IntegrationsCapabilityDefinition) =>
+          capability.type === "TYPE_TRIGGER" && capability.name === node.component,
+      ),
     );
     return match?.name;
   }

@@ -323,7 +323,7 @@ function approvalItemPropsForRecord(
     onApprove: async (comment?: string) => {
       if (!lastExecution?.id) return;
 
-      return context.actions.invokeNodeExecutionAction(lastExecution.id, "approve", {
+      return context.actions.invokeNodeExecutionHook(lastExecution.id, "approve", {
         index: record.index,
         comment: comment,
       });
@@ -331,7 +331,7 @@ function approvalItemPropsForRecord(
     onReject: async (reason: string) => {
       if (!lastExecution?.id) return;
 
-      return context.actions.invokeNodeExecutionAction(lastExecution.id, "reject", {
+      return context.actions.invokeNodeExecutionHook(lastExecution.id, "reject", {
         index: record.index,
         reason: reason,
       });

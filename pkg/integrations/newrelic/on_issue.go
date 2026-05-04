@@ -126,11 +126,11 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(struct{}{})
 }
 
-func (t *OnIssue) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnIssue) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnIssue) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 
