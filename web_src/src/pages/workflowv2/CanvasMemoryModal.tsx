@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+import { Fragment } from "react";
 import { Trash2 } from "lucide-react";
 
 export type CanvasMemoryModalProps = {
@@ -108,8 +109,24 @@ function ZeroState() {
   );
 }
 
-function formatValue(value: unknown): string {
+function isUrl(value: string): boolean {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+function formatValue(value: unknown): string | React.ReactElement {
   if (typeof value === "string") {
+    if (isUrl(value)) {
+      return (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline"
+        >
+          {value}
+        </a>
+      );
+    }
     return value;
   }
 
