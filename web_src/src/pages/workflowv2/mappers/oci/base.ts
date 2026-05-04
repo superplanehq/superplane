@@ -52,11 +52,12 @@ export const baseMapper: ComponentBaseMapper = {
   },
 };
 
-export function compactDetails(entries: Array<[string, string | undefined]>): Record<string, string> {
+/** Omits only null/undefined keys — keeps empty strings and other falsy string values. */
+export function compactDetails(entries: Array<[string, string | null | undefined]>): Record<string, string> {
   const details: Record<string, string> = {};
 
   for (const [key, value] of entries) {
-    if (value) {
+    if (value != null) {
       details[key] = value;
     }
   }
