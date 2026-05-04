@@ -367,26 +367,26 @@ export interface KnowledgeBaseDataSource {
 }
 
 export interface GetGPUDropletConfiguration {
-  droplet: string;
+  gpuDroplet: string;
 }
 
 export interface UpdateGPUDropletConfiguration {
-  droplet: string;
+  gpuDroplet: string;
   name?: string;
-  size?: string;
+  gpuSize?: string;
 }
 
 export interface DeleteGPUDropletConfiguration {
-  droplet: string;
+  gpuDroplet: string;
 }
 
 export interface CreateGPUDropletConfiguration {
   name?: string;
-  region?: string;
-  size?: string;
+  gpuRegion?: string;
+  gpuSize?: string;
   imageType?: string;
-  oneClickImage?: string;
-  baseImage?: string;
+  oneClickGPUImage?: string;
+  baseGPUImage?: string;
 }
 
 export interface NetworkV4 {

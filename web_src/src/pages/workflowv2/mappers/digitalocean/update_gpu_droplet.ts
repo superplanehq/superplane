@@ -75,16 +75,16 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (nodeMetadata?.dropletName) {
     metadata.push({ icon: "gpu", label: nodeMetadata.dropletName });
-  } else if (configuration?.droplet) {
-    metadata.push({ icon: "gpu", label: `GPU Droplet ID: ${configuration.droplet}` });
+  } else if (configuration?.gpuDroplet) {
+    metadata.push({ icon: "gpu", label: `GPU Droplet ID: ${configuration.gpuDroplet}` });
   }
 
   if (configuration?.name) {
     metadata.push({ icon: "edit", label: `Rename: ${configuration.name}` });
   }
 
-  if (configuration?.size) {
-    metadata.push({ icon: "arrow-up", label: `Upsize: ${configuration.size}` });
+  if (configuration?.gpuSize) {
+    metadata.push({ icon: "arrow-up", label: `Upsize: ${configuration.gpuSize}` });
   }
 
   return metadata;

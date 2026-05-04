@@ -59,8 +59,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as DeleteGPUDropletConfiguration;
 
-  if (configuration?.droplet) {
-    metadata.push({ icon: "trash-2", label: `Droplet: ${configuration.droplet}` });
+  if (configuration?.gpuDroplet) {
+    metadata.push({ icon: "trash-2", label: `Droplet: ${configuration.gpuDroplet}` });
   }
 
   return metadata;
