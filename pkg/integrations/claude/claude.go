@@ -11,7 +11,9 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("claude", &Claude{})
+	registry.RegisterIntegrationWithOptions("claude", &Claude{}, registry.IntegrationRegistrationOptions{
+		SetupProvider: &SetupProvider{},
+	})
 }
 
 type Claude struct{}
@@ -39,7 +41,7 @@ func (i *Claude) Description() string {
 func (i *Claude) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "apiKey",
+			Name:        SecretAPIKey,
 			Label:       "API Key",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
@@ -74,7 +76,7 @@ func (i *Claude) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if config.APIKey == "" {
+	if ctx.Integration.LegacySetup() && config.APIKey == "" {
 		return fmt.Errorf("apiKey is required")
 	}
 
