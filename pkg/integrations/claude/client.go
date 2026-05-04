@@ -75,16 +75,33 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, fmt.Errorf("no integration context")
 	}
 
+	if !ctx.LegacySetup() {
+		return NewClientWithStorageContexts(httpClient, ctx.Secrets())
+	}
+
 	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
 		return nil, err
 	}
 
+	return NewClientWithAPIKey(httpClient, string(apiKey)), nil
+}
+
+func NewClientWithStorageContexts(httpClient core.HTTPContext, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+	apiKey, err := secrets.Get("apiKey")
+	if err != nil {
+		return nil, err
+	}
+
+	return NewClientWithAPIKey(httpClient, apiKey), nil
+}
+
+func NewClientWithAPIKey(httpClient core.HTTPContext, apiKey string) *Client {
 	return &Client{
-		APIKey:  string(apiKey),
+		APIKey:  apiKey,
 		BaseURL: defaultBaseURL,
 		http:    httpClient,
-	}, nil
+	}
 }
 
 func (c *Client) Verify() error {

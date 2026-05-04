@@ -19,16 +19,33 @@ type Client struct {
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	if !ctx.LegacySetup() {
+		return NewClientWithStorageContexts(http, ctx.Secrets())
+	}
+
 	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
 		return nil, fmt.Errorf("error getting API key: %v", err)
 	}
 
+	return NewClientWithAPIKey(http, string(apiKey)), nil
+}
+
+func NewClientWithStorageContexts(http core.HTTPContext, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+	apiKey, err := secrets.Get("apiKey")
+	if err != nil {
+		return nil, err
+	}
+
+	return NewClientWithAPIKey(http, apiKey), nil
+}
+
+func NewClientWithAPIKey(http core.HTTPContext, apiKey string) *Client {
 	return &Client{
-		Token:   string(apiKey),
+		Token:   apiKey,
 		BaseURL: BaseURL,
 		http:    http,
-	}, nil
+	}
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {

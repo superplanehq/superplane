@@ -18,7 +18,10 @@ To connect FireHydrant, create an API key:
 `
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("firehydrant", &FireHydrant{}, &FireHydrantWebhookHandler{})
+	registry.RegisterIntegrationWithOptions("firehydrant", &FireHydrant{}, registry.IntegrationRegistrationOptions{
+		WebhookHandler: &FireHydrantWebhookHandler{},
+		SetupProvider:  newSetupProvider(),
+	})
 }
 
 type FireHydrant struct{}
@@ -77,14 +80,16 @@ func (f *FireHydrant) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (f *FireHydrant) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return fmt.Errorf("failed to decode config: %v", err)
-	}
+	if ctx.Integration.LegacySetup() {
+		config := Configuration{}
+		err := mapstructure.Decode(ctx.Configuration, &config)
+		if err != nil {
+			return fmt.Errorf("failed to decode config: %v", err)
+		}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("API key is required")
+		if config.APIKey == "" {
+			return fmt.Errorf("API key is required")
+		}
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

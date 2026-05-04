@@ -10,7 +10,9 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("perplexity", &Perplexity{})
+	registry.RegisterIntegrationWithOptions("perplexity", &Perplexity{}, registry.IntegrationRegistrationOptions{
+		SetupProvider: newSetupProvider(),
+	})
 }
 
 type Perplexity struct{}
@@ -69,13 +71,15 @@ func (p *Perplexity) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (p *Perplexity) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %v", err)
-	}
+	if ctx.Integration.LegacySetup() {
+		config := Configuration{}
+		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+			return fmt.Errorf("failed to decode configuration: %v", err)
+		}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("apiKey is required")
+		if config.APIKey == "" {
+			return fmt.Errorf("apiKey is required")
+		}
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

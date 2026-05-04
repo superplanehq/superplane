@@ -11,7 +11,9 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("claude", &Claude{})
+	registry.RegisterIntegrationWithOptions("claude", &Claude{}, registry.IntegrationRegistrationOptions{
+		SetupProvider: newSetupProvider(),
+	})
 }
 
 type Claude struct{}
@@ -69,13 +71,15 @@ func (i *Claude) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (i *Claude) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %v", err)
-	}
+	if ctx.Integration.LegacySetup() {
+		config := Configuration{}
+		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+			return fmt.Errorf("failed to decode configuration: %v", err)
+		}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("apiKey is required")
+		if config.APIKey == "" {
+			return fmt.Errorf("apiKey is required")
+		}
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

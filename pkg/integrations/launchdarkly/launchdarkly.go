@@ -11,7 +11,10 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("launchdarkly", &LaunchDarkly{}, &LaunchDarklyWebhookHandler{})
+	registry.RegisterIntegrationWithOptions("launchdarkly", &LaunchDarkly{}, registry.IntegrationRegistrationOptions{
+		WebhookHandler: &LaunchDarklyWebhookHandler{},
+		SetupProvider:  newSetupProvider(),
+	})
 }
 
 type LaunchDarkly struct{}
@@ -76,14 +79,16 @@ func (l *LaunchDarkly) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (l *LaunchDarkly) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return fmt.Errorf("failed to decode config: %w", err)
-	}
+	if ctx.Integration.LegacySetup() {
+		config := Configuration{}
+		err := mapstructure.Decode(ctx.Configuration, &config)
+		if err != nil {
+			return fmt.Errorf("failed to decode config: %w", err)
+		}
 
-	if strings.TrimSpace(config.APIKey) == "" {
-		return fmt.Errorf("API access token is required")
+		if strings.TrimSpace(config.APIKey) == "" {
+			return fmt.Errorf("API access token is required")
+		}
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

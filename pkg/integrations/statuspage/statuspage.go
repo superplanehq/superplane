@@ -10,7 +10,9 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("statuspage", &Statuspage{})
+	registry.RegisterIntegrationWithOptions("statuspage", &Statuspage{}, registry.IntegrationRegistrationOptions{
+		SetupProvider: newSetupProvider(),
+	})
 }
 
 type Statuspage struct{}
@@ -66,14 +68,16 @@ func (s *Statuspage) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (s *Statuspage) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
+	if ctx.Integration.LegacySetup() {
+		config := Configuration{}
+		err := mapstructure.Decode(ctx.Configuration, &config)
+		if err != nil {
+			return fmt.Errorf("failed to decode configuration: %w", err)
+		}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("apiKey is required")
+		if config.APIKey == "" {
+			return fmt.Errorf("apiKey is required")
+		}
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

@@ -38,6 +38,10 @@ func validateBaseURL(baseURL string) error {
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	if !ctx.LegacySetup() {
+		return NewClientWithStorageContexts(http, ctx.Properties(), ctx.Secrets())
+	}
+
 	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
 		return nil, fmt.Errorf("api key not found: %w", err)
@@ -53,8 +57,38 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		return nil, err
 	}
 
+	return NewClientWithAPIKey(http, string(apiKey), baseURL)
+}
+
+func NewClientWithStorageContexts(http core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+	apiKey, err := secrets.Get("apiKey")
+	if err != nil {
+		return nil, err
+	}
+
+	baseURL := defaultBaseURL
+	if properties != nil {
+		baseURLConfig, err := properties.GetString("baseURL")
+		if err == nil && baseURLConfig != "" {
+			baseURL = baseURLConfig
+		}
+	}
+
+	return NewClientWithAPIKey(http, apiKey, baseURL)
+}
+
+func NewClientWithAPIKey(http core.HTTPContext, apiKey, baseURL string) (*Client, error) {
+	if baseURL == "" {
+		baseURL = defaultBaseURL
+	}
+
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	if err := validateBaseURL(baseURL); err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		apiKey:  string(apiKey),
+		apiKey:  apiKey,
 		baseURL: baseURL,
 		http:    http,
 	}, nil
