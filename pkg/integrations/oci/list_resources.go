@@ -18,6 +18,7 @@ const (
 	ResourceTypeFunction            = "function"
 	ResourceTypeContainerRepository = "containerRepository"
 	ResourceTypeContainerImage      = "containerImage"
+	ResourceTypeInstance            = "instance"
 )
 
 func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -44,6 +45,8 @@ func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return listContainerRepositories(ctx)
 	case ResourceTypeContainerImage:
 		return listContainerImages(ctx)
+	case ResourceTypeInstance:
+		return listInstances(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
@@ -409,6 +412,51 @@ func listFunctions(ctx core.ListResourcesContext) ([]core.IntegrationResource, e
 			Name: fn.DisplayName,
 			ID:   fn.ID,
 		})
+	}
+
+	return resources, nil
+}
+
+func listInstances(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentIDs := []string{client.tenancyOCID}
+	compartments, err := client.ListCompartments()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list compartments: %w", err)
+	}
+
+	for _, c := range compartments {
+		if c.LifecycleState == "ACTIVE" {
+			compartmentIDs = append(compartmentIDs, c.ID)
+		}
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, compartmentID := range compartmentIDs {
+		instances, err := client.ListInstances(compartmentID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list instances in compartment %s: %w", compartmentID, err)
+		}
+
+		for _, instance := range instances {
+			if instance.LifecycleState == instanceStateTerminated || instance.LifecycleState == instanceStateTerminating {
+				continue
+			}
+
+			name := instance.DisplayName
+			if name == "" {
+				name = instance.ID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeInstance,
+				Name: name,
+				ID:   instance.ID,
+			})
+		}
 	}
 
 	return resources, nil
