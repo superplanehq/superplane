@@ -365,6 +365,13 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 	//
 	// Save app properties
 	//
+	appURL, err := common.AppURL(ctx.Integration.Properties(), appData.Slug)
+	if err != nil {
+		ctx.Logger.Errorf("failed to get app URL: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	err = ctx.Integration.Properties().CreateMany([]core.IntegrationPropertyDefinition{
 		{
 			Type:     core.IntegrationPropertyTypeString,
@@ -378,6 +385,13 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 			Name:     common.PropertyAppSlug,
 			Label:    "GitHub App Slug",
 			Value:    appData.Slug,
+			Editable: false,
+		},
+		{
+			Type:     core.IntegrationPropertyTypeString,
+			Name:     common.PropertyAppURL,
+			Label:    "GitHub App URL",
+			Value:    appURL,
 			Editable: false,
 		},
 		{
@@ -543,12 +557,28 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	err = ctx.Integration.Properties().Create(core.IntegrationPropertyDefinition{
-		Name:     common.PropertyAppInstallationID,
-		Label:    "GitHub App Installation ID",
-		Type:     core.IntegrationPropertyTypeString,
-		Value:    installationID,
-		Editable: false,
+	installationURL, err := common.AppInstallationURL(installationID)
+	if err != nil {
+		ctx.Logger.Errorf("failed to get app installation URL: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = ctx.Integration.Properties().CreateMany([]core.IntegrationPropertyDefinition{
+		{
+			Name:     common.PropertyAppInstallationID,
+			Label:    "GitHub App Installation ID",
+			Type:     core.IntegrationPropertyTypeString,
+			Value:    installationID,
+			Editable: false,
+		},
+		{
+			Name:     common.PropertyAppInstallationURL,
+			Label:    "GitHub App Installation URL",
+			Type:     core.IntegrationPropertyTypeString,
+			Value:    installationURL,
+			Editable: false,
+		},
 	})
 
 	if err != nil {

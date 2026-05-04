@@ -121,29 +121,6 @@ func (g *SetupProvider) onCapabilityUpdateForPAT(ctx core.CapabilityUpdateContex
 	}, nil
 }
 
-func (g *SetupProvider) appURL(properties core.IntegrationPropertyStorageReader) (string, error) {
-	ownerType, err := properties.GetString(common.PropertyOwnerType)
-	if err != nil {
-		return "", fmt.Errorf("error getting owner type: %v", err)
-	}
-
-	appSlug, err := properties.GetString(common.PropertyAppSlug)
-	if err != nil {
-		return "", fmt.Errorf("error getting app slug: %v", err)
-	}
-
-	if ownerType == common.OwnerTypeOrganization {
-		owner, err := properties.GetString(common.PropertyOwner)
-		if err != nil {
-			return "", fmt.Errorf("error getting owner: %v", err)
-		}
-
-		return fmt.Sprintf("https://github.com/organizations/%s/settings/apps/%s/permissions", owner, appSlug), nil
-	}
-
-	return fmt.Sprintf("https://github.com/settings/apps/%s/permissions", appSlug), nil
-}
-
 func (g *SetupProvider) onCapabilityUpdateForGitHubApp(ctx core.CapabilityUpdateContext, requested []string, newPermissions []Permission) (*core.SetupStep, error) {
 	ctx.Capabilities.Request(requested...)
 	owner, err := ctx.Properties.GetString(common.PropertyOwner)
@@ -156,7 +133,12 @@ func (g *SetupProvider) onCapabilityUpdateForGitHubApp(ctx core.CapabilityUpdate
 		return nil, fmt.Errorf("error parsing template: %v", err)
 	}
 
-	appURL, err := g.appURL(ctx.Properties)
+	appSlug, err := ctx.Properties.GetString(common.PropertyAppSlug)
+	if err != nil {
+		return nil, fmt.Errorf("error getting app slug: %v", err)
+	}
+
+	appURL, err := common.AppURL(ctx.Properties, appSlug)
 	if err != nil {
 		return nil, fmt.Errorf("error getting app URL: %v", err)
 	}
@@ -310,21 +292,18 @@ func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	return nil, errors.New("unknown step")
 }
 
-func (g *SetupProvider) appPermissionAcceptURL(properties core.IntegrationPropertyStorageReader) (string, error) {
-	installationID, err := properties.GetString(common.PropertyAppInstallationID)
-	if err != nil {
-		return "", fmt.Errorf("error getting app slug: %v", err)
-	}
-
-	return fmt.Sprintf("https://github.com/settings/installations/%s/permissions/update", installationID), nil
-}
-
 func (g *SetupProvider) onUpdateAppPermissionsSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	acceptURL, err := g.appPermissionAcceptURL(ctx.Properties)
+	installationID, err := ctx.Properties.GetString(common.PropertyAppInstallationID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting app permission accept URL: %v", err)
+		return nil, fmt.Errorf("error getting app installation ID: %v", err)
 	}
 
+	installationURL, err := common.AppInstallationURL(installationID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting app installation URL: %v", err)
+	}
+
+	acceptURL := fmt.Sprintf("%s/permissions/update", installationURL)
 	tmpl, err := template.New("appAcceptNewPermissions").Parse(string(appAcceptNewPermissionsTemplate))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing template: %v", err)
@@ -701,7 +680,7 @@ func (g *SetupProvider) onCapabilitySelectionRevert(ctx core.SetupStepContext) e
 }
 
 func (g *SetupProvider) onSelectAuthMethodRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete(common.PropertyAuthMethod)
+	return ctx.Properties.Delete(common.PropertyAuthMethod, common.PropertyAppState)
 }
 
 func (g *SetupProvider) onEnterPATRevert(ctx core.SetupStepContext) error {

@@ -17,8 +17,10 @@ const OwnerTypeOrganization = "Organization"
  */
 const PropertyAppID = "GitHub App ID"
 const PropertyAppSlug = "GitHub App Slug"
-const PropertyAppClientID = "GitHub App Client ID"
+const PropertyAppURL = "GitHub App URL"
 const PropertyAppInstallationID = "GitHub App Installation ID"
+const PropertyAppInstallationURL = "GitHub App Installation URL"
+const PropertyAppClientID = "GitHub App Client ID"
 const PropertyAppState = "GitHub App State"
 
 /*
