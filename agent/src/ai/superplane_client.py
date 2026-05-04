@@ -508,6 +508,7 @@ class SuperplaneClient:
             label=cap.label,
             description=cap.description,
             configuration=cap.configuration,
+            defaultRunTitle=cap.default_run_title,
         )
 
     @staticmethod
