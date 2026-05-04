@@ -17,19 +17,19 @@ const gpuDropletPollInterval = 10 * time.Second
 type CreateGPUDroplet struct{}
 
 type CreateGPUDropletSpec struct {
-	Name          string   `json:"name"`
-	Region        string   `json:"region"`
-	Size          string   `json:"size"`
-	ImageType     string   `json:"imageType"`
-	OneClickImage string   `json:"oneClickImage"`
-	BaseImage     string   `json:"baseImage"`
-	SSHKeys       []string `json:"sshKeys"`
-	Tags          []string `json:"tags"`
-	UserData      string   `json:"userData"`
-	Backups       bool     `json:"backups"`
-	IPv6          bool     `json:"ipv6"`
-	Monitoring    bool     `json:"monitoring"`
-	VpcUUID       string   `json:"vpcUuid"`
+	Name             string   `json:"name" mapstructure:"name"`
+	GPURegion        string   `json:"region" mapstructure:"gpuRegion"`
+	GPUSize          string   `json:"size" mapstructure:"gpuSize"`
+	ImageType        string   `json:"imageType" mapstructure:"imageType"`
+	OneClickGPUImage string   `json:"oneClickImage" mapstructure:"oneClickGPUImage"`
+	BaseGPUImage     string   `json:"baseImage" mapstructure:"baseGPUImage"`
+	SSHKeys          []string `json:"sshKeys" mapstructure:"sshKeys"`
+	Tags             []string `json:"tags" mapstructure:"tags"`
+	UserData         string   `json:"userData" mapstructure:"userData"`
+	Backups          bool     `json:"backups" mapstructure:"backups"`
+	IPv6             bool     `json:"ipv6" mapstructure:"ipv6"`
+	Monitoring       bool     `json:"monitoring" mapstructure:"monitoring"`
+	Vpc              string   `json:"vpcUuid" mapstructure:"vpc"`
 }
 
 func (c *CreateGPUDroplet) Name() string {
@@ -263,7 +263,7 @@ func (c *CreateGPUDroplet) Setup(ctx core.SetupContext) error {
 		return errors.New("name is required")
 	}
 
-	if spec.Region == "" {
+	if spec.GPURegion == "" {
 		// Check if there are any GPU regions available
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
@@ -282,7 +282,7 @@ func (c *CreateGPUDroplet) Setup(ctx core.SetupContext) error {
 		return errors.New("region is required")
 	}
 
-	if spec.Size == "" {
+	if spec.GPUSize == "" {
 		// Check if there are any GPU sizes available
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
@@ -310,10 +310,10 @@ func (c *CreateGPUDroplet) Setup(ctx core.SetupContext) error {
 	}
 
 	// Validate image based on imageType
-	if spec.ImageType == "one-click" && spec.OneClickImage == "" {
+	if spec.ImageType == "one-click" && spec.OneClickGPUImage == "" {
 		return errors.New("one-click application image is required")
 	}
-	if spec.ImageType == "base-os" && spec.BaseImage == "" {
+	if spec.ImageType == "base-os" && spec.BaseGPUImage == "" {
 		return errors.New("base OS image is required")
 	}
 
@@ -332,9 +332,9 @@ func (c *CreateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Determine which image to use based on imageType
-	image := spec.OneClickImage
+	image := spec.OneClickGPUImage
 	if spec.ImageType == "base-os" {
-		image = spec.BaseImage
+		image = spec.BaseGPUImage
 	}
 
 	// Defensive check: ensure we never send an empty image
@@ -349,8 +349,8 @@ func (c *CreateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 
 	droplet, err := client.CreateDroplet(CreateDropletRequest{
 		Name:       spec.Name,
-		Region:     spec.Region,
-		Size:       spec.Size,
+		Region:     spec.GPURegion,
+		Size:       spec.GPUSize,
 		Image:      image,
 		SSHKeys:    spec.SSHKeys,
 		Tags:       spec.Tags,
@@ -358,7 +358,7 @@ func (c *CreateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		Backups:    spec.Backups,
 		IPv6:       spec.IPv6,
 		Monitoring: spec.Monitoring,
-		VpcUUID:    spec.VpcUUID,
+		VpcUUID:    spec.Vpc,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create GPU droplet: %v", err)

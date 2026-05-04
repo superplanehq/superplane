@@ -17,9 +17,9 @@ const gpuDropletUpdatePollInterval = 10 * time.Second
 type UpdateGPUDroplet struct{}
 
 type UpdateGPUDropletSpec struct {
-	Droplet string  `json:"droplet"`
-	Name    *string `json:"name,omitempty"`
-	Size    *string `json:"size,omitempty"`
+	GPUDroplet string  `json:"droplet" mapstructure:"gpuDroplet"`
+	Name       *string `json:"name,omitempty" mapstructure:"name"`
+	GPUSize    *string `json:"size,omitempty" mapstructure:"gpuSize"`
 }
 
 func (u *UpdateGPUDroplet) Name() string {
@@ -128,18 +128,18 @@ func (u *UpdateGPUDroplet) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.Droplet == "" {
-		return errors.New("droplet is required")
+	if spec.GPUDroplet == "" {
+		return errors.New("GPU droplet is required")
 	}
 
 	hasName := spec.Name != nil && *spec.Name != ""
-	hasSize := spec.Size != nil && *spec.Size != ""
+	hasSize := spec.GPUSize != nil && *spec.GPUSize != ""
 
 	if !hasName && !hasSize {
 		return errors.New("at least one of name or size must be provided")
 	}
 
-	err = resolveDropletMetadata(ctx, spec.Droplet)
+	err = resolveDropletMetadata(ctx, spec.GPUDroplet)
 	if err != nil {
 		return fmt.Errorf("error resolving GPU droplet metadata: %v", err)
 	}
@@ -154,9 +154,9 @@ func (u *UpdateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	dropletID, err := parseDropletID(spec.Droplet)
+	dropletID, err := parseDropletID(spec.GPUDroplet)
 	if err != nil {
-		return fmt.Errorf("invalid GPU droplet ID %q: %w", spec.Droplet, err)
+		return fmt.Errorf("invalid GPU droplet ID %q: %w", spec.GPUDroplet, err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -165,7 +165,7 @@ func (u *UpdateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 	}
 
 	hasName := spec.Name != nil && *spec.Name != ""
-	hasSize := spec.Size != nil && *spec.Size != ""
+	hasSize := spec.GPUSize != nil && *spec.GPUSize != ""
 
 	// Start with rename if specified, otherwise go directly to resize
 	if hasName {
@@ -187,7 +187,7 @@ func (u *UpdateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		}
 
 		if hasSize {
-			metadata["newSize"] = *spec.Size
+			metadata["newSize"] = *spec.GPUSize
 		} else {
 			state = "renaming_only"
 			metadata["state"] = state
@@ -206,7 +206,7 @@ func (u *UpdateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new GPU size is required for resizing")
 	}
 
-	action, err := client.ResizeDroplet(dropletID, *spec.Size, true)
+	action, err := client.ResizeDroplet(dropletID, *spec.GPUSize, true)
 	if err != nil {
 		return fmt.Errorf("failed to resize GPU droplet: %v", err)
 	}
@@ -215,7 +215,7 @@ func (u *UpdateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		"actionID":  action.ID,
 		"dropletID": dropletID,
 		"state":     "resizing",
-		"newSize":   *spec.Size,
+		"newSize":   *spec.GPUSize,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store metadata: %v", err)
