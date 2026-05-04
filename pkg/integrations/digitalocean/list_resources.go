@@ -69,9 +69,9 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listGPURegions(ctx)
 	case "gpu_size":
 		return listGPUSizes(ctx)
-	case "gpu_image_oneclick":
+	case "one_click_gpu_image":
 		return listGPUImagesOneClick(ctx)
-	case "gpu_image_base":
+	case "base_gpu_image":
 		return listGPUImagesBase(ctx)
 	default:
 		return []core.IntegrationResource{}, nil

@@ -83,7 +83,7 @@ func (u *UpdateGPUDroplet) OutputChannels(configuration any) []core.OutputChanne
 func (u *UpdateGPUDroplet) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "droplet",
+			Name:        "gpuDroplet",
 			Label:       "GPU Droplet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -105,7 +105,7 @@ func (u *UpdateGPUDroplet) Configuration() []configuration.Field {
 			Description: "The new hostname for the GPU droplet",
 		},
 		{
-			Name:        "size",
+			Name:        "gpuSize",
 			Label:       "New GPU Size",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,

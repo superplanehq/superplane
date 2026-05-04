@@ -74,7 +74,7 @@ func (g *GetGPUDroplet) OutputChannels(configuration any) []core.OutputChannel {
 func (g *GetGPUDroplet) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "droplet",
+			Name:        "gpuDroplet",
 			Label:       "GPU Droplet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,

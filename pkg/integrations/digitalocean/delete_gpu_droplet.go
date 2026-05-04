@@ -71,7 +71,7 @@ func (d *DeleteGPUDroplet) OutputChannels(configuration any) []core.OutputChanne
 func (d *DeleteGPUDroplet) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "droplet",
+			Name:        "gpuDroplet",
 			Label:       "GPU Droplet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
