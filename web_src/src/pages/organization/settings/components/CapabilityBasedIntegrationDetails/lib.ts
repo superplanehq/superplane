@@ -20,11 +20,51 @@ export function getCapabilityDescription(capability: DisplayCapability): string 
   return capability.definition?.description;
 }
 
-export function getCapabilityStatusDotClass(state: IntegrationCapabilityStateState): string {
-  if (state === "STATE_ENABLED") return "bg-green-500";
-  if (state === "STATE_DISABLED") return "bg-red-500";
-  if (state === "STATE_REQUESTED") return "bg-amber-500";
-  return "bg-gray-400 dark:bg-gray-500";
+export function getCapabilityStatusLabel(state: IntegrationCapabilityStateState): string {
+  switch (state) {
+    case "STATE_ENABLED":
+      return "Enabled";
+    case "STATE_DISABLED":
+      return "Disabled";
+    case "STATE_REQUESTED":
+      return "Requested";
+    case "STATE_AVAILABLE":
+      return "Available";
+    case "STATE_UNAVAILABLE":
+      return "Unavailable";
+  }
+}
+
+/** Outline badge coloring aligned with former status-dot semantics (enabled=green, disabled=red, …). */
+export function getCapabilityStatusBadgeClassName(state: IntegrationCapabilityStateState): string {
+  switch (state) {
+    case "STATE_ENABLED":
+      return "border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300";
+    case "STATE_DISABLED":
+      return "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300";
+    case "STATE_REQUESTED":
+      return "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200";
+    case "STATE_AVAILABLE":
+      return "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200";
+    case "STATE_UNAVAILABLE":
+      return "border-gray-200 bg-gray-100 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300";
+  }
+}
+
+/** Solid circle inside the status badge (matches former standalone dot colors). */
+export function getCapabilityStatusBadgeDotClassName(state: IntegrationCapabilityStateState): string {
+  switch (state) {
+    case "STATE_ENABLED":
+      return "bg-green-500 dark:bg-green-400";
+    case "STATE_DISABLED":
+      return "bg-red-500 dark:bg-red-400";
+    case "STATE_REQUESTED":
+      return "bg-amber-500 dark:bg-amber-400";
+    case "STATE_AVAILABLE":
+      return "bg-sky-500 dark:bg-sky-400";
+    case "STATE_UNAVAILABLE":
+      return "bg-gray-400 dark:bg-gray-500";
+  }
 }
 
 export const getActiveTabClass = (activeTab?: boolean) => {

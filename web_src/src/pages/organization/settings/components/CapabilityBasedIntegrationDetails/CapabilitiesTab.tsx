@@ -145,7 +145,7 @@ export function CapabilitiesTab({
             loading={capabilitiesMutationPending}
             loadingText="Updating…"
           >
-            Apply changes
+            Update capabilities
           </LoadingButton>
         </div>
       ) : null}
