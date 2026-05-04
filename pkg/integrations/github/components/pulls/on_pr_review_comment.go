@@ -65,6 +65,10 @@ func (p *OnPRReviewComment) Color() string {
 	return "gray"
 }
 
+func (p *OnPRReviewComment) DefaultRunTitle() string {
+	return "#{{ root().data.pull_request.number }} - PR Review Comment"
+}
+
 func (p *OnPRReviewComment) Configuration() []configuration.Field {
 	return prCommentConfigurationFields()
 }

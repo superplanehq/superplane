@@ -433,7 +433,7 @@ describe("onAlertFiringTriggerRenderer.getTriggerProps", () => {
         data: { title: "Recent Alert", status: "firing" },
         nodeId: "node-1",
         type: "grafana.alert.firing",
-        customName: undefined,
+        runTitle: undefined,
       },
     });
 

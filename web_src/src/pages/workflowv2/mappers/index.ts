@@ -460,17 +460,17 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
 
   const parts = name?.split(".");
   if (parts?.length === 1) {
-    return createSafeTriggerRenderer(withCustomName(triggerRenderers[name] || defaultTriggerRenderer), name);
+    return createSafeTriggerRenderer(withRunTitle(triggerRenderers[name] || defaultTriggerRenderer), name);
   }
 
   const appName = parts[0];
   const appTriggers = appTriggerRenderers[appName];
   if (!appTriggers) {
-    return createSafeTriggerRenderer(withCustomName(defaultTriggerRenderer), name);
+    return createSafeTriggerRenderer(withRunTitle(defaultTriggerRenderer), name);
   }
 
   const triggerName = parts.slice(1).join(".");
-  return createSafeTriggerRenderer(withCustomName(appTriggers[triggerName] || defaultTriggerRenderer), name);
+  return createSafeTriggerRenderer(withRunTitle(appTriggers[triggerName] || defaultTriggerRenderer), name);
 }
 
 /**
@@ -582,18 +582,18 @@ function findRegisteredComponentMapper(name: string): ComponentBaseMapper | unde
   return appMapper[parts.slice(1).join(".")];
 }
 
-function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
+function withRunTitle(renderer: TriggerRenderer): TriggerRenderer {
   return {
     ...renderer,
     getTriggerProps: (context: TriggerRendererContext) => {
       const props = renderer.getTriggerProps(context);
-      const customName = context.lastEvent?.customName?.trim();
-      if (customName && props.lastEventData) {
+      const runTitle = context.lastEvent?.runTitle?.trim();
+      if (runTitle && props.lastEventData) {
         return {
           ...props,
           lastEventData: {
             ...props.lastEventData,
-            title: customName,
+            title: runTitle,
           },
         };
       }
@@ -602,9 +602,9 @@ function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
     },
     getTitleAndSubtitle: (context: TriggerEventContext) => {
       const { title, subtitle } = renderer.getTitleAndSubtitle(context);
-      const customName = context.event?.customName?.trim();
-      if (customName) {
-        return { title: customName, subtitle };
+      const runTitle = context.event?.runTitle?.trim();
+      if (runTitle) {
+        return { title: runTitle, subtitle };
       }
 
       return { title, subtitle };

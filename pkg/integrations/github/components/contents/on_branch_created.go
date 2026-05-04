@@ -66,6 +66,10 @@ func (t *OnBranchCreated) Color() string {
 	return "gray"
 }
 
+func (t *OnBranchCreated) DefaultRunTitle() string {
+	return "Branch: {{ root().data.ref }}"
+}
+
 func (t *OnBranchCreated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

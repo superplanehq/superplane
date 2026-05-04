@@ -223,6 +223,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *pb.CanvasChangese
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
 		Configuration:     datatypes.NewJSONType(node.Configuration),
+		RunTitleTemplate:  p.runTitleTemplateForNode(node),
 		Metadata:          datatypes.NewJSONType(node.Metadata),
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
@@ -320,6 +321,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	existingNode.Type = updatedNode.Type
 	existingNode.Ref = datatypes.NewJSONType(updatedNode.Ref)
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
+	existingNode.RunTitleTemplate = p.runTitleTemplateForNode(updatedNode)
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
 	existingNode.AppInstallationID = p.getNodeIntegrationID(updatedNode)
@@ -350,6 +352,33 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 	updatedNode.Metadata = existingNode.Metadata.Data()
 	p.finalNodes[existingNode.NodeID] = updatedNode
 	return p.tx.Save(&existingNode).Error
+}
+
+func (p *CanvasPublisher) runTitleTemplateForNode(node models.Node) *string {
+	if node.RunTitleTemplate != nil {
+		template := strings.TrimSpace(*node.RunTitleTemplate)
+		if template == "" {
+			return nil
+		}
+
+		return &template
+	}
+
+	if node.Type != models.NodeTypeTrigger || node.Ref.Trigger == nil {
+		return nil
+	}
+
+	trigger, err := p.options.Registry.GetTrigger(node.Ref.Trigger.Name)
+	if err != nil {
+		return nil
+	}
+
+	template := strings.TrimSpace(trigger.DefaultRunTitle())
+	if template == "" {
+		return nil
+	}
+
+	return &template
 }
 
 func (p *CanvasPublisher) deleteNode(change *pb.CanvasChangeset_Change) error {

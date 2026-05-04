@@ -46,6 +46,7 @@ type Story = StoryObj<typeof meta>;
 function SettingsTabPlayground() {
   const [configuration, setConfiguration] = useState<Record<string, unknown>>(settingsTabConfiguration);
   const [nodeName, setNodeName] = useState("Renderer Coverage Demo");
+  const [runTitleTemplate, setRunTitleTemplate] = useState("");
   const [integrationRef, setIntegrationRef] = useState(STORY_INTEGRATION_REF);
 
   return (
@@ -55,14 +56,17 @@ function SettingsTabPlayground() {
       nodeName={nodeName}
       configuration={configuration}
       configurationFields={settingsTabFields}
-      onSave={(updatedConfiguration, updatedNodeName, updatedIntegrationRef) => {
+      runTitleTemplate={runTitleTemplate}
+      onSave={(updatedConfiguration, updatedNodeName, updatedIntegrationRef, updatedRunTitleTemplate) => {
         setConfiguration(updatedConfiguration);
         setNodeName(updatedNodeName);
         setIntegrationRef(updatedIntegrationRef);
+        setRunTitleTemplate(updatedRunTitleTemplate || "");
         console.log("SettingsTab saved", {
           configuration: updatedConfiguration,
           nodeName: updatedNodeName,
           integration: updatedIntegrationRef,
+          runTitleTemplate: updatedRunTitleTemplate,
         });
       }}
       domainId={STORY_DOMAIN_ID}
@@ -75,6 +79,7 @@ function SettingsTabPlayground() {
         label: "GitHub",
         icon: "github",
       }}
+      defaultRunTitle="{{ root().data.head_commit.message }}"
       autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
       onOpenCreateIntegrationDialog={() => console.log("Open integration connect dialog")}
       onOpenConfigureIntegrationDialog={(integrationId) =>

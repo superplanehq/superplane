@@ -88,6 +88,10 @@ func (t *OnEmailEvent) Color() string {
 	return "gray"
 }
 
+func (t *OnEmailEvent) DefaultRunTitle() string {
+	return "{{ root().data.email }} - {{ root().data.event }}"
+}
+
 func (t *OnEmailEvent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

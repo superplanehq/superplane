@@ -56,4 +56,38 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 2}))
 		assert.Len(t, newEvents, 2)
 	})
+
+	t.Run("run title template is resolved from node", func(t *testing.T) {
+		runTitleTemplate := "Run: {{ root().data.message }}"
+		canvas, nodes := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID:           triggerNodeID,
+					Name:             triggerNodeID,
+					Type:             models.NodeTypeTrigger,
+					Ref:              datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					RunTitleTemplate: &runTitleTemplate,
+					Configuration:    datatypes.NewJSONType(map[string]any{}),
+				},
+			},
+			nil,
+		)
+
+		ctx := NewEventContext(database.Conn(), &nodes[0], nil)
+		require.NoError(t, ctx.Emit("test.payload", map[string]any{
+			"message": "hello",
+		}))
+
+		var event models.CanvasEvent
+		require.NoError(t, database.Conn().
+			Where("workflow_id = ? AND node_id = ?", canvas.ID, triggerNodeID).
+			First(&event).
+			Error,
+		)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
+	})
 }
