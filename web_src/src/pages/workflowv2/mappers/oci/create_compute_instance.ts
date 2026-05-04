@@ -38,6 +38,7 @@ interface CreateComputeInstanceNodeMetadata {
 }
 
 interface CreateComputeInstanceOutputData {
+  instanceId?: string;
   displayName?: string;
   lifecycleState?: string;
   shape?: string;
@@ -46,6 +47,7 @@ interface CreateComputeInstanceOutputData {
   region?: string;
   timeCreated?: string;
   publicIp?: string;
+  privateIp?: string;
 }
 
 type CreateComputeInstanceOutputPayload = OutputPayload & {
@@ -92,6 +94,10 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 
     if (!data) return details;
 
+    if (data.instanceId) {
+      details["Instance ID"] = data.instanceId;
+    }
+
     if (data.displayName) {
       details["Display Name"] = data.displayName;
     }
@@ -114,6 +120,10 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 
     if (data.publicIp) {
       details["Public IP"] = data.publicIp;
+    }
+
+    if (data.privateIp) {
+      details["Private IP"] = data.privateIp;
     }
 
     return details;
