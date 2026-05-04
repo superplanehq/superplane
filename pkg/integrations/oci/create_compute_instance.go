@@ -54,6 +54,20 @@ type CreateInstanceExecutionMetadata struct {
 	StartedAt               string `json:"startedAt" mapstructure:"startedAt"`
 }
 
+type CreateInstanceNodeMetadata struct {
+	DisplayName        string `json:"displayName,omitempty" mapstructure:"displayName"`
+	Shape              string `json:"shape,omitempty" mapstructure:"shape"`
+	AvailabilityDomain string `json:"availabilityDomain,omitempty" mapstructure:"availabilityDomain"`
+	CompartmentID      string `json:"compartmentId,omitempty" mapstructure:"compartmentId"`
+	CompartmentName    string `json:"compartmentName,omitempty" mapstructure:"compartmentName"`
+	ImageID            string `json:"imageId,omitempty" mapstructure:"imageId"`
+	ImageName          string `json:"imageName,omitempty" mapstructure:"imageName"`
+	SubnetID           string `json:"subnetId,omitempty" mapstructure:"subnetId"`
+	SubnetName         string `json:"subnetName,omitempty" mapstructure:"subnetName"`
+	BlockVolumeID      string `json:"blockVolumeId,omitempty" mapstructure:"blockVolumeId"`
+	BlockVolumeName    string `json:"blockVolumeName,omitempty" mapstructure:"blockVolumeName"`
+}
+
 func (c *CreateComputeInstance) Name() string {
 	return "oci.createComputeInstance"
 }
@@ -209,20 +223,12 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 		{
 			Name:        "imageOs",
 			Label:       "Image OS",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "Operating system family for the boot image",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Oracle Linux", Value: "Oracle Linux"},
-						{Label: "Ubuntu", Value: "Canonical Ubuntu"},
-						{Label: "Red Hat", Value: "Red Hat Enterprise Linux"},
-						{Label: "CentOS", Value: "CentOS"},
-						{Label: "AlmaLinux", Value: "AlmaLinux"},
-						{Label: "Rocky Linux", Value: "Rocky Linux"},
-						{Label: "Windows", Value: "Windows"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeImageOS,
 				},
 			},
 		},
@@ -297,18 +303,13 @@ func (c *CreateComputeInstance) Configuration() []configuration.Field {
 		{
 			Name:        "bootVolumeVpusPerGB",
 			Label:       "Boot Volume Performance (VPUs/GB)",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Togglable:   true,
 			Description: "Boot volume performance tier",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Lower Cost (0 VPUs/GB)", Value: "0"},
-						{Label: "Balanced (10 VPUs/GB)", Value: "10"},
-						{Label: "Higher Performance (20 VPUs/GB)", Value: "20"},
-						{Label: "Ultra High Performance (30 VPUs/GB)", Value: "30"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeBootVolumeVPU,
 				},
 			},
 		},
@@ -393,7 +394,60 @@ func (c *CreateComputeInstance) Setup(ctx core.SetupContext) error {
 		return errors.New("imageOs is required")
 	}
 
-	return nil
+	return ctx.Metadata.Set(resolveCreateInstanceNodeMetadata(ctx, spec))
+}
+
+func resolveCreateInstanceNodeMetadata(ctx core.SetupContext, spec CreateComputeInstanceSpec) CreateInstanceNodeMetadata {
+	metadata := CreateInstanceNodeMetadata{
+		DisplayName:        strings.TrimSpace(spec.DisplayName),
+		Shape:              strings.TrimSpace(spec.Shape),
+		AvailabilityDomain: strings.TrimSpace(spec.AvailabilityDomain),
+		CompartmentID:      strings.TrimSpace(spec.Compartment),
+		ImageID:            strings.TrimSpace(spec.Image),
+		SubnetID:           strings.TrimSpace(spec.Subnet),
+		BlockVolumeID:      strings.TrimSpace(spec.BlockVolumeID),
+	}
+
+	if ctx.HTTP == nil || ctx.Integration == nil {
+		return metadata
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return metadata
+	}
+
+	metadata.CompartmentName = findCompartmentName(client, metadata.CompartmentID)
+
+	if metadata.ImageID != "" {
+		if image, err := client.GetImage(metadata.ImageID); err == nil {
+			metadata.ImageName = image.DisplayName
+		}
+	}
+
+	if metadata.SubnetID != "" {
+		if subnets, err := client.ListSubnets(metadata.CompartmentID, ""); err == nil {
+			for _, subnet := range subnets {
+				if subnet.ID == metadata.SubnetID {
+					metadata.SubnetName = subnet.DisplayName
+					break
+				}
+			}
+		}
+	}
+
+	if metadata.BlockVolumeID != "" {
+		if volumes, err := client.ListBlockVolumes(metadata.CompartmentID); err == nil {
+			for _, volume := range volumes {
+				if volume.ID == metadata.BlockVolumeID {
+					metadata.BlockVolumeName = volume.DisplayName
+					break
+				}
+			}
+		}
+	}
+
+	return metadata
 }
 
 func (c *CreateComputeInstance) Execute(ctx core.ExecutionContext) error {
@@ -532,40 +586,13 @@ func (c *CreateComputeInstance) poll(ctx core.ActionHookContext) error {
 func (c *CreateComputeInstance) emitInstance(ctx core.ActionHookContext, client *Client, instance *Instance, metadata CreateInstanceExecutionMetadata) error {
 	payload := instanceToMap(instance)
 
-	c.enrichWithVNICIPs(ctx, client, instance, payload)
+	enrichInstanceWithVNICIPs(ctx.Logger, client, instance, payload)
 
 	if err := c.ensureBlockVolumeAttached(ctx, client, instance, &metadata, payload); err != nil {
 		return err
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, ComputeInstancePayloadType, []any{payload})
-}
-
-// enrichWithVNICIPs looks up the primary VNIC for the instance and adds publicIp / privateIp
-// to payload. Errors are logged as warnings so a transient VNIC-lookup failure does not block
-// the execution from completing.
-func (c *CreateComputeInstance) enrichWithVNICIPs(ctx core.ActionHookContext, client *Client, instance *Instance, payload map[string]any) {
-	attachments, err := client.ListVNICAttachments(instance.CompartmentID, instance.ID)
-	if err != nil {
-		ctx.Logger.Warnf("failed to list VNIC attachments for instance %s: %v", instance.ID, err)
-		return
-	}
-
-	for _, att := range attachments {
-		if att.LifecycleState != "ATTACHED" || att.VNICID == "" {
-			continue
-		}
-
-		vnic, err := client.GetVNIC(att.VNICID)
-		if err != nil {
-			ctx.Logger.Warnf("failed to get VNIC %s for instance %s: %v", att.VNICID, instance.ID, err)
-			return
-		}
-
-		payload["publicIp"] = vnic.PublicIP
-		payload["privateIp"] = vnic.PrivateIP
-		return
-	}
 }
 
 // ensureBlockVolumeAttached attaches the configured block volume (if any) to the instance and
