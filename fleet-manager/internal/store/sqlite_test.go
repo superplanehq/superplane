@@ -60,6 +60,42 @@ func TestSQLite_CreateClaimComplete(t *testing.T) {
 	}
 }
 
+func TestSQLite_CreateCommandsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Commands:      []string{`echo 'hello world'`, `echo 'second'`},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC().Truncate(time.Second),
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ClaimTask(ctx, "runner-1", 5*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("expected task")
+	}
+	if len(got.Commands) != 2 || got.Commands[0] != `echo 'hello world'` || got.Commands[1] != `echo 'second'` {
+		t.Fatalf("commands: %#v", got.Commands)
+	}
+	if len(got.Command) != 0 {
+		t.Fatalf("command argv should be empty, got %#v", got.Command)
+	}
+}
+
 func TestSQLite_ReapExpiredLeases(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "test.db")

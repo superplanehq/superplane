@@ -22,10 +22,63 @@ import (
 	"github.com/superplane/runner/shared/models"
 )
 
-// TestEchoHelloWorld builds fleet-manager and runner, starts one fleet process and one runner
-// process, submits `echo 'hello world'`, and asserts on the completion webhook.
 func TestEchoHelloWorld(t *testing.T) {
 	t.Parallel()
+	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
+		return api.CreateTaskRequest{
+			Commands: []string{
+				`echo 'hello world'`,
+				`echo 'second'`,
+			},
+			WebhookURL: wh,
+		}
+	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {
+		if payload.TaskID != created.ID {
+			t.Errorf("webhook task_id: got %q want %q", payload.TaskID, created.ID)
+		}
+		if payload.Status != string(models.StatusSucceeded) {
+			t.Errorf("status: got %q want %q", payload.Status, models.StatusSucceeded)
+		}
+		if payload.ExitCode != 0 {
+			t.Errorf("exit_code: got %d want 0", payload.ExitCode)
+		}
+		if !strings.Contains(payload.Output, "hello world") {
+			t.Errorf("output should contain first line; got %q", payload.Output)
+		}
+		if !strings.Contains(payload.Output, "second") {
+			t.Errorf("output should contain second line; got %q", payload.Output)
+		}
+	})
+}
+
+func TestCommandsShareShellEnv(t *testing.T) {
+	t.Parallel()
+	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
+		return api.CreateTaskRequest{
+			Commands: []string{
+				"export A=123",
+				"echo $A",
+			},
+			WebhookURL: wh,
+		}
+	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {
+		if payload.TaskID != created.ID {
+			t.Errorf("webhook task_id: got %q want %q", payload.TaskID, created.ID)
+		}
+		if payload.Status != string(models.StatusSucceeded) {
+			t.Errorf("status: got %q want %q", payload.Status, models.StatusSucceeded)
+		}
+		if payload.ExitCode != 0 {
+			t.Errorf("exit_code: got %d want 0", payload.ExitCode)
+		}
+		if !strings.Contains(payload.Output, "123") {
+			t.Errorf("exported variable should be visible in next command; output %q", payload.Output)
+		}
+	})
+}
+
+func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.CreateTaskRequest, check func(*testing.T, api.CreateTaskResponse, api.WebhookPayload)) {
+	t.Helper()
 
 	root := moduleRoot(t)
 	binDir := t.TempDir()
@@ -107,13 +160,13 @@ func TestEchoHelloWorld(t *testing.T) {
 		_, _ = runnerCmd.Process.Wait()
 	})
 
-	body := bytes.NewBufferString(`{
-  "command": ["sh", "-c", "echo 'hello world'"],
-  "webhook_url": "` + whSrv.URL + `"
-}`)
+	createBody, err := json.Marshal(makeReq(whSrv.URL))
+	if err != nil {
+		t.Fatalf("marshal create task: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/v1/tasks", body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/v1/tasks", bytes.NewReader(createBody))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
@@ -142,18 +195,7 @@ func TestEchoHelloWorld(t *testing.T) {
 		t.Fatal("timed out waiting for webhook")
 	}
 
-	if payload.TaskID != created.ID {
-		t.Errorf("webhook task_id: got %q want %q", payload.TaskID, created.ID)
-	}
-	if payload.Status != string(models.StatusSucceeded) {
-		t.Errorf("status: got %q want %q", payload.Status, models.StatusSucceeded)
-	}
-	if payload.ExitCode != 0 {
-		t.Errorf("exit_code: got %d want 0", payload.ExitCode)
-	}
-	if !strings.Contains(payload.Output, "hello world") {
-		t.Errorf("output should contain hello world; got %q", payload.Output)
-	}
+	check(t, created, payload)
 }
 
 func moduleRoot(t *testing.T) string {

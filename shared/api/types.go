@@ -4,7 +4,11 @@ import "github.com/superplane/runner/shared/models"
 
 // CreateTaskRequest is POST /v1/tasks.
 type CreateTaskRequest struct {
-	Command       []string `json:"command"`
+	// Command is argv for one process. Omit when using Commands.
+	Command []string `json:"command,omitempty"`
+	// Commands are lines of one shell script: joined with newlines and run as a single
+	// sh -c so export, cd, and shell state persist between lines. Omit when using Command.
+	Commands      []string `json:"commands,omitempty"`
 	WebhookURL    string   `json:"webhook_url"`
 	ExecutionMode string   `json:"execution_mode"` // "host" | "docker"
 	DockerImage   string   `json:"docker_image,omitempty"`
@@ -29,7 +33,8 @@ type ClaimTaskResponse struct {
 // TaskPayload is the task spec sent to runners.
 type TaskPayload struct {
 	ID            string   `json:"id"`
-	Command       []string `json:"command"`
+	Command       []string `json:"command,omitempty"`
+	Commands      []string `json:"commands,omitempty"` // one script, lines joined with newlines; see CreateTaskRequest
 	ExecutionMode string   `json:"execution_mode"`
 	DockerImage   string   `json:"docker_image,omitempty"`
 }
@@ -47,6 +52,7 @@ func TaskPayloadFrom(t *models.Task) *TaskPayload {
 	return &TaskPayload{
 		ID:            t.ID,
 		Command:       t.Command,
+		Commands:      t.Commands,
 		ExecutionMode: string(t.ExecutionMode),
 		DockerImage:   t.DockerImage,
 	}

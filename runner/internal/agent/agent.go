@@ -166,6 +166,9 @@ func (a *Agent) execute(ctx context.Context, task *api.TaskPayload) (int, string
 }
 
 func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload) (int, string, error) {
+	if len(task.Commands) > 0 {
+		return a.runHostShellScripts(ctx, task.Commands)
+	}
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")
 	}
@@ -188,12 +191,80 @@ func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload) (int, string
 	return exit, out, nil
 }
 
+func (a *Agent) runHostShellScripts(ctx context.Context, scripts []string) (int, string, error) {
+	combined, ok := joinShellScriptLines(scripts)
+	if !ok {
+		return 1, "", errors.New("empty commands")
+	}
+	cmd := exec.CommandContext(ctx, "sh", "-c", combined)
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	err := cmd.Run()
+	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
+	exit := 0
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			exit = ee.ExitCode()
+		} else {
+			exit = 1
+		}
+		return exit, out, err
+	}
+	return exit, out, nil
+}
+
+// joinShellScriptLines joins non-empty trimmed command lines with newlines so a single
+// shell session preserves cwd, environment, and variables between lines.
+func joinShellScriptLines(scripts []string) (string, bool) {
+	var parts []string
+	for _, s := range scripts {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			parts = append(parts, s)
+		}
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	return strings.Join(parts, "\n"), true
+}
+
 func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload) (int, string, error) {
 	if strings.TrimSpace(task.DockerImage) == "" {
 		return 1, "", errors.New("docker_image required")
 	}
+	if len(task.Commands) > 0 {
+		return a.runDockerShellScripts(ctx, task.DockerImage, task.Commands)
+	}
 	args := []string{"run", "--rm", task.DockerImage}
 	args = append(args, task.Command...)
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	err := cmd.Run()
+	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
+	exit := 0
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			exit = ee.ExitCode()
+		} else {
+			exit = 1
+		}
+		return exit, out, err
+	}
+	return exit, out, nil
+}
+
+func (a *Agent) runDockerShellScripts(ctx context.Context, image string, scripts []string) (int, string, error) {
+	combined, ok := joinShellScriptLines(scripts)
+	if !ok {
+		return 1, "", errors.New("empty commands")
+	}
+	args := []string{"run", "--rm", image, "sh", "-c", combined}
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf

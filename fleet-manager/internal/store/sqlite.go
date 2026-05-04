@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/superplane/runner/shared/models"
@@ -36,7 +37,7 @@ func OpenSQLite(path string) (*SQLiteStore, error) {
 }
 
 func (s *SQLiteStore) migrate() error {
-	_, err := s.db.Exec(`
+	if _, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS tasks (
 	id TEXT PRIMARY KEY,
 	command_json TEXT NOT NULL,
@@ -53,7 +54,22 @@ CREATE TABLE IF NOT EXISTS tasks (
 	error_message TEXT
 );
 CREATE INDEX IF NOT EXISTS tasks_status_created ON tasks(status, created_at);
-`)
+`); err != nil {
+		return err
+	}
+	return s.ensureCommandsJSONColumn()
+}
+
+func (s *SQLiteStore) ensureCommandsJSONColumn() error {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='commands_json'`).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err = s.db.Exec(`ALTER TABLE tasks ADD COLUMN commands_json TEXT`)
 	return err
 }
 
@@ -62,17 +78,29 @@ func (s *SQLiteStore) Close() error {
 }
 
 func (s *SQLiteStore) CreateTask(ctx context.Context, t *models.Task) error {
-	cmdJSON, err := json.Marshal(t.Command)
+	cmd := t.Command
+	if cmd == nil {
+		cmd = []string{}
+	}
+	cmdJSON, err := json.Marshal(cmd)
 	if err != nil {
 		return err
+	}
+	var cmdsJSON any
+	if len(t.Commands) > 0 {
+		b, err := json.Marshal(t.Commands)
+		if err != nil {
+			return err
+		}
+		cmdsJSON = string(b)
 	}
 	if t.ExecutionMode == "" {
 		t.ExecutionMode = models.ExecutionHost
 	}
 	_, err = s.db.ExecContext(ctx, `
-INSERT INTO tasks (id, command_json, webhook_url, status, created_at, execution_mode, docker_image)
-VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, string(cmdJSON), t.WebhookURL, string(t.Status), t.CreatedAt.Unix(),
+INSERT INTO tasks (id, command_json, commands_json, webhook_url, status, created_at, execution_mode, docker_image)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, string(cmdJSON), cmdsJSON, t.WebhookURL, string(t.Status), t.CreatedAt.Unix(),
 		string(t.ExecutionMode), nullString(t.DockerImage),
 	)
 	return err
@@ -124,7 +152,7 @@ RETURNING id`,
 // GetByID returns a task by id.
 func (s *SQLiteStore) GetByID(ctx context.Context, id string) (*models.Task, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT id, command_json, webhook_url, status, created_at, claimed_at, lease_until, runner_id,
+SELECT id, command_json, commands_json, webhook_url, status, created_at, claimed_at, lease_until, runner_id,
 	execution_mode, docker_image, exit_code, output, error_message
 FROM tasks WHERE id = ?`, id)
 	return scanTask(row)
@@ -133,12 +161,13 @@ FROM tasks WHERE id = ?`, id)
 func scanTask(row *sql.Row) (*models.Task, error) {
 	var (
 		id, cmdJSON, webhook, status          string
+		commandsJSON                          sql.NullString
 		createdAt, claimedAt, leaseUntil      sql.NullInt64
 		runnerID, dockerImage, output, errMsg sql.NullString
 		execMode                              string
 		exitCode                              sql.NullInt64
 	)
-	if err := row.Scan(&id, &cmdJSON, &webhook, &status, &createdAt, &claimedAt, &leaseUntil,
+	if err := row.Scan(&id, &cmdJSON, &commandsJSON, &webhook, &status, &createdAt, &claimedAt, &leaseUntil,
 		&runnerID, &execMode, &dockerImage, &exitCode, &output, &errMsg); err != nil {
 		return nil, err
 	}
@@ -146,9 +175,16 @@ func scanTask(row *sql.Row) (*models.Task, error) {
 	if err := json.Unmarshal([]byte(cmdJSON), &cmd); err != nil {
 		return nil, fmt.Errorf("command_json: %w", err)
 	}
+	var cmds []string
+	if commandsJSON.Valid && strings.TrimSpace(commandsJSON.String) != "" {
+		if err := json.Unmarshal([]byte(commandsJSON.String), &cmds); err != nil {
+			return nil, fmt.Errorf("commands_json: %w", err)
+		}
+	}
 	t := &models.Task{
 		ID:            id,
 		Command:       cmd,
+		Commands:      cmds,
 		WebhookURL:    webhook,
 		Status:        models.TaskStatus(status),
 		CreatedAt:     time.Unix(createdAt.Int64, 0).UTC(),

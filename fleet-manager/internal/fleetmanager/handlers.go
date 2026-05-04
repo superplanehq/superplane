@@ -35,8 +35,22 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	if len(req.Command) == 0 {
-		writeError(w, http.StatusBadRequest, "command required")
+	hasArgv := len(req.Command) > 0
+	var normalizedCmds []string
+	for _, c := range req.Commands {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			normalizedCmds = append(normalizedCmds, c)
+		}
+	}
+	hasShell := len(normalizedCmds) > 0
+
+	switch {
+	case hasArgv && hasShell:
+		writeError(w, http.StatusBadRequest, "specify either command or commands, not both")
+		return
+	case !hasArgv && !hasShell:
+		writeError(w, http.StatusBadRequest, "command or commands required")
 		return
 	}
 	if strings.TrimSpace(req.WebhookURL) == "" {
@@ -61,12 +75,18 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 
 	task := &models.Task{
 		ID:            uuid.NewString(),
-		Command:       req.Command,
 		WebhookURL:    req.WebhookURL,
 		Status:        models.StatusQueued,
 		CreatedAt:     time.Now().UTC(),
 		ExecutionMode: mode,
 		DockerImage:   req.DockerImage,
+	}
+	if hasShell {
+		task.Commands = normalizedCmds
+		task.Command = nil
+	} else {
+		task.Command = req.Command
+		task.Commands = nil
 	}
 	if err := s.Store.CreateTask(r.Context(), task); err != nil {
 		s.Log.Error("create task", slog.Any("err", err))
