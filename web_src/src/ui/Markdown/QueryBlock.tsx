@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import * as yaml from "js-yaml";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ExternalLink } from "lucide-react";
 
 import { useCanvasMemoryEntries, type CanvasMemoryEntry } from "@/hooks/useCanvasData";
+import { formatRelativeTime } from "@/lib/timezone";
 
 //
 // Authored as a fenced code block inside Launchpad markdown panels:
@@ -10,13 +11,19 @@ import { useCanvasMemoryEntries, type CanvasMemoryEntry } from "@/hooks/useCanva
 //   ```query
 //   source: memory
 //   namespace: environments
+//   columns:                # optional — auto-detected from values keys when omitted
+//     - label: PR
+//       field: pr_number
+//     - label: URL
+//       field: url
+//       format: link:Open
+//   where:                  # optional — all conditions ANDed
+//     - field: url
+//       op: exists
 //   ```
 //
-// v1 only supports `source: memory`. The block is parsed as YAML, validated,
-// then rendered as a plain table with columns auto-derived from the union of
-// `values` keys across matched memory entries. Failure modes (parse error,
-// missing namespace, unsupported source, API error) all render an inline
-// error card so the surrounding markdown keeps rendering.
+// v2 supports `source: memory` only. Render path:
+//   parsed -> namespace filter -> where filter -> columns (explicit or auto)
 //
 
 export interface QueryBlockProps {
@@ -24,9 +31,28 @@ export interface QueryBlockProps {
   canvasId: string;
 }
 
+type Format = "plain" | "link" | { kind: "linkLabel"; label: string } | "relative" | "date" | "badge" | "code";
+
+interface ColumnSpec {
+  label: string;
+  field: string;
+  format: Format;
+}
+
+const FILTER_OPS = ["eq", "neq", "contains", "not_contains", "gt", "lt", "exists", "not_exists"] as const;
+type FilterOp = (typeof FILTER_OPS)[number];
+
+interface FilterCondition {
+  field: string;
+  op: FilterOp;
+  value: string;
+}
+
 interface ParsedQuery {
-  source: string;
+  source: "memory";
   namespace: string;
+  columns?: ColumnSpec[];
+  where?: FilterCondition[];
 }
 
 interface QueryParseError {
@@ -68,7 +94,125 @@ function parseQueryBody(body: string): ParseResult {
     return { kind: "error", error: { message: "Invalid query block: missing `namespace`" } };
   }
 
-  return { kind: "ok", query: { source, namespace } };
+  const columnsResult = parseColumns(obj.columns);
+  if (columnsResult.kind === "error") return columnsResult;
+
+  const whereResult = parseWhere(obj.where);
+  if (whereResult.kind === "error") return whereResult;
+
+  return {
+    kind: "ok",
+    query: {
+      source: "memory",
+      namespace,
+      columns: columnsResult.value,
+      where: whereResult.value,
+    },
+  };
+}
+
+type ParsePartResult<T> = { kind: "ok"; value: T | undefined } | { kind: "error"; error: QueryParseError };
+
+function parseColumns(raw: unknown): ParsePartResult<ColumnSpec[]> {
+  if (raw === undefined || raw === null) return { kind: "ok", value: undefined };
+  if (!Array.isArray(raw)) {
+    return { kind: "error", error: { message: "Invalid query block: `columns` must be a list" } };
+  }
+  if (raw.length === 0) {
+    return { kind: "error", error: { message: "Invalid query block: `columns` must not be empty" } };
+  }
+
+  const result: ColumnSpec[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i];
+    if (!isPlainObject(item)) {
+      return { kind: "error", error: { message: `Invalid query block: columns[${i}] must be an object` } };
+    }
+    const label = item.label;
+    const field = item.field;
+    const formatRaw = item.format;
+    if (typeof label !== "string" || label.trim() === "") {
+      return { kind: "error", error: { message: `Invalid query block: columns[${i}] missing \`label\`` } };
+    }
+    if (typeof field !== "string" || field.trim() === "") {
+      return { kind: "error", error: { message: `Invalid query block: columns[${i}] missing \`field\`` } };
+    }
+    if (formatRaw !== undefined && typeof formatRaw !== "string") {
+      return {
+        kind: "error",
+        error: { message: `Invalid query block: columns[${i}].format must be a string` },
+      };
+    }
+    result.push({ label, field, format: parseFormat(formatRaw) });
+  }
+  return { kind: "ok", value: result };
+}
+
+function parseFormat(raw: string | undefined): Format {
+  if (raw === undefined) return "plain";
+  if (raw === "link") return "link";
+  if (raw.startsWith("link:")) {
+    return { kind: "linkLabel", label: raw.slice("link:".length) };
+  }
+  if (raw === "plain" || raw === "relative" || raw === "date" || raw === "badge" || raw === "code") {
+    return raw;
+  }
+  // Per spec: unknown format does NOT fail the block. Warn once and fall back to plain.
+  // eslint-disable-next-line no-console
+  console.warn(`[QueryBlock] Unknown format "${raw}", falling back to plain text`);
+  return "plain";
+}
+
+function parseWhere(raw: unknown): ParsePartResult<FilterCondition[]> {
+  if (raw === undefined || raw === null) return { kind: "ok", value: undefined };
+  if (!Array.isArray(raw)) {
+    return { kind: "error", error: { message: "Invalid query block: `where` must be a list" } };
+  }
+  if (raw.length === 0) {
+    return { kind: "error", error: { message: "Invalid query block: `where` must not be empty" } };
+  }
+
+  const result: FilterCondition[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i];
+    if (!isPlainObject(item)) {
+      return { kind: "error", error: { message: `Invalid query block: where[${i}] must be an object` } };
+    }
+    const field = item.field;
+    const op = item.op;
+    const value = item.value;
+    if (typeof field !== "string" || field.trim() === "") {
+      return { kind: "error", error: { message: `Invalid query block: where[${i}] missing \`field\`` } };
+    }
+    if (typeof op !== "string" || op.trim() === "") {
+      return { kind: "error", error: { message: `Invalid query block: where[${i}] missing \`op\`` } };
+    }
+    if (!isFilterOp(op)) {
+      return { kind: "error", error: { message: `Unknown filter operator: "${op}"` } };
+    }
+    const opNeedsValue = op !== "exists" && op !== "not_exists";
+    if (opNeedsValue) {
+      if (value === undefined || value === null) {
+        return { kind: "error", error: { message: `Invalid query block: where[${i}] missing \`value\`` } };
+      }
+      if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+        return {
+          kind: "error",
+          error: { message: `Invalid query block: where[${i}].value must be a scalar` },
+        };
+      }
+    }
+    result.push({
+      field,
+      op,
+      value: opNeedsValue ? String(value) : "",
+    });
+  }
+  return { kind: "ok", value: result };
+}
+
+function isFilterOp(op: string): op is FilterOp {
+  return (FILTER_OPS as readonly string[]).includes(op);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -86,6 +230,136 @@ function stringifyCell(value: unknown): string {
   }
 }
 
+//
+// Filter engine
+//
+
+function evalCondition(values: Record<string, unknown>, cond: FilterCondition): boolean {
+  const has = Object.prototype.hasOwnProperty.call(values, cond.field);
+  const raw = has ? values[cond.field] : undefined;
+  const val = raw == null ? "" : typeof raw === "string" ? raw : stringifyCell(raw);
+
+  if (cond.op === "exists") return val !== "";
+  if (cond.op === "not_exists") return val === "";
+
+  if (!has) return false;
+
+  switch (cond.op) {
+    case "eq":
+      return val === cond.value;
+    case "neq":
+      return val !== cond.value;
+    case "contains":
+      return val.includes(cond.value);
+    case "not_contains":
+      return !val.includes(cond.value);
+    case "gt":
+    case "lt": {
+      const a = parseFloat(val);
+      const b = parseFloat(cond.value);
+      if (Number.isNaN(a) || Number.isNaN(b)) return false;
+      return cond.op === "gt" ? a > b : a < b;
+    }
+  }
+}
+
+function applyWhere(entries: CanvasMemoryEntry[], where: FilterCondition[]): CanvasMemoryEntry[] {
+  return entries.filter((entry) => {
+    const values = isPlainObject(entry.values) ? entry.values : {};
+    return where.every((cond) => evalCondition(values, cond));
+  });
+}
+
+//
+// Cell renderers
+//
+
+function truncate(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return value.slice(0, Math.max(0, max - 1)) + "…";
+}
+
+const BADGE_PILL_CLASS =
+  "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none bg-emerald-100 text-emerald-700 border-emerald-200";
+
+function renderCell(value: unknown, format: Format): React.ReactNode {
+  const text = stringifyCell(value);
+  if (text === "") return null;
+
+  if (typeof format === "object" && format.kind === "linkLabel") {
+    return <CellLink href={text} display={format.label} />;
+  }
+
+  switch (format) {
+    case "plain":
+      return text;
+    case "link":
+      return <CellLink href={text} display={truncate(text, 40)} />;
+    case "relative":
+      return <CellRelative raw={text} />;
+    case "date":
+      return <CellDate raw={text} />;
+    case "badge":
+      return <span className={BADGE_PILL_CLASS}>{text}</span>;
+    case "code":
+      return (
+        <code className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800">
+          {text}
+        </code>
+      );
+    default:
+      return text;
+  }
+}
+
+function CellLink({ href, display }: { href: string; display: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-0.5 text-blue-600 underline"
+    >
+      {display}
+      <ExternalLink className="inline h-3 w-3 shrink-0" />
+    </a>
+  );
+}
+
+function resolveDate(raw: string): Date | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  // Numeric string -> Unix epoch seconds.
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    const n = Number(trimmed);
+    const ms = Math.abs(n) < 1e12 ? n * 1000 : n;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function CellRelative({ raw }: { raw: string }) {
+  const date = resolveDate(raw);
+  if (!date) return <>{raw}</>;
+  return <span title={formatAbsoluteUtc(date)}>{formatRelativeTime(date.toISOString(), false)}</span>;
+}
+
+function CellDate({ raw }: { raw: string }) {
+  const date = resolveDate(raw);
+  if (!date) return <>{raw}</>;
+  return <span>{formatAbsoluteUtc(date)}</span>;
+}
+
+function formatAbsoluteUtc(date: Date): string {
+  return date.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+}
+
+//
+// Component
+//
+
 export function QueryBlock({ body, canvasId }: QueryBlockProps) {
   const parsed = useMemo(() => parseQueryBody(body), [body]);
 
@@ -98,7 +372,7 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
     return <QueryBlockError message={parsed.error.message} body={body} />;
   }
 
-  const namespace = parsed.query.namespace;
+  const { namespace, columns: explicitColumns, where } = parsed.query;
 
   if (memoryQuery.isLoading) {
     return <QueryBlockSkeleton />;
@@ -109,9 +383,10 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
     return <QueryBlockError message={`Failed to load memory: ${message}`} body={body} />;
   }
 
-  const entries = (memoryQuery.data ?? []).filter((entry) => entry.namespace === namespace);
+  const inNamespace = (memoryQuery.data ?? []).filter((entry) => entry.namespace === namespace);
+  const filtered = where ? applyWhere(inNamespace, where) : inNamespace;
 
-  if (entries.length === 0) {
+  if (filtered.length === 0) {
     return (
       <div
         data-testid="canvas-query-block-empty"
@@ -122,31 +397,31 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
     );
   }
 
-  const columns = collectColumns(entries);
+  const columns: ColumnSpec[] = explicitColumns ?? autoColumns(filtered);
 
   return (
     <div data-testid="canvas-query-block" className="my-2 overflow-x-auto rounded border border-slate-200">
       <table className="min-w-full border-collapse text-left text-xs">
         <thead>
           <tr>
-            {columns.map((column) => (
+            {columns.map((column, i) => (
               <th
-                key={column}
+                key={`${column.label}-${i}`}
                 className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-gray-600"
               >
-                {column}
+                {column.label}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {entries.map((entry) => {
+          {filtered.map((entry) => {
             const values = isPlainObject(entry.values) ? entry.values : {};
             return (
               <tr key={entry.id}>
-                {columns.map((column) => (
-                  <td key={column} className="border-b border-slate-100 px-3 py-1.5 align-top">
-                    {stringifyCell(values[column])}
+                {columns.map((column, i) => (
+                  <td key={`${column.field}-${i}`} className="border-b border-slate-100 px-3 py-1.5 align-top">
+                    {renderCell(values[column.field], column.format)}
                   </td>
                 ))}
               </tr>
@@ -158,7 +433,15 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
   );
 }
 
-function collectColumns(entries: CanvasMemoryEntry[]): string[] {
+function autoColumns(entries: CanvasMemoryEntry[]): ColumnSpec[] {
+  return collectColumnFields(entries).map<ColumnSpec>((field) => ({
+    label: field,
+    field,
+    format: "plain",
+  }));
+}
+
+function collectColumnFields(entries: CanvasMemoryEntry[]): string[] {
   const set = new Set<string>();
   for (const entry of entries) {
     if (!isPlainObject(entry.values)) continue;
