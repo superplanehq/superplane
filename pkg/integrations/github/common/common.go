@@ -16,6 +16,13 @@ import (
 
 var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 
+// IsExpression reports whether the given string contains an expression
+// placeholder (e.g. `{{ ... }}`). Useful in Setup paths to skip strict
+// validation of values that will only be known at execution time.
+func IsExpression(s string) bool {
+	return expressionPlaceholderRegex.MatchString(s)
+}
+
 type Repository struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -37,7 +44,7 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, 
 	if repository == "" {
 		return fmt.Errorf("repository is required")
 	}
-	if expressionPlaceholderRegex.MatchString(repository) {
+	if IsExpression(repository) {
 		return nil
 	}
 
