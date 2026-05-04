@@ -525,5 +525,9 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 }
 
 func isLegacySetup(integration *models.Integration) bool {
+	if integration.SetupState != nil {
+		return false
+	}
+
 	return len(integration.Capabilities) == 0
 }
