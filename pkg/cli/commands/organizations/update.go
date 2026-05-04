@@ -3,22 +3,31 @@ package organizations
 import (
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 type updateCommand struct {
-	name                    *string
-	description             *string
-	changeManagementEnabled *bool
+	name                                *string
+	description                         *string
+	changeManagementEnabled             *bool
+	allowedOAuthProvidersRaw            *string
+	allowDirectEmailInviteCompletionRaw *string
 }
 
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if !ctx.Cmd.Flags().Changed("name") &&
 		!ctx.Cmd.Flags().Changed("description") &&
-		!ctx.Cmd.Flags().Changed("change-management-enabled") {
-		return fmt.Errorf("at least one flag must be provided: --name, --description, or --change-management-enabled")
+		!ctx.Cmd.Flags().Changed("change-management-enabled") &&
+		!ctx.Cmd.Flags().Changed("allowed-oauth-providers") &&
+		!ctx.Cmd.Flags().Changed("allow-direct-email-invite-completion") {
+		return fmt.Errorf(
+			"at least one flag must be provided: --name, --description, --change-management-enabled, --allowed-oauth-providers, or --allow-direct-email-invite-completion",
+		)
 	}
 
 	organizationID, err := core.ResolveOrganizationID(ctx)
@@ -37,10 +46,41 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	org := openapi_client.OrganizationsOrganization{}
 	org.SetMetadata(metadata)
 
-	if ctx.Cmd.Flags().Changed("change-management-enabled") {
-		spec := openapi_client.OrganizationsOrganizationSpec{}
-		spec.SetChangeManagementEnabled(*c.changeManagementEnabled)
-		org.SetSpec(spec)
+	if ctx.Cmd.Flags().Changed("change-management-enabled") ||
+		ctx.Cmd.Flags().Changed("allowed-oauth-providers") ||
+		ctx.Cmd.Flags().Changed("allow-direct-email-invite-completion") {
+		spec := openapi_client.NewOrganizationsOrganizationSpec()
+		if ctx.Cmd.Flags().Changed("change-management-enabled") {
+			spec.SetChangeManagementEnabled(*c.changeManagementEnabled)
+		}
+		if ctx.Cmd.Flags().Changed("allow-direct-email-invite-completion") {
+			raw := strings.TrimSpace(strings.ToLower(*c.allowDirectEmailInviteCompletionRaw))
+			v, err := strconv.ParseBool(raw)
+			if err != nil {
+				return fmt.Errorf("--allow-direct-email-invite-completion must be true or false")
+			}
+			spec.SetAllowDirectEmailInviteCompletion(v)
+		}
+		if ctx.Cmd.Flags().Changed("allowed-oauth-providers") {
+			raw := strings.TrimSpace(*c.allowedOAuthProvidersRaw)
+			var providers []string
+			if raw != "" {
+				for _, part := range strings.Split(raw, ",") {
+					p := strings.TrimSpace(part)
+					if p != "" {
+						providers = append(providers, p)
+					}
+				}
+			}
+			if err := models.ValidateAllowedOAuthProviders(providers); err != nil {
+				return err
+			}
+			providers = models.NormalizeAllowedOAuthProviders(providers)
+			aop := openapi_client.OrganizationAllowedOAuthProviders{}
+			aop.SetProviders(providers)
+			spec.SetAllowedOauthProviders(aop)
+		}
+		org.SetSpec(*spec)
 	}
 
 	body := openapi_client.OrganizationsUpdateOrganizationBody{}
