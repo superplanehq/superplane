@@ -29,6 +29,7 @@ interface OwnerSetupSurveyProps {
 
 type SurveyAnswer = string | string[];
 type SurveyResponses = Record<number, SurveyAnswer>;
+type SurveyQuestionType = "single_choice" | "multiple_choice" | "text";
 
 const parseChoiceLabel = (choice: string): { title: string; subtitle: string | null } => {
   const match = choice.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
@@ -38,10 +39,7 @@ const parseChoiceLabel = (choice: string): { title: string; subtitle: string | n
   return { title: match[1].trim(), subtitle: match[2].trim() };
 };
 
-const getQuestionType = (
-  question: SurveyQuestion,
-  hasChoices: boolean,
-): "single_choice" | "multiple_choice" | "text" => {
+const getQuestionType = (question: SurveyQuestion, hasChoices: boolean): SurveyQuestionType => {
   const rawType = `${question.type ?? ""} ${question.display_type ?? ""}`.toLowerCase();
   const isMultiple =
     question.allow_multiple === true || question.multiple === true || /multi|multiple|checkbox/.test(rawType);
@@ -56,6 +54,118 @@ const getQuestionType = (
 
   return "single_choice";
 };
+
+interface SurveyChoiceButtonsProps {
+  choices: string[];
+  onSelect: (choice: string) => void;
+}
+
+const SurveyChoiceButtons: React.FC<SurveyChoiceButtonsProps> = ({ choices, onSelect }) => (
+  <div className="space-y-2">
+    {choices.map((choice) => {
+      const { title, subtitle } = parseChoiceLabel(choice);
+      return (
+        <Button
+          key={choice}
+          type="button"
+          variant="outline"
+          className="w-full justify-start whitespace-normal h-auto py-3 text-left"
+          onClick={() => onSelect(choice)}
+        >
+          <span className="flex flex-col items-start">
+            <span className="font-medium">{title}</span>
+            {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
+          </span>
+        </Button>
+      );
+    })}
+  </div>
+);
+
+interface SurveyMultiChoiceProps {
+  choices: string[];
+  selectedChoices: string[];
+  onToggle: (choice: string, checked: boolean) => void;
+  onSubmit: () => void;
+}
+
+const SurveyMultiChoice: React.FC<SurveyMultiChoiceProps> = ({ choices, selectedChoices, onToggle, onSubmit }) => (
+  <div className="space-y-4">
+    <div className="space-y-2">
+      {choices.map((choice) => {
+        const isChecked = selectedChoices.includes(choice);
+        const { title, subtitle } = parseChoiceLabel(choice);
+        return (
+          <label
+            key={choice}
+            className="flex items-start gap-3 rounded-md border border-gray-200 px-3 py-2 text-left cursor-pointer"
+          >
+            <Checkbox
+              checked={isChecked}
+              onCheckedChange={(checked) => onToggle(choice, checked === true)}
+              className="mt-0.5"
+            />
+            <span className="flex flex-col text-sm text-gray-800 dark:text-gray-200">
+              <span className="font-medium">{title}</span>
+              {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+    <Button type="button" className="w-full" onClick={onSubmit} disabled={selectedChoices.length === 0}>
+      Continue
+    </Button>
+  </div>
+);
+
+interface SurveyTextQuestionProps {
+  placeholder?: string;
+  textAnswer: string;
+  onTextChange: (value: string) => void;
+  onSubmit: () => void;
+}
+
+const SurveyTextQuestion: React.FC<SurveyTextQuestionProps> = ({ placeholder, textAnswer, onTextChange, onSubmit }) => (
+  <div className="space-y-4">
+    <Textarea
+      placeholder={placeholder ?? "Type your answer"}
+      value={textAnswer}
+      onChange={(event) => onTextChange(event.target.value)}
+    />
+    <Button type="button" className="w-full" onClick={onSubmit} disabled={!textAnswer.trim()}>
+      Continue
+    </Button>
+  </div>
+);
+
+interface SurveyProgressProps {
+  questionCount: number;
+  currentQuestionIndex: number;
+  onSkip: () => void;
+}
+
+const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQuestionIndex, onSkip }) => (
+  <div className="flex flex-col items-center gap-3">
+    <div className="flex gap-1.5">
+      {Array.from({ length: questionCount }).map((_, i) => (
+        <div
+          key={i}
+          className={`h-1.5 rounded-full transition-all duration-300 ${
+            i === currentQuestionIndex ? "w-4 bg-gray-900 dark:bg-white" : "w-1.5 bg-gray-300 dark:bg-gray-600"
+          }`}
+        />
+      ))}
+    </div>
+    <button
+      type="button"
+      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+      onClick={onSkip}
+    >
+      Skip this question
+    </button>
+  </div>
+);
 
 const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizationId }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -158,96 +268,32 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       </div>
 
       {currentType === "single_choice" && (
-        <div className="space-y-2">
-          {currentChoices.map((choice) => {
-            const { title, subtitle } = parseChoiceLabel(choice);
-            return (
-              <Button
-                key={choice}
-                type="button"
-                variant="outline"
-                className="w-full justify-start whitespace-normal h-auto py-3 text-left"
-                onClick={() => handleSingleChoice(choice)}
-              >
-                <span className="flex flex-col items-start">
-                  <span className="font-medium">{title}</span>
-                  {subtitle && <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>}
-                </span>
-              </Button>
-            );
-          })}
-        </div>
+        <SurveyChoiceButtons choices={currentChoices} onSelect={handleSingleChoice} />
       )}
 
       {currentType === "multiple_choice" && (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            {currentChoices.map((choice) => {
-              const isChecked = multiAnswer.includes(choice);
-              const { title, subtitle } = parseChoiceLabel(choice);
-              return (
-                <label
-                  key={choice}
-                  className="flex items-start gap-3 rounded-md border border-gray-200 px-3 py-2 text-left cursor-pointer"
-                >
-                  <Checkbox
-                    checked={isChecked}
-                    onCheckedChange={(checked) => handleToggleMultiChoice(choice, checked === true)}
-                    className="mt-0.5"
-                  />
-                  <span className="flex flex-col text-sm text-gray-800 dark:text-gray-200">
-                    <span className="font-medium">{title}</span>
-                    {subtitle && (
-                      <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</span>
-                    )}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-          <Button
-            type="button"
-            className="w-full"
-            onClick={handleSubmitMultiChoice}
-            disabled={multiAnswer.length === 0}
-          >
-            Continue
-          </Button>
-        </div>
+        <SurveyMultiChoice
+          choices={currentChoices}
+          selectedChoices={multiAnswer}
+          onToggle={handleToggleMultiChoice}
+          onSubmit={handleSubmitMultiChoice}
+        />
       )}
 
       {currentType === "text" && (
-        <div className="space-y-4">
-          <Textarea
-            placeholder={currentQuestion.placeholder ?? "Type your answer"}
-            value={textAnswer}
-            onChange={(event) => setTextAnswer(event.target.value)}
-          />
-          <Button type="button" className="w-full" onClick={handleSubmitTextAnswer} disabled={!textAnswer.trim()}>
-            Continue
-          </Button>
-        </div>
+        <SurveyTextQuestion
+          placeholder={currentQuestion.placeholder}
+          textAnswer={textAnswer}
+          onTextChange={setTextAnswer}
+          onSubmit={handleSubmitTextAnswer}
+        />
       )}
 
-      <div className="flex flex-col items-center gap-3">
-        <div className="flex gap-1.5">
-          {Array.from({ length: survey.questions.length }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === currentQuestionIndex ? "w-4 bg-gray-900 dark:bg-white" : "w-1.5 bg-gray-300 dark:bg-gray-600"
-              }`}
-            />
-          ))}
-        </div>
-        <button
-          type="button"
-          className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          onClick={handleSkipQuestion}
-        >
-          Skip this question
-        </button>
-      </div>
+      <SurveyProgress
+        questionCount={survey.questions.length}
+        currentQuestionIndex={currentQuestionIndex}
+        onSkip={handleSkipQuestion}
+      />
     </div>
   );
 };
