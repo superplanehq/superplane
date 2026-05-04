@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { Puzzle } from "lucide-react";
 import {
   canvasesInvokeNodeExecutionHook,
+  canvasesInvokeNodeTriggerHook,
   type CanvasesCanvasEvent,
   type CanvasesCanvasNodeExecution,
   type CanvasesCanvasNodeQueueItem,
@@ -15,7 +16,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { CanvasNode } from "@/ui/CanvasPage";
-import type { ActionContext, ComponentBaseMapper, User } from "../mappers/types";
+import type { ActionContext, ComponentBaseMapper, TriggerActionContext, User } from "../mappers/types";
 import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
 
@@ -80,8 +81,19 @@ function buildPreparedTriggerCanvasNode(args: {
   displayLabel: string;
   position: NodePosition;
   canvasMode?: "live" | "edit";
+  canvasId: string;
+  queryClient: QueryClient;
 }): CanvasNode {
-  const { node, triggerMetadata, nodeEventsMap, displayLabel, position, canvasMode = "live" } = args;
+  const {
+    node,
+    triggerMetadata,
+    nodeEventsMap,
+    displayLabel,
+    position,
+    canvasMode = "live",
+    canvasId,
+    queryClient,
+  } = args;
   const renderer = getTriggerRenderer(node.component || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps({
@@ -89,6 +101,7 @@ function buildPreparedTriggerCanvasNode(args: {
     definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
     canvasMode,
+    actions: buildTriggerActionContext(queryClient, canvasId, node.id!),
   });
 
   return {
@@ -161,6 +174,7 @@ export function prepareTriggerNode(
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   canvasMode: "live" | "edit" = "live",
+  options: { canvasId: string; queryClient: QueryClient },
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.component);
   const displayLabel = getTriggerDisplayLabel(node, triggerMetadata);
@@ -174,6 +188,8 @@ export function prepareTriggerNode(
       displayLabel,
       position,
       canvasMode,
+      canvasId: options.canvasId,
+      queryClient: options.queryClient,
     });
   } catch (error) {
     console.error(`[CanvasPage] Failed to prepare trigger node "${node.id}":`, error);
@@ -279,6 +295,31 @@ function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: 
         queryClient.invalidateQueries({
           queryKey: canvasKeys.nodeExecution(canvasId, nodeId),
         });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
+      }
+    },
+  };
+}
+
+function buildTriggerActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): TriggerActionContext {
+  return {
+    invokeNodeTriggerHook: async (hookName: string, parameters: unknown) => {
+      try {
+        await canvasesInvokeNodeTriggerHook(
+          withOrganizationHeader({
+            path: {
+              canvasId,
+              nodeId,
+              hookName,
+            },
+            body: {
+              parameters,
+            },
+          }),
+        );
+        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeEvent(canvasId, nodeId) });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
       }

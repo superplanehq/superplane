@@ -367,12 +367,6 @@ type CanvasAnnotationUpdate = {
   y?: number;
 };
 
-type PendingRunData = {
-  nodeId?: string;
-  initialData?: string;
-  templateName?: string;
-};
-
 type CanvasNodeRendererCallbacks = {
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
@@ -422,12 +416,6 @@ type CollapsibleNodeData = {
   trigger?: { collapsed?: boolean };
   composite?: { collapsed?: boolean };
 };
-
-declare global {
-  interface Window {
-    __pendingRunData?: PendingRunData;
-  }
-}
 
 function createNodeRenderFallbackData(data: BlockData): BlockData {
   return {
@@ -790,31 +778,21 @@ function CanvasPage(props: CanvasPageProps) {
       // Hard guard: if running is disabled (e.g., unsaved changes), do nothing
       if (props.runDisabled) return;
 
-      // Check for pending run data from custom field
-      // Note: This uses a window property as a workaround to pass nodeId,
-      // initialData, and templateName through the onRun callback chain without
-      // breaking existing signatures.
-      const pendingData = window.__pendingRunData;
-      const actualNodeId = nodeId || pendingData?.nodeId;
-      const actualInitialData = initialData || pendingData?.initialData;
-      const actualTemplateName = pendingData?.templateName;
-
-      if (!actualNodeId) return;
+      if (!nodeId) return;
 
       // Find the node to get its name and channels
-      const node = state.nodes.find((n) => n.id === actualNodeId);
+      const node = state.nodes.find((n) => n.id === nodeId);
       if (!node) return;
 
       const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-      const nodeName = nodeData?.label || actualNodeId;
+      const nodeName = nodeData?.label || nodeId;
       const channels = nodeData?.outputChannels || ["default"];
 
       setEmitModalData({
-        nodeId: actualNodeId,
+        nodeId,
         nodeName,
         channels,
-        initialData: actualInitialData,
-        templateName: actualTemplateName,
+        initialData,
       });
     },
     [state.nodes, props.runDisabled],

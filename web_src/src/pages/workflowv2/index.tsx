@@ -5800,7 +5800,10 @@ function prepareNode(
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
-      return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode);
+      return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode, {
+        canvasId: workflowId,
+        queryClient,
+      });
     case "TYPE_WIDGET":
       return prepareAnnotationNode(node);
 

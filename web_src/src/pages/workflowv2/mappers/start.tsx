@@ -2,6 +2,7 @@ import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type {
   TriggerRenderer,
   CustomFieldRenderer,
+  CustomFieldRendererContext,
   NodeInfo,
   TriggerRendererContext,
   TriggerEventContext,
@@ -22,6 +23,14 @@ interface StartConfiguration {
   templates?: StartTemplate[];
 }
 
+function payloadForTemplateRun(template: StartTemplate): Record<string, unknown> {
+  const p = template.payload;
+  if (p && typeof p === "object" && !Array.isArray(p)) {
+    return p as Record<string, unknown>;
+  }
+  return {};
+}
+
 /**
  * Default renderer for the start trigger
  */
@@ -35,29 +44,13 @@ export const startTriggerRenderer: TriggerRenderer = {
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
-    const { node, definition, lastEvent } = context;
-    const nodeId = node.id;
+    const { node, definition, lastEvent, canvasMode, actions } = context;
 
-    // Create customField as a function that will receive onRun when ComponentBase renders it
-    // We'll create a wrapper that captures nodeId and allows passing initialData and templateName.
-    const customField = (onRunBase?: () => void) => {
-      if (!onRunBase) {
-        return startCustomFieldRenderer.render(node);
-      }
-
-      // Create a wrapper onRun that can accept initialData and templateName
-      // Store them temporarily in window and trigger the base onRun.
-      // handleNodeRun will check for this data.
-      const onRunWithContext = (initialData?: string, templateName?: string) => {
-        (window as any).__pendingRunData = { nodeId, initialData, templateName };
-        onRunBase();
-        // Clear after a short delay to allow handleNodeRun to read it
-        setTimeout(() => {
-          delete (window as any).__pendingRunData;
-        }, 100);
-      };
-
-      return startCustomFieldRenderer.render(node, { onRun: onRunWithContext });
+    const customField = (_onRunBase?: () => void) => {
+      return startCustomFieldRenderer.render(node, {
+        canvasMode: canvasMode ?? "live",
+        actions,
+      });
     };
 
     const props: TriggerProps = {
@@ -89,10 +82,7 @@ export const startTriggerRenderer: TriggerRenderer = {
  * This is only used internally by startTriggerRenderer, not registered in the global registry
  */
 const startCustomFieldRenderer: CustomFieldRenderer = {
-  render: (
-    node: NodeInfo,
-    context?: { onRun?: (initialData?: string, templateName?: string) => void },
-  ): React.ReactNode => {
+  render: (node: NodeInfo, context?: CustomFieldRendererContext): React.ReactNode => {
     const config = node.configuration as StartConfiguration;
     const templates = config?.templates || [];
 
@@ -100,12 +90,9 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
       return null;
     }
 
-    const handleRun = (template: StartTemplate) => {
-      if (context?.onRun) {
-        const payloadString = JSON.stringify(template.payload, null, 2);
-        context.onRun(payloadString, template.name);
-      }
-    };
+    const mode = context?.canvasMode ?? "live";
+    const actions = context?.actions;
+    const showTemplateRun = mode === "live" && !!actions;
 
     return (
       <div className="px-2 py-1.5 flex flex-col gap-1.5">
@@ -117,14 +104,17 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
               </div>
               <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
             </div>
-            {context?.onRun && (
+            {showTemplateRun && actions && (
               <Button
                 size="sm"
                 data-testid="start-template-run"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleRun(template);
+                  void actions.invokeNodeTriggerHook("run", {
+                    template: template.name,
+                    payload: payloadForTemplateRun(template),
+                  });
                 }}
                 className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
               >

@@ -134,6 +134,8 @@ describe("canvas node preparation resilience", () => {
       makeTriggerNode(),
       [{ name: "webhook", label: "Webhook", icon: "bolt" }] as never,
       {},
+      "live",
+      { canvasId: "canvas-1", queryClient: new QueryClient() },
     );
 
     const triggerData = result.data as { trigger: { error?: string; warning?: string } };
