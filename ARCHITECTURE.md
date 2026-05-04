@@ -64,14 +64,14 @@ Provisioning is **orthogonal** to task claiming:
 - **Security** — Authentication for callers and runners (tokens, mTLS); whether arbitrary shell is acceptable or sandboxes/allowlists are required.
 - **Fairness and isolation** — Single queue vs priorities; per-tenant quotas and rate limits.
 
-## Suggested module boundaries
+## Repository layout (this monorepo)
 
-| Module | Concern |
-|--------|---------|
-| `api` | Task submission, claim, completion callbacks from runners, admin. |
-| `queue` | Persistence, leasing, state transitions. |
-| `hooks` | Outbound webhook delivery and retries. |
-| `runner` | Claim loop, host/docker execution, log streaming to fleet-manager. |
-| `provisioner` (optional) | EC2/ASG/K8s and other backends behind one interface. |
+| Path | Concern |
+|------|---------|
+| `fleet-manager/` | HTTP API (`internal/fleetmanager`), persistence (`internal/store`), webhooks (`internal/webhook`), `cmd/fleet-manager` |
+| `runner/` | Worker agent (`internal/agent`), `cmd/runner` |
+| `shared/api`, `shared/models` | Shared request/response and domain types used by both services |
+
+Optional **provisioner** (EC2/ASG/K8s) can live under `fleet-manager/internal/provisioner` or its own top-level package later.
 
 This separation keeps **orchestration and callbacks** in fleet-manager, **execution** in runners, and **infrastructure scaling** as an optional plug-in.

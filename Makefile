@@ -1,0 +1,11 @@
+.PHONY: build test fmt
+
+build:
+	go build -o bin/fleet-manager ./fleet-manager/cmd/fleet-manager
+	go build -o bin/runner ./runner/cmd/runner
+
+test:
+	go test ./...
+
+fmt:
+	gofmt -w fleet-manager runner shared
