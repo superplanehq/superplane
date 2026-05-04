@@ -75,6 +75,7 @@ export function CapabilityBasedIntegrationDetails({
       showSuccessToast("Property saved");
     } catch (_error) {
       showErrorToast(`Failed to save property: ${getApiErrorMessage(_error)}`);
+      throw _error;
     }
   };
 
@@ -86,6 +87,7 @@ export function CapabilityBasedIntegrationDetails({
       showSuccessToast("Secret saved");
     } catch (_error) {
       showErrorToast(`Failed to save secret: ${getApiErrorMessage(_error)}`);
+      throw _error;
     }
   };
 
