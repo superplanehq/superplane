@@ -10,8 +10,8 @@ spec:
     type: TYPE_ACTION
     configuration:
       clearCache: false
-      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-d7ofgvvlk1mc73891npg"
-        : "srv-d7ofiedckfvc73annk50" }}'
+      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-api-blue-abc123"
+        : "srv-api-green-def456" }}'
     position:
       x: 2680
       y: 1180
@@ -61,7 +61,7 @@ spec:
     configuration:
       channel: '1496141530417598635'
       embedColor: '#00FF00'
-      embedDescription: '**app.efodconsulting.com** canary passed, traffic switched.
+      embedDescription: '**app.example.com** canary passed, traffic switched.
 
 
         **Commit:** {{ root().data.head_commit.message }}
@@ -133,8 +133,8 @@ spec:
     type: TYPE_ACTION
     configuration:
       clearCache: false
-      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-d7ofh0pj2pic73dkgsdg"
-        : "srv-d7ofifn7f7vs73ar0m6g" }}'
+      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-web-blue-abc123"
+        : "srv-web-green-def456" }}'
     position:
       x: 2680
       y: 1540
@@ -192,7 +192,7 @@ spec:
       method: PUT
       text: '{"green_weight": 0.7, "blue_weight": 0.3}'
       timeoutSeconds: 10
-      url: https://api.cloudflare.com/client/v4/accounts/<CLOUDFLARE_ACCOUNT_ID>/storage/kv/namespaces/<KV_NAMESPACE_ID>/values/weights
+      url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 4600
       y: 1720
@@ -203,8 +203,8 @@ spec:
     type: TYPE_ACTION
     configuration:
       deployId: '{{ $["Read Deploy IDs"].data.values[0].api_deploy }}'
-      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-d7ofgvvlk1mc73891npg"
-        : "srv-d7ofiedckfvc73annk50" }}'
+      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-api-blue-abc123"
+        : "srv-api-green-def456" }}'
     position:
       x: 9720
       y: 1540
@@ -216,13 +216,13 @@ spec:
     configuration:
       inputs:
       - name: api_url
-        value: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "https://storejs-api-green.onrender.com"
-          : "https://storejs-api-blue.onrender.com" }}'
+        value: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "https://webapp-api-green.onrender.com"
+          : "https://webapp-api-blue.onrender.com" }}'
       - name: web_url
-        value: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "https://storejs-web-green.onrender.com"
-          : "https://storejs-web-blue.onrender.com" }}'
+        value: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "https://webapp-web-green.onrender.com"
+          : "https://webapp-web-blue.onrender.com" }}'
       ref: main
-      repository: storejs
+      repository: webapp
       workflowFile: .github/workflows/smoke-test.yml
     position:
       x: 5240
@@ -231,9 +231,9 @@ spec:
     isCollapsed: false
     metadata:
       repository:
-        id: <GITHUB_REPO_ID>
-        name: storejs
-        url: https://github.com/puppies-inc/storejs
+        id: 123456789
+        name: webapp
+        url: https://github.com/acme-corp/webapp
   - id: canary-30-green
     name: Canary 30% Green
     type: TYPE_ACTION
@@ -247,7 +247,7 @@ spec:
       method: PUT
       text: '{"green_weight": 0.3, "blue_weight": 0.7}'
       timeoutSeconds: 10
-      url: https://api.cloudflare.com/client/v4/accounts/<CLOUDFLARE_ACCOUNT_ID>/storage/kv/namespaces/<KV_NAMESPACE_ID>/values/weights
+      url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 4600
       y: 1360
@@ -303,8 +303,8 @@ spec:
     type: TYPE_ACTION
     configuration:
       deployId: '{{ $["Read Deploy IDs"].data.values[0].worker_deploy }}'
-      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-d7ofh1e7r5hc73b1jh7g"
-        : "srv-d7ofigflk1mc7388mudg" }}'
+      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-worker-blue-abc123"
+        : "srv-worker-green-def456" }}'
     position:
       x: 9720
       y: 2260
@@ -341,7 +341,7 @@ spec:
       method: PUT
       text: '{"green_weight": 1, "blue_weight": 0}'
       timeoutSeconds: 10
-      url: https://api.cloudflare.com/client/v4/accounts/<CLOUDFLARE_ACCOUNT_ID>/storage/kv/namespaces/<KV_NAMESPACE_ID>/values/weights
+      url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
       y: 1000
@@ -352,8 +352,8 @@ spec:
     type: TYPE_ACTION
     configuration:
       dataset: default
-      syntheticCheck: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "<DASH0_SYNTHETIC_CHECK_BLUE>"
-        : "<DASH0_SYNTHETIC_CHECK_GREEN>" }}'
+      syntheticCheck: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "aaaaaaaa-bbbb-cccc-dddd-111111111111"
+        : "aaaaaaaa-bbbb-cccc-dddd-222222222222" }}'
     position:
       x: 5240
       y: 1540
@@ -397,8 +397,8 @@ spec:
     type: TYPE_ACTION
     configuration:
       clearCache: false
-      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-d7ofh1e7r5hc73b1jh7g"
-        : "srv-d7ofigflk1mc7388mudg" }}'
+      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-worker-blue-abc123"
+        : "srv-worker-green-def456" }}'
     position:
       x: 2680
       y: 1900
@@ -427,7 +427,7 @@ spec:
       method: PUT
       text: '{"green_weight": 0, "blue_weight": 1}'
       timeoutSeconds: 10
-      url: https://api.cloudflare.com/client/v4/accounts/<CLOUDFLARE_ACCOUNT_ID>/storage/kv/namespaces/<KV_NAMESPACE_ID>/values/weights
+      url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
       y: 1360
@@ -459,8 +459,8 @@ spec:
     type: TYPE_ACTION
     configuration:
       deployId: '{{ $["Read Deploy IDs"].data.values[0].web_deploy }}'
-      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-d7ofh0pj2pic73dkgsdg"
-        : "srv-d7ofifn7f7vs73ar0m6g" }}'
+      service: '{{ $["Read Live Env"].data.values[0].key == "blue" ? "srv-web-blue-abc123"
+        : "srv-web-green-def456" }}'
     position:
       x: 9720
       y: 1900
@@ -493,7 +493,7 @@ spec:
       method: PUT
       text: '{"green_weight": 0, "blue_weight": 1}'
       timeoutSeconds: 10
-      url: https://api.cloudflare.com/client/v4/accounts/<CLOUDFLARE_ACCOUNT_ID>/storage/kv/namespaces/<KV_NAMESPACE_ID>/values/weights
+      url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
       y: 1720
@@ -544,16 +544,16 @@ spec:
       refs:
       - type: equals
         value: refs/heads/main
-      repository: storejs
+      repository: webapp
     position:
       x: 120
       y: 1540
     isCollapsed: false
     metadata:
       repository:
-        id: <GITHUB_REPO_ID>
-        name: storejs
-        url: https://github.com/puppies-inc/storejs
+        id: 123456789
+        name: webapp
+        url: https://github.com/acme-corp/webapp
   - id: annotation-overview
     name: Overview
     type: TYPE_WIDGET
@@ -601,7 +601,7 @@ spec:
       method: PUT
       text: '{"green_weight": 1, "blue_weight": 0}'
       timeoutSeconds: 10
-      url: https://api.cloudflare.com/client/v4/accounts/<CLOUDFLARE_ACCOUNT_ID>/storage/kv/namespaces/<KV_NAMESPACE_ID>/values/weights
+      url: https://api.cloudflare.com/client/v4/accounts/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/storage/kv/namespaces/f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3/values/weights
     position:
       x: 8440
       y: 2080
