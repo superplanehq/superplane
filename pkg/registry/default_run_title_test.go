@@ -27,12 +27,23 @@ func TestTriggerDefaultRunTitlesResolveWithExampleData(t *testing.T) {
 			}
 
 			resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
-				WithRootPayload(trigger.ExampleData()).
+				WithRootPayload(rootPayloadForExampleData(trigger.ExampleData())).
 				ResolveTemplateExpressions(template)
 
 			require.NoError(t, err)
 			require.NotEmpty(t, strings.TrimSpace(resolved.(string)))
 		})
+	}
+}
+
+func rootPayloadForExampleData(exampleData map[string]any) map[string]any {
+	if _, ok := exampleData["data"]; ok {
+		return exampleData
+	}
+
+	return map[string]any{
+		"type": "default",
+		"data": exampleData,
 	}
 }
 

@@ -21,9 +21,9 @@ func TestTriggerRunTitle(t *testing.T) {
 		// Set a run title that references the trigger payload.
 		// The default manual trigger template sends {"message": "Hello, World!"}
 		steps.whenRunTitleToggleIsEnabled()
-		steps.whenRunTitleIsSetTo("Run: {{ root().message }}")
+		steps.whenRunTitleIsSetTo("Run: {{ root().data.message }}")
 		steps.waitForAutoSave()
-		steps.thenRunTitleInDBEquals("Run: {{ root().message }}")
+		steps.thenRunTitleInDBEquals("Run: {{ root().data.message }}")
 
 		// Publish and trigger an event
 		steps.saveAndPublish()
