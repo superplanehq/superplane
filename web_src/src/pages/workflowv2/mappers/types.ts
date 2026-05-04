@@ -56,6 +56,8 @@ export type TriggerRendererContext = {
   definition: ComponentDefinition;
   lastEvent: EventInfo;
   canvasMode?: "live" | "edit";
+  /** Canvas-scoped trigger hook invoker (same layering as {@link ActionContext} on components). */
+  actions?: TriggerActionContext;
 };
 
 export type EventInfo =
@@ -129,6 +131,10 @@ export type ActionContext = {
   invokeNodeExecutionHook: (executionId: string, hook: string, parameters: unknown) => Promise<void>;
 };
 
+export type TriggerActionContext = {
+  invokeNodeTriggerHook: (hookName: string, parameters: unknown) => Promise<void>;
+};
+
 export type SubtitleContext = {
   node: NodeInfo;
   execution: ExecutionInfo;
@@ -177,9 +183,20 @@ export interface EventStateRegistry {
  * (via getCustomFieldRenderer) and canvas nodes (via customField prop).
  */
 export interface CustomFieldRendererContext {
-  onRun?: (initialData?: string) => void;
+  /**
+   * Open the run/emit-event modal for this node.
+   *
+   * @param initialData Optional JSON string to prefill the payload editor.
+   * @param templateName Reserved for legacy callers; start-trigger template runs use
+   *  {@link TriggerRendererContext.actions} instead.
+   */
+  onRun?: (initialData?: string, templateName?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
   integration?: OrganizationsIntegration;
+  /** Set when rendering the start trigger manual-run templates on the canvas. */
+  canvasMode?: "live" | "edit";
+  /** Start trigger template Run uses this on the canvas (parallel to component {@link ActionContext}). */
+  actions?: TriggerActionContext;
 }
 
 export interface CustomFieldRenderer {
