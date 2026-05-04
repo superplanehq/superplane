@@ -197,7 +197,7 @@ export function LaunchpadView({
   if (errorMessage) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600">
-        <p className="font-medium">Failed to load launchpad</p>
+        <p className="font-medium">Failed to load Apps</p>
         <p className="text-slate-500">{errorMessage}</p>
       </div>
     );
@@ -208,7 +208,7 @@ export function LaunchpadView({
   return (
     <div ref={containerRef} className="relative flex h-full w-full flex-col overflow-auto">
       <div className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur">
-        <h2 className="text-sm font-semibold text-slate-800">Launchpad</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Apps</h2>
         <div className="flex items-center gap-2">
           {isSaving ? (
             <span className="inline-flex items-center gap-1 text-xs text-slate-500">
@@ -375,7 +375,7 @@ function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: (def: Panel
   return (
     <div className="flex flex-1 items-center justify-center p-8" data-testid="launchpad-empty-state">
       <div className="flex max-w-md flex-col items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
-        <h3 className="text-base font-semibold text-slate-800">Build your Launchpad</h3>
+        <h3 className="text-base font-semibold text-slate-800">Build your Apps page</h3>
         <p className="text-sm text-slate-500">
           Add panels to surface the most important docs, links, and notes for this canvas. Panels can be dragged and
           resized into a grid that suits your team.
