@@ -24,14 +24,14 @@ func (c *ContextsCommand) Execute(ctx core.CommandContext) error {
 		if err != nil {
 			return err
 		}
-		return c.renderContext(ctx, *selected)
+		return renderContextOutput(ctx, *selected)
 	}
 
 	if !ctx.Renderer.IsText() || !ctx.IsInteractive() {
-		return c.renderContexts(ctx, contexts)
+		return renderContextsOutput(ctx, contexts)
 	}
 
-	selected, err := c.selectContextInteractively(ctx, contexts)
+	selected, err := promptContextSelection(ctx, contexts)
 	if err != nil {
 		return err
 	}
@@ -45,13 +45,13 @@ func (c *ContextsCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	return c.renderContext(ctx, *selected)
+	return renderContextOutput(ctx, *selected)
 }
 
 /*
  * Do not render the API token in the output for security reasons.
  */
-func (c *ContextsCommand) renderContexts(ctx core.CommandContext, contexts []ConfigContext) error {
+func renderContextsOutput(ctx core.CommandContext, contexts []ConfigContext) error {
 	if !ctx.Renderer.IsText() {
 		ctxs := make([]map[string]any, 0, len(contexts))
 		for _, context := range contexts {
@@ -71,7 +71,7 @@ func (c *ContextsCommand) renderContexts(ctx core.CommandContext, contexts []Con
 	})
 }
 
-func (c *ContextsCommand) renderContext(ctx core.CommandContext, context ConfigContext) error {
+func renderContextOutput(ctx core.CommandContext, context ConfigContext) error {
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(contextToMap(context))
 	}
@@ -93,7 +93,7 @@ func contextToMap(context ConfigContext) map[string]any {
 	return m
 }
 
-func (c *ContextsCommand) selectContextInteractively(ctx core.CommandContext, contexts []ConfigContext) (*ConfigContext, error) {
+func promptContextSelection(ctx core.CommandContext, contexts []ConfigContext) (*ConfigContext, error) {
 	currentContext, hasCurrentContext := GetCurrentContext()
 	currentSelector := ContextSelector(currentContext)
 
@@ -143,7 +143,8 @@ var contextsCmd = &cobra.Command{
 	Short: "List and switch CLI contexts",
 	Long: "Without arguments, lists available contexts and prompts for a selection. " +
 		"With BASE_URL and ORGANIZATION, switches directly. " +
-		"ORGANIZATION can be the organization name or ID.",
+		"ORGANIZATION can be the organization name or ID. " +
+		"To switch by organization id or name across installations, use \"superplane context\".",
 	Args: cobra.MatchAll(
 		func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || len(args) == 2 {
