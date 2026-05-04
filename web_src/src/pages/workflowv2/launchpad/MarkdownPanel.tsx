@@ -97,7 +97,9 @@ export function MarkdownPanel({ content, readOnly, onChange, ctx }: PanelRenderP
 
   return (
     <div className="h-full w-full overflow-auto p-3" onDoubleClick={startEdit} data-testid="launchpad-markdown-view">
-      <CanvasMarkdown nodeRefs={ctx.nodeRefs}>{content.body}</CanvasMarkdown>
+      <CanvasMarkdown nodeRefs={ctx.nodeRefs} canvasId={ctx.canvasId}>
+        {content.body}
+      </CanvasMarkdown>
     </div>
   );
 }

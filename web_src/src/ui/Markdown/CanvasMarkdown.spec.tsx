@@ -1,5 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+
+vi.mock("./QueryBlock", () => ({
+  QueryBlock: ({ body, canvasId }: { body: string; canvasId: string }) => (
+    <div data-testid="canvas-query-block-mock" data-canvas-id={canvasId}>
+      {body}
+    </div>
+  ),
+}));
+
 import { CanvasMarkdown, NODE_REF_CLASS, NODE_STATUS_CLASS, TRIGGER_RUN_CLASS, remarkNodeRefs } from "./CanvasMarkdown";
 
 type MdastNode = {
@@ -371,5 +380,27 @@ describe("CanvasMarkdown node-status chip", () => {
     expect(chip).not.toBeNull();
     expect(chip?.className).toContain("border-dashed");
     expect(chip?.textContent).toBe("missing:status");
+  });
+});
+
+describe("CanvasMarkdown query block routing", () => {
+  const queryMarkdown = "```query\nsource: memory\nnamespace: environments\n```";
+
+  it("routes a fenced ```query block to QueryBlock when canvasId is provided", () => {
+    render(<CanvasMarkdown canvasId="canvas-1">{queryMarkdown}</CanvasMarkdown>);
+
+    const block = screen.getByTestId("canvas-query-block-mock");
+    expect(block).toBeInTheDocument();
+    expect(block.getAttribute("data-canvas-id")).toBe("canvas-1");
+    expect(block.textContent).toContain("source: memory");
+    expect(block.textContent).toContain("namespace: environments");
+  });
+
+  it("falls back to a regular code block when canvasId is missing", () => {
+    const { container } = render(<CanvasMarkdown>{queryMarkdown}</CanvasMarkdown>);
+
+    expect(screen.queryByTestId("canvas-query-block-mock")).toBeNull();
+    const code = container.querySelector("code.language-query");
+    expect(code).not.toBeNull();
   });
 });

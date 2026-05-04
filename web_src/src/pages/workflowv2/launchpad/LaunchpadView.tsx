@@ -26,6 +26,7 @@ export interface LaunchpadViewProps {
   isSaving?: boolean;
   readOnly: boolean;
   nodeRefs?: NodeChipContext;
+  canvasId?: string;
   /**
    * Persists the next launchpad state. Called whenever the user makes any
    * change (drag, resize, add, delete, edit). Implementations should debounce
@@ -48,6 +49,7 @@ export function LaunchpadView({
   isSaving,
   readOnly,
   nodeRefs,
+  canvasId,
   onChange,
 }: LaunchpadViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -110,7 +112,7 @@ export function LaunchpadView({
     };
   }, [onChange]);
 
-  const ctx: PanelRenderCtx = useMemo(() => ({ nodeRefs }), [nodeRefs]);
+  const ctx: PanelRenderCtx = useMemo(() => ({ nodeRefs, canvasId }), [nodeRefs, canvasId]);
 
   const handleAddPanel = useCallback(
     (def: PanelDef) => {

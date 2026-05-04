@@ -6090,6 +6090,7 @@ export function WorkflowPageV2() {
                 errorMessage={launchpadQuery.error instanceof Error ? launchpadQuery.error.message : undefined}
                 isSaving={updateCanvasLaunchpadMutation.isPending}
                 readOnly={!canUpdateCanvas || isTemplate}
+                canvasId={canvasId}
                 nodeRefs={{
                   nodes: readmeNodesBySlug,
                   icons: readmeIconsBySlug,

@@ -19,6 +19,7 @@ import { resolveIcon } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
 import { MermaidDiagram } from "./MermaidDiagram";
+import { QueryBlock } from "./QueryBlock";
 
 import "highlight.js/styles/github.css";
 
@@ -199,47 +200,61 @@ function extractCodeString(children: React.ReactNode): string {
   return text;
 }
 
-function InlineCode({ children, className }: { children?: React.ReactNode; className?: string }) {
-  const classes = typeof className === "string" ? className : "";
+interface InlineCodeContext {
+  canvasId?: string;
+}
 
-  // Fenced ```mermaid block → render as a live diagram instead of highlighted code.
-  if (/(^|\s)language-mermaid(\s|$)/.test(classes)) {
-    const source = extractCodeString(children).replace(/\n$/, "");
-    return <MermaidDiagram code={source} />;
-  }
+function buildInlineCodeComponent({ canvasId }: InlineCodeContext) {
+  return function InlineCode({ children, className }: { children?: React.ReactNode; className?: string }) {
+    const classes = typeof className === "string" ? className : "";
 
-  const text = String(children ?? "");
-  const match = text.match(BADGE_RE);
+    // Fenced ```mermaid block → render as a live diagram instead of highlighted code.
+    if (/(^|\s)language-mermaid(\s|$)/.test(classes)) {
+      const source = extractCodeString(children).replace(/\n$/, "");
+      return <MermaidDiagram code={source} />;
+    }
 
-  if (match) {
-    const [, type, label] = match;
-    const color = BADGE_COLORS[type] ?? BADGE_COLORS.info;
+    // Fenced ```query block → render as a memory-backed table when canvasId is
+    // available. In surfaces that don't supply canvasId (e.g. Readme modal)
+    // the block falls through to the regular highlighted code rendering.
+    if (/(^|\s)language-query(\s|$)/.test(classes) && canvasId) {
+      const source = extractCodeString(children).replace(/\n$/, "");
+      return <QueryBlock body={source} canvasId={canvasId} />;
+    }
+
+    const text = String(children ?? "");
+    const match = text.match(BADGE_RE);
+
+    if (match) {
+      const [, type, label] = match;
+      const color = BADGE_COLORS[type] ?? BADGE_COLORS.info;
+      return (
+        <span
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${color}`}
+        >
+          {label}
+        </span>
+      );
+    }
+
+    //
+    // Fenced code blocks arrive with `className="language-xxx"` and are already
+    // wrapped in a <pre> by react-markdown — we pass those through untouched so
+    // rehype-highlight keeps control of their styling. Inline snippets (no
+    // language-* class) get a pill treatment so short commands / paths /
+    // identifiers stand out from the surrounding prose.
+    //
+    const isFencedBlock = /(^|\s)language-/.test(classes);
+    if (isFencedBlock) {
+      return <code className={className}>{children}</code>;
+    }
+
     return (
-      <span
-        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${color}`}
-      >
-        {label}
-      </span>
+      <code className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800">
+        {children}
+      </code>
     );
-  }
-
-  //
-  // Fenced code blocks arrive with `className="language-xxx"` and are already
-  // wrapped in a <pre> by react-markdown — we pass those through untouched so
-  // rehype-highlight keeps control of their styling. Inline snippets (no
-  // language-* class) get a pill treatment so short commands / paths /
-  // identifiers stand out from the surrounding prose.
-  //
-  const isFencedBlock = /(^|\s)language-/.test(classes);
-  if (isFencedBlock) {
-    return <code className={className}>{children}</code>;
-  }
-
-  return (
-    <code className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800">
-      {children}
-    </code>
-  );
+  };
 }
 
 //
@@ -1026,12 +1041,13 @@ interface CanvasMarkdownProps {
   children: string;
   className?: string;
   nodeRefs?: NodeChipContext;
+  canvasId?: string;
 }
 
-export function CanvasMarkdown({ children, className, nodeRefs }: CanvasMarkdownProps) {
+export function CanvasMarkdown({ children, className, nodeRefs, canvasId }: CanvasMarkdownProps) {
   const components = React.useMemo(
     () => ({
-      code: InlineCode,
+      code: buildInlineCodeComponent({ canvasId }),
       blockquote: Blockquote,
       a: Anchor,
       table: Table,
@@ -1043,7 +1059,7 @@ export function CanvasMarkdown({ children, className, nodeRefs }: CanvasMarkdown
       summary: Summary,
       span: buildSpanComponent(nodeRefs ?? {}),
     }),
-    [nodeRefs],
+    [nodeRefs, canvasId],
   );
 
   const wrapperClassName = className ?? DEFAULT_TYPOGRAPHY_CLASS;

@@ -11,6 +11,7 @@ import { MarkdownPanel, type MarkdownPanelContent } from "./MarkdownPanel";
  */
 export interface PanelRenderCtx {
   nodeRefs?: NodeChipContext;
+  canvasId?: string;
 }
 
 export interface PanelRenderProps<TContent> {
