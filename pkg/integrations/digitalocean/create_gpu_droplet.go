@@ -67,7 +67,7 @@ func (c *CreateGPUDroplet) Documentation() string {
 - **Backups**: Enable automated backups for the droplet (optional)
 - **IPv6**: Enable IPv6 networking on the droplet (optional)
 - **Monitoring**: Enable DigitalOcean monitoring agent on the droplet (optional)
-- **VPC UUID**: UUID of the VPC to create the droplet in (optional)
+- **VPC**: UUID of the VPC to create the droplet in (optional)
 
 ## Output
 
@@ -102,7 +102,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Description: "The hostname for the GPU droplet",
 		},
 		{
-			Name:        "region",
+			Name:        "gpuRegion",
 			Label:       "Region",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -115,7 +115,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "size",
+			Name:        "gpuSize",
 			Label:       "GPU Size",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -144,7 +144,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "oneClickImage",
+			Name:        "oneClickGPUImage",
 			Label:       "One-Click Application",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -152,7 +152,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Placeholder: "Select a one-click application",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "gpu_image_oneclick",
+					Type: "one_click_gpu_image",
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -160,7 +160,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "baseImage",
+			Name:        "baseGPUImage",
 			Label:       "Base OS Image",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -168,7 +168,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Placeholder: "Select a base OS",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "gpu_image_base",
+					Type: "base_gpu_image",
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -236,7 +236,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Description: "Enable DigitalOcean monitoring agent on the droplet",
 		},
 		{
-			Name:        "vpcUuid",
+			Name:        "vpc",
 			Label:       "VPC",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
