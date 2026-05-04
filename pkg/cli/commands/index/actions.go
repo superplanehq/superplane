@@ -236,7 +236,7 @@ func (c *actionsCommand) listActions(ctx core.CommandContext, from string) ([]op
 			return nil, err
 		}
 
-		return integration.GetActions(), nil
+		return actionsFromCapabilities(integration.GetCapabilities()), nil
 	}
 
 	//
@@ -268,7 +268,7 @@ func (c *actionsCommand) findActionByName(ctx core.CommandContext, name string) 
 }
 
 func findIntegrationComponent(integration openapi_client.IntegrationsIntegrationDefinition, name string) (openapi_client.SuperplaneActionsAction, error) {
-	for _, action := range integration.GetActions() {
+	for _, action := range actionsFromCapabilities(integration.GetCapabilities()) {
 		actionName := action.GetName()
 		if actionName == name || actionName == fmt.Sprintf("%s.%s", integration.GetName(), name) {
 			return action, nil
@@ -276,4 +276,21 @@ func findIntegrationComponent(integration openapi_client.IntegrationsIntegration
 	}
 
 	return openapi_client.SuperplaneActionsAction{}, fmt.Errorf("action %q not found in integration %q", name, integration.GetName())
+}
+
+func actionsFromCapabilities(capabilities []openapi_client.IntegrationsCapabilityDefinition) []openapi_client.SuperplaneActionsAction {
+	actions := []openapi_client.SuperplaneActionsAction{}
+	for _, capability := range capabilities {
+		if capability.GetType() != openapi_client.INTEGRATIONSCAPABILITYDEFINITIONTYPE_TYPE_ACTION {
+			continue
+		}
+		actions = append(actions, openapi_client.SuperplaneActionsAction{
+			Name:           capability.Name,
+			Label:          capability.Label,
+			Description:    capability.Description,
+			Configuration:  capability.Configuration,
+			OutputChannels: capability.OutputChannels,
+		})
+	}
+	return actions
 }

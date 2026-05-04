@@ -59,6 +59,7 @@ func (s *fakeUsageService) SetupAccount(_ context.Context, accountID string) (*p
 func (s *fakeUsageService) SetupOrganization(
 	_ context.Context,
 	organizationID, accountID string,
+	_ usage.SetupOrganizationDetails,
 ) (*pb.SetupOrganizationResponse, error) {
 	s.setupOrganizationCalls = append(s.setupOrganizationCalls, [2]string{organizationID, accountID})
 	if s.setupOrganizationError != nil {

@@ -15,7 +15,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Application" href="#create-application" description="Create a new OCI Functions application" />
   <LinkCard title="Create Compute Instance" href="#create-compute-instance" description="Provision a new OCI Compute instance and wait for it to reach RUNNING state" />
+  <LinkCard title="Create Function" href="#create-function" description="Deploy a new function within an OCI Functions application" />
+  <LinkCard title="Delete Application" href="#delete-application" description="Delete an OCI Functions application" />
+  <LinkCard title="Delete Function" href="#delete-function" description="Remove a function from an OCI Functions application" />
+  <LinkCard title="Invoke Function" href="#invoke-function" description="Execute an OCI Function and capture its response" />
 </CardGrid>
 
 ## Instructions
@@ -135,6 +140,48 @@ Each event payload includes:
 }
 ```
 
+<a id="create-application"></a>
+
+## Create Application
+
+The Create Application component creates a new Oracle Cloud Infrastructure Functions application.
+
+### Use Cases
+
+- **Serverless environment provisioning**: Create application containers as part of a deployment workflow
+- **Environment lifecycle management**: Automatically create application environments for each release
+
+### Configuration
+
+- **Compartment**: The compartment where the application will be created
+- **Display Name**: A human-readable name for the application
+- **Subnet OCIDs**: One or more subnet OCIDs (comma-separated) for the application's VCN configuration
+
+### Output
+
+Emits the created application details including:
+- `applicationId` — application OCID
+- `displayName` — application name
+- `lifecycleState` — current state (`ACTIVE`)
+- `compartmentId` — the compartment OCID
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+    "displayName": "my-functions-app",
+    "lifecycleState": "ACTIVE",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:31:58.249783188Z",
+  "type": "oci.applicationCreated"
+}
+```
+
 <a id="create-compute-instance"></a>
 
 ## Create Compute Instance
@@ -190,6 +237,163 @@ Emits the created instance details on the default output channel, including:
   },
   "timestamp": "2026-04-22T20:31:58.249783188Z",
   "type": "oci.computeInstanceCreated"
+}
+```
+
+<a id="create-function"></a>
+
+## Create Function
+
+The Create Function component deploys a new serverless function within an existing OCI Functions application.
+
+### Use Cases
+
+- **Continuous deployment**: Automatically deploy new function versions as part of a CI/CD pipeline
+- **Serverless provisioning**: Create functions on-demand as part of environment setup workflows
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application to deploy the function into
+- **Display Name**: A human-readable name for the function
+- **Image**: The container image URI (e.g. `phx.ocir.io/namespace/repo/image:tag`)
+- **Memory (MB)**: Memory allocated to the function (minimum 128 MB)
+- **Timeout (seconds)**: Optional maximum execution time in seconds
+
+### Output
+
+Emits the created function details including:
+- `functionId` — function OCID
+- `displayName` — function name
+- `applicationId` — parent application OCID
+- `image` — the container image
+- `invokeEndpoint` — the HTTPS endpoint used to invoke the function
+- `memoryInMBs` — memory allocated in megabytes
+- `lifecycleState` — current state
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "displayName": "my-function",
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "image": "phx.ocir.io/mynamespace/myrepo/myfunction:0.0.1",
+    "invokeEndpoint": "https://aabbccddeeff.call.eu-frankfurt-1.oci.oraclecloud.com",
+    "lifecycleState": "ACTIVE",
+    "memoryInMBs": 256,
+    "timeCreated": "2026-04-22T20:33:10.512Z"
+  },
+  "timestamp": "2026-04-22T20:33:11.102345678Z",
+  "type": "oci.functionCreated"
+}
+```
+
+<a id="delete-application"></a>
+
+## Delete Application
+
+The Delete Application component removes an Oracle Cloud Infrastructure Functions application.
+
+> **Important:** OCI will reject the deletion with a 409 Conflict if the application still contains functions.
+> You must delete all functions inside the application (using the **Delete Function** component) before using this component.
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application to delete. The application must have no remaining functions.
+
+### Output
+
+Emits the deleted application ID on the default output channel:
+- `applicationId` — OCID of the deleted application
+- `deleted` — boolean confirming deletion
+- `displayName` — name of the deleted application
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "deleted": true,
+    "displayName": "my-functions-app"
+  },
+  "timestamp": "2026-04-22T20:35:00.000000000Z",
+  "type": "oci.applicationDeleted"
+}
+```
+
+<a id="delete-function"></a>
+
+## Delete Function
+
+The Delete Function component removes a function from an Oracle Cloud Infrastructure Functions application.
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application that owns the function
+- **Function**: The function to delete
+
+### Output
+
+Emits the deleted function ID on the default output channel:
+- `functionId` — OCID of the deleted function
+- `deleted` — boolean confirming deletion
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz"
+  },
+  "timestamp": "2026-04-22T20:36:00.000000000Z",
+  "type": "oci.functionDeleted"
+}
+```
+
+<a id="invoke-function"></a>
+
+## Invoke Function
+
+The Invoke Function component executes an Oracle Cloud Infrastructure serverless function and emits its response.
+
+### Use Cases
+
+- **Data transformation**: Invoke a function to process or transform data mid-workflow
+- **Custom logic**: Run arbitrary serverless code as a workflow step
+- **Integration hooks**: Call a function to trigger external systems
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application that owns the function
+- **Function**: The function to invoke
+- **Payload**: Optional JSON or plain-text body sent to the function
+
+### Output
+
+Emits the function response on the default output channel:
+- `functionId` — OCID of the invoked function
+- `statusCode` — HTTP status code returned by the function runtime
+- `response` — raw response body as a string
+
+### Example Output
+
+```json
+{
+  "data": {
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "response": "{\"result\": \"ok\", \"processed\": 42}",
+    "statusCode": 200
+  },
+  "timestamp": "2026-04-22T20:34:05.987654321Z",
+  "type": "oci.functionInvoked"
 }
 ```
 

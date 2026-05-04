@@ -27,7 +27,7 @@ func (s *fakeEventRetentionUsageService) SetupAccount(context.Context, string) (
 	return &pb.SetupAccountResponse{}, nil
 }
 
-func (s *fakeEventRetentionUsageService) SetupOrganization(context.Context, string, string) (*pb.SetupOrganizationResponse, error) {
+func (s *fakeEventRetentionUsageService) SetupOrganization(context.Context, string, string, usage.SetupOrganizationDetails) (*pb.SetupOrganizationResponse, error) {
 	return &pb.SetupOrganizationResponse{}, nil
 }
 

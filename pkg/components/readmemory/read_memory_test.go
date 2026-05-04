@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -80,6 +81,18 @@ func TestReadMemoryExecute(t *testing.T) {
 		assert.Equal(t, PayloadType, execState.Type)
 		assert.Len(t, execState.Payloads, 1)
 
+		payload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.NotContains(t, data, "data")
+		assert.Equal(t, "machines", data["namespace"])
+		assert.Equal(t, map[string]any{"creator": "igor", "pull_request": 123}, data["matches"])
+		assert.Equal(t, ResultModeAll, data["resultMode"])
+		assert.Equal(t, EmitModeAllAtOnce, data["emitMode"])
+		assert.Equal(t, memoryCtx.values, data["values"])
+		assert.Equal(t, 1, data["count"])
+
 		assert.Equal(
 			t,
 			map[string]any{
@@ -151,6 +164,16 @@ func TestReadMemoryExecute(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, ChannelNameFound, execState.Channel)
 		assert.Len(t, execState.Payloads, 2)
+
+		firstPayload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		firstData, ok := firstPayload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.NotContains(t, firstData, "data")
+		assert.Equal(t, []any{memoryCtx.values[0]}, firstData["values"])
+		assert.Equal(t, 1, firstData["count"])
+		assert.Equal(t, 0, firstData["index"])
+		assert.Equal(t, 2, firstData["totalCount"])
 	})
 
 	t.Run("emits notFound channel when there are no matches", func(t *testing.T) {
