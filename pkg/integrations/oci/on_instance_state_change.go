@@ -53,8 +53,6 @@ type OnInstanceStateChangeConfiguration struct {
 
 type OnInstanceStateChangeMetadata struct {
 	CompartmentID string `json:"compartmentId" mapstructure:"compartmentId"`
-	EventsRuleID  string `json:"eventsRuleId" mapstructure:"eventsRuleId"`
-	Condition     string `json:"condition" mapstructure:"condition"`
 }
 
 func (t *OnInstanceStateChange) Name() string {
@@ -74,7 +72,7 @@ func (t *OnInstanceStateChange) Documentation() string {
 
 ## How It Works
 
-When this trigger is added to a workflow, SuperPlane creates an **OCI Events rule** in the configured compartment that forwards Compute instance lifecycle events to the integration's shared OCI Notifications topic.
+When the OCI integration is set up, SuperPlane creates a shared **OCI Notifications (ONS) topic** and a tenancy-level **OCI Events rule** that forwards Compute instance power and termination events to that topic. When this trigger is added to a workflow, SuperPlane subscribes your workflow webhook to that topic and filters deliveries to the configured compartment and selected state changes — no separate Events rule is created per trigger.
 
 ## Configuration
 
@@ -164,62 +162,13 @@ func (t *OnInstanceStateChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("integration topic not ready yet; ensure the OCI integration has been fully set up")
 	}
 
-	var metadata OnInstanceStateChangeMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode trigger metadata: %w", err)
-	}
-
-	condition := `{"eventType": ["com.oraclecloud.computeapi.instanceaction.end","com.oraclecloud.computeapi.terminateinstance.end"]}`
-
-	if metadata.CompartmentID == config.Compartment && metadata.EventsRuleID != "" && metadata.Condition == condition {
-		return ctx.Integration.RequestWebhook(WebhookConfiguration{
-			CompartmentID: config.Compartment,
-			TopicID:       integrationMetadata.TopicID,
-		})
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create OCI client: %w", err)
-	}
-
-	if metadata.EventsRuleID != "" {
-		if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
-			ctx.Logger.Warnf("failed to delete old Events rule %q: %v", metadata.EventsRuleID, err)
-		}
-	}
-
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("failed to set up webhook URL: %w", err)
-	}
-	webhookID, err := extractWebhookID(webhookURL)
-	if err != nil {
-		return err
-	}
-	ruleName := fmt.Sprintf("superplane-instance-state-change-%s", webhookID)
-	rule, err := client.CreateEventsRule(
-		config.Compartment,
-		ruleName,
-		condition,
-		integrationMetadata.TopicID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create Events rule: %w", err)
-	}
-
 	if err := ctx.Metadata.Set(OnInstanceStateChangeMetadata{
 		CompartmentID: config.Compartment,
-		EventsRuleID:  rule.ID,
-		Condition:     condition,
 	}); err != nil {
 		return fmt.Errorf("failed to persist trigger metadata: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		CompartmentID: config.Compartment,
-		TopicID:       integrationMetadata.TopicID,
-	})
+	return requestWebhook(ctx, config.Compartment, integrationMetadata.TopicID)
 }
 
 func (t *OnInstanceStateChange) Hooks() []core.Hook {
@@ -231,25 +180,7 @@ func (t *OnInstanceStateChange) HandleHook(ctx core.TriggerHookContext) (map[str
 }
 
 func (t *OnInstanceStateChange) Cleanup(ctx core.TriggerContext) error {
-	var metadata OnInstanceStateChangeMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		ctx.Logger.Warnf("failed to decode trigger metadata during cleanup: %v", err)
-		return nil
-	}
-
-	if metadata.EventsRuleID == "" {
-		return nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create OCI client during cleanup: %w", err)
-	}
-
-	if err := client.DeleteEventsRule(metadata.EventsRuleID); err != nil {
-		ctx.Logger.Warnf("failed to delete Events rule %q during cleanup: %v", metadata.EventsRuleID, err)
-	}
-
+	// The Events rule is shared at integration level and cleaned up by OCI.Cleanup.
 	return nil
 }
 

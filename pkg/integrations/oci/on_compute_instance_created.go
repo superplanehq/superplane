@@ -45,7 +45,7 @@ func (t *OnComputeInstanceCreated) Documentation() string {
 
 ## How It Works
 
-When the OCI integration is set up, SuperPlane automatically creates a shared **OCI Notifications (ONS) topic** and subscribes to it. When this trigger is added to a workflow, SuperPlane automatically creates an **OCI Events rule** in the configured compartment that forwards ` + "`com.oraclecloud.computeapi.launchinstance.end`" + ` events to that topic — no manual OCI configuration is required.
+When the OCI integration is set up, SuperPlane automatically creates a shared **OCI Notifications (ONS) topic** and a tenancy-level **OCI Events rule** that forwards ` + "`com.oraclecloud.computeapi.launchinstance.end`" + ` events to that topic. When this trigger is added to a workflow, SuperPlane subscribes your workflow webhook to that topic and filters deliveries to the configured compartment — no manual OCI configuration is required.
 
 ## Configuration
 

@@ -2,7 +2,6 @@ package oci
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"testing"
 
@@ -36,30 +35,26 @@ func Test__OnInstanceStateChange__HandleWebhook_ConfirmsSubscription(t *testing.
 	assert.Equal(t, "https://notification.eu-frankfurt-1.oraclecloud.com/confirm", httpCtx.Requests[0].URL.String())
 }
 
-func Test__OnInstanceStateChange__Setup_UsesWebhookPathIDForRuleName(t *testing.T) {
+func Test__OnInstanceStateChange__Setup_RequestsWebhookWithoutEventsRule(t *testing.T) {
 	trigger := &OnInstanceStateChange{}
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			ociMockResponse(http.StatusOK, `{"id":"ocid1.eventsrule.oc1.test"}`),
-		},
-	}
+	httpCtx := &contexts.HTTPContext{}
+	integration := ociIntegrationContext()
 
 	err := trigger.Setup(core.TriggerContext{
 		Configuration: map[string]any{"compartment": testCompartmentID},
 		HTTP:          httpCtx,
-		Integration:   ociIntegrationContext(),
+		Integration:   integration,
 		Metadata:      &contexts.MetadataContext{},
-		Webhook:       fixedNodeWebhookContext{url: "https://example.com/api/v1/webhooks/webhook-id?token=abc#frag"},
 		Logger:        ociLogger(),
 	})
 
 	require.NoError(t, err)
-	require.Len(t, httpCtx.Requests, 1)
-	assert.Contains(t, httpCtx.Requests[0].URL.String(), "/20181201/rules")
-	body, err := io.ReadAll(httpCtx.Requests[0].Body)
-	require.NoError(t, err)
-	assert.Contains(t, string(body), `"displayName":"superplane-instance-state-change-webhook-id"`)
-	assert.NotContains(t, string(body), "token=abc")
+	assert.Empty(t, httpCtx.Requests, "instance state events use the integration-level Events rule from Sync, not a per-trigger rule")
+	require.Len(t, integration.WebhookRequests, 1)
+	cfg, ok := integration.WebhookRequests[0].(WebhookConfiguration)
+	require.True(t, ok, "expected WebhookConfiguration, got %T", integration.WebhookRequests[0])
+	assert.Equal(t, testCompartmentID, cfg.CompartmentID)
+	assert.Equal(t, "ocid1.onstopic.oc1.eu-frankfurt-1.testtopic", cfg.TopicID)
 }
 
 func Test__OnInstanceStateChange__Setup_RejectsUnsupportedStateChanges(t *testing.T) {
@@ -277,28 +272,4 @@ func instanceStateChangeEventBody(t *testing.T, eventType, compartmentID, action
 	})
 	require.NoError(t, err)
 	return body
-}
-
-type fixedNodeWebhookContext struct {
-	url string
-}
-
-func (w fixedNodeWebhookContext) Setup() (string, error) {
-	return w.url, nil
-}
-
-func (w fixedNodeWebhookContext) GetSecret() ([]byte, error) {
-	return nil, nil
-}
-
-func (w fixedNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
-	return nil, nil, nil
-}
-
-func (w fixedNodeWebhookContext) SetSecret(secret []byte) error {
-	return nil
-}
-
-func (w fixedNodeWebhookContext) GetBaseURL() string {
-	return "http://localhost:3000/api/v1"
 }
