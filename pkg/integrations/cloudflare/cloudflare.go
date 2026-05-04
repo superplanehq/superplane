@@ -92,6 +92,7 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
 	 - Account / Workers KV Storage / Edit
+     - Account / Load Balancing: Monitor and Pools / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -141,6 +142,8 @@ func (c *Cloudflare) Actions() []core.Action {
 		&GetKVValue{},
 		&DeleteKVValue{},
 		&DeleteKVNamespace{},
+		&CreatePool{},
+		&UpdatePool{},
 	}
 }
 

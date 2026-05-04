@@ -96,3 +96,23 @@ var exampleOutputDeleteKVNamespace map[string]any
 func (c *DeleteKVNamespace) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteKVNamespaceOnce, exampleOutputDeleteKVNamespaceBytes, &exampleOutputDeleteKVNamespace)
 }
+
+//go:embed example_output_create_pool.json
+var exampleOutputCreatePoolBytes []byte
+
+var exampleOutputCreatePoolOnce sync.Once
+var exampleOutputCreatePool map[string]any
+
+func (c *CreatePool) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreatePoolOnce, exampleOutputCreatePoolBytes, &exampleOutputCreatePool)
+}
+
+//go:embed example_output_update_pool.json
+var exampleOutputUpdatePoolBytes []byte
+
+var exampleOutputUpdatePoolOnce sync.Once
+var exampleOutputUpdatePool map[string]any
+
+func (c *UpdatePool) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdatePoolOnce, exampleOutputUpdatePoolBytes, &exampleOutputUpdatePool)
+}

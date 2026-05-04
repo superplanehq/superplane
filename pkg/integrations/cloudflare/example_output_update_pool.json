@@ -1,0 +1,27 @@
+{
+  "pool": {
+    "id": "17b5962d775c646f3f9725cbc7a53df4",
+    "name": "primary-pool",
+    "description": "Primary origin pool",
+    "enabled": true,
+    "minimum_origins": 1,
+    "monitor": "",
+    "notification_email": "",
+    "origins": [
+      {
+        "name": "app-stable",
+        "address": "192.0.2.1",
+        "enabled": true,
+        "weight": 0.9
+      },
+      {
+        "name": "app-canary",
+        "address": "192.0.2.3",
+        "enabled": true,
+        "weight": 0.1
+      }
+    ]
+  },
+  "accountId": "01a7362d577a6c3019a474fd6f485823",
+  "poolId": "17b5962d775c646f3f9725cbc7a53df4"
+}

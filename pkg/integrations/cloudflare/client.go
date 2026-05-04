@@ -968,3 +968,118 @@ func (c *Client) DeleteKVNamespace(accountID, namespaceID string) error {
 
 	return nil
 }
+
+// ---- Pool types ----
+
+// Origin represents a single origin server in a pool
+type Origin struct {
+	Name    string  `json:"name"`
+	Address string  `json:"address"`
+	Enabled bool    `json:"enabled"`
+	Weight  float64 `json:"weight"`
+}
+
+// LoadShedding configures load shedding behaviour for a pool
+type LoadShedding struct {
+	DefaultPercent float64 `json:"default_percent"`
+	DefaultPolicy  string  `json:"default_policy"`
+	SessionPercent float64 `json:"session_percent"`
+	SessionPolicy  string  `json:"session_policy"`
+}
+
+// Pool represents a Cloudflare Load Balancer origin pool
+type Pool struct {
+	ID                string        `json:"id"`
+	Name              string        `json:"name"`
+	Description       string        `json:"description"`
+	Enabled           bool          `json:"enabled"`
+	MinimumOrigins    int           `json:"minimum_origins"`
+	Monitor           string        `json:"monitor,omitempty"`
+	NotificationEmail string        `json:"notification_email,omitempty"`
+	Origins           []Origin      `json:"origins"`
+	LoadShedding      *LoadShedding `json:"load_shedding,omitempty"`
+}
+
+// CreatePoolRequest is the payload for creating a pool
+type CreatePoolRequest struct {
+	Name              string        `json:"name"`
+	Description       string        `json:"description,omitempty"`
+	Enabled           bool          `json:"enabled"`
+	MinimumOrigins    int           `json:"minimum_origins,omitempty"`
+	Monitor           string        `json:"monitor,omitempty"`
+	NotificationEmail string        `json:"notification_email,omitempty"`
+	Origins           []Origin      `json:"origins"`
+	LoadShedding      *LoadShedding `json:"load_shedding,omitempty"`
+}
+
+// CreatePool creates a new origin pool under a Cloudflare account
+func (c *Client) CreatePool(accountID string, req CreatePoolRequest) (*Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools", c.BaseURL, accountID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// UpdatePoolRequest is the payload for updating an origin pool
+type UpdatePoolRequest struct {
+	Name              string        `json:"name,omitempty"`
+	Description       string        `json:"description,omitempty"`
+	Enabled           *bool         `json:"enabled,omitempty"`
+	MinimumOrigins    *int          `json:"minimum_origins,omitempty"`
+	Monitor           string        `json:"monitor,omitempty"`
+	NotificationEmail string        `json:"notification_email,omitempty"`
+	Origins           []Origin      `json:"origins,omitempty"`
+	LoadShedding      *LoadShedding `json:"load_shedding,omitempty"`
+}
+
+// UpdatePool updates an existing origin pool under a Cloudflare account
+func (c *Client) UpdatePool(accountID, poolID string, req UpdatePoolRequest) (*Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools/%s", c.BaseURL, accountID, poolID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}

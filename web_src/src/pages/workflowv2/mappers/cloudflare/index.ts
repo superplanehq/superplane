@@ -21,6 +21,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getKVValue: getKVValueMapper,
   deleteKVValue: deleteKVValueMapper,
   deleteKVNamespace: deleteKVNamespaceMapper,
+  createPool: baseMapper,
+  updatePool: baseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -38,4 +40,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getKVValue: buildActionStateRegistry("fetched"),
   deleteKVValue: buildActionStateRegistry("deleted"),
   deleteKVNamespace: buildActionStateRegistry("deleted"),
+  createPool: buildActionStateRegistry("completed"),
+  updatePool: buildActionStateRegistry("completed"),
 };
