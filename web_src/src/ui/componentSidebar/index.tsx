@@ -41,6 +41,7 @@ import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { analytics, useIntegrationConfigureOpen } from "@/lib/analytics";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -278,15 +279,23 @@ export const ComponentSidebar = ({
     configureIntegrationId ?? "",
   );
   const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
-  const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const createIntegrationMutation = useCreateIntegration(domainId ?? "", "node_configuration");
   const configureIntegrationDefinition = useMemo(
     () =>
-      configureIntegration?.spec?.integrationName
-        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.spec?.integrationName)
+      configureIntegration?.metadata?.integrationName
+        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.metadata?.integrationName)
         : undefined,
-    [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
+    [availableIntegrationDefinitions, configureIntegration?.metadata?.integrationName],
   );
   const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
+
+  useIntegrationConfigureOpen(
+    configureIntegration ?? undefined,
+    configureIntegrationId,
+    "node_configuration",
+    domainId,
+  );
+
   const createIntegrationDefinition = useMemo(
     () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
     [availableIntegrationDefinitions, integrationName],
@@ -296,7 +305,7 @@ export const ComponentSidebar = ({
     if (!domainId) return "#";
     const selectedIntegrationId =
       integrationRef?.id ||
-      integrations?.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
+      integrations?.find((integration) => integration.metadata?.integrationName === selectedIntegrationForDialog?.name)
         ?.metadata?.id;
     if (selectedIntegrationId) {
       return `/${domainId}/settings/integrations/${selectedIntegrationId}`;
@@ -314,7 +323,10 @@ export const ComponentSidebar = ({
 
   const handleOpenCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(true);
-  }, []);
+    if (integrationName && domainId) {
+      analytics.integrationConnectStart(integrationName, "node_configuration", domainId);
+    }
+  }, [integrationName, domainId]);
 
   const handleCloseCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(false);
@@ -388,9 +400,9 @@ export const ComponentSidebar = ({
 
   useEffect(() => {
     setConfigureIntegrationName(
-      configureIntegration?.metadata?.name || configureIntegration?.spec?.integrationName || "",
+      configureIntegration?.metadata?.name || configureIntegration?.metadata?.integrationName || "",
     );
-  }, [configureIntegration?.metadata?.name, configureIntegration?.spec?.integrationName]);
+  }, [configureIntegration?.metadata?.name, configureIntegration?.metadata?.integrationName]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -874,6 +886,7 @@ export const ComponentSidebar = ({
                       actions={actions}
                       triggers={triggers}
                       onHighlightedNodesChange={onHighlightedNodesChange}
+                      organizationId={domainId}
                     />
                   )}
                 </div>
@@ -921,15 +934,15 @@ export const ComponentSidebar = ({
               <DialogHeader>
                 <div className="flex items-center gap-3">
                   <IntegrationIcon
-                    integrationName={configureIntegration.spec?.integrationName}
+                    integrationName={configureIntegration.metadata?.integrationName}
                     iconSlug={configureIntegrationDefinition?.icon}
                     className="h-6 w-6 text-gray-500 dark:text-gray-400"
                   />
                   <div className="flex items-center gap-2">
                     <DialogTitle>
                       Configure{" "}
-                      {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
-                        configureIntegration.spec?.integrationName}
+                      {getIntegrationTypeDisplayName(undefined, configureIntegration.metadata?.integrationName) ||
+                        configureIntegration.metadata?.integrationName}
                     </DialogTitle>
                     <a
                       href={

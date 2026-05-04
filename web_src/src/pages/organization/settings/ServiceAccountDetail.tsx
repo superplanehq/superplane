@@ -132,6 +132,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
   }
 
   const createdAt = serviceAccount.createdAt ? new Date(serviceAccount.createdAt).toLocaleDateString() : "—";
+  const createdByLabel = serviceAccount.createdByName ? serviceAccount.createdByName.trim() : "—";
   const serviceAccountsHref = `/${organizationId}/settings/service-accounts`;
 
   return (
@@ -239,7 +240,9 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
             <dl className="grid grid-cols-2 gap-y-4 text-sm">
               <dt className="text-gray-500 dark:text-gray-400">Description</dt>
               <dd className="text-gray-800 dark:text-white">{serviceAccount.description || "—"}</dd>
-              <dt className="text-gray-500 dark:text-gray-400">Created</dt>
+              <dt className="text-gray-500 dark:text-gray-400">Created by</dt>
+              <dd className="text-gray-800 dark:text-white">{createdByLabel}</dd>
+              <dt className="text-gray-500 dark:text-gray-400">Created at</dt>
               <dd className="text-gray-800 dark:text-white">{createdAt}</dd>
               <dt className="text-gray-500 dark:text-gray-400">ID</dt>
               <dd className="text-gray-800 dark:text-white font-mono text-xs">{serviceAccount.id}</dd>

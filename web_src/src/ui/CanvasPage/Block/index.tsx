@@ -17,7 +17,12 @@ export const Block = React.memo(function Block(props: BlockProps) {
     <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={(e) => props.onClick?.(e)}>
       <LeftHandle data={data} nodeId={props.nodeId} isConnectionInteractive={isConnectionInteractive} />
       <BlockContent {...props} />
-      <RightHandle data={data} nodeId={props.nodeId} isConnectionInteractive={isConnectionInteractive} />
+      <RightHandle
+        data={data}
+        nodeId={props.nodeId}
+        isConnectionInteractive={isConnectionInteractive}
+        onAppendFromNode={props.onAppendFromNode}
+      />
     </div>
   );
 });

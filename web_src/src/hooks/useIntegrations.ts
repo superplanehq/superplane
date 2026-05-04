@@ -7,8 +7,17 @@ import {
   organizationsCreateIntegration,
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
+  organizationsNextIntegrationSetupStep,
+  organizationsPreviousIntegrationSetupStep,
+  organizationsUpdateIntegrationSecret,
+  organizationsUpdateIntegrationProperty,
+  organizationsUpdateIntegrationCapabilities,
 } from "@/api-client/sdk.gen";
-import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
+import type {
+  IntegrationCapabilityState,
+  IntegrationsIntegrationDefinition,
+  OrganizationsIntegration,
+} from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { analytics } from "@/lib/analytics";
@@ -125,11 +134,16 @@ export const useIntegrationResources = (
 };
 
 // Hook to create an integration
-export const useCreateIntegration = (organizationId: string) => {
+export const useCreateIntegration = (organizationId: string, source: "node_configuration" | "integrations_page") => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { integrationName: string; name: string; configuration?: Record<string, unknown> }) => {
+    mutationFn: async (data: {
+      integrationName: string;
+      name: string;
+      configuration?: Record<string, unknown>;
+      capabilities?: string[];
+    }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -137,20 +151,77 @@ export const useCreateIntegration = (organizationId: string) => {
             integrationName: data.integrationName,
             name: data.name,
             configuration: data.configuration,
+            capabilities: data.capabilities,
           },
         }),
       );
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
-      analytics.integrationCreate(variables.integrationName, organizationId);
+      const status = (data.data?.integration?.status?.state || "pending") as "ready" | "error" | "pending";
+      analytics.integrationConnectSubmit(variables.integrationName, source, status, organizationId);
     },
   });
 };
 
-// Hook to update an integration
+export const useNextIntegrationSetupStep = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown>; capabilities?: string[] }) => {
+      return await organizationsNextIntegrationSetupStep(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId: data.integrationId },
+          body: {
+            inputs: data.inputs,
+            capabilities: data.capabilities,
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const integration = response.data?.integration;
+      const integrationId = integration?.metadata?.id;
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(organizationId),
+      });
+
+      if (integrationId) {
+        queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
+      }
+    },
+  });
+};
+
+export const usePreviousIntegrationSetupStep = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { integrationId: string }) => {
+      return await organizationsPreviousIntegrationSetupStep(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId: data.integrationId },
+          body: {},
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const integration = response.data?.integration;
+      const integrationId = integration?.metadata?.id;
+
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(organizationId),
+      });
+
+      if (integrationId) {
+        queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
+      }
+    },
+  });
+};
+
 export const useUpdateIntegration = (organizationId: string, integrationId: string) => {
   const queryClient = useQueryClient();
 
@@ -177,25 +248,128 @@ export const useUpdateIntegration = (organizationId: string, integrationId: stri
   });
 };
 
+export const useUpdateIntegrationCapabilities = (organizationId: string, integrationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (capabilities: IntegrationCapabilityState[]) => {
+      return await organizationsUpdateIntegrationCapabilities(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId },
+          body: { capabilities },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(organizationId),
+      });
+      const integration = response.data?.integration;
+      if (integration) {
+        queryClient.setQueryData(integrationKeys.integration(organizationId, integrationId), integration);
+        return;
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.integration(organizationId, integrationId),
+      });
+    },
+  });
+};
+
+function applyIntegrationDescribeCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  organizationId: string,
+  integrationId: string,
+  integration: OrganizationsIntegration | null,
+) {
+  queryClient.invalidateQueries({
+    queryKey: integrationKeys.connected(organizationId),
+  });
+  if (integration?.metadata?.id) {
+    queryClient.setQueryData(integrationKeys.integration(organizationId, integration.metadata.id), integration);
+    return;
+  }
+
+  queryClient.invalidateQueries({
+    queryKey: integrationKeys.integration(organizationId, integrationId),
+  });
+}
+
+export const useUpdateIntegrationProperty = (organizationId: string, integrationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: { propertyName: string; value: string }) => {
+      const response = await organizationsUpdateIntegrationProperty(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId },
+          body: { propertyName: body.propertyName, value: body.value },
+        }),
+      );
+      return response.data?.integration ?? null;
+    },
+    onSuccess: (integration) => {
+      applyIntegrationDescribeCache(queryClient, organizationId, integrationId, integration);
+    },
+  });
+};
+
+export const useUpdateIntegrationSecret = (organizationId: string, integrationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: { secretName: string; value: string }) => {
+      const response = await organizationsUpdateIntegrationSecret(
+        withOrganizationHeader({
+          path: { id: organizationId, integrationId },
+          body: { secretName: body.secretName, value: body.value },
+        }),
+      );
+      return response.data?.integration ?? null;
+    },
+    onSuccess: (integration) => {
+      applyIntegrationDescribeCache(queryClient, organizationId, integrationId, integration);
+    },
+  });
+};
+
+export const useIntegrationMutations = (organizationId: string, integrationId: string) => {
+  const deleteMutation = useDeleteIntegration(organizationId, integrationId);
+  const updateCapabilitiesMutation = useUpdateIntegrationCapabilities(organizationId, integrationId);
+  const updatePropertyMutation = useUpdateIntegrationProperty(organizationId, integrationId);
+  const updateSecretMutation = useUpdateIntegrationSecret(organizationId, integrationId);
+
+  return {
+    deleteMutation,
+    updateCapabilitiesMutation,
+    updatePropertyMutation,
+    updateSecretMutation,
+    settingsMutationBusy: updatePropertyMutation.isPending || updateSecretMutation.isPending,
+  };
+};
+
 // Hook to delete an integration
 export const useDeleteIntegration = (organizationId: string, integrationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      return await organizationsDeleteIntegration(
+    mutationFn: async (data: { integrationName: string }) => {
+      await organizationsDeleteIntegration(
         withOrganizationHeader({
           path: { id: organizationId, integrationId },
         }),
       );
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.connected(organizationId),
       });
       queryClient.removeQueries({
         queryKey: integrationKeys.integration(organizationId, integrationId),
       });
+      analytics.integrationDelete(variables.integrationName, organizationId);
     },
   });
 };
