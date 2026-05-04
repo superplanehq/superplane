@@ -307,195 +307,6 @@ Emits the created instance details on the default output channel, including:
 }
 ```
 
-<a id="delete-instance"></a>
-
-## Delete Instance
-
-The Delete Instance component terminates an Oracle Cloud Infrastructure Compute instance and waits until OCI reports it as terminated.
-
-### Use Cases
-
-- **Cleanup workflows**: Tear down temporary instances after a test or deployment finishes
-- **Cost controls**: Delete unused Compute instances from automation
-- **Incident remediation**: Terminate compromised or unhealthy instances after replacement capacity exists
-
-### Configuration
-
-- **Instance**: The OCI Compute instance to terminate.
-- **Preserve Boot Volume**: When enabled, OCI preserves the boot volume after instance termination.
-
-### Output
-
-Emits a minimal deletion payload on the default output channel:
-- `instanceId` — instance OCID
-- `lifecycleState` — `TERMINATED`
-
-### Example Output
-
-```json
-{
-  "data": {
-    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
-    "lifecycleState": "TERMINATED"
-  },
-  "timestamp": "2026-04-22T20:40:00.000Z",
-  "type": "oci.deleteInstance"
-}
-```
-
-<a id="get-instance"></a>
-
-## Get Instance
-
-The Get Instance component fetches the latest details for an Oracle Cloud Infrastructure Compute instance.
-
-### Use Cases
-
-- **Inventory checks**: Read instance state, shape, region, and network addresses during a workflow
-- **Deployment gates**: Verify a target instance exists and is in the expected lifecycle state
-- **Audit workflows**: Capture instance metadata before another operation runs
-
-### Configuration
-
-- **Instance**: The OCI Compute instance to fetch.
-
-### Output
-
-Emits the instance details on the default output channel, including:
-- `instanceId` — instance OCID
-- `displayName` — instance display name
-- `lifecycleState` — current lifecycle state
-- `publicIp` — public IP address, if assigned
-- `privateIp` — primary private IP address, if available
-- `shape` — the instance shape
-- `availabilityDomain` — the availability domain
-- `compartmentId` — the compartment OCID
-- `region` — the region
-- `timeCreated` — ISO-8601 creation timestamp
-
-### Example Output
-
-```json
-{
-  "data": {
-    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
-    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
-    "displayName": "test-instance-12",
-    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
-    "lifecycleState": "RUNNING",
-    "privateIp": "10.0.0.17",
-    "publicIp": "192.0.2.1",
-    "region": "eu-frankfurt-1",
-    "shape": "VM.Standard.E2.1.Micro",
-    "timeCreated": "2026-04-22T20:31:25.145Z"
-  },
-  "timestamp": "2026-04-22T20:32:00.000Z",
-  "type": "oci.getInstance"
-}
-```
-
-<a id="manage-instance-power"></a>
-
-## Manage Instance Power
-
-The Manage Instance Power component performs a power lifecycle action on an Oracle Cloud Infrastructure Compute instance and waits for the target state.
-
-### Use Cases
-
-- **Scheduled shutdowns**: Stop instances outside business hours to reduce cost
-- **Recovery workflows**: Reset or soft-reset an instance after an incident
-- **Startup automation**: Start instances before a deployment, test, or maintenance workflow runs
-
-### Configuration
-
-- **Instance**: The OCI Compute instance.
-- **Action**: One of `START`, `STOP`, `SOFTSTOP`, `RESET`, or `SOFTRESET`.
-
-### Output
-
-Emits the instance details on the default output channel once the instance reaches the expected lifecycle state:
-- `instanceId` — instance OCID
-- `displayName` — instance display name
-- `lifecycleState` — `RUNNING` for start/reset actions, or `STOPPED` for stop actions
-- `shape` — the instance shape
-- `availabilityDomain` — the availability domain
-- `compartmentId` — the compartment OCID
-- `region` — the region
-- `timeCreated` — ISO-8601 creation timestamp
-
-### Example Output
-
-```json
-{
-  "data": {
-    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
-    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
-    "displayName": "test-instance-12",
-    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
-    "lifecycleState": "STOPPED",
-    "region": "eu-frankfurt-1",
-    "shape": "VM.Standard.E2.1.Micro",
-    "timeCreated": "2026-04-22T20:31:25.145Z"
-  },
-  "timestamp": "2026-04-22T20:35:00.000Z",
-  "type": "oci.manageInstancePower"
-}
-```
-
-<a id="update-instance"></a>
-
-## Update Instance
-
-The Update Instance component updates mutable attributes on an Oracle Cloud Infrastructure Compute instance.
-
-### Use Cases
-
-- **Rename instances**: Update the display name for operational clarity
-- **Resize flex shapes**: Adjust OCPUs or memory for supported flexible shapes
-- **Post-provisioning changes**: Apply instance settings after a workflow decides the desired capacity
-
-### Configuration
-
-- **Instance**: The OCI Compute instance to update.
-- **Display Name**: Optional new display name.
-- **OCPUs**: Optional OCPU count for flexible shapes.
-- **Memory (GB)**: Optional memory size for flexible shapes.
-
-### Output
-
-Emits the updated instance details on the default output channel, including:
-- `instanceId` — instance OCID
-- `displayName` — instance display name
-- `lifecycleState` — current lifecycle state
-- `publicIp` — public IP address, if assigned
-- `privateIp` — primary private IP address, if available
-- `shape` — the instance shape
-- `availabilityDomain` — the availability domain
-- `compartmentId` — the compartment OCID
-- `region` — the region
-- `timeCreated` — ISO-8601 creation timestamp
-
-### Example Output
-
-```json
-{
-  "data": {
-    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
-    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
-    "displayName": "test-instance-renamed",
-    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
-    "lifecycleState": "RUNNING",
-    "privateIp": "10.0.0.17",
-    "publicIp": "192.0.2.1",
-    "region": "eu-frankfurt-1",
-    "shape": "VM.Standard.E2.1.Micro",
-    "timeCreated": "2026-04-22T20:31:25.145Z"
-  },
-  "timestamp": "2026-04-22T20:33:00.000Z",
-  "type": "oci.updateInstance"
-}
-```
-
 <a id="create-function"></a>
 
 ## Create Function
@@ -613,6 +424,93 @@ Emits the deleted function ID on the default output channel:
 }
 ```
 
+<a id="delete-instance"></a>
+
+## Delete Instance
+
+The Delete Instance component terminates an Oracle Cloud Infrastructure Compute instance and waits until OCI reports it as terminated.
+
+### Use Cases
+
+- **Cleanup workflows**: Tear down temporary instances after a test or deployment finishes
+- **Cost controls**: Delete unused Compute instances from automation
+- **Incident remediation**: Terminate compromised or unhealthy instances after replacement capacity exists
+
+### Configuration
+
+- **Instance**: The OCI Compute instance to terminate.
+- **Preserve Boot Volume**: When enabled, OCI preserves the boot volume after instance termination.
+
+### Output
+
+Emits a minimal deletion payload on the default output channel:
+- `instanceId` — instance OCID
+- `lifecycleState` — `TERMINATED`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "TERMINATED"
+  },
+  "timestamp": "2026-04-22T20:40:00.000Z",
+  "type": "oci.deleteInstance"
+}
+```
+
+<a id="get-instance"></a>
+
+## Get Instance
+
+The Get Instance component fetches the latest details for an Oracle Cloud Infrastructure Compute instance.
+
+### Use Cases
+
+- **Inventory checks**: Read instance state, shape, region, and network addresses during a workflow
+- **Deployment gates**: Verify a target instance exists and is in the expected lifecycle state
+- **Audit workflows**: Capture instance metadata before another operation runs
+
+### Configuration
+
+- **Instance**: The OCI Compute instance to fetch.
+
+### Output
+
+Emits the instance details on the default output channel, including:
+- `instanceId` — instance OCID
+- `displayName` — instance display name
+- `lifecycleState` — current lifecycle state
+- `publicIp` — public IP address, if assigned
+- `privateIp` — primary private IP address, if available
+- `shape` — the instance shape
+- `availabilityDomain` — the availability domain
+- `compartmentId` — the compartment OCID
+- `region` — the region
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
+    "displayName": "test-instance-12",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "RUNNING",
+    "privateIp": "10.0.0.17",
+    "publicIp": "192.0.2.1",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:32:00.000Z",
+  "type": "oci.getInstance"
+}
+```
+
 <a id="invoke-function"></a>
 
 ## Invoke Function
@@ -652,3 +550,106 @@ Emits the function response on the default output channel:
   "type": "oci.functionInvoked"
 }
 ```
+
+<a id="manage-instance-power"></a>
+
+## Manage Instance Power
+
+The Manage Instance Power component performs a power lifecycle action on an Oracle Cloud Infrastructure Compute instance and waits for the target state.
+
+### Use Cases
+
+- **Scheduled shutdowns**: Stop instances outside business hours to reduce cost
+- **Recovery workflows**: Reset or soft-reset an instance after an incident
+- **Startup automation**: Start instances before a deployment, test, or maintenance workflow runs
+
+### Configuration
+
+- **Instance**: The OCI Compute instance.
+- **Action**: One of `START`, `STOP`, `SOFTSTOP`, `RESET`, or `SOFTRESET`.
+
+### Output
+
+Emits the instance details on the default output channel once the instance reaches the expected lifecycle state:
+- `instanceId` — instance OCID
+- `displayName` — instance display name
+- `lifecycleState` — `RUNNING` for start/reset actions, or `STOPPED` for stop actions
+- `shape` — the instance shape
+- `availabilityDomain` — the availability domain
+- `compartmentId` — the compartment OCID
+- `region` — the region
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
+    "displayName": "test-instance-12",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "STOPPED",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:35:00.000Z",
+  "type": "oci.manageInstancePower"
+}
+```
+
+<a id="update-instance"></a>
+
+## Update Instance
+
+The Update Instance component updates mutable attributes on an Oracle Cloud Infrastructure Compute instance.
+
+### Use Cases
+
+- **Rename instances**: Update the display name for operational clarity
+- **Resize flex shapes**: Adjust OCPUs or memory for supported flexible shapes
+- **Post-provisioning changes**: Apply instance settings after a workflow decides the desired capacity
+
+### Configuration
+
+- **Instance**: The OCI Compute instance to update.
+- **Display Name**: Optional new display name.
+- **OCPUs**: Optional OCPU count for flexible shapes.
+- **Memory (GB)**: Optional memory size for flexible shapes.
+
+### Output
+
+Emits the updated instance details on the default output channel, including:
+- `instanceId` — instance OCID
+- `displayName` — instance display name
+- `lifecycleState` — current lifecycle state
+- `publicIp` — public IP address, if assigned
+- `privateIp` — primary private IP address, if available
+- `shape` — the instance shape
+- `availabilityDomain` — the availability domain
+- `compartmentId` — the compartment OCID
+- `region` — the region
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
+    "displayName": "test-instance-renamed",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "RUNNING",
+    "privateIp": "10.0.0.17",
+    "publicIp": "192.0.2.1",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:33:00.000Z",
+  "type": "oci.updateInstance"
+}
+```
+
