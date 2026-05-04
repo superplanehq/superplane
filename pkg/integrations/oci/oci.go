@@ -163,6 +163,10 @@ func (o *OCI) Configuration() []configuration.Field {
 func (o *OCI) Actions() []core.Action {
 	return []core.Action{
 		&CreateComputeInstance{},
+		&CreateImage{},
+		&GetImage{},
+		&UpdateImage{},
+		&DeleteImage{},
 		&CreateApplication{},
 		&DeleteApplication{},
 		&CreateFunction{},
