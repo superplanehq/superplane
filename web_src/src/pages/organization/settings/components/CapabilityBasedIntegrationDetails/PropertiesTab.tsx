@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { isUrl } from "@/lib/utils";
-import { Check, Info, Pencil, X } from "lucide-react";
+import { Check, Pencil, X } from "lucide-react";
+import { DescriptionTooltip } from "./DescriptionTooltip";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 
@@ -19,35 +19,6 @@ export interface PropertiesTabProps {
   settingsMutationBusy: boolean;
   saveProperty: (propertyName: string, value: string) => Promise<void>;
   isSavingProperty: (propertyName: string | undefined) => boolean;
-}
-
-type PropertyDescriptionTooltipProps = {
-  title: string;
-  description: string | undefined;
-};
-
-function PropertyDescriptionTooltip({ title, description }: PropertyDescriptionTooltipProps) {
-  if (!description) {
-    return null;
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          aria-label={`About ${title}`}
-        >
-          <Info className="size-4 shrink-0" aria-hidden />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs text-balance">
-        {description}
-      </TooltipContent>
-    </Tooltip>
-  );
 }
 
 type PropertyReadonlyDisplayProps = {
@@ -160,6 +131,7 @@ type IntegrationPropertyRowProps = {
   setPropertyDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   editingPropertyName: string | null;
   setEditingPropertyName: Dispatch<SetStateAction<string | null>>;
+  beginEditProperty: (propertyName: string) => void;
   canUpdateIntegrations: boolean;
   permissionsLoading: boolean;
   settingsMutationBusy: boolean;
@@ -173,6 +145,7 @@ function IntegrationPropertyRow({
   setPropertyDrafts,
   editingPropertyName,
   setEditingPropertyName,
+  beginEditProperty,
   canUpdateIntegrations,
   permissionsLoading,
   settingsMutationBusy,
@@ -198,8 +171,6 @@ function IntegrationPropertyRow({
     }));
   };
 
-  const startEdit = () => setEditingPropertyName(propertyName);
-
   const trimmedDraft = draft.trim();
   const readonlyHref = trimmedDraft !== "" && isUrl(trimmedDraft) ? trimmedDraft : null;
 
@@ -211,7 +182,7 @@ function IntegrationPropertyRow({
       >
         {title}
       </Label>
-      <PropertyDescriptionTooltip title={title} description={description} />
+      <DescriptionTooltip title={title} description={description} />
 
       <PermissionTooltip
         allowed={canUpdateIntegrations || permissionsLoading}
@@ -242,7 +213,7 @@ function IntegrationPropertyRow({
                   size="icon-xs"
                   aria-label={`Edit ${title}`}
                   disabled={!canUpdateIntegrations || settingsMutationBusy}
-                  onClick={startEdit}
+                  onClick={() => beginEditProperty(propertyName)}
                 >
                   <Pencil className="size-4" aria-hidden />
                 </Button>
@@ -267,6 +238,21 @@ export function PropertiesTab({
 }: PropertiesTabProps) {
   const [editingPropertyName, setEditingPropertyName] = useState<string | null>(null);
 
+  const beginEditProperty = (propertyName: string) => {
+    const previousEditing = editingPropertyName;
+    if (previousEditing && previousEditing !== propertyName) {
+      const previousProperty = integrationProperties.find((candidate) => candidate.name === previousEditing);
+      if (previousProperty !== undefined) {
+        const serverValue = previousProperty.value ?? "";
+        setPropertyDrafts((previousDrafts) => ({
+          ...previousDrafts,
+          [previousEditing]: serverValue,
+        }));
+      }
+    }
+    setEditingPropertyName(propertyName);
+  };
+
   if (integrationProperties.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">No properties for this integration.</p>;
   }
@@ -281,6 +267,7 @@ export function PropertiesTab({
           setPropertyDrafts={setPropertyDrafts}
           editingPropertyName={editingPropertyName}
           setEditingPropertyName={setEditingPropertyName}
+          beginEditProperty={beginEditProperty}
           canUpdateIntegrations={canUpdateIntegrations}
           permissionsLoading={permissionsLoading}
           settingsMutationBusy={settingsMutationBusy}

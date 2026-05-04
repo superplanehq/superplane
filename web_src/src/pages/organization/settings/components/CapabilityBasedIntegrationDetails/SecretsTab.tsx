@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Check, Info, Pencil, X } from "lucide-react";
+import { Check, Pencil, X } from "lucide-react";
+import { DescriptionTooltip } from "./DescriptionTooltip";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 
@@ -22,35 +22,6 @@ export interface SecretsTabProps {
 
 const READONLY_SECRET_INPUT_CLASS =
   "cursor-default bg-gray-50 opacity-100 dark:bg-gray-950 [&::placeholder]:opacity-70";
-
-type SecretDescriptionTooltipProps = {
-  title: string;
-  description: string | undefined;
-};
-
-function SecretDescriptionTooltip({ title, description }: SecretDescriptionTooltipProps) {
-  if (!description) {
-    return null;
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          aria-label={`About ${title}`}
-        >
-          <Info className="size-4 shrink-0" aria-hidden />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs text-balance">
-        {description}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
 
 type SecretEditingControlsProps = {
   inputId: string;
@@ -114,9 +85,7 @@ function SecretEditingControls({
           color="blue"
           size="sm"
           className="shrink-0"
-          disabled={
-            !canUpdateIntegrations || !secretHasNewValue || settingsMutationBusy || !secretNameTrimmed
-          }
+          disabled={!canUpdateIntegrations || !secretHasNewValue || settingsMutationBusy || !secretNameTrimmed}
           loading={savingThisSecret}
           loadingText="Updating…"
           onClick={async () => {
@@ -232,7 +201,7 @@ function IntegrationSecretRow({
       <Label htmlFor={inputId} className="shrink-0 text-gray-800 dark:text-gray-100">
         {title}
       </Label>
-      <SecretDescriptionTooltip title={title} description={description} />
+      <DescriptionTooltip title={title} description={description} />
 
       <PermissionTooltip
         allowed={canUpdateIntegrations || permissionsLoading}
