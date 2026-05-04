@@ -4,6 +4,77 @@ This document provides a high-level overview of SuperPlane's architecture to hel
 
 SuperPlane is built as a modular monolith, where each module (API, Workers, etc.) can be independently scaled based on workload requirements.
 
+## System Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        UI["Web UI (React)"]
+        CLI["CLI Tool"]
+    end
+    
+    subgraph "API Layer"
+        REST["REST API"]
+        WS["WebSocket"]
+        GRPC["gRPC API"]
+    end
+    
+    subgraph "Application"
+        AUTH["Authentication & Authorization"]
+        BIZ["Business Logic<br/>Services"]
+        REG["Component Registry"]
+    end
+    
+    subgraph "Persistence"
+        DB["PostgreSQL<br/>Database"]
+    end
+    
+    subgraph "Message Queue"
+        MQ["RabbitMQ"]
+    end
+    
+    subgraph "Workers"
+        WER["Event Router"]
+        CEX["Component<br/>Executor"]
+        WH["Webhook<br/>Handler"]
+        SCHED["Scheduler"]
+    end
+    
+    subgraph "Integrations"
+        INT["GitHub, Slack,<br/>DataDog, etc."]
+    end
+    
+    UI -->|REST| REST
+    UI -->|WebSocket| WS
+    CLI -->|REST| REST
+    
+    REST --> AUTH
+    GRPC --> AUTH
+    
+    AUTH --> BIZ
+    BIZ --> REG
+    BIZ --> DB
+    
+    BIZ -->|Enqueue| MQ
+    
+    MQ -->|Consume| WER
+    MQ -->|Consume| CEX
+    MQ -->|Consume| WH
+    MQ -->|Consume| SCHED
+    
+    WER --> DB
+    WER -->|Enqueue| MQ
+    
+    CEX --> DB
+    CEX --> INT
+    CEX -->|Enqueue| MQ
+    
+    WH --> INT
+    WH -->|Enqueue| MQ
+    
+    SCHED -->|Enqueue| MQ
+```
+
 ## Key Concepts
 
 ### API
@@ -30,6 +101,48 @@ The frontend is a React application built with TypeScript and Vite. It communica
 
 The event processing system is the engine that drives workflow execution. It operates on an event-driven model where events flow through workflow graphs, triggering component execution.
 
+### Event Processing Flow Diagram
+
+```mermaid
+graph LR
+    subgraph "Trigger"
+        TRG["Webhook / Schedule /<br/>Manual Start"]
+    end
+    
+    subgraph "Event Queue"
+        EVT["Event Created<br/>Status: pending"]
+    end
+    
+    subgraph "Event Router"
+        RT["WorkflowEventRouter<br/>Identifies next nodes"]
+        QUEUE["Queue Items<br/>Created"]
+    end
+    
+    subgraph "Execution Queue"
+        MQ["RabbitMQ<br/>Job Queue"]
+    end
+    
+    subgraph "Execution"
+        CEX["ComponentExecutor<br/>Worker"]
+        EXEC["Component<br/>Logic"]
+        RES["Store Result<br/>Create new event"]
+    end
+    
+    subgraph "Next Iteration"
+        NEXT["Event flows to<br/>downstream nodes"]
+    end
+    
+    TRG -->|Event| EVT
+    EVT -->|Picked up| RT
+    RT -->|For each node| QUEUE
+    QUEUE -->|Published| MQ
+    MQ -->|Consumed| CEX
+    CEX -->|Run| EXEC
+    EXEC -->|Complete| RES
+    RES -->|Emit| NEXT
+    NEXT -->|Loop| RT
+```
+
 **Event Lifecycle:**
 
 1. **Event Creation**: Events are created when triggers fire (webhooks, schedules, manual starts) or when components complete execution. Events are stored in the database with a `pending` state.
@@ -43,6 +156,83 @@ The event processing system is the engine that drives workflow execution. It ope
 5. **Event Propagation**: When a component finishes, it emits a new event that flows to its downstream nodes, continuing the workflow execution cycle.
 
 This architecture enables parallel execution of independent workflow branches, reliable event delivery, and scalable processing through worker queues.
+
+### Example: Webhook-Triggered Workflow
+
+Let's trace a real workflow execution:
+
+```
+Scenario: GitHub push → build check → Slack notification
+
+1. GitHub webhook fires on push
+   ↓
+2. SuperPlane receives webhook, creates Event("github_push", payload)
+   ↓
+3. WorkflowEventRouter scans pending events
+   - Finds canvas with "on GitHub push" trigger
+   - Identifies first component: "Build Check"
+   ↓
+4. Queue item created: {node_id: "build_check", event_id: 123}
+   ↓
+5. ComponentExecutor worker picks up job
+   - Executes "Build Check" component
+   - Calls GitHub API to trigger build
+   - Stores result in database
+   - Emits new event: Event("build_complete", build_result)
+   ↓
+6. WorkflowEventRouter scans again
+   - Finds "build_complete" event
+   - Identifies next component: "Slack Notification" (connected by edge)
+   ↓
+7. Queue item created: {node_id: "slack_notify", event_id: 124}
+   ↓
+8. ComponentExecutor worker picks up job
+   - Executes "Slack Notification" component
+   - Posts message to Slack channel
+   - Marks workflow as complete
+   ↓
+9. Workflow execution finished ✓
+```
+
+This flow enables:
+- **Parallel execution**: Multiple branches can execute simultaneously
+- **Resilience**: If a worker crashes, RabbitMQ ensures the message is retried
+- **Scalability**: Add more workers to handle more events
+
+## Request Flow (API to Database)
+
+When a user makes an API request (e.g., updating a canvas), here's what happens:
+
+```mermaid
+sequenceDiagram
+    participant Client as Web Client
+    participant API as REST API
+    participant Auth as Auth Middleware
+    participant Service as Business Service
+    participant DB as PostgreSQL
+    participant Cache as Cache Layer
+    
+    Client->>API: POST /canvases/{id}
+    API->>Auth: Extract JWT + Check Permissions
+    Auth->>DB: Verify User & Org
+    Auth->>API: ✓ Authenticated & Authorized
+    API->>Service: UpdateCanvas(id, data)
+    Service->>DB: Begin Transaction
+    Service->>DB: Lock Canvas Row (SELECT FOR UPDATE)
+    Service->>DB: Update canvas config
+    Service->>DB: Update last_modified timestamp
+    Service->>Cache: Invalidate cache entry
+    Service->>DB: Commit
+    DB->>Service: ✓ Success
+    Service->>API: Return updated canvas
+    API->>Client: 200 OK {canvas}
+```
+
+**Key Points**:
+- Every request goes through authentication middleware
+- Permission checks happen before business logic
+- Database transactions ensure data consistency
+- Cache is invalidated on mutations to prevent stale data
 
 ## Authentication & Authorization
 
@@ -127,6 +317,74 @@ Account (1) ──→ (N) Users ──→ (1) Organization
 Organization (1) ──→ (N) Canvases
 Organization (1) ──→ (N) Integrations
 ```
+
+## Component Architecture
+
+Components are the building blocks of workflows. Here's how they work:
+
+### Component Lifecycle
+
+```mermaid
+graph LR
+    A["Component<br/>Definition"] -->|Registered| B["Component<br/>Registry"]
+    B -->|Added to<br/>Canvas| C["Canvas Node"]
+    C -->|Workflow<br/>Executes| D["Event Arrives<br/>at Node"]
+    D -->|Component<br/>Executor| E["Run Component<br/>Logic"]
+    E -->|On Success| F["Emit Event<br/>to Next Nodes"]
+    E -->|On Error| G["Emit Error<br/>Event/Retry"]
+```
+
+### Component Types
+
+1. **Built-in Components** (`pkg/components/`)
+   - HTTP Request - Call external APIs
+   - Delay - Wait for a period of time
+   - Condition - Branch logic
+   - Loop - Repeat actions
+   - Store Data - Persist data for workflow
+   - Send Notification - Various notification channels
+
+2. **Integration Components** (`pkg/integrations/*/`)
+   - GitHub - Trigger builds, manage PRs, create issues
+   - Slack - Post messages, send threads
+   - DataDog - Query metrics, create incidents
+   - Custom integrations for your tools
+
+3. **Trigger Components** (`pkg/triggers/`)
+   - Webhooks - HTTP-based triggers
+   - Schedules - Time-based triggers
+   - Manual - User-initiated workflows
+
+### Component Execution Model
+
+When a component executes:
+
+```
+1. Resolve input parameters
+   ├─ Map event payload values
+   ├─ Substitute secrets
+   └─ Evaluate expressions
+
+2. Execute component logic
+   ├─ Call integration APIs
+   ├─ Process data
+   └─ Handle errors
+
+3. Create output event
+   ├─ Store execution result
+   ├─ Map output to next component's input
+   └─ Emit new event for propagation
+```
+
+### Adding a New Component
+
+When adding a component (see [Component Implementation Guide](./component-implementations.md)):
+
+1. Define component schema (inputs, outputs, config)
+2. Implement `Execute()` method
+3. Register in component registry
+4. Add UI mapper in frontend
+5. Write tests and documentation
 
 ## Directory Structure
 
