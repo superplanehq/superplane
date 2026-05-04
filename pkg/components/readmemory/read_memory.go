@@ -311,16 +311,14 @@ func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
 		payloads := make([]any, 0, len(values))
 		for i, value := range values {
 			payloads = append(payloads, map[string]any{
-				"data": map[string]any{
-					"namespace":  spec.Namespace,
-					"matches":    matches,
-					"resultMode": spec.ResultMode,
-					"emitMode":   spec.EmitMode,
-					"values":     []any{value},
-					"count":      1,
-					"index":      i,
-					"totalCount": len(values),
-				},
+				"namespace":  spec.Namespace,
+				"matches":    matches,
+				"resultMode": spec.ResultMode,
+				"emitMode":   spec.EmitMode,
+				"values":     []any{value},
+				"count":      1,
+				"index":      i,
+				"totalCount": len(values),
 			})
 		}
 		return payloads
@@ -328,14 +326,12 @@ func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
 
 	return []any{
 		map[string]any{
-			"data": map[string]any{
-				"namespace":  spec.Namespace,
-				"matches":    matches,
-				"resultMode": spec.ResultMode,
-				"emitMode":   spec.EmitMode,
-				"values":     values,
-				"count":      len(values),
-			},
+			"namespace":  spec.Namespace,
+			"matches":    matches,
+			"resultMode": spec.ResultMode,
+			"emitMode":   spec.EmitMode,
+			"values":     values,
+			"count":      len(values),
 		},
 	}
 }

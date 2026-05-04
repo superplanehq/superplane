@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -22,13 +23,13 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 
 func (g *GitHub) listRepositoryResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	// Decode metadata to get GitHub App ID and Installation ID
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
 	// Create GitHub client
-	client, err := NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
@@ -74,12 +75,12 @@ func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.Inte
 		return []core.IntegrationResource{}, nil
 	}
 
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}

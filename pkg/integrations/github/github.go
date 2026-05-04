@@ -13,14 +13,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/actions"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/statuses"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const (
-	GitHubAppPEM           = "pem"
-	GitHubAppClientSecret  = "clientSecret"
-	GitHubAppWebhookSecret = "webhookSecret"
-
 	appBootstrapDescription = `
 To complete the GitHub app setup:
 
@@ -58,20 +62,6 @@ type Configuration struct {
 	Organization string `mapstructure:"organization" json:"organization"`
 }
 
-type Metadata struct {
-	InstallationID string            `mapstructure:"installationId" json:"installationId"`
-	State          string            `mapstructure:"state" json:"state"`
-	Owner          string            `mapstructure:"owner" json:"owner"`
-	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
-	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
-}
-
-type GitHubAppMetadata struct {
-	ID       int64  `mapstructure:"id" json:"id"`
-	Slug     string `mapstructure:"slug" json:"slug"`
-	ClientID string `mapstructure:"clientId" json:"clientId"`
-}
-
 func (g *GitHub) Name() string {
 	return "github"
 }
@@ -105,40 +95,40 @@ func (g *GitHub) Configuration() []configuration.Field {
 
 func (g *GitHub) Actions() []core.Action {
 	return []core.Action{
-		&GetIssue{},
-		&GetRepositoryPermission{},
-		&CreateIssue{},
-		&CreateIssueComment{},
-		&AddReaction{},
-		&UpdateIssue{},
-		&AddIssueLabel{},
-		&RemoveIssueLabel{},
-		&AddIssueAssignee{},
-		&RemoveIssueAssignee{},
-		&CreateReview{},
-		&CreatePullRequest{},
-		&RunWorkflow{},
-		&PublishCommitStatus{},
-		&CreateRelease{},
-		&GetRelease{},
-		&UpdateRelease{},
-		&DeleteRelease{},
-		&GetWorkflowUsage{},
+		&admin.GetWorkflowUsage{},
+		&actions.RunWorkflow{},
+		&contents.CreateRelease{},
+		&contents.GetRelease{},
+		&contents.UpdateRelease{},
+		&contents.DeleteRelease{},
+		&issues.GetIssue{},
+		&issues.CreateIssue{},
+		&issues.CreateIssueComment{},
+		&issues.UpdateIssue{},
+		&issues.AddIssueLabel{},
+		&issues.RemoveIssueLabel{},
+		&issues.AddIssueAssignee{},
+		&issues.RemoveIssueAssignee{},
+		&metadata.GetRepositoryPermission{},
+		&pulls.CreateReview{},
+		&pulls.CreatePullRequest{},
+		&pulls.AddReaction{},
+		&statuses.PublishCommitStatus{},
 	}
 }
 
 func (g *GitHub) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnPush{},
-		&OnPullRequest{},
-		&OnPRComment{},
-		&OnPRReviewComment{},
-		&OnIssue{},
-		&OnIssueComment{},
-		&OnRelease{},
-		&OnTagCreated{},
-		&OnBranchCreated{},
-		&OnWorkflowRun{},
+		&contents.OnPush{},
+		&pulls.OnPullRequest{},
+		&pulls.OnPRComment{},
+		&pulls.OnPRReviewComment{},
+		&issues.OnIssue{},
+		&issues.OnIssueComment{},
+		&contents.OnRelease{},
+		&contents.OnTagCreated{},
+		&contents.OnBranchCreated{},
+		&actions.OnWorkflowRun{},
 	}
 }
 
@@ -153,7 +143,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode configuration: %v", err)
 	}
 
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
@@ -181,7 +171,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		},
 	})
 
-	ctx.Integration.SetMetadata(Metadata{
+	ctx.Integration.SetMetadata(common.Metadata{
 		Owner: config.Organization,
 		State: state,
 	})
@@ -190,7 +180,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 }
 
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return
@@ -215,8 +205,8 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(http.StatusNotFound)
 }
 
-func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
-	webhookSecret, err := findSecret(ctx.Integration, GitHubAppWebhookSecret)
+func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata common.Metadata) {
+	webhookSecret, err := common.FindSecret(ctx.Integration, common.GitHubAppWebhookSecret)
 	if err != nil {
 		ctx.Logger.Errorf("Error finding webhook secret: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
@@ -254,7 +244,7 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
 	}
 }
 
-func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata Metadata, event *github.InstallationEvent) {
+func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata common.Metadata, event *github.InstallationEvent) {
 	switch *event.Action {
 
 	//
@@ -289,7 +279,7 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 		}
 
 		metadata.InstallationID = ""
-		metadata.Repositories = []Repository{}
+		metadata.Repositories = []common.Repository{}
 		metadata.State = state
 
 		ctx.Integration.SetMetadata(metadata)
@@ -305,8 +295,8 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 	}
 }
 
-func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, metadata Metadata) {
-	client, err := NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, metadata common.Metadata) {
+	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -326,7 +316,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 	ctx.Integration.SetMetadata(metadata)
 }
 
-func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata) {
+func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata common.Metadata) {
 	code := ctx.Request.URL.Query().Get("code")
 	state := ctx.Request.URL.Query().Get("state")
 
@@ -346,7 +336,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 	//
 	// Save installation metadata
 	//
-	metadata.GitHubApp = GitHubAppMetadata{
+	metadata.GitHubApp = common.GitHubAppMetadata{
 		ID:       appData.ID,
 		Slug:     appData.Slug,
 		ClientID: appData.ClientID,
@@ -357,21 +347,21 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 	//
 	// Save installation secrets
 	//
-	err = ctx.Integration.SetSecret(GitHubAppClientSecret, []byte(appData.ClientSecret))
+	err = ctx.Integration.SetSecret(common.GitHubAppClientSecret, []byte(appData.ClientSecret))
 	if err != nil {
 		ctx.Logger.Errorf("failed to save client secret: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	err = ctx.Integration.SetSecret(GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
+	err = ctx.Integration.SetSecret(common.GitHubAppWebhookSecret, []byte(appData.WebhookSecret))
 	if err != nil {
 		ctx.Logger.Errorf("failed to save webhook secret: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	err = ctx.Integration.SetSecret(GitHubAppPEM, []byte(appData.PEM))
+	err = ctx.Integration.SetSecret(common.GitHubAppPEM, []byte(appData.PEM))
 	if err != nil {
 		ctx.Logger.Errorf("failed to save PEM: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -395,7 +385,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext, metadata Metadata
 	)
 }
 
-func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Metadata) {
+func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata common.Metadata) {
 	//
 	// App installation has already been set up.
 	// Just redirect to the SuperPlane app installation page.
@@ -431,7 +421,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	}
 
 	metadata.InstallationID = installationID
-	client, err := NewClient(ctx.Integration, metadata.GitHubApp.ID, installationID)
+	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, installationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -556,7 +546,7 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	return &appData, nil
 }
 
-func listInstallationRepositories(ctx context.Context, client *github.Client) ([]Repository, error) {
+func listInstallationRepositories(ctx context.Context, client *github.Client) ([]common.Repository, error) {
 	var allRepos []*github.Repository
 	opts := &github.ListOptions{
 		PerPage: 100,
@@ -576,12 +566,12 @@ func listInstallationRepositories(ctx context.Context, client *github.Client) ([
 		opts.Page = resp.NextPage
 	}
 
-	out := make([]Repository, 0, len(allRepos))
+	out := make([]common.Repository, 0, len(allRepos))
 	for _, r := range allRepos {
 		if r == nil || r.ID == nil {
 			continue
 		}
-		out = append(out, Repository{
+		out = append(out, common.Repository{
 			ID:   *r.ID,
 			Name: r.GetName(),
 			URL:  r.GetHTMLURL(),

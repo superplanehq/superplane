@@ -33,7 +33,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 	var createFile string
-	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
+	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "path to resource file, or - to read from stdin")
 	_ = createCmd.MarkFlagRequired("file")
 	core.Bind(createCmd, &createCommand{file: &createFile}, options)
 
@@ -43,7 +43,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 	var updateFile string
-	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
+	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "path to resource file, or - to read from stdin")
 	_ = updateCmd.MarkFlagRequired("file")
 	core.Bind(updateCmd, &updateCommand{file: &updateFile}, options)
 

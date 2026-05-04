@@ -57,7 +57,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		assert.Equal(t, integrationID, describeResponse.Integration.Metadata.Id)
 		assert.Equal(t, name, describeResponse.Integration.Metadata.Name)
-		assert.Equal(t, "dummy", describeResponse.Integration.Spec.IntegrationName)
+		assert.Equal(t, "dummy", describeResponse.Integration.Metadata.IntegrationName)
 		assert.Equal(t, models.IntegrationStateReady, describeResponse.Integration.Status.State)
 	})
 

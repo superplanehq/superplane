@@ -15,26 +15,74 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Application" href="#create-application" description="Create a new OCI Functions application" />
   <LinkCard title="Create Compute Instance" href="#create-compute-instance" description="Provision a new OCI Compute instance and wait for it to reach RUNNING state" />
+  <LinkCard title="Create Function" href="#create-function" description="Deploy a new function within an OCI Functions application" />
+  <LinkCard title="Create Image" href="#create-image" description="Create an OCI boot disk image from an instance or Object Storage export" />
+  <LinkCard title="Delete Application" href="#delete-application" description="Delete an OCI Functions application" />
+  <LinkCard title="Delete Function" href="#delete-function" description="Remove a function from an OCI Functions application" />
+  <LinkCard title="Delete Image" href="#delete-image" description="Delete an OCI custom image by OCID" />
+  <LinkCard title="Get Image" href="#get-image" description="Get OCI custom image details by OCID" />
+  <LinkCard title="Invoke Function" href="#invoke-function" description="Execute an OCI Function and capture its response" />
+  <LinkCard title="Update Image" href="#update-image" description="Update an OCI custom image display name" />
 </CardGrid>
 
 ## Instructions
 
 ## Connect Oracle Cloud Infrastructure
 
-SuperPlane authenticates to OCI using API Key authentication.
+SuperPlane authenticates to OCI using API Key authentication tied to a dedicated service user with least-privilege permissions.
 
-### Steps
+### Part 1 — Create a Dedicated Group and Service User
 
 1. Open the [OCI Console](https://cloud.oracle.com/) and sign in.
-2. Go to **Profile → User settings → My profile → Tokens and keys → API keys → Add API key**.
-3. Choose **Generate API Key Pair**, download the private key, and click **Add**.
-4. After the key is added, copy the **Configuration File Preview** values:
-   - **User OCID** (begins with `ocid1.user.`)
-   - **Fingerprint** (e.g. `12:34:56:…`)
-   - **Tenancy OCID** (begins with `ocid1.tenancy.`)
+2. Go to **Menu** → **Identity & Security → Domains → Default → User Management → Groups**.
+3. Click **Create Group**.
+4. Set the name to `SuperPlaneIntegration` and add a description, then click **Create**.
+5. In the same **User Management** tab, go to **Users → Create User**.
+6. Fill in the details:
+   - **Lastname:** `superplane-integration`
+   - **Email:** use any valid email (not used for authentication)
+7. In the **Groups** section, assign the user to the `SuperPlaneIntegration` group
+8. Click **Create**.
+
+### Part 2 — Create an IAM Policy
+
+1. Go to **Identity & Security → Policies**.
+2. Make sure you are in the **root compartment** (check the Compartment selector on the left).
+3. Click **Create Policy**, name it `SuperPlanePolicies`, add a description and enable the **manual editor**.
+4. Paste in the following statements, replacing `<your-compartment>` with your target compartment name, and then Click **Create**.:
+```
+Allow group SuperPlaneIntegration to manage instances in tenancy
+Allow group SuperPlaneIntegration to manage volumes in tenancy
+Allow group SuperPlaneIntegration to manage volume-attachments in tenancy
+Allow group SuperPlaneIntegration to manage virtual-network-family in tenancy
+Allow group SuperPlaneIntegration to manage buckets in tenancy
+Allow group SuperPlaneIntegration to manage objects in tenancy
+Allow group SuperPlaneIntegration to manage objectstorage-namespaces in tenancy   
+Allow group SuperPlaneIntegration to manage fn-app in tenancy
+Allow group SuperPlaneIntegration to manage fn-function in tenancy
+Allow group SuperPlaneIntegration to manage fn-invocation in tenancy
+Allow group SuperPlaneIntegration to manage ons-topics in tenancy
+Allow group SuperPlaneIntegration to manage ons-subscriptions in tenancy
+Allow group SuperPlaneIntegration to inspect compartments in tenancy
+Allow group SuperPlaneIntegration to inspect all-resources in tenancy
+Allow group SuperPlaneIntegration to manage cloudevents-rules in tenancy
+Allow group SuperPlaneIntegration to manage autonomous-database-family in tenancy
+Allow service cloudEvents to use ons-topics in tenancy
+```
+ 
+### Part 3 — Generate API Keys for the Service User and Connect to SuperPlane
+
+1. Go to **Menu** → **Identity & Security → Domains → Default → User Management → Users**.
+2. Choose the service user you created, then go to **API Keys → Add API Key**.
+3. Select **Generate API key pair**, download the private key file and then click **Add**.
+4. Copy the **Configuration File Preview** values that appear to the UI:
+    - **User OCID** (begins with `ocid1.user.`)
+    - **Fingerprint** (e.g. `12:34:56:…`)
+    - **Tenancy OCID** (begins with `ocid1.tenancy.`)
 5. Select the **Region** that matches your OCI tenancy's home region.
-6. Open the downloaded private key file and paste its full contents into the **Private Key** field below.
+6. Open the downloaded private key file and paste its full contents into the **Private Key** field.
 7. Click **Connect** to validate the credentials and save the integration.
 
 <a id="on-compute-instance-created"></a>
@@ -96,6 +144,48 @@ Each event payload includes:
 }
 ```
 
+<a id="create-application"></a>
+
+## Create Application
+
+The Create Application component creates a new Oracle Cloud Infrastructure Functions application.
+
+### Use Cases
+
+- **Serverless environment provisioning**: Create application containers as part of a deployment workflow
+- **Environment lifecycle management**: Automatically create application environments for each release
+
+### Configuration
+
+- **Compartment**: The compartment where the application will be created
+- **Display Name**: A human-readable name for the application
+- **Subnet OCIDs**: One or more subnet OCIDs (comma-separated) for the application's VCN configuration
+
+### Output
+
+Emits the created application details including:
+- `applicationId` — application OCID
+- `displayName` — application name
+- `lifecycleState` — current state (`ACTIVE`)
+- `compartmentId` — the compartment OCID
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+    "displayName": "my-functions-app",
+    "lifecycleState": "ACTIVE",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:31:58.249783188Z",
+  "type": "oci.applicationCreated"
+}
+```
+
 <a id="create-compute-instance"></a>
 
 ## Create Compute Instance
@@ -151,6 +241,311 @@ Emits the created instance details on the default output channel, including:
   },
   "timestamp": "2026-04-22T20:31:58.249783188Z",
   "type": "oci.computeInstanceCreated"
+}
+```
+
+<a id="create-function"></a>
+
+## Create Function
+
+The Create Function component deploys a new serverless function within an existing OCI Functions application.
+
+### Use Cases
+
+- **Continuous deployment**: Automatically deploy new function versions as part of a CI/CD pipeline
+- **Serverless provisioning**: Create functions on-demand as part of environment setup workflows
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application to deploy the function into
+- **Display Name**: A human-readable name for the function
+- **Image**: The container image URI (e.g. `phx.ocir.io/namespace/repo/image:tag`)
+- **Memory (MB)**: Memory allocated to the function (minimum 128 MB)
+- **Timeout (seconds)**: Optional maximum execution time in seconds
+
+### Output
+
+Emits the created function details including:
+- `functionId` — function OCID
+- `displayName` — function name
+- `applicationId` — parent application OCID
+- `image` — the container image
+- `invokeEndpoint` — the HTTPS endpoint used to invoke the function
+- `memoryInMBs` — memory allocated in megabytes
+- `lifecycleState` — current state
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "displayName": "my-function",
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "image": "phx.ocir.io/mynamespace/myrepo/myfunction:0.0.1",
+    "invokeEndpoint": "https://aabbccddeeff.call.eu-frankfurt-1.oci.oraclecloud.com",
+    "lifecycleState": "ACTIVE",
+    "memoryInMBs": 256,
+    "timeCreated": "2026-04-22T20:33:10.512Z"
+  },
+  "timestamp": "2026-04-22T20:33:11.102345678Z",
+  "type": "oci.functionCreated"
+}
+```
+
+<a id="create-image"></a>
+
+## Create Image
+
+The Create Image component creates an OCI Compute boot disk image.
+
+### Use Cases
+
+- **Golden image pipelines**: Bake reusable server images from configured instances
+- **Environment promotion**: Import exported images from Object Storage into a target compartment
+- **Backup workflows**: Capture a known-good instance image before a risky change
+
+### Configuration
+
+- **Source Type**: Create from an instance, import from an Object Storage URL, or import from a bucket object
+- **Compartment**: Compartment where the image is created
+- **Display Name**: Friendly name for the image
+- **Instance OCID**: Source instance when creating from an instance
+- **Source Image Type**: Image format for imported images, such as QCOW2, VMDK, or OCI
+- **Namespace, Bucket, Object**: Object Storage location when importing from a bucket object
+- **Tags**: Optional freeform tags to apply to the image
+
+### Completion behavior
+
+The component waits for the image to reach `AVAILABLE` before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-2026-04-28",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:15:12.000Z",
+  "type": "oci.image"
+}
+```
+
+<a id="delete-application"></a>
+
+## Delete Application
+
+The Delete Application component removes an Oracle Cloud Infrastructure Functions application.
+
+> **Important:** OCI will reject the deletion with a 409 Conflict if the application still contains functions.
+> You must delete all functions inside the application (using the **Delete Function** component) before using this component.
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application to delete. The application must have no remaining functions.
+
+### Output
+
+Emits the deleted application ID on the default output channel:
+- `applicationId` — OCID of the deleted application
+- `deleted` — boolean confirming deletion
+- `displayName` — name of the deleted application
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "deleted": true,
+    "displayName": "my-functions-app"
+  },
+  "timestamp": "2026-04-22T20:35:00.000000000Z",
+  "type": "oci.applicationDeleted"
+}
+```
+
+<a id="delete-function"></a>
+
+## Delete Function
+
+The Delete Function component removes a function from an Oracle Cloud Infrastructure Functions application.
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application that owns the function
+- **Function**: The function to delete
+
+### Output
+
+Emits the deleted function ID on the default output channel:
+- `functionId` — OCID of the deleted function
+- `deleted` — boolean confirming deletion
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz"
+  },
+  "timestamp": "2026-04-22T20:36:00.000000000Z",
+  "type": "oci.functionDeleted"
+}
+```
+
+<a id="delete-image"></a>
+
+## Delete Image
+
+The Delete Image component deletes an OCI Compute custom image. Oracle-provided platform images cannot be deleted.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove obsolete custom images
+- **Quota management**: Delete old images before creating new ones
+- **Security response**: Retire vulnerable images from automated provisioning
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deletedAt": "2026-04-28T09:20:00Z",
+    "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "state": "DELETED"
+  },
+  "timestamp": "2026-04-28T09:20:00Z",
+  "type": "oci.imageDeleted"
+}
+```
+
+<a id="get-image"></a>
+
+## Get Image
+
+The Get Image component retrieves metadata for an OCI Compute custom image. Oracle-provided platform images are not returned by this component.
+
+### Use Cases
+
+- **Deployment checks**: Verify that an image is available before launching instances
+- **Traceability**: Resolve image details by OCID
+- **Audit workflows**: Capture operating system, launch mode, and lifecycle state metadata
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-2026-04-28",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:16:00.000Z",
+  "type": "oci.image"
+}
+```
+
+<a id="invoke-function"></a>
+
+## Invoke Function
+
+The Invoke Function component executes an Oracle Cloud Infrastructure serverless function and emits its response.
+
+### Use Cases
+
+- **Data transformation**: Invoke a function to process or transform data mid-workflow
+- **Custom logic**: Run arbitrary serverless code as a workflow step
+- **Integration hooks**: Call a function to trigger external systems
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application that owns the function
+- **Function**: The function to invoke
+- **Payload**: Optional JSON or plain-text body sent to the function
+
+### Output
+
+Emits the function response on the default output channel:
+- `functionId` — OCID of the invoked function
+- `statusCode` — HTTP status code returned by the function runtime
+- `response` — raw response body as a string
+
+### Example Output
+
+```json
+{
+  "data": {
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "response": "{\"result\": \"ok\", \"processed\": 42}",
+    "statusCode": 200
+  },
+  "timestamp": "2026-04-22T20:34:05.987654321Z",
+  "type": "oci.functionInvoked"
+}
+```
+
+<a id="update-image"></a>
+
+## Update Image
+
+The Update Image component updates the display name of an OCI Compute custom image. Oracle-provided platform images cannot be updated.
+
+### Use Cases
+
+- **Release promotion**: Rename an image after validation
+- **Operational cleanup**: Standardize image names
+- **Inventory hygiene**: Keep image metadata readable in automated workflows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-production",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:18:00.000Z",
+  "type": "oci.image"
 }
 ```
 

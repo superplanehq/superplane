@@ -23,6 +23,8 @@ import { showErrorToast } from "@/lib/toast";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { analytics } from "@/lib/analytics";
+import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -42,7 +44,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   const { data: availableIntegrations = [], isLoading: loadingAvailable } = useAvailableIntegrations();
   const { data: organizationIntegrations = [], isLoading: loadingInstalled } = useConnectedIntegrations(organizationId);
-  const createIntegrationMutation = useCreateIntegration(organizationId);
+  const createIntegrationMutation = useCreateIntegration(organizationId, "integrations_page");
 
   const isLoading = loadingAvailable || loadingInstalled;
   const integrationNames = useMemo(() => {
@@ -54,7 +56,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     const groups = new Map<string, typeof organizationIntegrations>();
 
     organizationIntegrations.forEach((integration) => {
-      const provider = integration.spec?.integrationName;
+      const provider = integration.metadata?.integrationName;
       if (!provider) return;
       const current = groups.get(provider) || [];
       current.push(integration);
@@ -130,7 +132,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       }
 
       return item.instances.some((instance) =>
-        (instance.metadata?.name || instance.spec?.integrationName || "").toLowerCase().includes(normalizedQuery),
+        (instance.metadata?.name || instance.metadata?.integrationName || "").toLowerCase().includes(normalizedQuery),
       );
     });
   }, [filterQuery, integrationCatalog]);
@@ -157,10 +159,19 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
     if (!canCreateIntegrations) return;
+
+    if (isCapabilityBasedIntegrationDefinition(integration)) {
+      if (!integration.name) return;
+      analytics.integrationConnectStart(integration.name, "integrations_page", organizationId);
+      navigate(`/${organizationId}/settings/integrations/${integration.name}/setup`);
+      return;
+    }
+
     setSelectedIntegration(integration);
     setIntegrationName(getNextIntegrationName(integration.name));
     setConfiguration({});
     setIsModalOpen(true);
+    analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
   };
   const handleConnect = async () => {
     if (!canCreateIntegrations) return;
@@ -290,10 +301,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       {connectedCount} connected instance{connectedCount === 1 ? "" : "s"}
                     </p>
                     {item.instances.map((integration, index) => {
-                      const integrationDisplayName =
-                        integration.metadata?.name ||
-                        getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
-                        integration.spec?.integrationName;
+                      const integrationDisplayName = integration.metadata?.name;
                       const statusLabel = integration.status?.state
                         ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
                         : "Unknown";
@@ -336,6 +344,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                                 size="sm"
                                 onClick={() => {
                                   if (!canUpdateIntegrations) return;
+                                  const providerName = integration.metadata?.integrationName;
+                                  if (providerName && integration.status?.setupState?.currentStep) {
+                                    navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
+                                      state: { integrationId: integration.metadata?.id },
+                                    });
+                                    return;
+                                  }
+
                                   navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
                                     state: { tab: "configuration" },
                                   });
