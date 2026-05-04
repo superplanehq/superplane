@@ -42,7 +42,7 @@ func Test__Client__NewClient(t *testing.T) {
 				"authType": AuthTypeAppOAuth,
 				"groupId":  "group-456",
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("oauth-token-123")},
 			},
 		}

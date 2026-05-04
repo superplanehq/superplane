@@ -1,5 +1,6 @@
-import type React from "react";
 import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -8,12 +9,30 @@ import type {
   SubtitleContext,
 } from "../types";
 import { baseProps } from "./base";
+import type { BaseNodeMetadata, Comment } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
-import type { Comment } from "./types";
+
+interface CreateIssueCommentConfiguration {
+  repository?: string;
+}
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const props = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const configuration = (context.node.configuration as CreateIssueCommentConfiguration | undefined) ?? {};
+    const metadata = (context.node.metadata as BaseNodeMetadata | undefined) ?? ({} as BaseNodeMetadata);
+
+    const repository = configuration.repository || metadata?.repository?.name;
+    const metadataItems: MetadataItem[] = [];
+
+    if (repository) {
+      metadataItems.push({ icon: "book", label: repository });
+    }
+
+    return {
+      ...props,
+      metadata: metadataItems.length > 0 ? metadataItems : props.metadata,
+    };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
