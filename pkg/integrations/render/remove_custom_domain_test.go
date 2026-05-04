@@ -17,21 +17,21 @@ func Test__Render_RemoveCustomDomain__Setup(t *testing.T) {
 
 	t.Run("missing service -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"domainName": "app.example.com"},
+			Configuration: map[string]any{"domain": "app.example.com"},
 		})
 		require.ErrorContains(t, err, "service is required")
 	})
 
-	t.Run("missing domainName -> error", func(t *testing.T) {
+	t.Run("missing domain -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{"service": "srv-123"},
 		})
-		require.ErrorContains(t, err, "domainName is required")
+		require.ErrorContains(t, err, "domain is required")
 	})
 
 	t.Run("valid configuration -> success", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"service": "srv-123", "domainName": "app.example.com"},
+			Configuration: map[string]any{"service": "srv-123", "domain": "app.example.com"},
 		})
 		require.NoError(t, err)
 	})
@@ -52,8 +52,8 @@ func Test__Render_RemoveCustomDomain__Setup(t *testing.T) {
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			Metadata:    metadataCtx,
 			Configuration: map[string]any{
-				"service":    "srv-123",
-				"domainName": "app.example.com",
+				"service": "srv-123",
+				"domain":  "app.example.com",
 			},
 		})
 
@@ -84,8 +84,8 @@ func Test__Render_RemoveCustomDomain__Execute(t *testing.T) {
 			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			ExecutionState: executionState,
 			Configuration: map[string]any{
-				"service":    "srv-123",
-				"domainName": "app.example.com",
+				"service": "srv-123",
+				"domain":  "app.example.com",
 			},
 		})
 

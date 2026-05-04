@@ -25,7 +25,7 @@ type AddCustomDomain struct{}
 
 type AddCustomDomainConfiguration struct {
 	Service             string `json:"service" mapstructure:"service"`
-	DomainName          string `json:"domainName" mapstructure:"domainName"`
+	Domain              string `json:"domain" mapstructure:"domain"`
 	WaitForVerification bool   `json:"waitForVerification" mapstructure:"waitForVerification"`
 }
 
@@ -104,7 +104,7 @@ func (c *AddCustomDomain) Configuration() []configuration.Field {
 			Description: "Render service to add the domain to",
 		},
 		{
-			Name:        "domainName",
+			Name:        "domain",
 			Label:       "Domain Name",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
@@ -129,13 +129,13 @@ func decodeAddCustomDomainConfiguration(cfg any) (AddCustomDomainConfiguration, 
 	}
 
 	spec.Service = strings.TrimSpace(spec.Service)
-	spec.DomainName = strings.TrimSpace(spec.DomainName)
+	spec.Domain = strings.TrimSpace(spec.Domain)
 
 	if spec.Service == "" {
 		return AddCustomDomainConfiguration{}, fmt.Errorf("service is required")
 	}
-	if spec.DomainName == "" {
-		return AddCustomDomainConfiguration{}, fmt.Errorf("domainName is required")
+	if spec.Domain == "" {
+		return AddCustomDomainConfiguration{}, fmt.Errorf("domain is required")
 	}
 
 	return spec, nil
@@ -165,7 +165,7 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	domain, err := client.AddCustomDomain(spec.Service, spec.DomainName)
+	domain, err := client.AddCustomDomain(spec.Service, spec.Domain)
 	if err != nil {
 		return err
 	}

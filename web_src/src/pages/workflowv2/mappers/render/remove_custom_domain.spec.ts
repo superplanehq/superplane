@@ -74,8 +74,8 @@ describe("removeCustomDomainMapper.props", () => {
     );
   });
 
-  it("includes domainName metadata when configuration.domainName is set", () => {
-    const ctx = makePropsContext({ configuration: { domainName: "app.example.com" } });
+  it("includes domain metadata when configuration.domain is set", () => {
+    const ctx = makePropsContext({ configuration: { domain: "app.example.com" } });
     const props = removeCustomDomainMapper.props!(ctx);
     expect(props.metadata).toEqual(expect.arrayContaining([expect.objectContaining({ label: "app.example.com" })]));
   });

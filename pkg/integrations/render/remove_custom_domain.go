@@ -16,8 +16,8 @@ const RemoveCustomDomainPayloadType = "render.customDomain.removed"
 type RemoveCustomDomain struct{}
 
 type RemoveCustomDomainConfiguration struct {
-	Service    string `json:"service" mapstructure:"service"`
-	DomainName string `json:"domainName" mapstructure:"domainName"`
+	Service string `json:"service" mapstructure:"service"`
+	Domain  string `json:"domain" mapstructure:"domain"`
 }
 
 func (c *RemoveCustomDomain) Name() string {
@@ -77,7 +77,7 @@ func (c *RemoveCustomDomain) Configuration() []configuration.Field {
 			Description: "Render service to remove the domain from",
 		},
 		{
-			Name:        "domainName",
+			Name:        "domain",
 			Label:       "Domain Name",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -105,13 +105,13 @@ func decodeRemoveCustomDomainConfiguration(cfg any) (RemoveCustomDomainConfigura
 	}
 
 	spec.Service = strings.TrimSpace(spec.Service)
-	spec.DomainName = strings.TrimSpace(spec.DomainName)
+	spec.Domain = strings.TrimSpace(spec.Domain)
 
 	if spec.Service == "" {
 		return RemoveCustomDomainConfiguration{}, fmt.Errorf("service is required")
 	}
-	if spec.DomainName == "" {
-		return RemoveCustomDomainConfiguration{}, fmt.Errorf("domainName is required")
+	if spec.Domain == "" {
+		return RemoveCustomDomainConfiguration{}, fmt.Errorf("domain is required")
 	}
 
 	return spec, nil
@@ -141,7 +141,7 @@ func (c *RemoveCustomDomain) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if err := client.RemoveCustomDomain(spec.Service, spec.DomainName); err != nil {
+	if err := client.RemoveCustomDomain(spec.Service, spec.Domain); err != nil {
 		return err
 	}
 
@@ -150,7 +150,7 @@ func (c *RemoveCustomDomain) Execute(ctx core.ExecutionContext) error {
 		RemoveCustomDomainPayloadType,
 		[]any{
 			map[string]any{
-				"name":      spec.DomainName,
+				"name":      spec.Domain,
 				"serviceId": spec.Service,
 			},
 		},

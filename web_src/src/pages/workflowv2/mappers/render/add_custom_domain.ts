@@ -15,7 +15,7 @@ import { baseProps } from "./base";
 
 interface AddCustomDomainConfiguration {
   service?: string;
-  domainName?: string;
+  domain?: string;
   waitForVerification?: boolean;
 }
 
@@ -34,8 +34,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.service) {
     metadata.push({ icon: "server", label: `Service: ${serviceMetadataLabel(nodeMetadata, configuration.service)}` });
   }
-  if (configuration?.domainName) {
-    metadata.push({ icon: "globe", label: configuration.domainName });
+  if (configuration?.domain) {
+    metadata.push({ icon: "globe", label: configuration.domain });
   }
   if (configuration?.waitForVerification) {
     metadata.push({ icon: "shield-check", label: "Wait for verification" });

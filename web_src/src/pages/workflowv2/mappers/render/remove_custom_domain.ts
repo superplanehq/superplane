@@ -15,7 +15,7 @@ import { baseProps } from "./base";
 
 interface RemoveCustomDomainConfiguration {
   service?: string;
-  domainName?: string;
+  domain?: string;
 }
 
 interface RemoveCustomDomainOutput {
@@ -31,8 +31,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.service) {
     metadata.push({ icon: "server", label: `Service: ${serviceMetadataLabel(nodeMetadata, configuration.service)}` });
   }
-  if (configuration?.domainName) {
-    metadata.push({ icon: "globe", label: configuration.domainName });
+  if (configuration?.domain) {
+    metadata.push({ icon: "globe", label: configuration.domain });
   }
 
   return metadata;

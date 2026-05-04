@@ -57,7 +57,7 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 			Metadata:       &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"service":             addServiceID,
-				"domainName":          noWaitDomain,
+				"domain":              noWaitDomain,
 				"waitForVerification": false,
 			},
 		})
@@ -83,7 +83,7 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 			Requests:       requests,
 			Configuration: map[string]any{
 				"service":             addServiceID,
-				"domainName":          waitDomain,
+				"domain":              waitDomain,
 				"waitForVerification": true,
 			},
 		})
