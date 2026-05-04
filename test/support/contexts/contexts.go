@@ -3,6 +3,7 @@ package contexts
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,13 +86,14 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type IntegrationContext struct {
+	NewSetupFlow     bool
 	IntegrationID    string
 	Configuration    map[string]any
 	Metadata         any
 	State            string
 	StateDescription string
 	BrowserAction    *core.BrowserAction
-	Secrets          map[string]core.IntegrationSecret
+	CurrentSecrets   map[string]core.IntegrationSecret
 	WebhookRequests  []any
 	ResyncRequests   []time.Duration
 	ActionRequests   []ActionRequest
@@ -114,7 +116,8 @@ func (c *IntegrationContext) ID() uuid.UUID {
 		return uuid.MustParse(c.IntegrationID)
 	}
 
-	return uuid.New()
+	c.IntegrationID = uuid.New().String()
+	return uuid.MustParse(c.IntegrationID)
 }
 
 func (c *IntegrationContext) GetMetadata() any {
@@ -166,16 +169,16 @@ func (c *IntegrationContext) RemoveBrowserAction() {
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {
-	if c.Secrets == nil {
-		c.Secrets = make(map[string]core.IntegrationSecret)
+	if c.CurrentSecrets == nil {
+		c.CurrentSecrets = make(map[string]core.IntegrationSecret)
 	}
-	c.Secrets[name] = core.IntegrationSecret{Name: name, Value: value}
+	c.CurrentSecrets[name] = core.IntegrationSecret{Name: name, Value: value}
 	return nil
 }
 
 func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
-	secrets := make([]core.IntegrationSecret, 0, len(c.Secrets))
-	for _, secret := range c.Secrets {
+	secrets := make([]core.IntegrationSecret, 0, len(c.CurrentSecrets))
+	for _, secret := range c.CurrentSecrets {
 		secrets = append(secrets, secret)
 	}
 	return secrets, nil
@@ -212,6 +215,18 @@ func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 	s := Subscription{ID: uuid.New(), Configuration: subscription}
 	c.Subscriptions = append(c.Subscriptions, s)
 	return &s.ID, nil
+}
+
+func (c *IntegrationContext) LegacySetup() bool {
+	return !c.NewSetupFlow
+}
+
+func (c *IntegrationContext) Properties() core.IntegrationPropertyStorage {
+	return nil
+}
+
+func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
+	return &IntegrationSecretStorage{parentContext: c}
 }
 
 type SubscriptionContext struct {
@@ -417,4 +432,156 @@ func (c *NotificationContext) IsAvailable() bool {
 func (c *NotificationContext) Send(title, body, url, urlLabel string, receivers core.NotificationReceivers) error {
 	c.Messages = append(c.Messages, Notification{Title: title, Body: body, URL: url, URLLabel: urlLabel, Receivers: receivers})
 	return nil
+}
+
+type IntegrationSecretStorage struct {
+	parentContext *IntegrationContext
+}
+
+func (s *IntegrationSecretStorage) Get(name string) (string, error) {
+	v, ok := s.parentContext.CurrentSecrets[name]
+	if !ok {
+		return "", fmt.Errorf("secret not found: %s", name)
+	}
+
+	return string(v.Value), nil
+}
+
+func (s *IntegrationSecretStorage) Delete(name string) error {
+	delete(s.parentContext.CurrentSecrets, name)
+	return nil
+}
+
+func (s *IntegrationSecretStorage) Create(def core.IntegrationSecretDefinition) error {
+	if len(s.parentContext.CurrentSecrets) == 0 {
+		s.parentContext.CurrentSecrets = make(map[string]core.IntegrationSecret)
+	}
+
+	s.parentContext.CurrentSecrets[def.Name] = core.IntegrationSecret{Name: def.Name, Value: []byte(def.Value)}
+	return nil
+}
+
+func (s *IntegrationSecretStorage) CreateMany(defs []core.IntegrationSecretDefinition) error {
+	for _, def := range defs {
+		err := s.Create(def)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *IntegrationSecretStorage) Update(name string, value string) error {
+	if len(s.parentContext.CurrentSecrets) == 0 {
+		s.parentContext.CurrentSecrets = make(map[string]core.IntegrationSecret)
+	}
+
+	s.parentContext.CurrentSecrets[name] = core.IntegrationSecret{Name: name, Value: []byte(value)}
+	return nil
+}
+
+type IntegrationPropertyStorage struct {
+	values map[string]any
+}
+
+func NewIntegrationPropertyStorage() *IntegrationPropertyStorage {
+	return &IntegrationPropertyStorage{values: make(map[string]any)}
+}
+
+func (s *IntegrationPropertyStorage) Get(name string) (any, error) {
+	v, ok := s.values[name]
+	if !ok {
+		return nil, fmt.Errorf("property not found: %s", name)
+	}
+
+	return v, nil
+}
+
+func (s *IntegrationPropertyStorage) GetString(name string) (string, error) {
+	property, err := s.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	v, ok := property.(string)
+	if !ok {
+		return "", fmt.Errorf("property is not a string: %s", name)
+	}
+
+	return v, nil
+}
+
+func (s *IntegrationPropertyStorage) Delete(names ...string) error {
+	for _, n := range names {
+		delete(s.values, n)
+	}
+
+	return nil
+}
+
+func (s *IntegrationPropertyStorage) Create(def core.IntegrationPropertyDefinition) error {
+	s.values[def.Name] = def.Value
+
+	return nil
+}
+
+func (s *IntegrationPropertyStorage) CreateMany(defs []core.IntegrationPropertyDefinition) error {
+	for _, def := range defs {
+		err := s.Create(def)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type CapabilityContext struct {
+	RequestedCapabilties    []string
+	EnabledCapabilities     []string
+	DisabledCapabilities    []string
+	AvailableCapabilities   []string
+	UnavailableCapabilities []string
+}
+
+func (c *CapabilityContext) Request(capabilities ...string) {
+	c.RequestedCapabilties = append(c.RequestedCapabilties, capabilities...)
+}
+
+func (c *CapabilityContext) Enable(capabilities ...string) {
+	c.EnabledCapabilities = append(c.EnabledCapabilities, capabilities...)
+}
+
+func (c *CapabilityContext) Disable(capabilities ...string) {
+	c.DisabledCapabilities = append(c.DisabledCapabilities, capabilities...)
+}
+
+func (c *CapabilityContext) Available(capabilities ...string) {
+	c.AvailableCapabilities = append(c.AvailableCapabilities, capabilities...)
+}
+
+func (c *CapabilityContext) Unavailable(capabilities ...string) {
+	c.UnavailableCapabilities = append(c.UnavailableCapabilities, capabilities...)
+}
+
+func (c *CapabilityContext) Clear() {
+	c.RequestedCapabilties = []string{}
+	c.EnabledCapabilities = []string{}
+	c.DisabledCapabilities = []string{}
+	c.AvailableCapabilities = []string{}
+	c.UnavailableCapabilities = []string{}
+}
+
+func (c *CapabilityContext) IsRequested(capabilities ...string) bool {
+	for _, capability := range capabilities {
+		if !slices.Contains(c.RequestedCapabilties, capability) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (c *CapabilityContext) Requested() []string {
+	return c.RequestedCapabilties
 }

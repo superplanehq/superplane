@@ -18,9 +18,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Application" href="#create-application" description="Create a new OCI Functions application" />
   <LinkCard title="Create Compute Instance" href="#create-compute-instance" description="Provision a new OCI Compute instance and wait for it to reach RUNNING state" />
   <LinkCard title="Create Function" href="#create-function" description="Deploy a new function within an OCI Functions application" />
+  <LinkCard title="Create Image" href="#create-image" description="Create an OCI boot disk image from an instance or Object Storage export" />
   <LinkCard title="Delete Application" href="#delete-application" description="Delete an OCI Functions application" />
   <LinkCard title="Delete Function" href="#delete-function" description="Remove a function from an OCI Functions application" />
+  <LinkCard title="Delete Image" href="#delete-image" description="Delete an OCI custom image by OCID" />
+  <LinkCard title="Get Image" href="#get-image" description="Get OCI custom image details by OCID" />
   <LinkCard title="Invoke Function" href="#invoke-function" description="Execute an OCI Function and capture its response" />
+  <LinkCard title="Update Image" href="#update-image" description="Update an OCI custom image display name" />
 </CardGrid>
 
 ## Instructions
@@ -291,6 +295,56 @@ Emits the created function details including:
 }
 ```
 
+<a id="create-image"></a>
+
+## Create Image
+
+The Create Image component creates an OCI Compute boot disk image.
+
+### Use Cases
+
+- **Golden image pipelines**: Bake reusable server images from configured instances
+- **Environment promotion**: Import exported images from Object Storage into a target compartment
+- **Backup workflows**: Capture a known-good instance image before a risky change
+
+### Configuration
+
+- **Source Type**: Create from an instance, import from an Object Storage URL, or import from a bucket object
+- **Compartment**: Compartment where the image is created
+- **Display Name**: Friendly name for the image
+- **Instance OCID**: Source instance when creating from an instance
+- **Source Image Type**: Image format for imported images, such as QCOW2, VMDK, or OCI
+- **Namespace, Bucket, Object**: Object Storage location when importing from a bucket object
+- **Tags**: Optional freeform tags to apply to the image
+
+### Completion behavior
+
+The component waits for the image to reach `AVAILABLE` before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-2026-04-28",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:15:12.000Z",
+  "type": "oci.image"
+}
+```
+
 <a id="delete-application"></a>
 
 ## Delete Application
@@ -357,6 +411,68 @@ Emits the deleted function ID on the default output channel:
 }
 ```
 
+<a id="delete-image"></a>
+
+## Delete Image
+
+The Delete Image component deletes an OCI Compute custom image. Oracle-provided platform images cannot be deleted.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove obsolete custom images
+- **Quota management**: Delete old images before creating new ones
+- **Security response**: Retire vulnerable images from automated provisioning
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deletedAt": "2026-04-28T09:20:00Z",
+    "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "state": "DELETED"
+  },
+  "timestamp": "2026-04-28T09:20:00Z",
+  "type": "oci.imageDeleted"
+}
+```
+
+<a id="get-image"></a>
+
+## Get Image
+
+The Get Image component retrieves metadata for an OCI Compute custom image. Oracle-provided platform images are not returned by this component.
+
+### Use Cases
+
+- **Deployment checks**: Verify that an image is available before launching instances
+- **Traceability**: Resolve image details by OCID
+- **Audit workflows**: Capture operating system, launch mode, and lifecycle state metadata
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-2026-04-28",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:16:00.000Z",
+  "type": "oci.image"
+}
+```
+
 <a id="invoke-function"></a>
 
 ## Invoke Function
@@ -394,6 +510,42 @@ Emits the function response on the default output channel:
   },
   "timestamp": "2026-04-22T20:34:05.987654321Z",
   "type": "oci.functionInvoked"
+}
+```
+
+<a id="update-image"></a>
+
+## Update Image
+
+The Update Image component updates the display name of an OCI Compute custom image. Oracle-provided platform images cannot be updated.
+
+### Use Cases
+
+- **Release promotion**: Rename an image after validation
+- **Operational cleanup**: Standardize image names
+- **Inventory hygiene**: Keep image metadata readable in automated workflows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-production",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:18:00.000Z",
+  "type": "oci.image"
 }
 ```
 

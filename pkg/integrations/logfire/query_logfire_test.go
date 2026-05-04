@@ -92,7 +92,6 @@ func TestQueryLogfire_Setup_ValidatesProjectSelection(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_us_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	metadataCtx := &contexts.MetadataContext{}
@@ -120,9 +119,9 @@ func TestQueryLogfire_Setup_ValidatesProjectSelection(t *testing.T) {
 	assert.Equal(t, "Project 123", meta.Project.Name)
 
 	// Verify per-project secret was stored.
-	secret, ok := integrationCtx.Secrets[readTokenSecretNameForProject("proj_123")]
-	require.True(t, ok)
-	assert.Equal(t, "read_token_new", string(secret.Value))
+	secret, err := integrationCtx.Secrets().Get(readTokenSecretNameForProject("proj_123"))
+	require.NoError(t, err)
+	assert.Equal(t, "read_token_new", secret)
 }
 
 func TestQueryLogfire_Setup_InvalidProject_ReturnsError(t *testing.T) {
@@ -142,7 +141,6 @@ func TestQueryLogfire_Setup_InvalidProject_ReturnsError(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_us_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	err := component.Setup(core.SetupContext{
@@ -184,7 +182,7 @@ func TestQueryLogfire_Setup_ReusesExistingToken(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_us_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			readTokenSecretNameForProject("proj_123"): {
 				Name:  readTokenSecretNameForProject("proj_123"),
 				Value: []byte("existing_read_token"),
@@ -243,7 +241,7 @@ func TestQueryLogfire_Setup_MigratesLegacyToken(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_us_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			readTokenSecretName: {
 				Name:  readTokenSecretName,
 				Value: []byte("legacy_read_token"),
@@ -269,9 +267,9 @@ func TestQueryLogfire_Setup_MigratesLegacyToken(t *testing.T) {
 	require.Len(t, httpCtx.Requests, 2)
 
 	// Verify per-project secret was stored (migration from legacy).
-	secret, ok := integrationCtx.Secrets[readTokenSecretNameForProject("proj_123")]
-	require.True(t, ok)
-	assert.Equal(t, "legacy_read_token", string(secret.Value))
+	secret, err := integrationCtx.Secrets().Get(readTokenSecretNameForProject("proj_123"))
+	require.NoError(t, err)
+	assert.Equal(t, "legacy_read_token", secret)
 
 	// Verify metadata was set.
 	var meta QueryLogfireNodeMetadata
@@ -300,7 +298,7 @@ func TestQueryLogfire_Execute_Success(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_us_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			readTokenSecretNameForProject("proj_123"): {
 				Name:  readTokenSecretNameForProject("proj_123"),
 				Value: []byte("read_token_123"),
@@ -349,7 +347,7 @@ func TestQueryLogfire_Execute_FallsBackToLegacyToken(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_us_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			readTokenSecretName: {
 				Name:  readTokenSecretName,
 				Value: []byte("legacy_read_token"),
@@ -393,7 +391,6 @@ func TestQueryLogfire_Execute_NoTokenAvailable(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_us_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	err := component.Execute(core.ExecutionContext{

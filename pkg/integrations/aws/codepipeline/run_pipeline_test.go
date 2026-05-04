@@ -92,7 +92,7 @@ func Test__RunPipeline__Setup(t *testing.T) {
 			Metadata: &contexts.MetadataContext{Metadata: map[string]any{}},
 			HTTP:     httpCtx,
 			Integration: &contexts.IntegrationContext{
-				Secrets: validSecrets(),
+				CurrentSecrets: validSecrets(),
 			},
 		})
 
@@ -115,8 +115,8 @@ func Test__RunPipeline__Setup(t *testing.T) {
 
 		metadataCtx := &contexts.MetadataContext{Metadata: map[string]any{}}
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets:  validSecrets(),
-			Metadata: map[string]any{},
+			CurrentSecrets: validSecrets(),
+			Metadata:       map[string]any{},
 		}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -165,7 +165,7 @@ func Test__RunPipeline__Execute(t *testing.T) {
 					},
 				},
 			},
-			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
+			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		})
 
@@ -192,8 +192,8 @@ func Test__RunPipeline__Execute(t *testing.T) {
 		}
 		requestCtx := &contexts.RequestContext{}
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets:  validSecrets(),
-			Metadata: map[string]any{},
+			CurrentSecrets: validSecrets(),
+			Metadata:       map[string]any{},
 		}
 
 		err := component.Execute(core.ExecutionContext{
@@ -477,7 +477,7 @@ func Test__RunPipeline__Poll(t *testing.T) {
 			},
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{
-				Secrets: validSecrets(),
+				CurrentSecrets: validSecrets(),
 			},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Requests:       requestCtx,
@@ -519,7 +519,7 @@ func Test__RunPipeline__Poll(t *testing.T) {
 			},
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{
-				Secrets: validSecrets(),
+				CurrentSecrets: validSecrets(),
 			},
 			ExecutionState: execState,
 			Requests:       &contexts.RequestContext{},
@@ -575,7 +575,7 @@ func Test__RunPipeline__Poll(t *testing.T) {
 			},
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{
-				Secrets: validSecrets(),
+				CurrentSecrets: validSecrets(),
 			},
 			ExecutionState: execState,
 			Requests:       &contexts.RequestContext{},
@@ -893,7 +893,7 @@ func Test__RunPipeline__ListPipelines(t *testing.T) {
 	t.Run("missing credentials -> error", func(t *testing.T) {
 		_, err := ListPipelines(core.ListResourcesContext{
 			Parameters:  map[string]string{"region": "us-east-1"},
-			Integration: &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
+			Integration: &contexts.IntegrationContext{},
 		}, "codepipeline.pipeline")
 
 		require.ErrorContains(t, err, "AWS session credentials are missing")
@@ -918,7 +918,7 @@ func Test__RunPipeline__ListPipelines(t *testing.T) {
 			Parameters: map[string]string{"region": "us-east-1"},
 			HTTP:       httpCtx,
 			Integration: &contexts.IntegrationContext{
-				Secrets: validSecrets(),
+				CurrentSecrets: validSecrets(),
 			},
 		}, "codepipeline.pipeline")
 
