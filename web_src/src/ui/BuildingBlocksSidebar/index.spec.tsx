@@ -134,7 +134,7 @@ describe("BuildingBlocksSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Integrations" }));
     expect(screen.getByText("Connect Integrations")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "GitHub" }));
+    fireEvent.click(screen.getByRole("button", { name: /GitHub/ }));
     expect(onConnectIntegration).toHaveBeenCalledWith("github");
   });
 });
