@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -132,6 +133,94 @@ func SwitchContext(baseURL, org string) (*ConfigContext, error) {
 	}
 
 	return nil, fmt.Errorf("no context found for %s %q", url, name)
+}
+
+func contextMatchesOrgArg(c ConfigContext, orgOrID string) bool {
+	if c.OrganizationID != "" && c.OrganizationID == orgOrID {
+		return true
+	}
+	return c.Organization == orgOrID
+}
+
+func distinctBaseURLs(contexts []ConfigContext) []string {
+	seen := make(map[string]struct{}, len(contexts))
+	for _, c := range contexts {
+		if c.URL != "" {
+			seen[c.URL] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for u := range seen {
+		out = append(out, u)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func formatURLBulletList(urls []string) string {
+	var b strings.Builder
+	for _, u := range urls {
+		b.WriteString("- ")
+		b.WriteString(u)
+		b.WriteString("\n")
+	}
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
+// SwitchContextByOrganization sets the current context using organization id or
+// name across saved installations. When urlFilter is non-empty, only contexts
+// at that base URL are considered (so multiple matches are always same-installation
+// duplicates, never cross-installation ambiguity). Multiple matches on different
+// base URLs without urlFilter returns an error that lists installations and suggests --url.
+func SwitchContextByOrganization(orgOrID, urlFilter string) (*ConfigContext, error) {
+	orgOrID = strings.TrimSpace(orgOrID)
+	if orgOrID == "" {
+		return nil, fmt.Errorf("organization id or name is required")
+	}
+
+	contexts := GetContexts()
+	if len(contexts) == 0 {
+		return nil, fmt.Errorf("no contexts configured")
+	}
+
+	wantURL := normalizeBaseURL(urlFilter)
+	var candidates []ConfigContext
+	for _, c := range contexts {
+		if !contextMatchesOrgArg(c, orgOrID) {
+			continue
+		}
+		if wantURL != "" && c.URL != wantURL {
+			continue
+		}
+		candidates = append(candidates, c)
+	}
+
+	if len(candidates) == 0 {
+		if wantURL != "" {
+			return nil, fmt.Errorf("no context found for %q at %s", orgOrID, wantURL)
+		}
+		return nil, fmt.Errorf("no context found for organization %q", orgOrID)
+	}
+
+	if len(candidates) == 1 {
+		return saveCurrent(candidates[0])
+	}
+
+	urls := distinctBaseURLs(candidates)
+	if len(urls) == 1 {
+		return nil, fmt.Errorf(
+			"multiple saved contexts match %q at %s; remove duplicate entries from your config",
+			orgOrID,
+			urls[0],
+		)
+	}
+
+	return nil, fmt.Errorf(
+		"ambiguous organization %q matches multiple installations:\n%s\n\nUse: superplane context %q --url <base-url>",
+		orgOrID,
+		formatURLBulletList(urls),
+		orgOrID,
+	)
 }
 
 func saveCurrent(selected ConfigContext) (*ConfigContext, error) {

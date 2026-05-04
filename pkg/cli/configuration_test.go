@@ -141,6 +141,126 @@ func TestUpsertContextUpgradesLegacyEntryInPlace(t *testing.T) {
 	require.Equal(t, "tok-new", all[0].APIToken)
 }
 
+func TestSwitchContextByOrganizationUniqueByID(t *testing.T) {
+	setupViper(t)
+
+	ctx := ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Playground",
+		OrganizationID: "eb3aca82-3864-4f76-b1d6-f670c297f136",
+		APIToken:       "tok",
+	}
+	require.NoError(t, SaveContexts([]ConfigContext{ctx}))
+
+	got, err := SwitchContextByOrganization("eb3aca82-3864-4f76-b1d6-f670c297f136", "")
+	require.NoError(t, err)
+	require.Equal(t, ctx.OrganizationID, got.OrganizationID)
+
+	current, ok := GetCurrentContext()
+	require.True(t, ok)
+	require.Equal(t, ctx.OrganizationID, current.OrganizationID)
+}
+
+func TestSwitchContextByOrganizationUniqueByName(t *testing.T) {
+	setupViper(t)
+
+	ctx := ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Playground",
+		OrganizationID: "eb3aca82-3864-4f76-b1d6-f670c297f136",
+		APIToken:       "tok",
+	}
+	require.NoError(t, SaveContexts([]ConfigContext{ctx}))
+
+	got, err := SwitchContextByOrganization("Playground", "")
+	require.NoError(t, err)
+	require.Equal(t, ctx.OrganizationID, got.OrganizationID)
+}
+
+func TestSwitchContextByOrganizationAmbiguousWithoutURL(t *testing.T) {
+	setupViper(t)
+
+	a := ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Shared",
+		OrganizationID: "aaaaaaaa-0000-0000-0000-000000000001",
+		APIToken:       "tok-a",
+	}
+	b := ConfigContext{
+		URL:            "https://staging.example.com",
+		Organization:   "Shared",
+		OrganizationID: "bbbbbbbb-0000-0000-0000-000000000002",
+		APIToken:       "tok-b",
+	}
+	require.NoError(t, SaveContexts([]ConfigContext{a, b}))
+
+	_, err := SwitchContextByOrganization("Shared", "")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ambiguous organization")
+	require.Contains(t, err.Error(), "https://app.superplane.com")
+	require.Contains(t, err.Error(), "https://staging.example.com")
+}
+
+func TestSwitchContextByOrganizationResolvesWithURLFlag(t *testing.T) {
+	setupViper(t)
+
+	a := ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Shared",
+		OrganizationID: "aaaaaaaa-0000-0000-0000-000000000001",
+		APIToken:       "tok-a",
+	}
+	b := ConfigContext{
+		URL:            "https://staging.example.com",
+		Organization:   "Shared",
+		OrganizationID: "bbbbbbbb-0000-0000-0000-000000000002",
+		APIToken:       "tok-b",
+	}
+	require.NoError(t, SaveContexts([]ConfigContext{a, b}))
+
+	got, err := SwitchContextByOrganization("Shared", "https://staging.example.com")
+	require.NoError(t, err)
+	require.Equal(t, b.OrganizationID, got.OrganizationID)
+}
+
+func TestSwitchContextByOrganizationDuplicateSameURLError(t *testing.T) {
+	setupViper(t)
+
+	a := ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Dup",
+		OrganizationID: "aaaaaaaa-0000-0000-0000-000000000001",
+		APIToken:       "tok-a",
+	}
+	b := ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Dup",
+		OrganizationID: "aaaaaaaa-0000-0000-0000-000000000001",
+		APIToken:       "tok-b",
+	}
+	require.NoError(t, SaveContexts([]ConfigContext{a, b}))
+
+	_, err := SwitchContextByOrganization("Dup", "")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "multiple saved contexts")
+}
+
+func TestSwitchContextByOrganizationUnknown(t *testing.T) {
+	setupViper(t)
+
+	ctx := ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Only",
+		OrganizationID: "aaaaaaaa-0000-0000-0000-000000000001",
+		APIToken:       "tok",
+	}
+	require.NoError(t, SaveContexts([]ConfigContext{ctx}))
+
+	_, err := SwitchContextByOrganization("nope", "")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no context found")
+}
+
 func TestGetCurrentContextResolvesAfterUpgrade(t *testing.T) {
 	setupViper(t)
 
