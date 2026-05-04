@@ -14,7 +14,7 @@ import (
 type DeleteGPUDroplet struct{}
 
 type DeleteGPUDropletSpec struct {
-	Droplet string `json:"droplet"`
+	GPUDroplet string `json:"droplet" mapstructure:"gpuDroplet"`
 }
 
 func (d *DeleteGPUDroplet) Name() string {
@@ -94,11 +94,11 @@ func (d *DeleteGPUDroplet) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.Droplet == "" {
-		return errors.New("droplet is required")
+	if spec.GPUDroplet == "" {
+		return errors.New("GPU droplet is required")
 	}
 
-	err = resolveDropletMetadata(ctx, spec.Droplet)
+	err = resolveDropletMetadata(ctx, spec.GPUDroplet)
 	if err != nil {
 		return fmt.Errorf("error resolving droplet metadata: %v", err)
 	}
@@ -113,9 +113,9 @@ func (d *DeleteGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	dropletID, err := parseDropletID(spec.Droplet)
+	dropletID, err := parseDropletID(spec.GPUDroplet)
 	if err != nil {
-		return fmt.Errorf("invalid droplet ID %q: %w", spec.Droplet, err)
+		return fmt.Errorf("invalid droplet ID %q: %w", spec.GPUDroplet, err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

@@ -14,7 +14,7 @@ import (
 type GetGPUDroplet struct{}
 
 type GetGPUDropletSpec struct {
-	Droplet string `json:"droplet"`
+	GPUDroplet string `json:"droplet" mapstructure:"gpuDroplet"`
 }
 
 func (g *GetGPUDroplet) Name() string {
@@ -97,11 +97,11 @@ func (g *GetGPUDroplet) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.Droplet == "" {
-		return errors.New("droplet is required")
+	if spec.GPUDroplet == "" {
+		return errors.New("GPU droplet is required")
 	}
 
-	err = resolveDropletMetadata(ctx, spec.Droplet)
+	err = resolveDropletMetadata(ctx, spec.GPUDroplet)
 	if err != nil {
 		return fmt.Errorf("error resolving GPU droplet metadata: %v", err)
 	}
@@ -121,9 +121,9 @@ func (g *GetGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	dropletID, err := parseDropletID(spec.Droplet)
+	dropletID, err := parseDropletID(spec.GPUDroplet)
 	if err != nil {
-		return fmt.Errorf("invalid GPU droplet ID %q: %w", spec.Droplet, err)
+		return fmt.Errorf("invalid GPU droplet ID %q: %w", spec.GPUDroplet, err)
 	}
 
 	droplet, err := client.GetDroplet(dropletID)
