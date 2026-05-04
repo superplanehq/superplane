@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@xyflow/react", () => ({
@@ -7,17 +8,22 @@ vi.mock("@xyflow/react", () => ({
     id,
     className,
     style,
+    children,
   }: {
     type: string;
     id?: string;
     className?: string;
     style?: { pointerEvents?: string };
+    children?: React.ReactNode;
   }) => (
     <div
       data-testid={`handle-${type}-${id || "default"}`}
-      data-highlighted={className === "highlighted" ? "true" : "false"}
+      data-highlighted={className?.includes("highlighted") ? "true" : "false"}
       data-pointer-events={style?.pointerEvents || "auto"}
-    />
+      data-class-name={className}
+    >
+      {children}
+    </div>
   ),
   Position: {
     Left: "left",

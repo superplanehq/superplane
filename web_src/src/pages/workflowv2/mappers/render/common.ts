@@ -19,6 +19,17 @@ interface OnEventConfiguration {
   service?: string;
 }
 
+export interface RenderServiceNodeMetadata {
+  service?: {
+    id?: string;
+    name?: string;
+  };
+}
+
+export function serviceMetadataLabel(nodeMetadata: RenderServiceNodeMetadata | undefined, serviceId: string): string {
+  return nodeMetadata?.service?.name || serviceId;
+}
+
 /** Labels for event types as received in payloads (dot-case, e.g. render.deploy.ended). */
 const eventLabelsByType: Record<string, string> = {
   "render.deploy.ended": "Deploy Ended",

@@ -12,7 +12,7 @@ import (
 
 func testIntegrationWithCredentials() *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 			"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 			"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

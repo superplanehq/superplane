@@ -1,10 +1,5 @@
 import { Handle, Position } from "@xyflow/react";
-import {
-  APPEND_CONNECTOR_COLOR,
-  AppendHandleButton,
-  AppendHandlePreview,
-  type AppendFromNodeHandler,
-} from "./appendHandle";
+import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import { getOutputChannels } from "./data";
 import { HANDLE_STYLE } from "./handleStyle";
@@ -169,37 +164,15 @@ function EndNodeAppendConnector({
 
   return (
     <>
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={channel}
+      <AppendSourceHandle
+        channel={channel}
+        label="Add next component"
+        onAppend={() => onAppendFromNode(nodeId, channel)}
+        isHighlighted={isHighlighted}
         style={{
-          ...HANDLE_STYLE,
           right: -21,
           top: 13,
-          pointerEvents: "auto",
           transform: "none",
-        }}
-        className={isHighlighted ? "highlighted" : undefined}
-      />
-      <div
-        style={{
-          position: "absolute",
-          right: -63,
-          top: 17,
-          width: 42,
-          height: 3,
-          backgroundColor: APPEND_CONNECTOR_COLOR,
-          pointerEvents: "none",
-        }}
-      />
-      <AppendHandleButton
-        label="Add next component"
-        onClick={() => onAppendFromNode(nodeId, channel)}
-        style={{
-          right: -87,
-          top: 6,
-          position: "absolute",
         }}
       />
       <AppendHandlePreview

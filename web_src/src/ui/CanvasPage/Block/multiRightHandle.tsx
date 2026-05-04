@@ -2,8 +2,8 @@ import React from "react";
 import { Handle, Position } from "@xyflow/react";
 import {
   APPEND_CONNECTOR_COLOR,
-  AppendHandleButton,
   AppendHandlePreview,
+  AppendSourceHandle,
   type AppendFromNodeHandler,
 } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
@@ -183,42 +183,20 @@ function MultiRightChannelControl({
         {channel}
       </span>
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={channel}
-        style={{
-          ...HANDLE_STYLE,
-          left: layout.handleLeftX,
-          top: `calc(50% + ${offsetY}px)`,
-          transform: "translateY(-50%)",
-          pointerEvents: isConnectionInteractive ? "auto" : "none",
-        }}
-        className={isHighlighted ? "highlighted" : undefined}
-      />
-
       {canAppend ? (
         <>
-          <div
-            style={{
-              position: "absolute",
-              left: layout.handleLeftX + 12,
-              top: `calc(50% + ${offsetY}px)`,
-              transform: "translateY(-50%)",
-              width: 24,
-              height: 3,
-              backgroundColor: APPEND_CONNECTOR_COLOR,
-              pointerEvents: "none",
-            }}
-          />
-          <AppendHandleButton
+          <AppendSourceHandle
+            channel={channel}
             label={`Add next component (${channel})`}
-            onClick={onAppend}
+            onAppend={onAppend}
+            isHighlighted={isHighlighted}
+            lineWidth={24}
+            buttonLeft={32}
+            buttonTop={-6}
             style={{
-              left: layout.handleLeftX + 32,
+              left: layout.handleLeftX,
               top: `calc(50% + ${offsetY}px)`,
               transform: "translateY(-50%)",
-              position: "absolute",
             }}
           />
           <AppendHandlePreview
@@ -231,7 +209,21 @@ function MultiRightChannelControl({
             containerOffsetY={54}
           />
         </>
-      ) : null}
+      ) : (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={channel}
+          style={{
+            ...HANDLE_STYLE,
+            left: layout.handleLeftX,
+            top: `calc(50% + ${offsetY}px)`,
+            transform: "translateY(-50%)",
+            pointerEvents: isConnectionInteractive ? "auto" : "none",
+          }}
+          className={isHighlighted ? "highlighted" : undefined}
+        />
+      )}
     </React.Fragment>
   );
 }
