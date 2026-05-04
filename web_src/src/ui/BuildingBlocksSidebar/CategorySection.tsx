@@ -57,6 +57,7 @@ interface BlockItemProps {
   block: BuildingBlock;
   canvasZoom: number;
   isDraggingRef: React.RefObject<boolean>;
+  isCoreCategory: boolean;
   setHoveredBlock: (block: BuildingBlock | null) => void;
   dragPreviewRef: React.RefObject<HTMLDivElement | null>;
   onBlockClick?: (block: BuildingBlock) => void;
@@ -66,6 +67,7 @@ function BlockItem({
   block,
   canvasZoom,
   isDraggingRef,
+  isCoreCategory,
   setHoveredBlock,
   dragPreviewRef,
   onBlockClick,
@@ -103,7 +105,11 @@ function BlockItem({
     >
       <ItemMedia>
         {appIconSrc ? (
-          <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
+          <img
+            src={appIconSrc}
+            alt={block.label || block.name}
+            className={`size-4 ${isCoreCategory ? "opacity-50" : ""}`}
+          />
         ) : (
           <IconComponent size={14} className="text-gray-500" />
         )}
@@ -247,6 +253,7 @@ export function CategorySection({
             <BlockItem
               key={`${block.type}-${block.name}`}
               block={block}
+              isCoreCategory={isCoreCategory}
               canvasZoom={canvasZoom}
               isDraggingRef={isDraggingRef}
               setHoveredBlock={setHoveredBlock}
