@@ -21,6 +21,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
+		steps.assertSMTPNotConfigured()
 		steps.assertRedirectedToOrganizationHome()
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
@@ -54,6 +55,21 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertOwnerAndOrganizationCreated()
 		steps.assertPrivateNetworkAccessEnabled()
 		steps.assertRedirectedToOrganizationHome()
+	})
+
+	t.Run("can skip SMTP setup from the SMTP configuration step", func(t *testing.T) {
+		steps := &ownerSetupSteps{t: t}
+		steps.start()
+		steps.visitRootPage()
+		steps.assertRedirectedToSetup()
+		steps.visitSetupPage()
+		steps.fillInOwnerDetails("skip-smtp-config-owner@example.com", "Skip", "SMTP", "Password1")
+		steps.chooseSMTPSetup()
+		steps.skipSMTPConfig()
+		steps.assertOwnerAndOrganizationCreated()
+		steps.assertSMTPNotConfigured()
+		steps.assertRedirectedToOrganizationHome()
+		steps.assertOwnerSetupIsNoLongerRequired()
 	})
 
 	t.Run("can login with email and password after owner setup", func(t *testing.T) {
@@ -175,6 +191,11 @@ func (s *ownerSetupSteps) submitSMTPSetup() {
 	s.waitForSetupToComplete()
 }
 
+func (s *ownerSetupSteps) skipSMTPConfig() {
+	s.session.Click(q.Text("Skip"))
+	s.waitForSetupToComplete()
+}
+
 func (s *ownerSetupSteps) waitForSetupToComplete() {
 	// Poll for up to 10 seconds, checking every 200ms
 	for i := 0; i < 50; i++ {
@@ -222,6 +243,13 @@ func (s *ownerSetupSteps) assertRedirectedToOrganizationHome() {
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {
 	required := middleware.IsOwnerSetupRequired()
 	assert.False(s.t, required, "owner setup should no longer be required after completion")
+}
+
+func (s *ownerSetupSteps) assertSMTPNotConfigured() {
+	var count int64
+	err := database.Conn().Model(&models.EmailSettings{}).Where("provider = ?", models.EmailProviderSMTP).Count(&count).Error
+	assert.NoError(s.t, err, "count email settings")
+	assert.Equal(s.t, int64(0), count, "expected SMTP settings to not be configured")
 }
 
 func (s *ownerSetupSteps) assertPrivateNetworkAccessEnabled() {
