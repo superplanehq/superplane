@@ -28,7 +28,7 @@ func (c *GetService) Label() string {
 }
 
 func (c *GetService) Description() string {
-	return "Retrieve a Render service by ID"
+	return "Retrieve a Render service and its custom domains"
 }
 
 func (c *GetService) Documentation() string {
@@ -36,7 +36,7 @@ func (c *GetService) Documentation() string {
 
 ## Use Cases
 
-- **Service inspection**: Fetch current service configuration and metadata
+- **Service inspection**: Fetch current service configuration, metadata, and custom domains
 - **Workflow context**: Use service fields to drive branching decisions in later steps
 
 ## Configuration
@@ -45,7 +45,7 @@ func (c *GetService) Documentation() string {
 
 ## Output
 
-Emits a ` + "`render.service`" + ` payload containing service fields like ` + "`serviceId`" + `, ` + "`serviceName`" + `, ` + "`type`" + `, ` + "`dashboardUrl`" + `, and ` + "`suspended`" + `.`
+Emits a ` + "`render.service`" + ` payload containing service fields like ` + "`serviceId`" + `, ` + "`serviceName`" + `, ` + "`type`" + `, ` + "`dashboardUrl`" + `, ` + "`suspended`" + `, and ` + "`customDomains`" + `.`
 }
 
 func (c *GetService) Icon() string {
@@ -116,10 +116,15 @@ func (c *GetService) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	domains, err := client.ListCustomDomains(spec.Service)
+	if err != nil {
+		return err
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		GetServicePayloadType,
-		[]any{serviceDataFromService(service)},
+		[]any{serviceDataFromServiceAndCustomDomains(service, domains)},
 	)
 }
 
