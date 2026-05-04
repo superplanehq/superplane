@@ -17,6 +17,7 @@ func renderOrganization(stdout io.Writer, org openapi_client.OrganizationsOrgani
 	_, _ = fmt.Fprintf(stdout, "Name: %s\n", metadata.GetName())
 	_, _ = fmt.Fprintf(stdout, "Description: %s\n", metadata.GetDescription())
 	_, _ = fmt.Fprintf(stdout, "Change Management Enabled: %t\n", spec.GetChangeManagementEnabled())
+	_, _ = fmt.Fprintf(stdout, "Allow non-OAuth invite completion (email / magic link / password): %t\n", spec.GetAllowDirectEmailInviteCompletion())
 	if ap, ok := spec.GetAllowedOauthProvidersOk(); ok && ap != nil {
 		ps := ap.GetProviders()
 		if len(ps) == 0 {
