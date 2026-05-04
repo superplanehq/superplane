@@ -27,13 +27,9 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 
 	apiKey := os.Getenv("RENDER_API_KEY")
 	addServiceID := os.Getenv("RENDER_TEST_ADD_SERVICE_ID")
-	verifyServiceID := os.Getenv("RENDER_TEST_VERIFY_SERVICE_ID")
-	verifyDomainName := os.Getenv("RENDER_TEST_VERIFY_DOMAIN_NAME")
 
 	require.NotEmpty(t, apiKey, "RENDER_API_KEY is required")
 	require.NotEmpty(t, addServiceID, "RENDER_TEST_ADD_SERVICE_ID is required")
-	require.NotEmpty(t, verifyServiceID, "RENDER_TEST_VERIFY_SERVICE_ID is required")
-	require.NotEmpty(t, verifyDomainName, "RENDER_TEST_VERIFY_DOMAIN_NAME is required")
 
 	httpCtx := liveHTTPContext{client: &http.Client{Timeout: 30 * time.Second}}
 	integration := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": apiKey}}
@@ -46,31 +42,6 @@ func Test__Render_LiveCustomDomainActions(t *testing.T) {
 	t.Cleanup(func() {
 		_ = client.RemoveCustomDomain(addServiceID, noWaitDomain)
 		_ = client.RemoveCustomDomain(addServiceID, waitDomain)
-	})
-
-	t.Run("trigger DNS configuration -> accepted", func(t *testing.T) {
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := (&TriggerDNSConfiguration{}).Execute(core.ExecutionContext{
-			HTTP:           httpCtx,
-			Integration:    integration,
-			ExecutionState: executionState,
-			Configuration: map[string]any{
-				"service":    verifyServiceID,
-				"domainName": verifyDomainName,
-			},
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, core.DefaultOutputChannel.Name, executionState.Channel)
-		assert.Equal(t, TriggerDNSConfigurationPayloadType, executionState.Type)
-		require.Len(t, executionState.Payloads, 1)
-
-		payload := readMap(executionState.Payloads[0])
-		data := readMap(payload["data"])
-		assert.Equal(t, verifyDomainName, data["name"])
-		assert.Equal(t, verifyServiceID, data["serviceId"])
-		assert.Equal(t, "accepted", data["status"])
 	})
 
 	t.Run("add custom domain with wait disabled -> emits payload", func(t *testing.T) {

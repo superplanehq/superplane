@@ -256,6 +256,7 @@ func Test__Render__ListResources(t *testing.T) {
 
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/v1/services/srv-123/custom-domains")
+		assert.Equal(t, "100", httpCtx.Requests[0].URL.Query().Get("limit"))
 	})
 }
 

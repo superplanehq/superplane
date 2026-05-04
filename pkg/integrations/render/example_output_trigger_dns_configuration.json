@@ -1,9 +1,0 @@
-{
-  "data": {
-    "name": "app.example.com",
-    "serviceId": "srv-cukouhrtq21c73e9scng",
-    "status": "accepted"
-  },
-  "timestamp": "2026-02-05T16:25:00.000000Z",
-  "type": "render.dnsConfiguration.verification.requested"
-}

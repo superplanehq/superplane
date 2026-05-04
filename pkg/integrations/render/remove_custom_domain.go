@@ -21,7 +21,7 @@ type RemoveCustomDomainConfiguration struct {
 }
 
 func (c *RemoveCustomDomain) Name() string {
-	return "render.removeCustomDomain"
+	return "render.service.removeCustomDomain"
 }
 
 func (c *RemoveCustomDomain) Label() string {

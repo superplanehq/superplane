@@ -9,8 +9,6 @@ import { PURGE_CACHE_STATE_REGISTRY, purgeCacheMapper } from "./purge_cache";
 import { rollbackDeployMapper } from "./rollback_deploy";
 import { updateEnvVarMapper } from "./update_env_var";
 import { addCustomDomainMapper } from "./add_custom_domain";
-import { triggerDNSConfigurationMapper, TRIGGER_DNS_CONFIGURATION_STATE_REGISTRY } from "./trigger_dns_configuration";
-import { retrieveCustomDomainMapper } from "./retrieve_custom_domain";
 import { removeCustomDomainMapper } from "./remove_custom_domain";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -21,10 +19,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   rollbackDeploy: rollbackDeployMapper,
   purgeCache: purgeCacheMapper,
   updateEnvVar: updateEnvVarMapper,
-  addCustomDomain: addCustomDomainMapper,
-  triggerDNSConfiguration: triggerDNSConfigurationMapper,
-  retrieveCustomDomain: retrieveCustomDomainMapper,
-  removeCustomDomain: removeCustomDomainMapper,
+  "service.addCustomDomain": addCustomDomainMapper,
+  "service.removeCustomDomain": removeCustomDomainMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -37,5 +33,4 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   cancelDeploy: DEPLOY_STATE_REGISTRY,
   rollbackDeploy: DEPLOY_STATE_REGISTRY,
   purgeCache: PURGE_CACHE_STATE_REGISTRY,
-  triggerDNSConfiguration: TRIGGER_DNS_CONFIGURATION_STATE_REGISTRY,
 };

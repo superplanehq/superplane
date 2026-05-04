@@ -594,10 +594,13 @@ func (c *Client) ListCustomDomains(serviceID string) ([]CustomDomainResponse, er
 		return nil, fmt.Errorf("serviceID is required")
 	}
 
+	query := url.Values{}
+	query.Set("limit", "100")
+
 	_, body, err := c.execRequestWithResponse(
 		http.MethodGet,
 		"/services/"+url.PathEscape(serviceID)+"/custom-domains",
-		nil,
+		query,
 		nil,
 	)
 	if err != nil {

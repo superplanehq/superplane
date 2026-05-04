@@ -5,12 +5,12 @@ import type { ComponentBaseContext, ExecutionDetailsContext, NodeInfo } from "..
 const NODE: NodeInfo = {
   id: "n1",
   name: "Add Custom Domain",
-  componentName: "render.addCustomDomain",
+  componentName: "render.service.addCustomDomain",
   isCollapsed: false,
 };
 
 const DEFINITION = {
-  name: "render.addCustomDomain",
+  name: "render.service.addCustomDomain",
   label: "Add Custom Domain",
   description: "",
   icon: "globe",

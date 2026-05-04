@@ -37,12 +37,6 @@ var exampleOutputUpdateEnvVarBytes []byte
 //go:embed example_output_add_custom_domain.json
 var exampleOutputAddCustomDomainBytes []byte
 
-//go:embed example_output_trigger_dns_configuration.json
-var exampleOutputTriggerDNSConfigurationBytes []byte
-
-//go:embed example_output_retrieve_custom_domain.json
-var exampleOutputRetrieveCustomDomainBytes []byte
-
 //go:embed example_output_remove_custom_domain.json
 var exampleOutputRemoveCustomDomainBytes []byte
 
@@ -75,12 +69,6 @@ var exampleOutputUpdateEnvVar map[string]any
 
 var exampleOutputAddCustomDomainOnce sync.Once
 var exampleOutputAddCustomDomain map[string]any
-
-var exampleOutputTriggerDNSConfigurationOnce sync.Once
-var exampleOutputTriggerDNSConfiguration map[string]any
-
-var exampleOutputRetrieveCustomDomainOnce sync.Once
-var exampleOutputRetrieveCustomDomain map[string]any
 
 var exampleOutputRemoveCustomDomainOnce sync.Once
 var exampleOutputRemoveCustomDomain map[string]any
@@ -162,22 +150,6 @@ func (c *AddCustomDomain) ExampleOutput() map[string]any {
 		&exampleOutputAddCustomDomainOnce,
 		exampleOutputAddCustomDomainBytes,
 		&exampleOutputAddCustomDomain,
-	)
-}
-
-func (c *TriggerDNSConfiguration) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputTriggerDNSConfigurationOnce,
-		exampleOutputTriggerDNSConfigurationBytes,
-		&exampleOutputTriggerDNSConfiguration,
-	)
-}
-
-func (c *RetrieveCustomDomain) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputRetrieveCustomDomainOnce,
-		exampleOutputRetrieveCustomDomainBytes,
-		&exampleOutputRetrieveCustomDomain,
 	)
 }
 

@@ -5,12 +5,12 @@ import type { ComponentBaseContext, ExecutionDetailsContext, NodeInfo } from "..
 const NODE: NodeInfo = {
   id: "n1",
   name: "Remove Custom Domain",
-  componentName: "render.removeCustomDomain",
+  componentName: "render.service.removeCustomDomain",
   isCollapsed: false,
 };
 
 const DEFINITION = {
-  name: "render.removeCustomDomain",
+  name: "render.service.removeCustomDomain",
   label: "Remove Custom Domain",
   description: "",
   icon: "globe",

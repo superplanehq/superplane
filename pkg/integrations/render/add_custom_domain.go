@@ -41,7 +41,7 @@ type CustomDomainMetadata struct {
 }
 
 func (c *AddCustomDomain) Name() string {
-	return "render.addCustomDomain"
+	return "render.service.addCustomDomain"
 }
 
 func (c *AddCustomDomain) Label() string {
@@ -59,6 +59,12 @@ func (c *AddCustomDomain) Documentation() string {
 
 - **Blue/green deployments**: Add the live domain to the new (green) service as part of a traffic switch
 - **Domain management**: Automate custom domain provisioning as part of a deployment workflow
+
+## How It Works
+
+1. Adds the custom domain to the selected Render service
+2. When **Wait For Verification** is enabled, triggers Render DNS verification and retrieves the latest custom domain status
+3. Continues polling by re-triggering verification and checking ` + "`verificationStatus`" + ` until Render reports ` + "`verified`" + ` or ` + "`failed`" + `
 
 ## Configuration
 
@@ -208,7 +214,7 @@ func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
-	latestDomain, err := triggerAndRetrieveCustomDomainVerification(client, spec.Service, domainID)
+	latestDomain, err := verifyAndFetchCustomDomain(client, spec.Service, domainID)
 	if err != nil {
 		return err
 	}
@@ -267,7 +273,7 @@ func (c *AddCustomDomain) poll(ctx core.ActionHookContext) error {
 		return err
 	}
 
-	domain, err := triggerAndRetrieveCustomDomainVerification(client, spec.Service, metadata.CustomDomain.ID)
+	domain, err := verifyAndFetchCustomDomain(client, spec.Service, metadata.CustomDomain.ID)
 	if err != nil {
 		return err
 	}
@@ -298,16 +304,6 @@ func (c *AddCustomDomain) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func customDomainPayload(serviceID string, domain CustomDomainResponse) map[string]any {
-	payload := map[string]any{
-		"id":                 domain.ID,
-		"name":               domain.Name,
-		"serviceId":          serviceID,
-		"verificationStatus": domain.VerificationStatus,
-	}
-	return payload
-}
-
 func metadataFromDomain(serviceID string, domain CustomDomainResponse) AddCustomDomainExecutionMetadata {
 	return AddCustomDomainExecutionMetadata{
 		CustomDomain: &CustomDomainMetadata{
@@ -336,7 +332,7 @@ func emitCustomDomainVerificationResult(
 	}
 }
 
-func triggerAndRetrieveCustomDomainVerification(client *Client, serviceID string, domainNameOrID string) (CustomDomainResponse, error) {
+func verifyAndFetchCustomDomain(client *Client, serviceID string, domainNameOrID string) (CustomDomainResponse, error) {
 	if _, err := client.VerifyCustomDomain(serviceID, domainNameOrID); err != nil {
 		return CustomDomainResponse{}, err
 	}
