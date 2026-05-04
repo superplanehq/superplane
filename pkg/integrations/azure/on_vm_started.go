@@ -105,6 +105,10 @@ func (t *OnVMStarted) Color() string {
 	return "blue"
 }
 
+func (t *OnVMStarted) DefaultRunTitle() string {
+	return "VM started"
+}
+
 func (t *OnVMStarted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

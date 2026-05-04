@@ -86,6 +86,10 @@ func (t *OnVMInstance) Color() string {
 	return "gray"
 }
 
+func (t *OnVMInstance) DefaultRunTitle() string {
+	return "VM instance event"
+}
+
 func (t *OnVMInstance) Configuration() []configuration.Field {
 	return nil
 }
