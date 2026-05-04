@@ -11,6 +11,7 @@ func organizationToProto(organization *models.Organization) *pb.Organization {
 	if providers == nil {
 		providers = []string{}
 	}
+	allowDirect := organization.AllowDirectEmailInviteCompletion
 	return &pb.Organization{
 		Metadata: &pb.Organization_Metadata{
 			Id:          organization.ID.String(),
@@ -20,8 +21,9 @@ func organizationToProto(organization *models.Organization) *pb.Organization {
 			UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 		},
 		Spec: &pb.Organization_Spec{
-			ChangeManagementEnabled:     &organization.ChangeManagementEnabled,
-			EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
+			ChangeManagementEnabled:          &organization.ChangeManagementEnabled,
+			EnabledExperimentalFeatures:      []string(organization.EnabledExperimentalFeatures),
+			AllowDirectEmailInviteCompletion: &allowDirect,
 			AllowedOauthProviders: &pb.Organization_AllowedOAuthProviders{
 				Providers: providers,
 			},

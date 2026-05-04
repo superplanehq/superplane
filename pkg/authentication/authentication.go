@@ -258,26 +258,24 @@ func (a *Handler) acceptPendingInvitations(account *models.Account, provider str
 }
 
 func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, account *models.Account, provider string) error {
-	// provider is empty for password/magic-code logins; those are not OAuth-based
-	// so allowed_providers does not apply to them.
-	// Shareable invite-link joins (gRPC AcceptInviteLink) also bypass this check; see
-	// organizations.AcceptInviteLinkWithUsage.
-	if provider != "" {
-		org, err := models.FindOrganizationByID(invitation.OrganizationID.String())
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				// FindOrganizationByID excludes soft-deleted orgs, so this covers
-				// both "never existed" and "was deleted" cases.
-				log.Warnf("Skipping invitation to org %s for account %s: org not found or deleted", invitation.OrganizationID, account.Email)
-				return nil
-			}
-			return err
+	org, err := models.FindOrganizationByID(invitation.OrganizationID.String())
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Warnf("Skipping invitation to org %s for account %s: org not found or deleted", invitation.OrganizationID, account.Email)
+			return nil
 		}
+		return err
+	}
 
+	if provider != "" {
 		if !org.IsProviderAllowed(provider) {
 			log.Warnf("Skipping invitation to org %s for account %s: provider %q not allowed", invitation.OrganizationID, account.Email, provider)
 			return nil
 		}
+	} else if !org.AllowDirectEmailInviteCompletion {
+		// provider is empty for password/magic-code/email flows; orgs may disallow that path.
+		log.Warnf("Skipping invitation to org %s for account %s: non-OAuth invite completion disabled for org", invitation.OrganizationID, account.Email)
+		return nil
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
