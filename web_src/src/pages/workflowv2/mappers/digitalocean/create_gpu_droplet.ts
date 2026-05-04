@@ -69,15 +69,15 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as CreateGPUDropletConfiguration;
 
-  if (configuration?.region) {
-    metadata.push({ icon: "map-pin", label: `Region: ${configuration.region}` });
+  if (configuration?.gpuRegion) {
+    metadata.push({ icon: "map-pin", label: `Region: ${configuration.gpuRegion}` });
   }
 
-  if (configuration?.size) {
-    metadata.push({ icon: "gpu", label: `GPU Size: ${configuration.size}` });
+  if (configuration?.gpuSize) {
+    metadata.push({ icon: "gpu", label: `GPU Size: ${configuration.gpuSize}` });
   }
 
-  const image = configuration?.oneClickImage || configuration?.baseImage;
+  const image = configuration?.oneClickGPUImage || configuration?.baseGPUImage;
   if (image) {
     metadata.push({ icon: "hard-drive", label: `Image: ${image}` });
   }

@@ -80,8 +80,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (nodeMetadata?.dropletName) {
     metadata.push({ icon: "gpu", label: nodeMetadata.dropletName });
-  } else if (configuration?.droplet) {
-    metadata.push({ icon: "info", label: `GPU Droplet ID: ${configuration.droplet}` });
+  } else if (configuration?.gpuDroplet) {
+    metadata.push({ icon: "info", label: `GPU Droplet ID: ${configuration.gpuDroplet}` });
   }
 
   return metadata;
