@@ -134,8 +134,8 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
       const result = await createMutation.mutateAsync({
         name: parsed.metadata!.name!,
         description: parsed.metadata?.description,
-        nodes: parsed.spec?.nodes ?? [],
-        edges: parsed.spec?.edges ?? [],
+        nodes: (parsed.spec?.nodes as any[]) || [],
+        edges: (parsed.spec?.edges as any[]) || [],
         method: "yaml_import",
       });
 

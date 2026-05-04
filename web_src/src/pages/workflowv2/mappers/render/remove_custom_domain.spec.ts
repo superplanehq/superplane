@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { removeCustomDomainMapper } from "./remove_custom_domain";
-import type { ComponentBaseContext, ExecutionDetailsContext, NodeInfo } from "../types";
+import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
 
 const NODE: NodeInfo = {
   id: "n1",
@@ -29,9 +29,10 @@ function makePropsContext(overrides: Partial<NodeInfo> = {}): ComponentBaseConte
 }
 
 function makeDetailsContext(outputData?: Record<string, unknown>): ExecutionDetailsContext {
-  const execution: any = {
+  const execution: ExecutionInfo = {
     id: "exec-1",
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     state: "STATE_FINISHED",
     result: "RESULT_SUCCEEDED",
     resultReason: "RESULT_REASON_UNSPECIFIED",
