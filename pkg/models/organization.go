@@ -14,21 +14,22 @@ import (
 )
 
 type Organization struct {
-	ID                          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                        string    `gorm:"uniqueIndex"`
-	Description                 string
+	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name        string    `gorm:"uniqueIndex"`
+	Description string
 	// OAuth provider IDs (e.g. github, google) allowed when completing pending *email* invitations
 	// after an OAuth login. Empty slice means unrestricted for that path. Does not apply to
-	// password/magic sign-in (see authentication) or to shareable invite-link acceptance.
-	AllowedProviders            datatypes.JSONSlice[string]
-	ChangeManagementEnabled     bool
-	EnabledExperimentalFeatures datatypes.JSONSlice[string]
-	UsageSyncedAt               *time.Time
-	UsageRetentionWindowDays    *int32
-	UsageLimitsSyncedAt         *time.Time
-	CreatedAt                   *time.Time
-	UpdatedAt                   *time.Time
-	DeletedAt                   gorm.DeletedAt `gorm:"index"`
+	// shareable invite-link acceptance. Non-OAuth flows use allow_direct_email_invite_completion.
+	AllowedProviders                 datatypes.JSONSlice[string]
+	AllowDirectEmailInviteCompletion bool `gorm:"column:allow_direct_email_invite_completion;not null;default:true"`
+	ChangeManagementEnabled          bool
+	EnabledExperimentalFeatures      datatypes.JSONSlice[string]
+	UsageSyncedAt                    *time.Time
+	UsageRetentionWindowDays         *int32
+	UsageLimitsSyncedAt              *time.Time
+	CreatedAt                        *time.Time
+	UpdatedAt                        *time.Time
+	DeletedAt                        gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
@@ -184,13 +185,14 @@ func CreateOrganization(name, description string) (*Organization, error) {
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:                        name,
-		Description:                 description,
-		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
-		ChangeManagementEnabled:     false,
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{},
-		CreatedAt:                   &now,
-		UpdatedAt:                   &now,
+		Name:                             name,
+		Description:                      description,
+		AllowedProviders:                 datatypes.JSONSlice[string]{ProviderGitHub},
+		AllowDirectEmailInviteCompletion: true,
+		ChangeManagementEnabled:          false,
+		EnabledExperimentalFeatures:      datatypes.JSONSlice[string]{},
+		CreatedAt:                        &now,
+		UpdatedAt:                        &now,
 	}
 
 	err := tx.

@@ -349,9 +349,13 @@ export const useUpdateOrganization = (organizationId: string) => {
       changeManagementEnabled?: boolean;
       /** When set, replaces stored OAuth allow-list for invitations (empty = no restriction). */
       allowedOauthProviders?: string[];
+      /** When set, controls whether non-OAuth sign-in may auto-accept pending email invitations. */
+      allowDirectEmailInviteCompletion?: boolean;
     }) => {
       const hasSpecUpdate =
-        typeof params.changeManagementEnabled === "boolean" || params.allowedOauthProviders !== undefined;
+        typeof params.changeManagementEnabled === "boolean" ||
+        params.allowedOauthProviders !== undefined ||
+        typeof params.allowDirectEmailInviteCompletion === "boolean";
 
       const spec = hasSpecUpdate
         ? {
@@ -360,6 +364,9 @@ export const useUpdateOrganization = (organizationId: string) => {
               : {}),
             ...(params.allowedOauthProviders !== undefined
               ? { allowedOauthProviders: { providers: params.allowedOauthProviders } }
+              : {}),
+            ...(typeof params.allowDirectEmailInviteCompletion === "boolean"
+              ? { allowDirectEmailInviteCompletion: params.allowDirectEmailInviteCompletion }
               : {}),
           }
         : undefined;

@@ -23,6 +23,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	var updateDescription string
 	var updateChangeManagementEnabled bool
 	var updateAllowedOAuthProviders string
+	var updateAllowDirectEmailInviteCompletion string
 	updateCmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update the current organization",
@@ -37,11 +38,18 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		"",
 		"comma-separated OAuth providers allowed for invitations (github, google); empty string clears restriction",
 	)
+	updateCmd.Flags().StringVar(
+		&updateAllowDirectEmailInviteCompletion,
+		"allow-direct-email-invite-completion",
+		"",
+		"true or false: whether magic-link, password, and email sign-in may auto-accept pending email invitations",
+	)
 	core.Bind(updateCmd, &updateCommand{
-		name:                     &updateName,
-		description:              &updateDescription,
-		changeManagementEnabled:  &updateChangeManagementEnabled,
-		allowedOAuthProvidersRaw: &updateAllowedOAuthProviders,
+		name:                              &updateName,
+		description:                       &updateDescription,
+		changeManagementEnabled:           &updateChangeManagementEnabled,
+		allowedOAuthProvidersRaw:          &updateAllowedOAuthProviders,
+		allowDirectEmailInviteCompletionRaw: &updateAllowDirectEmailInviteCompletion,
 	}, options)
 
 	root.AddCommand(getCmd)
