@@ -1,12 +1,6 @@
 import type { MetadataItem } from "@/ui/metadataList";
-import type {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  OutputPayload,
-  SubtitleContext,
-} from "../types";
-import { baseMapper } from "./base";
+import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import { baseMapper, executedAt, getDefaultChannelOutputData } from "./base";
 
 interface DeleteInstanceConfiguration {
   instance?: string;
@@ -16,21 +10,6 @@ interface DeleteInstanceConfiguration {
 interface InstanceOutputData {
   instanceId?: string;
   lifecycleState?: string;
-}
-
-type InstanceOutputPayload = OutputPayload & {
-  data?: InstanceOutputData;
-};
-
-function getOutputData(context: ExecutionDetailsContext): InstanceOutputData | undefined {
-  const outputs = context.execution.outputs as { default?: InstanceOutputPayload[] } | undefined;
-  const payload = outputs?.default?.[0];
-  if (!payload) return undefined;
-  return (payload.data ?? payload) as InstanceOutputData;
-}
-
-function executedAt(context: ExecutionDetailsContext): string {
-  return context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-";
 }
 
 export const deleteInstanceMapper: ComponentBaseMapper = {
@@ -58,7 +37,7 @@ export const deleteInstanceMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const config = context.node.configuration as DeleteInstanceConfiguration | undefined;
-    const data = getOutputData(context);
+    const data = getDefaultChannelOutputData<InstanceOutputData>(context);
     return {
       "Executed At": executedAt(context),
       "Instance ID": data?.instanceId ?? "-",

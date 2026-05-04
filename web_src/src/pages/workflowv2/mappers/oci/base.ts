@@ -13,6 +13,10 @@ import type {
 import ociIcon from "@/assets/icons/integrations/oci.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
+type DefaultChannelPayload<T> = OutputPayload & {
+  data?: T;
+};
+
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -63,6 +67,18 @@ export function compactDetails(entries: Array<[string, string | null | undefined
   }
 
   return details;
+}
+
+/** First item on the default output channel: uses `data` when present, otherwise the payload object. */
+export function getDefaultChannelOutputData<T>(context: ExecutionDetailsContext): T | undefined {
+  const outputs = context.execution.outputs as { default?: DefaultChannelPayload<T>[] } | undefined;
+  const payload = outputs?.default?.[0];
+  if (!payload) return undefined;
+  return (payload.data ?? payload) as T;
+}
+
+export function executedAt(context: ExecutionDetailsContext): string {
+  return context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-";
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
