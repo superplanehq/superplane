@@ -1,9 +1,20 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import * as yaml from "js-yaml";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 
 import { useCanvasMemoryEntries, type CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { formatRelativeTime } from "@/lib/timezone";
+import { showSuccessToast } from "@/lib/toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import type { NodeChipContext } from "./CanvasMarkdown";
 
 //
 // Authored as a fenced code block inside Launchpad markdown panels:
@@ -29,6 +40,8 @@ import { formatRelativeTime } from "@/lib/timezone";
 export interface QueryBlockProps {
   body: string;
   canvasId: string;
+  /** Forwarded by CanvasMarkdown so row actions can resolve trigger slugs and emit events. */
+  nodeRefs?: NodeChipContext;
 }
 
 type Format = "plain" | "link" | { kind: "linkLabel"; label: string } | "relative" | "date" | "badge" | "code";
@@ -48,11 +61,29 @@ interface FilterCondition {
   value: string;
 }
 
+const ACTION_VARIANTS = ["default", "danger", "primary"] as const;
+type ActionVariant = (typeof ACTION_VARIANTS)[number];
+
+const ACTION_ICONS = ["trash", "play", "refresh", "stop", "external-link"] as const;
+type ActionIcon = (typeof ACTION_ICONS)[number];
+
+interface ActionSpec {
+  label: string;
+  trigger: string;
+  /** Parsed for self-documentation; not used at runtime in v1 (payload built from `fill`). */
+  template?: string;
+  icon?: ActionIcon;
+  fill?: Record<string, string>;
+  confirm?: string;
+  variant: ActionVariant;
+}
+
 interface ParsedQuery {
   source: "memory";
   namespace: string;
   columns?: ColumnSpec[];
   where?: FilterCondition[];
+  actions?: ActionSpec[];
 }
 
 interface QueryParseError {
@@ -100,6 +131,9 @@ function parseQueryBody(body: string): ParseResult {
   const whereResult = parseWhere(obj.where);
   if (whereResult.kind === "error") return whereResult;
 
+  const actionsResult = parseActions(obj.actions);
+  if (actionsResult.kind === "error") return actionsResult;
+
   return {
     kind: "ok",
     query: {
@@ -107,6 +141,7 @@ function parseQueryBody(body: string): ParseResult {
       namespace,
       columns: columnsResult.value,
       where: whereResult.value,
+      actions: actionsResult.value,
     },
   };
 }
@@ -213,6 +248,115 @@ function parseWhere(raw: unknown): ParsePartResult<FilterCondition[]> {
 
 function isFilterOp(op: string): op is FilterOp {
   return (FILTER_OPS as readonly string[]).includes(op);
+}
+
+function parseActions(raw: unknown): ParsePartResult<ActionSpec[]> {
+  if (raw === undefined || raw === null) return { kind: "ok", value: undefined };
+  if (!Array.isArray(raw)) {
+    return { kind: "error", error: { message: "Invalid query block: `actions` must be a list" } };
+  }
+  if (raw.length === 0) {
+    return { kind: "error", error: { message: "Invalid query block: `actions` must not be empty" } };
+  }
+
+  const result: ActionSpec[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i];
+    if (!isPlainObject(item)) {
+      return { kind: "error", error: { message: `Invalid query block: actions[${i}] must be an object` } };
+    }
+    const label = item.label;
+    const trigger = item.trigger;
+    const template = item.template;
+    const icon = item.icon;
+    const fill = item.fill;
+    const confirm = item.confirm;
+    const variant = item.variant;
+
+    if (typeof label !== "string" || label.trim() === "") {
+      return { kind: "error", error: { message: `Invalid query block: actions[${i}] missing \`label\`` } };
+    }
+    if (typeof trigger !== "string" || trigger.trim() === "") {
+      return { kind: "error", error: { message: `Invalid query block: actions[${i}] missing \`trigger\`` } };
+    }
+    if (template !== undefined && typeof template !== "string") {
+      return {
+        kind: "error",
+        error: { message: `Invalid query block: actions[${i}].template must be a string` },
+      };
+    }
+    if (confirm !== undefined && typeof confirm !== "string") {
+      return {
+        kind: "error",
+        error: { message: `Invalid query block: actions[${i}].confirm must be a string` },
+      };
+    }
+
+    let parsedFill: Record<string, string> | undefined;
+    if (fill !== undefined && fill !== null) {
+      if (!isPlainObject(fill)) {
+        return {
+          kind: "error",
+          error: { message: `Invalid query block: actions[${i}].fill must be an object` },
+        };
+      }
+      parsedFill = {};
+      for (const [path, value] of Object.entries(fill)) {
+        if (typeof value !== "string") {
+          return {
+            kind: "error",
+            error: {
+              message: `Invalid query block: actions[${i}].fill.${path} must be a string`,
+            },
+          };
+        }
+        parsedFill[path] = value;
+      }
+    }
+
+    let parsedIcon: ActionIcon | undefined;
+    if (icon !== undefined) {
+      if (typeof icon !== "string") {
+        return {
+          kind: "error",
+          error: { message: `Invalid query block: actions[${i}].icon must be a string` },
+        };
+      }
+      if ((ACTION_ICONS as readonly string[]).includes(icon)) {
+        parsedIcon = icon as ActionIcon;
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(`[QueryBlock] Unknown action icon "${icon}", omitting icon`);
+      }
+    }
+
+    let parsedVariant: ActionVariant = "default";
+    if (variant !== undefined) {
+      if (typeof variant !== "string") {
+        return {
+          kind: "error",
+          error: { message: `Invalid query block: actions[${i}].variant must be a string` },
+        };
+      }
+      if ((ACTION_VARIANTS as readonly string[]).includes(variant)) {
+        parsedVariant = variant as ActionVariant;
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(`[QueryBlock] Unknown action variant "${variant}", falling back to default`);
+      }
+    }
+
+    result.push({
+      label,
+      trigger,
+      template: typeof template === "string" ? template : undefined,
+      icon: parsedIcon,
+      fill: parsedFill,
+      confirm: typeof confirm === "string" ? confirm : undefined,
+      variant: parsedVariant,
+    });
+  }
+  return { kind: "ok", value: result };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -357,10 +501,180 @@ function formatAbsoluteUtc(date: Date): string {
 }
 
 //
+// Action helpers
+//
+
+function interpolate(template: string, values: Record<string, unknown>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => stringifyCell(values[key]));
+}
+
+function setPath(obj: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".");
+  let cur: Record<string, unknown> = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    if (!isPlainObject(cur[k])) cur[k] = {};
+    cur = cur[k] as Record<string, unknown>;
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
+function buildFillPayload(
+  fill: Record<string, string> | undefined,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (!fill) return payload;
+  for (const [path, template] of Object.entries(fill)) {
+    setPath(payload, path, interpolate(template, row));
+  }
+  return payload;
+}
+
+const VARIANT_CLASSES: Record<ActionVariant, string> = {
+  default: "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+  danger: "border-red-300 bg-red-50 text-red-700 hover:bg-red-100",
+  primary: "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100",
+};
+
+const ICON_MAP: Record<ActionIcon, React.ComponentType<{ className?: string }>> = {
+  trash: Trash2,
+  play: Play,
+  refresh: RefreshCw,
+  stop: Square,
+  "external-link": ExternalLink,
+};
+
+function ActionButtons({
+  row,
+  actions,
+  nodeRefs,
+}: {
+  row: Record<string, unknown>;
+  actions: ActionSpec[];
+  nodeRefs?: NodeChipContext;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {actions.map((action, i) => (
+        <ActionButton key={`${action.trigger}-${i}`} row={row} action={action} nodeRefs={nodeRefs} />
+      ))}
+    </div>
+  );
+}
+
+function ActionButton({
+  row,
+  action,
+  nodeRefs,
+}: {
+  row: Record<string, unknown>;
+  action: ActionSpec;
+  nodeRefs?: NodeChipContext;
+}) {
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isFiring, setIsFiring] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const Icon = action.icon ? ICON_MAP[action.icon] : null;
+  const nodeId = nodeRefs?.nodeIds?.[action.trigger];
+  const onEmit = nodeRefs?.onEmitEvent;
+  const triggerMissing = !nodeId;
+  const disabled = triggerMissing || !onEmit || isFiring;
+
+  const baseClass =
+    "inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60";
+  const variantClass = VARIANT_CLASSES[action.variant];
+
+  const fire = async () => {
+    if (!onEmit || triggerMissing) return;
+    const payload = buildFillPayload(action.fill, row);
+    setIsFiring(true);
+    setError(null);
+    try {
+      await onEmit({ nodeSlug: action.trigger, channel: "default", data: payload });
+      showSuccessToast(`Triggered: ${action.label}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    } finally {
+      setIsFiring(false);
+    }
+  };
+
+  const handleClick = () => {
+    if (disabled) return;
+    if (action.confirm) {
+      setIsConfirmOpen(true);
+      return;
+    }
+    void fire();
+  };
+
+  const handleConfirmFire = async () => {
+    setIsConfirmOpen(false);
+    await fire();
+  };
+
+  const tooltip = triggerMissing
+    ? `Trigger "${action.trigger}" not found on canvas`
+    : !onEmit
+      ? "Action not available in this view"
+      : undefined;
+
+  return (
+    <div className="inline-flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled}
+        title={tooltip}
+        data-testid={`canvas-query-block-action-${action.trigger}`}
+        data-variant={action.variant}
+        className={`${baseClass} ${variantClass}`}
+      >
+        {isFiring ? <Loader2 className="h-3 w-3 animate-spin" /> : Icon ? <Icon className="h-3 w-3" /> : null}
+        <span>{action.label}</span>
+      </button>
+      {error ? (
+        <span
+          className="max-w-[18rem] text-[11px] text-red-600"
+          data-testid={`canvas-query-block-action-error-${action.trigger}`}
+        >
+          {error}
+        </span>
+      ) : null}
+      {action.confirm ? (
+        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{action.label}</DialogTitle>
+              <DialogDescription>{interpolate(action.confirm, row)}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant={action.variant === "danger" ? "destructive" : "default"}
+                onClick={handleConfirmFire}
+                data-testid={`canvas-query-block-action-confirm-${action.trigger}`}
+              >
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </div>
+  );
+}
+
+//
 // Component
 //
 
-export function QueryBlock({ body, canvasId }: QueryBlockProps) {
+export function QueryBlock({ body, canvasId, nodeRefs }: QueryBlockProps) {
   const parsed = useMemo(() => parseQueryBody(body), [body]);
 
   // Always call the hook; gate it via `enabled` so invalid blocks don't
@@ -372,7 +686,7 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
     return <QueryBlockError message={parsed.error.message} body={body} />;
   }
 
-  const { namespace, columns: explicitColumns, where } = parsed.query;
+  const { namespace, columns: explicitColumns, where, actions } = parsed.query;
 
   if (memoryQuery.isLoading) {
     return <QueryBlockSkeleton />;
@@ -398,6 +712,7 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
   }
 
   const columns: ColumnSpec[] = explicitColumns ?? autoColumns(filtered);
+  const hasActions = !!actions && actions.length > 0;
 
   return (
     <div data-testid="canvas-query-block" className="my-2 overflow-x-auto rounded border border-slate-200">
@@ -412,6 +727,11 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
                 {column.label}
               </th>
             ))}
+            {hasActions ? (
+              <th className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-gray-600">
+                Actions
+              </th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -424,6 +744,11 @@ export function QueryBlock({ body, canvasId }: QueryBlockProps) {
                     {renderCell(values[column.field], column.format)}
                   </td>
                 ))}
+                {hasActions ? (
+                  <td className="border-b border-slate-100 px-3 py-1.5 align-top">
+                    <ActionButtons row={values} actions={actions!} nodeRefs={nodeRefs} />
+                  </td>
+                ) : null}
               </tr>
             );
           })}

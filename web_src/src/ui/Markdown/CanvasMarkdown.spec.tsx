@@ -2,8 +2,21 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
 vi.mock("./QueryBlock", () => ({
-  QueryBlock: ({ body, canvasId }: { body: string; canvasId: string }) => (
-    <div data-testid="canvas-query-block-mock" data-canvas-id={canvasId}>
+  QueryBlock: ({
+    body,
+    canvasId,
+    nodeRefs,
+  }: {
+    body: string;
+    canvasId: string;
+    nodeRefs?: { nodeIds?: Record<string, string>; onEmitEvent?: unknown };
+  }) => (
+    <div
+      data-testid="canvas-query-block-mock"
+      data-canvas-id={canvasId}
+      data-node-ids={nodeRefs?.nodeIds ? Object.keys(nodeRefs.nodeIds).join(",") : ""}
+      data-has-emit={nodeRefs?.onEmitEvent ? "yes" : "no"}
+    >
       {body}
     </div>
   ),
@@ -402,5 +415,21 @@ describe("CanvasMarkdown query block routing", () => {
     expect(screen.queryByTestId("canvas-query-block-mock")).toBeNull();
     const code = container.querySelector("code.language-query");
     expect(code).not.toBeNull();
+  });
+
+  it("forwards nodeRefs (nodeIds + onEmitEvent) into QueryBlock", () => {
+    const onEmitEvent = vi.fn();
+    render(
+      <CanvasMarkdown
+        canvasId="canvas-1"
+        nodeRefs={{ nodes: { destroy: "Destroy" }, nodeIds: { destroy: "node-1" }, onEmitEvent }}
+      >
+        {queryMarkdown}
+      </CanvasMarkdown>,
+    );
+
+    const block = screen.getByTestId("canvas-query-block-mock");
+    expect(block.getAttribute("data-node-ids")).toBe("destroy");
+    expect(block.getAttribute("data-has-emit")).toBe("yes");
   });
 });

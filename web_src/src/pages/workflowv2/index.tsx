@@ -5692,6 +5692,31 @@ export function WorkflowPageV2() {
     [readmeNodeIdBySlug, readmeTriggerTemplatesBySlug],
   );
 
+  //
+  // Direct-emit callback used by Apps query-block row actions. Resolves a
+  // trigger slug to a node ID and fires the event without opening the modal.
+  // Surfaces resolution errors to the caller (the row action) so the button
+  // can show its own inline error state.
+  //
+  const handleEmitEventBySlug = useCallback(
+    async ({ nodeSlug, channel, data }: { nodeSlug: string; channel: string; data: unknown }) => {
+      if (!canvasId) {
+        throw new Error("Canvas ID is missing");
+      }
+      const nodeId = readmeNodeIdBySlug[nodeSlug];
+      if (!nodeId) {
+        throw new Error(`Trigger "${nodeSlug}" not found on canvas`);
+      }
+      await canvasesEmitNodeEvent(
+        withOrganizationHeader({
+          path: { canvasId, nodeId },
+          body: { channel, data },
+        }),
+      );
+    },
+    [canvasId, readmeNodeIdBySlug],
+  );
+
   const handleReadmeSaveDraft = useCallback(
     async (content: string) => {
       await updateCanvasReadmeMutation.mutateAsync({ content });
@@ -6101,6 +6126,8 @@ export function WorkflowPageV2() {
                   onTriggerTemplateRun:
                     !canUpdateCanvas || isTemplate || runDisabled ? undefined : handleTriggerTemplateRun,
                   nodeStatuses: readmeNodeStatusBySlug,
+                  nodeIds: readmeNodeIdBySlug,
+                  onEmitEvent: !canUpdateCanvas || isTemplate || runDisabled ? undefined : handleEmitEventBySlug,
                 }}
                 onChange={(next) => updateCanvasLaunchpadMutation.mutate(next)}
               />

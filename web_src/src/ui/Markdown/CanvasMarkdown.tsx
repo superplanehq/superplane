@@ -202,9 +202,10 @@ function extractCodeString(children: React.ReactNode): string {
 
 interface InlineCodeContext {
   canvasId?: string;
+  nodeRefs?: NodeChipContext;
 }
 
-function buildInlineCodeComponent({ canvasId }: InlineCodeContext) {
+function buildInlineCodeComponent({ canvasId, nodeRefs }: InlineCodeContext) {
   return function InlineCode({ children, className }: { children?: React.ReactNode; className?: string }) {
     const classes = typeof className === "string" ? className : "";
 
@@ -219,7 +220,7 @@ function buildInlineCodeComponent({ canvasId }: InlineCodeContext) {
     // the block falls through to the regular highlighted code rendering.
     if (/(^|\s)language-query(\s|$)/.test(classes) && canvasId) {
       const source = extractCodeString(children).replace(/\n$/, "");
-      return <QueryBlock body={source} canvasId={canvasId} />;
+      return <QueryBlock body={source} canvasId={canvasId} nodeRefs={nodeRefs} />;
     }
 
     const text = String(children ?? "");
@@ -548,6 +549,14 @@ export interface NodeChipContext {
    * dashed-grey "unknown status" pill (e.g. for triggers).
    */
   nodeStatuses?: Record<string, NodeStatusInfo | undefined>;
+  /** Node slug -> node ID. Used by query-block row actions to fire events. */
+  nodeIds?: Record<string, string>;
+  /**
+   * Direct event-emit callback used by query-block row actions. The caller is
+   * responsible for resolving `nodeSlug` to a node ID and posting the event.
+   * When undefined, action buttons render disabled.
+   */
+  onEmitEvent?: (input: { nodeSlug: string; channel: string; data: unknown }) => Promise<void>;
 }
 
 interface ChipTheme {
@@ -1047,7 +1056,7 @@ interface CanvasMarkdownProps {
 export function CanvasMarkdown({ children, className, nodeRefs, canvasId }: CanvasMarkdownProps) {
   const components = React.useMemo(
     () => ({
-      code: buildInlineCodeComponent({ canvasId }),
+      code: buildInlineCodeComponent({ canvasId, nodeRefs }),
       blockquote: Blockquote,
       a: Anchor,
       table: Table,

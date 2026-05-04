@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type * as SdkGen from "@/api-client/sdk.gen";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +12,13 @@ vi.mock("@/api-client/sdk.gen", async (importOriginal) => {
   const actual = await importOriginal<typeof SdkGen>();
   return { ...actual, canvasesListCanvasMemories };
 });
+
+const showSuccessToast = vi.fn();
+const showErrorToast = vi.fn();
+vi.mock("@/lib/toast", () => ({
+  showSuccessToast: (...args: unknown[]) => showSuccessToast(...args),
+  showErrorToast: (...args: unknown[]) => showErrorToast(...args),
+}));
 
 import { QueryBlock } from "./QueryBlock";
 
@@ -30,6 +37,8 @@ namespace: environments`;
 
 beforeEach(() => {
   canvasesListCanvasMemories.mockReset();
+  showSuccessToast.mockReset();
+  showErrorToast.mockReset();
 });
 
 describe("QueryBlock", () => {
@@ -571,5 +580,261 @@ describe("QueryBlock backward compatibility", () => {
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
     expect(headers).toEqual(["a", "m", "z"]);
+  });
+});
+
+describe("QueryBlock actions", () => {
+  function bodyWithActions(actionsYaml: string, columnsYaml = "  - label: PR\n    field: pr_number\n"): string {
+    return `source: memory\nnamespace: environments\ncolumns:\n${columnsYaml}actions:\n${actionsYaml}`;
+  }
+
+  type EmitEventFn = (input: { nodeSlug: string; channel: string; data: unknown }) => Promise<void>;
+
+  function renderWithActions(
+    body: string,
+    opts?: {
+      onEmitEvent?: EmitEventFn;
+      nodeIds?: Record<string, string>;
+      memory?: Array<{ id: string; namespace: string; values: Record<string, unknown> }>;
+    },
+  ) {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: opts?.memory ?? [
+          { id: "a", namespace: "environments", values: { pr_number: "69", pr_title: "Fix bug" } },
+        ],
+      },
+    });
+    const onEmitEvent: EmitEventFn = opts?.onEmitEvent ?? vi.fn(async () => undefined);
+    const nodeIds = opts?.nodeIds ?? { destroy: "node-1" };
+    const result = renderWithClient(
+      <QueryBlock body={body} canvasId="c1" nodeRefs={{ nodes: { destroy: "Destroy" }, nodeIds, onEmitEvent }} />,
+    );
+    return { onEmitEvent, ...result };
+  }
+
+  it("renders an Actions column when actions are present, and one button per action per row", async () => {
+    const body = bodyWithActions("  - label: Destroy\n    trigger: destroy\n    variant: danger\n");
+    renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+    });
+
+    const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
+    expect(headers).toEqual(["PR", "Actions"]);
+
+    const button = screen.getByTestId("canvas-query-block-action-destroy");
+    expect(button).toBeInTheDocument();
+    expect(button.textContent).toContain("Destroy");
+    expect(button.getAttribute("data-variant")).toBe("danger");
+    expect(button.className).toContain("bg-red-50");
+  });
+
+  it("does not render an Actions column when actions are omitted", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [{ id: "a", namespace: "environments", values: { pr_number: "1" } }],
+      },
+    });
+    renderWithClient(
+      <QueryBlock
+        body={"source: memory\nnamespace: environments\ncolumns:\n  - label: PR\n    field: pr_number\n"}
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block")).toBeInTheDocument();
+    });
+
+    const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
+    expect(headers).toEqual(["PR"]);
+  });
+
+  it("clicks fire onEmitEvent with the merged fill payload (no confirm)", async () => {
+    const body = bodyWithActions(
+      '  - label: Destroy\n    trigger: destroy\n    fill:\n      data.issue.number: "{{pr_number}}"\n',
+    );
+    const { onEmitEvent } = renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+
+    await waitFor(() => {
+      expect(onEmitEvent).toHaveBeenCalledTimes(1);
+    });
+    expect(onEmitEvent).toHaveBeenCalledWith({
+      nodeSlug: "destroy",
+      channel: "default",
+      data: { data: { issue: { number: "69" } } },
+    });
+  });
+
+  it("interpolates missing fields as empty string", async () => {
+    const body = bodyWithActions(
+      '  - label: Destroy\n    trigger: destroy\n    fill:\n      data.missing: "{{not_in_row}}"\n',
+    );
+    const { onEmitEvent } = renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    await waitFor(() => {
+      expect(onEmitEvent).toHaveBeenCalled();
+    });
+    expect(onEmitEvent).toHaveBeenCalledWith(expect.objectContaining({ data: { data: { missing: "" } } }));
+  });
+
+  it("opens a confirm dialog when `confirm` is set; only Confirm fires the event", async () => {
+    const body = bodyWithActions(
+      '  - label: Destroy\n    trigger: destroy\n    confirm: "Destroy PR #{{pr_number}}?"\n',
+    );
+    const { onEmitEvent } = renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+
+    // Dialog body has the interpolated text.
+    await screen.findByText("Destroy PR #69?");
+    expect(onEmitEvent).not.toHaveBeenCalled();
+
+    // Cancel closes without firing.
+    fireEvent.click(screen.getByText("Cancel"));
+    await waitFor(() => {
+      expect(screen.queryByText("Destroy PR #69?")).toBeNull();
+    });
+    expect(onEmitEvent).not.toHaveBeenCalled();
+
+    // Reopen and confirm.
+    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+    await screen.findByText("Destroy PR #69?");
+    fireEvent.click(screen.getByTestId("canvas-query-block-action-confirm-destroy"));
+
+    await waitFor(() => {
+      expect(onEmitEvent).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("shows the success toast with the action label after firing", async () => {
+    const body = bodyWithActions("  - label: Destroy\n    trigger: destroy\n");
+    renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+
+    await waitFor(() => {
+      expect(showSuccessToast).toHaveBeenCalledWith("Triggered: Destroy");
+    });
+  });
+
+  it("renders an inline error near the button on API rejection (and no toast)", async () => {
+    const onEmitEvent: EmitEventFn = vi.fn(async () => {
+      throw new Error("nope");
+    });
+    const body = bodyWithActions("  - label: Destroy\n    trigger: destroy\n");
+    renderWithActions(body, { onEmitEvent });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("canvas-query-block-action-destroy"));
+
+    const err = await screen.findByTestId("canvas-query-block-action-error-destroy");
+    expect(err.textContent).toContain("nope");
+    expect(showSuccessToast).not.toHaveBeenCalled();
+  });
+
+  it("disables the button with a tooltip when the trigger slug is unknown", async () => {
+    const body = bodyWithActions("  - label: Destroy\n    trigger: ghost\n");
+    renderWithActions(body, { nodeIds: {} });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-ghost")).toBeInTheDocument();
+    });
+    const button = screen.getByTestId("canvas-query-block-action-ghost") as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("title")).toMatch(/Trigger "ghost" not found/);
+  });
+
+  it("renders multiple buttons in a single row when multiple actions are configured", async () => {
+    const body = bodyWithActions(
+      "  - label: Open\n    trigger: deploy\n    variant: primary\n  - label: Destroy\n    trigger: destroy\n    variant: danger\n",
+    );
+    renderWithActions(body, { nodeIds: { destroy: "node-1", deploy: "node-2" } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+
+    const open = screen.getByTestId("canvas-query-block-action-deploy");
+    const destroy = screen.getByTestId("canvas-query-block-action-destroy");
+    expect(open.className).toContain("bg-blue-50");
+    expect(destroy.className).toContain("bg-red-50");
+  });
+
+  it("warns and falls back when `icon` is unknown", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const body = bodyWithActions("  - label: Destroy\n    trigger: destroy\n    icon: bogus\n");
+    renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+    expect(warn).toHaveBeenCalled();
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('Unknown action icon "bogus"'))).toBe(true);
+    warn.mockRestore();
+  });
+
+  it("warns and falls back to default styling when `variant` is unknown", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const body = bodyWithActions("  - label: Destroy\n    trigger: destroy\n    variant: weird\n");
+    renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-query-block-action-destroy")).toBeInTheDocument();
+    });
+    const button = screen.getByTestId("canvas-query-block-action-destroy");
+    expect(button.getAttribute("data-variant")).toBe("default");
+    expect(button.className).toContain("bg-white");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("renders a parse error for a malformed action (missing trigger)", () => {
+    renderWithClient(
+      <QueryBlock
+        body={"source: memory\nnamespace: env\nactions:\n  - label: Destroy\n"}
+        canvasId="c1"
+        nodeRefs={{ nodes: {}, nodeIds: {}, onEmitEvent: vi.fn(async () => undefined) }}
+      />,
+    );
+    const error = screen.getByTestId("canvas-query-block-error");
+    expect(error.textContent).toMatch(/actions\[0\] missing `trigger`/);
+    expect(canvasesListCanvasMemories).not.toHaveBeenCalled();
+  });
+
+  it("renders a parse error when fill has a non-string value", () => {
+    renderWithClient(
+      <QueryBlock
+        body={
+          "source: memory\nnamespace: env\nactions:\n  - label: Destroy\n    trigger: destroy\n    fill:\n      data.issue.number: 42\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ nodes: {}, nodeIds: {}, onEmitEvent: vi.fn(async () => undefined) }}
+      />,
+    );
+    const error = screen.getByTestId("canvas-query-block-error");
+    expect(error.textContent).toMatch(/actions\[0\]\.fill\.data\.issue\.number must be a string/);
   });
 });
