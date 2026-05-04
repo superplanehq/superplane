@@ -9,10 +9,11 @@ import (
 )
 
 type ConfigContext struct {
-	URL          string  `json:"url" yaml:"url"`
-	Organization string  `json:"organization" yaml:"organization"`
-	APIToken     string  `json:"apiToken" yaml:"apiToken"`
-	Canvas       *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`
+	URL            string  `json:"url" yaml:"url"`
+	Organization   string  `json:"organization" yaml:"organization"`
+	OrganizationID string  `json:"organizationId,omitempty" yaml:"organizationId,omitempty"`
+	APIToken       string  `json:"apiToken" yaml:"apiToken"`
+	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`
 }
 
 func normalizeBaseURL(raw string) string {
@@ -23,18 +24,18 @@ func normalizeBaseURL(raw string) string {
 func normalizeContext(context ConfigContext) ConfigContext {
 	context.URL = normalizeBaseURL(context.URL)
 	context.Organization = strings.TrimSpace(context.Organization)
+	context.OrganizationID = strings.TrimSpace(context.OrganizationID)
 	context.APIToken = strings.TrimSpace(context.APIToken)
-
-	if context.Canvas != nil {
-		context.Canvas = context.Canvas
-	}
-
 	return context
 }
 
 func ContextSelector(context ConfigContext) string {
 	context = normalizeContext(context)
-	return fmt.Sprintf("%s/%s", context.URL, context.Organization)
+	id := context.OrganizationID
+	if id == "" {
+		id = context.Organization
+	}
+	return fmt.Sprintf("%s/%s", context.URL, id)
 }
 
 func normalizeContextSelector(raw string) string {
@@ -102,35 +103,42 @@ func SaveContexts(contexts []ConfigContext) error {
 	return WriteConfig()
 }
 
-func SaveCurrentContextBySelector(selector string) (*ConfigContext, error) {
+// SwitchContext makes the context identified by (baseURL, org) current. The
+// org argument matches on organization ID first and then on organization name.
+func SwitchContext(baseURL, org string) (*ConfigContext, error) {
 	contexts := GetContexts()
 	if len(contexts) == 0 {
 		return nil, fmt.Errorf("no contexts configured")
 	}
 
-	normalizedSelector := normalizeContextSelector(selector)
-	if normalizedSelector == "" {
-		return nil, fmt.Errorf("context selector is required")
+	url := normalizeBaseURL(baseURL)
+	name := strings.TrimSpace(org)
+	if url == "" {
+		return nil, fmt.Errorf("base URL is required")
+	}
+	if name == "" {
+		return nil, fmt.Errorf("organization is required")
 	}
 
-	selectedIndex := -1
-	for i, context := range contexts {
-		if ContextSelector(context) == normalizedSelector {
-			selectedIndex = i
-			break
+	for i, c := range contexts {
+		if c.URL == url && c.OrganizationID != "" && c.OrganizationID == name {
+			return saveCurrent(contexts[i])
+		}
+	}
+	for i, c := range contexts {
+		if c.URL == url && c.Organization == name {
+			return saveCurrent(contexts[i])
 		}
 	}
 
-	if selectedIndex == -1 {
-		return nil, fmt.Errorf("context %q not found", normalizedSelector)
-	}
+	return nil, fmt.Errorf("no context found for %s %q", url, name)
+}
 
-	selected := contexts[selectedIndex]
+func saveCurrent(selected ConfigContext) (*ConfigContext, error) {
 	viper.Set(ConfigKeyCurrentContext, ContextSelector(selected))
 	if err := WriteConfig(); err != nil {
 		return nil, err
 	}
-
 	return &selected, nil
 }
 
@@ -144,13 +152,7 @@ func UpsertContext(context ConfigContext) (ConfigContext, error) {
 	}
 
 	contexts := GetContexts()
-	existingIndex := -1
-	for i, existing := range contexts {
-		if ContextSelector(existing) == ContextSelector(context) {
-			existingIndex = i
-			break
-		}
-	}
+	existingIndex := findMatchingContextIndex(contexts, context)
 
 	if existingIndex >= 0 {
 		contexts[existingIndex] = context
@@ -165,6 +167,30 @@ func UpsertContext(context ConfigContext) (ConfigContext, error) {
 	}
 
 	return context, nil
+}
+
+func findMatchingContextIndex(contexts []ConfigContext, context ConfigContext) int {
+	selector := ContextSelector(context)
+	for i, existing := range contexts {
+		if ContextSelector(existing) == selector {
+			return i
+		}
+	}
+
+	if context.OrganizationID == "" || context.Organization == "" {
+		return -1
+	}
+
+	for i, existing := range contexts {
+		if existing.OrganizationID != "" {
+			continue
+		}
+		if existing.URL == context.URL && existing.Organization == context.Organization {
+			return i
+		}
+	}
+
+	return -1
 }
 
 /*

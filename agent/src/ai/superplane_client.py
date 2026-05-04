@@ -498,7 +498,7 @@ class SuperplaneClient:
             label=cap.label,
             description=cap.description,
             configuration=cap.configuration,
-            outputChannels=cap.output_channels,
+            output_channels=cap.output_channels,
         )
 
     @staticmethod
