@@ -16,12 +16,12 @@ import (
 type CreatePullRequest struct{}
 
 type CreatePullRequestConfiguration struct {
-	Repository string `mapstructure:"repository"`
-	Head       string `mapstructure:"head"`
-	Base       string `mapstructure:"base"`
-	Title      string `mapstructure:"title"`
-	Body       string `mapstructure:"body"`
-	Draft      bool   `mapstructure:"draft"`
+	Repository string `mapstructure:"repository" json:"repository"`
+	Head       string `mapstructure:"head" json:"head"`
+	Base       string `mapstructure:"base" json:"base"`
+	Title      string `mapstructure:"title" json:"title"`
+	Body       string `mapstructure:"body" json:"body"`
+	Draft      bool   `mapstructure:"draft" json:"draft"`
 }
 
 func (c *CreatePullRequest) Name() string {
@@ -61,7 +61,14 @@ Returns the created pull request object with details including:
 - URL
 - State
 - Head and base branch information
-- Created timestamp`
+- Created timestamp
+
+## Limitations
+
+- Only same-repository pull requests are supported. Cross-repository
+  (fork) pull requests using GitHub's owner:branch head syntax are not
+  currently supported - both the head and base branch must live in the
+  selected repository.`
 }
 
 func (c *CreatePullRequest) Icon() string {
@@ -95,7 +102,7 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 			Label:       "Head Branch",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The branch containing the changes to be merged.",
+			Description: "The branch containing the changes to be merged. Must live in the selected repository; cross-repository (fork) PRs are not supported.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           "branch",
@@ -149,6 +156,34 @@ func (c *CreatePullRequest) Configuration() []configuration.Field {
 }
 
 func (c *CreatePullRequest) Setup(ctx core.SetupContext) error {
+	var config CreatePullRequestConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Repository == "" {
+		return errors.New("repository is required")
+	}
+
+	if config.Head == "" {
+		return errors.New("head branch is required")
+	}
+
+	if config.Base == "" {
+		return errors.New("base branch is required")
+	}
+
+	if config.Title == "" {
+		return errors.New("title is required")
+	}
+
+	// Only enforce the head != base constraint when both sides are literal values.
+	// If either is a templated expression, we cannot know its resolved value at
+	// setup time and defer the check to Execute.
+	if !common.IsExpression(config.Head) && !common.IsExpression(config.Base) && config.Head == config.Base {
+		return errors.New("head and base branches must be different")
+	}
+
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
