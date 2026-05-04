@@ -1,4 +1,5 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
+import { setPendingStartTemplateRun } from "@/pages/workflowv2/lib/start-template-run-bridge";
 import type {
   TriggerRenderer,
   CustomFieldRenderer,
@@ -44,12 +45,25 @@ export const startTriggerRenderer: TriggerRenderer = {
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
-    const { node, definition, lastEvent, canvasMode, actions } = context;
+    const { node, definition, lastEvent, canvasMode } = context;
+    const mode = canvasMode ?? "live";
 
-    const customField = (_onRunBase?: () => void) => {
+    const customField = (onRunBase?: () => void) => {
       return startCustomFieldRenderer.render(node, {
-        canvasMode: canvasMode ?? "live",
-        actions,
+        canvasMode: mode,
+        onRun:
+          onRunBase && mode === "live"
+            ? (initialData?: string, templateName?: string) => {
+                if (initialData !== undefined && templateName !== undefined) {
+                  setPendingStartTemplateRun({
+                    nodeId: node.id,
+                    templateName,
+                    initialData,
+                  });
+                }
+                onRunBase();
+              }
+            : undefined,
       });
     };
 
@@ -91,8 +105,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     }
 
     const mode = context?.canvasMode ?? "live";
-    const actions = context?.actions;
-    const showTemplateRun = mode === "live" && !!actions;
+    const showTemplateRun = mode === "live" && !!context?.onRun;
 
     return (
       <div className="px-2 py-1.5 flex flex-col gap-1.5">
@@ -104,17 +117,15 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
               </div>
               <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
             </div>
-            {showTemplateRun && actions && (
+            {showTemplateRun && context.onRun && (
               <Button
                 size="sm"
                 data-testid="start-template-run"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  void actions.invokeNodeTriggerHook("run", {
-                    template: template.name,
-                    payload: payloadForTemplateRun(template),
-                  });
+                  const payloadString = JSON.stringify(payloadForTemplateRun(template), null, 2);
+                  context.onRun!(payloadString, template.name);
                 }}
                 className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
               >

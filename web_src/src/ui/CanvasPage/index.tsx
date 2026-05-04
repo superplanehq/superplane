@@ -52,6 +52,7 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
+import { takePendingStartTemplateRunForNode } from "@/pages/workflowv2/lib/start-template-run-bridge";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -784,6 +785,8 @@ function CanvasPage(props: CanvasPageProps) {
       const node = state.nodes.find((n) => n.id === nodeId);
       if (!node) return;
 
+      const pendingTemplate = takePendingStartTemplateRunForNode(nodeId);
+
       const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
       const nodeName = nodeData?.label || nodeId;
       const channels = nodeData?.outputChannels || ["default"];
@@ -792,7 +795,8 @@ function CanvasPage(props: CanvasPageProps) {
         nodeId,
         nodeName,
         channels,
-        initialData,
+        initialData: pendingTemplate?.initialData ?? initialData,
+        templateName: pendingTemplate?.templateName,
       });
     },
     [state.nodes, props.runDisabled],
