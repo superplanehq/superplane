@@ -185,7 +185,6 @@ func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.Cre
 		req.IntegrationName,
 		req.Name,
 		req.Configuration,
-		req.Capabilities,
 	)
 }
 
@@ -216,7 +215,7 @@ func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.Del
 
 func (s *OrganizationService) NextIntegrationSetupStep(ctx context.Context, req *pb.NextIntegrationSetupStepRequest) (*pb.NextIntegrationSetupStepResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.NextIntegrationSetupStep(ctx, s.registry, s.baseURL, s.webhooksBaseURL, orgID, req.IntegrationId, req.Inputs)
+	return organizations.NextIntegrationSetupStep(ctx, s.registry, s.baseURL, s.webhooksBaseURL, orgID, req.IntegrationId, req.Inputs, req.Capabilities)
 }
 
 func (s *OrganizationService) PreviousIntegrationSetupStep(ctx context.Context, req *pb.PreviousIntegrationSetupStepRequest) (*pb.PreviousIntegrationSetupStepResponse, error) {

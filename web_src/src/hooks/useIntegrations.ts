@@ -170,12 +170,13 @@ export const useNextIntegrationSetupStep = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown> }) => {
+    mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown>; capabilities?: string[] }) => {
       return await organizationsNextIntegrationSetupStep(
         withOrganizationHeader({
           path: { id: organizationId, integrationId: data.integrationId },
           body: {
             inputs: data.inputs,
+            capabilities: data.capabilities,
           },
         }),
       );

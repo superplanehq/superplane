@@ -1142,12 +1142,18 @@ func CapabilityStateToProto(t string) organizationpb.Integration_CapabilityState
 		return organizationpb.Integration_CapabilityState_STATE_ENABLED
 	case string(core.IntegrationCapabilityStateDisabled):
 		return organizationpb.Integration_CapabilityState_STATE_DISABLED
+	case string(core.IntegrationCapabilityStateAvailable):
+		return organizationpb.Integration_CapabilityState_STATE_AVAILABLE
 	}
 	return organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE
 }
 
 func ProtoToCapabilityState(t organizationpb.Integration_CapabilityState_State) string {
 	switch t {
+	case organizationpb.Integration_CapabilityState_STATE_AVAILABLE:
+		return string(core.IntegrationCapabilityStateAvailable)
+	case organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE:
+		return string(core.IntegrationCapabilityStateUnavailable)
 	case organizationpb.Integration_CapabilityState_STATE_REQUESTED:
 		return string(core.IntegrationCapabilityStateRequested)
 	case organizationpb.Integration_CapabilityState_STATE_ENABLED:
