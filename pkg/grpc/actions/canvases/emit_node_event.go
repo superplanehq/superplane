@@ -44,7 +44,7 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	runTitle, err := resolveRunTitle(node, data)
+	runTitle, err := resolveRunTitle(node, data, buildRootPayload(channel, data, now))
 	if err != nil {
 		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
 		event.RunTitle = &failed
@@ -68,7 +68,15 @@ func EmitNodeEvent(
 	}, nil
 }
 
-func resolveRunTitle(node *models.CanvasNode, payload map[string]any) (*string, error) {
+func buildRootPayload(channel string, payload map[string]any, timestamp time.Time) map[string]any {
+	return map[string]any{
+		"type":      channel,
+		"timestamp": timestamp,
+		"data":      payload,
+	}
+}
+
+func resolveRunTitle(node *models.CanvasNode, payload map[string]any, rootPayload map[string]any) (*string, error) {
 	template := strings.TrimSpace(valueOrEmpty(node.RunTitleTemplate))
 	if template == "" {
 		return nil, nil
@@ -77,7 +85,7 @@ func resolveRunTitle(node *models.CanvasNode, payload map[string]any) (*string, 
 	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithInput(map[string]any{node.NodeID: payload}).
-		WithRootPayload(payload)
+		WithRootPayload(rootPayload)
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err

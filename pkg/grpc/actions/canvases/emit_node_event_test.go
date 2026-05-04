@@ -161,6 +161,49 @@ func Test__EmitNodeEvent(t *testing.T) {
 		assert.Equal(t, "Run: hello", *event.RunTitle)
 	})
 
+	t.Run("run title template resolves root payload data envelope", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: "node-1",
+					Name:   "node-1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		node, err := canvas.FindNode("node-1")
+		require.NoError(t, err)
+		runTitleTemplate := "Run: {{ root().data.message }}"
+		node.RunTitleTemplate = &runTitleTemplate
+		require.NoError(t, database.Conn().Save(node).Error)
+
+		response, err := EmitNodeEvent(
+			ctx,
+			r.Organization.ID,
+			canvas.ID,
+			"node-1",
+			"default",
+			map[string]any{"message": "hello"},
+		)
+		require.NoError(t, err)
+
+		eventID, err := uuid.Parse(response.EventId)
+		require.NoError(t, err)
+
+		event, err := models.FindCanvasEvent(eventID)
+		require.NoError(t, err)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
+	})
+
 	t.Run("successful event emission publishes RabbitMQ message", func(t *testing.T) {
 		amqpURL, _ := config.RabbitMQURL()
 		testconsumer := testconsumer.New(amqpURL, messages.CanvasEventCreatedRoutingKey)
