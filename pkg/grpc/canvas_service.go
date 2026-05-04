@@ -253,6 +253,10 @@ func (s *CanvasService) UpdateNodePause(ctx context.Context, req *pb.UpdateNodeP
 	return canvases.UpdateNodePause(ctx, s.registry, req.CanvasId, req.NodeId, req.Paused)
 }
 
+func (s *CanvasService) UpdateCanvasPause(ctx context.Context, req *pb.UpdateCanvasPauseRequest) (*pb.UpdateCanvasPauseResponse, error) {
+	return canvases.UpdateCanvasPause(ctx, s.registry, req.CanvasId, req.Paused)
+}
+
 func (s *CanvasService) ListNodeExecutions(ctx context.Context, req *pb.ListNodeExecutionsRequest) (*pb.ListNodeExecutionsResponse, error) {
 	return canvases.ListNodeExecutions(ctx, s.registry, req.CanvasId, req.NodeId, req.States, req.Results, req.Limit, req.Before)
 }

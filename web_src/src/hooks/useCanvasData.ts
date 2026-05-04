@@ -5,6 +5,7 @@ import {
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
   canvasesUpdateCanvas,
+  canvasesUpdateCanvasPause,
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
@@ -468,6 +469,30 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
             },
           };
         });
+      }
+    },
+  });
+};
+
+export const useUpdateCanvasPause = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (paused: boolean) => {
+      return await canvasesUpdateCanvasPause(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: { paused },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+
+      const updatedCanvas = response?.data?.canvas;
+      if (updatedCanvas) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedCanvas);
       }
     },
   });

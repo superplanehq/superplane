@@ -207,6 +207,7 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 			"live_version_id",
 			"is_template",
 			"name",
+			"paused",
 			"created_by",
 			"created_at",
 			"updated_at",

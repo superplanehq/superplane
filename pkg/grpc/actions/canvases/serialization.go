@@ -94,6 +94,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
 				IsTemplate:     canvas.IsTemplate,
+				Paused:         canvas.Paused,
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes:            serializedNodes,
@@ -146,6 +147,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
 			IsTemplate:     canvas.IsTemplate,
+			Paused:         canvas.Paused,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes:            serializedNodes,

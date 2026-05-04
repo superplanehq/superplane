@@ -189,6 +189,12 @@ export interface CanvasPageProps {
   canUpdateIntegrations?: boolean;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
+
+  paused?: boolean;
+  onToggleCanvasPause?: (paused: boolean) => void;
+  canvasPauseDisabled?: boolean;
+  canvasPauseDisabledTooltip?: string;
+
   // Disable running nodes when there are unsaved changes (with tooltip)
   runDisabled?: boolean;
   runDisabledTooltip?: string;
@@ -1164,6 +1170,10 @@ function CanvasPage(props: CanvasPageProps) {
           onOpenVersionControl={props.onOpenVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
+          paused={props.paused}
+          onToggleCanvasPause={props.onToggleCanvasPause}
+          canvasPauseDisabled={props.canvasPauseDisabled}
+          canvasPauseDisabledTooltip={props.canvasPauseDisabledTooltip}
           agentState={agentState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
@@ -1672,6 +1682,10 @@ function CanvasContentHeader({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
+  paused,
+  onToggleCanvasPause,
+  canvasPauseDisabled,
+  canvasPauseDisabledTooltip,
   agentState,
 }: {
   state: CanvasPageState;
@@ -1702,6 +1716,10 @@ function CanvasContentHeader({
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
+  paused?: boolean;
+  onToggleCanvasPause?: (paused: boolean) => void;
+  canvasPauseDisabled?: boolean;
+  canvasPauseDisabledTooltip?: string;
   agentState: AgentState;
 }) {
   const stateRef = useRef(state);
@@ -1742,6 +1760,10 @@ function CanvasContentHeader({
       onOpenVersionControl={onOpenVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
+      paused={paused}
+      onToggleCanvasPause={onToggleCanvasPause}
+      canvasPauseDisabled={canvasPauseDisabled}
+      canvasPauseDisabledTooltip={canvasPauseDisabledTooltip}
       agentState={agentState}
     />
   );

@@ -55,6 +55,7 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
+  useUpdateCanvasPause,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -202,10 +203,11 @@ export function WorkflowPageV2() {
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
-  const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
-  const deleteCanvasVersionMutation = useDeleteCanvasVersion(organizationId!, canvasId!);
-  const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
+  const updateCanvasPauseMutation = useUpdateCanvasPause(organizationId!, canvasId!);
+  const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
+
+  const publishCanvasVersionMutation = usePublishCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
   const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
@@ -3916,6 +3918,20 @@ export function WorkflowPageV2() {
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
+  const handleToggleCanvasPause = useCallback(
+    async (paused: boolean) => {
+      if (!organizationId || !canvasId) return;
+
+      try {
+        await updateCanvasPauseMutation.mutateAsync(paused);
+        showSuccessToast(paused ? "Canvas paused" : "Canvas resumed");
+      } catch (error) {
+        showErrorToast(error instanceof Error ? error.message : "Failed to toggle canvas pause");
+      }
+    },
+    [organizationId, canvasId, updateCanvasPauseMutation],
+  );
+
   const handleRun = useCallback(
     async (nodeId: string, channel: string, data: any) => {
       if (!canvasId) return;
@@ -5384,6 +5400,16 @@ export function WorkflowPageV2() {
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
+          paused={canvas?.metadata?.paused}
+          onToggleCanvasPause={canUpdateCanvas && isViewingLiveVersion ? handleToggleCanvasPause : undefined}
+          canvasPauseDisabled={updateCanvasPauseMutation.isPending}
+          canvasPauseDisabledTooltip={
+            !canUpdateCanvas
+              ? "You don't have permission to pause this canvas."
+              : !isViewingCurrentLiveVersion
+                ? "Only the current live version can be paused."
+                : undefined
+          }
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}

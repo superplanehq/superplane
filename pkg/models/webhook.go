@@ -111,8 +111,10 @@ func FindWebhookNodes(webhookID uuid.UUID) ([]CanvasNode, error) {
 func FindWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]CanvasNode, error) {
 	var nodes []CanvasNode
 	err := tx.
-		Where("webhook_id = ?", webhookID).
-		Where("deleted_at IS NULL").
+		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
+		Where("workflow_nodes.webhook_id = ?", webhookID).
+		Where("workflow_nodes.deleted_at IS NULL").
+		Where("workflows.paused = ?", false).
 		Find(&nodes).
 		Error
 
