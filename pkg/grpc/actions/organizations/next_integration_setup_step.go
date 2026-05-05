@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,10 +81,63 @@ func getStepInputs(inputs *structpb.Struct) map[string]any {
 	return inputs.AsMap()
 }
 
+// postSetupSyncDescription is shown while the integration request worker runs the first Sync()
+// (required to persist OAuth tokens, webhooks, metadata, etc.).
+const postSetupSyncDescription = "Running initial sync..."
+
+const postSetupSyncDescriptionGCPWIFDelayed = "Running initial sync shortly (brief wait for IAM propagation)..."
+
+// GCP workload identity: IAM bindings can lag creation; defer first sync so workers do not hit STS before propagation.
+const (
+	gcpIntegrationAppName               = "gcp"
+	gcpPropertyConnectionMethod         = "connectionMethod"
+	gcpConnectionMethodWorkloadIdentity = "workloadIdentityFederation"
+	gcpWIFInitialSyncDelay              = 90 * time.Second
+)
+
+func gcpWorkloadIdentityFederationDeferredSync(integration *models.Integration) bool {
+	if integration.AppName != gcpIntegrationAppName {
+		return false
+	}
+	for _, p := range integration.Properties {
+		if p.Name != gcpPropertyConnectionMethod {
+			continue
+		}
+		v, ok := p.Value.(string)
+		if !ok {
+			v = fmt.Sprint(p.Value)
+		}
+		return strings.TrimSpace(v) == gcpConnectionMethodWorkloadIdentity
+	}
+	return false
+}
+
+func initialSyncRunAt(integration *models.Integration) time.Time {
+	t := time.Now()
+	if gcpWorkloadIdentityFederationDeferredSync(integration) {
+		return t.Add(gcpWIFInitialSyncDelay)
+	}
+	return t
+}
+
+func initialSyncStateDescription(integration *models.Integration) string {
+	if gcpWorkloadIdentityFederationDeferredSync(integration) {
+		return postSetupSyncDescriptionGCPWIFDelayed
+	}
+	return postSetupSyncDescription
+}
+
 func clearIntegrationSetupState(registry *registry.Registry, integration *models.Integration) (*pb.NextIntegrationSetupStepResponse, error) {
 	integration.SetupState = nil
-	integration.State = models.IntegrationStateReady
-	err := database.Conn().Save(integration).Error
+	integration.State = models.IntegrationStatePending
+	integration.StateDescription = initialSyncStateDescription(integration)
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(integration).Error; err != nil {
+			return err
+		}
+		runAt := initialSyncRunAt(integration)
+		return integration.CreateSyncRequest(tx, &runAt)
+	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to clear integration setup state")
 	}
@@ -152,7 +206,13 @@ func submitStep(
 			integration.UpdatedAt = &now
 			integration.Capabilities = capabilityCtx.States()
 			integration.SetupState = nil
-			return tx.Save(integration).Error
+			integration.State = models.IntegrationStatePending
+			integration.StateDescription = initialSyncStateDescription(integration)
+			if err := tx.Save(integration).Error; err != nil {
+				return err
+			}
+			runAt := initialSyncRunAt(integration)
+			return integration.CreateSyncRequest(tx, &runAt)
 		}
 
 		//
