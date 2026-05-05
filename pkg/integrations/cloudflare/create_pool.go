@@ -40,8 +40,8 @@ type CoordinatesSpec struct {
 type OriginSpec struct {
 	Name        string           `json:"name"`
 	Address     string           `json:"address"`
-	Enabled     bool             `json:"enabled"`
-	Weight      float64          `json:"weight"`
+	Enabled     *bool            `json:"enabled"`
+	Weight      *float64         `json:"weight"`
 	Port        int              `json:"port"`
 	Coordinates *CoordinatesSpec `json:"coordinates"`
 }
@@ -69,7 +69,6 @@ func (c *CreatePool) Documentation() string {
 
 ## Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Name**: A unique, human-readable name for the pool
 - **Description**: Optional description
 - **Origins**: List of origin servers with name, address, enabled flag, weight, optional port, and optional coordinates
@@ -356,14 +355,16 @@ func (c *CreatePool) Execute(ctx core.ExecutionContext) error {
 
 	origins := make([]Origin, len(spec.Origins))
 	for i, o := range spec.Origins {
-		weight := o.Weight
-		if weight == 0 {
-			weight = 1.0
+		weight := 1.0
+		if o.Weight != nil {
+			weight = *o.Weight
 		}
 
 		address := o.Address
-		if o.Port > 0 {
-			address = fmt.Sprintf("%s:%d", o.Address, o.Port)
+
+		enabled := true
+		if o.Enabled != nil {
+			enabled = *o.Enabled
 		}
 
 		var coords *Coordinates
@@ -374,8 +375,9 @@ func (c *CreatePool) Execute(ctx core.ExecutionContext) error {
 		origins[i] = Origin{
 			Name:        o.Name,
 			Address:     address,
-			Enabled:     o.Enabled,
+			Enabled:     enabled,
 			Weight:      weight,
+			Port:        o.Port,
 			Coordinates: coords,
 		}
 	}

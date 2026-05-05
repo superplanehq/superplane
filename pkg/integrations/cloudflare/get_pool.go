@@ -42,7 +42,6 @@ func (c *GetPool) Documentation() string {
 
 ## Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Pool ID**: The origin pool to retrieve
 
 ## Output

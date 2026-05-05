@@ -197,7 +197,6 @@ The Create Pool component creates a new Cloudflare Load Balancer origin pool.
 
 ### Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Name**: A unique, human-readable name for the pool
 - **Description**: Optional description
 - **Origins**: List of origin servers with name, address, enabled flag, weight, optional port, and optional coordinates
@@ -220,7 +219,7 @@ Returns the created origin pool with its assigned ID and full configuration.
     "pool": {
       "description": "my pool",
       "enabled": true,
-      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "id": "483e85c07a861ae7a8813ef010be7036",
       "minimum_origins": 1,
       "name": "my-pool",
       "origin_steering": {
@@ -228,15 +227,16 @@ Returns the created origin pool with its assigned ID and full configuration.
       },
       "origins": [
         {
-          "address": "192.0.2.1:2015",
-          "enabled": false,
+          "address": "192.0.2.1",
+          "enabled": true,
           "name": "server-1",
+          "port": 2013,
           "weight": 1
         }
       ]
     }
   },
-  "timestamp": "2026-05-05T05:57:07.706260875Z",
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.pool.created"
 }
 ```
@@ -482,7 +482,6 @@ The Delete Pool component permanently removes a Cloudflare Load Balancer origin 
 
 ### Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Pool ID**: The origin pool to delete
 
 ### Output
@@ -497,27 +496,10 @@ Emits a confirmation with the account ID and pool ID of the deleted pool.
 {
   "data": {
     "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
-    "pool": {
-      "description": "my deleted pool",
-      "enabled": true,
-      "id": "f7be7edc94014415ba06bca7b13c5c5a",
-      "minimum_origins": 1,
-      "name": "my-deleted-pool",
-      "origin_steering": {
-        "policy": "random"
-      },
-      "origins": [
-        {
-          "address": "138.68.89.169:2015",
-          "enabled": false,
-          "name": "server-1",
-          "weight": 1
-        }
-      ]
-    },
+    "deleted": true,
     "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
   },
-  "timestamp": "2026-05-05T05:58:40.060373991Z",
+  "timestamp": "2026-05-05T05:59:02.93536262Z",
   "type": "cloudflare.pool.deleted"
 }
 ```
@@ -536,7 +518,6 @@ The Get Pool component fetches the current state of a Cloudflare Load Balancer o
 
 ### Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Pool ID**: The origin pool to retrieve
 
 ### Output
@@ -678,7 +659,6 @@ The Update Pool component modifies an existing Cloudflare Load Balancer origin p
 
 ### Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Pool ID**: The ID of the pool to update
 - **Origins**: Full list of origin servers with updated weights or enabled status
 - **Name**: Optional new name for the pool

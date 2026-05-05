@@ -50,7 +50,6 @@ func (c *UpdatePool) Documentation() string {
 
 ## Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Pool ID**: The ID of the pool to update
 - **Origins**: Full list of origin servers with updated weights or enabled status
 - **Name**: Optional new name for the pool
@@ -377,14 +376,16 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 	if len(spec.Origins) > 0 {
 		origins := make([]Origin, len(spec.Origins))
 		for i, o := range spec.Origins {
-			weight := o.Weight
-			if weight == 0 {
-				weight = 1.0
+			weight := 1.0
+			if o.Weight != nil {
+				weight = *o.Weight
 			}
 
 			address := o.Address
-			if o.Port > 0 {
-				address = fmt.Sprintf("%s:%d", o.Address, o.Port)
+
+			enabled := true
+			if o.Enabled != nil {
+				enabled = *o.Enabled
 			}
 
 			var coords *Coordinates
@@ -395,8 +396,9 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 			origins[i] = Origin{
 				Name:        o.Name,
 				Address:     address,
-				Enabled:     o.Enabled,
+				Enabled:     enabled,
 				Weight:      weight,
+				Port:        o.Port,
 				Coordinates: coords,
 			}
 		}

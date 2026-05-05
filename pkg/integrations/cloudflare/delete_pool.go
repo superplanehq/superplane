@@ -41,7 +41,6 @@ func (c *DeletePool) Documentation() string {
 
 ## Configuration
 
-- **Account ID**: The Cloudflare account ID that owns the pool
 - **Pool ID**: The origin pool to delete
 
 ## Output
@@ -124,6 +123,9 @@ func (c *DeletePool) Execute(ctx core.ExecutionContext) error {
 	}
 
 	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+	if accountID == "" {
+		return errors.New("accountId is required")
+	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {

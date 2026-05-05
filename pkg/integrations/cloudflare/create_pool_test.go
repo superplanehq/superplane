@@ -159,7 +159,7 @@ func Test__CreatePool__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execState.Passed)
 		assert.Equal(t, "default", execState.Channel)
-		assert.Equal(t, "cloudflare.pool", execState.Type)
+		assert.Equal(t, "cloudflare.pool.created", execState.Type)
 		assert.Len(t, execState.Payloads, 1)
 
 		require.Len(t, httpContext.Requests, 1)

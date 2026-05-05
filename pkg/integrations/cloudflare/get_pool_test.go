@@ -19,7 +19,7 @@ func Test__GetPool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "",
-				"poolId":    "pool123",
+				"pool":      "pool123",
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -32,20 +32,20 @@ func Test__GetPool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "",
+				"pool":      "",
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
-		require.ErrorContains(t, err, "poolId is required")
+		require.ErrorContains(t, err, "pool is required")
 	})
 
 	t.Run("expression poolId is accepted without API call", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "{{ $.trigger.data.poolId }}",
+				"pool":      "{{ $.trigger.data.poolId }}",
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -57,7 +57,7 @@ func Test__GetPool__Setup(t *testing.T) {
 	t.Run("accountId from integration metadata is used as fallback", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"poolId": "{{ $.trigger.data.poolId }}",
+				"pool": "{{ $.trigger.data.poolId }}",
 			},
 			Integration: &contexts.IntegrationContext{
 				Metadata: Metadata{AccountID: "acc-from-integration"},
@@ -73,7 +73,7 @@ func Test__GetPool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":      "pool123",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -141,7 +141,7 @@ func Test__GetPool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":      "pool123",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -153,7 +153,7 @@ func Test__GetPool__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execState.Passed)
 		assert.Equal(t, "default", execState.Channel)
-		assert.Equal(t, "cloudflare.pool", execState.Type)
+		assert.Equal(t, "cloudflare.pool.fetched", execState.Type)
 		assert.Len(t, execState.Payloads, 1)
 
 		require.Len(t, httpContext.Requests, 1)
@@ -184,7 +184,7 @@ func Test__GetPool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":      "pool123",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

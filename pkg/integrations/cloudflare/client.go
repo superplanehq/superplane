@@ -983,6 +983,7 @@ type Origin struct {
 	Address     string       `json:"address"`
 	Enabled     bool         `json:"enabled"`
 	Weight      float64      `json:"weight"`
+	Port        int          `json:"port,omitempty"`
 	Coordinates *Coordinates `json:"coordinates,omitempty"`
 }
 

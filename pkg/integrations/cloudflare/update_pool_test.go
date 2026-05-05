@@ -19,7 +19,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "",
-				"poolId":    "pool123",
+				"pool":    "pool123",
 			},
 		}
 
@@ -31,19 +31,19 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "",
+				"pool":    "",
 			},
 		}
 
 		err := component.Setup(ctx)
-		require.ErrorContains(t, err, "poolId is required")
+		require.ErrorContains(t, err, "pool is required")
 	})
 
 	t.Run("origin missing address returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":    "pool123",
 				"origins": []any{
 					map[string]any{"name": "o1", "address": "", "enabled": true, "weight": 1},
 				},
@@ -58,7 +58,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":    "pool123",
 			},
 		}
 
@@ -70,7 +70,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":    "pool123",
 				"origins": []any{
 					map[string]any{"name": "stable", "address": "1.2.3.4", "enabled": true, "weight": 0.9},
 					map[string]any{"name": "canary", "address": "1.2.3.5", "enabled": true, "weight": 0.1},
@@ -122,7 +122,7 @@ func Test__UpdatePool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":      "pool123",
 				"origins": []any{
 					map[string]any{"name": "stable", "address": "1.2.3.4", "enabled": true, "weight": 0.9},
 					map[string]any{"name": "canary", "address": "1.2.3.5", "enabled": true, "weight": 0.1},
@@ -138,7 +138,7 @@ func Test__UpdatePool__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execState.Passed)
 		assert.Equal(t, "default", execState.Channel)
-		assert.Equal(t, "cloudflare.pool", execState.Type)
+		assert.Equal(t, "cloudflare.pool.updated", execState.Type)
 		assert.Len(t, execState.Payloads, 1)
 
 		require.Len(t, httpContext.Requests, 1)
@@ -178,7 +178,7 @@ func Test__UpdatePool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":    "pool123",
 				"name":      "renamed-pool",
 			},
 			HTTP:           httpContext,
@@ -190,7 +190,7 @@ func Test__UpdatePool__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.True(t, execState.Passed)
-		assert.Equal(t, "cloudflare.pool", execState.Type)
+		assert.Equal(t, "cloudflare.pool.updated", execState.Type)
 	})
 
 	t.Run("API error returns error", func(t *testing.T) {
@@ -216,7 +216,7 @@ func Test__UpdatePool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"poolId":    "pool123",
+				"pool":      "pool123",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
