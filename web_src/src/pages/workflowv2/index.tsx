@@ -6145,7 +6145,6 @@ export function WorkflowPageV2() {
                 layout={launchpadQuery.data?.layout ?? []}
                 isLoading={launchpadQuery.isLoading}
                 errorMessage={launchpadQuery.error instanceof Error ? launchpadQuery.error.message : undefined}
-                isSaving={updateCanvasLaunchpadMutation.isPending}
                 readOnly={!canUpdateCanvas || isTemplate}
                 canvasId={canvasId}
                 nodeRefs={{

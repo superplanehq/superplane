@@ -1,0 +1,144 @@
+/*
+ * Launchpad / Apps page CSS overrides.
+ *
+ * Imported AFTER react-grid-layout's own stylesheets so these rules win.
+ * Targets:
+ *   - the dotted grid background on the Apps overlay container
+ *   - the drag placeholder (replaces the library's red rectangle)
+ *   - the resize handles (replaces the tiny SE arrow with themed indicators
+ *     on south, east, and south-east edges, visible on panel hover)
+ *   - the active drag/resize state on the panel chrome
+ */
+
+.launchpad-canvas {
+  background-color: rgb(248 250 252); /* slate-50 */
+  background-image: radial-gradient(circle, rgb(203 213 225 / 0.7) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: 16px 16px;
+}
+
+/* Drag placeholder ------------------------------------------------------- */
+
+.launchpad-grid > .react-grid-placeholder {
+  background: rgb(186 230 253 / 0.55); /* sky-200 / 55% */
+  border: 1.5px dashed rgb(56 189 248); /* sky-400 */
+  border-radius: 0.5rem;
+  opacity: 1;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.4);
+  transition-property: transform;
+  transition-duration: 150ms;
+}
+
+/* Resize handles --------------------------------------------------------- */
+
+.launchpad-grid > .react-grid-item > .react-resizable-handle {
+  background-image: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.launchpad-grid > .react-grid-item:hover > .react-resizable-handle,
+.launchpad-grid > .react-grid-item.resizing > .react-resizable-handle {
+  opacity: 1;
+}
+
+.launchpad-grid > .react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  border-radius: 1px;
+  pointer-events: none;
+  transition: background-color 120ms ease;
+}
+
+.launchpad-grid > .react-grid-item > .react-resizable-handle-se {
+  /* The library positions this in the bottom-right; we draw a small bracket. */
+  cursor: nwse-resize;
+}
+.launchpad-grid > .react-grid-item > .react-resizable-handle-se::after {
+  right: 4px;
+  bottom: 4px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgb(148 163 184); /* slate-400 */
+  border-bottom: 2px solid rgb(148 163 184);
+  border-bottom-right-radius: 2px;
+}
+.launchpad-grid > .react-grid-item:hover > .react-resizable-handle-se:hover::after {
+  border-color: rgb(56 189 248); /* sky-400 on hover */
+}
+
+.launchpad-grid > .react-grid-item > .react-resizable-handle-s {
+  cursor: ns-resize;
+  /* The library applies bottom-center positioning by default; reinforce it. */
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 8px;
+}
+.launchpad-grid > .react-grid-item > .react-resizable-handle-s::after {
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: rgb(148 163 184 / 0.7); /* slate-400 */
+  border-radius: 9999px;
+}
+.launchpad-grid > .react-grid-item > .react-resizable-handle-s:hover::after {
+  background: rgb(56 189 248);
+}
+
+.launchpad-grid > .react-grid-item > .react-resizable-handle-e {
+  cursor: ew-resize;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 32px;
+}
+.launchpad-grid > .react-grid-item > .react-resizable-handle-e::after {
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 24px;
+  background: rgb(148 163 184 / 0.7);
+  border-radius: 9999px;
+}
+.launchpad-grid > .react-grid-item > .react-resizable-handle-e:hover::after {
+  background: rgb(56 189 248);
+}
+
+/* Active drag/resize states --------------------------------------------- */
+
+.launchpad-grid > .react-grid-item.react-draggable-dragging,
+.launchpad-grid > .react-grid-item.resizing {
+  z-index: 30;
+}
+
+.launchpad-grid > .react-grid-item.react-draggable-dragging [data-panel-chrome],
+.launchpad-grid > .react-grid-item.resizing [data-panel-chrome] {
+  border-color: rgb(56 189 248); /* sky-400 */
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.05),
+    0 12px 28px -8px rgb(15 23 42 / 0.18);
+}
+
+/* Auto-height panels ----------------------------------------------------- */
+
+/*
+ * When a panel has `data-auto-height="true"`, the height is driven by a
+ * ResizeObserver in the React layer instead of by the user. Hide the south
+ * (s) and southeast (se) resize handles so the user can't manually fight the
+ * observer. Horizontal resizing still works via the east (e) handle.
+ *
+ * The attribute lives on the wrapper div we render as a child of
+ * `.react-grid-item`, so we use `:has()` to scope the rule to the matching
+ * grid item.
+ */
+.launchpad-grid > .react-grid-item:has(> [data-auto-height="true"]) > .react-resizable-handle-s,
+.launchpad-grid > .react-grid-item:has(> [data-auto-height="true"]) > .react-resizable-handle-se {
+  display: none;
+}

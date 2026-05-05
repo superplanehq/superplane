@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -138,7 +139,7 @@ describe("LaunchpadView", () => {
     expect(args.layout[0].i).toBe(args.panels[0].id);
   });
 
-  it("renders one chrome per panel and exposes the delete button when editable", () => {
+  it("renders one chrome per panel with a flat icon cluster (no kebab menu)", () => {
     render(
       <LaunchpadView
         panels={[makePanel("p1"), makePanel("p2")]}
@@ -150,7 +151,13 @@ describe("LaunchpadView", () => {
     );
     expect(screen.getByTestId("launchpad-panel-p1")).toBeInTheDocument();
     expect(screen.getByTestId("launchpad-panel-p2")).toBeInTheDocument();
-    expect(screen.getAllByTestId("launchpad-delete-panel")).toHaveLength(2);
+    expect(screen.getAllByTestId("launchpad-drag-handle")).toHaveLength(2);
+    expect(screen.getAllByTestId("launchpad-panel-actions")).toHaveLength(2);
+    expect(screen.getAllByTestId("launchpad-edit-panel")).toHaveLength(2);
+    expect(screen.getAllByTestId("launchpad-toggle-auto-height")).toHaveLength(2);
+    expect(screen.getAllByTestId("launchpad-delete-panel-button")).toHaveLength(2);
+    // The kebab menu has been removed in favor of direct icon buttons.
+    expect(screen.queryByTestId("launchpad-panel-menu")).toBeNull();
   });
 
   it("hides edit affordances and the add button when readOnly is true", () => {
@@ -164,12 +171,17 @@ describe("LaunchpadView", () => {
       />,
     );
     expect(screen.queryByTestId("launchpad-add-panel")).toBeNull();
-    expect(screen.queryByTestId("launchpad-delete-panel")).toBeNull();
+    expect(screen.queryByTestId("launchpad-edit-panel")).toBeNull();
+    expect(screen.queryByTestId("launchpad-toggle-auto-height")).toBeNull();
+    expect(screen.queryByTestId("launchpad-delete-panel-button")).toBeNull();
     expect(screen.queryByTestId("launchpad-drag-handle")).toBeNull();
+    expect(screen.queryByTestId("launchpad-panel-actions")).toBeNull();
   });
 
-  it("deleting a panel removes both the panel and its layout entry", () => {
+  it("clicking the delete icon goes straight to the confirm dialog", async () => {
+    vi.useRealTimers();
     const onChange = vi.fn();
+    const user = userEvent.setup();
     render(
       <LaunchpadView
         panels={[makePanel("p1"), makePanel("p2")]}
@@ -179,15 +191,35 @@ describe("LaunchpadView", () => {
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getAllByTestId("launchpad-delete-panel")[0]);
-    act(() => {
-      vi.runAllTimers();
-    });
+
+    await user.click(screen.getAllByTestId("launchpad-delete-panel-button")[0]);
+
+    expect(screen.getByTestId("launchpad-delete-confirm")).toBeInTheDocument();
+    await user.click(screen.getByTestId("launchpad-delete-confirm-action"));
+
+    // Wait past the save debounce (350ms) so onChange is invoked.
+    await new Promise((r) => setTimeout(r, 500));
+
     expect(onChange).toHaveBeenCalledTimes(1);
     const [args] = onChange.mock.calls[0];
     expect(args.panels).toHaveLength(1);
     expect(args.panels[0].id).toBe("p2");
     expect(args.layout.map((l: LaunchpadLayoutItem) => l.i)).toEqual(["p2"]);
+  });
+
+  it("clicking the header Edit button puts the markdown panel in edit mode", () => {
+    render(
+      <LaunchpadView
+        panels={[makePanel("p1", "# hi")]}
+        layout={[makeLayout("p1")]}
+        isLoading={false}
+        readOnly={false}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("launchpad-markdown-editor")).toBeNull();
+    fireEvent.click(screen.getByTestId("launchpad-edit-panel"));
+    expect(screen.getByTestId("launchpad-markdown-editor")).toBeInTheDocument();
   });
 
   it("forwards nodeStatuses through nodeRefs into the markdown layer", () => {
@@ -262,5 +294,156 @@ describe("LaunchpadView", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     const [args] = onChange.mock.calls[0];
     expect(args.layout[0]).toMatchObject({ i: "p1", x: 1, y: 1, w: 4, h: 4 });
+  });
+
+  it("toggling 'grow with content' flips data-auto-height and persists the autoHeight flag", () => {
+    const onChange = vi.fn();
+    render(
+      <LaunchpadView
+        panels={[makePanel("p1")]}
+        layout={[makeLayout("p1")]}
+        isLoading={false}
+        readOnly={false}
+        onChange={onChange}
+      />,
+    );
+    const wrapper = screen.getByTestId("launchpad-panel-p1");
+    expect(wrapper.getAttribute("data-auto-height")).toBe("false");
+    expect(screen.getByTestId("launchpad-toggle-auto-height").getAttribute("data-active")).toBe("false");
+
+    fireEvent.click(screen.getByTestId("launchpad-toggle-auto-height"));
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(screen.getByTestId("launchpad-panel-p1").getAttribute("data-auto-height")).toBe("true");
+    expect(screen.getByTestId("launchpad-toggle-auto-height").getAttribute("data-active")).toBe("true");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const [args] = onChange.mock.calls[0];
+    expect(args.layout[0]).toMatchObject({ i: "p1", autoHeight: true });
+  });
+
+  it("ignores h changes from drag for autoHeight panels", () => {
+    const onChange = vi.fn();
+    render(
+      <LaunchpadView
+        panels={[makePanel("p1")]}
+        layout={[{ ...makeLayout("p1"), autoHeight: true, h: 8 }]}
+        isLoading={false}
+        readOnly={false}
+        onChange={onChange}
+      />,
+    );
+    // The mocked drag tries to write h=4. With autoHeight=true, the previous
+    // h (8) should be preserved so the observer remains the source of truth.
+    fireEvent.click(screen.getByTestId("rgl-simulate-drag"));
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const [args] = onChange.mock.calls[0];
+    expect(args.layout[0]).toMatchObject({ i: "p1", x: 1, y: 1, w: 4, h: 8, autoHeight: true });
+  });
+
+  it("auto-height observer pushes a new h back through onChange when content grows", () => {
+    // Replace the no-op stub with an instrumented version that captures the
+    // measure callback so the test can fire it on demand.
+    const observers: Array<{
+      cb: ResizeObserverCallback;
+      target: Element | null;
+    }> = [];
+    class InstrumentedRO {
+      cb: ResizeObserverCallback;
+      target: Element | null = null;
+      constructor(cb: ResizeObserverCallback) {
+        this.cb = cb;
+        observers.push(this);
+      }
+      observe(el: Element) {
+        this.target = el;
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    (globalThis as unknown as { ResizeObserver: typeof InstrumentedRO }).ResizeObserver = InstrumentedRO;
+
+    const onChange = vi.fn();
+    render(
+      <LaunchpadView
+        panels={[makePanel("p1")]}
+        layout={[{ ...makeLayout("p1", 6, 4), autoHeight: true }]}
+        isLoading={false}
+        readOnly={false}
+        onChange={onChange}
+      />,
+    );
+
+    // The body observer is the second one created (the first is the
+    // container width tracker on LaunchpadView).
+    const bodyObserver = observers.find((o) => o.target && o.target.getAttribute("class")?.includes("flex-1"));
+    expect(bodyObserver).toBeDefined();
+
+    // Force the panel body to report a 320px scrollHeight, then trigger the
+    // observer callback. With ROW_HEIGHT=40 and MARGIN_Y=12, 320px maps to
+    // ceil((320 + 12) / (40 + 12)) = ceil(332 / 52) = 7 rows.
+    Object.defineProperty(bodyObserver!.target!, "scrollHeight", {
+      configurable: true,
+      get: () => 320,
+    });
+    act(() => {
+      bodyObserver!.cb(
+        [{ target: bodyObserver!.target! } as ResizeObserverEntry],
+        bodyObserver as unknown as ResizeObserver,
+      );
+      vi.runAllTimers();
+    });
+
+    expect(onChange).toHaveBeenCalled();
+    const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1];
+    expect(lastCall[0].layout[0]).toMatchObject({ i: "p1", h: 7, autoHeight: true });
+  });
+
+  it("renders a panel with a heading + single widget in fill mode", () => {
+    render(
+      <LaunchpadView
+        panels={[
+          {
+            id: "p1",
+            type: "markdown",
+            content: { body: "# Avg time\n\n```widget\nsource: x\nrender: { kind: number }\n```" },
+          },
+        ]}
+        layout={[makeLayout("p1")]}
+        isLoading={false}
+        readOnly={false}
+        canvasId="canvas-1"
+        onChange={vi.fn()}
+      />,
+    );
+    const view = screen.getByTestId("launchpad-markdown-view");
+    expect(view.getAttribute("data-fill")).toBe("true");
+  });
+
+  it("renders a panel with multiple widget fences in regular (non-fill) mode", () => {
+    render(
+      <LaunchpadView
+        panels={[
+          {
+            id: "p1",
+            type: "markdown",
+            content: {
+              body: "```widget\nsource: a\n```\n\n```widget\nsource: b\n```",
+            },
+          },
+        ]}
+        layout={[makeLayout("p1")]}
+        isLoading={false}
+        readOnly={false}
+        canvasId="canvas-1"
+        onChange={vi.fn()}
+      />,
+    );
+    const view = screen.getByTestId("launchpad-markdown-view");
+    expect(view.getAttribute("data-fill")).toBe("false");
   });
 });

@@ -254,12 +254,10 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 	return result, nil
 }
 
-//
 // ResolveCustomNameTemplate resolves expressions in a simple title template
 // against a trigger payload. Unlike the component-level resolver, this runs
 // without database context so the only function available is root() which
 // returns the supplied payload. Any expression error aborts the resolution.
-//
 func ResolveCustomNameTemplate(template string, payload any) (string, error) {
 	if !expressionRegex.MatchString(template) {
 		return template, nil
@@ -307,12 +305,10 @@ func ResolveCustomNameTemplate(template string, payload any) (string, error) {
 	return result, nil
 }
 
-//
 // ResolveReportTemplateFromPayload resolves expressions in a report template
 // against a trigger payload, replacing failed expressions with inline error
 // markers instead of failing the entire template. This is used on the
 // trigger path where there is no previous execution chain to resolve from.
-//
 func ResolveReportTemplateFromPayload(template string, payload any) (string, []error) {
 	if !expressionRegex.MatchString(template) {
 		return template, nil
@@ -356,13 +352,11 @@ func ResolveReportTemplateFromPayload(template string, payload any) (string, []e
 	return result, errors
 }
 
-//
 // ResolveReportTemplate resolves expressions in a component's report
 // template, using the full message chain plus a `current()` function that
 // returns the output events the component just emitted. Failed expressions
 // are replaced with inline error markers so a partial report is still
 // persisted when one expression breaks.
-//
 func (b *NodeConfigurationBuilder) ResolveReportTemplate(template string, outputEvents []any) (string, []error) {
 	if !expressionRegex.MatchString(template) {
 		return template, nil

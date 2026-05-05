@@ -1,15 +1,42 @@
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
+import "./launchpad.css";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { ReactGridLayout, type Layout, type LayoutItem } from "react-grid-layout/legacy";
-import { Plus, Trash2, GripVertical, Loader2 } from "lucide-react";
+import {
+  Plus,
+  GripVertical,
+  Loader2,
+  Pencil,
+  Trash2,
+  ChevronsUpDown,
+  LayoutDashboard,
+  AtSign,
+  BarChart3,
+  Play,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import type { NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
 import { cn } from "@/lib/utils";
 import type { LaunchpadLayoutItem, LaunchpadPanel } from "@/hooks/useCanvasData";
-import { getPanelDef, listPanelDefs, type PanelDef, type PanelRenderCtx } from "./panelRegistry";
+import {
+  getPanelDef,
+  listPanelDefs,
+  type PanelDef,
+  type PanelImperativeHandle,
+  type PanelRenderCtx,
+} from "./panelRegistry";
 
 const GRID_COLS = 12;
 const ROW_HEIGHT = 40;
@@ -23,7 +50,6 @@ export interface LaunchpadViewProps {
   layout: LaunchpadLayoutItem[];
   isLoading: boolean;
   errorMessage?: string;
-  isSaving?: boolean;
   readOnly: boolean;
   nodeRefs?: NodeChipContext;
   canvasId?: string;
@@ -41,12 +67,64 @@ interface PanelInternal {
   content: Record<string, unknown>;
 }
 
+const AUTO_HEIGHT_DEBOUNCE_MS = 100;
+
+/**
+ * Observes the panel body and reports its natural content height (in pixels)
+ * back to the parent so it can resize the grid item to fit. Only does work
+ * when `enabled` is true.
+ *
+ * Uses `scrollHeight` rather than `contentRect.height` so we get the natural
+ * content size even when the parent grid item visually clips the body. Both
+ * `ResizeObserver` (catches direct size changes / window resize) and
+ * `MutationObserver` (catches descendant additions like new table rows) are
+ * wired so dynamic content keeps the panel in sync.
+ */
+function useAutoHeightObserver(enabled: boolean, onMeasured: (contentHeightPx: number) => void) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  // Stash the latest callback in a ref so we don't reset the observers every
+  // time `onMeasured` changes identity (it depends on layout state).
+  const callbackRef = useRef(onMeasured);
+  useEffect(() => {
+    callbackRef.current = onMeasured;
+  }, [onMeasured]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const node = ref.current;
+    if (!node) return;
+    if (typeof ResizeObserver === "undefined" || typeof MutationObserver === "undefined") return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const measure = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!ref.current) return;
+        callbackRef.current(ref.current.scrollHeight);
+      }, AUTO_HEIGHT_DEBOUNCE_MS);
+    };
+
+    const ro = new ResizeObserver(measure);
+    ro.observe(node);
+    const mo = new MutationObserver(measure);
+    mo.observe(node, { childList: true, subtree: true, characterData: true });
+    measure();
+
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [enabled]);
+
+  return ref;
+}
+
 export function LaunchpadView({
   panels,
   layout,
   isLoading,
   errorMessage,
-  isSaving,
   readOnly,
   nodeRefs,
   canvasId,
@@ -167,27 +245,60 @@ export function LaunchpadView({
     (newLayout: Layout) => {
       // Only persist when something actually moved — react-grid-layout fires
       // onLayoutChange on every render including the initial mount.
+      //
+      // For panels with autoHeight=true, the ResizeObserver in PanelChrome
+      // owns the `h` dimension; ignore whatever react-grid-layout proposes
+      // here so a transient drag doesn't stomp the auto-fit value.
       const nextLayout: LaunchpadLayoutItem[] = newLayout.map((item: LayoutItem) => {
         const existing = localLayout.find((l) => l.i === item.i);
+        const autoHeight = existing?.autoHeight === true;
         return {
           i: item.i,
           x: item.x,
           y: item.y,
           w: item.w,
-          h: item.h,
+          h: autoHeight ? (existing?.h ?? item.h) : item.h,
           ...(existing?.minW !== undefined ? { minW: existing.minW } : {}),
           ...(existing?.minH !== undefined ? { minH: existing.minH } : {}),
+          ...(autoHeight ? { autoHeight: true } : {}),
         };
       });
       const before = localLayout
-        .map((l) => `${l.i}:${l.x},${l.y},${l.w},${l.h}`)
+        .map((l) => `${l.i}:${l.x},${l.y},${l.w},${l.h},${l.autoHeight ? 1 : 0}`)
         .sort()
         .join("|");
       const after = nextLayout
-        .map((l) => `${l.i}:${l.x},${l.y},${l.w},${l.h}`)
+        .map((l) => `${l.i}:${l.x},${l.y},${l.w},${l.h},${l.autoHeight ? 1 : 0}`)
         .sort()
         .join("|");
       if (before === after) return;
+      setLocalLayout(nextLayout);
+      queueSave(localPanels, nextLayout);
+    },
+    [localLayout, localPanels, queueSave],
+  );
+
+  const handleToggleAutoHeight = useCallback(
+    (id: string) => {
+      const nextLayout = localLayout.map((l) => (l.i === id ? { ...l, autoHeight: !l.autoHeight } : l));
+      setLocalLayout(nextLayout);
+      queueSave(localPanels, nextLayout);
+    },
+    [localLayout, localPanels, queueSave],
+  );
+
+  // Translate a measured pixel height into row units, snapping up so we never
+  // clip content. Mirrors react-grid-layout's row math: each row is
+  // `ROW_HEIGHT + MARGIN[1]` tall (the trailing margin is shared with the
+  // next row, hence the `+ MARGIN[1]` in the numerator).
+  const handleAutoHeightMeasured = useCallback(
+    (id: string, contentHeightPx: number) => {
+      const item = localLayout.find((l) => l.i === id);
+      if (!item || item.autoHeight !== true) return;
+      const minH = item.minH ?? 1;
+      const rowsNeeded = Math.max(minH, Math.ceil((contentHeightPx + MARGIN[1]) / (ROW_HEIGHT + MARGIN[1])));
+      if (rowsNeeded === item.h) return;
+      const nextLayout = localLayout.map((l) => (l.i === id ? { ...l, h: rowsNeeded } : l));
       setLocalLayout(nextLayout);
       queueSave(localPanels, nextLayout);
     },
@@ -207,18 +318,11 @@ export function LaunchpadView({
 
   return (
     <div ref={containerRef} className="relative flex h-full w-full flex-col overflow-auto">
-      <div className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur">
-        <h2 className="text-sm font-semibold text-slate-800">Apps</h2>
-        <div className="flex items-center gap-2">
-          {isSaving ? (
-            <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Saving
-            </span>
-          ) : null}
-          {!readOnly ? <AddPanelButton onAdd={handleAddPanel} /> : null}
+      {!readOnly && !isLoading && !showEmptyState ? (
+        <div className="sticky top-0 z-10 flex h-11 shrink-0 items-center justify-end gap-2 border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur">
+          <AddPanelButton onAdd={handleAddPanel} />
         </div>
-      </div>
+      ) : null}
 
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">
@@ -247,22 +351,34 @@ export function LaunchpadView({
               }))}
               isDraggable={!readOnly}
               isResizable={!readOnly}
+              resizeHandles={["s", "e", "se"]}
               compactType="vertical"
               preventCollision={false}
               draggableHandle={DRAG_HANDLE_SELECTOR}
               onLayoutChange={handleLayoutChange}
             >
-              {localPanels.map((panel) => (
-                <div key={panel.id} data-testid={`launchpad-panel-${panel.id}`}>
-                  <PanelChrome
-                    panel={panel}
-                    readOnly={readOnly}
-                    ctx={ctx}
-                    onDelete={() => handleDeletePanel(panel.id)}
-                    onChange={(content) => handlePanelContentChange(panel.id, content)}
-                  />
-                </div>
-              ))}
+              {localPanels.map((panel) => {
+                const layoutItem = localLayout.find((l) => l.i === panel.id);
+                const autoHeight = layoutItem?.autoHeight === true;
+                return (
+                  <div
+                    key={panel.id}
+                    data-testid={`launchpad-panel-${panel.id}`}
+                    data-auto-height={autoHeight ? "true" : "false"}
+                  >
+                    <PanelChrome
+                      panel={panel}
+                      readOnly={readOnly}
+                      ctx={ctx}
+                      autoHeight={autoHeight}
+                      onDelete={() => handleDeletePanel(panel.id)}
+                      onChange={(content) => handlePanelContentChange(panel.id, content)}
+                      onToggleAutoHeight={() => handleToggleAutoHeight(panel.id)}
+                      onAutoHeightMeasured={(h) => handleAutoHeightMeasured(panel.id, h)}
+                    />
+                  </div>
+                );
+              })}
             </ReactGridLayout>
           ) : null}
         </div>
@@ -275,16 +391,38 @@ function PanelChrome({
   panel,
   readOnly,
   ctx,
+  autoHeight,
   onDelete,
   onChange,
+  onToggleAutoHeight,
+  onAutoHeightMeasured,
 }: {
   panel: PanelInternal;
   readOnly: boolean;
   ctx: PanelRenderCtx;
+  autoHeight: boolean;
   onDelete: () => void;
   onChange: (content: Record<string, unknown>) => void;
+  onToggleAutoHeight: () => void;
+  onAutoHeightMeasured: (contentHeightPx: number) => void;
 }) {
   const def = getPanelDef(panel.type);
+  const handleRef = useRef<PanelImperativeHandle | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const autoHeightRef = useAutoHeightObserver(autoHeight, onAutoHeightMeasured);
+
+  // Build a stable per-panel ctx so the inner renderer can register an
+  // imperative handle (used by the chrome's Edit button). Reusing the parent
+  // ctx avoids losing the nodeRefs / canvasId fields.
+  const panelCtx: PanelRenderCtx = useMemo(
+    () => ({
+      ...ctx,
+      registerImperativeHandle: (handle) => {
+        handleRef.current = handle;
+      },
+    }),
+    [ctx],
+  );
 
   if (!def) {
     return (
@@ -296,45 +434,170 @@ function PanelChrome({
   }
 
   const content = def.normalize(panel.content);
+  const supportsEdit = !readOnly && def.supportsEdit === true;
+
+  const triggerEdit = () => {
+    if (readOnly) return;
+    handleRef.current?.startEdit();
+  };
 
   return (
-    <div className="group/panel relative flex h-full w-full flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-      {!readOnly ? (
-        <div
-          className={cn(
-            "absolute right-1.5 top-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity",
-            "group-hover/panel:opacity-100 focus-within:opacity-100",
-          )}
-        >
-          <button
-            type="button"
-            onClick={onDelete}
-            className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-red-50 hover:text-red-600"
-            aria-label="Delete panel"
-            data-testid="launchpad-delete-panel"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-          <span
-            className={cn(
-              "launchpad-drag-handle inline-flex h-6 w-6 cursor-move items-center justify-center rounded text-slate-500 hover:bg-slate-100",
-            )}
-            aria-label="Drag panel"
-            data-testid="launchpad-drag-handle"
-          >
-            <GripVertical className="h-3.5 w-3.5" />
-          </span>
+    <>
+      <Card
+        data-panel-chrome
+        className={cn(
+          "group/panel relative flex h-full w-full flex-col overflow-hidden gap-0 p-0 rounded-lg",
+          "border-slate-200/80 bg-white",
+          "shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]",
+          "transition-[box-shadow,border-color,transform] duration-150",
+          "hover:border-slate-300 hover:shadow-[0_4px_12px_-2px_rgb(15_23_42_/_0.08)]",
+        )}
+      >
+        <div ref={autoHeightRef} className="min-h-0 flex-1 overflow-hidden">
+          {def.render({
+            content,
+            readOnly,
+            ctx: panelCtx,
+            onChange: (next) => onChange(next as Record<string, unknown>),
+          })}
         </div>
+        {!readOnly ? (
+          <PanelOverlay
+            supportsEdit={supportsEdit}
+            autoHeight={autoHeight}
+            onEdit={triggerEdit}
+            onToggleAutoHeight={onToggleAutoHeight}
+            onRequestDelete={() => setConfirmingDelete(true)}
+          />
+        ) : null}
+      </Card>
+      <DeleteConfirmDialog
+        open={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          onDelete();
+        }}
+      />
+    </>
+  );
+}
+
+function PanelOverlay({
+  supportsEdit,
+  autoHeight,
+  onEdit,
+  onToggleAutoHeight,
+  onRequestDelete,
+}: {
+  supportsEdit: boolean;
+  autoHeight: boolean;
+  onEdit: () => void;
+  onToggleAutoHeight: () => void;
+  onRequestDelete: () => void;
+}) {
+  // Single hover-revealed cluster anchored top-right. Order: drag, edit,
+  // grow-with-content toggle, delete. The drag icon keeps the
+  // `.launchpad-drag-handle` class so react-grid-layout's `draggableHandle`
+  // selector still resolves to it.
+  return (
+    <div
+      className="absolute right-1 top-1 z-20 flex items-center gap-0.5 rounded-md bg-white/85 opacity-0 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)] backdrop-blur transition-opacity duration-150 group-hover/panel:opacity-100 focus-within:opacity-100"
+      data-testid="launchpad-panel-actions"
+      // Stop the drag-handle drag from initiating when interacting with the
+      // action cluster — clicks on these buttons should not start a drag.
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+    >
+      <span
+        className="launchpad-drag-handle inline-flex h-6 w-6 cursor-grab items-center justify-center rounded text-slate-500 transition-colors hover:text-slate-700 active:cursor-grabbing"
+        data-testid="launchpad-drag-handle"
+        role="button"
+        aria-label="Drag panel"
+        title="Drag to move"
+        // The drag handle isn't focusable on its own — the rest of the cluster
+        // already provides keyboard access — but we still want to swallow
+        // mousedowns so the drag (rather than focus shift) starts.
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </span>
+      {supportsEdit ? (
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          onClick={onEdit}
+          aria-label="Edit panel"
+          title="Edit"
+          data-testid="launchpad-edit-panel"
+          className="h-6 w-6 text-slate-500 hover:text-slate-700"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
       ) : null}
-      <div className="min-h-0 flex-1">
-        {def.render({
-          content,
-          readOnly,
-          ctx,
-          onChange: (next) => onChange(next as Record<string, unknown>),
-        })}
-      </div>
+      <Button
+        type="button"
+        size="icon-xs"
+        variant="ghost"
+        onClick={onToggleAutoHeight}
+        aria-pressed={autoHeight}
+        aria-label="Grow with content"
+        title={autoHeight ? "Stop growing with content" : "Grow with content"}
+        data-testid="launchpad-toggle-auto-height"
+        data-active={autoHeight ? "true" : "false"}
+        className={cn(
+          "h-6 w-6 transition-colors",
+          autoHeight ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "text-slate-500 hover:text-slate-700",
+        )}
+      >
+        <ChevronsUpDown className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        type="button"
+        size="icon-xs"
+        variant="ghost"
+        onClick={onRequestDelete}
+        aria-label="Delete panel"
+        title="Delete"
+        data-testid="launchpad-delete-panel-button"
+        className="h-6 w-6 text-slate-500 hover:bg-red-50 hover:text-red-600"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
     </div>
+  );
+}
+
+function DeleteConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? null : onClose())}>
+      <DialogContent data-testid="launchpad-delete-confirm">
+        <DialogHeader>
+          <DialogTitle>Delete this panel?</DialogTitle>
+          <DialogDescription>
+            This panel and its contents will be removed from the Apps page. You can add it back later, but the content
+            isn't recoverable.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm} data-testid="launchpad-delete-confirm-action">
+            Delete panel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -374,14 +637,64 @@ function AddPanelButton({ onAdd }: { onAdd: (def: PanelDef) => void }) {
 function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: (def: PanelDef) => void }) {
   return (
     <div className="flex flex-1 items-center justify-center p-8" data-testid="launchpad-empty-state">
-      <div className="flex max-w-md flex-col items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
-        <h3 className="text-base font-semibold text-slate-800">Build your Apps page</h3>
-        <p className="text-sm text-slate-500">
-          Add panels to surface the most important docs, links, and notes for this canvas. Panels can be dragged and
-          resized into a grid that suits your team.
-        </p>
-        {!readOnly ? <AddPanelButton onAdd={onAdd} /> : null}
+      <div className="flex w-full max-w-2xl flex-col items-center gap-5 rounded-xl border border-dashed border-slate-300 bg-white/70 px-8 py-10 text-center shadow-[0_1px_2px_rgb(15_23_42_/_0.04)] backdrop-blur">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+          <LayoutDashboard className="h-7 w-7 text-slate-500" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-lg font-semibold text-slate-800">Build your Apps page</h3>
+          <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-500">
+            Apps panels surface the most important docs, links, and live data for this canvas. Drag and resize panels to
+            lay them out the way your team works.
+          </p>
+        </div>
+
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+          <FeatureTile
+            icon={AtSign}
+            title="Reference nodes"
+            description="Drop in @my-node chips that show live status."
+          />
+          <FeatureTile
+            icon={BarChart3}
+            title="Show live data"
+            description="Embed canvas memory or executions with widget blocks."
+          />
+          <FeatureTile
+            icon={Play}
+            title="Trigger runs"
+            description="Add Run buttons for manual triggers right in markdown."
+          />
+        </div>
+
+        {!readOnly ? (
+          <div className="flex items-center gap-3">
+            <AddPanelButton onAdd={onAdd} />
+          </div>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function FeatureTile({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Card className="gap-2 border-slate-200/80 bg-white px-3 py-3 text-left shadow-none">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-50 text-sky-600">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="text-xs font-semibold text-slate-700">{title}</span>
+      </div>
+      <p className="text-xs leading-snug text-slate-500">{description}</p>
+    </Card>
   );
 }

@@ -4,6 +4,16 @@ import type { NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
 import { MarkdownPanel, type MarkdownPanelContent } from "./MarkdownPanel";
 
 /**
+ * Imperative handle a panel renderer can expose so the chrome (or anything
+ * else outside the panel) can drive panel-local actions like "start editing".
+ * Only `startEdit` is defined today; future verbs ("save", "discard") slot in
+ * here.
+ */
+export interface PanelImperativeHandle {
+  startEdit: () => void;
+}
+
+/**
  * Context shared with every panel renderer. Today this is just the node-ref
  * data needed by Markdown panels (so `@node` chips render rich previews); it
  * lives here so future panel types (charts, run lists, etc.) can pick what
@@ -12,6 +22,13 @@ import { MarkdownPanel, type MarkdownPanelContent } from "./MarkdownPanel";
 export interface PanelRenderCtx {
   nodeRefs?: NodeChipContext;
   canvasId?: string;
+  /**
+   * Lets a panel renderer expose imperative actions (currently only
+   * `startEdit`) to its surrounding chrome. The chrome calls this once on
+   * mount and once with `null` on unmount; renderers that don't support
+   * imperative actions can ignore it.
+   */
+  registerImperativeHandle?: (handle: PanelImperativeHandle | null) => void;
 }
 
 export interface PanelRenderProps<TContent> {
@@ -33,6 +50,12 @@ export interface PanelDef<TContent = PanelContent> {
   defaultContent: TContent;
   defaultSize: { w: number; h: number; minW?: number; minH?: number };
   /**
+   * When true, the panel chrome shows an explicit Edit button that drives
+   * the renderer's `startEdit` imperative handle. When false / unset, the
+   * Edit affordance is hidden (the chrome's More menu still shows Delete).
+   */
+  supportsEdit?: boolean;
+  /**
    * Best-effort coercion of a stored panel.content into the typed shape this
    * renderer expects. Used when reading from the API; missing/malformed fields
    * should be normalized to safe defaults rather than throwing.
@@ -47,6 +70,7 @@ const markdownPanelDef: PanelDef<MarkdownPanelContent> = {
   icon: FileText,
   defaultContent: { body: "" },
   defaultSize: { w: 6, h: 6, minW: 2, minH: 2 },
+  supportsEdit: true,
   normalize: (raw) => ({
     body: typeof raw?.body === "string" ? (raw.body as string) : "",
   }),

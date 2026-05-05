@@ -83,6 +83,13 @@ export interface WidgetBlockProps {
   canvasId: string;
   /** Forwarded by CanvasMarkdown so row actions can resolve trigger slugs and emit events. */
   nodeRefs?: NodeChipContext;
+  /**
+   * When true, the chart / number renderer fills its parent's height instead
+   * of using fixed pixel dimensions. Used by single-widget panels in Apps so
+   * the chart resizes with the panel. The parent MUST provide a defined
+   * height (`h-full` from a flex column ancestor is fine).
+   */
+  fill?: boolean;
 }
 
 //
@@ -1532,24 +1539,43 @@ function collectSparklineSeries(rows: Record<string, unknown>[], number: NumberS
 // Chart renderers
 //
 
-function ChartEmpty({ testId }: { testId: string }) {
+function ChartEmpty({ testId, fill }: { testId: string; fill?: boolean }) {
   return (
     <div
       data-testid={testId}
-      className="my-2 flex items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-xs text-slate-500"
+      className={
+        fill
+          ? "flex h-full w-full items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-xs text-slate-500"
+          : "my-2 flex items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-xs text-slate-500"
+      }
     >
       No data
     </div>
   );
 }
 
-function ChartRenderer({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
-  if (chart.type === "donut") return <DonutInner rows={rows} chart={chart} />;
-  if (chart.type === "stacked-bar") return <StackedBarInner rows={rows} chart={chart} />;
-  return <SingleSeriesInner rows={rows} chart={chart} />;
+function ChartRenderer({ rows, chart, fill }: { rows: Record<string, unknown>[]; chart: ChartSpec; fill?: boolean }) {
+  if (chart.type === "donut") return <DonutInner rows={rows} chart={chart} fill={fill} />;
+  if (chart.type === "stacked-bar") return <StackedBarInner rows={rows} chart={chart} fill={fill} />;
+  return <SingleSeriesInner rows={rows} chart={chart} fill={fill} />;
 }
 
-function SingleSeriesInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
+// In fill mode the wrapping div uses `h-full flex flex-col` so the chart
+// container can flex-grow into the panel. Outside fill mode (markdown body
+// with mixed content) the original `my-2` block-flow wrapper is preserved
+// so chart blocks coexist with surrounding text.
+const fillWrapClass = "flex h-full w-full flex-col";
+const fillChartClass = "aspect-auto h-full w-full flex-1";
+
+function SingleSeriesInner({
+  rows,
+  chart,
+  fill,
+}: {
+  rows: Record<string, unknown>[];
+  chart: ChartSpec;
+  fill?: boolean;
+}) {
   const data = useMemo(() => shapeXY(rows, chart), [rows, chart]);
   const colorVar = chart.color ? COLOR_KEYWORD_TO_VAR[chart.color] : "var(--chart-1)";
   const seriesKey = "y";
@@ -1559,11 +1585,15 @@ function SingleSeriesInner({ rows, chart }: { rows: Record<string, unknown>[]; c
     [seriesLabel, colorVar],
   );
 
-  if (data.length === 0) return <ChartEmpty testId="canvas-widget-block-chart-empty" />;
+  if (data.length === 0) return <ChartEmpty testId="canvas-widget-block-chart-empty" fill={fill} />;
 
   return (
-    <div data-testid="canvas-widget-block-chart" data-chart-type={chart.type} className="my-2">
-      <ChartContainer config={config} className="aspect-auto" style={{ height: CHART_HEIGHT }}>
+    <div data-testid="canvas-widget-block-chart" data-chart-type={chart.type} className={fill ? fillWrapClass : "my-2"}>
+      <ChartContainer
+        config={config}
+        className={fill ? fillChartClass : "aspect-auto"}
+        style={fill ? undefined : { height: CHART_HEIGHT }}
+      >
         {chart.type === "bar" ? (
           <BarChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -1617,7 +1647,7 @@ function SingleSeriesInner({ rows, chart }: { rows: Record<string, unknown>[]; c
   );
 }
 
-function StackedBarInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
+function StackedBarInner({ rows, chart, fill }: { rows: Record<string, unknown>[]; chart: ChartSpec; fill?: boolean }) {
   const { data, groups } = useMemo(() => shapeStacked(rows, chart), [rows, chart]);
   const config: ChartConfig = useMemo(() => {
     const cfg: ChartConfig = {};
@@ -1628,12 +1658,20 @@ function StackedBarInner({ rows, chart }: { rows: Record<string, unknown>[]; cha
   }, [groups]);
 
   if (data.length === 0 || groups.length === 0) {
-    return <ChartEmpty testId="canvas-widget-block-chart-empty" />;
+    return <ChartEmpty testId="canvas-widget-block-chart-empty" fill={fill} />;
   }
 
   return (
-    <div data-testid="canvas-widget-block-chart" data-chart-type="stacked-bar" className="my-2">
-      <ChartContainer config={config} className="aspect-auto" style={{ height: CHART_HEIGHT }}>
+    <div
+      data-testid="canvas-widget-block-chart"
+      data-chart-type="stacked-bar"
+      className={fill ? fillWrapClass : "my-2"}
+    >
+      <ChartContainer
+        config={config}
+        className={fill ? fillChartClass : "aspect-auto"}
+        style={fill ? undefined : { height: CHART_HEIGHT }}
+      >
         <BarChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -1656,7 +1694,7 @@ function StackedBarInner({ rows, chart }: { rows: Record<string, unknown>[]; cha
   );
 }
 
-function DonutInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
+function DonutInner({ rows, chart, fill }: { rows: Record<string, unknown>[]; chart: ChartSpec; fill?: boolean }) {
   const data = useMemo(() => shapeDonut(rows, chart), [rows, chart]);
   const config: ChartConfig = useMemo(() => {
     const cfg: ChartConfig = {};
@@ -1666,11 +1704,15 @@ function DonutInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: C
     return cfg;
   }, [data]);
 
-  if (data.length === 0) return <ChartEmpty testId="canvas-widget-block-chart-empty" />;
+  if (data.length === 0) return <ChartEmpty testId="canvas-widget-block-chart-empty" fill={fill} />;
 
   return (
-    <div data-testid="canvas-widget-block-chart" data-chart-type="donut" className="my-2">
-      <ChartContainer config={config} className="aspect-auto" style={{ height: CHART_HEIGHT }}>
+    <div data-testid="canvas-widget-block-chart" data-chart-type="donut" className={fill ? fillWrapClass : "my-2"}>
+      <ChartContainer
+        config={config}
+        className={fill ? fillChartClass : "aspect-auto"}
+        style={fill ? undefined : { height: CHART_HEIGHT }}
+      >
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
           <Pie
@@ -1697,18 +1739,34 @@ function DonutInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: C
 // Number renderer (with optional sparkline).
 //
 
-function NumberRenderer({ rows, number }: { rows: Record<string, unknown>[]; number: NumberSpec }) {
+function NumberRenderer({
+  rows,
+  number,
+  fill,
+}: {
+  rows: Record<string, unknown>[];
+  number: NumberSpec;
+  fill?: boolean;
+}) {
   const value = useMemo(() => computeNumberAggregate(rows, number), [rows, number]);
   const display = formatNumberValue(value, number.format);
   const sparkPoints = useMemo(() => (number.sparkline ? collectSparklineSeries(rows, number) : null), [rows, number]);
+  // In fill mode the card stretches to fill the panel and the value is
+  // visually centered, with the sparkline (if any) anchored to the bottom.
   return (
     <div
       data-testid="canvas-widget-block-number"
-      className="my-2 flex flex-col items-start gap-1 rounded border border-slate-200 bg-white px-4 py-3"
+      className={
+        fill
+          ? "flex h-full w-full flex-col items-start justify-center gap-1.5 rounded border border-slate-200 bg-white px-6 py-5"
+          : "my-2 flex flex-col items-start gap-1 rounded border border-slate-200 bg-white px-4 py-3"
+      }
     >
-      <span className="text-3xl font-semibold text-slate-800">{display}</span>
+      <span className={fill ? "text-5xl font-semibold text-slate-800" : "text-3xl font-semibold text-slate-800"}>
+        {display}
+      </span>
       <span className="text-xs uppercase tracking-wide text-slate-500">{number.label}</span>
-      {sparkPoints && sparkPoints.length > 1 ? <SparklineInner points={sparkPoints} /> : null}
+      {sparkPoints && sparkPoints.length > 1 ? <SparklineInner points={sparkPoints} fill={fill} /> : null}
     </div>
   );
 }
@@ -1717,10 +1775,14 @@ const SPARKLINE_CONFIG: ChartConfig = {
   y: { label: "value", color: "var(--chart-1)" },
 };
 
-function SparklineInner({ points }: { points: Array<{ i: number; y: number }> }) {
+function SparklineInner({ points, fill }: { points: Array<{ i: number; y: number }>; fill?: boolean }) {
+  // In fill mode the sparkline gets a slightly larger fixed height since it
+  // sits inside a much taller card; otherwise keep the compact 40px sparkline
+  // used inline with markdown content.
+  const height = fill ? 64 : SPARKLINE_HEIGHT;
   return (
-    <div data-testid="canvas-widget-block-number-sparkline" className="mt-2 w-full">
-      <ChartContainer config={SPARKLINE_CONFIG} className="aspect-auto" style={{ height: SPARKLINE_HEIGHT }}>
+    <div data-testid="canvas-widget-block-number-sparkline" className={fill ? "mt-3 w-full" : "mt-2 w-full"}>
+      <ChartContainer config={SPARKLINE_CONFIG} className="aspect-auto" style={{ height }}>
         <AreaChart data={points} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <Area
             dataKey="y"
@@ -1770,7 +1832,7 @@ function formatDurationSeconds(value: number): string {
 // Component
 //
 
-export function WidgetBlock({ body, canvasId, nodeRefs }: WidgetBlockProps) {
+export function WidgetBlock({ body, canvasId, nodeRefs, fill }: WidgetBlockProps) {
   const parsed = useMemo(() => parseWidgetBody(body), [body]);
   const isOk = parsed.kind === "ok";
   const widget = isOk ? parsed.widget : null;
@@ -1832,10 +1894,10 @@ export function WidgetBlock({ body, canvasId, nodeRefs }: WidgetBlockProps) {
   }
 
   if (w.render.kind === "chart") {
-    return <ChartRenderer rows={filtered} chart={w.render.chart} />;
+    return <ChartRenderer rows={filtered} chart={w.render.chart} fill={fill} />;
   }
   if (w.render.kind === "number") {
-    return <NumberRenderer rows={filtered} number={w.render.number} />;
+    return <NumberRenderer rows={filtered} number={w.render.number} fill={fill} />;
   }
 
   const columns: ColumnSpec[] = w.columns ?? autoColumns(w.source, filtered);

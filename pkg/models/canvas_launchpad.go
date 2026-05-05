@@ -22,13 +22,14 @@ type LaunchpadPanel struct {
 // LaunchpadLayoutItem mirrors the shape that react-grid-layout produces in its
 // onLayoutChange callback. The `i` field references LaunchpadPanel.ID.
 type LaunchpadLayoutItem struct {
-	I    string `json:"i"`
-	X    int    `json:"x"`
-	Y    int    `json:"y"`
-	W    int    `json:"w"`
-	H    int    `json:"h"`
-	MinW *int   `json:"minW,omitempty"`
-	MinH *int   `json:"minH,omitempty"`
+	I          string `json:"i"`
+	X          int    `json:"x"`
+	Y          int    `json:"y"`
+	W          int    `json:"w"`
+	H          int    `json:"h"`
+	MinW       *int   `json:"minW,omitempty"`
+	MinH       *int   `json:"minH,omitempty"`
+	AutoHeight *bool  `json:"autoHeight,omitempty"`
 }
 
 type CanvasLaunchpad struct {

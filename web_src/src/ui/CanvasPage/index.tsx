@@ -1223,7 +1223,7 @@ function CanvasPage(props: CanvasPageProps) {
             <div className="absolute inset-0 z-[15] overflow-hidden pointer-events-none">{props.runViewOverlay}</div>
           ) : null}
           {props.headerMode === "launchpad" && props.launchpadOverlay ? (
-            <div className="absolute inset-0 z-[15] overflow-hidden bg-slate-50">{props.launchpadOverlay}</div>
+            <div className="launchpad-canvas absolute inset-0 z-[15] overflow-hidden">{props.launchpadOverlay}</div>
           ) : null}
           {props.headerMode === "runs" && props.runDetailPanel ? props.runDetailPanel : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (

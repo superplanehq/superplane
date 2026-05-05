@@ -380,12 +380,10 @@ func CountNodeQueueItemsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.
 	return count, nil
 }
 
-//
 // ListQueueItemsForRootEvents returns every queue item whose root_event_id is
 // in the given set. Used to surface queued components that belong to a run
 // in the Runs list and Run View so those runs aren't misreported as
 // "completed" when there's still work sitting in the queue.
-//
 func ListQueueItemsForRootEvents(rootEventIDs []uuid.UUID) ([]CanvasNodeQueueItem, error) {
 	if len(rootEventIDs) == 0 {
 		return []CanvasNodeQueueItem{}, nil

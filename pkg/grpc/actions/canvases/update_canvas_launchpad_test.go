@@ -143,4 +143,25 @@ func Test__UpdateCanvasLaunchpad(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
+
+	t.Run("round-trips auto_height through serialization", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+		autoHeight := true
+		resp, err := UpdateCanvasLaunchpad(ctx, r.Organization.ID.String(), canvas.ID.String(),
+			[]*pb.LaunchpadPanel{newMarkdownPanel(t, "p1", "table panel")},
+			[]*pb.LaunchpadLayoutItem{{I: "p1", X: 0, Y: 0, W: 6, H: 4, AutoHeight: &autoHeight}},
+		)
+		require.NoError(t, err)
+		require.Len(t, resp.Launchpad.Layout, 1)
+		require.NotNil(t, resp.Launchpad.Layout[0].AutoHeight)
+		assert.Equal(t, true, *resp.Launchpad.Layout[0].AutoHeight)
+
+		stored, err := models.FindCanvasLaunchpadInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		require.Len(t, stored.Layout.Data(), 1)
+		require.NotNil(t, stored.Layout.Data()[0].AutoHeight)
+		assert.Equal(t, true, *stored.Layout.Data()[0].AutoHeight)
+	})
 }

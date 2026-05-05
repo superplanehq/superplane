@@ -31,12 +31,10 @@ func NewExecutionStateContext(
 	}
 }
 
-//
 // SetConfigBuilder wires a NodeConfigurationBuilder so that report
 // templates can be resolved against the full expression namespace (root,
 // previous, $, memory) when the node finishes. Without this set, the
 // report template will be skipped rather than failing the execution.
-//
 func (s *ExecutionStateContext) SetConfigBuilder(builder *NodeConfigurationBuilder) {
 	s.configBuilder = builder
 }
@@ -157,7 +155,6 @@ func (s *ExecutionStateContext) resolveReportEntry(outputEvents []any) {
 	}
 }
 
-//
 // buildFallbackConfigBuilder produces a NodeConfigurationBuilder wired with
 // enough context to evaluate report template expressions even when the
 // outer execution context didn't call SetConfigBuilder. The builder needs
@@ -166,7 +163,6 @@ func (s *ExecutionStateContext) resolveReportEntry(outputEvents []any) {
 // on the happy path. If the input event can't be loaded we return nil so
 // the caller silently skips template resolution (matching prior behavior
 // for unavailable builders).
-//
 func (s *ExecutionStateContext) buildFallbackConfigBuilder() *NodeConfigurationBuilder {
 	inputEvent, err := models.FindCanvasEventInTransaction(s.tx, s.execution.EventID)
 	if err != nil {
