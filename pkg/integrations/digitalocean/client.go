@@ -3261,8 +3261,7 @@ func isGPURelatedImage(image Image) bool {
 	lowerSlug := strings.ToLower(image.Slug)
 
 	for _, keyword := range gpuKeywords {
-		lowerKeyword := strings.ToLower(keyword)
-		if strings.Contains(lowerName, lowerKeyword) || strings.Contains(lowerSlug, lowerKeyword) {
+		if strings.Contains(lowerName, keyword) || strings.Contains(lowerSlug, keyword) {
 			return true
 		}
 	}
@@ -3274,8 +3273,10 @@ func isGPURelatedImage(image Image) bool {
 // support per distribution slug prefix. New versions released by DigitalOcean will automatically
 // be included once they meet or exceed these minimums.
 var gpuMinVersions = map[string]int{
-	"ubuntu": 2204, // Ubuntu 22.04+
-	"fedora": 42,   // Fedora 42+
+	"ubuntu":     2204, // Ubuntu 22.04+
+	"fedora":     42,   // Fedora 42+
+	"debian":     11,   // Debian 11+
+	"rockylinux": 8,    // Rocky Linux 8+
 }
 
 // isGPUSupportedDistribution checks if a distribution image meets the minimum version
