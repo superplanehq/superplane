@@ -215,32 +215,29 @@ Returns the created origin pool with its assigned ID and full configuration.
 
 ```json
 {
-  "accountId": "01a7362d577a6c3019a474fd6f485823",
-  "pool": {
-    "description": "Primary origin pool",
-    "enabled": true,
-    "id": "17b5962d775c646f3f9725cbc7a53df4",
-    "minimum_origins": 1,
-    "monitor": "",
-    "name": "primary-pool",
-    "origin_steering": {
-      "policy": "random"
-    },
-    "origins": [
-      {
-        "address": "192.0.2.1",
-        "enabled": true,
-        "name": "app-1",
-        "weight": 1
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-pool",
+      "origin_steering": {
+        "policy": "random"
       },
-      {
-        "address": "192.0.2.2",
-        "enabled": true,
-        "name": "app-2",
-        "weight": 1
-      }
-    ]
-  }
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "timestamp": "2026-05-05T05:57:07.706260875Z",
+  "type": "cloudflare.pool.created"
 }
 ```
 
@@ -498,9 +495,30 @@ Emits a confirmation with the account ID and pool ID of the deleted pool.
 
 ```json
 {
-  "accountId": "01a7362d577a6c3019a474fd6f485823",
-  "deleted": true,
-  "poolId": "17b5962d775c646f3f9725cbc7a53df4"
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my deleted pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-deleted-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "138.68.89.169:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:58:40.060373991Z",
+  "type": "cloudflare.pool.deleted"
 }
 ```
 
@@ -529,27 +547,30 @@ Returns the full pool configuration including its origins, enabled state, and he
 
 ```json
 {
-  "accountId": "01a7362d577a6c3019a474fd6f485823",
-  "pool": {
-    "description": "Primary origin pool",
-    "enabled": true,
-    "id": "17b5962d775c646f3f9725cbc7a53df4",
-    "minimum_origins": 1,
-    "monitor": "",
-    "name": "primary-pool",
-    "origin_steering": {
-      "policy": "random"
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
     },
-    "origins": [
-      {
-        "address": "192.0.2.1",
-        "enabled": true,
-        "name": "app-1",
-        "weight": 1
-      }
-    ]
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
   },
-  "poolId": "17b5962d775c646f3f9725cbc7a53df4"
+  "timestamp": "2026-05-05T05:58:40.060373991Z",
+  "type": "cloudflare.pool.fetched"
 }
 ```
 
@@ -676,33 +697,30 @@ Returns the updated origin pool configuration.
 
 ```json
 {
-  "accountId": "01a7362d577a6c3019a474fd6f485823",
-  "pool": {
-    "description": "Primary origin pool",
-    "enabled": true,
-    "id": "17b5962d775c646f3f9725cbc7a53df4",
-    "minimum_origins": 1,
-    "monitor": "",
-    "name": "primary-pool",
-    "origin_steering": {
-      "policy": "random"
-    },
-    "origins": [
-      {
-        "address": "192.0.2.1",
-        "enabled": true,
-        "name": "app-stable",
-        "weight": 0.9
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
       },
-      {
-        "address": "192.0.2.3",
-        "enabled": true,
-        "name": "app-canary",
-        "weight": 0.1
-      }
-    ]
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
   },
-  "poolId": "17b5962d775c646f3f9725cbc7a53df4"
+  "timestamp": "2026-05-05T05:57:59.044021383Z",
+  "type": "cloudflare.pool.updated"
 }
 ```
 

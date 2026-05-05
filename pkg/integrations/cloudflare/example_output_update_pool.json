@@ -1,29 +1,26 @@
 {
-  "pool": {
-    "id": "17b5962d775c646f3f9725cbc7a53df4",
-    "name": "primary-pool",
-    "description": "Primary origin pool",
-    "enabled": true,
-    "minimum_origins": 1,
-    "monitor": "",
-    "origins": [
-      {
-        "name": "app-stable",
-        "address": "192.0.2.1",
-        "enabled": true,
-        "weight": 0.9
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
       },
-      {
-        "name": "app-canary",
-        "address": "192.0.2.3",
-        "enabled": true,
-        "weight": 0.1
-      }
-    ],
-    "origin_steering": {
-      "policy": "random"
-    }
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
   },
-  "accountId": "01a7362d577a6c3019a474fd6f485823",
-  "poolId": "17b5962d775c646f3f9725cbc7a53df4"
+  "timestamp": "2026-05-05T05:57:59.044021383Z",
+  "type": "cloudflare.pool.updated"
 }

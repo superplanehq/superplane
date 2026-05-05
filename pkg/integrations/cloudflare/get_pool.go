@@ -142,7 +142,7 @@ func (c *GetPool) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"cloudflare.pool",
+		"cloudflare.pool.fetched",
 		[]any{result},
 	)
 }

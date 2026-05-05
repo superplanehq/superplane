@@ -418,7 +418,7 @@ func (c *CreatePool) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"cloudflare.pool",
+		"cloudflare.pool.created",
 		[]any{result},
 	)
 }
