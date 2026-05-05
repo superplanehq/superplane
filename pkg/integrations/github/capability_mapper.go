@@ -111,6 +111,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: true, Trigger: &pulls.OnPRReviewComment{}},
 					{ReadOnly: false, Action: &pulls.CreateReview{}},
 					{ReadOnly: false, Action: &pulls.AddReaction{}},
+					{ReadOnly: false, Action: &pulls.CreatePullRequest{}},
 				},
 			},
 		},

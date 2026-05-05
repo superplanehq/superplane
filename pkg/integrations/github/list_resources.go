@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/go-github/v84/github"
@@ -22,6 +23,10 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 
 		return toIntegrationResources(repositories), nil
+
+	case "branch":
+		return g.listBranchResources(ctx)
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -37,4 +42,48 @@ func toIntegrationResources(repositories []*github.Repository) []core.Integratio
 		})
 	}
 	return resources
+}
+
+func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	repository := ctx.Parameters["repository"]
+	if repository == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := common.NewClient(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	var allBranches []*github.Branch
+	opts := &github.BranchListOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	for {
+		branches, resp, err := client.ListBranches(context.Background(), repository, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list branches: %w", err)
+		}
+
+		allBranches = append(allBranches, branches...)
+		if resp.NextPage == 0 {
+			break
+		}
+
+		opts.Page = resp.NextPage
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(allBranches))
+	for _, branch := range allBranches {
+		if branch.Name != nil {
+			resources = append(resources, core.IntegrationResource{
+				Type: "branch",
+				Name: *branch.Name,
+				ID:   *branch.Name,
+			})
+		}
+	}
+
+	return resources, nil
 }

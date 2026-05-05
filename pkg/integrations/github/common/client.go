@@ -149,6 +149,10 @@ func (c *Client) listOrganizationRepositories() ([]*github.Repository, error) {
 	return allRepos, nil
 }
 
+func (c *Client) ListBranches(ctx context.Context, repository string, opts *github.BranchListOptions) ([]*github.Branch, *github.Response, error) {
+	return c.underlying.Repositories.ListBranches(ctx, c.owner, repository, opts)
+}
+
 func (c *Client) CreateIssueReaction(ctx context.Context, repository string, commentID int64, content string) (*github.Reaction, *github.Response, error) {
 	return c.underlying.Reactions.CreateIssueCommentReaction(ctx, c.owner, repository, commentID, content)
 }
@@ -159,6 +163,10 @@ func (c *Client) CreateReviewCommentReaction(ctx context.Context, repository str
 
 func (c *Client) CreatePullRequestReview(ctx context.Context, repository string, pullNumber int, review *github.PullRequestReviewRequest) (*github.PullRequestReview, *github.Response, error) {
 	return c.underlying.PullRequests.CreateReview(ctx, c.owner, repository, pullNumber, review)
+}
+
+func (c *Client) CreatePullRequest(ctx context.Context, repository string, pullRequest *github.NewPullRequest) (*github.PullRequest, *github.Response, error) {
+	return c.underlying.PullRequests.Create(ctx, c.owner, repository, pullRequest)
 }
 
 func (c *Client) CreateStatus(ctx context.Context, repository string, sha string, status github.RepoStatus) (*github.RepoStatus, *github.Response, error) {

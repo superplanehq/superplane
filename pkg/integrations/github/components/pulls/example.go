@@ -22,11 +22,17 @@ var exampleDataOnPRReviewCommentBytes []byte
 //go:embed payloads/add_reaction.json
 var exampleOutputAddReactionBytes []byte
 
+//go:embed payloads/create_pull_request.json
+var exampleOutputCreatePullRequestBytes []byte
+
 var exampleOutputAddReactionOnce sync.Once
 var exampleOutputAddReaction map[string]any
 
 var exampleOutputCreateReviewOnce sync.Once
 var exampleOutputCreateReview map[string]any
+
+var exampleOutputCreatePullRequestOnce sync.Once
+var exampleOutputCreatePullRequest map[string]any
 
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
@@ -66,5 +72,13 @@ func (c *CreateReview) ExampleOutput() map[string]any {
 		&exampleOutputCreateReviewOnce,
 		exampleOutputCreateReviewBytes,
 		&exampleOutputCreateReview,
+	)
+}
+
+func (c *CreatePullRequest) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreatePullRequestOnce,
+		exampleOutputCreatePullRequestBytes,
+		&exampleOutputCreatePullRequest,
 	)
 }
