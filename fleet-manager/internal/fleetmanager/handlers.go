@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/superplane/runner/fleet-manager/internal/store"
-	"github.com/superplane/runner/fleet-manager/internal/webhook"
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/webhook"
 )
 
 // Server exposes fleet-manager HTTP handlers.

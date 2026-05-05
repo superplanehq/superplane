@@ -60,9 +60,10 @@ func TaskPayloadFrom(t *models.Task) *TaskPayload {
 
 // WebhookPayload is POSTed to the caller webhook URL on terminal status.
 type WebhookPayload struct {
-	TaskID   string `json:"task_id"`
-	Status   string `json:"status"`
-	ExitCode int    `json:"exit_code"`
-	Output   string `json:"output"`
-	Error    string `json:"error,omitempty"`
+	TaskID      string `json:"task_id"`
+	FleetTaskID string `json:"fleet_task_id,omitempty"` // when task-broker forwards, fleet-managed id
+	Status      string `json:"status"`
+	ExitCode    int    `json:"exit_code"`
+	Output      string `json:"output"`
+	Error       string `json:"error,omitempty"`
 }

@@ -68,9 +68,10 @@ Provisioning is **orthogonal** to task claiming:
 
 | Path | Concern |
 |------|---------|
-| `fleet-manager/` | HTTP API (`internal/fleetmanager`), persistence (`internal/store`), webhooks (`internal/webhook`), `cmd/fleet-manager` |
+| `task-broker/` | Proxies tasks to registered fleet-managers (`internal/broker`), fleet registry + routing SQLite (`internal/store`), `cmd/task-broker`; receives downstream completion webhooks and forwards to caller URLs |
+| `fleet-manager/` | HTTP API (`internal/fleetmanager`), persistence (`internal/store`), `cmd/fleet-manager`; delivers completion webhooks (shared sender in `shared/webhook`) |
 | `runner/` | Worker agent (`internal/agent`), `cmd/runner` |
-| `shared/api`, `shared/models` | Shared request/response and domain types used by both services |
+| `shared/api`, `shared/models`, `shared/webhook` | Shared types and webhook retry client used by fleet-manager and task-broker |
 
 Optional **provisioner** (EC2/ASG/K8s) can live under `fleet-manager/internal/provisioner` or its own top-level package later.
 

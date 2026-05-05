@@ -52,7 +52,7 @@ func (s *Sender) Deliver(ctx context.Context, url string, payload api.WebhookPay
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "superplane-fleet-manager/webhook")
+		req.Header.Set("User-Agent", "superplane/webhook")
 
 		resp, err := s.Client.Do(req)
 		if err != nil {

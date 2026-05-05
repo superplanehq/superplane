@@ -7,19 +7,19 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"syscall"
 	"time"
 
-	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
-	"github.com/superplane/runner/fleet-manager/internal/store"
+	"github.com/superplane/runner/task-broker/internal/broker"
+
 	"github.com/superplane/runner/shared/webhook"
+	"github.com/superplane/runner/task-broker/internal/store"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	dbPath := getenv("DATABASE_PATH", "./fleet.db")
+	dbPath := getenv("DATABASE_PATH", "./broker.db")
 	if dir := filepath.Dir(dbPath); dir != "." && dir != "" {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			log.Error("mkdir", slog.Any("err", err))
@@ -33,15 +33,25 @@ func main() {
 	}
 	defer st.Close()
 
-	srv := &fleetmanager.Server{
-		Store:   st,
-		Webhook: webhook.DefaultSender(),
-		Log:     log,
+	publicURL := getenv("BROKER_PUBLIC_URL", "")
+	if publicURL == "" {
+		log.Warn("BROKER_PUBLIC_URL unset; downstream fleet-man cannot POST completion webhooks in production")
 	}
-	auth := getenv("AUTH_TOKEN", "")
-	handler := fleetmanager.NewRouter(srv, fleetmanager.RouterOptions{AuthToken: auth})
 
-	addr := getenv("LISTEN_ADDR", ":8080")
+	srv := &broker.Server{
+		Store:     st,
+		PublicURL: publicURL,
+		Webhook:   webhook.DefaultSender(),
+		Log:       log,
+		HTTP: &http.Client{
+			Timeout: 60 * time.Second,
+		},
+	}
+
+	auth := getenv("AUTH_TOKEN", "")
+	handler := broker.NewRouter(srv, broker.RouterOptions{AuthToken: auth})
+
+	addr := getenv("LISTEN_ADDR", ":8081")
 	httpSrv := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
@@ -51,34 +61,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	reapInterval := 15 * time.Second
-	if v := getenv("REAP_INTERVAL_SEC", ""); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			reapInterval = time.Duration(n) * time.Second
-		}
-	}
 	go func() {
-		t := time.NewTicker(reapInterval)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				n, err := st.ReapExpiredLeases(context.Background())
-				if err != nil {
-					log.Warn("reap leases", slog.Any("err", err))
-					continue
-				}
-				if n > 0 {
-					log.Info("reaped expired task leases", slog.Int64("count", n))
-				}
-			}
-		}
-	}()
-
-	go func() {
-		log.Info("fleet-manager listening", slog.String("addr", addr))
+		log.Info("task-broker listening", slog.String("addr", addr))
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("http server", slog.Any("err", err))
 			stop()
