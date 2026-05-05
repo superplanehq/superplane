@@ -84,4 +84,3 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   return metadata;
 }
-
