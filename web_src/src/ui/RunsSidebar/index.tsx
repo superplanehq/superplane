@@ -12,7 +12,6 @@ import {
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
-import { formatDurationSeconds } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import { Filter, Link as LinkIcon, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,17 +38,22 @@ interface RunsSidebarProps {
   totalCount?: number;
 }
 
-function RunStatusBadge({ status }: { status: string }) {
+//
+// One small colored dot to the right of the title -- the only run-level
+// status indicator in v2. Completed / cancelled runs show no dot at all so
+// "everything is fine" reads as the absence of indicators. The running dot
+// pulses; queued / error are static.
+//
+function StatusDot({ status }: { status: string }) {
+  if (status !== "running" && status !== "queued" && status !== "error") return null;
   const { badgeColor, label } = getStatusBadgeProps(status);
   return (
     <span
-      className={cn(
-        "shrink-0 rounded px-[4px] py-[1px] text-[10px] font-semibold uppercase tracking-wide text-white",
-        badgeColor,
-      )}
-    >
-      {label}
-    </span>
+      role="img"
+      aria-label={label}
+      title={label}
+      className={cn("inline-block h-2 w-2 shrink-0 rounded-full", badgeColor, status === "running" && "animate-pulse")}
+    />
   );
 }
 
@@ -89,29 +93,20 @@ function TriggerIcon({
 //
 type StatusOptionId = Exclude<RunsStatusFilter, "all">;
 
+//
+// Runs in these aggregate states are pinned to the top of the list ("active"
+// group). Errors deliberately stay in chronological position because they
+// are historical -- floating them up would let old failures pile on top of
+// what's actually live right now.
+//
+const ACTIVE_STATUSES = new Set(["running", "queued"]);
+
 const STATUS_OPTIONS: { id: StatusOptionId; label: string; color: string }[] = [
   { id: "running", label: "Running", color: badgeColorForEventState("running") },
   { id: "queued", label: "Queued", color: badgeColorForEventState("queued") },
   { id: "errors", label: "Errors", color: badgeColorForEventState("error") },
   { id: "completed", label: "Completed", color: badgeColorForEventState("success") },
 ];
-
-function computeRunDuration(event: CanvasesCanvasEventWithExecutions): string | null {
-  const executions = event.executions || [];
-  if (!event.createdAt || executions.length === 0) return null;
-  if (!executions.every((e) => e.state === "STATE_FINISHED")) return null;
-
-  const startMs = new Date(event.createdAt).getTime();
-  let latestEndMs = startMs;
-  for (const exec of executions) {
-    if (exec.updatedAt) {
-      const endMs = new Date(exec.updatedAt).getTime();
-      if (endMs > latestEndMs) latestEndMs = endMs;
-    }
-  }
-  if (latestEndMs <= startMs) return null;
-  return formatDurationSeconds(latestEndMs - startMs);
-}
 
 type TriggerOption = {
   id: string;
@@ -427,23 +422,32 @@ export function RunsSidebar({
             </button>
           </div>
         ) : (
-          <>
-            {filteredEvents.map(({ event, triggerName, title }) => {
+          (() => {
+            //
+            // Decorate each row, then partition by `isActive` so running /
+            // queued runs float to the top of the list as the "active"
+            // group. Errors deliberately stay in chronological position
+            // (they're historical, otherwise old failures would pile on top
+            // of what's actually live). Rendering is one closure shared by
+            // both groups so the layout stays consistent.
+            //
+            const decorated = filteredEvents.map(({ event, triggerName, title }) => {
               const executions = event.executions || [];
               const pendingQueueCount = (event.queueItems || []).length;
               const status = getAggregateRunStatus(executions, pendingQueueCount > 0);
-              const isSelected = event.id === selectedEventId;
+              const isActive = ACTIVE_STATUSES.has(status);
+              return { event, triggerName, title, status, isActive };
+            });
 
+            const active = decorated.filter((r) => r.isActive);
+            const rest = decorated.filter((r) => !r.isActive);
+
+            const renderRow = ({ event, triggerName, title, status }: (typeof decorated)[number]) => {
+              const isSelected = event.id === selectedEventId;
               const triggerNode = event.nodeId ? nodeMap.get(event.nodeId) : undefined;
               const iconSrc = getHeaderIconSrc(triggerNode?.trigger?.name);
               const iconSlug = resolveNodeIconSlug(triggerNode, componentIconMap || {});
-
-              //
-              // Only show duration for terminal runs. If there are pending
-              // queue items or a running execution, the run isn't actually
-              // done -- the numeric duration would lie.
-              //
-              const duration = pendingQueueCount === 0 && status !== "running" ? computeRunDuration(event) : null;
+              const isError = status === "error";
 
               return (
                 <div
@@ -458,60 +462,69 @@ export function RunsSidebar({
                     }
                   }}
                   className={cn(
-                    "group flex w-full cursor-pointer flex-col gap-1 border-b border-slate-100 px-3 py-2.5 text-left transition-colors",
+                    // Always-2px left border so the conditional red tint on
+                    // failed runs doesn't shift surrounding rows by 2px.
+                    "group flex w-full cursor-pointer items-center gap-1.5 border-b border-l-2 border-slate-100 px-3 py-2 text-left transition-colors",
                     isSelected ? "bg-sky-50" : "hover:bg-gray-50",
+                    isError ? "border-l-red-400" : "border-l-transparent",
                   )}
                 >
-                  <div className="flex items-center gap-1.5">
-                    <TriggerIcon iconSrc={iconSrc} iconSlug={iconSlug || undefined} alt={triggerName} />
-                    <span className="truncate text-xs text-gray-600">{triggerName}</span>
-                    <span className="text-gray-300">&middot;</span>
-                    <span className="shrink-0 font-mono text-[10px] text-gray-400">#{event.id?.slice(0, 4)}</span>
-                    <button
-                      type="button"
-                      title="Copy link to run"
-                      className="ml-auto hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:block"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const url = new URL(window.location.href);
-                        url.searchParams.set("run", event.id || "");
-                        navigator.clipboard.writeText(url.toString());
-                        toast.success("Run link copied");
-                      }}
-                    >
-                      <LinkIcon className="h-3 w-3" />
-                    </button>
-                    <span className="ml-auto shrink-0 text-[10px] tabular-nums text-gray-400">
-                      {event.createdAt ? <TimeAgo date={event.createdAt} /> : ""}
+                  <TriggerIcon iconSrc={iconSrc} iconSlug={iconSlug || undefined} alt={triggerName} />
+                  <span className="max-w-[35%] shrink-0 truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                    {triggerName}
+                  </span>
+                  {title ? (
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800">{title}</span>
+                  ) : (
+                    <span className="flex-1" />
+                  )}
+                  <button
+                    type="button"
+                    title="Copy link to run"
+                    className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const url = new URL(window.location.href);
+                      url.searchParams.set("run", event.id || "");
+                      navigator.clipboard.writeText(url.toString());
+                      toast.success("Run link copied");
+                    }}
+                  >
+                    <LinkIcon className="h-3 w-3" />
+                  </button>
+                  <StatusDot status={status} />
+                  {event.createdAt ? (
+                    <span className="shrink-0 text-[10px] tabular-nums text-gray-400">
+                      <TimeAgo date={event.createdAt} />
                     </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <RunStatusBadge status={status} />
-                    {title ? <span className="min-w-0 truncate text-xs font-medium text-gray-800">{title}</span> : null}
-                    {duration && (
-                      <span className="ml-auto shrink-0 font-mono text-[10px] text-gray-400">{duration}</span>
-                    )}
-                  </div>
+                  ) : null}
                 </div>
               );
-            })}
-            {hasNextPage && onLoadMore ? (
-              <div className="px-3 py-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={onLoadMore}
-                  disabled={isFetchingNextPage}
-                >
-                  {isFetchingNextPage ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-                  Load more
-                </Button>
-              </div>
-            ) : null}
-          </>
+            };
+
+            return (
+              <>
+                {active.map(renderRow)}
+                {active.length > 0 && rest.length > 0 ? <div className="h-px bg-slate-300" aria-hidden /> : null}
+                {rest.map(renderRow)}
+                {hasNextPage && onLoadMore ? (
+                  <div className="px-3 py-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={onLoadMore}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                      Load more
+                    </Button>
+                  </div>
+                ) : null}
+              </>
+            );
+          })()
         )}
       </div>
 
