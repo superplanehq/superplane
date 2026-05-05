@@ -3,11 +3,12 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Pencil, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
+import { useLaunchpadHeaderSlotNode } from "./LaunchpadHeaderSlotContext";
 
 type HeaderMode = "default" | "launchpad" | "version-live" | "version-edit" | "runs";
 
@@ -120,19 +121,17 @@ function PageHeader({
 }
 
 function SecondaryHeader(props: HeaderProps) {
+  // The Editor tab has been replaced by an explicit Edit button. The mode
+  // toggle stays visible during edit mode so the user can still navigate to
+  // Apps/Runs; the Canvas tab adopts a draft visual treatment to signal the
+  // edit state.
   const showCanvasViewModeToggle =
     props.mode === "launchpad" ||
     props.mode === "version-live" ||
     props.mode === "version-edit" ||
     props.mode === "runs";
-  const canvasViewMode =
-    props.mode === "launchpad"
-      ? "launchpad"
-      : props.mode === "version-edit"
-        ? "version-edit"
-        : props.mode === "runs"
-          ? "runs"
-          : "version-live";
+  const canvasViewMode = props.mode === "launchpad" ? "launchpad" : props.mode === "runs" ? "runs" : "version-live";
+  const editing = props.mode === "version-edit";
 
   return (
     <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
@@ -140,14 +139,14 @@ function SecondaryHeader(props: HeaderProps) {
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
-          {showCanvasViewModeToggle && props.onEnterEditMode && props.onExitEditMode ? (
+          {showCanvasViewModeToggle && props.onExitEditMode ? (
             <CanvasModeToggle
               mode={canvasViewMode}
               onSelectLaunchpad={props.onSelectLaunchpad}
-              onSelectEditor={props.onEnterEditMode}
               onSelectLive={props.onExitEditMode}
               onSelectRuns={props.onSelectRuns}
               runsNotificationCount={props.runsNotificationCount}
+              editing={editing}
             />
           ) : null}
         </div>
@@ -177,17 +176,34 @@ function SecondaryHeaderActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
+  const launchpadSlotNode = useLaunchpadHeaderSlotNode();
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
+      {mode === "launchpad" && launchpadSlotNode ? launchpadSlotNode : null}
+
       {showVersionControlTrigger ? (
         <VersionControlButton
           onToggle={onOpenVersionControl}
           isOpen={!!isVersionControlOpen}
           tooltip={versionControlButtonTooltip}
           notificationCount={versionControlNotificationCount}
+        />
+      ) : null}
+
+      {mode === "version-live" && onEnterEditMode ? (
+        <EnterEditButton
+          onClick={onEnterEditMode}
+          disabled={!!enterEditModeDisabled}
+          disabledTooltip={enterEditModeDisabledTooltip}
         />
       ) : null}
 
@@ -209,6 +225,13 @@ function SecondaryHeaderActions({
               disabledTooltip={discardVersionDisabledTooltip}
             />
           ) : null}
+          {onExitEditMode ? (
+            <ExitEditButton
+              onClick={() => onExitEditMode()}
+              disabled={!!exitEditModeDisabled}
+              disabledTooltip={exitEditModeDisabledTooltip}
+            />
+          ) : null}
           <PublishVersionButton
             onPublish={() => onPublishVersion?.()}
             label={publishVersionLabel || "Publish"}
@@ -220,6 +243,79 @@ function SecondaryHeaderActions({
       ) : null}
     </div>
   );
+}
+
+function EnterEditButton({
+  onClick,
+  disabled,
+  disabledTooltip,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  disabledTooltip?: string;
+}) {
+  const button = (
+    <UIButton
+      type="button"
+      variant="default"
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      data-testid="canvas-edit-button"
+    >
+      <Pencil className="h-3.5 w-3.5" />
+      Edit
+    </UIButton>
+  );
+
+  if (disabled && disabledTooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">{button}</div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
+}
+
+function ExitEditButton({
+  onClick,
+  disabled,
+  disabledTooltip,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  disabledTooltip?: string;
+}) {
+  const button = (
+    <UIButton
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      data-testid="canvas-exit-edit-button"
+    >
+      Exit edit
+    </UIButton>
+  );
+
+  if (disabled && disabledTooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">{button}</div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
 }
 
 function VersionControlButton({

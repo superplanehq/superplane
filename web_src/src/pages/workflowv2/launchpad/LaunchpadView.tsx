@@ -30,6 +30,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
 import { cn } from "@/lib/utils";
 import type { LaunchpadLayoutItem, LaunchpadPanel } from "@/hooks/useCanvasData";
+import { useLaunchpadHeaderSlotSetter } from "@/ui/CanvasPage/LaunchpadHeaderSlotContext";
 import {
   getPanelDef,
   listPanelDefs,
@@ -226,6 +227,29 @@ export function LaunchpadView({
     [localLayout, localPanels, queueSave],
   );
 
+  // Render the Add panel control into the secondary header slot when one is
+  // available. Falls back to the empty-state button if no provider is mounted
+  // (e.g. during isolated component tests). The setter is stable across
+  // renders, and we route through a ref so handleAddPanel's identity churn
+  // (it depends on the live panel/layout state) doesn't re-fire the effect.
+  const setLaunchpadHeaderNode = useLaunchpadHeaderSlotSetter();
+  const handleAddPanelRef = useRef(handleAddPanel);
+  handleAddPanelRef.current = handleAddPanel;
+  const stableHandleAddPanel = useCallback((def: PanelDef) => {
+    handleAddPanelRef.current(def);
+  }, []);
+  useEffect(() => {
+    if (!setLaunchpadHeaderNode) return;
+    if (readOnly) {
+      setLaunchpadHeaderNode(null);
+      return;
+    }
+    setLaunchpadHeaderNode(<AddPanelButton onAdd={stableHandleAddPanel} />);
+    return () => {
+      setLaunchpadHeaderNode(null);
+    };
+  }, [setLaunchpadHeaderNode, readOnly, stableHandleAddPanel]);
+
   const handleDeletePanel = useCallback(
     (id: string) => {
       const nextPanels = localPanels.filter((p) => p.id !== id);
@@ -323,12 +347,6 @@ export function LaunchpadView({
 
   return (
     <div ref={containerRef} className="relative flex h-full w-full flex-col overflow-auto">
-      {!readOnly && !isLoading && !showEmptyState ? (
-        <div className="sticky top-0 z-10 flex h-11 shrink-0 items-center justify-end gap-2 border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur">
-          <AddPanelButton onAdd={handleAddPanel} />
-        </div>
-      ) : null}
-
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-slate-400" />

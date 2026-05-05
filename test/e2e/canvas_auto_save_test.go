@@ -100,11 +100,11 @@ func (s *canvasAutoSaveSteps) givenCanvasWithChangeManagementEnabled(name string
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
 }
 
 func (s *canvasAutoSaveSteps) enterEditMode() {
-	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	deadline := time.Now().Add(15 * time.Second)
 
 	for {

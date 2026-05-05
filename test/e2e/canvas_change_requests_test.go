@@ -82,7 +82,7 @@ func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationChangeManagementEn
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
 }
 
 func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled bool) {
@@ -95,7 +95,7 @@ func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled b
 }
 
 func (s *canvasChangeRequestSteps) enterEditMode() {
-	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	deadline := time.Now().Add(15 * time.Second)
 
 	for {

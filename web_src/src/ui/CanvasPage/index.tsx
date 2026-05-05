@@ -68,6 +68,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
+import { LaunchpadHeaderSlotProvider } from "./LaunchpadHeaderSlotContext";
 import { RightSideControls } from "./RightSideControls";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -1134,260 +1135,264 @@ function CanvasPage(props: CanvasPageProps) {
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
-    <div
-      ref={canvasWrapperRef}
-      className={cn(
-        "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        props.headerMode === "version-live" && "sp-canvas-live",
-      )}
-    >
-      {/* Header at the top spanning full width */}
-      <div className="relative z-30">
-        <CanvasContentHeader
-          state={state}
-          canvasName={props.title ?? ""}
-          onSave={props.onSave}
-          organizationId={props.organizationId}
-          saveIsPrimary={props.saveIsPrimary}
-          saveButtonHidden={props.saveButtonHidden}
-          saveDisabled={props.saveDisabled}
-          saveDisabledTooltip={props.saveDisabledTooltip}
-          onPublishVersion={props.onPublishVersion}
-          onDiscardVersion={props.onDiscardVersion}
-          publishVersionDisabled={props.publishVersionDisabled}
-          publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
-          discardVersionDisabled={props.discardVersionDisabled}
-          discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
-          headerMode={props.headerMode}
-          onEnterEditMode={props.onEnterEditMode}
-          enterEditModeDisabled={props.enterEditModeDisabled}
-          enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-          onExitEditMode={props.onExitEditMode}
-          exitEditModeDisabled={props.exitEditModeDisabled}
-          exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          publishVersionLabel={props.publishVersionLabel}
-          hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
-          showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          isVersionControlOpen={props.isVersionControlOpen}
-          onOpenVersionControl={props.onOpenVersionControl}
-          versionControlButtonTooltip={props.versionControlButtonTooltip}
-          versionControlNotificationCount={props.versionControlNotificationCount}
-          onSelectRuns={props.onSelectRuns}
-          runsNotificationCount={props.runsNotificationCount}
-          onSelectLaunchpad={props.onSelectLaunchpad}
-          agentState={agentState}
-        />
-        {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
-      </div>
-
-      {/* Main content area with sidebar and canvas */}
-      <div className="flex-1 flex relative overflow-hidden">
-        {props.headerMode === "runs"
-          ? props.runsSidebar
-          : props.headerMode === "launchpad"
-            ? null
-            : props.versionControlSidebar}
-
-        <AgentSidebar agentState={agentState} />
-
-        {props.headerMode === "launchpad" ? null : (
-          <RightSideControls
-            mode={readOnly ? "live" : "edit"}
-            onSidebarOpen={() => handleSidebarToggle(true)}
-            onAddNote={handleAddNote}
-            onMemoryOpen={props.onMemoryOpen}
-            onReadmeOpen={props.onReadmeOpen}
-            onYamlOpen={props.onYamlOpen}
-            belowOverlayHeader={props.headerMode === "runs" && !!props.runViewOverlay}
-          />
+    <LaunchpadHeaderSlotProvider>
+      <div
+        ref={canvasWrapperRef}
+        className={cn(
+          "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
+          props.headerMode === "version-live" && "sp-canvas-live",
         )}
-
-        {props.hideAddControls ||
-        !isBuildingBlocksSidebarOpen ||
-        props.headerMode === "runs" ||
-        props.headerMode === "launchpad" ? null : (
-          <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live"}
-            onToggle={handleSidebarToggle}
-            blocks={props.buildingBlocks || []}
-            integrations={props.integrations}
-            canvasZoom={canvasZoom}
-            disabled={readOnly}
-            disabledMessage="You don't have permission to edit this canvas."
-            onBlockClick={handleBuildingBlockClick}
-          />
-        )}
-
-        <div className="flex-1 relative">
-          {props.headerMode === "runs" && props.runViewOverlay ? (
-            <div className="absolute inset-0 z-[15] overflow-hidden pointer-events-none">{props.runViewOverlay}</div>
-          ) : null}
-          {props.headerMode === "launchpad" && props.launchpadOverlay ? (
-            <div className="launchpad-canvas absolute inset-0 z-[15] overflow-hidden">{props.launchpadOverlay}</div>
-          ) : null}
-          {props.headerMode === "runs" && props.runDetailPanel ? props.runDetailPanel : null}
-          {showPreviewFloatingBar || showAwaitingFloatingBar ? (
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
-              <div
-                className={cn(
-                  "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
-                  showAwaitingFloatingBar ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName : "bg-sky-50",
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex min-w-0 max-w-full items-center gap-1 text-sm",
-                    showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
-                  )}
-                >
-                  {showAwaitingFloatingBar ? (
-                    <>
-                      <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
-                      <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
-                        {props.awaitingApprovalBanner?.reviewUi.label}
-                      </span>
-                    </>
-                  ) : (
-                    "Previewing previous version"
-                  )}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => {
-                    if (showAwaitingFloatingBar) {
-                      props.awaitingApprovalBanner?.onViewNodeDiff?.();
-                    } else {
-                      props.onPreviewPreviousVersionViewDetails?.();
-                    }
-                  }}
-                >
-                  View details
-                </Button>
-              </div>
-            </div>
-          ) : null}
-          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-            <CanvasContent
-              state={state}
-              onNodeEdit={handleNodeEdit}
-              onNodeDelete={handleNodeDelete}
-              onNodesDelete={props.onNodesDelete}
-              onDuplicateNodes={props.onDuplicateNodes}
-              onAutoLayoutNodes={props.onAutoLayoutNodes}
-              onEdgeCreate={props.onEdgeCreate}
-              onToggleView={handleToggleView}
-              onRun={(nodeId) => handleNodeRun(nodeId)}
-              onDuplicate={props.onDuplicate}
-              onDeactivate={props.onDeactivate}
-              onAnnotationUpdate={props.onAnnotationUpdate}
-              onAnnotationBlur={props.onAnnotationBlur}
-              onTogglePause={props.onTogglePause}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
-              onBuildingBlockDrop={handleBuildingBlockDrop}
-              onBuildingBlocksSidebarToggle={handleSidebarToggle}
-              onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-              onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onZoomChange={setCanvasZoom}
-              hasFitToViewRef={hasFitToViewRef}
-              viewportRefProp={props.viewportRef}
-              highlightedNodeIds={highlightedNodeIds}
-              workflowNodes={props.workflowNodes}
-              setCurrentTab={setCurrentTab}
-              showBottomStatusControls={props.showBottomStatusControls}
-              headerMode={props.headerMode}
-              isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
-              onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
-              autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
-              autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
-              readOnly={props.readOnly}
-              logEntries={props.logEntries}
-              focusRequest={props.focusRequest}
-              initialFocusNodeId={props.initialFocusNodeId}
-              runsEvents={props.runsEvents}
-              runsTotalCount={props.runsTotalCount}
-              runsHasNextPage={props.runsHasNextPage}
-              runsIsFetchingNextPage={props.runsIsFetchingNextPage}
-              onRunsLoadMore={props.onRunsLoadMore}
-              runsNodes={props.runsNodes}
-              runsComponentIconMap={props.runsComponentIconMap}
-              runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
-              onRunNodeSelect={props.onRunNodeSelect}
-              onRunExecutionSelect={props.onRunExecutionSelect}
-              onAcknowledgeErrors={props.onAcknowledgeErrors}
-              missingIntegrations={props.missingIntegrations}
-              onConnectIntegration={props.onConnectIntegration}
-              canCreateIntegrations={props.canCreateIntegrations}
-              onNodeDoubleClick={props.onNodeDoubleClick}
-              onNodeClick={props.onNodeClick}
-              fitAllRequest={props.fitAllRequest}
-            />
-          </ReactFlowProvider>
-
-          <Sidebar
+      >
+        {/* Header at the top spanning full width */}
+        <div className="relative z-30">
+          <CanvasContentHeader
             state={state}
-            getSidebarData={props.getSidebarData}
-            loadSidebarData={props.loadSidebarData}
-            getTabData={props.getTabData}
-            getAutocompleteExampleObj={props.getAutocompleteExampleObj}
-            onCancelQueueItem={handleCancelQueueItem}
-            onCancelExecution={handleCancelExecution}
-            getAllHistoryEvents={props.getAllHistoryEvents}
-            onLoadMoreHistory={props.onLoadMoreHistory}
-            getHasMoreHistory={props.getHasMoreHistory}
-            getLoadingMoreHistory={props.getLoadingMoreHistory}
-            onLoadMoreQueue={props.onLoadMoreQueue}
-            getAllQueueEvents={props.getAllQueueEvents}
-            getHasMoreQueue={props.getHasMoreQueue}
-            getLoadingMoreQueue={props.getLoadingMoreQueue}
-            onReEmit={props.onReEmit}
-            loadExecutionChain={props.loadExecutionChain}
-            getExecutionState={props.getExecutionState}
-            onSidebarClose={handleSidebarClose}
-            editingNodeData={editingNodeData}
-            onSaveConfiguration={handleSaveConfiguration}
-            configurationSaveMode={props.configurationSaveMode}
-            currentTab={currentTab}
-            onTabChange={setCurrentTab}
-            canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
+            canvasName={props.title ?? ""}
+            onSave={props.onSave}
             organizationId={props.organizationId}
-            getCustomField={props.getCustomField}
-            integrations={props.integrations}
-            workflowNodes={props.workflowNodes}
-            components={props.components}
-            triggers={props.triggers}
-            blueprints={props.blueprints}
-            onHighlightedNodesChange={setHighlightedNodeIds}
-            focusRequest={props.focusRequest}
-            onExecutionChainHandled={props.onExecutionChainHandled}
-            readOnly={readOnly}
-            canReadIntegrations={props.canReadIntegrations}
-            canCreateIntegrations={props.canCreateIntegrations}
-            canUpdateIntegrations={props.canUpdateIntegrations}
+            saveIsPrimary={props.saveIsPrimary}
+            saveButtonHidden={props.saveButtonHidden}
+            saveDisabled={props.saveDisabled}
+            saveDisabledTooltip={props.saveDisabledTooltip}
+            onPublishVersion={props.onPublishVersion}
+            onDiscardVersion={props.onDiscardVersion}
+            publishVersionDisabled={props.publishVersionDisabled}
+            publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+            discardVersionDisabled={props.discardVersionDisabled}
+            discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+            headerMode={props.headerMode}
+            onEnterEditMode={props.onEnterEditMode}
+            enterEditModeDisabled={props.enterEditModeDisabled}
+            enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+            onExitEditMode={props.onExitEditMode}
+            exitEditModeDisabled={props.exitEditModeDisabled}
+            exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
+            publishVersionLabel={props.publishVersionLabel}
+            hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+            showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+            isVersionControlOpen={props.isVersionControlOpen}
+            onOpenVersionControl={props.onOpenVersionControl}
+            versionControlButtonTooltip={props.versionControlButtonTooltip}
+            versionControlNotificationCount={props.versionControlNotificationCount}
+            onSelectRuns={props.onSelectRuns}
+            runsNotificationCount={props.runsNotificationCount}
+            onSelectLaunchpad={props.onSelectLaunchpad}
+            agentState={agentState}
           />
+          {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
         </div>
+
+        {/* Main content area with sidebar and canvas */}
+        <div className="flex-1 flex relative overflow-hidden">
+          {props.headerMode === "runs"
+            ? props.runsSidebar
+            : props.headerMode === "launchpad"
+              ? null
+              : props.versionControlSidebar}
+
+          <AgentSidebar agentState={agentState} />
+
+          {props.headerMode === "launchpad" ? null : (
+            <RightSideControls
+              mode={readOnly ? "live" : "edit"}
+              onSidebarOpen={() => handleSidebarToggle(true)}
+              onAddNote={handleAddNote}
+              onMemoryOpen={props.onMemoryOpen}
+              onReadmeOpen={props.onReadmeOpen}
+              onYamlOpen={props.onYamlOpen}
+              belowOverlayHeader={props.headerMode === "runs" && !!props.runViewOverlay}
+            />
+          )}
+
+          {props.hideAddControls ||
+          !isBuildingBlocksSidebarOpen ||
+          props.headerMode === "runs" ||
+          props.headerMode === "launchpad" ? null : (
+            <BuildingBlocksSidebar
+              isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live"}
+              onToggle={handleSidebarToggle}
+              blocks={props.buildingBlocks || []}
+              integrations={props.integrations}
+              canvasZoom={canvasZoom}
+              disabled={readOnly}
+              disabledMessage="You don't have permission to edit this canvas."
+              onBlockClick={handleBuildingBlockClick}
+            />
+          )}
+
+          <div className="flex-1 relative">
+            {props.headerMode === "runs" && props.runViewOverlay ? (
+              <div className="absolute inset-0 z-[15] overflow-hidden pointer-events-none">{props.runViewOverlay}</div>
+            ) : null}
+            {props.headerMode === "launchpad" && props.launchpadOverlay ? (
+              <div className="launchpad-canvas absolute inset-0 z-[15] overflow-hidden">{props.launchpadOverlay}</div>
+            ) : null}
+            {props.headerMode === "runs" && props.runDetailPanel ? props.runDetailPanel : null}
+            {showPreviewFloatingBar || showAwaitingFloatingBar ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
+                <div
+                  className={cn(
+                    "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
+                    showAwaitingFloatingBar
+                      ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName
+                      : "bg-sky-50",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex min-w-0 max-w-full items-center gap-1 text-sm",
+                      showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
+                    )}
+                  >
+                    {showAwaitingFloatingBar ? (
+                      <>
+                        <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
+                        <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
+                          {props.awaitingApprovalBanner?.reviewUi.label}
+                        </span>
+                      </>
+                    ) : (
+                      "Previewing previous version"
+                    )}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => {
+                      if (showAwaitingFloatingBar) {
+                        props.awaitingApprovalBanner?.onViewNodeDiff?.();
+                      } else {
+                        props.onPreviewPreviousVersionViewDetails?.();
+                      }
+                    }}
+                  >
+                    View details
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+              <CanvasContent
+                state={state}
+                onNodeEdit={handleNodeEdit}
+                onNodeDelete={handleNodeDelete}
+                onNodesDelete={props.onNodesDelete}
+                onDuplicateNodes={props.onDuplicateNodes}
+                onAutoLayoutNodes={props.onAutoLayoutNodes}
+                onEdgeCreate={props.onEdgeCreate}
+                onToggleView={handleToggleView}
+                onRun={(nodeId) => handleNodeRun(nodeId)}
+                onDuplicate={props.onDuplicate}
+                onDeactivate={props.onDeactivate}
+                onAnnotationUpdate={props.onAnnotationUpdate}
+                onAnnotationBlur={props.onAnnotationBlur}
+                onTogglePause={props.onTogglePause}
+                runDisabled={props.runDisabled}
+                runDisabledTooltip={props.runDisabledTooltip}
+                onBuildingBlockDrop={handleBuildingBlockDrop}
+                onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                onZoomChange={setCanvasZoom}
+                hasFitToViewRef={hasFitToViewRef}
+                viewportRefProp={props.viewportRef}
+                highlightedNodeIds={highlightedNodeIds}
+                workflowNodes={props.workflowNodes}
+                setCurrentTab={setCurrentTab}
+                showBottomStatusControls={props.showBottomStatusControls}
+                headerMode={props.headerMode}
+                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                readOnly={props.readOnly}
+                logEntries={props.logEntries}
+                focusRequest={props.focusRequest}
+                initialFocusNodeId={props.initialFocusNodeId}
+                runsEvents={props.runsEvents}
+                runsTotalCount={props.runsTotalCount}
+                runsHasNextPage={props.runsHasNextPage}
+                runsIsFetchingNextPage={props.runsIsFetchingNextPage}
+                onRunsLoadMore={props.onRunsLoadMore}
+                runsNodes={props.runsNodes}
+                runsComponentIconMap={props.runsComponentIconMap}
+                runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
+                onRunNodeSelect={props.onRunNodeSelect}
+                onRunExecutionSelect={props.onRunExecutionSelect}
+                onAcknowledgeErrors={props.onAcknowledgeErrors}
+                missingIntegrations={props.missingIntegrations}
+                onConnectIntegration={props.onConnectIntegration}
+                canCreateIntegrations={props.canCreateIntegrations}
+                onNodeDoubleClick={props.onNodeDoubleClick}
+                onNodeClick={props.onNodeClick}
+                fitAllRequest={props.fitAllRequest}
+              />
+            </ReactFlowProvider>
+
+            <Sidebar
+              state={state}
+              getSidebarData={props.getSidebarData}
+              loadSidebarData={props.loadSidebarData}
+              getTabData={props.getTabData}
+              getAutocompleteExampleObj={props.getAutocompleteExampleObj}
+              onCancelQueueItem={handleCancelQueueItem}
+              onCancelExecution={handleCancelExecution}
+              getAllHistoryEvents={props.getAllHistoryEvents}
+              onLoadMoreHistory={props.onLoadMoreHistory}
+              getHasMoreHistory={props.getHasMoreHistory}
+              getLoadingMoreHistory={props.getLoadingMoreHistory}
+              onLoadMoreQueue={props.onLoadMoreQueue}
+              getAllQueueEvents={props.getAllQueueEvents}
+              getHasMoreQueue={props.getHasMoreQueue}
+              getLoadingMoreQueue={props.getLoadingMoreQueue}
+              onReEmit={props.onReEmit}
+              loadExecutionChain={props.loadExecutionChain}
+              getExecutionState={props.getExecutionState}
+              onSidebarClose={handleSidebarClose}
+              editingNodeData={editingNodeData}
+              onSaveConfiguration={handleSaveConfiguration}
+              configurationSaveMode={props.configurationSaveMode}
+              currentTab={currentTab}
+              onTabChange={setCurrentTab}
+              canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
+              organizationId={props.organizationId}
+              getCustomField={props.getCustomField}
+              integrations={props.integrations}
+              workflowNodes={props.workflowNodes}
+              components={props.components}
+              triggers={props.triggers}
+              blueprints={props.blueprints}
+              onHighlightedNodesChange={setHighlightedNodeIds}
+              focusRequest={props.focusRequest}
+              onExecutionChainHandled={props.onExecutionChainHandled}
+              readOnly={readOnly}
+              canReadIntegrations={props.canReadIntegrations}
+              canCreateIntegrations={props.canCreateIntegrations}
+              canUpdateIntegrations={props.canUpdateIntegrations}
+            />
+          </div>
+        </div>
+
+        {/* Edit existing node modal - now handled by settings sidebar */}
+
+        {/* Emit Event Modal */}
+        {emitModalData && (
+          <EmitEventModal
+            isOpen={true}
+            onClose={() => setEmitModalData(null)}
+            nodeId={emitModalData.nodeId}
+            nodeName={emitModalData.nodeName}
+            workflowId={props.organizationId || ""}
+            organizationId={props.organizationId || ""}
+            channels={emitModalData.channels}
+            onEmit={handleEmit}
+            initialData={emitModalData.initialData}
+          />
+        )}
       </div>
-
-      {/* Edit existing node modal - now handled by settings sidebar */}
-
-      {/* Emit Event Modal */}
-      {emitModalData && (
-        <EmitEventModal
-          isOpen={true}
-          onClose={() => setEmitModalData(null)}
-          nodeId={emitModalData.nodeId}
-          nodeName={emitModalData.nodeName}
-          workflowId={props.organizationId || ""}
-          organizationId={props.organizationId || ""}
-          channels={emitModalData.channels}
-          onEmit={handleEmit}
-          initialData={emitModalData.initialData}
-        />
-      )}
-    </div>
+    </LaunchpadHeaderSlotProvider>
   );
 }
 
