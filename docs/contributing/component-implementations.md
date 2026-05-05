@@ -2,6 +2,12 @@
 
 This document outlines best practices and patterns for implementing components in SuperPlane.
 
+## Related
+
+- [Widgets](widgets.md) — markdown-embedded data blocks (table / chart / number)
+  used in Apps panels, including the CEL expression syntax available inside
+  `{{ ... }}` placeholders.
+
 ## Configuration Spec Struct
 
 ### Use Strongly Typed Spec Structs

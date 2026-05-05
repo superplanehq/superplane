@@ -18,6 +18,16 @@ import {
 import { Button } from "@/components/ui/button";
 import type { NodeChipContext } from "./CanvasMarkdown";
 import {
+  buildEnv,
+  compileMaybeExpr,
+  compileTemplate,
+  evalRowField as evalRowFieldExpr,
+  evalTemplate as evalTemplateExpr,
+  type CompiledTemplate,
+  type ExprEnv,
+  type MaybeExpr,
+} from "./widgetExpr";
+import {
   Area,
   AreaChart,
   Bar,
@@ -100,7 +110,7 @@ type Format = "plain" | "link" | { kind: "linkLabel"; label: string } | "relativ
 
 interface ColumnSpec {
   label: string;
-  field: string;
+  field: MaybeExpr;
   format: Format;
 }
 
@@ -112,9 +122,10 @@ const FILTER_OPS = ["eq", "neq", "contains", "not_contains", "gt", "lt", "exists
 type FilterOp = (typeof FILTER_OPS)[number];
 
 interface FilterCondition {
-  field: string;
+  field: MaybeExpr;
   op: FilterOp;
-  value: string;
+  /** `value` is parsed as a `MaybeExpr` so authors can either compare against a literal scalar or a CEL expression like `{{ int(now) - 7200 }}`. Unused for `exists` / `not_exists`. */
+  value: MaybeExpr;
 }
 
 //
@@ -134,15 +145,22 @@ interface ActionBase {
   label: string;
   variant: ActionVariant;
   icon?: ActionIcon;
-  confirm?: string;
-  show?: string;
+  /** Compiled at parse time so confirm dialogs can interpolate per-row values without re-parsing on every render. */
+  confirm?: CompiledTemplate;
+  /**
+   * `MaybeExpr` so a CEL `show: "{{ status == 'running' }}"` is compiled
+   * once, while a legacy `show: 'status == "running"'` falls back to the
+   * old `evalShow` simple comparator.
+   */
+  show?: MaybeExpr;
 }
 
 interface TriggerActionSpec extends ActionBase {
   kind: "trigger";
   trigger: string;
   template?: string;
-  fill?: Record<string, string>;
+  /** Each value is compiled as a template; the runtime-evaluated payload values are coerced to strings to keep the trigger payload contract unchanged. */
+  fill?: Record<string, CompiledTemplate>;
 }
 
 interface ApproveActionSpec extends ActionBase {
@@ -176,11 +194,11 @@ const CHART_COLORS: readonly ChartColorKeyword[] = ["blue", "green", "red", "yel
 
 interface ChartSpec {
   type: ChartType;
-  x: string;
+  x: MaybeExpr;
   /** Required for bar | line | area | stacked-bar. Optional for donut. */
-  y?: string;
-  /** Required for stacked-bar; ignored elsewhere. Dot-path. */
-  group?: string;
+  y?: MaybeExpr;
+  /** Required for stacked-bar; ignored elsewhere. Dot-path or CEL expression. */
+  group?: MaybeExpr;
   label?: string;
   aggregate?: AggregateOp;
   /** Single-series only (bar | line | area). Ignored for stacked-bar / donut. */
@@ -188,7 +206,7 @@ interface ChartSpec {
 }
 
 interface NumberSpec {
-  field: string;
+  field: MaybeExpr;
   aggregate: AggregateOp;
   label: string;
   format: "number" | "duration" | "percent";
@@ -367,7 +385,7 @@ function parseColumns(raw: unknown): ParsePartResult<ColumnSpec[]> {
         error: { message: `Invalid widget block: columns[${i}].format must be a string` },
       };
     }
-    result.push({ label, field, format: parseFormat(formatRaw) });
+    result.push({ label, field: compileMaybeExpr(field), format: parseFormat(formatRaw) });
   }
   return { kind: "ok", value: result };
 }
@@ -426,9 +444,9 @@ function parseWhere(raw: unknown): ParsePartResult<FilterCondition[]> {
       }
     }
     result.push({
-      field,
+      field: compileMaybeExpr(field),
       op,
-      value: opNeedsValue ? String(value) : "",
+      value: compileMaybeExpr(opNeedsValue ? String(value) : ""),
     });
   }
   return { kind: "ok", value: result };
@@ -511,8 +529,8 @@ function parseActions(raw: unknown): ParsePartResult<ActionSpec[]> {
       label,
       variant,
       icon,
-      confirm: typeof confirm === "string" ? confirm : undefined,
-      show: typeof showRaw === "string" ? showRaw : undefined,
+      confirm: typeof confirm === "string" ? compileTemplate(confirm) : undefined,
+      show: typeof showRaw === "string" ? compileMaybeExpr(showRaw) : undefined,
     };
 
     // Resolve discriminator: explicit `kind`, or back-compat default to "trigger" when `trigger` is set.
@@ -542,7 +560,7 @@ function parseActions(raw: unknown): ParsePartResult<ActionSpec[]> {
           error: { message: `Invalid widget block: actions[${i}].template must be a string` },
         };
       }
-      let parsedFill: Record<string, string> | undefined;
+      let parsedFill: Record<string, CompiledTemplate> | undefined;
       if (fill !== undefined && fill !== null) {
         if (!isPlainObject(fill)) {
           return {
@@ -560,7 +578,7 @@ function parseActions(raw: unknown): ParsePartResult<ActionSpec[]> {
               },
             };
           }
-          parsedFill[path] = value;
+          parsedFill[path] = compileTemplate(value);
         }
       }
       result.push({
@@ -616,7 +634,7 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
     if (typeof chart.x !== "string" || chart.x.trim() === "") {
       return { kind: "error", error: { message: "Invalid widget block: `render.chart.x` is required" } };
     }
-    let y: string | undefined;
+    let yRaw: string | undefined;
     if (type !== "donut") {
       if (typeof chart.y !== "string" || chart.y.trim() === "") {
         return {
@@ -624,7 +642,7 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
           error: { message: `Invalid widget block: render.chart.y is required for ${type}` },
         };
       }
-      y = chart.y;
+      yRaw = chart.y;
     } else if (chart.y !== undefined) {
       if (typeof chart.y !== "string" || chart.y.trim() === "") {
         return {
@@ -632,9 +650,9 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
           error: { message: "Invalid widget block: `render.chart.y` must be a non-empty string" },
         };
       }
-      y = chart.y;
+      yRaw = chart.y;
     }
-    let group: string | undefined;
+    let groupRaw: string | undefined;
     if (type === "stacked-bar") {
       if (typeof chart.group !== "string" || chart.group.trim() === "") {
         return {
@@ -642,7 +660,7 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
           error: { message: "Invalid widget block: render.chart.group is required for stacked-bar" },
         };
       }
-      group = chart.group;
+      groupRaw = chart.group;
     }
     let aggregate: AggregateOp | undefined;
     if (chart.aggregate !== undefined) {
@@ -656,7 +674,7 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
       }
       aggregate = chart.aggregate as AggregateOp;
     }
-    if (type === "donut" && aggregate && aggregate !== "count" && !y) {
+    if (type === "donut" && aggregate && aggregate !== "count" && !yRaw) {
       return {
         kind: "error",
         error: {
@@ -683,9 +701,9 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
         kind: "chart",
         chart: {
           type,
-          x: chart.x,
-          y,
-          group,
+          x: compileMaybeExpr(chart.x),
+          y: yRaw !== undefined ? compileMaybeExpr(yRaw) : undefined,
+          group: groupRaw !== undefined ? compileMaybeExpr(groupRaw) : undefined,
           label: typeof chart.label === "string" ? chart.label : undefined,
           aggregate,
           color,
@@ -735,7 +753,13 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
       kind: "ok",
       value: {
         kind: "number",
-        number: { field: num.field, aggregate: num.aggregate as AggregateOp, label: num.label, format, sparkline },
+        number: {
+          field: compileMaybeExpr(num.field),
+          aggregate: num.aggregate as AggregateOp,
+          label: num.label,
+          format,
+          sparkline,
+        },
       },
     };
   }
@@ -775,17 +799,26 @@ function getByPath(obj: unknown, path: string): unknown {
 
 const SHOW_RE = /^\s*([\w.-]+)\s*(==|!=)\s*"([^"]*)"\s*$/;
 
-function evalShow(condition: string | undefined, row: Record<string, unknown>): boolean {
+/**
+ * Evaluate a `show` condition.
+ *
+ * - `undefined` (no `show:` authored) → button is visible.
+ * - `MaybeExpr.kind === "expr"` → CEL: any truthy non-undefined result shows the button. Runtime / parse errors fail-closed (button hidden).
+ * - `MaybeExpr.kind === "literal"` → legacy simple comparator (`field == "x"` / `field != "x"`). Anything that doesn't match the comparator regex fails-closed.
+ */
+function evalShow(condition: MaybeExpr | undefined, row: Record<string, unknown>, env: ExprEnv): boolean {
   if (!condition) return true;
-  const m = condition.match(SHOW_RE);
-  if (!m) return false; // fail-closed: malformed expression hides the button
+  if (condition.kind === "expr") {
+    const result = evalRowFieldExpr(condition, row, env, getByPath);
+    if (result === undefined) return false;
+    return Boolean(result);
+  }
+  const literal = condition.value;
+  const m = literal.match(SHOW_RE);
+  if (!m) return false;
   const [, path, op, expected] = m;
   const actual = stringifyCell(getByPath(row, path));
   return op === "==" ? actual === expected : actual !== expected;
-}
-
-function interpolate(template: string, values: Record<string, unknown>): string {
-  return template.replace(/\{\{([\w.-]+)\}\}/g, (_, key) => stringifyCell(getByPath(values, key)));
 }
 
 function setPath(obj: Record<string, unknown>, path: string, value: unknown): void {
@@ -800,13 +833,17 @@ function setPath(obj: Record<string, unknown>, path: string, value: unknown): vo
 }
 
 function buildFillPayload(
-  fill: Record<string, string> | undefined,
+  fill: Record<string, CompiledTemplate> | undefined,
   row: Record<string, unknown>,
+  env: ExprEnv,
 ): Record<string, unknown> {
+  // Trigger payload values are always strings (current contract). The CEL
+  // template's evaluated result is stringified so authors get type-safe
+  // `{{ ... }}` interpolation without changing what the trigger receives.
   const payload: Record<string, unknown> = {};
   if (!fill) return payload;
   for (const [path, template] of Object.entries(fill)) {
-    setPath(payload, path, interpolate(template, row));
+    setPath(payload, path, evalTemplateExpr(template, row, env, stringifyCell));
   }
   return payload;
 }
@@ -815,9 +852,10 @@ function buildFillPayload(
 // Filter engine
 //
 
-function evalCondition(values: Record<string, unknown>, cond: FilterCondition): boolean {
-  // Allow filters to use dot-paths so executions widgets can filter on nested fields too.
-  const raw = getByPath(values, cond.field);
+function evalCondition(values: Record<string, unknown>, cond: FilterCondition, env: ExprEnv): boolean {
+  // `field` follows the legacy convention: a literal string is a dot-path
+  // into the row; a CEL `{{ ... }}` is evaluated against the row.
+  const raw = evalRowFieldExpr(cond.field, values, env, getByPath);
   const has = raw !== undefined;
   const val = raw == null ? "" : typeof raw === "string" ? raw : stringifyCell(raw);
 
@@ -826,27 +864,38 @@ function evalCondition(values: Record<string, unknown>, cond: FilterCondition): 
 
   if (!has) return false;
 
+  // `value`, on the other hand, has always been a literal scalar to compare
+  // against. Only `{{ ... }}` opts into CEL; a bare string is the raw
+  // expected value and is NOT looked up against the row.
+  let expected: string;
+  if (cond.value.kind === "literal") {
+    expected = cond.value.value;
+  } else {
+    const expectedRaw = evalRowFieldExpr(cond.value, values, env, getByPath);
+    expected = expectedRaw == null ? "" : typeof expectedRaw === "string" ? expectedRaw : stringifyCell(expectedRaw);
+  }
+
   switch (cond.op) {
     case "eq":
-      return val === cond.value;
+      return val === expected;
     case "neq":
-      return val !== cond.value;
+      return val !== expected;
     case "contains":
-      return val.includes(cond.value);
+      return val.includes(expected);
     case "not_contains":
-      return !val.includes(cond.value);
+      return !val.includes(expected);
     case "gt":
     case "lt": {
       const a = parseFloat(val);
-      const b = parseFloat(cond.value);
+      const b = parseFloat(expected);
       if (Number.isNaN(a) || Number.isNaN(b)) return false;
       return cond.op === "gt" ? a > b : a < b;
     }
   }
 }
 
-function applyWhereOnRows<T extends Record<string, unknown>>(rows: T[], where: FilterCondition[]): T[] {
-  return rows.filter((row) => where.every((cond) => evalCondition(row, cond)));
+function applyWhereOnRows<T extends Record<string, unknown>>(rows: T[], where: FilterCondition[], env: ExprEnv): T[] {
+  return rows.filter((row) => where.every((cond) => evalCondition(row, cond, env)));
 }
 
 //
@@ -1128,15 +1177,23 @@ function ActionButtons({
   row,
   actions,
   nodeRefs,
+  env,
 }: {
   row: Record<string, unknown>;
   actions: ActionSpec[];
   nodeRefs?: NodeChipContext;
+  env: ExprEnv;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {actions.map((action, i) => (
-        <ActionButton key={`${action.kind}-${actionId(action)}-${i}`} row={row} action={action} nodeRefs={nodeRefs} />
+        <ActionButton
+          key={`${action.kind}-${actionId(action)}-${i}`}
+          row={row}
+          action={action}
+          nodeRefs={nodeRefs}
+          env={env}
+        />
       ))}
     </div>
   );
@@ -1156,17 +1213,19 @@ function ActionButton({
   row,
   action,
   nodeRefs,
+  env,
 }: {
   row: Record<string, unknown>;
   action: ActionSpec;
   nodeRefs?: NodeChipContext;
+  env: ExprEnv;
 }) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isFiring, setIsFiring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const passesShow = evalShow(action.show, row);
-  const resolved = resolveAction(action, row, nodeRefs);
+  const passesShow = evalShow(action.show, row, env);
+  const resolved = resolveAction(action, row, nodeRefs, env);
 
   if (!passesShow || !resolved.visible) return null;
 
@@ -1235,7 +1294,7 @@ function ActionButton({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{action.label}</DialogTitle>
-              <DialogDescription>{interpolate(action.confirm, row)}</DialogDescription>
+              <DialogDescription>{evalTemplateExpr(action.confirm, row, env, stringifyCell)}</DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
@@ -1256,7 +1315,12 @@ function ActionButton({
   );
 }
 
-function resolveAction(action: ActionSpec, row: Record<string, unknown>, nodeRefs?: NodeChipContext): ResolvedAction {
+function resolveAction(
+  action: ActionSpec,
+  row: Record<string, unknown>,
+  nodeRefs: NodeChipContext | undefined,
+  env: ExprEnv,
+): ResolvedAction {
   if (action.kind === "trigger") {
     const nodeId = nodeRefs?.nodeIds?.[action.trigger];
     const onEmit = nodeRefs?.onEmitEvent;
@@ -1273,7 +1337,8 @@ function resolveAction(action: ActionSpec, row: Record<string, unknown>, nodeRef
     return {
       testIdSuffix: action.trigger,
       visible: true,
-      fire: () => onEmit({ nodeSlug: action.trigger, channel: "default", data: buildFillPayload(action.fill, row) }),
+      fire: () =>
+        onEmit({ nodeSlug: action.trigger, channel: "default", data: buildFillPayload(action.fill, row, env) }),
     };
   }
 
@@ -1322,9 +1387,10 @@ interface BaseRowsRenderProps {
   columns: ColumnSpec[];
   actions?: ActionSpec[];
   nodeRefs?: NodeChipContext;
+  env: ExprEnv;
 }
 
-function TableRenderer({ rows, columns, actions, nodeRefs }: BaseRowsRenderProps) {
+function TableRenderer({ rows, columns, actions, nodeRefs, env }: BaseRowsRenderProps) {
   const hasActions = !!actions && actions.length > 0;
   return (
     <div data-testid="canvas-widget-block" className="my-2 overflow-x-auto rounded border border-slate-200">
@@ -1350,13 +1416,13 @@ function TableRenderer({ rows, columns, actions, nodeRefs }: BaseRowsRenderProps
           {rows.map((row, i) => (
             <tr key={(row.id as string | undefined) ?? i}>
               {columns.map((column, j) => (
-                <td key={`${column.field}-${j}`} className="border-b border-slate-100 px-3 py-1.5 align-top">
-                  {renderCell(getByPath(row, column.field), column.format)}
+                <td key={`${column.label}-${j}`} className="border-b border-slate-100 px-3 py-1.5 align-top">
+                  {renderCell(evalRowFieldExpr(column.field, row, env, getByPath), column.format)}
                 </td>
               ))}
               {hasActions ? (
                 <td className="border-b border-slate-100 px-3 py-1.5 align-top">
-                  <ActionButtons row={row} actions={actions!} nodeRefs={nodeRefs} />
+                  <ActionButtons row={row} actions={actions!} nodeRefs={nodeRefs} env={env} />
                 </td>
               ) : null}
             </tr>
@@ -1423,12 +1489,12 @@ interface XYPoint {
   y: number;
 }
 
-function shapeXY(rows: Record<string, unknown>[], chart: ChartSpec): XYPoint[] {
+function shapeXY(rows: Record<string, unknown>[], chart: ChartSpec, env: ExprEnv): XYPoint[] {
   const points: Array<[string, number]> = [];
   for (const row of rows) {
-    const x = stringifyCell(getByPath(row, chart.x));
+    const x = stringifyCell(evalRowFieldExpr(chart.x, row, env, getByPath));
     if (x === "") continue;
-    const y = coerceNumber(getByPath(row, chart.y!));
+    const y = coerceNumber(evalRowFieldExpr(chart.y!, row, env, getByPath));
     if (!Number.isFinite(y)) continue;
     points.push([x, y]);
   }
@@ -1451,20 +1517,20 @@ interface StackedShape {
   groups: string[];
 }
 
-function shapeStacked(rows: Record<string, unknown>[], chart: ChartSpec): StackedShape {
+function shapeStacked(rows: Record<string, unknown>[], chart: ChartSpec, env: ExprEnv): StackedShape {
   const op: AggregateOp = chart.aggregate ?? "sum";
   // Map of x -> group -> values[]
   const buckets = new Map<string, Map<string, number[]>>();
   const xOrder: string[] = [];
   const groupOrder: string[] = [];
   for (const row of rows) {
-    const x = stringifyCell(getByPath(row, chart.x));
+    const x = stringifyCell(evalRowFieldExpr(chart.x, row, env, getByPath));
     if (x === "") continue;
-    const g = stringifyCell(getByPath(row, chart.group!));
+    const g = stringifyCell(evalRowFieldExpr(chart.group!, row, env, getByPath));
     if (g === "") continue;
     let y = 0;
     if (op !== "count") {
-      const yRaw = coerceNumber(getByPath(row, chart.y!));
+      const yRaw = coerceNumber(evalRowFieldExpr(chart.y!, row, env, getByPath));
       if (!Number.isFinite(yRaw)) continue;
       y = yRaw;
     }
@@ -1497,16 +1563,16 @@ interface DonutSlice {
   value: number;
 }
 
-function shapeDonut(rows: Record<string, unknown>[], chart: ChartSpec): DonutSlice[] {
+function shapeDonut(rows: Record<string, unknown>[], chart: ChartSpec, env: ExprEnv): DonutSlice[] {
   const op: AggregateOp = chart.aggregate ?? "count";
   const buckets = new Map<string, number[]>();
   const order: string[] = [];
   for (const row of rows) {
-    const name = stringifyCell(getByPath(row, chart.x));
+    const name = stringifyCell(evalRowFieldExpr(chart.x, row, env, getByPath));
     if (name === "") continue;
     let y = 0;
     if (op !== "count") {
-      const yRaw = coerceNumber(getByPath(row, chart.y!));
+      const yRaw = coerceNumber(evalRowFieldExpr(chart.y!, row, env, getByPath));
       if (!Number.isFinite(yRaw)) continue;
       y = yRaw;
     }
@@ -1525,11 +1591,15 @@ function shapeDonut(rows: Record<string, unknown>[], chart: ChartSpec): DonutSli
   return out;
 }
 
-function collectSparklineSeries(rows: Record<string, unknown>[], number: NumberSpec): Array<{ i: number; y: number }> {
+function collectSparklineSeries(
+  rows: Record<string, unknown>[],
+  number: NumberSpec,
+  env: ExprEnv,
+): Array<{ i: number; y: number }> {
   const out: Array<{ i: number; y: number }> = [];
   let i = 0;
   for (const row of rows) {
-    const raw = getByPath(row, number.field);
+    const raw = evalRowFieldExpr(number.field, row, env, getByPath);
     const y = typeof raw === "number" ? raw : Number(stringifyCell(raw));
     if (!Number.isFinite(y)) continue;
     out.push({ i: i++, y });
@@ -1556,10 +1626,20 @@ function ChartEmpty({ testId, fill }: { testId: string; fill?: boolean }) {
   );
 }
 
-function ChartRenderer({ rows, chart, fill }: { rows: Record<string, unknown>[]; chart: ChartSpec; fill?: boolean }) {
-  if (chart.type === "donut") return <DonutInner rows={rows} chart={chart} fill={fill} />;
-  if (chart.type === "stacked-bar") return <StackedBarInner rows={rows} chart={chart} fill={fill} />;
-  return <SingleSeriesInner rows={rows} chart={chart} fill={fill} />;
+function ChartRenderer({
+  rows,
+  chart,
+  fill,
+  env,
+}: {
+  rows: Record<string, unknown>[];
+  chart: ChartSpec;
+  fill?: boolean;
+  env: ExprEnv;
+}) {
+  if (chart.type === "donut") return <DonutInner rows={rows} chart={chart} fill={fill} env={env} />;
+  if (chart.type === "stacked-bar") return <StackedBarInner rows={rows} chart={chart} fill={fill} env={env} />;
+  return <SingleSeriesInner rows={rows} chart={chart} fill={fill} env={env} />;
 }
 
 // In fill mode the wrapping div uses `h-full flex flex-col` so the chart
@@ -1573,12 +1653,14 @@ function SingleSeriesInner({
   rows,
   chart,
   fill,
+  env,
 }: {
   rows: Record<string, unknown>[];
   chart: ChartSpec;
   fill?: boolean;
+  env: ExprEnv;
 }) {
-  const data = useMemo(() => shapeXY(rows, chart), [rows, chart]);
+  const data = useMemo(() => shapeXY(rows, chart, env), [rows, chart, env]);
   const colorVar = chart.color ? COLOR_KEYWORD_TO_VAR[chart.color] : "var(--chart-1)";
   const seriesKey = "y";
   const seriesLabel = chart.label ?? "Value";
@@ -1649,8 +1731,18 @@ function SingleSeriesInner({
   );
 }
 
-function StackedBarInner({ rows, chart, fill }: { rows: Record<string, unknown>[]; chart: ChartSpec; fill?: boolean }) {
-  const { data, groups } = useMemo(() => shapeStacked(rows, chart), [rows, chart]);
+function StackedBarInner({
+  rows,
+  chart,
+  fill,
+  env,
+}: {
+  rows: Record<string, unknown>[];
+  chart: ChartSpec;
+  fill?: boolean;
+  env: ExprEnv;
+}) {
+  const { data, groups } = useMemo(() => shapeStacked(rows, chart, env), [rows, chart, env]);
   const config: ChartConfig = useMemo(() => {
     const cfg: ChartConfig = {};
     groups.forEach((g, i) => {
@@ -1696,8 +1788,18 @@ function StackedBarInner({ rows, chart, fill }: { rows: Record<string, unknown>[
   );
 }
 
-function DonutInner({ rows, chart, fill }: { rows: Record<string, unknown>[]; chart: ChartSpec; fill?: boolean }) {
-  const data = useMemo(() => shapeDonut(rows, chart), [rows, chart]);
+function DonutInner({
+  rows,
+  chart,
+  fill,
+  env,
+}: {
+  rows: Record<string, unknown>[];
+  chart: ChartSpec;
+  fill?: boolean;
+  env: ExprEnv;
+}) {
+  const data = useMemo(() => shapeDonut(rows, chart, env), [rows, chart, env]);
   const config: ChartConfig = useMemo(() => {
     const cfg: ChartConfig = {};
     data.forEach((slice, i) => {
@@ -1745,14 +1847,19 @@ function NumberRenderer({
   rows,
   number,
   fill,
+  env,
 }: {
   rows: Record<string, unknown>[];
   number: NumberSpec;
   fill?: boolean;
+  env: ExprEnv;
 }) {
-  const value = useMemo(() => computeNumberAggregate(rows, number), [rows, number]);
+  const value = useMemo(() => computeNumberAggregate(rows, number, env), [rows, number, env]);
   const display = formatNumberValue(value, number.format);
-  const sparkPoints = useMemo(() => (number.sparkline ? collectSparklineSeries(rows, number) : null), [rows, number]);
+  const sparkPoints = useMemo(
+    () => (number.sparkline ? collectSparklineSeries(rows, number, env) : null),
+    [rows, number, env],
+  );
   // In fill mode the card stretches to fill the panel and the value is
   // visually centered, with the sparkline (if any) anchored to the bottom.
   return (
@@ -1801,11 +1908,11 @@ function SparklineInner({ points, fill }: { points: Array<{ i: number; y: number
   );
 }
 
-function computeNumberAggregate(rows: Record<string, unknown>[], number: NumberSpec): number {
+function computeNumberAggregate(rows: Record<string, unknown>[], number: NumberSpec, env: ExprEnv): number {
   if (number.aggregate === "count") return rows.length;
   const values: number[] = [];
   for (const row of rows) {
-    const raw = getByPath(row, number.field);
+    const raw = evalRowFieldExpr(number.field, row, env, getByPath);
     const n = typeof raw === "number" ? raw : Number(stringifyCell(raw));
     if (Number.isFinite(n)) values.push(n);
   }
@@ -1838,6 +1945,11 @@ export function WidgetBlock({ body, canvasId, nodeRefs, fill }: WidgetBlockProps
   const parsed = useMemo(() => parseWidgetBody(body), [body]);
   const isOk = parsed.kind === "ok";
   const widget = isOk ? parsed.widget : null;
+  // `now` is computed once per render so every CEL expression in this render
+  // sees a consistent view of the clock. Custom function bindings live on
+  // `env.functions`; they don't change per render but are still recreated so
+  // tests can inject mocks via `buildEnv` overrides if needed in the future.
+  const env = useMemo<ExprEnv>(() => buildEnv(), [body]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const memoryEnabled = isOk && widget!.source === "memory";
   const memoryQuery = useCanvasMemoryEntries(canvasId, memoryEnabled);
@@ -1881,7 +1993,7 @@ export function WidgetBlock({ body, canvasId, nodeRefs, fill }: WidgetBlockProps
           }))
       : executionsQuery.rows;
 
-  const filtered = w.where ? applyWhereOnRows(baseRows, w.where) : baseRows;
+  const filtered = w.where ? applyWhereOnRows(baseRows, w.where, env) : baseRows;
 
   if (filtered.length === 0 && w.render.kind === "table") {
     const emptyLabel = w.source === "memory" ? `"${w.namespace}"` : "this widget";
@@ -1896,15 +2008,15 @@ export function WidgetBlock({ body, canvasId, nodeRefs, fill }: WidgetBlockProps
   }
 
   if (w.render.kind === "chart") {
-    return <ChartRenderer rows={filtered} chart={w.render.chart} fill={fill} />;
+    return <ChartRenderer rows={filtered} chart={w.render.chart} fill={fill} env={env} />;
   }
   if (w.render.kind === "number") {
-    return <NumberRenderer rows={filtered} number={w.render.number} fill={fill} />;
+    return <NumberRenderer rows={filtered} number={w.render.number} fill={fill} env={env} />;
   }
 
   const columns: ColumnSpec[] = w.columns ?? autoColumns(w.source, filtered);
 
-  return <TableRenderer rows={filtered} columns={columns} actions={w.actions} nodeRefs={nodeRefs} />;
+  return <TableRenderer rows={filtered} columns={columns} actions={w.actions} nodeRefs={nodeRefs} env={env} />;
 }
 
 function autoColumns(source: "memory" | "executions", rows: Record<string, unknown>[]): ColumnSpec[] {
@@ -1919,13 +2031,13 @@ function autoColumns(source: "memory" | "executions", rows: Record<string, unkno
     }
     return Array.from(set)
       .sort((a, b) => a.localeCompare(b))
-      .map<ColumnSpec>((field) => ({ label: field, field, format: "plain" }));
+      .map<ColumnSpec>((field) => ({ label: field, field: { kind: "literal", value: field }, format: "plain" }));
   }
   // Executions auto-columns: a sensible default trio.
   return [
-    { label: "Run", field: "root.id", format: "plain" },
-    { label: "Status", field: "status", format: "badge" },
-    { label: "Started", field: "root.createdAt", format: "relative" },
+    { label: "Run", field: { kind: "literal", value: "root.id" }, format: "plain" },
+    { label: "Status", field: { kind: "literal", value: "status" }, format: "badge" },
+    { label: "Started", field: { kind: "literal", value: "root.createdAt" }, format: "relative" },
   ];
 }
 

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type * as SdkGen from "@/api-client/sdk.gen";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { canvasesListCanvasMemories, canvasesListCanvasEvents } = vi.hoisted(() => ({
   canvasesListCanvasMemories: vi.fn(),
@@ -1794,6 +1794,241 @@ describe("WidgetBlock render: number", () => {
     expect(screen.getByTestId("canvas-widget-block-error").textContent).toContain(
       "render.number.sparkline must be a boolean",
     );
+  });
+});
+
+//
+// CEL expressions inside `{{ ... }}`. The expression engine itself has unit
+// coverage in widgetExpr.spec.ts; this block focuses on the integration with
+// the widget pipeline (filter, columns, chart, number, show, confirm).
+//
+
+describe("WidgetBlock CEL expressions", () => {
+  // Pin "now" so any expression using `now` produces a deterministic result.
+  // 2026-01-01T00:00:00Z = 1767225600 Unix seconds.
+  const FIXED_NOW_SEC = 1767225600;
+  let dateNowSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(FIXED_NOW_SEC * 1000);
+  });
+
+  afterEach(() => {
+    dateNowSpy.mockRestore();
+    vi.restoreAllMocks();
+  });
+
+  it("evaluates a CEL expression in a column field", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "a",
+            namespace: "environments",
+            // 5 minutes ago
+            values: { pr_number: "42", created_at: String(FIXED_NOW_SEC - 300) },
+          },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: environments\ncolumns:\n" +
+          "  - label: PR\n    field: pr_number\n" +
+          '  - label: Age\n    field: "{{ duration(int(now) - int(created_at)) }}"\n'
+        }
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.getByText("5m")).toBeInTheDocument();
+  });
+
+  it("filters rows using CEL on both `field` and `value`", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          // 30 minutes old — under the 2h threshold, should be excluded.
+          { id: "a", namespace: "environments", values: { name: "fresh", created_at: String(FIXED_NOW_SEC - 1800) } },
+          // 3 hours old — older than 2h, kept.
+          { id: "b", namespace: "environments", values: { name: "stale", created_at: String(FIXED_NOW_SEC - 10800) } },
+        ],
+      },
+    });
+
+    const body =
+      "source: memory\nnamespace: environments\nwhere:\n" +
+      '  - field: "{{ int(now) - int(created_at) }}"\n    op: gt\n    value: "{{ 7200 }}"\n' +
+      "columns:\n  - label: Name\n    field: name\n";
+
+    renderWithClient(<WidgetBlock body={body} canvasId="c1" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.getByText("stale")).toBeInTheDocument();
+    expect(screen.queryByText("fresh")).toBeNull();
+  });
+
+  it("uses a CEL expression for chart Y to compute a derived series", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          // 1 minute old → 60s / 60 = 1
+          { id: "a", namespace: "envs", values: { name: "alpha", created_at: String(FIXED_NOW_SEC - 60) } },
+          // 4 minutes old → 240s / 60 = 4
+          { id: "b", namespace: "envs", values: { name: "beta", created_at: String(FIXED_NOW_SEC - 240) } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n" +
+          "  kind: chart\n  chart:\n    type: bar\n" +
+          "    x: name\n" +
+          '    y: "{{ (int(now) - int(created_at)) / 60 }}"\n'
+        }
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
+    });
+    const chart = screen.getByTestId("rc-barchart");
+    const rows = JSON.parse(chart.getAttribute("data-rows") ?? "[]") as Array<Record<string, unknown>>;
+    expect(rows).toEqual([
+      { x: "alpha", y: 1 },
+      { x: "beta", y: 4 },
+    ]);
+  });
+
+  it("uses a CEL expression for a number aggregate (success-rate ternary)", async () => {
+    mockEventsResponse([
+      { ...samplePassedEvent, id: "ev-1" },
+      { ...samplePassedEvent, id: "ev-2" },
+      { ...sampleFailedEvent, id: "ev-3" },
+      { ...sampleFailedEvent, id: "ev-4" },
+    ]);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\nrender:\n" +
+          "  kind: number\n  number:\n" +
+          '    field: "{{ status == \\"passed\\" ? 1.0 : 0.0 }}"\n' +
+          "    aggregate: avg\n    label: Success rate\n    format: percent\n"
+        }
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
+    });
+    // 2 of 4 passed → 0.5 → 50.0%
+    expect(screen.getByText("50.0%")).toBeInTheDocument();
+  });
+
+  it("evaluates a CEL action `show` (truthy expression)", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "environments", values: { pr_number: "1", status: "running" } },
+          { id: "b", namespace: "environments", values: { pr_number: "2", status: "idle" } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: environments\n" +
+          "columns:\n  - label: PR\n    field: pr_number\n" +
+          "actions:\n" +
+          "  - label: Stop\n    trigger: stop\n" +
+          "    show: \"{{ status == 'running' }}\"\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ nodes: { stop: "Stop" }, nodeIds: { stop: "n-1" }, onEmitEvent: vi.fn(async () => undefined) }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    // Exactly one Stop button should render — the row with status running.
+    expect(screen.getAllByTestId("canvas-widget-block-action-stop")).toHaveLength(1);
+  });
+
+  it('keeps the legacy `show: field == "value"` simple comparator working', async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "environments", values: { pr_number: "1", status: "running" } },
+          { id: "b", namespace: "environments", values: { pr_number: "2", status: "idle" } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: environments\n" +
+          "columns:\n  - label: PR\n    field: pr_number\n" +
+          "actions:\n" +
+          "  - label: Stop\n    trigger: stop\n" +
+          '    show: status == "running"\n'
+        }
+        canvasId="c1"
+        nodeRefs={{ nodes: { stop: "Stop" }, nodeIds: { stop: "n-1" }, onEmitEvent: vi.fn(async () => undefined) }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block")).toBeInTheDocument();
+    });
+    expect(screen.getAllByTestId("canvas-widget-block-action-stop")).toHaveLength(1);
+  });
+
+  it("renders a confirm template with multiple `{{ }}` segments", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [{ id: "a", namespace: "environments", values: { pr_number: "42", repo: "core" } }],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: environments\n" +
+          "columns:\n  - label: PR\n    field: pr_number\n" +
+          "actions:\n" +
+          "  - label: Destroy\n    trigger: destroy\n" +
+          '    confirm: "Destroy PR #{{ pr_number }} in {{ upper(repo) }}?"\n'
+        }
+        canvasId="c1"
+        nodeRefs={{
+          nodes: { destroy: "Destroy" },
+          nodeIds: { destroy: "n-1" },
+          onEmitEvent: vi.fn(async () => undefined),
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("canvas-widget-block-action-destroy"));
+    await screen.findByText("Destroy PR #42 in CORE?");
   });
 });
 
