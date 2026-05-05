@@ -957,8 +957,8 @@ func listGPUImagesBase(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 
 	resources := make([]core.IntegrationResource, 0)
 	for _, image := range images {
-		// Only include base OS distributions (not snapshots or custom images)
-		if image.Type == "snapshot" || image.Type == "custom" {
+		// Only include base OS distributions (not application/one-click images)
+		if image.Type == "application" {
 			continue
 		}
 
