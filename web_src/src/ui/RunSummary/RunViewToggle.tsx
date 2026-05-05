@@ -19,11 +19,18 @@ function ViewTabs({ value, onChange }: { value: RunViewMode; onChange: (v: RunVi
       className="inline-flex w-auto"
       aria-label="Run view"
     >
-      <TabsList className="h-7 w-fit gap-0 rounded-sm border border-slate-300 bg-white p-0">
+      {/*
+        Match the size of the adjacent Edit / Add panel buttons (Button
+        `size="sm"`: h-7, rounded-md, text-[13px]). overflow-hidden on the
+        wrapper lets the active tab's primary background paint up to the
+        wrapper border without a 1px gap; h-full on the trigger overrides
+        the shadcn default h-[calc(100%-1px)].
+      */}
+      <TabsList className="h-7 w-fit gap-0 overflow-hidden rounded-md border border-slate-300 bg-white p-0">
         <TabsTrigger
           value="summary"
           aria-label="Report"
-          className="rounded-sm rounded-br-none rounded-tr-none border-none px-3 py-0.5 text-xs text-slate-600 transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+          className="h-full rounded-l-md rounded-r-none border-none px-3 py-0 text-[13px] text-slate-600 transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
         >
           Report
         </TabsTrigger>
@@ -31,7 +38,7 @@ function ViewTabs({ value, onChange }: { value: RunViewMode; onChange: (v: RunVi
         <TabsTrigger
           value="canvas"
           aria-label="Steps"
-          className="rounded-sm rounded-bl-none rounded-tl-none border-none px-3 py-0.5 text-xs text-slate-600 transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+          className="h-full rounded-l-none rounded-r-md border-none px-3 py-0 text-[13px] text-slate-600 transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
         >
           Steps
         </TabsTrigger>
