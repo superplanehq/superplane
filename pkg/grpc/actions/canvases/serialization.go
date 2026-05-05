@@ -62,6 +62,30 @@ func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
 	return protoCanvases, nil
 }
 
+func SerializeCanvasGroups(groups []models.CanvasGroup) []*pb.CanvasGroup {
+	protoGroups := make([]*pb.CanvasGroup, len(groups))
+	for i, group := range groups {
+		protoGroups[i] = SerializeCanvasGroup(&group)
+	}
+
+	return protoGroups
+}
+
+func SerializeCanvasGroup(group *models.CanvasGroup) *pb.CanvasGroup {
+	return &pb.CanvasGroup{
+		Metadata: &pb.CanvasGroup_Metadata{
+			Id:             group.ID.String(),
+			OrganizationId: group.OrganizationID.String(),
+			CreatedAt:      timestamppb.New(*group.CreatedAt),
+			UpdatedAt:      timestamppb.New(*group.UpdatedAt),
+		},
+		Spec: &pb.CanvasGroup_Spec{
+			Title:           group.Title,
+			BackgroundColor: group.BackgroundColor,
+		},
+	}
+}
+
 func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), canvas)
 	if err != nil {
@@ -83,6 +107,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		createdBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 	}
 
+	canvasGroupID := ""
+	if canvas.CanvasGroupID != nil {
+		canvasGroupID = canvas.CanvasGroupID.String()
+	}
+
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
@@ -94,6 +123,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
 				IsTemplate:     canvas.IsTemplate,
+				CanvasGroupId:  canvasGroupID,
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes:            serializedNodes,
@@ -146,6 +176,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
 			IsTemplate:     canvas.IsTemplate,
+			CanvasGroupId:  canvasGroupID,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes:            serializedNodes,

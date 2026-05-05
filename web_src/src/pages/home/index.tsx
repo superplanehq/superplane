@@ -1,28 +1,66 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Grid3x3, MoreVertical, Pencil, Plus, Palette, Rainbow, Rows3, Search, Trash2 } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  FolderMinus,
+  FolderOpen,
+  FolderPlus,
+  MoreVertical,
+  Palette,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../ui/dropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "../../ui/dropdownMenu";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasData";
+import {
+  CANVAS_GROUP_COLORS,
+  canvasKeys,
+  useCanvasGroups,
+  useCanvases,
+  useCreateCanvasGroup,
+  useDeleteCanvas,
+  useDeleteCanvasGroup,
+  useUpdateCanvasGroup,
+  useUpdateCanvasGroupPosition,
+  useUpdateCanvasGroupMembership,
+  type CanvasGroupColor,
+} from "../../hooks/useCanvasData";
 import { cn } from "../../lib/utils";
 import { showErrorToast, showSuccessToast } from "../../lib/toast";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
-import { OnboardingWelcome } from "./OnboardingWelcome";
-import type { CanvasesCanvas, SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
-
-type CanvasViewMode = "grid" | "list";
+import { getApiErrorMessage } from "../../lib/errors";
+import type {
+  CanvasesCanvas,
+  CanvasesCanvasGroup,
+  SuperplaneComponentsEdge,
+  SuperplaneComponentsNode,
+} from "@/api-client";
 
 interface CanvasCardData {
   id: string;
@@ -30,16 +68,43 @@ interface CanvasCardData {
   description?: string;
   createdAt: string;
   type: "canvases";
+  canvasGroupId?: string;
   createdBy?: { id?: string; name?: string };
   nodes?: SuperplaneComponentsNode[];
   edges?: SuperplaneComponentsEdge[];
+}
+
+interface CanvasGroupData {
+  id: string;
+  title: string;
+  backgroundColor: CanvasGroupColor;
+}
+
+const GROUP_BACKGROUND_CLASSES: Record<CanvasGroupColor, string> = {
+  "blue-800": "bg-blue-800",
+  "green-800": "bg-green-800",
+  "slate-700": "bg-slate-700",
+  "violet-800": "bg-violet-800",
+  "yellow-800": "bg-yellow-800",
+};
+
+const GROUP_SWATCH_CLASSES: Record<CanvasGroupColor, string> = {
+  "blue-800": "bg-blue-800",
+  "green-800": "bg-green-800",
+  "slate-700": "bg-slate-700",
+  "violet-800": "bg-violet-800",
+  "yellow-800": "bg-yellow-800",
+};
+
+const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
+function asCanvasGroupColor(value?: string): CanvasGroupColor {
+  return CANVAS_GROUP_COLORS.includes(value as CanvasGroupColor) ? (value as CanvasGroupColor) : "blue-800";
 }
 
 const HomePage = () => {
   usePageTitle(["Home"]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>("grid");
   const canvasModalState = useCreateCanvasModalState();
 
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -51,8 +116,14 @@ const HomePage = () => {
     isLoading: canvasesLoading,
     error: canvasesApiError,
   } = useCanvases(organizationId || "");
+  const {
+    data: canvasGroupsData = [],
+    isLoading: canvasGroupsLoading,
+    error: canvasGroupsApiError,
+  } = useCanvasGroups(organizationId || "");
 
-  const canvasError = canvasesApiError ? "Failed to fetch canvases. Please try again later." : null;
+  const canvasError =
+    canvasesApiError || canvasGroupsApiError ? "Failed to fetch canvases. Please try again later." : null;
   const canCreateCanvases = canAct("canvases", "create");
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
@@ -62,25 +133,36 @@ const HomePage = () => {
     return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: CanvasesCanvas) => ({
-    id: canvas.metadata?.id!,
-    name: canvas.metadata?.name!,
-    description: canvas.metadata?.description,
-    createdAt: formatDate(canvas.metadata?.createdAt),
-    type: "canvases" as const,
-    createdBy: canvas.metadata?.createdBy,
-    nodes: canvas.spec?.nodes || [],
-    edges: canvas.spec?.edges || [],
-  }));
+  const canvases: CanvasCardData[] = (canvasesData || [])
+    .map((canvas: CanvasesCanvas) => ({
+      id: canvas.metadata?.id!,
+      name: canvas.metadata?.name!,
+      description: canvas.metadata?.description,
+      createdAt: formatDate(canvas.metadata?.createdAt),
+      type: "canvases" as const,
+      canvasGroupId: canvas.metadata?.canvasGroupId || undefined,
+      createdBy: canvas.metadata?.createdBy,
+      nodes: canvas.spec?.nodes || [],
+      edges: canvas.spec?.edges || [],
+    }))
+    .sort(compareByName);
+
+  const canvasGroups: CanvasGroupData[] = (canvasGroupsData || [])
+    .map((group: CanvasesCanvasGroup) => ({
+      id: group.metadata?.id || "",
+      title: group.spec?.title || "",
+      backgroundColor: asCanvasGroupColor(group.spec?.backgroundColor),
+    }))
+    .filter((group) => group.id && group.title);
 
   const filteredCanvases = canvases.filter((canvas) => {
-    const matchesSearch =
-      canvas.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      canvas.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    const normalizedQuery = searchQuery.toLowerCase();
+    return (
+      canvas.name.toLowerCase().includes(normalizedQuery) || canvas.description?.toLowerCase().includes(normalizedQuery)
+    );
   });
 
-  const isLoading = canvasesLoading;
+  const isLoading = canvasesLoading || canvasGroupsLoading;
 
   if (isLoading) {
     return (
@@ -99,8 +181,6 @@ const HomePage = () => {
     );
   }
 
-  const error = canvasError;
-
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
       <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
@@ -109,46 +189,38 @@ const HomePage = () => {
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className="bg-slate-100 w-full flex-grow-1">
           <div className="mx-auto w-full max-w-6xl p-8">
-            {!(canvases.length === 0 && !searchQuery) && (
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <Heading level={2} className="!text-2xl mb-1">
-                    Canvases
-                  </Heading>
-                  <Text className="text-gray-800 dark:text-gray-400">
-                    Overview of all mapped automations across your organization.
-                  </Text>
-                </div>
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <Heading level={2} className="!text-2xl mb-1">
+                  Canvases
+                </Heading>
+                <Text className="text-gray-800 dark:text-gray-400">
+                  Overview of all mapped automations across your organization.
+                </Text>
               </div>
-            )}
+            </div>
 
-            {!(canvases.length === 0 && !searchQuery) && (
-              <div className="mb-6">
-                <SearchBar
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  canvasViewMode={canvasViewMode}
-                  onCanvasViewModeChange={setCanvasViewMode}
-                />
-              </div>
-            )}
+            <div className="mb-6">
+              <CanvasToolbar
+                organizationId={organizationId}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                canCreateCanvases={canCreateCanvases}
+                permissionsLoading={permissionsLoading}
+              />
+            </div>
 
-            {isLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <Text className="text-gray-500">Loading canvases...</Text>
-              </div>
-            ) : error ? (
+            {canvasError ? (
               <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
-                <Text>{error}</Text>
+                <Text>{canvasError}</Text>
               </div>
             ) : (
               <Content
                 filteredCanvases={filteredCanvases}
+                canvasGroups={canvasGroups}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
-                canvasViewMode={canvasViewMode}
                 onEditCanvas={canvasModalState.onOpenEdit}
-                canCreateCanvases={canCreateCanvases}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
                 permissionsLoading={permissionsLoading}
@@ -163,56 +235,51 @@ const HomePage = () => {
   );
 };
 
-interface SearchBarProps {
+interface CanvasToolbarProps {
+  organizationId: string;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  canvasViewMode: CanvasViewMode;
-  onCanvasViewModeChange: (mode: CanvasViewMode) => void;
+  canCreateCanvases: boolean;
+  permissionsLoading: boolean;
 }
 
-function SearchBar({ searchQuery, setSearchQuery, canvasViewMode, onCanvasViewModeChange }: SearchBarProps) {
+function CanvasToolbar({
+  organizationId,
+  searchQuery,
+  setSearchQuery,
+  canCreateCanvases,
+  permissionsLoading,
+}: CanvasToolbarProps) {
+  const allowed = canCreateCanvases || permissionsLoading;
+
   return (
-    <div className="flex w-full flex-wrap items-center justify-between gap-4">
-      <div className="min-w-0 w-full shrink-0 md:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]">
+    <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+      <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases.">
+        {allowed ? (
+          <Button asChild>
+            <Link to={`/${organizationId}/canvases/new`} aria-label="Create new canvas">
+              <Plus className="h-4 w-4" />
+              New Canvas
+            </Link>
+          </Button>
+        ) : (
+          <Button type="button" disabled>
+            <Plus className="h-4 w-4" />
+            New Canvas
+          </Button>
+        )}
+      </PermissionTooltip>
+
+      <div className="min-w-0 w-full sm:ml-auto sm:w-80">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <Input
-            placeholder="Filter canvases…"
+            placeholder="Filter canvases..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
-      </div>
-      <div className="ml-auto flex shrink-0 items-center">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
-            canvasViewMode === "grid" ? "opacity-100" : "opacity-50 hover:opacity-100",
-          )}
-          aria-label="Grid view"
-          aria-pressed={canvasViewMode === "grid"}
-          onClick={() => onCanvasViewModeChange("grid")}
-        >
-          <Grid3x3 className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
-            canvasViewMode === "list" ? "opacity-100" : "opacity-50 hover:opacity-100",
-          )}
-          aria-label="List view"
-          aria-pressed={canvasViewMode === "list"}
-          onClick={() => onCanvasViewModeChange("list")}
-        >
-          <Rows3 className="h-3.5 w-3.5" />
-        </Button>
       </div>
     </div>
   );
@@ -220,50 +287,86 @@ function SearchBar({ searchQuery, setSearchQuery, canvasViewMode, onCanvasViewMo
 
 function Content({
   filteredCanvases,
+  canvasGroups,
   organizationId,
   searchQuery,
-  canvasViewMode,
   onEditCanvas,
-  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: {
   filteredCanvases: CanvasCardData[];
+  canvasGroups: CanvasGroupData[];
   organizationId: string;
   searchQuery: string;
-  canvasViewMode: CanvasViewMode;
   onEditCanvas: (canvas: CanvasCardData) => void;
-  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }) {
-  if (filteredCanvases.length === 0) {
-    if (searchQuery) {
-      return <CanvasesSearchEmptyState />;
+  const groupedLayout = useMemo(() => {
+    const groupIDs = new Set(canvasGroups.map((group) => group.id));
+    const canvasesByGroupID = new Map<string, CanvasCardData[]>();
+    const ungroupedCanvases: CanvasCardData[] = [];
+
+    for (const group of canvasGroups) {
+      canvasesByGroupID.set(group.id, []);
     }
-    return (
-      <OnboardingWelcome
-        organizationId={organizationId}
-        canCreateCanvases={canCreateCanvases}
-        permissionsLoading={permissionsLoading}
-      />
-    );
+
+    for (const canvas of filteredCanvases) {
+      if (canvas.canvasGroupId && groupIDs.has(canvas.canvasGroupId)) {
+        canvasesByGroupID.get(canvas.canvasGroupId)?.push(canvas);
+        continue;
+      }
+
+      ungroupedCanvases.push(canvas);
+    }
+
+    const visibleGroups = searchQuery
+      ? canvasGroups.filter((group) => (canvasesByGroupID.get(group.id) || []).length > 0)
+      : canvasGroups;
+
+    return { canvasesByGroupID, ungroupedCanvases, visibleGroups };
+  }, [canvasGroups, filteredCanvases, searchQuery]);
+
+  if (filteredCanvases.length === 0 && (searchQuery || canvasGroups.length === 0)) {
+    return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
+  }
+
+  if (groupedLayout.visibleGroups.length === 0 && groupedLayout.ungroupedCanvases.length === 0) {
+    return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
   }
 
   return (
-    <CanvasGridView
-      filteredCanvases={filteredCanvases}
-      organizationId={organizationId}
-      view={canvasViewMode}
-      searchQuery={searchQuery}
-      onEditCanvas={onEditCanvas}
-      canCreateCanvases={canCreateCanvases}
-      canUpdateCanvases={canUpdateCanvases}
-      canDeleteCanvases={canDeleteCanvases}
-      permissionsLoading={permissionsLoading}
-    />
+    <div className="space-y-6">
+      {groupedLayout.visibleGroups.map((group) => (
+        <CanvasGroupSection
+          key={group.id}
+          group={group}
+          canvases={groupedLayout.canvasesByGroupID.get(group.id) || []}
+          canvasGroups={canvasGroups}
+          organizationId={organizationId}
+          onEditCanvas={onEditCanvas}
+          canUpdateCanvases={canUpdateCanvases}
+          canDeleteCanvases={canDeleteCanvases}
+          permissionsLoading={permissionsLoading}
+          canMoveUp={canvasGroups.findIndex((canvasGroup) => canvasGroup.id === group.id) > 0}
+          canMoveDown={canvasGroups.findIndex((canvasGroup) => canvasGroup.id === group.id) < canvasGroups.length - 1}
+        />
+      ))}
+
+      {groupedLayout.ungroupedCanvases.length > 0 ? (
+        <CanvasCardsGrid
+          canvases={groupedLayout.ungroupedCanvases}
+          canvasGroups={canvasGroups}
+          organizationId={organizationId}
+          onEditCanvas={onEditCanvas}
+          canUpdateCanvases={canUpdateCanvases}
+          canDeleteCanvases={canDeleteCanvases}
+          permissionsLoading={permissionsLoading}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -281,143 +384,228 @@ function CanvasesSearchEmptyState() {
   );
 }
 
-interface CanvasGridViewProps {
-  filteredCanvases: CanvasCardData[];
+function CanvasesEmptyState() {
+  return (
+    <div className="text-center py-12">
+      <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
+      <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
+        No canvases yet
+      </Heading>
+    </div>
+  );
+}
+
+interface CanvasGroupSectionProps {
+  group: CanvasGroupData;
+  canvases: CanvasCardData[];
+  canvasGroups: CanvasGroupData[];
   organizationId: string;
-  view: CanvasViewMode;
-  searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
-  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }
 
-function NewCanvasCard({
+function CanvasGroupSection({
+  group,
+  canvases,
+  canvasGroups,
   organizationId,
-  canCreateCanvases,
-  permissionsLoading,
-}: {
-  organizationId: string;
-  canCreateCanvases: boolean;
-  permissionsLoading: boolean;
-}) {
-  const allowed = canCreateCanvases || permissionsLoading;
-
-  return (
-    <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases." className="min-w-0">
-      <Link
-        to={`/${organizationId}/canvases/new`}
-        aria-label="Create new canvas"
-        className={cn(
-          "relative flex min-h-48 flex-col items-center justify-center rounded-md border border-dashed border-green-500 bg-green-50 text-center transition-colors dark:border-green-500 dark:bg-green-950/30",
-          "hover:bg-green-100 dark:hover:bg-green-950/50",
-          allowed && "cursor-pointer",
-        )}
-      >
-        <div className="flex flex-col items-center justify-center gap-3 px-4">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
-            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-          </span>
-          <Heading
-            level={3}
-            className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-          >
-            <span className="truncate">New Canvas</span>
-          </Heading>
-        </div>
-      </Link>
-    </PermissionTooltip>
-  );
-}
-
-function NewCanvasListRow({
-  organizationId,
-  canCreateCanvases,
-  permissionsLoading,
-}: {
-  organizationId: string;
-  canCreateCanvases: boolean;
-  permissionsLoading: boolean;
-}) {
-  const allowed = canCreateCanvases || permissionsLoading;
-
-  return (
-    <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases." className="min-w-0">
-      <Link
-        to={`/${organizationId}/canvases/new`}
-        aria-label="Create new canvas"
-        className={cn(
-          "relative flex flex-row items-center gap-4 rounded-md border border-dashed border-green-500 bg-green-50 px-4 py-3 transition-colors dark:border-green-500 dark:bg-green-950/30",
-          "hover:bg-green-100 dark:hover:bg-green-950/50",
-          allowed && "cursor-pointer",
-        )}
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
-          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-        </span>
-        <Heading
-          level={3}
-          className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate"
-        >
-          <span className="truncate">New Canvas</span>
-        </Heading>
-      </Link>
-    </PermissionTooltip>
-  );
-}
-
-function CanvasGridView({
-  filteredCanvases,
-  organizationId,
-  view,
-  searchQuery,
   onEditCanvas,
-  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
-}: CanvasGridViewProps) {
-  const showNewCanvasEntry = searchQuery.trim() === "";
+  canMoveUp,
+  canMoveDown,
+}: CanvasGroupSectionProps) {
+  const [draftTitle, setDraftTitle] = useState(group.title);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const isSubmittingRenameRef = useRef(false);
+  const ignoreBlurUntilRef = useRef(0);
+  const updateCanvasGroupMutation = useUpdateCanvasGroup(organizationId);
 
-  if (view === "list") {
-    return (
-      <div className="flex flex-col gap-3">
-        {showNewCanvasEntry ? (
-          <NewCanvasListRow
-            organizationId={organizationId}
-            canCreateCanvases={canCreateCanvases}
-            permissionsLoading={permissionsLoading}
-          />
-        ) : null}
-        {filteredCanvases.map((canvas) => (
-          <CanvasListRow
-            key={canvas.id}
-            canvas={canvas}
-            organizationId={organizationId}
-            onEdit={onEditCanvas}
-            canUpdateCanvases={canUpdateCanvases}
-            canDeleteCanvases={canDeleteCanvases}
-            permissionsLoading={permissionsLoading}
-          />
-        ))}
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!isRenaming) {
+      setDraftTitle(group.title);
+    }
+  }, [group.title, isRenaming]);
+
+  const focusRenameInput = (selectText = false) => {
+    window.setTimeout(() => {
+      renameInputRef.current?.focus();
+      if (selectText) {
+        renameInputRef.current?.select();
+      }
+    }, 0);
+  };
+
+  const startRenaming = ({ preserveFocus = false }: { preserveFocus?: boolean } = {}) => {
+    if (!canUpdateCanvases || updateCanvasGroupMutation.isPending) return;
+
+    if (preserveFocus) {
+      ignoreBlurUntilRef.current = Date.now() + 200;
+    }
+
+    setIsRenaming(true);
+    focusRenameInput(true);
+  };
+
+  const cancelRenaming = () => {
+    setDraftTitle(group.title);
+    setIsRenaming(false);
+  };
+
+  const submitRename = async () => {
+    if (!canUpdateCanvases || isSubmittingRenameRef.current) return;
+
+    const title = draftTitle.trim();
+    if (!title) {
+      showErrorToast("Group name is required");
+      focusRenameInput();
+      return;
+    }
+
+    if (title === group.title) {
+      cancelRenaming();
+      return;
+    }
+
+    isSubmittingRenameRef.current = true;
+
+    try {
+      await updateCanvasGroupMutation.mutateAsync({
+        groupId: group.id,
+        title,
+        backgroundColor: group.backgroundColor,
+      });
+      setIsRenaming(false);
+      showSuccessToast("Group renamed");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to rename group"));
+      focusRenameInput();
+    } finally {
+      isSubmittingRenameRef.current = false;
+    }
+  };
+
+  const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void submitRename();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelRenaming();
+    }
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {showNewCanvasEntry ? (
-        <NewCanvasCard
+    <section className={cn("w-full rounded-md p-4", GROUP_BACKGROUND_CLASSES[group.backgroundColor])}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {canUpdateCanvases ? (
+            isRenaming ? (
+              <Input
+                ref={renameInputRef}
+                value={draftTitle}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                onBlur={() => {
+                  if (ignoreBlurUntilRef.current > Date.now()) {
+                    focusRenameInput();
+                    return;
+                  }
+
+                  if (!isSubmittingRenameRef.current) {
+                    void submitRename();
+                  }
+                }}
+                onKeyDown={handleRenameKeyDown}
+                aria-label="Group name"
+                maxLength={128}
+                disabled={updateCanvasGroupMutation.isPending}
+                className="h-6 max-w-[320px] border-white/50 bg-white/5 px-1 text-base font-medium text-white shadow-none placeholder:text-white/60 focus-visible:border-white/60"
+              />
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => startRenaming()}
+                    className="flex h-6 max-w-xl items-center rounded-md border border-transparent px-1 text-left transition hover:border-white/25 hover:bg-white/5"
+                    aria-label={`Rename group ${group.title}`}
+                  >
+                    <span className="truncate text-base font-medium text-white">{group.title}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Rename</TooltipContent>
+              </Tooltip>
+            )
+          ) : (
+            <Heading level={3} className="mb-0 truncate !text-base font-medium text-white">
+              {group.title}
+            </Heading>
+          )}
+        </div>
+        <CanvasGroupActionsMenu
+          group={group}
           organizationId={organizationId}
-          canCreateCanvases={canCreateCanvases}
+          canUpdateCanvases={canUpdateCanvases}
+          permissionsLoading={permissionsLoading}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          onRenameRequest={() => startRenaming({ preserveFocus: true })}
+        />
+      </div>
+
+      {canvases.length > 0 ? (
+        <CanvasCardsGrid
+          canvases={canvases}
+          canvasGroups={canvasGroups}
+          organizationId={organizationId}
+          onEditCanvas={onEditCanvas}
+          canUpdateCanvases={canUpdateCanvases}
+          canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
         />
-      ) : null}
-      {filteredCanvases.map((canvas) => (
+      ) : (
+        <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md px-4 py-8 text-center text-[13px] font-medium text-white/80">
+          <FolderOpen size={18} className="text-white/80" />
+          <span>No canvases in this group</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CanvasCardsGrid({
+  canvases,
+  canvasGroups,
+  organizationId,
+  onEditCanvas,
+  canUpdateCanvases,
+  canDeleteCanvases,
+  permissionsLoading,
+}: {
+  canvases: CanvasCardData[];
+  canvasGroups: CanvasGroupData[];
+  organizationId: string;
+  onEditCanvas: (canvas: CanvasCardData) => void;
+  canUpdateCanvases: boolean;
+  canDeleteCanvases: boolean;
+  permissionsLoading: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {canvases.map((canvas) => (
         <CanvasCard
           key={canvas.id}
           canvas={canvas}
+          canvasGroups={canvasGroups}
           organizationId={organizationId}
           onEdit={onEditCanvas}
           canUpdateCanvases={canUpdateCanvases}
@@ -431,6 +619,7 @@ function CanvasGridView({
 
 interface CanvasCardProps {
   canvas: CanvasCardData;
+  canvasGroups: CanvasGroupData[];
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
@@ -440,6 +629,7 @@ interface CanvasCardProps {
 
 function CanvasCard({
   canvas,
+  canvasGroups,
   organizationId,
   onEdit,
   canUpdateCanvases,
@@ -451,15 +641,15 @@ function CanvasCard({
   const previewEdges = canvas.edges || [];
 
   return (
-    <div className="relative min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer">
+    <div className="relative min-h-40 bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer">
       <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
       <div className="pointer-events-none relative flex flex-col h-full">
-        <div className="p-4">
+        <div className="p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
-                className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                className="mb-0 line-clamp-2 !text-sm font-medium text-gray-800 transition-colors !leading-5"
               >
                 <span className="truncate">{canvas.name}</span>
               </Heading>
@@ -467,6 +657,7 @@ function CanvasCard({
             <div className="pointer-events-auto">
               <CanvasActionsMenu
                 canvas={canvas}
+                canvasGroups={canvasGroups}
                 organizationId={organizationId}
                 onEdit={onEdit}
                 canUpdateCanvases={canUpdateCanvases}
@@ -477,15 +668,15 @@ function CanvasCard({
           </div>
 
           {canvas.description ? (
-            <div className="mb-4">
-              <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
+            <div className="mb-3">
+              <Text className="line-clamp-2 text-left text-[12px] !leading-normal text-gray-800 dark:text-gray-400">
                 {canvas.description}
               </Text>
             </div>
           ) : null}
 
           <div className="flex justify-between items-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
+            <p className="mt-1 text-left text-[11px] leading-none text-gray-500 dark:text-gray-400">
               {canvas.createdBy?.name ? (
                 <>
                   Created by {canvas.createdBy.name}, on {canvas.createdAt}
@@ -514,14 +705,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   ) as Array<SuperplaneComponentsNode & { position: { x: number; y: number } }>;
 
   if (!positionedNodes.length) {
-    return (
-      <div className="p-4">
-        <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center gap-1 text-[13px] text-gray-500">
-          <Rainbow size={24} className="text-gray-500" />
-          Canvas is empty
-        </div>
-      </div>
-    );
+    return <div className="h-24 w-full p-3 pt-0" />;
   }
 
   const xs = positionedNodes.map((node) => node.position.x);
@@ -550,11 +734,11 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
     ) || [];
 
   return (
-    <div className="p-4 w-full overflow-hidden">
+    <div className="w-full overflow-hidden p-3 pt-0">
       <svg
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
-        className="w-full h-28 text-gray-500 dark:text-gray-400"
+        className="h-24 w-full text-gray-500 dark:text-gray-400"
       >
         {drawableEdges.map((edge) => {
           const source = nodePositions.get(edge.sourceId!);
@@ -595,8 +779,254 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   );
 }
 
+interface CanvasGroupActionsMenuProps {
+  group: CanvasGroupData;
+  organizationId: string;
+  canUpdateCanvases: boolean;
+  permissionsLoading: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onRenameRequest: () => void;
+}
+
+function CanvasGroupActionsMenu({
+  group,
+  organizationId,
+  canUpdateCanvases,
+  permissionsLoading,
+  canMoveUp,
+  canMoveDown,
+  onRenameRequest,
+}: CanvasGroupActionsMenuProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [shouldStartRename, setShouldStartRename] = useState(false);
+  const [shouldOpenDeleteDialog, setShouldOpenDeleteDialog] = useState(false);
+  const updateCanvasGroupMutation = useUpdateCanvasGroup(organizationId);
+  const updateCanvasGroupPositionMutation = useUpdateCanvasGroupPosition(organizationId);
+  const deleteCanvasGroupMutation = useDeleteCanvasGroup(organizationId);
+  const allowed = canUpdateCanvases || permissionsLoading;
+
+  useEffect(() => {
+    if (!isMenuOpen && shouldStartRename) {
+      setShouldStartRename(false);
+      onRenameRequest();
+    }
+  }, [isMenuOpen, onRenameRequest, shouldStartRename]);
+
+  useEffect(() => {
+    if (!isMenuOpen && shouldOpenDeleteDialog) {
+      setShouldOpenDeleteDialog(false);
+      setIsDialogOpen(true);
+    }
+  }, [isMenuOpen, shouldOpenDeleteDialog]);
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+  };
+
+  const handleColorChange = async (backgroundColor: CanvasGroupColor) => {
+    if (!canUpdateCanvases || backgroundColor === group.backgroundColor) return;
+
+    try {
+      await updateCanvasGroupMutation.mutateAsync({
+        groupId: group.id,
+        title: group.title,
+        backgroundColor,
+      });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to update group color"));
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!canUpdateCanvases) return;
+
+    try {
+      await deleteCanvasGroupMutation.mutateAsync(group.id);
+      showSuccessToast("Group removed");
+      closeDialog();
+    } catch {
+      showErrorToast("Failed to remove group");
+    }
+  };
+
+  const handleRenameRequest = () => {
+    setShouldStartRename(true);
+    setIsMenuOpen(false);
+  };
+
+  const handleMove = async (direction: "DIRECTION_UP" | "DIRECTION_DOWN") => {
+    if (!canUpdateCanvases) return;
+
+    try {
+      await updateCanvasGroupPositionMutation.mutateAsync({
+        groupId: group.id,
+        direction,
+      });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to move group"));
+    }
+  };
+
+  const handleOpenDeleteDialog = () => {
+    setShouldOpenDeleteDialog(true);
+    setIsMenuOpen(false);
+  };
+
+  return (
+    <>
+      {!canUpdateCanvases ? (
+        <PermissionTooltip allowed={allowed} message="You don't have permission to update canvases.">
+          <button
+            className="rounded p-1 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Group actions"
+            disabled
+          >
+            <MoreVertical size={16} />
+          </button>
+        </PermissionTooltip>
+      ) : (
+        <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="rounded p-1 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Group actions"
+              disabled={
+                updateCanvasGroupMutation.isPending ||
+                updateCanvasGroupPositionMutation.isPending ||
+                deleteCanvasGroupMutation.isPending
+              }
+            >
+              <MoreVertical size={16} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            onCloseAutoFocus={(event) => {
+              if (shouldStartRename) {
+                event.preventDefault();
+              }
+            }}
+          >
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                void handleMove("DIRECTION_UP");
+              }}
+              disabled={
+                !canMoveUp ||
+                updateCanvasGroupMutation.isPending ||
+                updateCanvasGroupPositionMutation.isPending ||
+                deleteCanvasGroupMutation.isPending
+              }
+            >
+              <ArrowUp size={16} />
+              Move Up
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                void handleMove("DIRECTION_DOWN");
+              }}
+              disabled={
+                !canMoveDown ||
+                updateCanvasGroupMutation.isPending ||
+                updateCanvasGroupPositionMutation.isPending ||
+                deleteCanvasGroupMutation.isPending
+              }
+            >
+              <ArrowDown size={16} />
+              Move Down
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                handleRenameRequest();
+              }}
+              disabled={
+                updateCanvasGroupMutation.isPending ||
+                updateCanvasGroupPositionMutation.isPending ||
+                deleteCanvasGroupMutation.isPending
+              }
+            >
+              <Pencil size={16} />
+              Change group name
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Palette size={16} />
+                Background
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-auto">
+                <div className="flex items-center gap-2 p-2">
+                  {CANVAS_GROUP_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`${color.replace("-800", "")} group color`}
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full border border-slate-950/15 text-white",
+                        GROUP_SWATCH_CLASSES[color],
+                        group.backgroundColor === color && "ring-2 ring-gray-900 ring-offset-1",
+                      )}
+                      onClick={() => void handleColorChange(color)}
+                      disabled={
+                        color === group.backgroundColor ||
+                        updateCanvasGroupMutation.isPending ||
+                        updateCanvasGroupPositionMutation.isPending
+                      }
+                    >
+                      {group.backgroundColor === color ? <Check className="h-3 w-3" /> : null}
+                    </button>
+                  ))}
+                </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                handleOpenDeleteDialog();
+              }}
+              disabled={deleteCanvasGroupMutation.isPending}
+            >
+              <Trash2 size={16} />
+              Remove Group
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
+        <DialogTitle className="text-gray-800 dark:text-white">Remove "{group.title}"?</DialogTitle>
+        <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
+          This will remove only the folder. The canvases will remain available.
+        </DialogDescription>
+        <DialogActions>
+          <LoadingButton
+            variant="default"
+            onClick={handleDelete}
+            disabled={!canUpdateCanvases}
+            loading={deleteCanvasGroupMutation.isPending}
+            loadingText="Removing..."
+            className="flex items-center gap-2"
+          >
+            <Trash2 size={16} />
+            Remove Group
+          </LoadingButton>
+          <Button variant="outline" onClick={closeDialog}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
 interface CanvasActionsMenuProps {
   canvas: CanvasCardData;
+  canvasGroups: CanvasGroupData[];
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
@@ -606,6 +1036,7 @@ interface CanvasActionsMenuProps {
 
 function CanvasActionsMenu({
   canvas,
+  canvasGroups,
   organizationId,
   onEdit,
   canUpdateCanvases,
@@ -613,7 +1044,11 @@ function CanvasActionsMenu({
   permissionsLoading,
 }: CanvasActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newGroupTitle, setNewGroupTitle] = useState("");
+  const [newGroupColor, setNewGroupColor] = useState<CanvasGroupColor>("blue-800");
   const deleteCanvasMutation = useDeleteCanvas(organizationId);
+  const createCanvasGroupMutation = useCreateCanvasGroup(organizationId);
+  const updateCanvasGroupMembershipMutation = useUpdateCanvasGroupMembership(organizationId);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -629,25 +1064,76 @@ function CanvasActionsMenu({
     setIsDialogOpen(true);
   };
 
+  const handleAssignToGroup = async (groupId: string) => {
+    if (!canUpdateCanvases || groupId === canvas.canvasGroupId) return;
+
+    try {
+      await updateCanvasGroupMembershipMutation.mutateAsync({ canvasId: canvas.id, groupId });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to add canvas to group"));
+    }
+  };
+
+  const handleRemoveFromGroup = async () => {
+    if (!canUpdateCanvases || !canvas.canvasGroupId) return;
+
+    try {
+      await updateCanvasGroupMembershipMutation.mutateAsync({ canvasId: canvas.id });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to remove canvas from group"));
+    }
+  };
+
+  const handleCreateGroup = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canUpdateCanvases) return;
+
+    const title = newGroupTitle.trim();
+    if (!title) return;
+
+    try {
+      const response = await createCanvasGroupMutation.mutateAsync({ title, backgroundColor: newGroupColor });
+      let groupId = response.data?.group?.metadata?.id;
+
+      if (!groupId) {
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.groupList(organizationId) });
+        await queryClient.refetchQueries({ queryKey: canvasKeys.groupList(organizationId), type: "active" });
+
+        const groups = queryClient.getQueryData<CanvasesCanvasGroup[]>(canvasKeys.groupList(organizationId)) || [];
+        groupId =
+          groups.find((group) => group.spec?.title?.trim().toLowerCase() === title.toLowerCase())?.metadata?.id || "";
+      }
+
+      if (!groupId) {
+        throw new Error("missing canvas group id");
+      }
+
+      await updateCanvasGroupMembershipMutation.mutateAsync({ canvasId: canvas.id, groupId });
+
+      setNewGroupTitle("");
+      setNewGroupColor("blue-800");
+      showSuccessToast("Group created");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to create group"));
+    }
+  };
+
   const handleDelete = async () => {
     if (!canDeleteCanvases) return;
-    // If we're currently viewing this workflow, navigate immediately and remove from cache to prevent 404
     const currentPath = location.pathname;
     const canvasPath = `/${organizationId}/canvases/${canvas.id}`;
     const isViewingCanvas = currentPath === canvasPath || currentPath.startsWith(`${canvasPath}/`);
 
     if (isViewingCanvas) {
-      // Remove from cache FIRST to prevent any queries from running
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvas.id) });
-      // Navigate immediately with replace to avoid back button issues and prevent 404 flash
       navigate(`/${organizationId}`, { replace: true });
-      // Then delete (fire and forget)
       deleteCanvasMutation.mutate(canvas.id, {
         onSuccess: () => {
           showSuccessToast("Canvas deleted successfully");
           closeDialog();
         },
-        onError: (_error) => {
+        onError: () => {
           showErrorToast("Failed to delete canvas");
         },
       });
@@ -697,7 +1183,7 @@ function CanvasActionsMenu({
               <button
                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Canvas actions"
-                disabled={deleteCanvasMutation.isPending}
+                disabled={deleteCanvasMutation.isPending || updateCanvasGroupMembershipMutation.isPending}
               >
                 <MoreVertical size={16} />
               </button>
@@ -720,17 +1206,91 @@ function CanvasActionsMenu({
                   Change Name
                 </DropdownMenuItem>
               </PermissionTooltip>
+
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={!canUpdateCanvases}>
+                  <FolderPlus size={16} />
+                  Add to Group
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-64">
+                  {canvasGroups.length > 0 && (
+                    <>
+                      {canvasGroups.map((group) => (
+                        <DropdownMenuItem
+                          key={group.id}
+                          onClick={() => handleAssignToGroup(group.id)}
+                          disabled={group.id === canvas.canvasGroupId || updateCanvasGroupMembershipMutation.isPending}
+                        >
+                          <span className={cn("h-3 w-3 rounded-full", GROUP_SWATCH_CLASSES[group.backgroundColor])} />
+                          <span className="truncate">{group.title}</span>
+                          {group.id === canvas.canvasGroupId ? <Check className="ml-auto h-4 w-4" /> : null}
+                        </DropdownMenuItem>
+                      ))}
+
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+
+                  <form
+                    className="space-y-3 p-3"
+                    onSubmit={handleCreateGroup}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Input
+                      value={newGroupTitle}
+                      onChange={(event) => setNewGroupTitle(event.target.value)}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      placeholder="New group name"
+                      className="h-8"
+                      maxLength={128}
+                      disabled={!canUpdateCanvases || createCanvasGroupMutation.isPending}
+                    />
+                    <div className="flex items-center gap-2">
+                      {CANVAS_GROUP_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          aria-label={`${color.replace("-800", "")} group color`}
+                          className={cn(
+                            "flex h-5 w-5 items-center justify-center rounded-full border border-slate-950/15 text-white",
+                            GROUP_SWATCH_CLASSES[color],
+                            newGroupColor === color && "ring-2 ring-gray-900 ring-offset-1",
+                          )}
+                          onClick={() => setNewGroupColor(color)}
+                        >
+                          {newGroupColor === color ? <Check className="h-3 w-3" /> : null}
+                        </button>
+                      ))}
+                    </div>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="w-full"
+                      disabled={!newGroupTitle.trim() || createCanvasGroupMutation.isPending}
+                    >
+                      Create Group
+                    </Button>
+                  </form>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
+              {canvas.canvasGroupId ? (
+                <DropdownMenuItem
+                  onClick={handleRemoveFromGroup}
+                  disabled={!canUpdateCanvases || updateCanvasGroupMembershipMutation.isPending}
+                >
+                  <FolderMinus size={16} />
+                  Remove from Group
+                </DropdownMenuItem>
+              ) : null}
+
               <PermissionTooltip
                 allowed={canDeleteCanvases || permissionsLoading}
                 message="You don't have permission to delete canvases."
               >
-                <DropdownMenuItem
-                  onClick={openDialog}
-                  className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                  disabled={!canDeleteCanvases}
-                >
+                <DropdownMenuItem onClick={openDialog} disabled={!canDeleteCanvases}>
                   <Trash2 size={16} />
-                  Delete
+                  Delete Canvas
                 </DropdownMenuItem>
               </PermissionTooltip>
             </DropdownMenuContent>
@@ -770,59 +1330,6 @@ function CanvasActionsMenu({
         </DialogActions>
       </Dialog>
     </>
-  );
-}
-
-function CanvasListRow({
-  canvas,
-  organizationId,
-  onEdit,
-  canUpdateCanvases,
-  canDeleteCanvases,
-  permissionsLoading,
-}: CanvasCardProps) {
-  const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
-
-  return (
-    <div className="relative overflow-hidden rounded-md bg-white outline outline-gray-950/15 hover:shadow-md dark:bg-gray-800">
-      <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
-      <div className="pointer-events-none relative flex w-full min-w-0 flex-col justify-center p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <Heading
-              level={3}
-              className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate"
-            >
-              <span className="truncate">{canvas.name}</span>
-            </Heading>
-          </div>
-          <div className="pointer-events-auto">
-            <CanvasActionsMenu
-              canvas={canvas}
-              organizationId={organizationId}
-              onEdit={onEdit}
-              canUpdateCanvases={canUpdateCanvases}
-              canDeleteCanvases={canDeleteCanvases}
-              permissionsLoading={permissionsLoading}
-            />
-          </div>
-        </div>
-        {canvas.description ? (
-          <Text className="mt-1 text-left text-[13px] !leading-normal text-gray-800 dark:text-gray-400 line-clamp-2">
-            {canvas.description}
-          </Text>
-        ) : null}
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {canvas.createdBy?.name ? (
-            <>
-              Created by {canvas.createdBy.name}, on {canvas.createdAt}
-            </>
-          ) : (
-            <>Created on {canvas.createdAt}</>
-          )}
-        </p>
-      </div>
-    </div>
   );
 }
 
