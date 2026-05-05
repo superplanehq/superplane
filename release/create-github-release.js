@@ -11,7 +11,7 @@ async function main() {
 
   if (!version || version.length < 2) {
     console.error(
-      "Usage: node release/make-github-release.js <version>\n\nExample:\n  node release/make-github-release.js v0.0.8"
+      "Usage: node release/create-github-release.js <version>\n\nExample:\n  node release/create-github-release.js v0.0.8"
     );
     process.exit(1);
   }
@@ -33,7 +33,7 @@ async function main() {
   const sbomPath = path.join(buildRoot, "superplane-sbom.json");
   const sbomAssetName = "superplane-sbom.json";
   const cliAssetsDir = path.join(repoRoot, "release/cli");
-  const cliAssetPrefix = `superplane-cli-`;
+  const cliAssets = getCliAssets(cliAssetsDir);
 
   if (!fs.existsSync(artifactPath)) {
     console.error(
@@ -124,14 +124,6 @@ async function main() {
     assetPath: sbomPath,
   });
 
-  const cliAssets = fs
-    .readdirSync(cliAssetsDir)
-    .filter((name) => name.startsWith(cliAssetPrefix))
-    .map((name) => ({
-      assetName: name,
-      assetPath: path.join(cliAssetsDir, name),
-    }));
-
   for (const cliAsset of cliAssets) {
     await uploadAsset({
       repository,
@@ -144,6 +136,41 @@ async function main() {
     });
   }
   console.log("Done.");
+}
+
+function getCliAssets(cliAssetsDir) {
+  if (!fs.existsSync(cliAssetsDir)) {
+    console.error(
+      `Error: ${cliAssetsDir} does not exist. Stage CLI artifacts (superplane-cli-* and install.sh) into release/cli before creating a release.`
+    );
+    process.exit(1);
+  }
+
+  const cliAssetPrefix = "superplane-cli-";
+  const names = fs.readdirSync(cliAssetsDir);
+  const binaryAssetNames = names.filter((name) => name.startsWith(cliAssetPrefix));
+
+  if (binaryAssetNames.length === 0) {
+    console.error(
+      `Error: No CLI binary assets found in ${cliAssetsDir}. Expected files named superplane-cli-<os>-<arch>.`
+    );
+    process.exit(1);
+  }
+
+  if (!names.includes("install.sh")) {
+    console.error(
+      `Error: ${path.join(
+        cliAssetsDir,
+        "install.sh"
+      )} does not exist. Stage the CLI installer script before creating a release.`
+    );
+    process.exit(1);
+  }
+
+  return [...binaryAssetNames, "install.sh"].map((name) => ({
+    assetName: name,
+    assetPath: path.join(cliAssetsDir, name),
+  }));
 }
 
 async function uploadAsset({
@@ -224,7 +251,13 @@ function requestJson(options, body) {
   });
 }
 
-main().catch((err) => {
-  console.error("Unexpected error:", err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Unexpected error:", err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  getCliAssets,
+};
