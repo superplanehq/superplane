@@ -169,24 +169,13 @@ In [Semaphore](https://semaphoreci.com/), create a **new project from this Git r
 
 ### Container images → GitHub Container Registry (GHCR)
 
-Publishing runs in [.semaphore/docker-publish.yml](.semaphore/docker-publish.yml); [.semaphore/semaphore.yml](.semaphore/semaphore.yml) promotes it via `pipeline_file: docker-publish.yml` (path relative to the `.semaphore/` directory).
-
-When **Build and test** completes with **`passed`**, Semaphore **[auto-promotes](https://docs.semaphoreci.com/using-semaphore/promotions)** only for the **`main`** branch.
-
-**Tags** (`v1.2.3`, etc.) and other branches do **not** auto-publish — run promotion **Publish Docker images to GHCR** manually from a finished pipeline in the Semaphore UI when you want images for those refs.
-
-Images are tagged as **`ghcr.io/<github-owner>/<repo>/<service>`** with:
-
-- **`fleet-manager`**, **`task-broker`**, **`runner`** as the `<service>` name  
-- A **12-character commit SHA** tag on every qualifying run  
-- **`latest`** only when publishing a **`main`** branch workflow  
-- The **literal git tag name** when the workflow is triggered by **`v*`** tags  
+Publishing runs from [.semaphore/docker-publish.yml](.semaphore/docker-publish.yml) (promoted via `pipeline_file: docker-publish.yml` next to [.semaphore/semaphore.yml](.semaphore/semaphore.yml)). After `docker login`, it runs **`make docker-publish-ghcr`** ([Makefile](./Makefile)); Semaphore fills **`IMAGE_PREFIX`** / **`IMAGE_TAG`**, and each of **`fleet-manager`**, **`task-broker`**, and **`runner`** is pushed under **`ghcr.io/<owner>/<repo>/`** with both the commit tag and **`latest`**. **[Auto-promote](https://docs.semaphoreci.com/using-semaphore/promotions)** after a green **Build and test** is limited to **`main`**.
 
 **Semaphore setup**
 
 1. In GitHub, create a [**personal access token (classic)**](https://docs.github.com/en/packages/learn-github-packages/publishing-and-managing-packages/publishing-docker-images) (or organization-level bot PAT) with at least **`read:packages`** and **`write:packages`**. SSO-enabled orgs must **authorize** the token for that org.
 
-2. In Semaphore: **Secrets** → create a secret named exactly **`ghcr`** with environment variables **`GHCR_USERNAME`** (your GitHub username or the PAT owner account) and **`GHCR_TOKEN`** (the PAT value).
+2. In Semaphore: **Secrets** → create a secret named exactly **`ghcr`** with **`GHCR_TOKEN`** (a PAT with **`read:packages`** and **`write:packages`**). Non-interactive `docker login --password-stdin` still requires a username, so the workflow uses the **`owner`** segment of **`owner/repo`** from `SEMAPHORE_GIT_REPO_SLUG` as **`-u`**, matching your **`ghcr.io/owner/...`** image paths. Ensure the PAT is for an account allowed to push to that namespace (often the same **`owner`** or a **`write:packages`** bot).
 
 For private packages, configure visibility under **GitHub → Packages** after the first successful push.
 

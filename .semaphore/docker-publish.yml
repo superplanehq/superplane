@@ -1,4 +1,4 @@
-# Promoted from .semaphore/semaphore.yml — requires secret "ghcr" (GHCR_USERNAME, GHCR_TOKEN).
+# Promoted when main is green — secret "ghcr" exposes GHCR_TOKEN.
 version: v1.0
 name: Publish Docker images
 
@@ -13,29 +13,10 @@ blocks:
       secrets:
         - name: ghcr
       jobs:
-        - name: build and push fleet-manager task-broker runner
+        - name: ghcr publish
           commands:
             - checkout
-            - test -n "${SEMAPHORE_GIT_REPO_SLUG:?SEMAPHORE_GIT_REPO_SLUG must be set}"
-            - export PREFIX="ghcr.io/$(echo "${SEMAPHORE_GIT_REPO_SLUG}" | tr '[:upper:]' '[:lower:]')"
-            - export SHORT_SHA="$(echo "${SEMAPHORE_GIT_SHA:?}" | cut -c1-12)"
-            - |
-              if [ -z "${GHCR_USERNAME:-}" ] || [ -z "${GHCR_TOKEN:-}" ]; then
-                echo "GHCR_USERNAME and GHCR_TOKEN must come from Semaphore secret 'ghcr'."
-                exit 1
-              fi
-            - echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
-            - |
-              for svc in fleet-manager task-broker runner; do
-                img="${PREFIX}/${svc}"
-                docker build -f "${svc}/Dockerfile" -t "${img}:${SHORT_SHA}" .
-                docker push "${img}:${SHORT_SHA}"
-                if [ "${SEMAPHORE_GIT_REF_TYPE:-}" = "tag" ] && [ -n "${SEMAPHORE_GIT_TAG_NAME:-}" ]; then
-                  docker tag "${img}:${SHORT_SHA}" "${img}:${SEMAPHORE_GIT_TAG_NAME}"
-                  docker push "${img}:${SEMAPHORE_GIT_TAG_NAME}"
-                fi
-                if [ "${SEMAPHORE_GIT_REF_TYPE:-}" = "branch" ] && [ "${SEMAPHORE_GIT_BRANCH:-}" = "main" ]; then
-                  docker tag "${img}:${SHORT_SHA}" "${img}:latest"
-                  docker push "${img}:latest"
-                fi
-              done
+            - export IMAGE_PREFIX="ghcr.io/$(echo "$SEMAPHORE_GIT_REPO_SLUG" | tr '[:upper:]' '[:lower:]')"
+            - export IMAGE_TAG="$(echo "$SEMAPHORE_GIT_SHA" | cut -c1-12)"
+            - echo "${GHCR_TOKEN}" | docker login ghcr.io -u "$(echo "$SEMAPHORE_GIT_REPO_SLUG" | cut -d/ -f1)" --password-stdin
+            - make docker-publish-ghcr
