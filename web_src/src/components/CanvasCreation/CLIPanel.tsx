@@ -1,5 +1,5 @@
 import { BookOpen, ExternalLink, KeyRound, Loader2 } from "lucide-react";
-import { detectPlatform, getInstallCommand } from "@/lib/cli";
+import { SUPPORTED_CLI_PLATFORMS, getInstallCommand, getManualInstallCommand } from "@/lib/cli";
 import { useConnectCommand } from "@/hooks/useConnectCommand";
 import { CopyButton } from "@/ui/CopyButton";
 
@@ -10,31 +10,46 @@ const CLI_COMMANDS = [
 ];
 
 export function CLIPanel({ organizationId }: { organizationId: string }) {
-  const platform = detectPlatform();
-  const installCommand = getInstallCommand(platform);
+  const installCommand = getInstallCommand();
   const { connectCommand, generating, handleGenerateConnect } = useConnectCommand(organizationId);
 
   return (
     <div className="space-y-4">
       <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">
-            Install ({platform})
-          </span>
+          <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">Install CLI</span>
           <CopyButton text={installCommand} dark />
+        </div>
+        <div className="text-[11px] font-sans text-gray-500 mb-2">
+          Run this in the terminal where you want SuperPlane installed.
         </div>
         <div className="text-green-400 break-all leading-relaxed">
           <span className="text-gray-500 select-none">$ </span>
           {installCommand}
         </div>
-        <a
-          href="https://docs.superplane.com/installation/cli"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block mt-2 text-[11px] font-sans text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          Other platforms
-        </a>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[11px] font-sans text-gray-500 hover:text-gray-300 transition-colors">
+            Manual binary downloads
+          </summary>
+          <div className="mt-3 space-y-2">
+            {SUPPORTED_CLI_PLATFORMS.map((manualPlatform) => {
+              const manualInstallCommand = getManualInstallCommand(manualPlatform);
+
+              return (
+                <div key={manualPlatform}>
+                  <div className="text-[11px] font-sans text-gray-500 mb-0.5">{manualPlatform}</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-gray-300 break-all">
+                      <span className="text-gray-500 select-none">$ </span>
+                      {manualInstallCommand}
+                    </div>
+                    <CopyButton text={manualInstallCommand} dark />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </details>
       </div>
 
       <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
