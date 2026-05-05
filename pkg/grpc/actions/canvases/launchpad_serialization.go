@@ -56,10 +56,6 @@ func serializeCanvasLaunchpad(launchpad *models.CanvasLaunchpad) (*pb.CanvasLaun
 			minH := int32(*item.MinH)
 			converted.MinH = &minH
 		}
-		if item.AutoHeight != nil {
-			autoHeight := *item.AutoHeight
-			converted.AutoHeight = &autoHeight
-		}
 		pbLayout = append(pbLayout, converted)
 	}
 
@@ -117,10 +113,6 @@ func deserializeLaunchpadLayout(in []*pb.LaunchpadLayoutItem) []models.Launchpad
 		if item.MinH != nil {
 			minH := int(*item.MinH)
 			converted.MinH = &minH
-		}
-		if item.AutoHeight != nil {
-			autoHeight := *item.AutoHeight
-			converted.AutoHeight = &autoHeight
 		}
 		out = append(out, converted)
 	}

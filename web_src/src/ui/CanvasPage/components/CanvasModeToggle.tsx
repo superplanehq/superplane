@@ -1,6 +1,5 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Pencil } from "lucide-react";
 
 export type CanvasMode = "launchpad" | "version-live" | "runs";
 
@@ -11,11 +10,16 @@ interface CanvasModeToggleProps {
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
   /**
-   * When true, the Canvas tab is highlighted as a draft/edit state. Used while
-   * the user is in version-edit mode so the toggle stays visible (for parking
-   * lot navigation) but signals that the canvas tab represents the draft.
+   * When true, the active Canvas tab uses an amber palette to signal that the
+   * user is currently in edit mode (the canvas being viewed is a draft).
    */
   editing?: boolean;
+  /**
+   * When true, an amber dot is shown next to the Canvas label to indicate
+   * there are unpublished draft changes. Independent of `editing` so the dot
+   * can persist after the user exits edit mode without publishing.
+   */
+  hasDraft?: boolean;
 }
 
 export function CanvasModeToggle({
@@ -25,6 +29,7 @@ export function CanvasModeToggle({
   onSelectRuns,
   runsNotificationCount,
   editing = false,
+  hasDraft = false,
 }: CanvasModeToggleProps) {
   const handleValueChange = (next: string) => {
     if (next === mode) {
@@ -83,13 +88,18 @@ export function CanvasModeToggle({
         <TabsTrigger
           value="version-live"
           data-testid="canvas-view-mode-live"
-          aria-label={editing ? "Canvas (editing)" : "Canvas"}
+          aria-label={editing ? "Canvas (editing)" : hasDraft ? "Canvas (unpublished draft)" : "Canvas"}
           className={liveCls}
         >
           <span className="inline-flex items-center gap-1.5">
-            {editing ? <Pencil className="h-3 w-3" aria-hidden="true" /> : null}
             Canvas
-            {editing ? <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" /> : null}
+            {hasDraft ? (
+              <span
+                className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"
+                aria-hidden="true"
+                data-testid="canvas-view-mode-live-draft-dot"
+              />
+            ) : null}
           </span>
         </TabsTrigger>
         {showRuns ? (

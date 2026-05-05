@@ -1055,10 +1055,9 @@ message LaunchpadLayoutItem {
   int32 h = 5;
   optional int32 min_w = 6;
   optional int32 min_h = 7;
-  // When true, the panel's height is auto-fit to its content on the
-  // frontend (a ResizeObserver writes back `h`). Vertical resize handles are
-  // hidden; horizontal resizing still works.
-  optional bool auto_height = 8;
+  // Field 8 was previously `auto_height`; removed in 2026-05.
+  reserved 8;
+  reserved "auto_height";
 }
 
 message CanvasLaunchpad {

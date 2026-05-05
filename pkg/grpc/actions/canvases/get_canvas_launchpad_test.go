@@ -76,24 +76,4 @@ func Test__GetCanvasLaunchpad(t *testing.T) {
 		assert.Equal(t, codes.NotFound, s.Code())
 	})
 
-	t.Run("surfaces auto_height when stored", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		autoHeight := true
-		_, err := models.UpsertCanvasLaunchpadInTransaction(database.Conn(), canvas.ID,
-			[]models.LaunchpadPanel{
-				{ID: "p1", Type: "markdown", Content: map[string]any{"body": "table"}},
-			},
-			[]models.LaunchpadLayoutItem{
-				{I: "p1", X: 0, Y: 0, W: 6, H: 4, AutoHeight: &autoHeight},
-			},
-		)
-		require.NoError(t, err)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		resp, err := GetCanvasLaunchpad(ctx, r.Organization.ID.String(), canvas.ID.String())
-		require.NoError(t, err)
-		require.Len(t, resp.Launchpad.Layout, 1)
-		require.NotNil(t, resp.Launchpad.Layout[0].AutoHeight)
-		assert.Equal(t, true, *resp.Launchpad.Layout[0].AutoHeight)
-	})
 }

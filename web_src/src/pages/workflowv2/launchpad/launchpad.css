@@ -125,20 +125,3 @@
     0 1px 2px rgb(15 23 42 / 0.05),
     0 12px 28px -8px rgb(15 23 42 / 0.18);
 }
-
-/* Auto-height panels ----------------------------------------------------- */
-
-/*
- * When a panel has `data-auto-height="true"`, the height is driven by a
- * ResizeObserver in the React layer instead of by the user. Hide the south
- * (s) and southeast (se) resize handles so the user can't manually fight the
- * observer. Horizontal resizing still works via the east (e) handle.
- *
- * The attribute lives on the wrapper div we render as a child of
- * `.react-grid-item`, so we use `:has()` to scope the rule to the matching
- * grid item.
- */
-.launchpad-grid > .react-grid-item:has(> [data-auto-height="true"]) > .react-resizable-handle-s,
-.launchpad-grid > .react-grid-item:has(> [data-auto-height="true"]) > .react-resizable-handle-se {
-  display: none;
-}

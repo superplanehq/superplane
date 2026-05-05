@@ -165,7 +165,7 @@ describe("LaunchpadView", () => {
     expect(screen.getAllByTestId("launchpad-drag-handle")).toHaveLength(2);
     expect(screen.getAllByTestId("launchpad-panel-actions")).toHaveLength(2);
     expect(screen.getAllByTestId("launchpad-edit-panel")).toHaveLength(2);
-    expect(screen.getAllByTestId("launchpad-toggle-auto-height")).toHaveLength(2);
+    expect(screen.queryByTestId("launchpad-toggle-auto-height")).toBeNull();
     expect(screen.getAllByTestId("launchpad-delete-panel-button")).toHaveLength(2);
     // The kebab menu has been removed in favor of direct icon buttons.
     expect(screen.queryByTestId("launchpad-panel-menu")).toBeNull();
@@ -183,7 +183,6 @@ describe("LaunchpadView", () => {
     );
     expect(screen.queryByTestId("launchpad-add-panel")).toBeNull();
     expect(screen.queryByTestId("launchpad-edit-panel")).toBeNull();
-    expect(screen.queryByTestId("launchpad-toggle-auto-height")).toBeNull();
     expect(screen.queryByTestId("launchpad-delete-panel-button")).toBeNull();
     expect(screen.queryByTestId("launchpad-drag-handle")).toBeNull();
     expect(screen.queryByTestId("launchpad-panel-actions")).toBeNull();
@@ -305,113 +304,6 @@ describe("LaunchpadView", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     const [args] = onChange.mock.calls[0];
     expect(args.layout[0]).toMatchObject({ i: "p1", x: 1, y: 1, w: 4, h: 4 });
-  });
-
-  it("toggling 'grow with content' flips data-auto-height and persists the autoHeight flag", () => {
-    const onChange = vi.fn();
-    render(
-      <LaunchpadView
-        panels={[makePanel("p1")]}
-        layout={[makeLayout("p1")]}
-        isLoading={false}
-        readOnly={false}
-        onChange={onChange}
-      />,
-    );
-    const wrapper = screen.getByTestId("launchpad-panel-p1");
-    expect(wrapper.getAttribute("data-auto-height")).toBe("false");
-    expect(screen.getByTestId("launchpad-toggle-auto-height").getAttribute("data-active")).toBe("false");
-
-    fireEvent.click(screen.getByTestId("launchpad-toggle-auto-height"));
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(screen.getByTestId("launchpad-panel-p1").getAttribute("data-auto-height")).toBe("true");
-    expect(screen.getByTestId("launchpad-toggle-auto-height").getAttribute("data-active")).toBe("true");
-    expect(onChange).toHaveBeenCalledTimes(1);
-    const [args] = onChange.mock.calls[0];
-    expect(args.layout[0]).toMatchObject({ i: "p1", autoHeight: true });
-  });
-
-  it("ignores h changes from drag for autoHeight panels", () => {
-    const onChange = vi.fn();
-    render(
-      <LaunchpadView
-        panels={[makePanel("p1")]}
-        layout={[{ ...makeLayout("p1"), autoHeight: true, h: 8 }]}
-        isLoading={false}
-        readOnly={false}
-        onChange={onChange}
-      />,
-    );
-    // The mocked drag tries to write h=4. With autoHeight=true, the previous
-    // h (8) should be preserved so the observer remains the source of truth.
-    fireEvent.click(screen.getByTestId("rgl-simulate-drag"));
-    act(() => {
-      vi.runAllTimers();
-    });
-    expect(onChange).toHaveBeenCalledTimes(1);
-    const [args] = onChange.mock.calls[0];
-    expect(args.layout[0]).toMatchObject({ i: "p1", x: 1, y: 1, w: 4, h: 8, autoHeight: true });
-  });
-
-  it("auto-height observer pushes a new h back through onChange when content grows", () => {
-    // Replace the no-op stub with an instrumented version that captures the
-    // measure callback so the test can fire it on demand.
-    const observers: Array<{
-      cb: ResizeObserverCallback;
-      target: Element | null;
-    }> = [];
-    class InstrumentedRO {
-      cb: ResizeObserverCallback;
-      target: Element | null = null;
-      constructor(cb: ResizeObserverCallback) {
-        this.cb = cb;
-        observers.push(this);
-      }
-      observe(el: Element) {
-        this.target = el;
-      }
-      unobserve() {}
-      disconnect() {}
-    }
-    (globalThis as unknown as { ResizeObserver: typeof InstrumentedRO }).ResizeObserver = InstrumentedRO;
-
-    const onChange = vi.fn();
-    render(
-      <LaunchpadView
-        panels={[makePanel("p1")]}
-        layout={[{ ...makeLayout("p1", 6, 4), autoHeight: true }]}
-        isLoading={false}
-        readOnly={false}
-        onChange={onChange}
-      />,
-    );
-
-    // The body observer is the second one created (the first is the
-    // container width tracker on LaunchpadView).
-    const bodyObserver = observers.find((o) => o.target && o.target.getAttribute("class")?.includes("flex-1"));
-    expect(bodyObserver).toBeDefined();
-
-    // Force the panel body to report a 320px scrollHeight, then trigger the
-    // observer callback. With ROW_HEIGHT=40 and MARGIN_Y=12, 320px maps to
-    // ceil((320 + 12) / (40 + 12)) = ceil(332 / 52) = 7 rows.
-    Object.defineProperty(bodyObserver!.target!, "scrollHeight", {
-      configurable: true,
-      get: () => 320,
-    });
-    act(() => {
-      bodyObserver!.cb(
-        [{ target: bodyObserver!.target! } as ResizeObserverEntry],
-        bodyObserver as unknown as ResizeObserver,
-      );
-      vi.runAllTimers();
-    });
-
-    expect(onChange).toHaveBeenCalled();
-    const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1];
-    expect(lastCall[0].layout[0]).toMatchObject({ i: "p1", h: 7, autoHeight: true });
   });
 
   it("renders a panel with a heading + single widget in fill mode", () => {

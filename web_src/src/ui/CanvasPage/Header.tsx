@@ -147,6 +147,7 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectRuns={props.onSelectRuns}
               runsNotificationCount={props.runsNotificationCount}
               editing={editing}
+              hasDraft={!!props.hasUnpublishedDraftChanges}
             />
           ) : null}
         </div>

@@ -971,13 +971,6 @@ export interface LaunchpadLayoutItem {
   h: number;
   minW?: number;
   minH?: number;
-  /**
-   * When true, the panel's height is auto-fit to its content via a
-   * ResizeObserver in the LaunchpadView. The user can still resize
-   * horizontally, but the south/southeast handles are hidden. Persisted as
-   * `auto_height` on the proto layout item.
-   */
-  autoHeight?: boolean;
 }
 
 export interface CanvasLaunchpad {
@@ -1013,7 +1006,6 @@ export const useCanvasLaunchpad = (canvasId: string, enabled = true) => {
         h: l.h ?? 1,
         minW: l.minW ?? undefined,
         minH: l.minH ?? undefined,
-        ...(l.autoHeight === true ? { autoHeight: true } : {}),
       }));
       return {
         canvasId: data.canvasId || canvasId,
@@ -1049,7 +1041,6 @@ export const useUpdateCanvasLaunchpad = (canvasId: string) => {
               h: l.h,
               ...(l.minW !== undefined ? { minW: l.minW } : {}),
               ...(l.minH !== undefined ? { minH: l.minH } : {}),
-              ...(l.autoHeight === true ? { autoHeight: true } : {}),
             })),
           },
         }),
