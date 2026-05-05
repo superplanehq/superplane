@@ -39,7 +39,6 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  IntegrationsIntegrationDefinition,
   SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -188,8 +187,6 @@ export interface CanvasPageProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  integrationDialogOpen?: boolean;
-  availableIntegrationDefinitions?: IntegrationsIntegrationDefinition[];
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   // Disable running nodes when there are unsaved changes (with tooltip)
@@ -266,8 +263,8 @@ export interface CanvasPageProps {
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
-    sourceNodeId?: string;
-    sourceHandleId?: string | null;
+    sourceNodeId: string;
+    sourceHandleId: string | null;
   }) => Promise<string>;
   onPlaceholderConfigure?: (data: {
     placeholderId: string;
@@ -668,7 +665,6 @@ function CanvasPage(props: CanvasPageProps) {
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
-  const isCreatingStarterPlaceholderRef = useRef(false);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
   const localIsSidebarOpenRef = useRef<boolean | null>(null);
@@ -1041,59 +1037,9 @@ function CanvasPage(props: CanvasPageProps) {
     [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
   );
 
-  const onPlaceholderAdd = props.onPlaceholderAdd;
-  const viewportRefProp = props.viewportRef;
-
-  const handleBuildingBlocksShortcutOpen = useCallback(async () => {
-    if (readOnly) {
-      return;
-    }
-
-    if (templateNodeId) {
-      handleSidebarToggle(true);
-      state.componentSidebar.close();
-      return;
-    }
-
-    if (!onPlaceholderAdd) {
-      handleSidebarToggle(true);
-      return;
-    }
-
-    if (isCreatingStarterPlaceholderRef.current) {
-      return;
-    }
-
-    isCreatingStarterPlaceholderRef.current = true;
-    try {
-      const position = findFreePositionInViewport({
-        viewport: viewportRefProp?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
-        canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
-        nodes: state.nodes || [],
-        nodeSize: { width: 420, height: 200 },
-        fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
-      });
-      const placeholderId = await onPlaceholderAdd({ position });
-      if (!placeholderId) {
-        handleSidebarToggle(true);
-        return;
-      }
-
-      setTemplateNodeId(placeholderId);
-      setIsBuildingBlocksSidebarOpen(true);
-      state.componentSidebar.close();
-    } finally {
-      isCreatingStarterPlaceholderRef.current = false;
-    }
-  }, [
-    readOnly,
-    templateNodeId,
-    onPlaceholderAdd,
-    viewportRefProp,
-    state.nodes,
-    state.componentSidebar,
-    handleSidebarToggle,
-  ]);
+  const handleBuildingBlocksShortcutOpen = useCallback(() => {
+    handleSidebarToggle(true);
+  }, [handleSidebarToggle]);
 
   useBuildingBlocksShortcut({
     disabled:
@@ -1243,13 +1189,10 @@ function CanvasPage(props: CanvasPageProps) {
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
-            availableIntegrations={props.availableIntegrationDefinitions}
-            integrationDialogOpen={props.integrationDialogOpen}
             canvasZoom={canvasZoom}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockClick}
-            onConnectIntegration={props.onConnectIntegration}
             onEnterSubmit={handleBuildingBlockEnter}
           />
         )}
