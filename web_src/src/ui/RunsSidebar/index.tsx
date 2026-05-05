@@ -21,6 +21,7 @@ import { Checkbox } from "@/ui/checkbox";
 import { toast } from "sonner";
 
 export const RUNS_SIDEBAR_WIDTH_STORAGE_KEY = "runs-sidebar-width";
+const RUNS_SIDEBAR_FILTERS_STORAGE_KEY = "runs-sidebar-filters";
 const RUNS_SIDEBAR_MIN_WIDTH = 260;
 const RUNS_SIDEBAR_MAX_WIDTH = 640;
 const RUNS_SIDEBAR_DEFAULT_WIDTH = 320;
@@ -108,6 +109,37 @@ const STATUS_OPTIONS: { id: StatusOptionId; label: string; color: string }[] = [
   { id: "completed", label: "Completed", color: badgeColorForEventState("success") },
 ];
 
+//
+// Filter persistence. Status options are global (the same enum applies on
+// every canvas), so we hydrate them eagerly. Trigger IDs are per-canvas and
+// will be pruned once the current canvas's nodes load -- see the prune
+// effect below.
+//
+function loadPersistedFilters(): { statuses: Set<StatusOptionId>; triggerIds: Set<string> } {
+  if (typeof window === "undefined") return { statuses: new Set(), triggerIds: new Set() };
+  try {
+    const raw = window.localStorage.getItem(RUNS_SIDEBAR_FILTERS_STORAGE_KEY);
+    if (!raw) return { statuses: new Set(), triggerIds: new Set() };
+    const parsed = JSON.parse(raw) as { statuses?: unknown; triggerIds?: unknown };
+    const validStatuses = new Set<StatusOptionId>(STATUS_OPTIONS.map((o) => o.id));
+    const statuses = new Set<StatusOptionId>(
+      Array.isArray(parsed.statuses)
+        ? parsed.statuses.filter(
+            (s: unknown): s is StatusOptionId => typeof s === "string" && validStatuses.has(s as StatusOptionId),
+          )
+        : [],
+    );
+    const triggerIds = new Set<string>(
+      Array.isArray(parsed.triggerIds)
+        ? parsed.triggerIds.filter((t: unknown): t is string => typeof t === "string")
+        : [],
+    );
+    return { statuses, triggerIds };
+  } catch {
+    return { statuses: new Set(), triggerIds: new Set() };
+  }
+}
+
 type TriggerOption = {
   id: string;
   name: string;
@@ -145,8 +177,8 @@ export function RunsSidebar({
   const [isResizing, setIsResizing] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(new Set());
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<StatusOptionId>>(new Set());
+  const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<StatusOptionId>>(() => loadPersistedFilters().statuses);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -175,6 +207,25 @@ export function RunsSidebar({
   }, [sidebarWidth]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        RUNS_SIDEBAR_FILTERS_STORAGE_KEY,
+        JSON.stringify({
+          statuses: Array.from(selectedStatuses),
+          triggerIds: Array.from(selectedTriggerIds),
+        }),
+      );
+    } catch {
+      //
+      // localStorage may throw in private mode or when the quota is full.
+      // Filter persistence is a nice-to-have; falling back to in-memory
+      // state is fine, so swallow the error rather than crashing the row.
+      //
+    }
+  }, [selectedStatuses, selectedTriggerIds]);
+
+  useEffect(() => {
     if (!isResizing) return;
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
@@ -200,6 +251,31 @@ export function RunsSidebar({
     opts.sort((a, b) => a.name.localeCompare(b.name));
     return opts;
   }, [workflowNodes, componentIconMap]);
+
+  //
+  // Trigger IDs are scoped to a single canvas, so when the user navigates
+  // between canvases the persisted set may contain IDs that aren't in the
+  // current canvas. Prune them once the current canvas's nodes are loaded
+  // (skip while triggerOptions is empty -- that's the loading state, not a
+  // canvas with zero triggers, and clearing here would discard valid
+  // selections during a refetch).
+  //
+  useEffect(() => {
+    if (triggerOptions.length === 0) return;
+    const valid = new Set(triggerOptions.map((o) => o.id));
+    setSelectedTriggerIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (valid.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [triggerOptions]);
 
   type DecoratedEvent = {
     event: CanvasesCanvasEventWithExecutions;
@@ -463,18 +539,32 @@ export function RunsSidebar({
                   }}
                   className={cn(
                     // Always-2px left border so the conditional red tint on
-                    // failed runs doesn't shift surrounding rows by 2px.
+                    // failed runs doesn't shift surrounding rows by 2px. The
+                    // selected sky border is applied last so it overrides
+                    // the error tint -- the red dot still conveys error.
                     "group flex w-full cursor-pointer items-center gap-1.5 border-b border-l-2 border-slate-100 px-3 py-2 text-left transition-colors",
-                    isSelected ? "bg-sky-50" : "hover:bg-gray-50",
                     isError ? "border-l-red-400" : "border-l-transparent",
+                    isSelected ? "border-l-sky-500 bg-sky-100" : "hover:bg-gray-50",
                   )}
                 >
                   <TriggerIcon iconSrc={iconSrc} iconSlug={iconSlug || undefined} alt={triggerName} />
-                  <span className="max-w-[35%] shrink-0 truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                  <span
+                    className={cn(
+                      "max-w-[35%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
+                      isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
+                    )}
+                  >
                     {triggerName}
                   </span>
                   {title ? (
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800">{title}</span>
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-xs",
+                        isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
+                      )}
+                    >
+                      {title}
+                    </span>
                   ) : (
                     <span className="flex-1" />
                   )}
