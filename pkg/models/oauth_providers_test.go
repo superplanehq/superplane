@@ -19,7 +19,7 @@ func TestValidateAllowedOAuthProviders(t *testing.T) {
 }
 
 func TestNormalizeAllowedOAuthProviders(t *testing.T) {
-	assert.Nil(t, NormalizeAllowedOAuthProviders(nil))
-	assert.Nil(t, NormalizeAllowedOAuthProviders([]string{}))
+	assert.Equal(t, []string{}, NormalizeAllowedOAuthProviders(nil))
+	assert.Equal(t, []string{}, NormalizeAllowedOAuthProviders([]string{}))
 	assert.Equal(t, []string{ProviderGitHub}, NormalizeAllowedOAuthProviders([]string{ProviderGitHub, ProviderGitHub}))
 }
