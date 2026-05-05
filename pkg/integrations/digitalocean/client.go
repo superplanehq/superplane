@@ -3215,45 +3215,6 @@ func (c *Client) ListGPUDroplets() ([]Droplet, error) {
 	return gpuDroplets, nil
 }
 
-// ListGPUImages returns GPU-compatible images including one-click applications
-func (c *Client) ListGPUImages() ([]Image, error) {
-	// Get distribution images (base OS images)
-	distImages, err := c.ListImages("distribution")
-	if err != nil {
-		return nil, err
-	}
-
-	// Get application images (one-click apps and marketplace images)
-	appImages, err := c.ListImages("application")
-	if err != nil {
-		return nil, err
-	}
-
-	// Combine both types
-	allImages := append(distImages, appImages...)
-
-	// Filter for GPU-compatible images
-	// DigitalOcean GPU images typically include:
-	// - Ubuntu, Debian, Rocky Linux, Fedora (base distributions)
-	// - ML-in-a-Box, NVIDIA CUDA, PyTorch, TensorFlow (one-click apps)
-	gpuImages := make([]Image, 0)
-	for _, image := range allImages {
-		// Include base distributions that support GPU
-		if image.Type == "application" {
-			// Only include marketplace apps that are GPU-related
-			if isGPURelatedImage(image) {
-				gpuImages = append(gpuImages, image)
-			}
-		} else if image.Distribution == "Ubuntu" || image.Distribution == "Debian" ||
-			image.Distribution == "Rocky Linux" || image.Distribution == "Fedora" {
-			// Include standard distributions
-			gpuImages = append(gpuImages, image)
-		}
-	}
-
-	return gpuImages, nil
-}
-
 // ListGPUImagesApplication returns only GPU-related one-click/marketplace application images.
 func (c *Client) ListGPUImagesApplication() ([]Image, error) {
 	appImages, err := c.ListImages("application")
@@ -3280,8 +3241,7 @@ func (c *Client) ListGPUImagesDistribution() ([]Image, error) {
 
 	gpuImages := make([]Image, 0)
 	for _, image := range distImages {
-		if image.Distribution == "Ubuntu" || image.Distribution == "Debian" ||
-			image.Distribution == "Rocky Linux" || image.Distribution == "Fedora" {
+		if isGPUSupportedDistribution(image) {
 			gpuImages = append(gpuImages, image)
 		}
 	}
@@ -3310,7 +3270,21 @@ func isGPURelatedImage(image Image) bool {
 	return false
 }
 
-// RenameDroplet renames a droplet
+// gpuSupportedImageSlugs is the hardcoded list of base OS images known to work with
+// DigitalOcean GPU droplets.
+var gpuSupportedImageSlugs = map[string]bool{
+	"ubuntu-22-04-x64": true,
+	"ubuntu-24-04-x64": true,
+	"ubuntu-25-10-x64": true,
+	"fedora-42-x64":    true,
+	"fedora-43-x64":    true,
+}
+
+// isGPUSupportedDistribution checks if a distribution image is on the hardcoded list of
+// base OS images that are known to be compatible with DigitalOcean GPU droplets.
+func isGPUSupportedDistribution(image Image) bool {
+	return gpuSupportedImageSlugs[image.Slug]
+}
 func (c *Client) RenameDroplet(dropletID int, name string) (*DOAction, error) {
 	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
 
