@@ -3272,11 +3272,12 @@ func isGPURelatedImage(image Image) bool {
 // gpuMinVersions defines the minimum OS version (major*100+minor) required for GPU droplet
 // support per distribution slug prefix. New versions released by DigitalOcean will automatically
 // be included once they meet or exceed these minimums.
+// All versions are encoded as major*100+minor (e.g. 22.04 → 2204, 11.x → 1100).
 var gpuMinVersions = map[string]int{
 	"ubuntu":     2204, // Ubuntu 22.04+
-	"fedora":     42,   // Fedora 42+
-	"debian":     11,   // Debian 11+
-	"rockylinux": 8,    // Rocky Linux 8+
+	"fedora":     4200, // Fedora 42+
+	"debian":     1100, // Debian 11+
+	"rockylinux": 800,  // Rocky Linux 8+
 }
 
 // isGPUSupportedDistribution checks if a distribution image meets the minimum version
@@ -3293,7 +3294,8 @@ func isGPUSupportedDistribution(image Image) bool {
 			continue
 		}
 
-		// Strip the prefix and parse version parts
+		// Strip the prefix and parse version parts.
+		// Version is always encoded as major*100+minor (minor defaults to 0 if absent).
 		rest := strings.TrimPrefix(slug, prefix+"-")
 		parts := strings.SplitN(rest, "-", 3)
 
@@ -3302,15 +3304,14 @@ func isGPUSupportedDistribution(image Image) bool {
 			continue
 		}
 
-		// Fedora slugs: fedora-43-x64 (major only)
-		// Ubuntu slugs: ubuntu-22-04-x64 (major + minor)
-		version := major
+		minor := 0
 		if len(parts) >= 2 {
-			if minor, err := strconv.Atoi(parts[1]); err == nil {
-				version = major*100 + minor
+			if m, err := strconv.Atoi(parts[1]); err == nil {
+				minor = m
 			}
 		}
 
+		version := major*100 + minor
 		if version >= minVersion {
 			return true
 		}
