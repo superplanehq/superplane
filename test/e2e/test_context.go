@@ -54,6 +54,7 @@ func (s *TestContext) Start() {
 	os.Setenv("OIDC_KEYS_PATH", "../../test/fixtures/oidc-keys")
 	os.Setenv("PUBLIC_API_PORT", "8001")
 	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
+	os.Setenv("VITE_DEV_HOST", "127.0.0.1")
 	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
 	os.Setenv("ALLOWED_WS_ORIGINS", "http://127.0.0.1:8001")
 	os.Setenv("APP_ENV", "development")
