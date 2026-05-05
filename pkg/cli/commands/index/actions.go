@@ -197,7 +197,89 @@ func renderConfigurationText(stdout io.Writer, configuration []openapi_client.Co
 		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\t%s\n", field.GetName(), field.GetType(), required, field.GetDescription())
 	}
 
-	return writer.Flush()
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+
+	if hasDetailedConfigurationMetadata(configuration) {
+		_, err = fmt.Fprintln(stdout, "  Tip: use -o json or -o yaml with --name to inspect nested schema fields, enum options, defaults, and conditions.")
+		return err
+	}
+
+	return nil
+}
+
+func hasDetailedConfigurationMetadata(configuration []openapi_client.ConfigurationField) bool {
+	for _, field := range configuration {
+		var payload map[string]any
+		serialized, err := json.Marshal(field)
+		if err != nil {
+			continue
+		}
+
+		err = json.Unmarshal(serialized, &payload)
+		if err != nil {
+			continue
+		}
+
+		if hasNonEmptyString(payload, "placeholder") ||
+			hasNonNilValue(payload, "default") ||
+			hasNonEmptyList(payload, "visibilityConditions") ||
+			hasNonEmptyList(payload, "requiredConditions") ||
+			hasDetailedTypeOptions(payload["typeOptions"]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasDetailedTypeOptions(value any) bool {
+	typeOptions, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	if hasNonEmptyList(nestedMap(typeOptions, "object"), "schema") {
+		return true
+	}
+
+	listOptions := nestedMap(typeOptions, "list")
+	itemDefinition := nestedMap(listOptions, "itemDefinition")
+	if hasNonEmptyList(itemDefinition, "schema") {
+		return true
+	}
+
+	if hasNonEmptyList(nestedMap(typeOptions, "select"), "options") ||
+		hasNonEmptyList(nestedMap(typeOptions, "multiSelect"), "options") {
+		return true
+	}
+
+	return false
+}
+
+func nestedMap(source map[string]any, key string) map[string]any {
+	value, ok := source[key].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	return value
+}
+
+func hasNonEmptyString(source map[string]any, key string) bool {
+	value, ok := source[key].(string)
+	return ok && strings.TrimSpace(value) != ""
+}
+
+func hasNonNilValue(source map[string]any, key string) bool {
+	value, ok := source[key]
+	return ok && value != nil
+}
+
+func hasNonEmptyList(source map[string]any, key string) bool {
+	values, ok := source[key].([]any)
+	return ok && len(values) > 0
 }
 
 func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]interface{}) error {
