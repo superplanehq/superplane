@@ -20,4 +20,4 @@ gcloud iam service-accounts add-iam-policy-binding SERVICE_ACCOUNT_EMAIL \
   --member="{{ .Principal }}"
 ~~~
 
-> The integration ID for this setup is `{{ .IntegrationID }}`. If the first sync fails before this binding is in place, add the IAM binding and resync.
+**Note:** IAM changes often take a minute or longer to fully propagate in Google Cloud. SuperPlane waits a short interval before running the first sync after setup; if you still see a permission error, wait briefly and use **Resync** from this integration.

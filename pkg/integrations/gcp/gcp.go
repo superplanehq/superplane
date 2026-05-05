@@ -105,7 +105,7 @@ func (g *GCP) Instructions() string {
    ` + "`principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/subject/app-installation:INTEGRATION_ID`" + `
 8. Enter the **pool provider resource name**, **Project ID**, and **Service account email** below.
 
-The ` + "`INTEGRATION_ID`" + ` is the SuperPlane integration ID. If the first sync fails before this role is granted, copy the integration ID from SuperPlane, add the IAM binding, then resync.
+IAM bindings often take a minute or longer to propagate. SuperPlane waits briefly before the first sync after setup for workload identity; if sync fails with a permission error, wait and trigger another sync from the integration settings.
 
 ## Required IAM roles
 
