@@ -11,6 +11,7 @@ import { HANDLE_STYLE } from "./handleStyle";
 import type { BlockConnectionState, BlockEdgeState } from "./types";
 
 const MULTI_HANDLE_CHANNEL_SPACING = 34;
+const MULTI_APPEND_SOURCE_HANDLE_LEFT_NUDGE = -4;
 
 type MultiRightHandleLayout = {
   handleSize: number;
@@ -190,11 +191,11 @@ function MultiRightChannelControl({
             label={`Add next component (${channel})`}
             onAppend={onAppend}
             isHighlighted={isHighlighted}
-            lineWidth={24}
-            buttonLeft={32}
-            buttonTop={-6}
+            lineWidth={28}
+            buttonLeft={40}
+            buttonTop={-9}
             style={{
-              left: layout.handleLeftX,
+              left: layout.handleLeftX + MULTI_APPEND_SOURCE_HANDLE_LEFT_NUDGE,
               top: `calc(50% + ${offsetY}px)`,
               transform: "translateY(-50%)",
             }}
