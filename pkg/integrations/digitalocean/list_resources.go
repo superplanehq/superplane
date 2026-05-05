@@ -912,18 +912,13 @@ func listGPUImagesOneClick(ctx core.ListResourcesContext) ([]core.IntegrationRes
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	images, err := client.ListGPUImages()
+	images, err := client.ListGPUImagesApplication()
 	if err != nil {
-		return nil, fmt.Errorf("error listing GPU images: %w", err)
+		return nil, fmt.Errorf("error listing GPU application images: %w", err)
 	}
 
 	resources := make([]core.IntegrationResource, 0)
 	for _, image := range images {
-		// Only include one-click/marketplace apps (application type)
-		if image.Type != "application" {
-			continue
-		}
-
 		name := image.Name
 		if image.Slug != "" {
 			name = fmt.Sprintf("%s (%s)", image.Name, image.Distribution)
@@ -950,18 +945,13 @@ func listGPUImagesBase(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	images, err := client.ListGPUImages()
+	images, err := client.ListGPUImagesDistribution()
 	if err != nil {
-		return nil, fmt.Errorf("error listing GPU images: %w", err)
+		return nil, fmt.Errorf("error listing GPU distribution images: %w", err)
 	}
 
 	resources := make([]core.IntegrationResource, 0)
 	for _, image := range images {
-		// Only include base OS distributions (not application/one-click images)
-		if image.Type == "application" {
-			continue
-		}
-
 		name := image.Name
 		if image.Slug != "" {
 			name = fmt.Sprintf("%s (%s)", image.Name, image.Distribution)
