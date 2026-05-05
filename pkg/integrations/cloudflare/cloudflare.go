@@ -144,6 +144,8 @@ func (c *Cloudflare) Actions() []core.Action {
 		&DeleteKVNamespace{},
 		&CreatePool{},
 		&UpdatePool{},
+		&GetPool{},
+		&DeletePool{},
 	}
 }
 
@@ -346,6 +348,62 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 			})
 		}
 		return keyResources, nil
+
+	case "monitor":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		monitors, err := client.ListMonitors(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing monitors: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, m := range monitors {
+			name := m.Description
+			if name == "" {
+				name = m.ID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   m.ID,
+			})
+		}
+		return resources, nil
+
+	case "pool":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		pools, err := client.ListPools(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing pools: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, p := range pools {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: p.Name,
+				ID:   p.ID,
+			})
+		}
+		return resources, nil
 
 	default:
 		return []core.IntegrationResource{}, nil

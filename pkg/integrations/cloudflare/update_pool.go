@@ -14,15 +14,16 @@ import (
 type UpdatePool struct{}
 
 type UpdatePoolSpec struct {
-	AccountID         string       `json:"accountId"`
-	PoolID            string       `json:"poolId"`
-	Name              string       `json:"name"`
-	Description       string       `json:"description"`
-	Enabled           *bool        `json:"enabled"`
-	MinimumOrigins    *int         `json:"minimumOrigins"`
-	Monitor           string       `json:"monitor"`
-	NotificationEmail string       `json:"notificationEmail"`
-	Origins           []OriginSpec `json:"origins"`
+	AccountID            string            `json:"accountId"`
+	PoolID               string            `json:"poolId"`
+	Name                 string            `json:"name"`
+	Description          string            `json:"description"`
+	Enabled              *bool             `json:"enabled"`
+	MinimumOrigins       *int              `json:"minimumOrigins"`
+	Monitor              string            `json:"monitor"`
+	Origins              []OriginSpec      `json:"origins"`
+	OriginSteeringPolicy string            `json:"originSteeringPolicy"`
+	LoadShedding         *LoadSheddingSpec `json:"loadShedding"`
 }
 
 func (c *UpdatePool) Name() string {
@@ -56,8 +57,9 @@ func (c *UpdatePool) Documentation() string {
 - **Description**: Optional new description
 - **Enabled**: Enable or disable the entire pool
 - **Minimum Origins**: Minimum number of healthy origins before pool is marked unhealthy
+- **Origin Steering Policy**: How requests are distributed across origins
 - **Monitor**: Health monitor ID for origin health checks
-- **Notification Email**: Email to notify on health changes
+- **Load Shedding**: Configure load shedding for the pool
 
 ## Output
 
@@ -87,10 +89,22 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "poolId",
-			Label:       "Pool ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Pool",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the origin pool to update",
+			Description: "The origin pool to update",
+			Placeholder: "Select a pool",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "pool",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "accountId",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "origins",
@@ -117,8 +131,15 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 								Label:       "Address",
 								Type:        configuration.FieldTypeString,
 								Required:    true,
-								Description: "IP address or hostname of the origin",
+								Description: "IPv4 address or hostname of the origin",
 								Placeholder: "192.0.2.1",
+							},
+							{
+								Name:        "port",
+								Label:       "Port",
+								Type:        configuration.FieldTypeNumber,
+								Required:    false,
+								Description: "Optional port to append to the address (e.g. 8080). Leave empty to use the default.",
 							},
 							{
 								Name:     "enabled",
@@ -134,6 +155,20 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 								Required:    false,
 								Default:     1,
 								Description: "Traffic weight for this origin (0.0–1.0)",
+							},
+							{
+								Name:        "latitude",
+								Label:       "Latitude",
+								Type:        configuration.FieldTypeNumber,
+								Required:    false,
+								Description: "Geographic latitude for proximity steering (e.g. 51.5074)",
+							},
+							{
+								Name:        "longitude",
+								Label:       "Longitude",
+								Type:        configuration.FieldTypeNumber,
+								Required:    false,
+								Description: "Geographic longitude for proximity steering (e.g. -0.1278)",
 							},
 						},
 					},
@@ -169,18 +204,98 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Description: "Minimum number of healthy origins before the pool is marked as unhealthy",
 		},
 		{
-			Name:        "monitor",
-			Label:       "Monitor ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "originSteeringPolicy",
+			Label:       "Origin Steering Policy",
+			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Description: "Health monitor ID to attach to this pool",
+			Description: "Determines how requests are distributed across origins",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Random", Value: "random"},
+						{Label: "Hash (URI)", Value: "hash"},
+						{Label: "Least Outstanding Requests", Value: "least_outstanding_requests"},
+						{Label: "Least Connections", Value: "least_connections"},
+					},
+				},
+			},
 		},
 		{
-			Name:        "notificationEmail",
-			Label:       "Notification Email",
-			Type:        configuration.FieldTypeString,
+			Name:        "monitor",
+			Label:       "Monitor",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Email address to notify when pool health changes",
+			Description: "Health monitor to attach to this pool",
+			Placeholder: "Select a monitor",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "monitor",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "accountId",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "loadShedding",
+			Label:       "Load Shedding",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Description: "Configure load shedding to drop a percentage of traffic to the pool",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "defaultPercent",
+							Label:       "Default Percent",
+							Type:        configuration.FieldTypeNumber,
+							Required:    false,
+							Default:     0,
+							Description: "Percentage of traffic to shed from all sessions (0–100)",
+						},
+						{
+							Name:        "defaultPolicy",
+							Label:       "Default Policy",
+							Type:        configuration.FieldTypeSelect,
+							Required:    false,
+							Description: "Policy for shedding default (non-session-affinity) traffic",
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Random", Value: "random"},
+										{Label: "Hash", Value: "hash"},
+									},
+								},
+							},
+						},
+						{
+							Name:        "sessionPercent",
+							Label:       "Session Percent",
+							Type:        configuration.FieldTypeNumber,
+							Required:    false,
+							Default:     0,
+							Description: "Percentage of existing sessions to shed (0–100)",
+						},
+						{
+							Name:        "sessionPolicy",
+							Label:       "Session Policy",
+							Type:        configuration.FieldTypeSelect,
+							Required:    false,
+							Description: "Policy for shedding session-affinity traffic",
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Hash", Value: "hash"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -222,13 +337,29 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
+	var originSteering *OriginSteering
+	if spec.OriginSteeringPolicy != "" {
+		originSteering = &OriginSteering{Policy: spec.OriginSteeringPolicy}
+	}
+
+	var loadShedding *LoadShedding
+	if spec.LoadShedding != nil {
+		loadShedding = &LoadShedding{
+			DefaultPercent: spec.LoadShedding.DefaultPercent,
+			DefaultPolicy:  spec.LoadShedding.DefaultPolicy,
+			SessionPercent: spec.LoadShedding.SessionPercent,
+			SessionPolicy:  spec.LoadShedding.SessionPolicy,
+		}
+	}
+
 	req := UpdatePoolRequest{
-		Name:              spec.Name,
-		Description:       spec.Description,
-		Enabled:           spec.Enabled,
-		MinimumOrigins:    spec.MinimumOrigins,
-		Monitor:           spec.Monitor,
-		NotificationEmail: spec.NotificationEmail,
+		Name:           spec.Name,
+		Description:    spec.Description,
+		Enabled:        spec.Enabled,
+		MinimumOrigins: spec.MinimumOrigins,
+		Monitor:        spec.Monitor,
+		OriginSteering: originSteering,
+		LoadShedding:   loadShedding,
 	}
 
 	if len(spec.Origins) > 0 {
@@ -239,11 +370,22 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 				weight = 1.0
 			}
 
+			address := o.Address
+			if o.Port > 0 {
+				address = fmt.Sprintf("%s:%d", o.Address, o.Port)
+			}
+
+			var coords *Coordinates
+			if o.Latitude != nil && o.Longitude != nil {
+				coords = &Coordinates{Latitude: *o.Latitude, Longitude: *o.Longitude}
+			}
+
 			origins[i] = Origin{
-				Name:    o.Name,
-				Address: o.Address,
-				Enabled: o.Enabled,
-				Weight:  weight,
+				Name:        o.Name,
+				Address:     address,
+				Enabled:     o.Enabled,
+				Weight:      weight,
+				Coordinates: coords,
 			}
 		}
 

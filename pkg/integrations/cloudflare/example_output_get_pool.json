@@ -12,17 +12,12 @@
         "address": "192.0.2.1",
         "enabled": true,
         "weight": 1
-      },
-      {
-        "name": "app-2",
-        "address": "192.0.2.2",
-        "enabled": true,
-        "weight": 1
       }
     ],
     "origin_steering": {
       "policy": "random"
     }
   },
-  "accountId": "01a7362d577a6c3019a474fd6f485823"
+  "accountId": "01a7362d577a6c3019a474fd6f485823",
+  "poolId": "17b5962d775c646f3f9725cbc7a53df4"
 }
