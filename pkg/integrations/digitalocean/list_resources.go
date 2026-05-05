@@ -919,8 +919,8 @@ func listGPUImagesOneClick(ctx core.ListResourcesContext) ([]core.IntegrationRes
 
 	resources := make([]core.IntegrationResource, 0)
 	for _, image := range images {
-		// Only include one-click/marketplace apps (snapshot or custom type)
-		if image.Type != "snapshot" && image.Type != "custom" {
+		// Only include one-click/marketplace apps (application type)
+		if image.Type != "application" {
 			continue
 		}
 
@@ -935,7 +935,7 @@ func listGPUImagesOneClick(ctx core.ListResourcesContext) ([]core.IntegrationRes
 		}
 
 		resources = append(resources, core.IntegrationResource{
-			Type: "gpu_image_oneclick",
+			Type: "one_click_gpu_image",
 			Name: name,
 			ID:   id,
 		})
@@ -973,7 +973,7 @@ func listGPUImagesBase(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 		}
 
 		resources = append(resources, core.IntegrationResource{
-			Type: "gpu_image_base",
+			Type: "base_gpu_image",
 			Name: name,
 			ID:   id,
 		})
