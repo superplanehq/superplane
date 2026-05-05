@@ -111,6 +111,7 @@ func (g *GitHub) Actions() []core.Action {
 		&issues.RemoveIssueAssignee{},
 		&metadata.GetRepositoryPermission{},
 		&pulls.CreateReview{},
+		&pulls.CreatePullRequest{},
 		&pulls.AddReaction{},
 		&statuses.PublishCommitStatus{},
 	}
