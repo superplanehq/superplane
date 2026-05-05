@@ -23,6 +23,10 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, fmt.Errorf("no integration context")
 	}
 
+	if !ctx.LegacySetup() {
+		return NewClientWithStorageContexts(httpClient, ctx.Properties(), ctx.Secrets())
+	}
+
 	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
 		return nil, err
@@ -33,11 +37,36 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		baseURL = string(customURL)
 	}
 
+	return NewClientWithAPIKey(httpClient, string(apiKey), baseURL), nil
+}
+
+func NewClientWithStorageContexts(httpClient core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+	apiKey, err := secrets.Get("apiKey")
+	if err != nil {
+		return nil, err
+	}
+
+	baseURL := defaultBaseURL
+	if properties != nil {
+		customURL, err := properties.GetString("baseURL")
+		if err == nil && customURL != "" {
+			baseURL = customURL
+		}
+	}
+
+	return NewClientWithAPIKey(httpClient, apiKey, baseURL), nil
+}
+
+func NewClientWithAPIKey(httpClient core.HTTPContext, apiKey, baseURL string) *Client {
+	if baseURL == "" {
+		baseURL = defaultBaseURL
+	}
+
 	return &Client{
-		APIKey:  string(apiKey),
+		APIKey:  apiKey,
 		BaseURL: baseURL,
 		http:    httpClient,
-	}, nil
+	}
 }
 
 type CreateResponseRequest struct {
