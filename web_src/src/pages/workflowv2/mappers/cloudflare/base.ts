@@ -53,19 +53,20 @@ export const baseMapper: ComponentBaseMapper = {
 };
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
+  const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
+  const eventSubtitle = execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "";
+  const eventState = getState(componentName)(execution);
 
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle,
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
-    },
-  ];
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  if (!rootTriggerNode || !execution.rootEvent?.id) {
+    return [{ receivedAt, eventTitle: "Execution", eventSubtitle, eventState, eventId: execution.id ?? "" }];
+  }
+
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
+  if (!rootTriggerRenderer) {
+    return [{ receivedAt, eventTitle: "Execution", eventSubtitle, eventState, eventId: execution.rootEvent.id }];
+  }
+
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  return [{ receivedAt, eventTitle: title, eventSubtitle, eventState, eventId: execution.rootEvent.id }];
 }

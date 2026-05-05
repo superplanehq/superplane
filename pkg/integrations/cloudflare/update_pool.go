@@ -237,12 +237,6 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "monitor",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "accountId",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
-						},
-					},
 				},
 			},
 		},
