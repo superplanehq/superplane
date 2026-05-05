@@ -447,6 +447,22 @@ export function WorkflowPageV2() {
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
+  const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    const stored = window.localStorage.getItem(CANVAS_VERSION_CONTROL_STORAGE_KEY);
+    if (stored === null) {
+      return true;
+    }
+
+    try {
+      return JSON.parse(stored) as boolean;
+    } catch {
+      return true;
+    }
+  });
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
 
@@ -581,22 +597,6 @@ export function WorkflowPageV2() {
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
   const [isMemoryViewModalOpen, setIsMemoryViewModalOpen] = useState(false);
-  const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const stored = window.localStorage.getItem(CANVAS_VERSION_CONTROL_STORAGE_KEY);
-    if (stored === null) {
-      return false;
-    }
-
-    try {
-      return JSON.parse(stored) as boolean;
-    } catch {
-      return false;
-    }
-  });
   /** After creating a change request, hide draft Discard until the user enters edit mode again. */
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
   const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
@@ -3424,8 +3424,8 @@ export function WorkflowPageV2() {
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
-      sourceNodeId: string;
-      sourceHandleId: string | null;
+      sourceNodeId?: string;
+      sourceHandleId?: string | null;
     }): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
@@ -3450,18 +3450,21 @@ export function WorkflowPageV2() {
         },
       };
 
-      const newEdge: ComponentsEdge = {
-        sourceId: data.sourceNodeId,
-        targetId: newNodeId,
-        channel: data.sourceHandleId || "default",
-      };
+      const newEdge =
+        data.sourceNodeId && data.sourceHandleId !== undefined
+          ? ({
+              sourceId: data.sourceNodeId,
+              targetId: newNodeId,
+              channel: data.sourceHandleId || "default",
+            } as ComponentsEdge)
+          : null;
 
       const updatedWorkflow = {
         ...latestWorkflow,
         spec: {
           ...latestWorkflow.spec,
           nodes: [...(latestWorkflow.spec?.nodes || []), newNode],
-          edges: [...(latestWorkflow.spec?.edges || []), newEdge],
+          edges: newEdge ? [...(latestWorkflow.spec?.edges || []), newEdge] : [...(latestWorkflow.spec?.edges || [])],
         },
       };
 
@@ -5393,6 +5396,8 @@ export function WorkflowPageV2() {
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
+          availableIntegrationDefinitions={availableIntegrations}
+          integrationDialogOpen={!!integrationDialogName}
           canReadIntegrations={canReadIntegrations}
           canCreateIntegrations={canCreateIntegrations}
           canUpdateIntegrations={canUpdateIntegrations}
