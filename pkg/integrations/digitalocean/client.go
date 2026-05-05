@@ -3254,6 +3254,41 @@ func (c *Client) ListGPUImages() ([]Image, error) {
 	return gpuImages, nil
 }
 
+// ListGPUImagesApplication returns only GPU-related one-click/marketplace application images.
+func (c *Client) ListGPUImagesApplication() ([]Image, error) {
+	appImages, err := c.ListImages("application")
+	if err != nil {
+		return nil, err
+	}
+
+	gpuImages := make([]Image, 0)
+	for _, image := range appImages {
+		if isGPURelatedImage(image) {
+			gpuImages = append(gpuImages, image)
+		}
+	}
+
+	return gpuImages, nil
+}
+
+// ListGPUImagesDistribution returns only GPU-compatible base OS distribution images.
+func (c *Client) ListGPUImagesDistribution() ([]Image, error) {
+	distImages, err := c.ListImages("distribution")
+	if err != nil {
+		return nil, err
+	}
+
+	gpuImages := make([]Image, 0)
+	for _, image := range distImages {
+		if image.Distribution == "Ubuntu" || image.Distribution == "Debian" ||
+			image.Distribution == "Rocky Linux" || image.Distribution == "Fedora" {
+			gpuImages = append(gpuImages, image)
+		}
+	}
+
+	return gpuImages, nil
+}
+
 // isGPURelatedImage checks if an image is GPU-related based on keywords in name/slug
 func isGPURelatedImage(image Image) bool {
 	// Use more specific keywords to avoid false positives like "rails", "portainer", "phpmyadmin"
