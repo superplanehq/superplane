@@ -145,12 +145,7 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -174,14 +169,7 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 		issueRequest.Labels = &config.Labels
 	}
 
-	// Create the issue
-	issue, _, err := client.Issues.Create(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		issueRequest,
-	)
-
+	issue, _, err := client.CreateIssue(context.Background(), config.Repository, issueRequest)
 	if err != nil {
 		return fmt.Errorf("failed to create issue: %w", err)
 	}
