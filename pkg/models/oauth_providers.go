@@ -18,7 +18,7 @@ func ValidateAllowedOAuthProviders(providers []string) error {
 // NormalizeAllowedOAuthProviders returns a copy with duplicates removed, order preserved.
 func NormalizeAllowedOAuthProviders(providers []string) []string {
 	if len(providers) == 0 {
-		return nil
+		return []string{}
 	}
 	out := make([]string, 0, len(providers))
 	for _, p := range providers {
