@@ -19,7 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
 import { cn } from "@/lib/utils";
 import type { LaunchpadLayoutItem, LaunchpadPanel } from "@/hooks/useCanvasData";
-import { useLaunchpadHeaderSlotSetter } from "@/ui/CanvasPage/LaunchpadHeaderSlotContext";
+import { useHeaderActionSlotSetter } from "@/ui/CanvasPage/HeaderActionSlotContext";
 import {
   getPanelDef,
   listPanelDefs,
@@ -163,23 +163,23 @@ export function LaunchpadView({
   // (e.g. during isolated component tests). The setter is stable across
   // renders, and we route through a ref so handleAddPanel's identity churn
   // (it depends on the live panel/layout state) doesn't re-fire the effect.
-  const setLaunchpadHeaderNode = useLaunchpadHeaderSlotSetter();
+  const setHeaderActionNode = useHeaderActionSlotSetter();
   const handleAddPanelRef = useRef(handleAddPanel);
   handleAddPanelRef.current = handleAddPanel;
   const stableHandleAddPanel = useCallback((def: PanelDef) => {
     handleAddPanelRef.current(def);
   }, []);
   useEffect(() => {
-    if (!setLaunchpadHeaderNode) return;
+    if (!setHeaderActionNode) return;
     if (readOnly) {
-      setLaunchpadHeaderNode(null);
+      setHeaderActionNode(null);
       return;
     }
-    setLaunchpadHeaderNode(<AddPanelButton onAdd={stableHandleAddPanel} />);
+    setHeaderActionNode(<AddPanelButton onAdd={stableHandleAddPanel} />);
     return () => {
-      setLaunchpadHeaderNode(null);
+      setHeaderActionNode(null);
     };
-  }, [setLaunchpadHeaderNode, readOnly, stableHandleAddPanel]);
+  }, [setHeaderActionNode, readOnly, stableHandleAddPanel]);
 
   const handleDeletePanel = useCallback(
     (id: string) => {

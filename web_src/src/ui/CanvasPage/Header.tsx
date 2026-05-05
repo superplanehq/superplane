@@ -8,7 +8,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
-import { useLaunchpadHeaderSlotNode } from "./LaunchpadHeaderSlotContext";
+import { useHeaderActionSlotNode } from "./HeaderActionSlotContext";
 
 type HeaderMode = "default" | "launchpad" | "version-live" | "version-edit" | "runs";
 
@@ -185,11 +185,14 @@ function SecondaryHeaderActions({
   exitEditModeDisabledTooltip,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
-  const launchpadSlotNode = useLaunchpadHeaderSlotNode();
+  // Whatever view is currently mounted (Apps, Runs, etc.) registers its own
+  // node into this slot via HeaderActionSlotContext. Each registering view's
+  // useEffect cleans up on unmount, so no per-mode gate is needed here.
+  const slotNode = useHeaderActionSlotNode();
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-      {mode === "launchpad" && launchpadSlotNode ? launchpadSlotNode : null}
+      {slotNode ?? null}
 
       {showVersionControlTrigger ? (
         <VersionControlButton

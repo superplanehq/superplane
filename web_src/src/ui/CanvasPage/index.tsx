@@ -68,7 +68,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
-import { LaunchpadHeaderSlotProvider } from "./LaunchpadHeaderSlotContext";
+import { HeaderActionSlotProvider } from "./HeaderActionSlotContext";
 import { RightSideControls } from "./RightSideControls";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -1135,7 +1135,7 @@ function CanvasPage(props: CanvasPageProps) {
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
-    <LaunchpadHeaderSlotProvider>
+    <HeaderActionSlotProvider>
       <div
         ref={canvasWrapperRef}
         className={cn(
@@ -1392,7 +1392,7 @@ function CanvasPage(props: CanvasPageProps) {
           />
         )}
       </div>
-    </LaunchpadHeaderSlotProvider>
+    </HeaderActionSlotProvider>
   );
 }
 

@@ -92,7 +92,7 @@ import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } f
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { RunSummary } from "@/ui/RunSummary";
-import { RunContextHeader, type RunViewMode } from "@/ui/RunSummary/RunContextHeader";
+import { RunViewToggle, type RunViewMode } from "@/ui/RunSummary/RunViewToggle";
 import { NodeDetailPanel } from "@/ui/NodeDetailPanel";
 import { usePushThroughHandler } from "@/pages/workflowv2/usePushThroughHandler";
 import { useApprovalActionHandler } from "@/pages/workflowv2/useApprovalActionHandler";
@@ -6184,14 +6184,12 @@ export function WorkflowPageV2() {
             isRunsMode ? (
               selectedRunEventId ? (
                 <div className="pointer-events-none flex h-full w-full flex-col">
-                  <RunContextHeader
-                    runData={describeRunQuery.data ?? null}
-                    isLoading={describeRunQuery.isLoading}
-                    workflowNodes={describeRunQuery.data?.snapshotVersion?.spec?.nodes ?? canvas?.spec?.nodes}
-                    componentIconMap={componentIconMap}
-                    viewMode={runViewMode}
-                    onChangeViewMode={setRunViewMode}
-                  />
+                  {/* Headless: registers the Report / Steps toggle into the
+                      global header's action slot. The previous in-overlay
+                      RunContextHeader bar (status dot, trigger, time,
+                      duration) was removed -- the same info is already
+                      visible in the Runs sidebar and inside the Report. */}
+                  <RunViewToggle value={runViewMode} onChange={setRunViewMode} />
                   <div className="min-h-0 flex-1">
                     {runViewMode === "summary" ? (
                       describeRunQuery.data ? (
