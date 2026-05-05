@@ -24,12 +24,12 @@ type Organization struct {
 	// or other non-OAuth sign-in (see authentication.Handler.acceptInvitation).
 	AllowDirectEmailInviteCompletion bool `gorm:"column:allow_direct_email_invite_completion;not null;default:true"`
 	ChangeManagementEnabled          bool
-	UsageSyncedAt            *time.Time
-	UsageRetentionWindowDays *int32
-	UsageLimitsSyncedAt      *time.Time
-	CreatedAt                *time.Time
-	UpdatedAt                *time.Time
-	DeletedAt                gorm.DeletedAt `gorm:"index"`
+	UsageSyncedAt                    *time.Time
+	UsageRetentionWindowDays         *int32
+	UsageLimitsSyncedAt              *time.Time
+	CreatedAt                        *time.Time
+	UpdatedAt                        *time.Time
+	DeletedAt                        gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
