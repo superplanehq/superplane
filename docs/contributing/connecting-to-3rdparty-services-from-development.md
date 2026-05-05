@@ -11,7 +11,7 @@ Install [ngrok](https://ngrok.com/):
 # Install ngrok (choose your OS)
 
 # macOS
-brew install ngrok/ngrok/ngrok
+brew install ngrok
 
 # Linux (Debian/Ubuntu)
 curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
