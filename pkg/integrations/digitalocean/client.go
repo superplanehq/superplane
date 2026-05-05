@@ -3239,7 +3239,7 @@ func (c *Client) ListGPUImages() ([]Image, error) {
 	gpuImages := make([]Image, 0)
 	for _, image := range allImages {
 		// Include base distributions that support GPU
-		if image.Type == "snapshot" || image.Type == "custom" {
+		if image.Type == "application" {
 			// Only include marketplace apps that are GPU-related
 			if isGPURelatedImage(image) {
 				gpuImages = append(gpuImages, image)
