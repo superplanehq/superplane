@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 
@@ -68,7 +67,7 @@ func baseURLField() configuration.Field {
 		Type:        configuration.FieldTypeString,
 		Required:    false,
 		Description: baseURLDescription,
-		Placeholder: common.DefaultBaseURL,
+		Default:     common.DefaultBaseURL,
 	}
 }
 
@@ -119,21 +118,6 @@ func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.T
 	return capabilities
 }
 
-func (s *SetupProvider) capabilityDiff(capabilities []string) []string {
-	groups := s.CapabilityGroups()
-
-	diff := []string{}
-	for _, group := range groups {
-		for _, capability := range group.Capabilities {
-			if !slices.Contains(capabilities, capability.Name) {
-				diff = append(diff, capability.Name)
-			}
-		}
-	}
-
-	return diff
-}
-
 func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 	return []core.CapabilityGroup{
 		{
@@ -182,27 +166,32 @@ func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	switch ctx.Step.Name {
 	case SetupStepCapabilitySelection:
 		return s.onCapabilitySelectionSubmit(ctx)
-	case SetupStepEnterAPIKey:
-		return s.onEnterAPIKeySubmit(ctx.Step.Inputs, ctx)
 	case SetupStepEnterBaseURL:
 		return s.onEnterBaseURLSubmit(ctx.Step.Inputs, ctx)
+	case SetupStepEnterAPIKey:
+		return s.onEnterAPIKeySubmit(ctx.Step.Inputs, ctx)
 	}
 
 	return nil, errors.New("unknown step")
 }
 
 func (s *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	ctx.Capabilities.Available(s.allCapabilityNames()...)
 	ctx.Capabilities.Request(ctx.Step.Capabilities...)
-	ctx.Capabilities.Available(s.capabilityDiff(ctx.Step.Capabilities)...)
+
+	instructions, err := renderBaseURLInstructions()
+	if err != nil {
+		return nil, err
+	}
 
 	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
-		Name:  SetupStepEnterAPIKey,
-		Label: "Enter OpenAI API key",
+		Name:  SetupStepEnterBaseURL,
+		Label: "Enter OpenAI Base URL",
 		Inputs: []configuration.Field{
-			apiKeyField(),
+			baseURLField(),
 		},
-		Instructions: string(apiKeyInstructionsTemplate),
+		Instructions: instructions,
 	}, nil
 }
 
@@ -210,10 +199,10 @@ func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 	switch ctx.Step.Name {
 	case SetupStepCapabilitySelection:
 		return s.onCapabilitySelectionRevert(ctx)
-	case SetupStepEnterAPIKey:
-		return s.onEnterAPIKeyRevert(ctx)
 	case SetupStepEnterBaseURL:
 		return s.onEnterBaseURLRevert(ctx)
+	case SetupStepEnterAPIKey:
+		return s.onEnterAPIKeyRevert(ctx)
 	}
 
 	return errors.New("unknown step")
@@ -288,43 +277,17 @@ func (s *SetupProvider) onEnterAPIKeySubmit(inputs any, ctx core.SetupStepContex
 		return nil, err
 	}
 
-	if err := ctx.Secrets.Create(apiKeySecret(apiKey)); err != nil {
-		return nil, fmt.Errorf("error creating secret: %v", err)
-	}
-
-	instructions, err := renderBaseURLInstructions()
+	baseURL, err := ctx.Properties.GetString(PropertyBaseURL)
 	if err != nil {
-		return nil, err
-	}
-
-	return &core.SetupStep{
-		Type:  core.SetupStepTypeInputs,
-		Name:  SetupStepEnterBaseURL,
-		Label: "Enter OpenAI Base URL",
-		Inputs: []configuration.Field{
-			baseURLField(),
-		},
-		Instructions: instructions,
-	}, nil
-}
-
-func (s *SetupProvider) onEnterBaseURLSubmit(inputs any, ctx core.SetupStepContext) (*core.SetupStep, error) {
-	baseURL, err := parseBaseURLInput(inputs)
-	if err != nil {
-		return nil, err
-	}
-
-	apiKey, err := ctx.Secrets.Get(SecretAPIKey)
-	if err != nil {
-		return nil, fmt.Errorf("error getting API key: %v", err)
+		return nil, fmt.Errorf("error getting Base URL: %v", err)
 	}
 
 	if err := common.NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
 		return nil, err
 	}
 
-	if err := ctx.Properties.Create(baseURLProperty(baseURL)); err != nil {
-		return nil, fmt.Errorf("error creating property: %v", err)
+	if err := ctx.Secrets.Create(apiKeySecret(apiKey)); err != nil {
+		return nil, fmt.Errorf("error creating secret: %v", err)
 	}
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
@@ -334,6 +297,27 @@ func (s *SetupProvider) onEnterBaseURLSubmit(inputs any, ctx core.SetupStepConte
 		Name:         SetupStepDone,
 		Label:        "Setup complete",
 		Instructions: string(setupCompleteTemplate),
+	}, nil
+}
+
+func (s *SetupProvider) onEnterBaseURLSubmit(inputs any, ctx core.SetupStepContext) (*core.SetupStep, error) {
+	baseURL, err := parseBaseURLInput(inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ctx.Properties.Create(baseURLProperty(baseURL)); err != nil {
+		return nil, fmt.Errorf("error creating property: %v", err)
+	}
+
+	return &core.SetupStep{
+		Type:  core.SetupStepTypeInputs,
+		Name:  SetupStepEnterAPIKey,
+		Label: "Enter OpenAI API key",
+		Inputs: []configuration.Field{
+			apiKeyField(),
+		},
+		Instructions: string(apiKeyInstructionsTemplate),
 	}, nil
 }
 

@@ -80,15 +80,13 @@ func (o *OpenAI) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (o *OpenAI) Sync(ctx core.SyncContext) error {
-	if ctx.Integration.LegacySetup() {
-		config := Configuration{}
-		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-			return fmt.Errorf("failed to decode configuration: %v", err)
-		}
+	config := Configuration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
 
-		if config.APIKey == "" {
-			return fmt.Errorf("apiKey is required")
-		}
+	if config.APIKey == "" {
+		return fmt.Errorf("apiKey is required")
 	}
 
 	client, err := common.NewClient(ctx.HTTP, ctx.Integration)

@@ -5,5 +5,4 @@ If you are using OpenAI:
 - Create a new secret key
 - Copy the key and paste it below
 
-If you are using an OpenAI-compatible provider, paste the API key or token from that provider instead.
-
+If you changed the Base URL in the previous step, paste the API key or token for that provider instead.
