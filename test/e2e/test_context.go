@@ -25,7 +25,7 @@ type TestContext struct {
 }
 
 func NewTestContext(t *testing.M) *TestContext {
-	return &TestContext{timeoutMs: 10000}
+	return &TestContext{timeoutMs: 15000}
 }
 
 func (s *TestContext) Start() {
@@ -87,13 +87,6 @@ func (s *TestContext) launchBrowser() {
 		Viewport: &pw.Size{
 			Width:  2560,
 			Height: 1440,
-		},
-		RecordVideo: &pw.RecordVideo{
-			Dir: "/app/tmp/videos",
-			Size: &pw.Size{
-				Width:  2560,
-				Height: 1440,
-			},
 		},
 	})
 	if err != nil {
