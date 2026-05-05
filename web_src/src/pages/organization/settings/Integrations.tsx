@@ -27,7 +27,7 @@ import { analytics } from "@/lib/analytics";
 import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
 import { posthog, isPostHogEnabled } from "@/posthog";
 
-const INTEGRATION_SURVEY_NAME = "Integration survey";
+const INTEGRATION_SURVEY_NAME = "Integration Survey";
 
 interface IntegrationsProps {
   organizationId: string;
