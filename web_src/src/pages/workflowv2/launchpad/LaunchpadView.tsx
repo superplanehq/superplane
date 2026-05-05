@@ -396,14 +396,17 @@ function PanelOverlay({
   // Single hover-revealed cluster anchored top-right. Order: drag, edit,
   // delete. The drag icon keeps the `.launchpad-drag-handle` class so
   // react-grid-layout's `draggableHandle` selector still resolves to it.
+  //
+  // No stopPropagation on the cluster: react-grid-layout's draggableHandle
+  // selector restricts drag-start to mousedowns that resolve up to the
+  // `.launchpad-drag-handle` element, so clicks on Edit / Delete won't start
+  // a drag on their own. Stopping propagation here would also block
+  // react-draggable's onMouseDown on the grid item, which is what just
+  // killed dragging entirely.
   return (
     <div
       className="absolute right-1 top-1 z-20 flex items-center gap-0.5 rounded-md bg-white/85 opacity-0 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)] backdrop-blur transition-opacity duration-150 group-hover/panel:opacity-100 focus-within:opacity-100"
       data-testid="launchpad-panel-actions"
-      // Stop the drag-handle drag from initiating when interacting with the
-      // action cluster — clicks on these buttons should not start a drag.
-      onMouseDown={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
     >
       <span
         className="launchpad-drag-handle inline-flex h-6 w-6 cursor-grab items-center justify-center rounded text-slate-500 transition-colors hover:text-slate-700 active:cursor-grabbing"
@@ -411,10 +414,6 @@ function PanelOverlay({
         role="button"
         aria-label="Drag panel"
         title="Drag to move"
-        // The drag handle isn't focusable on its own — the rest of the cluster
-        // already provides keyboard access — but we still want to swallow
-        // mousedowns so the drag (rather than focus shift) starts.
-        onMouseDown={(e) => e.stopPropagation()}
       >
         <GripVertical className="h-3.5 w-3.5" />
       </span>
