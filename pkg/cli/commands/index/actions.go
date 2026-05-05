@@ -20,7 +20,10 @@ func newActionsCommand(options core.BindOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "actions",
 		Short: "List or describe available actions",
-		Args:  cobra.NoArgs,
+		Long: `List or describe available actions.
+
+Use -o json or -o yaml with --name to inspect nested schema fields, enum options, defaults, and conditions.`,
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&from, "from", "", "integration definition name")
 	cmd.Flags().StringVar(&name, "name", "", "action name")
@@ -197,7 +200,11 @@ func renderConfigurationText(stdout io.Writer, configuration []openapi_client.Co
 		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\t%s\n", field.GetName(), field.GetType(), required, field.GetDescription())
 	}
 
-	return writer.Flush()
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]interface{}) error {
