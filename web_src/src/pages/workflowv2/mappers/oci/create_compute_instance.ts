@@ -7,27 +7,38 @@ import type {
   SubtitleContext,
 } from "../types";
 import { baseMapper } from "./base";
+import { isMetadataItem, MAX_NODE_METADATA_ITEMS, metadataItem } from "./image_common";
 
 interface CreateComputeInstanceConfiguration {
-  compartmentId?: string;
+  compartment?: string;
   availabilityDomain?: string;
   displayName?: string;
   shape?: string;
   imageOs?: string;
-  imageId?: string;
-  subnetId?: string;
+  image?: string;
+  subnet?: string;
   sshPublicKey?: string;
   ocpus?: number;
   memoryInGBs?: number;
   bootVolumeSizeGB?: number;
   bootVolumeVpusPerGB?: string;
   attachBlockVolume?: boolean;
-  blockVolumeId?: string;
+  blockVolume?: string;
   enableShieldedInstance?: boolean;
   enableConfidentialComputing?: boolean;
 }
 
+interface CreateComputeInstanceNodeMetadata {
+  displayName?: string;
+  shape?: string;
+  availabilityDomain?: string;
+  imageName?: string;
+  subnetName?: string;
+  blockVolumeName?: string;
+}
+
 interface CreateComputeInstanceOutputData {
+  instanceId?: string;
   displayName?: string;
   lifecycleState?: string;
   shape?: string;
@@ -36,6 +47,7 @@ interface CreateComputeInstanceOutputData {
   region?: string;
   timeCreated?: string;
   publicIp?: string;
+  privateIp?: string;
 }
 
 type CreateComputeInstanceOutputPayload = OutputPayload & {
@@ -55,8 +67,7 @@ function getExecutedAt(context: ExecutionDetailsContext): string | undefined {
 function getOutputData(context: ExecutionDetailsContext): CreateComputeInstanceOutputData | undefined {
   const outputs = context.execution.outputs as { default?: CreateComputeInstanceOutputPayload[] } | undefined;
   const payload = outputs?.default?.[0];
-  if (!payload) return undefined;
-  return (payload.data ?? payload) as CreateComputeInstanceOutputData;
+  return payload?.data;
 }
 
 export const createComputeInstanceMapper: ComponentBaseMapper = {
@@ -83,6 +94,10 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
 
     if (!data) return details;
 
+    if (data.instanceId) {
+      details["Instance ID"] = data.instanceId;
+    }
+
     if (data.displayName) {
       details["Display Name"] = data.displayName;
     }
@@ -107,25 +122,30 @@ export const createComputeInstanceMapper: ComponentBaseMapper = {
       details["Public IP"] = data.publicIp;
     }
 
+    if (data.privateIp) {
+      details["Private IP"] = data.privateIp;
+    }
+
     return details;
   },
 };
 
 function createComputeInstanceMetadataList(node: ComponentBaseContext["node"]): MetadataItem[] {
   const config = node.configuration as CreateComputeInstanceConfiguration | undefined;
-  const items: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as CreateComputeInstanceNodeMetadata | undefined;
 
-  if (config?.displayName) {
-    items.push({ icon: "tag", label: config.displayName });
-  }
+  const displayName = nodeMetadata?.displayName ?? config?.displayName;
+  const shape = nodeMetadata?.shape ?? config?.shape;
+  const availabilityDomain = nodeMetadata?.availabilityDomain ?? config?.availabilityDomain;
 
-  if (config?.shape) {
-    items.push({ icon: "cpu", label: config.shape });
-  }
-
-  if (config?.availabilityDomain) {
-    items.push({ icon: "map-pin", label: config.availabilityDomain });
-  }
-
-  return items;
+  return [
+    metadataItem("tag", displayName),
+    metadataItem("cpu", shape),
+    metadataItem("map-pin", availabilityDomain),
+    metadataItem("disc", nodeMetadata?.imageName),
+    metadataItem("network", nodeMetadata?.subnetName),
+    metadataItem("database", nodeMetadata?.blockVolumeName),
+  ]
+    .filter(isMetadataItem)
+    .slice(0, MAX_NODE_METADATA_ITEMS);
 }

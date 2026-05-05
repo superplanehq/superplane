@@ -63,6 +63,13 @@ from superplaneapi.models.canvases_validate_canvas_version_changeset_response im
 )
 from superplaneapi.models.components_node_type import ComponentsNodeType
 from superplaneapi.models.configuration_field import ConfigurationField
+from superplaneapi.models.integrations_capability_definition import IntegrationsCapabilityDefinition
+from superplaneapi.models.integrations_capability_definition_type import (
+    IntegrationsCapabilityDefinitionType,
+)
+from superplaneapi.models.integrations_integration_definition import (
+    IntegrationsIntegrationDefinition,
+)
 from superplaneapi.models.organizations_integration import OrganizationsIntegration
 from superplaneapi.models.organizations_list_integration_resources_response import (
     OrganizationsListIntegrationResourcesResponse,
@@ -485,6 +492,41 @@ class SuperplaneClient:
         return serialized
 
     @staticmethod
+    def _action_from_capability(cap: IntegrationsCapabilityDefinition) -> SuperplaneActionsAction:
+        return SuperplaneActionsAction(
+            name=cap.name,
+            label=cap.label,
+            description=cap.description,
+            configuration=cap.configuration,
+            outputChannels=cap.output_channels,
+        )
+
+    @staticmethod
+    def _trigger_from_capability(cap: IntegrationsCapabilityDefinition) -> TriggersTrigger:
+        return TriggersTrigger(
+            name=cap.name,
+            label=cap.label,
+            description=cap.description,
+            configuration=cap.configuration,
+        )
+
+    @staticmethod
+    def _scoped_actions_and_triggers_from_integration(
+        integration: IntegrationsIntegrationDefinition,
+    ) -> tuple[list[SuperplaneActionsAction], list[TriggersTrigger]]:
+        caps = integration.capabilities if isinstance(integration.capabilities, list) else []
+        actions: list[SuperplaneActionsAction] = []
+        triggers: list[TriggersTrigger] = []
+        for cap in caps:
+            if cap is None:
+                continue
+            if cap.type == IntegrationsCapabilityDefinitionType.TYPE_ACTION:
+                actions.append(SuperplaneClient._action_from_capability(cap))
+            elif cap.type == IntegrationsCapabilityDefinitionType.TYPE_TRIGGER:
+                triggers.append(SuperplaneClient._trigger_from_capability(cap))
+        return actions, triggers
+
+    @staticmethod
     def _serialize_component_list_item(component: SuperplaneActionsAction) -> dict[str, Any]:
         """Compact shape for list_components only; use describe_component for full schema."""
         output_channels = component.output_channels or []
@@ -580,20 +622,31 @@ class SuperplaneClient:
         }
 
     @staticmethod
-    def _serialize_available_integration(integration: Any) -> dict[str, Any]:
-        components = integration.actions if isinstance(integration.actions, list) else []
-        triggers = integration.triggers if isinstance(integration.triggers, list) else []
+    def _serialize_available_integration(
+        integration: IntegrationsIntegrationDefinition,
+    ) -> dict[str, Any]:
+        caps = integration.capabilities if isinstance(integration.capabilities, list) else []
+        action_count = sum(
+            1
+            for c in caps
+            if c is not None and c.type == IntegrationsCapabilityDefinitionType.TYPE_ACTION
+        )
+        trigger_count = sum(
+            1
+            for c in caps
+            if c is not None and c.type == IntegrationsCapabilityDefinitionType.TYPE_TRIGGER
+        )
         return {
             "name": integration.name,
             "provider": integration.name,
             "label": integration.label,
             "description": integration.description,
             "icon": integration.icon,
-            "component_count": len(components),
-            "trigger_count": len(triggers),
+            "component_count": action_count,
+            "trigger_count": trigger_count,
         }
 
-    def _list_available_integrations_raw(self) -> list[Any]:
+    def _list_available_integrations_raw(self) -> list[IntegrationsIntegrationDefinition]:
         response = self._api_request(
             lambda: self._integration_api.integrations_list_integrations(
                 _request_timeout=self._config.timeout_seconds,
@@ -602,7 +655,10 @@ class SuperplaneClient:
         )
         if not isinstance(response, SuperplaneIntegrationsListIntegrationsResponse):
             return []
-        return response.integrations if isinstance(response.integrations, list) else []
+        integrations = response.integrations if isinstance(response.integrations, list) else []
+        return [
+            item for item in integrations if isinstance(item, IntegrationsIntegrationDefinition)
+        ]
 
     def list_components(
         self,
@@ -633,10 +689,10 @@ class SuperplaneClient:
             integration_definitions = []
 
         for integration in integration_definitions:
-            scoped_components = integration.actions if isinstance(integration.actions, list) else []
+            scoped_components, _ = SuperplaneClient._scoped_actions_and_triggers_from_integration(
+                integration
+            )
             for component in scoped_components:
-                if not isinstance(component, SuperplaneActionsAction):
-                    continue
                 if isinstance(component.name, str) and component.name:
                     components_by_name[component.name] = component
 
@@ -698,10 +754,10 @@ class SuperplaneClient:
             integration_definitions = []
 
         for integration in integration_definitions:
-            scoped_triggers = integration.triggers if isinstance(integration.triggers, list) else []
+            _, scoped_triggers = SuperplaneClient._scoped_actions_and_triggers_from_integration(
+                integration
+            )
             for trigger in scoped_triggers:
-                if not isinstance(trigger, TriggersTrigger):
-                    continue
                 if isinstance(trigger.name, str) and trigger.name:
                     triggers_by_name[trigger.name] = trigger
 
@@ -723,11 +779,7 @@ class SuperplaneClient:
 
     def list_available_integrations(self) -> list[dict[str, Any]]:
         integrations = self._list_available_integrations_raw()
-        return [
-            self._serialize_available_integration(integration)
-            for integration in integrations
-            if integration is not None
-        ]
+        return [self._serialize_available_integration(integration) for integration in integrations]
 
     def describe_trigger(self, name: str) -> dict[str, Any]:
         response = self._api_request(

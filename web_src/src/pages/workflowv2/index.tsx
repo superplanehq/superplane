@@ -126,6 +126,7 @@ import {
   getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
+import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -1721,8 +1722,8 @@ export function WorkflowPageV2() {
   const allTriggers = useMemo(() => {
     const merged = [...triggers];
     availableIntegrations.forEach((integration) => {
-      if (integration.triggers) {
-        merged.push(...integration.triggers);
+      if (integration.capabilities) {
+        merged.push(...triggersFromCapabilities(integration.capabilities));
       }
     });
     return merged;
@@ -1731,8 +1732,8 @@ export function WorkflowPageV2() {
   const allComponents = useMemo(() => {
     const merged = [...components];
     availableIntegrations.forEach((integration) => {
-      if (integration.actions) {
-        merged.push(...integration.actions);
+      if (integration.capabilities) {
+        merged.push(...actionsFromCapabilities(integration.capabilities));
       }
     });
     return merged;
@@ -1782,14 +1783,9 @@ export function WorkflowPageV2() {
   const integrationNameByComponentName = useMemo(() => {
     const namesByComponent = new Map<string, string>();
     availableIntegrations.forEach((integration) => {
-      integration.actions?.forEach((action) => {
-        if (action.name && integration.name) {
-          namesByComponent.set(action.name, integration.name);
-        }
-      });
-      integration.triggers?.forEach((trigger) => {
-        if (trigger.name && integration.name) {
-          namesByComponent.set(trigger.name, integration.name);
+      integration.capabilities?.forEach((capability) => {
+        if (capability.name && integration.name) {
+          namesByComponent.set(capability.name, integration.name);
         }
       });
     });
