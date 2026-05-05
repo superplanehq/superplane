@@ -3270,20 +3270,52 @@ func isGPURelatedImage(image Image) bool {
 	return false
 }
 
-// gpuSupportedImageSlugs is the hardcoded list of base OS images known to work with
-// DigitalOcean GPU droplets.
-var gpuSupportedImageSlugs = map[string]bool{
-	"ubuntu-22-04-x64": true,
-	"ubuntu-24-04-x64": true,
-	"ubuntu-25-10-x64": true,
-	"fedora-42-x64":    true,
-	"fedora-43-x64":    true,
+// gpuMinVersions defines the minimum OS version (major*100+minor) required for GPU droplet
+// support per distribution slug prefix. New versions released by DigitalOcean will automatically
+// be included once they meet or exceed these minimums.
+var gpuMinVersions = map[string]int{
+	"ubuntu": 2204, // Ubuntu 22.04+
+	"fedora": 42,   // Fedora 42+
 }
 
-// isGPUSupportedDistribution checks if a distribution image is on the hardcoded list of
-// base OS images that are known to be compatible with DigitalOcean GPU droplets.
+// isGPUSupportedDistribution checks if a distribution image meets the minimum version
+// required for DigitalOcean GPU droplet support.
+// Slug format for distributions is: <distro>-<major>-<minor>-<arch> (e.g. ubuntu-22-04-x64)
 func isGPUSupportedDistribution(image Image) bool {
-	return gpuSupportedImageSlugs[image.Slug]
+	slug := image.Slug
+	if slug == "" {
+		return false
+	}
+
+	for prefix, minVersion := range gpuMinVersions {
+		if !strings.HasPrefix(slug, prefix+"-") {
+			continue
+		}
+
+		// Strip the prefix and parse version parts
+		rest := strings.TrimPrefix(slug, prefix+"-")
+		parts := strings.SplitN(rest, "-", 3)
+
+		major, err := strconv.Atoi(parts[0])
+		if err != nil {
+			continue
+		}
+
+		// Fedora slugs: fedora-43-x64 (major only)
+		// Ubuntu slugs: ubuntu-22-04-x64 (major + minor)
+		version := major
+		if len(parts) >= 2 {
+			if minor, err := strconv.Atoi(parts[1]); err == nil {
+				version = major*100 + minor
+			}
+		}
+
+		if version >= minVersion {
+			return true
+		}
+	}
+
+	return false
 }
 func (c *Client) RenameDroplet(dropletID int, name string) (*DOAction, error) {
 	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
