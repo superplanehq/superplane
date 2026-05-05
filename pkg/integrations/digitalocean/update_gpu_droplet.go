@@ -329,7 +329,7 @@ func (u *UpdateGPUDroplet) handleActionCompleted(
 
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, gpuDropletUpdatePollInterval)
 
-	case "renaming_only", "resizing":
+	case "renaming_only", "powering_on_after_resize":
 		// Final operation completed, fetch and emit the updated droplet
 		droplet, err := client.GetDroplet(dropletID)
 		if err != nil {
@@ -341,6 +341,25 @@ func (u *UpdateGPUDroplet) handleActionCompleted(
 			"digitalocean.gpuDroplet.updated",
 			[]any{droplet},
 		)
+
+	case "resizing":
+		// Resize completed, power the droplet back on
+		action, err := client.PostDropletAction(dropletID, "power_on")
+		if err != nil {
+			return fmt.Errorf("failed to power on GPU droplet after resize: %v", err)
+		}
+
+		err = ctx.Metadata.Set(map[string]any{
+			"actionID":  action.ID,
+			"dropletID": dropletID,
+			"state":     "powering_on_after_resize",
+			"newSize":   newSize,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to store metadata: %v", err)
+		}
+
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, gpuDropletUpdatePollInterval)
 
 	default:
 		return fmt.Errorf("unexpected state %q", state)
