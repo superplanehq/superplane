@@ -156,12 +156,7 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("body is required for %s", event)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -173,13 +168,7 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		req.Body = config.Body
 	}
 
-	review, _, err := client.PullRequests.CreateReview(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		pullNumber,
-		req,
-	)
+	review, _, err := client.CreatePullRequestReview(context.Background(), config.Repository, pullNumber, req)
 	if err != nil {
 		return fmt.Errorf("failed to create review: %w", err)
 	}
