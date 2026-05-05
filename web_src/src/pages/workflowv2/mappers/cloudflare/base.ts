@@ -54,7 +54,8 @@ export const baseMapper: ComponentBaseMapper = {
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
-  const eventSubtitle = execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "";
+  const subtitleDate = execution.updatedAt ?? execution.createdAt;
+  const eventSubtitle = subtitleDate ? renderTimeAgo(new Date(subtitleDate)) : "";
   const eventState = getState(componentName)(execution);
 
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

@@ -1099,8 +1099,24 @@ func (c *Client) GetPool(accountID, poolID string) (*Pool, error) {
 // DeletePool deletes an origin pool by ID for a given account
 func (c *Client) DeletePool(accountID, poolID string) error {
 	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools/%s", c.BaseURL, accountID, poolID)
-	_, err := c.execRequest(http.MethodDelete, url, nil)
-	return err
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("API returned success=false")
+	}
+
+	return nil
 }
 
 // CreatePoolRequest is the payload for creating a pool
