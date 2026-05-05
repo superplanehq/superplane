@@ -4,8 +4,8 @@ name: runner
 
 agent:
   machine:
-    type: e1-standard-2
-    os_image: ubuntu2204
+    type: f1-standard-2
+    os_image: ubuntu2404
 
 blocks:
   - name: Build and test
