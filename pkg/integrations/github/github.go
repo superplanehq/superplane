@@ -439,7 +439,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 	// Integrations from new setup flow do not store repositories in metadata,
 	// so this is a no-op for them.
 	//
-	if ctx.Integration.LegacySetup() {
+	if !ctx.Integration.LegacySetup() {
 		return
 	}
 
@@ -563,6 +563,12 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 			Editable: false,
 		},
 	})
+
+	if err != nil {
+		ctx.Logger.Errorf("failed to save GitHub App secrets: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
 
 	ctx.Logger.Infof("Successfully created GitHub App %s - %d", appData.Slug, appData.ID)
 
@@ -988,7 +994,7 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := common.FindSecret(ctx, common.SecretAppPEM)
+	pem, err := findAppPrivateKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find PEM: %v", err)
 	}
@@ -1001,4 +1007,12 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 	)
 
 	return github.NewClient(&http.Client{Transport: itr}), nil
+}
+
+func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {
+	if ctx.LegacySetup() {
+		return common.FindSecret(ctx, common.GitHubAppPEM)
+	}
+
+	return ctx.Secrets().Get(common.SecretAppPEM)
 }

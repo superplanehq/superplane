@@ -241,10 +241,6 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create pull request: %w", explainGitHubError(err))
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to create pull request: %w", explainGitHubError(err))
-	}
-
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.pullRequest",

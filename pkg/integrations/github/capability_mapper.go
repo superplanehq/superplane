@@ -172,6 +172,70 @@ func (m *CapabilityMapper) capabilityName(capability CapabilityDef) string {
 	return ""
 }
 
+type LookupEntry struct {
+	Permission string
+
+	// Using uint8 here to easily compare if an access level is greater than another.
+	// 0. Read
+	// 1. Read & Write
+	Access uint8
+}
+
+func (m CapabilityMapper) buildLookup() map[string]LookupEntry {
+	out := map[string]LookupEntry{}
+	for resourceName, group := range m.Groups {
+		for _, c := range group.Capabilities {
+			var name string
+			if c.Action != nil {
+				name = c.Action.Name()
+			} else if c.Trigger != nil {
+				name = c.Trigger.Name()
+			}
+
+			level := uint8(0)
+			if !c.ReadOnly {
+				level = 1
+			}
+
+			out[name] = LookupEntry{Permission: resourceName, Access: level}
+		}
+	}
+
+	return out
+}
+
+func (m *CapabilityMapper) NewPermissionSet(capabilities []string) PermissionSet {
+	lookup := m.buildLookup()
+	out := PermissionSet{
+		Repository:   map[string]uint8{},
+		Organization: map[string]uint8{},
+	}
+
+	for _, capability := range capabilities {
+		c, ok := lookup[capability]
+		if !ok {
+			continue
+		}
+
+		var x map[string]uint8
+		if m.Groups[c.Permission].PermissionScope == PermissionScopeRepository {
+			x = out.Repository
+		} else {
+			x = out.Organization
+		}
+
+		if _, ok := x[c.Permission]; !ok {
+			x[c.Permission] = c.Access
+		} else {
+			if c.Access > x[c.Permission] {
+				x[c.Permission] = c.Access
+			}
+		}
+	}
+
+	return out
+}
+
 type PermissionSet struct {
 	Repository   map[string]uint8
 	Organization map[string]uint8
@@ -217,95 +281,63 @@ func (p *PermissionSet) IsEmpty() bool {
 	return len(p.Repository) == 0 && len(p.Organization) == 0
 }
 
-func (m *CapabilityMapper) NewPermissionSet(capabilities []string) PermissionSet {
-	lookup := m.buildLookup()
-	out := PermissionSet{
-		Repository:   map[string]uint8{},
-		Organization: map[string]uint8{},
-	}
-
-	for _, capability := range capabilities {
-		c, ok := lookup[capability]
-		if !ok {
-			continue
-		}
-
-		var x map[string]uint8
-		if m.Groups[c.Permission].PermissionScope == PermissionScopeRepository {
-			x = out.Repository
-		} else {
-			x = out.Organization
-		}
-
-		if _, ok := x[c.Permission]; !ok {
-			x[c.Permission] = c.Access
-		} else {
-			if c.Access > x[c.Permission] {
-				x[c.Permission] = c.Access
-			}
-		}
-	}
-
-	return out
-}
-
 type Permission struct {
 	Name   string
 	Scope  string
 	Access string
 }
 
-func (s *PermissionSet) ForHuman() []Permission {
+func (p *PermissionSet) ForHuman() []Permission {
 	permissions := []Permission{}
 
-	for resource, permission := range s.Repository {
+	for resource, permission := range p.Repository {
 		permissions = append(permissions, Permission{
 			Name:   resource,
 			Scope:  PermissionScopeRepository,
-			Access: s.accessString(permission),
+			Access: p.accessString(permission),
 		})
 	}
 
-	for resource, permission := range s.Organization {
+	for resource, permission := range p.Organization {
 		permissions = append(permissions, Permission{
 			Name:   resource,
 			Scope:  PermissionScopeOrganization,
-			Access: s.accessString(permission),
+			Access: p.accessString(permission),
 		})
 	}
 
 	return permissions
 }
 
-func (s *PermissionSet) accessString(permission uint8) string {
+func (p *PermissionSet) accessString(permission uint8) string {
 	if permission == 1 {
 		return "Read & Write"
 	}
 	return "Read"
 }
 
-func (s *PermissionSet) ForAppManifest() map[string]string {
+func (p *PermissionSet) ForAppManifest() map[string]string {
 	permissions := map[string]string{}
 
-	for resource, permission := range s.Repository {
-		permissions[s.permissionForAppManifest(resource)] = s.accessForAppManifest(permission)
+	for resource, permission := range p.Repository {
+		permissions[p.permissionForAppManifest(resource)] = p.accessForAppManifest(permission)
 	}
 
-	for resource, permission := range s.Organization {
-		permissions[s.permissionForAppManifest(resource)] = s.accessForAppManifest(permission)
+	for resource, permission := range p.Organization {
+		permissions[p.permissionForAppManifest(resource)] = p.accessForAppManifest(permission)
 	}
 
 	return permissions
 }
 
-func (s *PermissionSet) accessForAppManifest(level uint8) string {
+func (p *PermissionSet) accessForAppManifest(level uint8) string {
 	if level == 1 {
 		return "write"
 	}
 	return "read"
 }
 
-func (s *PermissionSet) permissionForAppManifest(r string) string {
+func (p *PermissionSet) permissionForAppManifest(r string) string {
 	switch r {
 	case PermissionIssues:
 		return "issues"
@@ -324,36 +356,4 @@ func (s *PermissionSet) permissionForAppManifest(r string) string {
 	default:
 		return ""
 	}
-}
-
-type LookupEntry struct {
-	Permission string
-
-	// Using uint8 here to easily compare if an access level is greater than another.
-	// 0. Read
-	// 1. Read & Write
-	Access uint8
-}
-
-func (m CapabilityMapper) buildLookup() map[string]LookupEntry {
-	out := map[string]LookupEntry{}
-	for resourceName, group := range m.Groups {
-		for _, c := range group.Capabilities {
-			var name string
-			if c.Action != nil {
-				name = c.Action.Name()
-			} else if c.Trigger != nil {
-				name = c.Trigger.Name()
-			}
-
-			level := uint8(0)
-			if !c.ReadOnly {
-				level = 1
-			}
-
-			out[name] = LookupEntry{Permission: resourceName, Access: level}
-		}
-	}
-
-	return out
 }
