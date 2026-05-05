@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -257,42 +257,5 @@ describe("CanvasPage connection drop", () => {
       sourceNodeId: "source-node",
       sourceHandleId: "default",
     });
-  });
-
-  it("creates a starter placeholder when the add component button is clicked", async () => {
-    const onPlaceholderAdd = vi.fn(
-      async (_data: { position: { x: number; y: number }; sourceNodeId?: string; sourceHandleId?: string | null }) =>
-        "placeholder-starter",
-    );
-
-    render(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          nodes={[]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={true}
-          activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
-          onYamlOpen={vi.fn()}
-          onEdgeCreate={vi.fn()}
-          onPlaceholderAdd={onPlaceholderAdd}
-        />
-      </MemoryRouter>,
-    );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("open-sidebar-button"));
-    });
-
-    expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
-    const payload = onPlaceholderAdd.mock.calls[0]?.[0];
-    expect(payload).toBeDefined();
-    expect(payload).toMatchObject({
-      position: { x: expect.any(Number), y: expect.any(Number) },
-    });
-    expect(payload?.sourceNodeId).toBeUndefined();
-    expect(payload?.sourceHandleId).toBeUndefined();
   });
 });

@@ -170,8 +170,9 @@ function EndNodeAppendConnector({
         onAppend={() => onAppendFromNode(nodeId, channel)}
         isHighlighted={isHighlighted}
         style={{
-          right: -15,
-          top: 18,
+          right: -21,
+          top: 13,
+          transform: "none",
         }}
       />
       <AppendHandlePreview

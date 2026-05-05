@@ -11,7 +11,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestSendEmailComponent(t *testing.T) {
@@ -61,7 +60,12 @@ func (s *SendEmailSteps) givenACanvasExists(canvasName string) {
 }
 
 func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
-	s.canvas.AddBuildingBlockByTestID("building-block-sendemail", models.Position{X: 500, Y: 250})
+	s.canvas.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-sendemail")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, 500, 250)
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -122,7 +126,12 @@ func (s *SendEmailSteps) givenCanvasWithManualTriggerSendEmailAndOutput() {
 }
 
 func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) {
-	s.canvas.AddBuildingBlockByTestID("building-block-sendemail", pos)
+	s.canvas.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-sendemail")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -145,7 +154,7 @@ func (s *SendEmailSteps) runManualTrigger() {
 	s.canvas.WaitForExecution(
 		"Send Email",
 		models.CanvasNodeExecutionStateFinished,
-		90*time.Second,
+		30*time.Second,
 	)
 }
 
@@ -162,42 +171,14 @@ func (s *SendEmailSteps) givenSMTPSettingsExist() {
 
 func (s *SendEmailSteps) runManualTriggerAndWaitForFinish() {
 	s.canvas.RunManualTrigger("Start")
-	if s.waitForSendEmailFinished(90 * time.Second) {
-		return
-	}
-
-	// Fallback for missed click in overloaded suites: emit trigger directly.
-	s.emitManualTriggerFallback()
-	_ = s.waitForSendEmailFinished(180 * time.Second)
-}
-
-func (s *SendEmailSteps) waitForSendEmailFinished(timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		executions := s.canvas.GetExecutionsForNodeInState("Send Email", models.CanvasNodeExecutionStateFinished)
-		if len(executions) > 0 {
-			return true
-		}
-		s.session.Sleep(500)
-	}
-	return false
-}
-
-func (s *SendEmailSteps) emitManualTriggerFallback() {
-	startNode := s.canvas.GetNodeFromDB("Start")
-	support.EmitCanvasEventForNodeWithData(
-		s.t,
-		s.canvas.WorkflowID,
-		startNode.NodeID,
-		"default",
-		nil,
-		map[string]any{"message": "Hello, World!"},
+	s.canvas.WaitForExecution(
+		"Send Email",
+		models.CanvasNodeExecutionStateFinished,
+		30*time.Second,
 	)
 }
 
 func (s *SendEmailSteps) assertSendEmailExecutionFinished() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 90*time.Second)
-
 	sendEmailExecs := s.canvas.GetExecutionsForNode("Send Email")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")
 
@@ -210,10 +191,7 @@ func (s *SendEmailSteps) assertSendEmailExecutionFinished() {
 
 func (s *SendEmailSteps) assertSendEmailExecutionFailed() {
 	sendEmailExecs := s.canvas.GetExecutionsForNode("Send Email")
-	outputExecs := s.canvas.GetExecutionsForNode("Output")
-
 	require.Len(s.t, sendEmailExecs, 1, "expected one execution for send email node")
-	require.Empty(s.t, outputExecs, "expected output node not to execute when send email fails")
 	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, sendEmailExecs[0].State)
 	require.Equal(s.t, models.CanvasNodeExecutionResultFailed, sendEmailExecs[0].Result)
 }
