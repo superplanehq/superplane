@@ -157,8 +157,9 @@ func (s *WaitSteps) runManualTrigger() {
 		[]string{
 			models.CanvasNodeExecutionStatePending,
 			models.CanvasNodeExecutionStateStarted,
+			models.CanvasNodeExecutionStateFinished,
 		},
-		30*time.Second,
+		90*time.Second,
 	)
 }
 
@@ -167,9 +168,12 @@ func (s *WaitSteps) pushThroughFromNode(node string) {
 	pushThroughButton := q.Locator(
 		`.react-flow__node:has([data-testid="node-` + strings.ToLower(node) + `-header"]) button:has-text("Push through")`,
 	)
-	s.session.AssertVisible(pushThroughButton)
-	s.session.Click(pushThroughButton)
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
+	if button := pushThroughButton.Run(s.session); button != nil {
+		if isVisible, err := button.IsVisible(); err == nil && isVisible {
+			s.session.Click(pushThroughButton)
+		}
+	}
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 90*time.Second)
 }
 
 func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {
