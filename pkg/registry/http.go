@@ -11,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/circuitbreaker"
 )
 
 type HTTPPolicy struct {
@@ -27,6 +29,7 @@ type HTTPContext struct {
 	policyMu         sync.RWMutex
 	policy           compiledHTTPPolicy
 	policyExpiresAt  time.Time
+	cbManager        *circuitbreaker.Manager
 }
 
 type HTTPOptions struct {
@@ -47,6 +50,7 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 		maxResponseBytes: options.MaxResponseBytes,
 		policyResolver:   options.PolicyResolver,
 		policyCacheTTL:   options.PolicyCacheTTL,
+		cbManager:        circuitbreaker.NewManager(circuitbreaker.DefaultConfig()),
 	}
 
 	if httpCtx.policyResolver == nil {
@@ -135,14 +139,40 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 	}
 
 	if len(policy.privateIPRanges) == 0 && len(policy.blockedHosts) == 0 {
-		return c.do(request)
+		return c.doWithCircuitBreaker(request)
 	}
 
 	if err := c.validateURLWithPolicy(policy, request.URL); err != nil {
 		return nil, err
 	}
 
-	return c.do(request)
+	return c.doWithCircuitBreaker(request)
+}
+
+func (c *HTTPContext) doWithCircuitBreaker(request *http.Request) (*http.Response, error) {
+	breaker, err := c.cbManager.GetBreaker(request.URL.String())
+	if err != nil {
+		return nil, err
+	}
+
+	if !breaker.CanAttempt() {
+		return nil, fmt.Errorf("circuit breaker is OPEN for host %s", request.URL.Host)
+	}
+
+	resp, err := c.do(request)
+
+	if err != nil {
+		breaker.RecordFailure(0)
+		return nil, err
+	}
+
+	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+		breaker.RecordFailure(resp.StatusCode)
+	} else {
+		breaker.RecordSuccess()
+	}
+
+	return resp, nil
 }
 
 func (c *HTTPContext) InvalidatePolicyCache() {
@@ -150,6 +180,14 @@ func (c *HTTPContext) InvalidatePolicyCache() {
 	defer c.policyMu.Unlock()
 
 	c.policyExpiresAt = time.Time{}
+}
+
+func (c *HTTPContext) GetCircuitBreakerStates() map[string]circuitbreaker.ManagerState {
+	return c.cbManager.GetStates()
+}
+
+func (c *HTTPContext) ResetCircuitBreaker(host string) {
+	c.cbManager.Reset(host)
 }
 
 func (c *HTTPContext) do(request *http.Request) (*http.Response, error) {
