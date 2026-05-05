@@ -201,20 +201,20 @@ func (u *UpdateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, gpuDropletUpdatePollInterval)
 	}
 
-	// No rename, start with resize
+	// No rename, power off the droplet before resizing
 	if !hasSize {
 		return fmt.Errorf("new GPU size is required for resizing")
 	}
 
-	action, err := client.ResizeDroplet(dropletID, *spec.GPUSize, true)
+	action, err := client.PostDropletAction(dropletID, "power_off")
 	if err != nil {
-		return fmt.Errorf("failed to resize GPU droplet: %v", err)
+		return fmt.Errorf("failed to power off GPU droplet before resize: %v", err)
 	}
 
 	err = ctx.Metadata.Set(map[string]any{
 		"actionID":  action.ID,
 		"dropletID": dropletID,
-		"state":     "resizing",
+		"state":     "powering_off_for_resize",
 		"newSize":   *spec.GPUSize,
 	})
 	if err != nil {
@@ -292,10 +292,29 @@ func (u *UpdateGPUDroplet) handleActionCompleted(
 ) error {
 	switch state {
 	case "renaming":
-		// Rename completed, now start resize
+		// Rename completed, now power off before resizing
+		action, err := client.PostDropletAction(dropletID, "power_off")
+		if err != nil {
+			return fmt.Errorf("failed to power off GPU droplet after rename: %v", err)
+		}
+
+		err = ctx.Metadata.Set(map[string]any{
+			"actionID":  action.ID,
+			"dropletID": dropletID,
+			"state":     "powering_off_for_resize",
+			"newSize":   newSize,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to store metadata: %v", err)
+		}
+
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, gpuDropletUpdatePollInterval)
+
+	case "powering_off_for_resize":
+		// Power off completed, now start resize
 		action, err := client.ResizeDroplet(dropletID, newSize, true)
 		if err != nil {
-			return fmt.Errorf("failed to resize GPU droplet after rename: %v", err)
+			return fmt.Errorf("failed to resize GPU droplet after power off: %v", err)
 		}
 
 		err = ctx.Metadata.Set(map[string]any{
