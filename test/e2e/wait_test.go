@@ -157,9 +157,8 @@ func (s *WaitSteps) runManualTrigger() {
 		[]string{
 			models.CanvasNodeExecutionStatePending,
 			models.CanvasNodeExecutionStateStarted,
-			models.CanvasNodeExecutionStateFinished,
 		},
-		90*time.Second,
+		30*time.Second,
 	)
 }
 
@@ -170,7 +169,7 @@ func (s *WaitSteps) pushThroughFromNode(node string) {
 	)
 	s.session.AssertVisible(pushThroughButton)
 	s.session.Click(pushThroughButton)
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 90*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 }
 
 func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {

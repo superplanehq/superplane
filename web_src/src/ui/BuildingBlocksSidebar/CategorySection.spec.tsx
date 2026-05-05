@@ -21,7 +21,17 @@ describe("CategorySection", () => {
   it("does not render the ItemGroup for a non-Core category that is collapsed by default", () => {
     const category = createCategory("Email");
 
-    const { container } = render(<CategorySection category={category} />);
+    const { container } = render(
+      <CategorySection
+        category={category}
+        integrations={[]}
+        showIntegrationSetupStatus={false}
+        canvasZoom={1}
+        isDraggingRef={{ current: false }}
+        setHoveredBlock={() => {}}
+        dragPreviewRef={{ current: null }}
+      />,
+    );
 
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(container.querySelector('[data-slot="item-group"]')).not.toBeInTheDocument();
@@ -30,7 +40,17 @@ describe("CategorySection", () => {
   it("renders the ItemGroup for the Core category, which is expanded by default", () => {
     const category = createCategory("Core");
 
-    const { container } = render(<CategorySection category={category} />);
+    const { container } = render(
+      <CategorySection
+        category={category}
+        integrations={[]}
+        showIntegrationSetupStatus={false}
+        canvasZoom={1}
+        isDraggingRef={{ current: false }}
+        setHoveredBlock={() => {}}
+        dragPreviewRef={{ current: null }}
+      />,
+    );
 
     expect(screen.getByText("Core")).toBeInTheDocument();
     expect(screen.getByText("Send Email")).toBeInTheDocument();
@@ -40,7 +60,18 @@ describe("CategorySection", () => {
   it("renders the ItemGroup for a non-Core category when a search term is present", () => {
     const category = createCategory("Email");
 
-    const { container } = render(<CategorySection category={category} searchTerm="send" />);
+    const { container } = render(
+      <CategorySection
+        category={category}
+        integrations={[]}
+        showIntegrationSetupStatus={false}
+        canvasZoom={1}
+        searchTerm="send"
+        isDraggingRef={{ current: false }}
+        setHoveredBlock={() => {}}
+        dragPreviewRef={{ current: null }}
+      />,
+    );
 
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(screen.getByText("Send Email")).toBeInTheDocument();
@@ -50,7 +81,17 @@ describe("CategorySection", () => {
   it("renders the ItemGroup for a non-Core category after it is manually opened", () => {
     const category = createCategory("Email");
 
-    const { container } = render(<CategorySection category={category} />);
+    const { container } = render(
+      <CategorySection
+        category={category}
+        integrations={[]}
+        showIntegrationSetupStatus={false}
+        canvasZoom={1}
+        isDraggingRef={{ current: false }}
+        setHoveredBlock={() => {}}
+        dragPreviewRef={{ current: null }}
+      />,
+    );
 
     const details = container.querySelector("details");
     expect(details).toBeInTheDocument();

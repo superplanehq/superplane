@@ -129,28 +129,16 @@ func (s *triggerRunTitleSteps) waitForNodeID() string {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		draft := s.canvas.FindCurrentDraft()
-		if draft == nil {
-			time.Sleep(300 * time.Millisecond)
-			continue
-		}
-
-		for _, node := range draft.Nodes {
-			if node.Name == "Start" {
-				return node.ID
-			}
+		if draft != nil && len(draft.Nodes) == 1 {
+			return draft.Nodes[0].ID
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
 	draft := s.canvas.FindCurrentDraft()
 	require.NotNil(s.t, draft, "no draft version found")
-	for _, node := range draft.Nodes {
-		if node.Name == "Start" {
-			return node.ID
-		}
-	}
-	require.FailNow(s.t, "expected Start node in draft")
-	return ""
+	require.Len(s.t, draft.Nodes, 1, "expected exactly one node in draft")
+	return draft.Nodes[0].ID
 }
 
 func (s *triggerRunTitleSteps) getCustomNameField() (any, bool, bool) {
