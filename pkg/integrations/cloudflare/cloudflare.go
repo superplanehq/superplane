@@ -22,7 +22,7 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	Zones     []Zone `json:"zones"`
+	Zones         []Zone `json:"zones"`
 	AccountID string `json:"accountId"`
 }
 
@@ -82,6 +82,55 @@ func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error 
 		meta.PoolName = pool.Name
 	}
 	return ctx.Metadata.Set(meta)
+	AccountID string `json:"accountId"`
+}
+
+type PoolNodeMetadata struct {
+	PoolName string `json:"poolName"`
+}
+
+func accountIDFromIntegration(ctx core.IntegrationContext) string {
+	if ctx == nil {
+		return ""
+	}
+	metadata := Metadata{}
+	mapstructure.Decode(ctx.GetMetadata(), &metadata)
+	return metadata.AccountID
+}
+
+func resolveAccountID(specAccountID string, integration core.IntegrationContext) string {
+	if specAccountID != "" {
+		return specAccountID
+	}
+	return accountIDFromIntegration(integration)
+}
+
+// splitLBID splits a composite load balancer ID of the form "zoneID/lbID"
+// into its component parts.
+func splitLBID(compositeID string) (zoneID, lbID string, err error) {
+	parts := strings.SplitN(compositeID, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid load balancer ID %q: expected format zoneId/lbId", compositeID)
+	}
+	return parts[0], parts[1], nil
+}
+
+func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
+	meta := PoolNodeMetadata{}
+	if strings.Contains(poolID, "{{") {
+		meta.PoolName = poolID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		pool, err := client.GetPool(accountID, poolID)
+		if err != nil {
+			return fmt.Errorf("failed to get pool: %w", err)
+		}
+		meta.PoolName = pool.Name
+	}
+	return ctx.Metadata.Set(meta)
 }
 
 func (c *Cloudflare) Name() string {
@@ -115,6 +164,8 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Origin Rules / Edit
 	 - Account / Workers KV Storage / Edit
      - Account / Load Balancing: Monitor and Pools / Edit
+     - Zone / Load Balancers / Edit
+     - Account / Load Balancing: Monitors And Pools / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -168,6 +219,14 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdatePool{},
 		&GetPool{},
 		&DeletePool{},
+		&CreatePool{},
+		&UpdatePool{},
+		&GetPool{},
+		&DeletePool{},
+		&CreateLoadBalancer{},
+		&GetLoadBalancer{},
+		&UpdateLoadBalancer{},
+		&DeleteLoadBalancer{},
 	}
 }
 
@@ -208,13 +267,18 @@ func (c *Cloudflare) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "zone":
-		metadata := Metadata{}
-		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
 
-		resources := make([]core.IntegrationResource, 0, len(metadata.Zones))
-		for _, zone := range metadata.Zones {
+		zones, err := client.ListZones()
+		if err != nil {
+			return nil, fmt.Errorf("error listing zones: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(zones))
+		for _, zone := range zones {
 			resources = append(resources, core.IntegrationResource{
 				Type: resourceType,
 				Name: zone.Name,
@@ -430,6 +494,96 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 				Name: p.Name,
 				ID:   p.ID,
 			})
+		}
+		return resources, nil
+
+	case "monitor":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		monitors, err := client.ListMonitors(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing monitors: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, m := range monitors {
+			name := m.Description
+			if name == "" {
+				name = m.ID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   m.ID,
+			})
+		}
+		return resources, nil
+
+	case "pool":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		pools, err := client.ListPools(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing pools: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, p := range pools {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: p.Name,
+				ID:   p.ID,
+			})
+		}
+		return resources, nil
+
+	case "load_balancer":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		zones, err := client.ListZones()
+		if err != nil {
+			return nil, fmt.Errorf("error listing zones: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range zones {
+			lbs, err := client.ListLoadBalancers(zone.ID)
+			if err != nil {
+				ctx.Logger.WithError(err).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).Warn("failed to list load balancers for zone, skipping")
+				continue
+			}
+			for _, lb := range lbs {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: fmt.Sprintf("%s (%s)", lb.Name, zone.Name),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, lb.ID),
+				})
+			}
 		}
 		return resources, nil
 

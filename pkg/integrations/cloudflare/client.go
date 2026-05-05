@@ -1202,3 +1202,441 @@ func (c *Client) UpdatePool(accountID, poolID string, req UpdatePoolRequest) (*P
 
 	return &response.Result, nil
 }
+
+// ---- Pool types ----
+
+// Coordinates holds geographic coordinates used for proximity steering
+type Coordinates struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
+// Origin represents a single origin server in a pool
+type Origin struct {
+	Name        string       `json:"name"`
+	Address     string       `json:"address"`
+	Enabled     bool         `json:"enabled"`
+	Weight      float64      `json:"weight"`
+	Port        int          `json:"port,omitempty"`
+	Coordinates *Coordinates `json:"coordinates,omitempty"`
+}
+
+// OriginSteering configures how origins within a pool are selected
+type OriginSteering struct {
+	// Policy is one of: "random", "hash", "least_outstanding_requests", "least_connections"
+	Policy string `json:"policy,omitempty"`
+}
+
+// LoadShedding configures load shedding behaviour for a pool
+type LoadShedding struct {
+	DefaultPercent float64 `json:"default_percent"`
+	DefaultPolicy  string  `json:"default_policy"`
+	SessionPercent float64 `json:"session_percent"`
+	SessionPolicy  string  `json:"session_policy"`
+}
+
+// Pool represents a Cloudflare Load Balancer origin pool
+type Pool struct {
+	ID             string          `json:"id"`
+	Name           string          `json:"name"`
+	Description    string          `json:"description"`
+	Enabled        bool            `json:"enabled"`
+	MinimumOrigins int             `json:"minimum_origins"`
+	Monitor        string          `json:"monitor,omitempty"`
+	Origins        []Origin        `json:"origins"`
+	LoadShedding   *LoadShedding   `json:"load_shedding,omitempty"`
+	OriginSteering *OriginSteering `json:"origin_steering,omitempty"`
+}
+
+// PoolMonitor represents a Cloudflare health monitor
+type PoolMonitor struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+}
+
+// ListMonitors lists all health monitors for a Cloudflare account
+func (c *Client) ListMonitors(accountID string) ([]PoolMonitor, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors", c.BaseURL, accountID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool          `json:"success"`
+		Result  []PoolMonitor `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
+// ListPools lists all origin pools for a Cloudflare account
+func (c *Client) ListPools(accountID string) ([]Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools", c.BaseURL, accountID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool   `json:"success"`
+		Result  []Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
+// GetPool retrieves an origin pool by ID for a given account
+func (c *Client) GetPool(accountID, poolID string) (*Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools/%s", c.BaseURL, accountID, poolID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// DeletePool deletes an origin pool by ID for a given account
+func (c *Client) DeletePool(accountID, poolID string) error {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools/%s", c.BaseURL, accountID, poolID)
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("API returned success=false")
+	}
+
+	return nil
+}
+
+// CreatePoolRequest is the payload for creating a pool
+type CreatePoolRequest struct {
+	Name           string          `json:"name"`
+	Description    string          `json:"description,omitempty"`
+	Enabled        bool            `json:"enabled"`
+	MinimumOrigins int             `json:"minimum_origins,omitempty"`
+	Monitor        string          `json:"monitor,omitempty"`
+	Origins        []Origin        `json:"origins"`
+	LoadShedding   *LoadShedding   `json:"load_shedding,omitempty"`
+	OriginSteering *OriginSteering `json:"origin_steering,omitempty"`
+}
+
+// CreatePool creates a new origin pool under a Cloudflare account
+func (c *Client) CreatePool(accountID string, req CreatePoolRequest) (*Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools", c.BaseURL, accountID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// UpdatePoolRequest is the payload for updating an origin pool
+type UpdatePoolRequest struct {
+	Name           string          `json:"name,omitempty"`
+	Description    string          `json:"description,omitempty"`
+	Enabled        *bool           `json:"enabled,omitempty"`
+	MinimumOrigins *int            `json:"minimum_origins,omitempty"`
+	Monitor        string          `json:"monitor,omitempty"`
+	Origins        []Origin        `json:"origins,omitempty"`
+	LoadShedding   *LoadShedding   `json:"load_shedding,omitempty"`
+	OriginSteering *OriginSteering `json:"origin_steering,omitempty"`
+}
+
+// UpdatePool updates an existing origin pool under a Cloudflare account
+func (c *Client) UpdatePool(accountID, poolID string, req UpdatePoolRequest) (*Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools/%s", c.BaseURL, accountID, poolID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// ---- Load Balancer types ----
+
+// RandomSteering holds per-pool weights used by the random steering policy
+type RandomSteering struct {
+	DefaultWeight float64            `json:"default_weight,omitempty"`
+	PoolWeights   map[string]float64 `json:"pool_weights,omitempty"`
+}
+
+// SessionAffinityAttributes holds extra session affinity options
+type SessionAffinityAttributes struct {
+	SameSite     string `json:"samesite,omitempty"`
+	Secure       string `json:"secure,omitempty"`
+	ZeroDowntime string `json:"zero_downtime_failover,omitempty"`
+}
+
+// LBRuleOverrides defines the overrides applied when an LB rule condition is met
+type LBRuleOverrides struct {
+	SteeringPolicy     string          `json:"steering_policy,omitempty"`
+	FallbackPool       string          `json:"fallback_pool,omitempty"`
+	DefaultPools       []string        `json:"default_pools,omitempty"`
+	SessionAffinity    string          `json:"session_affinity,omitempty"`
+	SessionAffinityTTL *int            `json:"session_affinity_ttl,omitempty"`
+	RandomSteering     *RandomSteering `json:"random_steering,omitempty"`
+}
+
+// LBRule defines a conditional override rule on a load balancer
+type LBRule struct {
+	Name      string          `json:"name"`
+	Condition string          `json:"condition"`
+	Disabled  bool            `json:"disabled,omitempty"`
+	Priority  int             `json:"priority,omitempty"`
+	Overrides LBRuleOverrides `json:"overrides"`
+}
+
+// LoadBalancer represents a Cloudflare Load Balancer
+type LoadBalancer struct {
+	ID                        string                     `json:"id"`
+	Name                      string                     `json:"name"`
+	Description               string                     `json:"description,omitempty"`
+	Enabled                   *bool                      `json:"enabled,omitempty"`
+	Proxied                   bool                       `json:"proxied"`
+	TTL                       int                        `json:"ttl,omitempty"`
+	FallbackPool              string                     `json:"fallback_pool"`
+	DefaultPools              []string                   `json:"default_pools"`
+	SteeringPolicy            string                     `json:"steering_policy,omitempty"`
+	SessionAffinity           string                     `json:"session_affinity,omitempty"`
+	SessionAffinityTTL        *int                       `json:"session_affinity_ttl,omitempty"`
+	SessionAffinityAttributes *SessionAffinityAttributes `json:"session_affinity_attributes,omitempty"`
+	RandomSteering            *RandomSteering            `json:"random_steering,omitempty"`
+	Networks                  []string                   `json:"networks,omitempty"`
+	Rules                     []LBRule                   `json:"rules,omitempty"`
+	Monitor                   string                     `json:"monitor,omitempty"`
+}
+
+// CreateLoadBalancerRequest is the payload for creating a load balancer
+type CreateLoadBalancerRequest struct {
+	Name                      string                     `json:"name"`
+	Description               string                     `json:"description,omitempty"`
+	Enabled                   *bool                      `json:"enabled,omitempty"`
+	Proxied                   bool                       `json:"proxied"`
+	TTL                       int                        `json:"ttl,omitempty"`
+	FallbackPool              string                     `json:"fallback_pool"`
+	DefaultPools              []string                   `json:"default_pools"`
+	SteeringPolicy            string                     `json:"steering_policy,omitempty"`
+	SessionAffinity           string                     `json:"session_affinity,omitempty"`
+	SessionAffinityTTL        *int                       `json:"session_affinity_ttl,omitempty"`
+	SessionAffinityAttributes *SessionAffinityAttributes `json:"session_affinity_attributes,omitempty"`
+	RandomSteering            *RandomSteering            `json:"random_steering,omitempty"`
+	Networks                  []string                   `json:"networks,omitempty"`
+	Rules                     []LBRule                   `json:"rules,omitempty"`
+	Monitor                   string                     `json:"monitor,omitempty"`
+}
+
+// UpdateLoadBalancerRequest is the payload for patching a load balancer
+type UpdateLoadBalancerRequest struct {
+	Name                      string                     `json:"name,omitempty"`
+	Description               string                     `json:"description,omitempty"`
+	Enabled                   *bool                      `json:"enabled,omitempty"`
+	SteeringPolicy            string                     `json:"steering_policy,omitempty"`
+	SessionAffinity           string                     `json:"session_affinity,omitempty"`
+	SessionAffinityTTL        *int                       `json:"session_affinity_ttl,omitempty"`
+	SessionAffinityAttributes *SessionAffinityAttributes `json:"session_affinity_attributes,omitempty"`
+	RandomSteering            *RandomSteering            `json:"random_steering,omitempty"`
+	FallbackPool              string                     `json:"fallback_pool,omitempty"`
+	DefaultPools              []string                   `json:"default_pools,omitempty"`
+}
+
+// ListLoadBalancers lists all load balancers for a given zone
+func (c *Client) ListLoadBalancers(zoneID string) ([]LoadBalancer, error) {
+	url := fmt.Sprintf("%s/zones/%s/load_balancers", c.BaseURL, zoneID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool           `json:"success"`
+		Result  []LoadBalancer `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
+// GetLoadBalancer retrieves a load balancer by ID for a given zone
+func (c *Client) GetLoadBalancer(zoneID, lbID string) (*LoadBalancer, error) {
+	url := fmt.Sprintf("%s/zones/%s/load_balancers/%s", c.BaseURL, zoneID, lbID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool         `json:"success"`
+		Result  LoadBalancer `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// CreateLoadBalancer creates a new load balancer under a zone
+func (c *Client) CreateLoadBalancer(zoneID string, req CreateLoadBalancerRequest) (*LoadBalancer, error) {
+	url := fmt.Sprintf("%s/zones/%s/load_balancers", c.BaseURL, zoneID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool         `json:"success"`
+		Result  LoadBalancer `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// UpdateLoadBalancer patches an existing load balancer
+func (c *Client) UpdateLoadBalancer(zoneID, lbID string, req UpdateLoadBalancerRequest) (*LoadBalancer, error) {
+	url := fmt.Sprintf("%s/zones/%s/load_balancers/%s", c.BaseURL, zoneID, lbID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool         `json:"success"`
+		Result  LoadBalancer `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// DeleteLoadBalancer deletes a load balancer by ID from a zone
+func (c *Client) DeleteLoadBalancer(zoneID, lbID string) error {
+	url := fmt.Sprintf("%s/zones/%s/load_balancers/%s", c.BaseURL, zoneID, lbID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
