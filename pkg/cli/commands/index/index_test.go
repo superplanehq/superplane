@@ -134,7 +134,7 @@ func TestActionsListReturnsFullJSON(t *testing.T) {
 	require.Contains(t, raw, "http")
 }
 
-func TestRenderConfigurationTextIncludesTipForNestedSchema(t *testing.T) {
+func TestRenderConfigurationTextOmitsNestedDetailsInTable(t *testing.T) {
 	var configuration []openapi_client.ConfigurationField
 	err := json.Unmarshal([]byte(`[
 		{
@@ -170,28 +170,8 @@ func TestRenderConfigurationTextIncludesTipForNestedSchema(t *testing.T) {
 
 	raw := stdout.String()
 	require.Contains(t, raw, "bootstrap")
-	require.Contains(t, raw, "use -o json or -o yaml")
+	require.Contains(t, raw, "object")
 	require.NotContains(t, raw, "Inline Script")
-}
-
-func TestRenderConfigurationTextOmitsTipForFlatSchema(t *testing.T) {
-	var configuration []openapi_client.ConfigurationField
-	err := json.Unmarshal([]byte(`[
-		{
-			"name": "url",
-			"type": "string",
-			"required": true,
-			"description": "Request URL"
-		}
-	]`), &configuration)
-	require.NoError(t, err)
-
-	stdout := bytes.NewBuffer(nil)
-	require.NoError(t, renderConfigurationText(stdout, configuration))
-
-	raw := stdout.String()
-	require.Contains(t, raw, "url")
-	require.NotContains(t, raw, "use -o json or -o yaml")
 }
 
 // Triggers tests
