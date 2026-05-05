@@ -1,0 +1,28 @@
+# Semaphore 2.0 — https://docs.semaphore.io
+version: v1.0
+name: runner
+
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu2204
+
+blocks:
+  - name: Build and test
+    task:
+      jobs:
+        - name: fmt, vet, build, tests
+          commands:
+            - checkout
+            - sem-version go 1.22
+            # Module cache — same pattern as Semaphore Go guide
+            - cache restore
+            - go mod download
+            - cache store
+            - |
+              FILES=$(gofmt -l fleet-manager runner shared task-broker test)
+              if [ -n "$FILES" ]; then echo "gofmt needed on:"; echo "$FILES"; exit 1; fi
+            - go vet ./...
+            - mkdir -p bin
+            - make build
+            - go test ./... -count=1

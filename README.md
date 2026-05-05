@@ -161,6 +161,12 @@ go test ./...
 go test ./test/... -v
 ```
 
+## CI (Semaphore)
+
+The pipeline definition is [.semaphore/semaphore.yml](.semaphore/semaphore.yml).
+
+In [Semaphore](https://semaphoreci.com/), create a **new project from this Git repository**. Semaphore 2.x picks up `.semaphore/semaphore.yml` on the default branch. Each push runs Go **1.22** on Ubuntu 22.04: module cache restore/store, **`gofmt` check**, **`go vet`**, **`make build`**, **`go test ./...`**.
+
 ## License
 
 (Add your license.)

@@ -18,10 +18,10 @@ type BrokerCreateTaskResponse struct {
 
 // RegisterFleetRequest is POST task-broker /v1/fleets.
 type RegisterFleetRequest struct {
-	ID          string   `json:"id"`
-	BaseURL     string   `json:"base_url"`
-	AuthToken   string   `json:"auth_token,omitempty"`
-	Labels      []string `json:"labels,omitempty"`
+	ID        string   `json:"id"`
+	BaseURL   string   `json:"base_url"`
+	AuthToken string   `json:"auth_token,omitempty"`
+	Labels    []string `json:"labels,omitempty"`
 }
 
 // FleetResponse describes a registered downstream fleet-manager.
