@@ -17,19 +17,40 @@ func Test__OpenAI__SetupProvider__OnStepSubmit(t *testing.T) {
 	provider := newSetupProvider()
 	intCtx := &contexts.IntegrationContext{}
 	props := contexts.NewIntegrationPropertyStorage()
+	capCtx := &contexts.CapabilityContext{RequestedCapabilties: []string{"openai.textPrompt"}}
+
+	next, err := provider.OnStepSubmit(core.SetupStepContext{
+		Step: core.StepInfo{
+			Name: SetupStepEnterAPIKey,
+			Inputs: map[string]any{
+				"apiKey": "sk-test",
+			},
+		},
+		Logger:       logger.DiscardLogger(),
+		Properties:   props,
+		Secrets:      intCtx.Secrets(),
+		Capabilities: capCtx,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, next)
+	assert.Equal(t, SetupStepEnterBaseURL, next.Name)
+	assert.Contains(t, next.Instructions, "Base URL")
+
+	apiKey, err := intCtx.Secrets().Get("apiKey")
+	require.NoError(t, err)
+	assert.Equal(t, "sk-test", apiKey)
+
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[]}`))},
 		},
 	}
-	capCtx := &contexts.CapabilityContext{RequestedCapabilties: []string{"openai.textPrompt"}}
 
-	next, err := provider.OnStepSubmit(core.SetupStepContext{
+	next, err = provider.OnStepSubmit(core.SetupStepContext{
 		Step: core.StepInfo{
-			Name: SetupStepEnterCredentials,
+			Name: SetupStepEnterBaseURL,
 			Inputs: map[string]any{
 				"baseURL": "https://custom.example.com/v1",
-				"apiKey":  "sk-test",
 			},
 		},
 		Logger:       logger.DiscardLogger(),
@@ -44,9 +65,6 @@ func Test__OpenAI__SetupProvider__OnStepSubmit(t *testing.T) {
 	assert.Equal(t, "https://custom.example.com/v1/models", httpCtx.Requests[0].URL.String())
 	assert.Equal(t, "Bearer sk-test", httpCtx.Requests[0].Header.Get("Authorization"))
 
-	apiKey, err := intCtx.Secrets().Get("apiKey")
-	require.NoError(t, err)
-	assert.Equal(t, "sk-test", apiKey)
 	baseURL, err := props.GetString("baseURL")
 	require.NoError(t, err)
 	assert.Equal(t, "https://custom.example.com/v1", baseURL)
