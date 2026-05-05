@@ -51,9 +51,9 @@ export const analytics = {
     posthog.capture("request_integration_clicked", { organization_id: organizationId });
   },
 
-  organizationJoined: (organizationId: string) => {
-    posthog.capture("organization joined", { organization_id: organizationId });
-  },
+  // organizationJoined: (organizationId: string) => {
+  //   posthog.capture("organization joined", { organization_id: organizationId });
+  // },
 
   yamlImport: () => {
     posthog.capture("canvas:yaml_import", {});
