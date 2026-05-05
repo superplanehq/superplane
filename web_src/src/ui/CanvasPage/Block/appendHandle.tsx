@@ -1,14 +1,12 @@
 import { Handle, Position } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
 import { HANDLE_STYLE } from "./handleStyle";
 import type { BlockProps } from "./types";
 
 export const APPEND_CONNECTOR_COLOR = "#C9D5E1";
 const APPEND_SOURCE_LINE_WIDTH = 42;
 const APPEND_SOURCE_BUTTON_LEFT = 54;
-const APPEND_HORIZONTAL_NUDGE = -4;
 
 const APPEND_HANDLE_STYLE: React.CSSProperties = {
   width: 24,
@@ -34,17 +32,8 @@ const APPEND_PREVIEW_DOT_STYLE: React.CSSProperties = {
 
 export type AppendFromNodeHandler = NonNullable<BlockProps["onAppendFromNode"]>;
 
-function getAppendSourceHandleClassName(isHighlighted: boolean | undefined, plusHovered: boolean) {
-  if (isHighlighted && plusHovered) {
-    return "sp-append-source-hitbox highlighted plus-hovered";
-  }
-  if (isHighlighted) {
-    return "sp-append-source-hitbox highlighted";
-  }
-  if (plusHovered) {
-    return "sp-append-source-hitbox plus-hovered";
-  }
-  return "sp-append-source-hitbox";
+function getAppendSourceHandleClassName(isHighlighted: boolean | undefined) {
+  return isHighlighted ? "sp-append-source-hitbox highlighted" : "sp-append-source-hitbox";
 }
 
 export function AppendSourceHandle({
@@ -55,7 +44,7 @@ export function AppendSourceHandle({
   style,
   lineWidth = APPEND_SOURCE_LINE_WIDTH,
   buttonLeft = APPEND_SOURCE_BUTTON_LEFT,
-  buttonTop = -9,
+  buttonTop = -7,
 }: {
   channel: string;
   label: string;
@@ -66,12 +55,10 @@ export function AppendSourceHandle({
   buttonLeft?: number;
   buttonTop?: number;
 }) {
-  const [plusHovered, setPlusHovered] = useState(false);
-
-  const handleStyle: React.CSSProperties = {
+  const handleStyle: React.CSSProperties & { "--sp-append-source-hitbox-width": string } = {
     ...HANDLE_STYLE,
+    "--sp-append-source-hitbox-width": `${buttonLeft + 24}px`,
     pointerEvents: "auto",
-    zIndex: 12,
     ...style,
   };
 
@@ -80,7 +67,7 @@ export function AppendSourceHandle({
       type="source"
       position={Position.Right}
       id={channel}
-      className={getAppendSourceHandleClassName(isHighlighted, plusHovered)}
+      className={getAppendSourceHandleClassName(isHighlighted)}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -92,24 +79,23 @@ export function AppendSourceHandle({
         aria-hidden="true"
         style={{
           position: "absolute",
-          left: 12 + APPEND_HORIZONTAL_NUDGE,
+          left: 12,
           top: "50%",
           width: lineWidth,
           height: 3,
           transform: "translateY(-50%)",
           backgroundColor: APPEND_CONNECTOR_COLOR,
           pointerEvents: "none",
-          zIndex: -1,
         }}
       />
       <AppendHandleButton
         label={label}
         onClick={onAppend}
-        onHoverChange={setPlusHovered}
         style={{
-          left: buttonLeft + APPEND_HORIZONTAL_NUDGE,
+          left: buttonLeft,
           top: buttonTop,
           position: "absolute",
+          pointerEvents: "none",
         }}
       />
     </Handle>
@@ -119,16 +105,12 @@ export function AppendSourceHandle({
 export function AppendHandleButton({
   label,
   onClick,
-  onHoverChange,
   style,
 }: {
   label: string;
   onClick: () => void | Promise<void>;
-  onHoverChange?: (hovered: boolean) => void;
   style: React.CSSProperties;
 }) {
-  const [isHovered, setIsHovered] = useState(false);
-
   return (
     <button
       type="button"
@@ -139,17 +121,8 @@ export function AppendHandleButton({
         event.stopPropagation();
         void onClick();
       }}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        onHoverChange?.(true);
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        onHoverChange?.(false);
-      }}
       style={{
         ...APPEND_HANDLE_STYLE,
-        borderColor: isHovered ? "#94A3B8" : APPEND_CONNECTOR_COLOR,
         ...style,
       }}
     >
@@ -171,8 +144,6 @@ export function AppendHandlePreview({
   const previewConnectorSize = 12;
   const previewContainerGap = 12;
   const previewContainerLeft = previewStemLength + previewConnectorSize / 2 + previewContainerGap;
-  const previewNudgeLeft = -2;
-  const connectorTopValue = typeof connectorTop === "number" ? `${connectorTop}px` : connectorTop;
 
   return (
     <div className="sp-append-source-preview" style={style}>
@@ -180,7 +151,7 @@ export function AppendHandlePreview({
         style={{
           position: "absolute",
           left: 0,
-          top: `calc(${connectorTopValue} + var(--sp-append-preview-connector-offset-y, 0px) + var(--sp-append-preview-offset-y, 0px))`,
+          top: connectorTop,
           width: previewStemLength,
           height: 3,
           transform: "translateY(-50%)",
@@ -192,16 +163,16 @@ export function AppendHandlePreview({
         style={{
           ...APPEND_PREVIEW_DOT_STYLE,
           position: "absolute",
-          left: previewStemLength + previewConnectorSize / 2 + previewNudgeLeft,
-          top: `calc(${connectorTopValue} + var(--sp-append-preview-connector-offset-y, 0px) + var(--sp-append-preview-offset-y, 0px))`,
+          left: previewStemLength + previewConnectorSize / 2,
+          top: connectorTop,
           transform: "translate(-50%, -50%)",
           pointerEvents: "none",
         }}
       />
       <div
         style={{
-          marginLeft: previewContainerLeft + previewNudgeLeft,
-          marginTop: `calc(${containerOffsetY}px + var(--sp-append-preview-offset-y, 0px))`,
+          marginLeft: previewContainerLeft,
+          marginTop: containerOffsetY,
           width: "23rem",
           height: 96,
           borderRadius: 8,
