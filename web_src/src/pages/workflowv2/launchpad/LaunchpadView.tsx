@@ -100,7 +100,12 @@ function useAutoHeightObserver(enabled: boolean, onMeasured: (contentHeightPx: n
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(() => {
         if (!ref.current) return;
-        callbackRef.current(ref.current.scrollHeight);
+        const h = ref.current.scrollHeight;
+        // Skip zero-height measurements — they happen during initial mount
+        // before content has rendered, and snapping the panel to a single
+        // row is worse than leaving its current height alone.
+        if (h <= 0) return;
+        callbackRef.current(h);
       }, AUTO_HEIGHT_DEBOUNCE_MS);
     };
 

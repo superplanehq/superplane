@@ -1380,13 +1380,15 @@ const CHART_PALETTE = [
 ] as const;
 
 const COLOR_KEYWORD_TO_VAR: Record<ChartColorKeyword, string> = {
-  // Mapped semantically against the existing five-slot palette in App.css
-  // (orange / teal / blue / yellow / gold).
-  red: "var(--chart-1)",
+  // Mapped semantically against the calm chart palette in App.css
+  // (blue / emerald / violet / amber / slate). `red` resolves to the
+  // dedicated `--chart-red` variable so it stays a true red even though
+  // the cycling palette no longer includes one.
+  blue: "var(--chart-1)",
   green: "var(--chart-2)",
-  blue: "var(--chart-3)",
   yellow: "var(--chart-4)",
   gray: "var(--chart-5)",
+  red: "var(--chart-red)",
 };
 
 const CHART_ANIMATION_MS = 300;

@@ -46,6 +46,17 @@ type MockNodeRefs = {
   nodeStatuses?: Record<string, MockNodeStatusInfo | undefined>;
 };
 
+// WidgetBlock pulls in useQueryClient transitively. The fill-mode tests only
+// care about the wrapping markdown view's `data-fill` attribute, so we
+// short-circuit to a simple stub.
+vi.mock("@/ui/Markdown/WidgetBlock", () => ({
+  WidgetBlock: ({ body, fill }: { body: string; fill?: boolean }) => (
+    <div data-testid="widget-block" data-fill={fill ? "yes" : "no"}>
+      <pre>{body}</pre>
+    </div>
+  ),
+}));
+
 vi.mock("@/ui/Markdown/CanvasMarkdown", () => ({
   CanvasMarkdown: ({ children, nodeRefs }: { children: string; nodeRefs?: MockNodeRefs }) => {
     const triggerKey = "my-trigger";

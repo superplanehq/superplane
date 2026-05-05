@@ -197,11 +197,24 @@
   --border: theme('colors.slate.300');
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /*
+   * Chart palette — calm-by-default sequence used by widget block charts
+   * (donut slices, multi-series bar/line/area). chart-1 is the slot a chart
+   * lands in when no `color:` keyword is specified, so we keep it neutral
+   * blue rather than red/orange to avoid implying "danger" on any default
+   * series (e.g. a Success Rate donut).
+   *
+   * Sequence: blue → emerald → violet → amber → slate
+   * `--chart-red` is reserved for the explicit `color: red` keyword in the
+   * widget-block YAML; it sits outside the cycling palette so an opt-in red
+   * still reads as red.
+   */
+  --chart-1: oklch(0.62 0.19 252);
+  --chart-2: oklch(0.7 0.15 162);
+  --chart-3: oklch(0.6 0.21 295);
+  --chart-4: oklch(0.78 0.16 75);
+  --chart-5: oklch(0.6 0.04 252);
+  --chart-red: oklch(0.62 0.22 25);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);

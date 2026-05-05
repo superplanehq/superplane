@@ -1425,8 +1425,8 @@ describe("WidgetBlock render: chart", () => {
     });
     expect(screen.getByTestId("rc-areachart")).toBeInTheDocument();
     const area = screen.getByTestId("rc-area-y");
-    expect(area.getAttribute("data-fill")).toBe("var(--chart-3)");
-    expect(area.getAttribute("data-stroke")).toBe("var(--chart-3)");
+    expect(area.getAttribute("data-fill")).toBe("var(--chart-1)");
+    expect(area.getAttribute("data-stroke")).toBe("var(--chart-1)");
   });
 
   it("collapses duplicate x values with chart.aggregate: avg", async () => {
