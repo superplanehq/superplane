@@ -16,9 +16,22 @@ export type { AgentContext, AgentMode } from "@/components/AgentSidebar/agentCha
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+type LegacyIntegrationSpec = {
+  integrationName?: string;
+};
+
+function hasLegacyIntegrationName(
+  spec: OrganizationsIntegration["spec"],
+): spec is OrganizationsIntegration["spec"] & LegacyIntegrationSpec {
+  return !!spec && "integrationName" in spec && typeof spec.integrationName === "string";
+}
+
 const getIntegrationTypeName = (integration: OrganizationsIntegration) => {
-  const legacySpec = integration.spec as unknown as { integrationName?: string } | undefined;
-  return legacySpec?.integrationName || integration.metadata?.integrationName;
+  if (hasLegacyIntegrationName(integration.spec)) {
+    return integration.spec.integrationName;
+  }
+  return integration.metadata?.integrationName;
 };
 
 export interface BuildingBlocksSidebarProps {
@@ -197,7 +210,10 @@ function OpenBuildingBlocksSidebar({
     const connected = new Set<string>();
     integrations.forEach((integration) => {
       if (integration.status?.state === "ready") {
-        connected.add(normalizeIntegrationName(getIntegrationTypeName(integration)));
+        const normalizedName = normalizeIntegrationName(getIntegrationTypeName(integration));
+        if (normalizedName) {
+          connected.add(normalizedName);
+        }
       }
     });
     return connected;
@@ -233,7 +249,10 @@ function OpenBuildingBlocksSidebar({
   const configuredIntegrationNames = useMemo(() => {
     const configured = new Set<string>();
     integrations.forEach((integration) => {
-      configured.add(normalizeIntegrationName(getIntegrationTypeName(integration)));
+      const normalizedName = normalizeIntegrationName(getIntegrationTypeName(integration));
+      if (normalizedName) {
+        configured.add(normalizedName);
+      }
     });
     return configured;
   }, [integrations]);
