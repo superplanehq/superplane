@@ -7,13 +7,8 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
-
-type WebhookConfiguration struct {
-	EventType  string   `json:"eventType"`
-	EventTypes []string `json:"eventTypes"` // Multiple event types (takes precedence over EventType if set)
-	Repository string   `json:"repository"`
-}
 
 type Webhook struct {
 	ID          int64  `json:"id"`
@@ -23,8 +18,8 @@ type Webhook struct {
 type GitHubWebhookHandler struct{}
 
 func (h *GitHubWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	configA := WebhookConfiguration{}
-	configB := WebhookConfiguration{}
+	configA := common.WebhookConfiguration{}
+	configB := common.WebhookConfiguration{}
 
 	err := mapstructure.Decode(a, &configA)
 	if err != nil {
@@ -74,18 +69,18 @@ func (h *GitHubWebhookHandler) Merge(current, requested any) (any, bool, error) 
 }
 
 func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		return nil, err
 	}
 
-	config := WebhookConfiguration{}
+	config := common.WebhookConfiguration{}
 	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
 	if err != nil {
 		return nil, err
@@ -121,13 +116,13 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 }
 
 func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return err
 	}
 
-	client, err := NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		return err
 	}
@@ -138,7 +133,7 @@ func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return err
 	}
 
-	configuration := WebhookConfiguration{}
+	configuration := common.WebhookConfiguration{}
 	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &configuration)
 	if err != nil {
 		return err

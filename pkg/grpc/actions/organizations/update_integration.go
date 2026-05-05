@@ -48,6 +48,10 @@ func UpdateIntegration(
 		return nil, status.Errorf(codes.NotFound, "integration not found: %v", err)
 	}
 
+	if !isLegacySetup(instance) {
+		return nil, status.Errorf(codes.InvalidArgument, "integration %s is not a legacy setup", instance.ID.String())
+	}
+
 	if name != "" && name != instance.InstallationName {
 		existing, err := models.FindIntegrationByName(org, name)
 		if err == nil && existing.ID != instance.ID {

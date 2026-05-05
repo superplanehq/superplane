@@ -56,6 +56,30 @@ func serviceDataFromService(service Service) map[string]any {
 	return data
 }
 
+func serviceDataFromServiceAndCustomDomains(service Service, domains []CustomDomainResponse) map[string]any {
+	data := serviceDataFromService(service)
+	data["customDomains"] = customDomainPayloads(service.ID, domains)
+	return data
+}
+
+func customDomainPayloads(serviceID string, domains []CustomDomainResponse) []map[string]any {
+	result := make([]map[string]any, 0, len(domains))
+	for _, domain := range domains {
+		result = append(result, customDomainPayload(serviceID, domain))
+	}
+
+	return result
+}
+
+func customDomainPayload(serviceID string, domain CustomDomainResponse) map[string]any {
+	return map[string]any{
+		"id":                 domain.ID,
+		"name":               domain.Name,
+		"serviceId":          serviceID,
+		"verificationStatus": domain.VerificationStatus,
+	}
+}
+
 func deployDataFromDeployResponse(serviceID string, deploy DeployResponse) map[string]any {
 	data := map[string]any{
 		"deployId":  deploy.ID,

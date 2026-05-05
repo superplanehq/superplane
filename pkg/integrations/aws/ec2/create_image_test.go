@@ -138,7 +138,7 @@ func Test__CreateImage__Execute(t *testing.T) {
 			Metadata:       metadata,
 			ExecutionState: execState,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -228,7 +228,7 @@ func Test__CreateImage__OnIntegrationMessage(t *testing.T) {
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
 			Logger: log.NewEntry(log.New()),
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

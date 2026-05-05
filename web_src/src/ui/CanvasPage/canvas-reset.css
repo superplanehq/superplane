@@ -100,6 +100,12 @@
   z-index: 10;
 }
 
+.sp-canvas .react-flow__handle.sp-append-source-hitbox.plus-hovered {
+  box-shadow: none;
+  border-color: #C9D5E1 !important;
+  z-index: auto;
+}
+
 .sp-canvas.sp-canvas-live .react-flow__handle:hover {
   box-shadow: none;
   border-color: #C9D5E1 !important;
@@ -108,6 +114,18 @@
 
 .sp-canvas .react-flow__handle.highlighted {
   border-color: #A1AEC0 !important;
+}
+
+.sp-canvas .sp-append-source-preview {
+  opacity: 0;
+  pointer-events: none;
+  --sp-append-preview-connector-offset-y: 1px;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.sp-canvas .react-flow__handle.sp-append-source-hitbox.plus-hovered + .sp-append-source-preview {
+  opacity: 1;
+  --sp-append-preview-offset-y: -1px;
 }
 
 .sp-canvas .edge-label {

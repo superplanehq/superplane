@@ -96,6 +96,25 @@ describe("createComputeInstanceMapper.props", () => {
     expect(props.metadata).toHaveLength(1);
     expect(props.metadata![0]).toMatchObject({ label: "my-instance" });
   });
+
+  it("limits node metadata to three items", () => {
+    const props = createComputeInstanceMapper.props(
+      buildComponentCtx({
+        configuration: {
+          displayName: "my-instance",
+          shape: "VM.Standard.E4.Flex",
+          availabilityDomain: "EXAMPLE:EU-FRANKFURT-1-AD-1",
+        },
+        metadata: {
+          imageName: "Oracle Linux",
+          subnetName: "public-subnet",
+          blockVolumeName: "data-volume",
+        },
+      }),
+    );
+
+    expect(props.metadata).toHaveLength(3);
+  });
 });
 
 // ── getExecutionDetails ────────────────────────────────────────────────
@@ -121,7 +140,7 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
       },
     });
     const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(details["Executed At"]).toBe(new Date(startedAt).toLocaleString());
+    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(startedAt).getTime());
   });
 
   it("falls back to execution.createdAt for Executed At when metadata.startedAt is absent", () => {
@@ -130,7 +149,7 @@ describe("createComputeInstanceMapper.getExecutionDetails", () => {
       execution: { createdAt, metadata: {}, outputs: undefined },
     });
     const details = createComputeInstanceMapper.getExecutionDetails(ctx);
-    expect(details["Executed At"]).toBe(new Date(createdAt).toLocaleString());
+    expect(new Date(details["Executed At"]).getTime()).toBe(new Date(createdAt).getTime());
   });
 
   it("maps output fields to display labels", () => {

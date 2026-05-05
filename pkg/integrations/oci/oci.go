@@ -28,6 +28,9 @@ type Configuration struct {
 type IntegrationMetadata struct {
 	TopicID      string `json:"topicId" mapstructure:"topicId"`
 	EventsRuleID string `json:"eventsRuleId" mapstructure:"eventsRuleId"`
+	// EventsRuleCondition is the condition string last successfully applied to the Events rule.
+	// Used to skip redundant UpdateEventsRule API calls when the desired condition has not changed.
+	EventsRuleCondition string `json:"eventsRuleCondition,omitempty" mapstructure:"eventsRuleCondition"`
 	// Deprecated: CompartmentRules was used in older versions to track per-compartment rules.
 	// It is kept only for cleanup of legacy resources.
 	CompartmentRules map[string]string `json:"compartmentRules,omitempty" mapstructure:"compartmentRules"`
@@ -160,13 +163,39 @@ func (o *OCI) Configuration() []configuration.Field {
 func (o *OCI) Actions() []core.Action {
 	return []core.Action{
 		&CreateComputeInstance{},
+		&CreateImage{},
+		&GetImage{},
+		&UpdateImage{},
+		&DeleteImage{},
+		&CreateApplication{},
+		&DeleteApplication{},
+		&CreateFunction{},
+		&DeleteFunction{},
+		&InvokeFunction{},
+		&GetInstance{},
+		&UpdateInstance{},
+		&ManageInstancePower{},
+		&DeleteInstance{},
 	}
 }
 
 func (o *OCI) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnComputeInstanceCreated{},
+		&OnInstanceStateChange{},
 	}
+}
+
+// desiredEventsRuleCondition returns the canonical OCI Events rule condition string.
+// Updating this function is the single place to add new event types; the Sync
+// reconciliation path will propagate the change to all existing integrations.
+// Event types must cover every OCI trigger that receives events via the shared ONS topic.
+func desiredEventsRuleCondition() string {
+	return fmt.Sprintf(`{"eventType":[%q,%q,%q]}`,
+		ociEventTypeComputeLaunchEnd,
+		"com.oraclecloud.computeapi.instanceaction.end",
+		"com.oraclecloud.computeapi.terminateinstance.end",
+	)
 }
 
 func (o *OCI) Sync(ctx core.SyncContext) error {
@@ -195,7 +224,8 @@ func (o *OCI) Sync(ctx core.SyncContext) error {
 	}
 
 	// Create the shared ONS topic once; idempotent across re-syncs.
-	// The per-trigger HTTPS subscription (webhook) is created in OnComputeInstanceCreated.Setup().
+	// Per-trigger HTTPS subscriptions (webhooks) are created in trigger Setup
+	// (e.g. OnComputeInstanceCreated, OnInstanceStateChange).
 	if metadata.TopicID == "" {
 		topicName := fmt.Sprintf("superplane-%s", ctx.Integration.ID())
 		topic, err := client.CreateONSTopic(cfg.TenancyOCID, topicName)
@@ -206,19 +236,27 @@ func (o *OCI) Sync(ctx core.SyncContext) error {
 		ctx.Integration.SetMetadata(metadata)
 	}
 
-	// Create a single shared Events rule in the tenancy compartment, co-located with the topic.
-	// The rule captures all compute launch events tenancy-wide; per-compartment filtering is
-	// done server-side in the webhook handler. Creating the rule here (in the tenancy compartment)
-	// avoids cross-compartment IAM issues that arise when the rule and topic are in different compartments.
+	// Create or reconcile the shared Events rule in the tenancy compartment.
+	condition := desiredEventsRuleCondition()
 	if metadata.EventsRuleID == "" {
 		ruleName := fmt.Sprintf("superplane-%s", ctx.Integration.ID())
-		condition := `{"eventType": ["com.oraclecloud.computeapi.launchinstance.end"]}`
 		rule, err := client.CreateEventsRule(cfg.TenancyOCID, ruleName, condition, metadata.TopicID)
 		if err != nil {
 			return fmt.Errorf("failed to create Events rule: %w", err)
 		}
 		metadata.EventsRuleID = rule.ID
+		metadata.EventsRuleCondition = condition
 		ctx.Integration.SetMetadata(metadata)
+	} else if metadata.EventsRuleCondition != condition {
+		// Reconcile the condition on pre-existing rules so that any new event types
+		// added in future deploys are picked up without requiring a re-integration.
+		// Skip the API call entirely when the condition is already up to date.
+		if err := client.UpdateEventsRule(metadata.EventsRuleID, condition); err != nil {
+			ctx.Logger.Warnf("failed to reconcile Events rule %q condition: %v", metadata.EventsRuleID, err)
+		} else {
+			metadata.EventsRuleCondition = condition
+			ctx.Integration.SetMetadata(metadata)
+		}
 	}
 
 	ctx.Integration.Ready()

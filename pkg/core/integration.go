@@ -191,6 +191,13 @@ type IntegrationCleanupContext struct {
 type IntegrationContext interface {
 
 	//
+	// Whether the integration is using the legacy setup flow.
+	//
+	LegacySetup() bool
+	Properties() IntegrationPropertyStorage
+	Secrets() IntegrationSecretStorage
+
+	//
 	// Control the metadata and config of the integration
 	//
 	ID() uuid.UUID

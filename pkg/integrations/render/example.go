@@ -34,6 +34,12 @@ var exampleOutputPurgeCacheBytes []byte
 //go:embed example_output_update_env_var.json
 var exampleOutputUpdateEnvVarBytes []byte
 
+//go:embed example_output_add_custom_domain.json
+var exampleOutputAddCustomDomainBytes []byte
+
+//go:embed example_output_remove_custom_domain.json
+var exampleOutputRemoveCustomDomainBytes []byte
+
 var exampleDataOnDeployOnce sync.Once
 var exampleDataOnDeploy map[string]any
 
@@ -60,6 +66,12 @@ var exampleOutputPurgeCache map[string]any
 
 var exampleOutputUpdateEnvVarOnce sync.Once
 var exampleOutputUpdateEnvVar map[string]any
+
+var exampleOutputAddCustomDomainOnce sync.Once
+var exampleOutputAddCustomDomain map[string]any
+
+var exampleOutputRemoveCustomDomainOnce sync.Once
+var exampleOutputRemoveCustomDomain map[string]any
 
 func (t *OnDeploy) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
@@ -130,5 +142,21 @@ func (c *UpdateEnvVar) ExampleOutput() map[string]any {
 		&exampleOutputUpdateEnvVarOnce,
 		exampleOutputUpdateEnvVarBytes,
 		&exampleOutputUpdateEnvVar,
+	)
+}
+
+func (c *AddCustomDomain) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputAddCustomDomainOnce,
+		exampleOutputAddCustomDomainBytes,
+		&exampleOutputAddCustomDomain,
+	)
+}
+
+func (c *RemoveCustomDomain) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputRemoveCustomDomainOnce,
+		exampleOutputRemoveCustomDomainBytes,
+		&exampleOutputRemoveCustomDomain,
 	)
 }

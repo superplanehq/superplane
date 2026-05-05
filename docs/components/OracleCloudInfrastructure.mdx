@@ -10,12 +10,26 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Compute Instance Created" href="#on-compute-instance-created" description="Fires when a new OCI Compute instance reaches RUNNING state (via OCI Events Service)" />
+  <LinkCard title="On Instance State Change" href="#on-instance-state-change" description="Fires when an OCI Compute instance starts, stops, resets, or terminates" />
 </CardGrid>
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Application" href="#create-application" description="Create a new OCI Functions application" />
   <LinkCard title="Create Compute Instance" href="#create-compute-instance" description="Provision a new OCI Compute instance and wait for it to reach RUNNING state" />
+  <LinkCard title="Create Function" href="#create-function" description="Deploy a new function within an OCI Functions application" />
+  <LinkCard title="Create Image" href="#create-image" description="Create an OCI boot disk image from an instance or Object Storage export" />
+  <LinkCard title="Delete Application" href="#delete-application" description="Delete an OCI Functions application" />
+  <LinkCard title="Delete Function" href="#delete-function" description="Remove a function from an OCI Functions application" />
+  <LinkCard title="Delete Image" href="#delete-image" description="Delete an OCI custom image by OCID" />
+  <LinkCard title="Delete Instance" href="#delete-instance" description="Terminate an OCI Compute instance and wait for termination" />
+  <LinkCard title="Get Image" href="#get-image" description="Get OCI custom image details by OCID" />
+  <LinkCard title="Get Instance" href="#get-instance" description="Fetch details for an OCI Compute instance" />
+  <LinkCard title="Invoke Function" href="#invoke-function" description="Execute an OCI Function and capture its response" />
+  <LinkCard title="Manage Instance Power" href="#manage-instance-power" description="Start, stop, or reset an OCI Compute instance and wait for the target state" />
+  <LinkCard title="Update Image" href="#update-image" description="Update an OCI custom image display name" />
+  <LinkCard title="Update Instance" href="#update-instance" description="Update mutable OCI Compute instance attributes" />
 </CardGrid>
 
 ## Instructions
@@ -84,7 +98,7 @@ The On Compute Instance Created trigger starts a workflow execution whenever an 
 
 ### How It Works
 
-When the OCI integration is set up, SuperPlane automatically creates a shared **OCI Notifications (ONS) topic** and subscribes to it. When this trigger is added to a workflow, SuperPlane automatically creates an **OCI Events rule** in the configured compartment that forwards `com.oraclecloud.computeapi.launchinstance.end` events to that topic — no manual OCI configuration is required.
+When the OCI integration is set up, SuperPlane automatically creates a shared **OCI Notifications (ONS) topic** and a tenancy-level **OCI Events rule** that forwards `com.oraclecloud.computeapi.launchinstance.end` events to that topic. When this trigger is added to a workflow, SuperPlane subscribes your workflow webhook to that topic and filters deliveries to the configured compartment — no manual OCI configuration is required.
 
 ### Configuration
 
@@ -132,6 +146,110 @@ Each event payload includes:
   },
   "timestamp": "2026-01-01T00:00:05Z",
   "type": "oci.onComputeInstanceCreated"
+}
+```
+
+<a id="on-instance-state-change"></a>
+
+## On Instance State Change
+
+The On Instance State Change trigger starts a workflow execution whenever an Oracle Cloud Infrastructure Compute instance completes a power or termination operation.
+
+### How It Works
+
+When the OCI integration is set up, SuperPlane creates a shared **OCI Notifications (ONS) topic** and a tenancy-level **OCI Events rule** that forwards Compute instance power and termination events to that topic. When this trigger is added to a workflow, SuperPlane subscribes your workflow webhook to that topic and filters deliveries to the configured compartment and selected state changes — no separate Events rule is created per trigger.
+
+### Configuration
+
+- **Compartment**: The compartment to monitor for Compute instance state changes.
+- **State Changes**: Optional list of state changes to emit. Leave empty to emit all supported state changes.
+
+### Event Data
+
+Each event payload includes:
+- `eventType` — the OCI Compute API event type, such as `com.oraclecloud.computeapi.instanceaction.end`
+- `data.resourceId` — the instance OCID
+- `data.resourceName` — the instance display name
+- `data.compartmentId` — the compartment OCID
+- `data.availabilityDomain` — the availability domain
+- `data.additionalDetails.instanceActionType` — the completed power action, such as `start`, `stop`, or `softstop`
+- `eventTime` — ISO-8601 timestamp of the event
+
+### Example Data
+
+```json
+{
+  "data": {
+    "cloudEventsVersion": "0.1",
+    "contentType": "application/json",
+    "data": {
+      "additionalDetails": {
+        "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaa4ktlslmw2fqu5trx2xk3rnnqozgstuqutjm3ffusi6juo3ef4zaq",
+        "instanceActionType": "stop",
+        "shape": "VM.Standard.E2.1.Micro",
+        "type": "CustomerVmi"
+      },
+      "availabilityDomain": "pYRG:EU-FRANKFURT-1-AD-3",
+      "compartmentId": "ocid1.tenancy.oc1..aaaaaaaaorle4tqd7rmhv2w7h37k32u6bskjrsnbnfem6i7qjupvexidmwpq",
+      "compartmentName": "root",
+      "definedTags": {},
+      "freeformTags": {},
+      "resourceId": "ocid1.instance.oc1.eu-frankfurt-1.antheljthvjhcwice6b33efkswzlk56zv4n5rcnb7xf4gsdlvuqlihvszjlq",
+      "resourceName": "test-instance-12"
+    },
+    "eventID": "8fc0df4c-ea5d-4438-a817-db7fa6440b8a",
+    "eventTime": "2026-04-22T20:34:54Z",
+    "eventType": "com.oraclecloud.computeapi.instanceaction.end",
+    "eventTypeVersion": "2.0",
+    "extensions": {
+      "compartmentId": "ocid1.tenancy.oc1..aaaaaaaaorle4tqd7rmhv2w7h37k32u6bskjrsnbnfem6i7qjupvexidmwpq"
+    },
+    "source": "ComputeApi"
+  },
+  "timestamp": "2026-04-22T20:35:05.079372195Z",
+  "type": "oci.onInstanceStateChange"
+}
+```
+
+<a id="create-application"></a>
+
+## Create Application
+
+The Create Application component creates a new Oracle Cloud Infrastructure Functions application.
+
+### Use Cases
+
+- **Serverless environment provisioning**: Create application containers as part of a deployment workflow
+- **Environment lifecycle management**: Automatically create application environments for each release
+
+### Configuration
+
+- **Compartment**: The compartment where the application will be created
+- **Display Name**: A human-readable name for the application
+- **Subnet OCIDs**: One or more subnet OCIDs (comma-separated) for the application's VCN configuration
+
+### Output
+
+Emits the created application details including:
+- `applicationId` — application OCID
+- `displayName` — application name
+- `lifecycleState` — current state (`ACTIVE`)
+- `compartmentId` — the compartment OCID
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+    "displayName": "my-functions-app",
+    "lifecycleState": "ACTIVE",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:31:58.249783188Z",
+  "type": "oci.applicationCreated"
 }
 ```
 
@@ -190,6 +308,500 @@ Emits the created instance details on the default output channel, including:
   },
   "timestamp": "2026-04-22T20:31:58.249783188Z",
   "type": "oci.computeInstanceCreated"
+}
+```
+
+<a id="create-function"></a>
+
+## Create Function
+
+The Create Function component deploys a new serverless function within an existing OCI Functions application.
+
+### Use Cases
+
+- **Continuous deployment**: Automatically deploy new function versions as part of a CI/CD pipeline
+- **Serverless provisioning**: Create functions on-demand as part of environment setup workflows
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application to deploy the function into
+- **Display Name**: A human-readable name for the function
+- **Image**: The container image URI (e.g. `phx.ocir.io/namespace/repo/image:tag`)
+- **Memory (MB)**: Memory allocated to the function (minimum 128 MB)
+- **Timeout (seconds)**: Optional maximum execution time in seconds
+
+### Output
+
+Emits the created function details including:
+- `functionId` — function OCID
+- `displayName` — function name
+- `applicationId` — parent application OCID
+- `image` — the container image
+- `invokeEndpoint` — the HTTPS endpoint used to invoke the function
+- `memoryInMBs` — memory allocated in megabytes
+- `lifecycleState` — current state
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "displayName": "my-function",
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "image": "phx.ocir.io/mynamespace/myrepo/myfunction:0.0.1",
+    "invokeEndpoint": "https://aabbccddeeff.call.eu-frankfurt-1.oci.oraclecloud.com",
+    "lifecycleState": "ACTIVE",
+    "memoryInMBs": 256,
+    "timeCreated": "2026-04-22T20:33:10.512Z"
+  },
+  "timestamp": "2026-04-22T20:33:11.102345678Z",
+  "type": "oci.functionCreated"
+}
+```
+
+<a id="create-image"></a>
+
+## Create Image
+
+The Create Image component creates an OCI Compute boot disk image.
+
+### Use Cases
+
+- **Golden image pipelines**: Bake reusable server images from configured instances
+- **Environment promotion**: Import exported images from Object Storage into a target compartment
+- **Backup workflows**: Capture a known-good instance image before a risky change
+
+### Configuration
+
+- **Source Type**: Create from an instance, import from an Object Storage URL, or import from a bucket object
+- **Compartment**: Compartment where the image is created
+- **Display Name**: Friendly name for the image
+- **Instance OCID**: Source instance when creating from an instance
+- **Source Image Type**: Image format for imported images, such as QCOW2, VMDK, or OCI
+- **Namespace, Bucket, Object**: Object Storage location when importing from a bucket object
+- **Tags**: Optional freeform tags to apply to the image
+
+### Completion behavior
+
+The component waits for the image to reach `AVAILABLE` before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-2026-04-28",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:15:12.000Z",
+  "type": "oci.image"
+}
+```
+
+<a id="delete-application"></a>
+
+## Delete Application
+
+The Delete Application component removes an Oracle Cloud Infrastructure Functions application.
+
+> **Important:** OCI will reject the deletion with a 409 Conflict if the application still contains functions.
+> You must delete all functions inside the application (using the **Delete Function** component) before using this component.
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application to delete. The application must have no remaining functions.
+
+### Output
+
+Emits the deleted application ID on the default output channel:
+- `applicationId` — OCID of the deleted application
+- `deleted` — boolean confirming deletion
+- `displayName` — name of the deleted application
+
+### Example Output
+
+```json
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "deleted": true,
+    "displayName": "my-functions-app"
+  },
+  "timestamp": "2026-04-22T20:35:00.000000000Z",
+  "type": "oci.applicationDeleted"
+}
+```
+
+<a id="delete-function"></a>
+
+## Delete Function
+
+The Delete Function component removes a function from an Oracle Cloud Infrastructure Functions application.
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application that owns the function
+- **Function**: The function to delete
+
+### Output
+
+Emits the deleted function ID on the default output channel:
+- `functionId` — OCID of the deleted function
+- `deleted` — boolean confirming deletion
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz"
+  },
+  "timestamp": "2026-04-22T20:36:00.000000000Z",
+  "type": "oci.functionDeleted"
+}
+```
+
+<a id="delete-image"></a>
+
+## Delete Image
+
+The Delete Image component deletes an OCI Compute custom image. Oracle-provided platform images cannot be deleted.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove obsolete custom images
+- **Quota management**: Delete old images before creating new ones
+- **Security response**: Retire vulnerable images from automated provisioning
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deletedAt": "2026-04-28T09:20:00Z",
+    "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "state": "DELETED"
+  },
+  "timestamp": "2026-04-28T09:20:00Z",
+  "type": "oci.imageDeleted"
+}
+```
+
+<a id="delete-instance"></a>
+
+## Delete Instance
+
+The Delete Instance component terminates an Oracle Cloud Infrastructure Compute instance and waits until OCI reports it as terminated.
+
+### Use Cases
+
+- **Cleanup workflows**: Tear down temporary instances after a test or deployment finishes
+- **Cost controls**: Delete unused Compute instances from automation
+- **Incident remediation**: Terminate compromised or unhealthy instances after replacement capacity exists
+
+### Configuration
+
+- **Instance**: The OCI Compute instance to terminate.
+- **Preserve Boot Volume**: When enabled, OCI preserves the boot volume after instance termination.
+
+### Output
+
+Emits a minimal deletion payload on the default output channel:
+- `instanceId` — instance OCID
+- `lifecycleState` — `TERMINATED`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "TERMINATED"
+  },
+  "timestamp": "2026-04-22T20:40:00.000Z",
+  "type": "oci.deleteInstance"
+}
+```
+
+<a id="get-image"></a>
+
+## Get Image
+
+The Get Image component retrieves metadata for an OCI Compute custom image. Oracle-provided platform images are not returned by this component.
+
+### Use Cases
+
+- **Deployment checks**: Verify that an image is available before launching instances
+- **Traceability**: Resolve image details by OCID
+- **Audit workflows**: Capture operating system, launch mode, and lifecycle state metadata
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-2026-04-28",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:16:00.000Z",
+  "type": "oci.image"
+}
+```
+
+<a id="get-instance"></a>
+
+## Get Instance
+
+The Get Instance component fetches the latest details for an Oracle Cloud Infrastructure Compute instance.
+
+### Use Cases
+
+- **Inventory checks**: Read instance state, shape, region, and network addresses during a workflow
+- **Deployment gates**: Verify a target instance exists and is in the expected lifecycle state
+- **Audit workflows**: Capture instance metadata before another operation runs
+
+### Configuration
+
+- **Instance**: The OCI Compute instance to fetch.
+
+### Output
+
+Emits the instance details on the default output channel, including:
+- `instanceId` — instance OCID
+- `displayName` — instance display name
+- `lifecycleState` — current lifecycle state
+- `publicIp` — public IP address, if assigned
+- `privateIp` — primary private IP address, if available
+- `shape` — the instance shape
+- `availabilityDomain` — the availability domain
+- `compartmentId` — the compartment OCID
+- `region` — the region
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
+    "displayName": "test-instance-12",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "RUNNING",
+    "privateIp": "10.0.0.17",
+    "publicIp": "192.0.2.1",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:32:00.000Z",
+  "type": "oci.getInstance"
+}
+```
+
+<a id="invoke-function"></a>
+
+## Invoke Function
+
+The Invoke Function component executes an Oracle Cloud Infrastructure serverless function and emits its response.
+
+### Use Cases
+
+- **Data transformation**: Invoke a function to process or transform data mid-workflow
+- **Custom logic**: Run arbitrary serverless code as a workflow step
+- **Integration hooks**: Call a function to trigger external systems
+
+### Configuration
+
+- **Compartment**: The compartment containing the application
+- **Application**: The application that owns the function
+- **Function**: The function to invoke
+- **Payload**: Optional JSON or plain-text body sent to the function
+
+### Output
+
+Emits the function response on the default output channel:
+- `functionId` — OCID of the invoked function
+- `statusCode` — HTTP status code returned by the function runtime
+- `response` — raw response body as a string
+
+### Example Output
+
+```json
+{
+  "data": {
+    "functionId": "ocid1.fnfunc.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "response": "{\"result\": \"ok\", \"processed\": 42}",
+    "statusCode": 200
+  },
+  "timestamp": "2026-04-22T20:34:05.987654321Z",
+  "type": "oci.functionInvoked"
+}
+```
+
+<a id="manage-instance-power"></a>
+
+## Manage Instance Power
+
+The Manage Instance Power component performs a power lifecycle action on an Oracle Cloud Infrastructure Compute instance and waits for the target state.
+
+### Use Cases
+
+- **Scheduled shutdowns**: Stop instances outside business hours to reduce cost
+- **Recovery workflows**: Reset or soft-reset an instance after an incident
+- **Startup automation**: Start instances before a deployment, test, or maintenance workflow runs
+
+### Configuration
+
+- **Instance**: The OCI Compute instance.
+- **Action**: One of `START`, `STOP`, `SOFTSTOP`, `RESET`, or `SOFTRESET`.
+
+### Output
+
+Emits the instance details on the default output channel once the instance reaches the expected lifecycle state:
+- `instanceId` — instance OCID
+- `displayName` — instance display name
+- `lifecycleState` — `RUNNING` for start/reset actions, or `STOPPED` for stop actions
+- `shape` — the instance shape
+- `availabilityDomain` — the availability domain
+- `compartmentId` — the compartment OCID
+- `region` — the region
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
+    "displayName": "test-instance-12",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "STOPPED",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:35:00.000Z",
+  "type": "oci.manageInstancePower"
+}
+```
+
+<a id="update-image"></a>
+
+## Update Image
+
+The Update Image component updates the display name of an OCI Compute custom image. Oracle-provided platform images cannot be updated.
+
+### Use Cases
+
+- **Release promotion**: Rename an image after validation
+- **Operational cleanup**: Standardize image names
+- **Inventory hygiene**: Keep image metadata readable in automated workflows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "image": {
+      "baseImageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaBaseImageExample",
+      "compartmentId": "ocid1.compartment.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "createImageAllowed": true,
+      "displayName": "app-golden-image-production",
+      "id": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaImageExample1234567890abcdefghijklmnopqrstuvwxyz",
+      "launchMode": "PARAVIRTUALIZED",
+      "lifecycleState": "AVAILABLE",
+      "operatingSystem": "Oracle Linux",
+      "operatingSystemVersion": "8",
+      "sizeInMBs": 51200,
+      "timeCreated": "2026-04-28T09:12:42.000Z"
+    }
+  },
+  "timestamp": "2026-04-28T09:18:00.000Z",
+  "type": "oci.image"
+}
+```
+
+<a id="update-instance"></a>
+
+## Update Instance
+
+The Update Instance component updates mutable attributes on an Oracle Cloud Infrastructure Compute instance.
+
+### Use Cases
+
+- **Rename instances**: Update the display name for operational clarity
+- **Resize flex shapes**: Adjust OCPUs or memory for supported flexible shapes
+- **Post-provisioning changes**: Apply instance settings after a workflow decides the desired capacity
+
+### Configuration
+
+- **Instance**: The OCI Compute instance to update.
+- **Display Name**: Optional new display name.
+- **OCPUs**: Optional OCPU count for flexible shapes.
+- **Memory (GB)**: Optional memory size for flexible shapes.
+
+### Output
+
+Emits the updated instance details on the default output channel, including:
+- `instanceId` — instance OCID
+- `displayName` — instance display name
+- `lifecycleState` — current lifecycle state
+- `publicIp` — public IP address, if assigned
+- `privateIp` — primary private IP address, if available
+- `shape` — the instance shape
+- `availabilityDomain` — the availability domain
+- `compartmentId` — the compartment OCID
+- `region` — the region
+- `timeCreated` — ISO-8601 creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
+    "displayName": "test-instance-renamed",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "lifecycleState": "RUNNING",
+    "privateIp": "10.0.0.17",
+    "publicIp": "192.0.2.1",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:33:00.000Z",
+  "type": "oci.updateInstance"
 }
 ```
 

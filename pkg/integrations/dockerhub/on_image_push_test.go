@@ -39,7 +39,7 @@ func Test__OnImagePush__Setup(t *testing.T) {
 
 		metadata := &contexts.MetadataContext{}
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
 			},
 		}

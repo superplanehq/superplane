@@ -229,10 +229,13 @@ func (s *TestSession) ClickWithControlOrMeta(q queries.Query) {
 func (s *TestSession) FillIn(q queries.Query, value string) {
 	s.t.Logf("Filling in %q with %q", q.Describe(), value)
 
-	if el := q.Run(s); el != nil {
-		if err := el.Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err == nil {
-			return
-		}
+	el := q.Run(s)
+	if el == nil {
+		s.t.Fatalf("fill in %q: query returned no element", q.Describe())
+	}
+
+	if err := el.Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("fill in %q with %q: %v", q.Describe(), value, err)
 	}
 }
 

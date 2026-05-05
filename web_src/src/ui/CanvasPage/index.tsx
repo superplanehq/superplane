@@ -39,6 +39,7 @@ import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  IntegrationsIntegrationDefinition,
   SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -187,6 +188,8 @@ export interface CanvasPageProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  integrationDialogOpen?: boolean;
+  availableIntegrationDefinitions?: IntegrationsIntegrationDefinition[];
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   // Disable running nodes when there are unsaved changes (with tooltip)
@@ -263,8 +266,8 @@ export interface CanvasPageProps {
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
-    sourceNodeId: string;
-    sourceHandleId: string | null;
+    sourceNodeId?: string;
+    sourceHandleId?: string | null;
   }) => Promise<string>;
   onPlaceholderConfigure?: (data: {
     placeholderId: string;
@@ -374,6 +377,7 @@ type PendingRunData = {
 
 type CanvasNodeRendererCallbacks = {
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
+  onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onRun: React.MutableRefObject<((nodeId: string) => void) | undefined>;
@@ -529,6 +533,7 @@ function buildInteractiveNodeBlockProps(
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
     canvasMode: callbacks.canvasMode,
+    onAppendFromNode: callbacks.onAppendFromNode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -663,6 +668,7 @@ function CanvasPage(props: CanvasPageProps) {
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
+  const isCreatingStarterPlaceholderRef = useRef(false);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
   const localIsSidebarOpenRef = useRef<boolean | null>(null);
@@ -1035,9 +1041,59 @@ function CanvasPage(props: CanvasPageProps) {
     [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
   );
 
-  const handleBuildingBlocksShortcutOpen = useCallback(() => {
-    handleSidebarToggle(true);
-  }, [handleSidebarToggle]);
+  const onPlaceholderAdd = props.onPlaceholderAdd;
+  const viewportRefProp = props.viewportRef;
+
+  const handleBuildingBlocksShortcutOpen = useCallback(async () => {
+    if (readOnly) {
+      return;
+    }
+
+    if (templateNodeId) {
+      handleSidebarToggle(true);
+      state.componentSidebar.close();
+      return;
+    }
+
+    if (!onPlaceholderAdd) {
+      handleSidebarToggle(true);
+      return;
+    }
+
+    if (isCreatingStarterPlaceholderRef.current) {
+      return;
+    }
+
+    isCreatingStarterPlaceholderRef.current = true;
+    try {
+      const position = findFreePositionInViewport({
+        viewport: viewportRefProp?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
+        canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
+        nodes: state.nodes || [],
+        nodeSize: { width: 420, height: 200 },
+        fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
+      });
+      const placeholderId = await onPlaceholderAdd({ position });
+      if (!placeholderId) {
+        handleSidebarToggle(true);
+        return;
+      }
+
+      setTemplateNodeId(placeholderId);
+      setIsBuildingBlocksSidebarOpen(true);
+      state.componentSidebar.close();
+    } finally {
+      isCreatingStarterPlaceholderRef.current = false;
+    }
+  }, [
+    readOnly,
+    templateNodeId,
+    onPlaceholderAdd,
+    viewportRefProp,
+    state.nodes,
+    state.componentSidebar,
+    handleSidebarToggle,
+  ]);
 
   useBuildingBlocksShortcut({
     disabled:
@@ -1187,10 +1243,13 @@ function CanvasPage(props: CanvasPageProps) {
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
+            availableIntegrations={props.availableIntegrationDefinitions}
+            integrationDialogOpen={props.integrationDialogOpen}
             canvasZoom={canvasZoom}
             disabled={readOnly}
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockClick}
+            onConnectIntegration={props.onConnectIntegration}
             onEnterSubmit={handleBuildingBlockEnter}
           />
         )}
@@ -1895,7 +1954,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
   onLogView?: () => void;
 }) {
-  const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
@@ -2311,9 +2370,54 @@ function CanvasContent({
 
   const hasMultiSelection = multiSelectedNodes.length >= 2;
 
+  const handleAppendFromNode = useCallback(
+    (sourceNodeId: string, sourceHandleId?: string | null) => {
+      if (isReadOnly || !onConnectionDropInEmptySpace) {
+        return;
+      }
+
+      const sourceNode = stateRef.current.nodes?.find((node) => node.id === sourceNodeId);
+      if (!sourceNode) {
+        return;
+      }
+
+      const sourceWidth = sourceNode.width ?? 240;
+      const appendGapX = 300;
+      const appendAlignmentY = 30;
+      const placeholderPosition = {
+        x: sourceNode.position.x + sourceWidth + appendGapX,
+        y: sourceNode.position.y + appendAlignmentY,
+      };
+
+      const currentViewport = getViewport();
+      const canvasWidth =
+        typeof document === "undefined" ? 0 : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
+      const rightSidebarSafeArea = 560;
+      const placeholderEstimatedWidth = 420;
+      const viewportBuffer = 48;
+      const placeholderRightScreenX =
+        (placeholderPosition.x + placeholderEstimatedWidth) * currentViewport.zoom + currentViewport.x;
+      const maxVisibleScreenX = canvasWidth - rightSidebarSafeArea - viewportBuffer;
+
+      if (canvasWidth > 0 && placeholderRightScreenX > maxVisibleScreenX) {
+        const overflow = placeholderRightScreenX - maxVisibleScreenX;
+        const nextViewport = { ...currentViewport, x: currentViewport.x - overflow };
+        setViewport(nextViewport, { duration: 180 });
+        viewportRef.current = nextViewport;
+      }
+
+      onConnectionDropInEmptySpace(placeholderPosition, {
+        nodeId: sourceNodeId,
+        handleId: sourceHandleId ?? "default",
+      });
+    },
+    [getViewport, isReadOnly, onConnectionDropInEmptySpace, setViewport, viewportRef],
+  );
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeClick,
+    onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
@@ -2331,6 +2435,7 @@ function CanvasContent({
   });
   callbacksRef.current = {
     handleNodeClick,
+    onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
