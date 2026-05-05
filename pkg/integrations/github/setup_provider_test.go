@@ -359,7 +359,7 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, next)
-		assert.Equal(t, SetupStepSetupApp, next.Name)
+		assert.Equal(t, SetupStepCreateApp, next.Name)
 		assert.Equal(t, core.SetupStepTypeRedirectPrompt, next.Type)
 		require.NotNil(t, next.RedirectPrompt)
 		assert.Equal(t, "POST", next.RedirectPrompt.Method)
@@ -474,7 +474,7 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 
 	t.Run("setup app step submit is a no-op", func(t *testing.T) {
 		next, err := g.OnStepSubmit(core.SetupStepContext{
-			Step:   core.StepInfo{Name: SetupStepSetupApp},
+			Step:   core.StepInfo{Name: SetupStepCreateApp},
 			Logger: log,
 		})
 		require.NoError(t, err)
@@ -557,7 +557,7 @@ func Test__GitHub__SetupProvider__OnStepRevert(t *testing.T) {
 
 	t.Run("setup app revert is a no-op", func(t *testing.T) {
 		require.NoError(t, g.OnStepRevert(core.SetupStepContext{
-			Step:   core.StepInfo{Name: SetupStepSetupApp},
+			Step:   core.StepInfo{Name: SetupStepCreateApp},
 			Logger: log,
 		}))
 	})

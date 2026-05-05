@@ -1,6 +1,7 @@
 package github
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
@@ -207,23 +209,7 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "/webhook") {
-
-		//
-		// TODO: implement this for new setup too
-		//
-		if !ctx.Integration.LegacySetup() {
-			return
-		}
-
-		metadata := Metadata{}
-		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
-		if err != nil {
-			ctx.Logger.Errorf("failed to decode metadata: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		g.handleWebhook(ctx, metadata)
+		g.handleWebhook(ctx)
 		return
 	}
 
@@ -231,8 +217,16 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(http.StatusNotFound)
 }
 
-func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
-	webhookSecret, err := common.FindSecret(ctx.Integration, GitHubAppWebhookSecret)
+func (g *GitHub) findWebhookSecret(ctx core.HTTPRequestContext) (string, error) {
+	if ctx.Integration.LegacySetup() {
+		return common.FindSecret(ctx.Integration, GitHubAppWebhookSecret)
+	}
+
+	return ctx.Integration.Secrets().Get(common.SecretAppWebhookSecret)
+}
+
+func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
+	webhookSecret, err := g.findWebhookSecret(ctx)
 	if err != nil {
 		ctx.Logger.Errorf("Error finding webhook secret: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
@@ -256,37 +250,58 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext, metadata Metadata) {
 
 	switch event := event.(type) {
 	case *github.InstallationEvent:
-		g.handleInstallationEvent(ctx, metadata, event)
+		g.handleInstallationEvent(ctx, event)
 
 	//
 	// We don't actually use the repositories_added and repositories_removed fields in the events.
 	// When we receive an installation_repositories event, we always reload the list of repositories using the API.
 	//
 	case *github.InstallationRepositoriesEvent:
-		g.handleInstallationRepositoriesEvent(ctx, metadata)
+		g.handleInstallationRepositoriesEvent(ctx)
 
 	default:
 		ctx.Logger.Warnf("ignoring eventType %s", eventType)
 	}
 }
 
-func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata Metadata, event *github.InstallationEvent) {
+func (g *GitHub) findInstallationID(ctx core.HTTPRequestContext) (string, error) {
+	if ctx.Integration.LegacySetup() {
+		metadata := Metadata{}
+		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+		if err != nil {
+			return "", fmt.Errorf("failed to decode metadata: %v", err)
+		}
+
+		return metadata.InstallationID, nil
+	}
+
+	return ctx.Integration.Properties().GetString(common.PropertyAppInstallationID)
+}
+
+func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, event *github.InstallationEvent) {
+	installationID, err := g.findInstallationID(ctx)
+	if err != nil {
+		ctx.Logger.Errorf("failed to find installation ID: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	switch *event.Action {
 
 	//
 	// This is handled by the setup_url, so no need to do anything here.
 	//
 	case "created":
-		ctx.Logger.Infof("installation %s created", metadata.InstallationID)
+		ctx.Logger.Infof("installation %s created", installationID)
 		return
 
 	case "suspend":
-		ctx.Logger.Infof("installation %s suspended", metadata.InstallationID)
+		ctx.Logger.Infof("installation %s suspended", installationID)
 		ctx.Integration.Error("app installation was suspended")
 		return
 
 	case "unsuspend":
-		ctx.Logger.Infof("installation %s unsuspended", metadata.InstallationID)
+		ctx.Logger.Infof("installation %s unsuspended", installationID)
 		ctx.Integration.Ready()
 		return
 
@@ -295,12 +310,37 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 	// we need to prompt the user to re-install it.
 	//
 	case "deleted":
-		ctx.Logger.Infof("installation %s deleted", metadata.InstallationID)
+		g.handleInstallationDeletion(ctx, installationID)
+		return
 
-		state, err := crypto.Base64String(32)
+	default:
+		ctx.Logger.Warnf("ignoring action: %s", *event.Action)
+	}
+}
+
+func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, installationID string) {
+	ctx.Logger.Infof("installation %s deleted", installationID)
+
+	state, err := crypto.Base64String(32)
+	if err != nil {
+		ctx.Logger.Errorf("Failed to generate GitHub App state: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	//
+	// Move the integration to error state
+	//
+	ctx.Integration.Error("App was uninstalled")
+
+	//
+	// If we are dealing with a legacy integration,
+	// we need to update metadata and browser action.
+	//
+	if ctx.Integration.LegacySetup() {
+		metadata := Metadata{}
+		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 		if err != nil {
-			ctx.Logger.Errorf("Failed to generate GitHub App state: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 			return
 		}
 
@@ -309,19 +349,107 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 		metadata.State = state
 
 		ctx.Integration.SetMetadata(metadata)
-		ctx.Integration.Error("error")
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appInstallationDescription,
 			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
 			Method:      "GET",
 		})
 
-	default:
-		ctx.Logger.Warnf("ignoring action: %s", *event.Action)
+		return
+	}
+
+	//
+	// If we are dealing with an integration using the new setup,
+	// we gotta cleanup the properties and update the integration setup state.
+	//
+	err = ctx.Integration.Properties().Delete(common.PropertyAppInstallationID, common.PropertyAppInstallationURL)
+	if err != nil {
+		ctx.Logger.Errorf("failed to delete properties: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	instructions, err := template.New("appInstallInstructions").Parse(string(appInstallInstructionsTemplate))
+	if err != nil {
+		ctx.Logger.Errorf("failed to parse template: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	appSlug, err := ctx.Integration.Properties().GetString(common.PropertyAppSlug)
+	if err != nil {
+		ctx.Logger.Errorf("failed to get app slug: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	owner, err := ctx.Integration.Properties().GetString(common.PropertyOwner)
+	if err != nil {
+		ctx.Logger.Errorf("failed to get owner: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]any{
+		"Owner":   owner,
+		"AppSlug": appSlug,
+	}
+
+	var buf bytes.Buffer
+	if err := instructions.Execute(&buf, data); err != nil {
+		ctx.Logger.Errorf("failed to execute template: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = ctx.Integration.Properties().Create(core.IntegrationPropertyDefinition{
+		Name:  common.PropertyAppState,
+		Label: "GitHub App State",
+		Type:  core.IntegrationPropertyTypeString,
+		Value: state,
+	})
+
+	if err != nil {
+		ctx.Logger.Errorf("failed to create app state property: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = ctx.IntegrationSetup.SetStep(core.SetupStep{
+		Type:         core.SetupStepTypeRedirectPrompt,
+		Name:         SetupStepInstallApp,
+		Label:        "Install the GitHub app",
+		Instructions: buf.String(),
+		RedirectPrompt: &core.RedirectPrompt{
+			URL:    fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", appSlug, state),
+			Method: "GET",
+		},
+	})
+
+	if err != nil {
+		ctx.Logger.Errorf("failed to set setup step: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
 	}
 }
 
-func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, metadata Metadata) {
+func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext) {
+	//
+	// Integrations from new setup flow do not store repositories in metadata,
+	// so this is a no-op for them.
+	//
+	if ctx.Integration.LegacySetup() {
+		return
+	}
+
+	metadata := Metadata{}
+	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if err != nil {
+		ctx.Logger.Errorf("failed to decode metadata: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	client, err := newClientForAppInstallation(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to create client: %v", err)
@@ -513,9 +641,12 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	if ctx.Integration.LegacySetup() {
+		ctx.Logger.Infof("handling app installation for legacy integration")
 		g.afterAppInstallationLegacy(ctx)
 		return
 	}
+
+	ctx.Logger.Infof("handling app installation for non-legacy integration")
 
 	//
 	// App installation has already been set up.
@@ -559,7 +690,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	installationURL, err := common.AppInstallationURL(installationID)
+	installationURL, err := common.AppInstallationURL(ctx.Integration.Properties(), installationID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to get app installation URL: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
@@ -623,8 +754,6 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	// TODO: save repositories in property storage
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 	ctx.Integration.Ready()

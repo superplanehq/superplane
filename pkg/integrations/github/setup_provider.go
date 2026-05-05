@@ -34,6 +34,9 @@ var patUpdateInstructionsTemplate []byte
 //go:embed templates/app-update-instructions.tpl
 var appUpdateInstructionsTemplate []byte
 
+//go:embed templates/app-install-instructions.tpl
+var appInstallInstructionsTemplate []byte
+
 //go:embed templates/app-accept-new-permissions.tpl
 var appAcceptNewPermissionsTemplate []byte
 
@@ -47,7 +50,8 @@ const (
 	SetupStepUpdatePATPermissions      = "updatePATPermissions"
 	SetupStepUpdateAppPermissions      = "updateAppPermissions"
 	SetupStepAcceptAppPermissionUpdate = "acceptAppPermissionUpdate"
-	SetupStepSetupApp                  = "setupApp"
+	SetupStepCreateApp                 = "createApp"
+	SetupStepInstallApp                = "installApp"
 )
 
 func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
@@ -285,7 +289,7 @@ func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	// This step is not submitted, since it's a redirect step.
 	// The GitHub App creation flow will clear the setup state, if successful.
 	//
-	case SetupStepSetupApp:
+	case SetupStepCreateApp:
 		return nil, nil
 	}
 
@@ -298,7 +302,7 @@ func (g *SetupProvider) onUpdateAppPermissionsSubmit(ctx core.SetupStepContext) 
 		return nil, fmt.Errorf("error getting app installation ID: %v", err)
 	}
 
-	installationURL, err := common.AppInstallationURL(installationID)
+	installationURL, err := common.AppInstallationURL(ctx.Properties, installationID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting app installation URL: %v", err)
 	}
@@ -561,19 +565,16 @@ func (g *SetupProvider) generateNextStepForApp(ctx core.SetupStepContext, state 
 		return nil, fmt.Errorf("error executing template: %v", err)
 	}
 
-	manifest := g.appManifest(ctx)
-	ctx.Logger.Infof("app manifest: %s", manifest)
-
 	return &core.SetupStep{
 		Type:         core.SetupStepTypeRedirectPrompt,
-		Name:         SetupStepSetupApp,
-		Label:        "Setup GitHub App",
+		Name:         SetupStepCreateApp,
+		Label:        "Create and install GitHub App",
 		Instructions: buf.String(),
 		RedirectPrompt: &core.RedirectPrompt{
 			Method: "POST",
 			URL:    g.createAppURL(ownerType, owner),
 			FormData: map[string]string{
-				"manifest": manifest,
+				"manifest": g.appManifest(ctx),
 				"state":    state,
 			},
 		},
@@ -663,7 +664,7 @@ func (g *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 		return g.onSelectAuthMethodRevert(ctx)
 	case SetupStepEnterPAT:
 		return g.onEnterPATRevert(ctx)
-	case SetupStepSetupApp:
+	case SetupStepCreateApp:
 		return nil
 	}
 

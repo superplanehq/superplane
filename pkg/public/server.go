@@ -664,14 +664,15 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 	)
 
 	integration.HandleRequest(core.HTTPRequestContext{
-		Logger:          logging.ForIntegration(*integrationInstance),
-		Request:         r,
-		Response:        w,
-		BaseURL:         s.BaseURL,
-		WebhooksBaseURL: s.WebhooksBaseURL,
-		OrganizationID:  integrationInstance.OrganizationID.String(),
-		HTTP:            s.registry.HTTPContext(),
-		Capabilities:    capabilityCtx,
+		Logger:           logging.ForIntegration(*integrationInstance),
+		Request:          r,
+		Response:         w,
+		BaseURL:          s.BaseURL,
+		WebhooksBaseURL:  s.WebhooksBaseURL,
+		OrganizationID:   integrationInstance.OrganizationID.String(),
+		HTTP:             s.registry.HTTPContext(),
+		Capabilities:     capabilityCtx,
+		IntegrationSetup: contexts.NewIntegrationSetupContext(integrationInstance),
 		Integration: contexts.NewIntegrationContext(
 			database.Conn(),
 			nil,
