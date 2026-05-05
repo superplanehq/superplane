@@ -32,14 +32,18 @@ type CreatePoolSpec struct {
 	LoadShedding         *LoadSheddingSpec `json:"loadShedding"`
 }
 
+type CoordinatesSpec struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
 type OriginSpec struct {
-	Name      string   `json:"name"`
-	Address   string   `json:"address"`
-	Enabled   bool     `json:"enabled"`
-	Weight    float64  `json:"weight"`
-	Port      int      `json:"port"`
-	Latitude  *float64 `json:"latitude"`
-	Longitude *float64 `json:"longitude"`
+	Name        string           `json:"name"`
+	Address     string           `json:"address"`
+	Enabled     bool             `json:"enabled"`
+	Weight      float64          `json:"weight"`
+	Port        int              `json:"port"`
+	Coordinates *CoordinatesSpec `json:"coordinates"`
 }
 
 func (c *CreatePool) Name() string {
@@ -167,18 +171,32 @@ func (c *CreatePool) Configuration() []configuration.Field {
 								Description: "Traffic weight for this origin (0.0–1.0)",
 							},
 							{
-								Name:        "latitude",
-								Label:       "Latitude",
-								Type:        configuration.FieldTypeNumber,
+								Name:        "coordinates",
+								Label:       "Coordinates",
+								Type:        configuration.FieldTypeObject,
 								Required:    false,
-								Description: "Geographic latitude for proximity steering (e.g. 51.5074)",
-							},
-							{
-								Name:        "longitude",
-								Label:       "Longitude",
-								Type:        configuration.FieldTypeNumber,
-								Required:    false,
-								Description: "Geographic longitude for proximity steering (e.g. -0.1278)",
+								Togglable:   true,
+								Description: "Geographic coordinates for proximity steering",
+								TypeOptions: &configuration.TypeOptions{
+									Object: &configuration.ObjectTypeOptions{
+										Schema: []configuration.Field{
+											{
+												Name:        "latitude",
+												Label:       "Latitude",
+												Type:        configuration.FieldTypeNumber,
+												Required:    false,
+												Description: "Geographic latitude for proximity steering (e.g. 51.5074)",
+											},
+											{
+												Name:        "longitude",
+												Label:       "Longitude",
+												Type:        configuration.FieldTypeNumber,
+												Required:    false,
+												Description: "Geographic longitude for proximity steering (e.g. -0.1278)",
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -242,6 +260,7 @@ func (c *CreatePool) Configuration() []configuration.Field {
 			Label:       "Load Shedding",
 			Type:        configuration.FieldTypeObject,
 			Required:    false,
+			Togglable:   true,
 			Description: "Configure load shedding to drop a percentage of traffic to the pool",
 			TypeOptions: &configuration.TypeOptions{
 				Object: &configuration.ObjectTypeOptions{
@@ -352,8 +371,8 @@ func (c *CreatePool) Execute(ctx core.ExecutionContext) error {
 		}
 
 		var coords *Coordinates
-		if o.Latitude != nil && o.Longitude != nil {
-			coords = &Coordinates{Latitude: *o.Latitude, Longitude: *o.Longitude}
+		if o.Coordinates != nil {
+			coords = &Coordinates{Latitude: o.Coordinates.Latitude, Longitude: o.Coordinates.Longitude}
 		}
 
 		origins[i] = Origin{

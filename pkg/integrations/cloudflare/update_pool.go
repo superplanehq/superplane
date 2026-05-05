@@ -111,6 +111,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Origins",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
+			Togglable:   true,
 			Description: "Updated list of origin servers. When provided, replaces the current list.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -157,18 +158,32 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 								Description: "Traffic weight for this origin (0.0–1.0)",
 							},
 							{
-								Name:        "latitude",
-								Label:       "Latitude",
-								Type:        configuration.FieldTypeNumber,
+								Name:        "coordinates",
+								Label:       "Coordinates",
+								Type:        configuration.FieldTypeObject,
 								Required:    false,
-								Description: "Geographic latitude for proximity steering (e.g. 51.5074)",
-							},
-							{
-								Name:        "longitude",
-								Label:       "Longitude",
-								Type:        configuration.FieldTypeNumber,
-								Required:    false,
-								Description: "Geographic longitude for proximity steering (e.g. -0.1278)",
+								Togglable:   true,
+								Description: "Geographic coordinates for proximity steering",
+								TypeOptions: &configuration.TypeOptions{
+									Object: &configuration.ObjectTypeOptions{
+										Schema: []configuration.Field{
+											{
+												Name:        "latitude",
+												Label:       "Latitude",
+												Type:        configuration.FieldTypeNumber,
+												Required:    false,
+												Description: "Geographic latitude for proximity steering (e.g. 51.5074)",
+											},
+											{
+												Name:        "longitude",
+												Label:       "Longitude",
+												Type:        configuration.FieldTypeNumber,
+												Required:    false,
+												Description: "Geographic longitude for proximity steering (e.g. -0.1278)",
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -180,6 +195,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Pool Name",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
+			Togglable:   true,
 			Description: "New name for the pool (optional)",
 		},
 		{
@@ -187,6 +203,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Description",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
+			Togglable:   true,
 			Description: "New description for the pool (optional)",
 		},
 		{
@@ -194,6 +211,8 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Enabled",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
+			Togglable:   true,
+			Default:     true,
 			Description: "Enable or disable the pool",
 		},
 		{
@@ -201,6 +220,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Minimum Origins",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
+			Togglable:   true,
 			Description: "Minimum number of healthy origins before the pool is marked as unhealthy",
 		},
 		{
@@ -208,6 +228,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Origin Steering Policy",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
+			Togglable:   true,
 			Description: "Determines how requests are distributed across origins",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
@@ -225,6 +246,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Monitor",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
+			Togglable:   true,
 			Description: "Health monitor to attach to this pool",
 			Placeholder: "Select a monitor",
 			TypeOptions: &configuration.TypeOptions{
@@ -244,6 +266,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Load Shedding",
 			Type:        configuration.FieldTypeObject,
 			Required:    false,
+			Togglable:   true,
 			Description: "Configure load shedding to drop a percentage of traffic to the pool",
 			TypeOptions: &configuration.TypeOptions{
 				Object: &configuration.ObjectTypeOptions{
@@ -376,8 +399,8 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 			}
 
 			var coords *Coordinates
-			if o.Latitude != nil && o.Longitude != nil {
-				coords = &Coordinates{Latitude: *o.Latitude, Longitude: *o.Longitude}
+			if o.Coordinates != nil {
+				coords = &Coordinates{Latitude: o.Coordinates.Latitude, Longitude: o.Coordinates.Longitude}
 			}
 
 			origins[i] = Origin{

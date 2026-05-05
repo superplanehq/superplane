@@ -8,6 +8,9 @@ import { getKVValueMapper } from "./get_kv_value";
 import { deleteKVValueMapper } from "./delete_kv_value";
 import { deleteKVNamespaceMapper } from "./delete_kv_namespace";
 import { createPoolMapper } from "./create_pool";
+import { getPoolMapper } from "./get_pool";
+import { deletePoolMapper } from "./delete_pool";
+import { updatePoolMapper } from "./update_pool";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDnsRecord: baseMapper,
@@ -23,9 +26,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteKVValue: deleteKVValueMapper,
   deleteKVNamespace: deleteKVNamespaceMapper,
   createPool: createPoolMapper,
-  updatePool: baseMapper,
-  getPool: baseMapper,
-  deletePool: baseMapper,
+  updatePool: updatePoolMapper,
+  getPool: getPoolMapper,
+  deletePool: deletePoolMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
