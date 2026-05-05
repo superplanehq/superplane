@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { BuildingBlocksSidebar } from "./index";
 import type { BuildingBlockCategory } from "./types";
+import type { OrganizationsIntegration } from "@/api-client";
 
 const defaultProps = {
   isOpen: true,
@@ -116,5 +117,48 @@ describe("BuildingBlocksSidebar", () => {
 
       expect(onEnterSubmit).not.toHaveBeenCalled();
     });
+  });
+
+  it("opens integrations modal and triggers connection flow", () => {
+    const onConnectIntegration = vi.fn();
+    render(
+      <BuildingBlocksSidebar
+        {...defaultProps}
+        onConnectIntegration={onConnectIntegration}
+        availableIntegrations={[
+          { name: "github", label: "GitHub" },
+          { name: "slack", label: "Slack" },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "+ Integrations" }));
+    expect(screen.getByText("Connect Integrations")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /GitHub/ }));
+    expect(onConnectIntegration).toHaveBeenCalledWith("github");
+  });
+
+  it("does not show integration categories for integrations without type names", () => {
+    const integrationCategory: BuildingBlockCategory = {
+      name: "Unknown Integration",
+      blocks: [{ name: "unknown.action", label: "Unknown Action", type: "component" }],
+    };
+    const integrationWithoutName: OrganizationsIntegration = {
+      spec: {},
+      metadata: {},
+      status: { state: "ready" },
+    };
+
+    render(
+      <BuildingBlocksSidebar
+        {...defaultProps}
+        blocks={[coreCategory, integrationCategory]}
+        integrations={[integrationWithoutName]}
+      />,
+    );
+
+    expect(screen.queryByText("Unknown Integration")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unknown Action")).not.toBeInTheDocument();
   });
 });
