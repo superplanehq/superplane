@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ComponentBase } from "@/ui/componentBase";
@@ -121,6 +121,32 @@ describe("workflow v2 edit-mode action affordances", () => {
     render(<Trigger {...props} canvasMode="live" onRun={vi.fn()} />);
 
     expect(screen.getByTestId("start-template-run")).toBeInTheDocument();
+  });
+
+  it("keeps start trigger run buttons visible when live runs are disabled", () => {
+    const onRun = vi.fn();
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext(),
+      canvasMode: "live",
+    });
+
+    render(
+      <Trigger
+        {...props}
+        canvasMode="live"
+        onRun={onRun}
+        runDisabled
+        runDisabledTooltip="Save canvas changes before running"
+      />,
+    );
+
+    const runButton = screen.getByTestId("start-template-run");
+    expect(runButton).toBeDisabled();
+    expect(screen.getByLabelText("Save canvas changes before running")).toBeInTheDocument();
+
+    fireEvent.click(runButton);
+
+    expect(onRun).not.toHaveBeenCalled();
   });
 
   it("disables approval actions in edit mode", () => {

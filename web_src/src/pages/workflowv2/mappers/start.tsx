@@ -1,16 +1,19 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type {
   TriggerRenderer,
+  CustomFieldRendererContext,
   CustomFieldRenderer,
   NodeInfo,
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
+import type { CustomFieldRunContext } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Play } from "lucide-react";
 
 interface StartTemplate {
@@ -20,6 +23,14 @@ interface StartTemplate {
 
 interface StartConfiguration {
   templates?: StartTemplate[];
+}
+
+function runWithPendingData(nodeId: string, initialData: string | undefined, onRun: () => void): void {
+  window.__pendingRunData = { nodeId, initialData };
+  onRun();
+  setTimeout(() => {
+    delete window.__pendingRunData;
+  }, 100);
 }
 
 /**
@@ -38,28 +49,11 @@ export const startTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const nodeId = node.id;
 
-    // Create customField as a function that will receive onRun when ComponentBase renders it
-    // We'll create a wrapper that captures nodeId and allows passing initialData
-    const customField = (onRunBase?: () => void) => {
-      if (!onRunBase) {
-        return startCustomFieldRenderer.render(node);
-      }
-
-      // Create a wrapper onRun that can accept initialData
-      // Store initialData temporarily in window and trigger the base onRun
-      // handleNodeRun will check for this data
-      const onRunWithContext = (initialData?: string) => {
-        // Store initialData temporarily and trigger the run
-        (window as any).__pendingRunData = { nodeId, initialData };
-        onRunBase();
-        // Clear after a short delay to allow handleNodeRun to read it
-        setTimeout(() => {
-          delete (window as any).__pendingRunData;
-        }, 100);
-      };
-
-      return startCustomFieldRenderer.render(node, { onRun: onRunWithContext });
-    };
+    const customField = (onRunBase?: () => void, runContext?: CustomFieldRunContext) =>
+      startCustomFieldRenderer.render(node, {
+        onRun: onRunBase ? (initialData?: string) => runWithPendingData(nodeId, initialData, onRunBase) : undefined,
+        ...runContext,
+      });
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
@@ -90,7 +84,7 @@ export const startTriggerRenderer: TriggerRenderer = {
  * This is only used internally by startTriggerRenderer, not registered in the global registry
  */
 const startCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: NodeInfo, context?: { onRun?: (initialData?: string) => void }): React.ReactNode => {
+  render: (node: NodeInfo, context?: CustomFieldRendererContext): React.ReactNode => {
     const config = node.configuration as StartConfiguration;
     const templates = config?.templates || [];
 
@@ -99,10 +93,47 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     }
 
     const handleRun = (template: StartTemplate) => {
-      if (context?.onRun) {
+      if (context?.onRun && !context.runDisabled) {
         const payloadString = JSON.stringify(template.payload, null, 2);
         context.onRun(payloadString);
       }
+    };
+
+    const renderRunButton = (template: StartTemplate) => {
+      if (!context?.onRun) {
+        return null;
+      }
+
+      const button = (
+        <Button
+          size="sm"
+          data-testid="start-template-run"
+          disabled={context.runDisabled}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleRun(template);
+          }}
+          className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+        >
+          Run
+        </Button>
+      );
+
+      if (!context.runDisabled || !context.runDisabledTooltip) {
+        return button;
+      }
+
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div aria-label={context.runDisabledTooltip} className="inline-flex flex-shrink-0">
+              {button}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>{context.runDisabledTooltip}</TooltipContent>
+        </Tooltip>
+      );
     };
 
     return (
@@ -115,20 +146,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
               </div>
               <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
             </div>
-            {context?.onRun && (
-              <Button
-                size="sm"
-                data-testid="start-template-run"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleRun(template);
-                }}
-                className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-              >
-                Run
-              </Button>
-            )}
+            {renderRunButton(template)}
           </div>
         ))}
       </div>

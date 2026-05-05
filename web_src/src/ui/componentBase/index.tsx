@@ -198,6 +198,11 @@ export interface EventSection {
   handleComponent?: React.ReactNode;
 }
 
+export interface CustomFieldRunContext {
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
+}
+
 export interface ComponentBaseProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
@@ -214,7 +219,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   selected?: boolean;
   metadata?: MetadataItem[];
   /** Custom content rendered on the node */
-  customField?: React.ReactNode | ((onRun?: () => void, nodeId?: string) => React.ReactNode);
+  customField?: React.ReactNode | ((onRun?: () => void, context?: CustomFieldRunContext) => React.ReactNode);
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
   customFieldPosition?: "before" | "after";
   /** Whether the custom field should only be shown in live mode */
@@ -277,9 +282,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const safeCustomFieldVisibility = customFieldVisibility === "live-only" ? "live-only" : "always";
   const safeCustomField = React.useMemo(() => {
     if (typeof customField === "function") {
-      return (onRunHandler?: () => void, nodeId?: string) => {
+      return (onRunHandler?: () => void, context?: CustomFieldRunContext) => {
         try {
-          return customField(onRunHandler, nodeId) ?? null;
+          return customField(onRunHandler, context) ?? null;
         } catch (renderError) {
           console.error("[ComponentBase] customField threw during render:", renderError);
           return null;
@@ -322,12 +327,19 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     safeEventSections && safeEventSections.length > 0
       ? (resolvedEventStateMap[compactEventState] || resolvedEventStateMap.neutral).badgeColor
       : undefined;
-  const customFieldOnRun = canvasMode === "edit" || runDisabled ? undefined : onRun;
+  const customFieldOnRun = canvasMode === "edit" ? undefined : onRun;
+  const customFieldRunContext = React.useMemo(
+    () => ({
+      runDisabled,
+      runDisabledTooltip: _runDisabledTooltip,
+    }),
+    [runDisabled, _runDisabledTooltip],
+  );
   const renderedCustomField =
     safeCustomFieldVisibility === "live-only" && canvasMode === "edit"
       ? null
       : typeof safeCustomField === "function"
-        ? safeCustomField(customFieldOnRun)
+        ? safeCustomField(customFieldOnRun, customFieldRunContext)
         : safeCustomField || null;
 
   return (
