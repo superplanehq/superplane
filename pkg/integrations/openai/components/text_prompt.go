@@ -1,4 +1,4 @@
-package openai
+package components
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/openai/common"
 )
 
 const ResponsePayloadType = "openai.response"
@@ -21,11 +22,11 @@ type CreateResponseSpec struct {
 }
 
 type ResponsePayload struct {
-	ID       string          `json:"id"`
-	Model    string          `json:"model"`
-	Text     string          `json:"text"`
-	Usage    *ResponseUsage  `json:"usage,omitempty"`
-	Response *OpenAIResponse `json:"response"`
+	ID       string                 `json:"id"`
+	Model    string                 `json:"model"`
+	Text     string                 `json:"text"`
+	Usage    *common.ResponseUsage  `json:"usage,omitempty"`
+	Response *common.OpenAIResponse `json:"response"`
 }
 
 func (c *CreateResponse) Name() string {
@@ -139,7 +140,7 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("input is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -177,7 +178,7 @@ func (c *CreateResponse) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	return http.StatusOK, nil, nil
 }
 
-func extractResponseText(response *OpenAIResponse) string {
+func extractResponseText(response *common.OpenAIResponse) string {
 	if response == nil {
 		return ""
 	}
