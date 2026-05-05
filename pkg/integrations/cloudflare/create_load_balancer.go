@@ -429,6 +429,44 @@ func (c *CreateLoadBalancer) Configuration() []configuration.Field {
 													},
 												},
 											},
+											{
+												Name:        "sessionAffinityTtl",
+												Label:       "Session Affinity TTL",
+												Type:        configuration.FieldTypeNumber,
+												Required:    false,
+												Description: "Override session affinity TTL (seconds) for matched requests",
+											},
+											{
+												Name:        "poolWeights",
+												Label:       "Pool Weights",
+												Type:        configuration.FieldTypeList,
+												Required:    false,
+												Description: "Override pool weights for matched requests",
+												TypeOptions: &configuration.TypeOptions{
+													List: &configuration.ListTypeOptions{
+														ItemLabel: "Pool Weight",
+														ItemDefinition: &configuration.ListItemDefinition{
+															Type: configuration.FieldTypeObject,
+															Schema: []configuration.Field{
+																{
+																	Name:        "pool",
+																	Label:       "Pool ID",
+																	Type:        configuration.FieldTypeString,
+																	Required:    true,
+																	Description: "Pool identifier",
+																},
+																{
+																	Name:        "weight",
+																	Label:       "Weight",
+																	Type:        configuration.FieldTypeNumber,
+																	Required:    true,
+																	Description: "Weight for random steering (0.0–1.0)",
+																},
+															},
+														},
+													},
+												},
+											},
 										},
 									},
 								},

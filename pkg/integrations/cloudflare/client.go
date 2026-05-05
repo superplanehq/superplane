@@ -1637,6 +1637,27 @@ func (c *Client) UpdateLoadBalancer(zoneID, lbID string, req UpdateLoadBalancerR
 // DeleteLoadBalancer deletes a load balancer by ID from a zone
 func (c *Client) DeleteLoadBalancer(zoneID, lbID string) error {
 	url := fmt.Sprintf("%s/zones/%s/load_balancers/%s", c.BaseURL, zoneID, lbID)
-	_, err := c.execRequest(http.MethodDelete, url, nil)
-	return err
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Success bool              `json:"success"`
+		Errors  []CloudflareError `json:"errors"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return &CloudflareAPIError{
+			StatusCode: http.StatusOK,
+			Errors:     response.Errors,
+			Body:       responseBody,
+		}
+	}
+
+	return nil
 }

@@ -171,7 +171,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"zoneId":       "zone123",
+				"zone":       "zone123",
 				"name":         "lb.example.com",
 				"fallbackPool": "pool123",
 				"defaultPools": []any{"pool123"},
