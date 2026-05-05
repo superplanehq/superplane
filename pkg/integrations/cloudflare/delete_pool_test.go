@@ -21,6 +21,7 @@ func Test__DeletePool__Setup(t *testing.T) {
 				"accountId": "",
 				"poolId":    "pool123",
 			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
@@ -33,22 +34,72 @@ func Test__DeletePool__Setup(t *testing.T) {
 				"accountId": "acc123",
 				"poolId":    "",
 			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		require.ErrorContains(t, err, "poolId is required")
 	})
 
-	t.Run("valid configuration passes", func(t *testing.T) {
+	t.Run("expression poolId is accepted without API call", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"accountId": "acc123",
+				"poolId":    "{{ $.trigger.data.poolId }}",
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+
+		err := component.Setup(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("accountId from integration metadata is used as fallback", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"poolId": "{{ $.trigger.data.poolId }}",
+			},
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{AccountID: "acc-from-integration"},
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+
+		err := component.Setup(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("valid configuration resolves pool name", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
 				"poolId":    "pool123",
 			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"success": true,
+							"result": {"id": "pool123", "name": "my-pool"}
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "token123"},
+			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		require.NoError(t, err)
+
+		meta, ok := ctx.Metadata.(*contexts.MetadataContext)
+		require.True(t, ok)
+		poolMeta, ok := meta.Metadata.(PoolNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "my-pool", poolMeta.PoolName)
 	})
 }
 

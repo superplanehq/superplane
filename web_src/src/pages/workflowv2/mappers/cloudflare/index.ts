@@ -46,8 +46,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getKVValue: buildActionStateRegistry("fetched"),
   deleteKVValue: buildActionStateRegistry("deleted"),
   deleteKVNamespace: buildActionStateRegistry("deleted"),
-  createPool: buildActionStateRegistry("completed"),
-  updatePool: buildActionStateRegistry("completed"),
-  getPool: buildActionStateRegistry("completed"),
-  deletePool: buildActionStateRegistry("completed"),
+  createPool: buildActionStateRegistry("created"),
+  updatePool: buildActionStateRegistry("updated"),
+  getPool: buildActionStateRegistry("fetched"),
+  deletePool: buildActionStateRegistry("deleted"),
 };

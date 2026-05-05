@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,7 +16,7 @@ type DeletePool struct{}
 
 type DeletePoolSpec struct {
 	AccountID string `json:"accountId"`
-	PoolID    string `json:"poolId"`
+	Pool      string `json:"pool"`
 }
 
 func (c *DeletePool) Name() string {
@@ -65,14 +66,7 @@ func (c *DeletePool) OutputChannels(configuration any) []core.OutputChannel {
 func (c *DeletePool) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "accountId",
-			Label:       "Account ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The Cloudflare account ID that owns the pool",
-		},
-		{
-			Name:        "poolId",
+			Name:        "pool",
 			Label:       "Pool",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -81,12 +75,6 @@ func (c *DeletePool) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "pool",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "accountId",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
-						},
-					},
 				},
 			},
 		},
@@ -99,15 +87,34 @@ func (c *DeletePool) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.AccountID == "" {
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+	if accountID == "" {
 		return errors.New("accountId is required")
 	}
 
-	if spec.PoolID == "" {
-		return errors.New("poolId is required")
+	if spec.Pool == "" {
+		return errors.New("pool is required")
 	}
 
-	return nil
+	return c.resolvePoolMetadata(ctx, accountID, spec.Pool)
+}
+
+func (c *DeletePool) resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
+	meta := PoolNodeMetadata{}
+	if strings.Contains(poolID, "{{") {
+		meta.PoolName = poolID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		pool, err := client.GetPool(accountID, poolID)
+		if err != nil {
+			return fmt.Errorf("failed to get pool: %w", err)
+		}
+		meta.PoolName = pool.Name
+	}
+	return ctx.Metadata.Set(meta)
 }
 
 func (c *DeletePool) Execute(ctx core.ExecutionContext) error {
@@ -116,18 +123,20 @@ func (c *DeletePool) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	if err := client.DeletePool(spec.AccountID, spec.PoolID); err != nil {
+	if err := client.DeletePool(accountID, spec.Pool); err != nil {
 		return fmt.Errorf("failed to delete pool: %v", err)
 	}
 
 	result := map[string]any{
-		"accountId": spec.AccountID,
-		"poolId":    spec.PoolID,
+		"accountId": accountID,
+		"poolId":    spec.Pool,
 		"deleted":   true,
 	}
 

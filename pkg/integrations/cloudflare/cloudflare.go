@@ -22,7 +22,7 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	Zones     []Zone `json:"zones"`
+	Zones         []Zone `json:"zones"`
 	AccountID string `json:"accountId"`
 }
 
@@ -44,6 +44,27 @@ func resolveKVNamespaceMetadata(ctx core.SetupContext, accountID, namespaceID st
 		return "", fmt.Errorf("failed to get KV namespace: %w", err)
 	}
 	return ns.Title, nil
+}
+
+func accountIDFromIntegration(ctx core.IntegrationContext) string {
+	if ctx == nil {
+		return ""
+	}
+	metadata := Metadata{}
+	mapstructure.Decode(ctx.GetMetadata(), &metadata)
+	return metadata.AccountID
+}
+
+func resolveAccountID(specAccountID string, integration core.IntegrationContext) string {
+	if specAccountID != "" {
+		return specAccountID
+	}
+	return accountIDFromIntegration(integration)
+	AccountID string `json:"accountId"`
+}
+
+type PoolNodeMetadata struct {
+	PoolName string `json:"poolName"`
 }
 
 func accountIDFromIntegration(ctx core.IntegrationContext) string {
@@ -352,6 +373,9 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 	case "monitor":
 		accountID := ctx.Parameters["accountId"]
 		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
 			return []core.IntegrationResource{}, nil
 		}
 
@@ -381,6 +405,9 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 
 	case "pool":
 		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
 		if accountID == "" {
 			return []core.IntegrationResource{}, nil
 		}

@@ -16,7 +16,11 @@ import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface GetPoolConfiguration {
-  poolId?: string;
+  pool?: string;
+}
+
+interface GetPoolNodeMetadata {
+  poolName?: string;
 }
 
 export const getPoolMapper: ComponentBaseMapper = {
@@ -70,10 +74,12 @@ export const getPoolMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as GetPoolNodeMetadata | undefined;
   const configuration = node.configuration as GetPoolConfiguration;
 
-  if (configuration?.poolId) {
-    metadata.push({ icon: "network", label: configuration.poolId });
+  const label = nodeMetadata?.poolName || configuration?.pool;
+  if (label) {
+    metadata.push({ icon: "network", label });
   }
 
   return metadata;

@@ -16,7 +16,11 @@ import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface DeletePoolConfiguration {
-  poolId?: string;
+  pool?: string;
+}
+
+interface DeletePoolNodeMetadata {
+  poolName?: string;
 }
 
 export const deletePoolMapper: ComponentBaseMapper = {
@@ -61,10 +65,12 @@ export const deletePoolMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as DeletePoolNodeMetadata | undefined;
   const configuration = node.configuration as DeletePoolConfiguration;
 
-  if (configuration?.poolId) {
-    metadata.push({ icon: "network", label: configuration.poolId });
+  const label = nodeMetadata?.poolName || configuration?.pool;
+  if (label) {
+    metadata.push({ icon: "network", label });
   }
 
   return metadata;

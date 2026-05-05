@@ -17,7 +17,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface UpdatePoolConfiguration {
   name?: string;
-  poolId?: string;
+  pool?: string;
 }
 
 export const updatePoolMapper: ComponentBaseMapper = {
@@ -75,8 +75,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.name) {
     metadata.push({ icon: "network", label: configuration.name });
-  } else if (configuration?.poolId) {
-    metadata.push({ icon: "network", label: configuration.poolId });
+  } else if (configuration?.pool) {
+    metadata.push({ icon: "network", label: configuration.pool });
   }
 
   return metadata;

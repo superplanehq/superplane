@@ -15,7 +15,7 @@ type UpdatePool struct{}
 
 type UpdatePoolSpec struct {
 	AccountID            string            `json:"accountId"`
-	PoolID               string            `json:"poolId"`
+	Pool                 string            `json:"pool"`
 	Name                 string            `json:"name"`
 	Description          string            `json:"description"`
 	Enabled              *bool             `json:"enabled"`
@@ -81,14 +81,7 @@ func (c *UpdatePool) OutputChannels(configuration any) []core.OutputChannel {
 func (c *UpdatePool) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "accountId",
-			Label:       "Account ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The Cloudflare account ID that owns the pool",
-		},
-		{
-			Name:        "poolId",
+			Name:        "pool",
 			Label:       "Pool",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -97,12 +90,6 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "pool",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "accountId",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
-						},
-					},
 				},
 			},
 		},
@@ -211,7 +198,6 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Enabled",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
-			Togglable:   true,
 			Default:     true,
 			Description: "Enable or disable the pool",
 		},
@@ -329,12 +315,13 @@ func (c *UpdatePool) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.AccountID == "" {
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+	if accountID == "" {
 		return errors.New("accountId is required")
 	}
 
-	if spec.PoolID == "" {
-		return errors.New("poolId is required")
+	if spec.Pool == "" {
+		return errors.New("pool is required")
 	}
 
 	for i, o := range spec.Origins {
@@ -354,6 +341,8 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
+
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -415,15 +404,15 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 		req.Origins = origins
 	}
 
-	pool, err := client.UpdatePool(spec.AccountID, spec.PoolID, req)
+	pool, err := client.UpdatePool(accountID, spec.Pool, req)
 	if err != nil {
 		return fmt.Errorf("failed to update pool: %v", err)
 	}
 
 	result := map[string]any{
 		"pool":      pool,
-		"accountId": spec.AccountID,
-		"poolId":    spec.PoolID,
+		"accountId": accountID,
+		"poolId":    spec.Pool,
 	}
 
 	return ctx.ExecutionState.Emit(

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,7 +16,7 @@ type GetPool struct{}
 
 type GetPoolSpec struct {
 	AccountID string `json:"accountId"`
-	PoolID    string `json:"poolId"`
+	Pool      string `json:"pool"`
 }
 
 func (c *GetPool) Name() string {
@@ -64,14 +65,7 @@ func (c *GetPool) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetPool) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "accountId",
-			Label:       "Account ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The Cloudflare account ID that owns the pool",
-		},
-		{
-			Name:        "poolId",
+			Name:        "pool",
 			Label:       "Pool",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -80,12 +74,6 @@ func (c *GetPool) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "pool",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "accountId",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
-						},
-					},
 				},
 			},
 		},
@@ -98,15 +86,34 @@ func (c *GetPool) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.AccountID == "" {
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+	if accountID == "" {
 		return errors.New("accountId is required")
 	}
 
-	if spec.PoolID == "" {
-		return errors.New("poolId is required")
+	if spec.Pool == "" {
+		return errors.New("pool is required")
 	}
 
-	return nil
+	return c.resolvePoolMetadata(ctx, accountID, spec.Pool)
+}
+
+func (c *GetPool) resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
+	meta := PoolNodeMetadata{}
+	if strings.Contains(poolID, "{{") {
+		meta.PoolName = poolID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		pool, err := client.GetPool(accountID, poolID)
+		if err != nil {
+			return fmt.Errorf("failed to get pool: %w", err)
+		}
+		meta.PoolName = pool.Name
+	}
+	return ctx.Metadata.Set(meta)
 }
 
 func (c *GetPool) Execute(ctx core.ExecutionContext) error {
@@ -115,20 +122,22 @@ func (c *GetPool) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	pool, err := client.GetPool(spec.AccountID, spec.PoolID)
+	pool, err := client.GetPool(accountID, spec.Pool)
 	if err != nil {
 		return fmt.Errorf("failed to get pool: %v", err)
 	}
 
 	result := map[string]any{
 		"pool":      pool,
-		"accountId": spec.AccountID,
-		"poolId":    spec.PoolID,
+		"accountId": accountID,
+		"poolId":    spec.Pool,
 	}
 
 	return ctx.ExecutionState.Emit(

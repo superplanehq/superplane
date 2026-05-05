@@ -99,13 +99,6 @@ func (c *CreatePool) OutputChannels(configuration any) []core.OutputChannel {
 func (c *CreatePool) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "accountId",
-			Label:       "Account ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The Cloudflare account ID that owns the pool",
-		},
-		{
 			Name:        "name",
 			Label:       "Pool Name",
 			Type:        configuration.FieldTypeString,
@@ -156,13 +149,6 @@ func (c *CreatePool) Configuration() []configuration.Field {
 								Description: "Optional port to append to the address (e.g. 8080). Leave empty to use the default.",
 							},
 							{
-								Name:     "enabled",
-								Label:    "Enabled",
-								Type:     configuration.FieldTypeBool,
-								Required: false,
-								Default:  true,
-							},
-							{
 								Name:        "weight",
 								Label:       "Weight",
 								Type:        configuration.FieldTypeNumber,
@@ -198,18 +184,17 @@ func (c *CreatePool) Configuration() []configuration.Field {
 									},
 								},
 							},
+							{
+								Name:     "enabled",
+								Label:    "Enabled",
+								Type:     configuration.FieldTypeBool,
+								Required: false,
+								Default:  true,
+							},
 						},
 					},
 				},
 			},
-		},
-		{
-			Name:        "enabled",
-			Label:       "Enabled",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Default:     true,
-			Description: "Whether the pool is active and receives traffic",
 		},
 		{
 			Name:        "minimumOrigins",
@@ -314,6 +299,14 @@ func (c *CreatePool) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "enabled",
+			Label:       "Enabled",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     true,
+			Description: "Whether the pool is active and receives traffic",
+		},
 	}
 }
 
@@ -323,7 +316,8 @@ func (c *CreatePool) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.AccountID == "" {
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+	if accountID == "" {
 		return errors.New("accountId is required")
 	}
 
@@ -352,6 +346,8 @@ func (c *CreatePool) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
+
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -410,14 +406,14 @@ func (c *CreatePool) Execute(ctx core.ExecutionContext) error {
 		LoadShedding:   loadShedding,
 	}
 
-	pool, err := client.CreatePool(spec.AccountID, req)
+	pool, err := client.CreatePool(accountID, req)
 	if err != nil {
 		return fmt.Errorf("failed to create pool: %v", err)
 	}
 
 	result := map[string]any{
 		"pool":      pool,
-		"accountId": spec.AccountID,
+		"accountId": accountID,
 	}
 
 	return ctx.ExecutionState.Emit(
