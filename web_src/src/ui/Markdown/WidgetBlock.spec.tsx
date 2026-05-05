@@ -21,9 +21,73 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-vi.mock("./MermaidDiagram", () => ({
-  MermaidDiagram: ({ code }: { code: string }) => <pre data-testid="mermaid-mock">{code}</pre>,
-}));
+// Mock recharts so we can assert on the shaped data and the props the widget
+// passes to Bar / Line / Area / Pie / Cell. ResponsiveContainer is replaced with
+// a fixed-size div so the chart subtree renders inside jsdom.
+vi.mock("recharts", () => {
+  type AnyProps = { children?: ReactNode } & Record<string, unknown>;
+
+  const Box =
+    (testid: string) =>
+    ({ children, ...rest }: AnyProps) => {
+      const dataAttrs: Record<string, string> = { "data-testid": testid };
+      if (typeof rest.data !== "undefined") {
+        dataAttrs["data-rows"] = JSON.stringify(rest.data);
+      }
+      return <div {...dataAttrs}>{children}</div>;
+    };
+
+  return {
+    ResponsiveContainer: ({ children }: AnyProps) => (
+      <div data-testid="rc-container" style={{ width: 800, height: 400 }}>
+        {children}
+      </div>
+    ),
+    BarChart: Box("rc-barchart"),
+    LineChart: Box("rc-linechart"),
+    AreaChart: Box("rc-areachart"),
+    PieChart: Box("rc-piechart"),
+    Bar: ({ dataKey, fill, stackId }: AnyProps) => (
+      <div
+        data-testid={`rc-bar-${String(dataKey)}`}
+        data-key={String(dataKey)}
+        data-fill={fill ? String(fill) : ""}
+        data-stack-id={stackId ? String(stackId) : ""}
+      />
+    ),
+    Line: ({ dataKey, stroke }: AnyProps) => (
+      <div
+        data-testid={`rc-line-${String(dataKey)}`}
+        data-key={String(dataKey)}
+        data-stroke={stroke ? String(stroke) : ""}
+      />
+    ),
+    Area: ({ dataKey, stroke, fill }: AnyProps) => (
+      <div
+        data-testid={`rc-area-${String(dataKey)}`}
+        data-key={String(dataKey)}
+        data-stroke={stroke ? String(stroke) : ""}
+        data-fill={fill ? String(fill) : ""}
+      />
+    ),
+    Pie: ({ children, data, dataKey, nameKey }: AnyProps) => (
+      <div
+        data-testid="rc-pie"
+        data-rows={JSON.stringify(data ?? [])}
+        data-key={String(dataKey ?? "")}
+        data-name-key={String(nameKey ?? "")}
+      >
+        {children}
+      </div>
+    ),
+    Cell: ({ fill }: AnyProps) => <div data-testid="rc-cell" data-fill={fill ? String(fill) : ""} />,
+    XAxis: () => null,
+    YAxis: () => null,
+    CartesianGrid: () => null,
+    Tooltip: () => null,
+    Legend: () => null,
+  };
+});
 
 import { WidgetBlock } from "./WidgetBlock";
 
@@ -1277,7 +1341,13 @@ describe("WidgetBlock execution actions", () => {
 //
 
 describe("WidgetBlock render: chart", () => {
-  it("emits xychart-beta source with bar series for memory rows", async () => {
+  function readBarChart() {
+    const chart = screen.getByTestId("rc-barchart");
+    const rows = JSON.parse(chart.getAttribute("data-rows") ?? "[]") as Array<Record<string, unknown>>;
+    return { chart, rows };
+  }
+
+  it("renders a BarChart with shaped rows for memory data", async () => {
     canvasesListCanvasMemories.mockResolvedValue({
       data: {
         items: [
@@ -1299,14 +1369,16 @@ describe("WidgetBlock render: chart", () => {
     await waitFor(() => {
       expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
     });
-    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
-    expect(code).toContain("xychart-beta");
-    expect(code).toContain('x-axis ["alpha", "beta"]');
-    expect(code).toContain("bar [30, 60]");
-    expect(code).toContain('title "Provisioning"');
+    const { rows } = readBarChart();
+    expect(rows).toEqual([
+      { x: "alpha", y: 30 },
+      { x: "beta", y: 60 },
+    ]);
+    const bar = screen.getByTestId("rc-bar-y");
+    expect(bar.getAttribute("data-fill")).toBe("var(--chart-1)");
   });
 
-  it("emits xychart-beta source with line series for executions rows", async () => {
+  it("renders a LineChart for executions rows", async () => {
     mockEventsResponse([
       { ...samplePassedEvent, id: "ev-a", data: { metric: 10 } },
       { ...samplePassedEvent, id: "ev-b", data: { metric: 20 } },
@@ -1323,8 +1395,38 @@ describe("WidgetBlock render: chart", () => {
     await waitFor(() => {
       expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
     });
-    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
-    expect(code).toContain("line [10, 20]");
+    const chart = screen.getByTestId("rc-linechart");
+    const rows = JSON.parse(chart.getAttribute("data-rows") ?? "[]") as Array<Record<string, unknown>>;
+    expect(rows).toEqual([
+      { x: "ev-a", y: 10 },
+      { x: "ev-b", y: 20 },
+    ]);
+  });
+
+  it("renders an AreaChart for type: area and respects color: blue", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { name: "alpha", duration: 30 } },
+          { id: "b", namespace: "envs", values: { name: "beta", duration: 60 } },
+        ],
+      },
+    });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: chart\n  chart:\n    type: area\n    x: name\n    y: duration\n    color: blue\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("rc-areachart")).toBeInTheDocument();
+    const area = screen.getByTestId("rc-area-y");
+    expect(area.getAttribute("data-fill")).toBe("var(--chart-3)");
+    expect(area.getAttribute("data-stroke")).toBe("var(--chart-3)");
   });
 
   it("collapses duplicate x values with chart.aggregate: avg", async () => {
@@ -1349,8 +1451,11 @@ describe("WidgetBlock render: chart", () => {
     await waitFor(() => {
       expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
     });
-    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
-    expect(code).toContain("bar [20, 50]");
+    const { rows } = readBarChart();
+    expect(rows).toEqual([
+      { x: "us", y: 20 },
+      { x: "eu", y: 50 },
+    ]);
   });
 
   it("drops non-numeric Y values before grouping", async () => {
@@ -1375,9 +1480,138 @@ describe("WidgetBlock render: chart", () => {
     await waitFor(() => {
       expect(screen.getByTestId("canvas-widget-block-chart")).toBeInTheDocument();
     });
-    const code = screen.getByTestId("mermaid-mock").textContent ?? "";
-    expect(code).toContain('x-axis ["alpha", "gamma"]');
-    expect(code).toContain("bar [30, 90]");
+    const { rows } = readBarChart();
+    expect(rows).toEqual([
+      { x: "alpha", y: 30 },
+      { x: "gamma", y: 90 },
+    ]);
+  });
+
+  it("renders an empty placeholder when no rows match", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({ data: { items: [] } });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: chart\n  chart:\n    type: bar\n    x: name\n    y: duration\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-chart-empty")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("rc-barchart")).toBeNull();
+  });
+
+  it("rejects unknown chart types", () => {
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: chart\n  chart:\n    type: pie\n    x: name\n    y: duration\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    expect(screen.getByTestId("canvas-widget-block-error").textContent).toContain('render.chart.type "pie"');
+  });
+});
+
+describe("WidgetBlock render: chart, type: stacked-bar", () => {
+  it("requires `group` and rejects without it", () => {
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: chart\n  chart:\n    type: stacked-bar\n    x: name\n    y: count\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    expect(screen.getByTestId("canvas-widget-block-error").textContent).toContain(
+      "render.chart.group is required for stacked-bar",
+    );
+  });
+
+  it("pivots rows into wide format with one Bar per group value", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "runs", values: { day: "Mon", status: "passed" } },
+          { id: "b", namespace: "runs", values: { day: "Mon", status: "failed" } },
+          { id: "c", namespace: "runs", values: { day: "Mon", status: "passed" } },
+          { id: "d", namespace: "runs", values: { day: "Tue", status: "passed" } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: runs\nrender:\n  kind: chart\n  chart:\n    type: stacked-bar\n    x: day\n    y: status\n    group: status\n    aggregate: count\n"
+        }
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("rc-barchart")).toBeInTheDocument();
+    });
+    const chart = screen.getByTestId("rc-barchart");
+    const rows = JSON.parse(chart.getAttribute("data-rows") ?? "[]") as Array<Record<string, unknown>>;
+    expect(rows).toEqual([
+      { x: "Mon", passed: 2, failed: 1 },
+      { x: "Tue", passed: 1, failed: 0 },
+    ]);
+    expect(screen.getByTestId("rc-bar-passed")).toBeInTheDocument();
+    expect(screen.getByTestId("rc-bar-failed")).toBeInTheDocument();
+    expect(screen.getByTestId("rc-bar-passed").getAttribute("data-stack-id")).toBe("a");
+    expect(screen.getByTestId("rc-bar-failed").getAttribute("data-stack-id")).toBe("a");
+  });
+});
+
+describe("WidgetBlock render: chart, type: donut", () => {
+  it("counts rows per `x` value when no aggregate is given", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "runs", values: { status: "passed" } },
+          { id: "b", namespace: "runs", values: { status: "passed" } },
+          { id: "c", namespace: "runs", values: { status: "failed" } },
+        ],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={"source: memory\nnamespace: runs\nrender:\n  kind: chart\n  chart:\n    type: donut\n    x: status\n"}
+        canvasId="c1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("rc-piechart")).toBeInTheDocument();
+    });
+    const pie = screen.getByTestId("rc-pie");
+    const data = JSON.parse(pie.getAttribute("data-rows") ?? "[]") as Array<Record<string, unknown>>;
+    expect(data).toEqual([
+      { name: "passed", value: 2 },
+      { name: "failed", value: 1 },
+    ]);
+    const cells = screen.getAllByTestId("rc-cell");
+    expect(cells).toHaveLength(2);
+  });
+
+  it("rejects donut with aggregate: sum but no `y`", () => {
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: runs\nrender:\n  kind: chart\n  chart:\n    type: donut\n    x: status\n    aggregate: sum\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    expect(screen.getByTestId("canvas-widget-block-error").textContent).toContain(
+      "render.chart.y is required when donut uses aggregate other than count",
+    );
   });
 });
 
@@ -1491,6 +1725,75 @@ describe("WidgetBlock render: number", () => {
       expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
     });
     expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("does not render a sparkline by default", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { dur: 10 } },
+          { id: "b", namespace: "envs", values: { dur: 20 } },
+        ],
+      },
+    });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: dur\n    aggregate: avg\n    label: Avg\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("canvas-widget-block-number-sparkline")).toBeNull();
+  });
+
+  it("renders a sparkline area chart when sparkline: true", async () => {
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [
+          { id: "a", namespace: "envs", values: { dur: 10 } },
+          { id: "b", namespace: "envs", values: { dur: 30 } },
+          { id: "c", namespace: "envs", values: { dur: 50 } },
+        ],
+      },
+    });
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: dur\n    aggregate: avg\n    label: Avg\n    sparkline: true\n"
+        }
+        canvasId="c1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-number-sparkline")).toBeInTheDocument();
+    });
+    const sparkline = screen.getByTestId("canvas-widget-block-number-sparkline");
+    const area = sparkline.querySelector('[data-testid="rc-areachart"]');
+    expect(area).not.toBeNull();
+    const rows = JSON.parse(area!.getAttribute("data-rows") ?? "[]") as Array<Record<string, unknown>>;
+    expect(rows).toEqual([
+      { i: 0, y: 10 },
+      { i: 1, y: 30 },
+      { i: 2, y: 50 },
+    ]);
+  });
+
+  it("rejects render.number.sparkline when not boolean", () => {
+    renderWithClient(
+      <WidgetBlock
+        body={
+          'source: memory\nnamespace: envs\nrender:\n  kind: number\n  number:\n    field: dur\n    aggregate: avg\n    label: Avg\n    sparkline: "yes"\n'
+        }
+        canvasId="c1"
+      />,
+    );
+    expect(screen.getByTestId("canvas-widget-block-error").textContent).toContain(
+      "render.number.sparkline must be a boolean",
+    );
   });
 });
 

@@ -17,7 +17,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { NodeChipContext } from "./CanvasMarkdown";
-import { MermaidDiagram } from "./MermaidDiagram";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
 //
 // Authored as a fenced ```widget code block (or the deprecated ```query alias)
@@ -147,12 +161,23 @@ type ActionSpec = TriggerActionSpec | ApproveActionSpec | CancelActionSpec | Pus
 type AggregateOp = "avg" | "sum" | "min" | "max" | "count";
 const AGGREGATE_OPS: readonly AggregateOp[] = ["avg", "sum", "min", "max", "count"];
 
+type ChartType = "bar" | "line" | "area" | "stacked-bar" | "donut";
+const CHART_TYPES: readonly ChartType[] = ["bar", "line", "area", "stacked-bar", "donut"];
+
+type ChartColorKeyword = "blue" | "green" | "red" | "yellow" | "gray";
+const CHART_COLORS: readonly ChartColorKeyword[] = ["blue", "green", "red", "yellow", "gray"];
+
 interface ChartSpec {
-  type: "bar" | "line";
+  type: ChartType;
   x: string;
-  y: string;
+  /** Required for bar | line | area | stacked-bar. Optional for donut. */
+  y?: string;
+  /** Required for stacked-bar; ignored elsewhere. Dot-path. */
+  group?: string;
   label?: string;
   aggregate?: AggregateOp;
+  /** Single-series only (bar | line | area). Ignored for stacked-bar / donut. */
+  color?: ChartColorKeyword;
 }
 
 interface NumberSpec {
@@ -160,6 +185,8 @@ interface NumberSpec {
   aggregate: AggregateOp;
   label: string;
   format: "number" | "duration" | "percent";
+  /** When true, renders a small area chart of per-row values behind the stat. */
+  sparkline: boolean;
 }
 
 type RenderSpec = { kind: "table" } | { kind: "chart"; chart: ChartSpec } | { kind: "number"; number: NumberSpec };
@@ -572,14 +599,43 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
     if (!isPlainObject(chart)) {
       return { kind: "error", error: { message: "Invalid widget block: `render.chart` must be an object" } };
     }
-    if (chart.type !== "bar" && chart.type !== "line") {
-      return { kind: "error", error: { message: 'Invalid widget block: `render.chart.type` must be "bar" or "line"' } };
+    if (typeof chart.type !== "string" || !(CHART_TYPES as readonly string[]).includes(chart.type)) {
+      return {
+        kind: "error",
+        error: { message: `Invalid widget block: render.chart.type "${String(chart.type)}" is not supported` },
+      };
     }
+    const type = chart.type as ChartType;
     if (typeof chart.x !== "string" || chart.x.trim() === "") {
       return { kind: "error", error: { message: "Invalid widget block: `render.chart.x` is required" } };
     }
-    if (typeof chart.y !== "string" || chart.y.trim() === "") {
-      return { kind: "error", error: { message: "Invalid widget block: `render.chart.y` is required" } };
+    let y: string | undefined;
+    if (type !== "donut") {
+      if (typeof chart.y !== "string" || chart.y.trim() === "") {
+        return {
+          kind: "error",
+          error: { message: `Invalid widget block: render.chart.y is required for ${type}` },
+        };
+      }
+      y = chart.y;
+    } else if (chart.y !== undefined) {
+      if (typeof chart.y !== "string" || chart.y.trim() === "") {
+        return {
+          kind: "error",
+          error: { message: "Invalid widget block: `render.chart.y` must be a non-empty string" },
+        };
+      }
+      y = chart.y;
+    }
+    let group: string | undefined;
+    if (type === "stacked-bar") {
+      if (typeof chart.group !== "string" || chart.group.trim() === "") {
+        return {
+          kind: "error",
+          error: { message: "Invalid widget block: render.chart.group is required for stacked-bar" },
+        };
+      }
+      group = chart.group;
     }
     let aggregate: AggregateOp | undefined;
     if (chart.aggregate !== undefined) {
@@ -593,16 +649,39 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
       }
       aggregate = chart.aggregate as AggregateOp;
     }
+    if (type === "donut" && aggregate && aggregate !== "count" && !y) {
+      return {
+        kind: "error",
+        error: {
+          message: "Invalid widget block: render.chart.y is required when donut uses aggregate other than count",
+        },
+      };
+    }
+    let color: ChartColorKeyword | undefined;
+    if (chart.color !== undefined) {
+      if (typeof chart.color !== "string") {
+        return { kind: "error", error: { message: "Invalid widget block: `render.chart.color` must be a string" } };
+      }
+      if ((CHART_COLORS as readonly string[]).includes(chart.color)) {
+        color = chart.color as ChartColorKeyword;
+      } else {
+        // Unknown color falls back to the default palette slot rather than failing.
+        // eslint-disable-next-line no-console
+        console.warn(`[WidgetBlock] Unknown chart color "${chart.color}", falling back to default`);
+      }
+    }
     return {
       kind: "ok",
       value: {
         kind: "chart",
         chart: {
-          type: chart.type,
+          type,
           x: chart.x,
-          y: chart.y,
+          y,
+          group,
           label: typeof chart.label === "string" ? chart.label : undefined,
           aggregate,
+          color,
         },
       },
     };
@@ -638,11 +717,18 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
       }
       format = num.format;
     }
+    let sparkline = false;
+    if (num.sparkline !== undefined) {
+      if (typeof num.sparkline !== "boolean") {
+        return { kind: "error", error: { message: "Invalid widget block: render.number.sparkline must be a boolean" } };
+      }
+      sparkline = num.sparkline;
+    }
     return {
       kind: "ok",
       value: {
         kind: "number",
-        number: { field: num.field, aggregate: num.aggregate as AggregateOp, label: num.label, format },
+        number: { field: num.field, aggregate: num.aggregate as AggregateOp, label: num.label, format, sparkline },
       },
     };
   }
@@ -1274,28 +1360,35 @@ function TableRenderer({ rows, columns, actions, nodeRefs }: BaseRowsRenderProps
   );
 }
 
-function ChartRenderer({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
-  const code = useMemo(() => buildXyChartSource(rows, chart), [rows, chart]);
-  return (
-    <div data-testid="canvas-widget-block-chart">
-      <MermaidDiagram code={code} />
-    </div>
-  );
-}
+//
+// Chart palette
+//
 
-function aggregatePoints(points: Array<[string, number]>, op: AggregateOp): Array<[string, number]> {
-  const groups = new Map<string, number[]>();
-  for (const [x, y] of points) {
-    const arr = groups.get(x) ?? [];
-    arr.push(y);
-    groups.set(x, arr);
-  }
-  const out: Array<[string, number]> = [];
-  for (const [x, ys] of groups) {
-    out.push([x, applyAggregate(ys, op)]);
-  }
-  return out;
-}
+const CHART_PALETTE = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+] as const;
+
+const COLOR_KEYWORD_TO_VAR: Record<ChartColorKeyword, string> = {
+  // Mapped semantically against the existing five-slot palette in App.css
+  // (orange / teal / blue / yellow / gold).
+  red: "var(--chart-1)",
+  green: "var(--chart-2)",
+  blue: "var(--chart-3)",
+  yellow: "var(--chart-4)",
+  gray: "var(--chart-5)",
+};
+
+const CHART_ANIMATION_MS = 300;
+const CHART_HEIGHT = 240;
+const SPARKLINE_HEIGHT = 40;
+
+//
+// Aggregate helper (reused by NumberRenderer + chart shapers).
+//
 
 function applyAggregate(values: number[], op: AggregateOp): number {
   if (op === "count") return values.length;
@@ -1307,38 +1400,307 @@ function applyAggregate(values: number[], op: AggregateOp): number {
   return NaN;
 }
 
-function buildXyChartSource(rows: Record<string, unknown>[], chart: ChartSpec): string {
+//
+// Data shapers — convert widget rows into the shape Recharts expects.
+//
+
+function coerceNumber(raw: unknown): number {
+  if (typeof raw === "number") return raw;
+  return Number(stringifyCell(raw));
+}
+
+interface XYPoint {
+  x: string;
+  y: number;
+}
+
+function shapeXY(rows: Record<string, unknown>[], chart: ChartSpec): XYPoint[] {
   const points: Array<[string, number]> = [];
   for (const row of rows) {
-    const xRaw = stringifyCell(getByPath(row, chart.x));
-    if (xRaw === "") continue;
-    const yRaw = getByPath(row, chart.y);
-    const y = typeof yRaw === "number" ? yRaw : Number(stringifyCell(yRaw));
+    const x = stringifyCell(getByPath(row, chart.x));
+    if (x === "") continue;
+    const y = coerceNumber(getByPath(row, chart.y!));
     if (!Number.isFinite(y)) continue;
-    points.push([xRaw, y]);
+    points.push([x, y]);
   }
-  const grouped = chart.aggregate ? aggregatePoints(points, chart.aggregate) : points;
-  const xLabels = grouped.map(([x]) => `"${escapeMermaidString(x)}"`).join(", ");
-  const yValues = grouped.map(([, y]) => formatChartNumber(y)).join(", ");
-  const series = chart.type === "line" ? `line [${yValues}]` : `bar [${yValues}]`;
-  const titleLine = chart.label ? `  title "${escapeMermaidString(chart.label)}"` : undefined;
-  const yAxisLine = chart.label ? `  y-axis "${escapeMermaidString(chart.label)}"` : undefined;
-  const lines = ["xychart-beta", titleLine, `  x-axis [${xLabels}]`, yAxisLine, `  ${series}`].filter(Boolean);
-  return lines.join("\n");
+  if (!chart.aggregate) {
+    return points.map(([x, y]) => ({ x, y }));
+  }
+  const groups = new Map<string, number[]>();
+  for (const [x, y] of points) {
+    const arr = groups.get(x) ?? [];
+    arr.push(y);
+    groups.set(x, arr);
+  }
+  const out: XYPoint[] = [];
+  for (const [x, ys] of groups) out.push({ x, y: applyAggregate(ys, chart.aggregate) });
+  return out;
 }
 
-function escapeMermaidString(value: string): string {
-  return value.replace(/"/g, "'");
+interface StackedShape {
+  data: Array<Record<string, string | number>>;
+  groups: string[];
 }
 
-function formatChartNumber(value: number): string {
-  if (!Number.isFinite(value)) return "0";
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+function shapeStacked(rows: Record<string, unknown>[], chart: ChartSpec): StackedShape {
+  const op: AggregateOp = chart.aggregate ?? "sum";
+  // Map of x -> group -> values[]
+  const buckets = new Map<string, Map<string, number[]>>();
+  const xOrder: string[] = [];
+  const groupOrder: string[] = [];
+  for (const row of rows) {
+    const x = stringifyCell(getByPath(row, chart.x));
+    if (x === "") continue;
+    const g = stringifyCell(getByPath(row, chart.group!));
+    if (g === "") continue;
+    let y = 0;
+    if (op !== "count") {
+      const yRaw = coerceNumber(getByPath(row, chart.y!));
+      if (!Number.isFinite(yRaw)) continue;
+      y = yRaw;
+    }
+    if (!buckets.has(x)) {
+      buckets.set(x, new Map());
+      xOrder.push(x);
+    }
+    const inner = buckets.get(x)!;
+    if (!inner.has(g)) {
+      inner.set(g, []);
+      if (!groupOrder.includes(g)) groupOrder.push(g);
+    }
+    inner.get(g)!.push(y);
+  }
+  const data: Array<Record<string, string | number>> = [];
+  for (const x of xOrder) {
+    const inner = buckets.get(x)!;
+    const row: Record<string, string | number> = { x };
+    for (const g of groupOrder) {
+      const values = inner.get(g);
+      row[g] = values ? applyAggregate(values, op) : 0;
+    }
+    data.push(row);
+  }
+  return { data, groups: groupOrder };
 }
+
+interface DonutSlice {
+  name: string;
+  value: number;
+}
+
+function shapeDonut(rows: Record<string, unknown>[], chart: ChartSpec): DonutSlice[] {
+  const op: AggregateOp = chart.aggregate ?? "count";
+  const buckets = new Map<string, number[]>();
+  const order: string[] = [];
+  for (const row of rows) {
+    const name = stringifyCell(getByPath(row, chart.x));
+    if (name === "") continue;
+    let y = 0;
+    if (op !== "count") {
+      const yRaw = coerceNumber(getByPath(row, chart.y!));
+      if (!Number.isFinite(yRaw)) continue;
+      y = yRaw;
+    }
+    if (!buckets.has(name)) {
+      buckets.set(name, []);
+      order.push(name);
+    }
+    buckets.get(name)!.push(y);
+  }
+  const out: DonutSlice[] = [];
+  for (const name of order) {
+    const values = buckets.get(name)!;
+    const value = applyAggregate(values, op);
+    if (Number.isFinite(value)) out.push({ name, value });
+  }
+  return out;
+}
+
+function collectSparklineSeries(rows: Record<string, unknown>[], number: NumberSpec): Array<{ i: number; y: number }> {
+  const out: Array<{ i: number; y: number }> = [];
+  let i = 0;
+  for (const row of rows) {
+    const raw = getByPath(row, number.field);
+    const y = typeof raw === "number" ? raw : Number(stringifyCell(raw));
+    if (!Number.isFinite(y)) continue;
+    out.push({ i: i++, y });
+  }
+  return out;
+}
+
+//
+// Chart renderers
+//
+
+function ChartEmpty({ testId }: { testId: string }) {
+  return (
+    <div
+      data-testid={testId}
+      className="my-2 flex items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-xs text-slate-500"
+    >
+      No data
+    </div>
+  );
+}
+
+function ChartRenderer({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
+  if (chart.type === "donut") return <DonutInner rows={rows} chart={chart} />;
+  if (chart.type === "stacked-bar") return <StackedBarInner rows={rows} chart={chart} />;
+  return <SingleSeriesInner rows={rows} chart={chart} />;
+}
+
+function SingleSeriesInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
+  const data = useMemo(() => shapeXY(rows, chart), [rows, chart]);
+  const colorVar = chart.color ? COLOR_KEYWORD_TO_VAR[chart.color] : "var(--chart-1)";
+  const seriesKey = "y";
+  const seriesLabel = chart.label ?? "Value";
+  const config: ChartConfig = useMemo(
+    () => ({ [seriesKey]: { label: seriesLabel, color: colorVar } }),
+    [seriesLabel, colorVar],
+  );
+
+  if (data.length === 0) return <ChartEmpty testId="canvas-widget-block-chart-empty" />;
+
+  return (
+    <div data-testid="canvas-widget-block-chart" data-chart-type={chart.type} className="my-2">
+      <ChartContainer config={config} className="aspect-auto" style={{ height: CHART_HEIGHT }}>
+        {chart.type === "bar" ? (
+          <BarChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
+            <YAxis tickLine={false} axisLine={false} width={32} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Bar
+              dataKey={seriesKey}
+              fill={colorVar}
+              radius={[4, 4, 0, 0]}
+              isAnimationActive
+              animationDuration={CHART_ANIMATION_MS}
+            />
+          </BarChart>
+        ) : chart.type === "line" ? (
+          <LineChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
+            <YAxis tickLine={false} axisLine={false} width={32} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Line
+              dataKey={seriesKey}
+              type="monotone"
+              stroke={colorVar}
+              strokeWidth={2}
+              dot={data.length === 1}
+              isAnimationActive
+              animationDuration={CHART_ANIMATION_MS}
+            />
+          </LineChart>
+        ) : (
+          <AreaChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
+            <YAxis tickLine={false} axisLine={false} width={32} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Area
+              dataKey={seriesKey}
+              type="monotone"
+              stroke={colorVar}
+              fill={colorVar}
+              fillOpacity={0.25}
+              strokeWidth={2}
+              isAnimationActive
+              animationDuration={CHART_ANIMATION_MS}
+            />
+          </AreaChart>
+        )}
+      </ChartContainer>
+    </div>
+  );
+}
+
+function StackedBarInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
+  const { data, groups } = useMemo(() => shapeStacked(rows, chart), [rows, chart]);
+  const config: ChartConfig = useMemo(() => {
+    const cfg: ChartConfig = {};
+    groups.forEach((g, i) => {
+      cfg[g] = { label: g, color: CHART_PALETTE[i % CHART_PALETTE.length] };
+    });
+    return cfg;
+  }, [groups]);
+
+  if (data.length === 0 || groups.length === 0) {
+    return <ChartEmpty testId="canvas-widget-block-chart-empty" />;
+  }
+
+  return (
+    <div data-testid="canvas-widget-block-chart" data-chart-type="stacked-bar" className="my-2">
+      <ChartContainer config={config} className="aspect-auto" style={{ height: CHART_HEIGHT }}>
+        <BarChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
+          <YAxis tickLine={false} axisLine={false} width={32} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          {groups.map((g, i) => (
+            <Bar
+              key={g}
+              dataKey={g}
+              stackId="a"
+              fill={CHART_PALETTE[i % CHART_PALETTE.length]}
+              radius={i === groups.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+              isAnimationActive
+              animationDuration={CHART_ANIMATION_MS}
+            />
+          ))}
+        </BarChart>
+      </ChartContainer>
+    </div>
+  );
+}
+
+function DonutInner({ rows, chart }: { rows: Record<string, unknown>[]; chart: ChartSpec }) {
+  const data = useMemo(() => shapeDonut(rows, chart), [rows, chart]);
+  const config: ChartConfig = useMemo(() => {
+    const cfg: ChartConfig = {};
+    data.forEach((slice, i) => {
+      cfg[slice.name] = { label: slice.name, color: CHART_PALETTE[i % CHART_PALETTE.length] };
+    });
+    return cfg;
+  }, [data]);
+
+  if (data.length === 0) return <ChartEmpty testId="canvas-widget-block-chart-empty" />;
+
+  return (
+    <div data-testid="canvas-widget-block-chart" data-chart-type="donut" className="my-2">
+      <ChartContainer config={config} className="aspect-auto" style={{ height: CHART_HEIGHT }}>
+        <PieChart>
+          <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={50}
+            outerRadius={80}
+            paddingAngle={2}
+            isAnimationActive
+            animationDuration={CHART_ANIMATION_MS}
+          >
+            {data.map((slice, i) => (
+              <Cell key={slice.name} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+    </div>
+  );
+}
+
+//
+// Number renderer (with optional sparkline).
+//
 
 function NumberRenderer({ rows, number }: { rows: Record<string, unknown>[]; number: NumberSpec }) {
   const value = useMemo(() => computeNumberAggregate(rows, number), [rows, number]);
   const display = formatNumberValue(value, number.format);
+  const sparkPoints = useMemo(() => (number.sparkline ? collectSparklineSeries(rows, number) : null), [rows, number]);
   return (
     <div
       data-testid="canvas-widget-block-number"
@@ -1346,6 +1708,31 @@ function NumberRenderer({ rows, number }: { rows: Record<string, unknown>[]; num
     >
       <span className="text-3xl font-semibold text-slate-800">{display}</span>
       <span className="text-xs uppercase tracking-wide text-slate-500">{number.label}</span>
+      {sparkPoints && sparkPoints.length > 1 ? <SparklineInner points={sparkPoints} /> : null}
+    </div>
+  );
+}
+
+const SPARKLINE_CONFIG: ChartConfig = {
+  y: { label: "value", color: "var(--chart-1)" },
+};
+
+function SparklineInner({ points }: { points: Array<{ i: number; y: number }> }) {
+  return (
+    <div data-testid="canvas-widget-block-number-sparkline" className="mt-2 w-full">
+      <ChartContainer config={SPARKLINE_CONFIG} className="aspect-auto" style={{ height: SPARKLINE_HEIGHT }}>
+        <AreaChart data={points} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+          <Area
+            dataKey="y"
+            type="monotone"
+            stroke="var(--chart-1)"
+            fill="var(--chart-1)"
+            fillOpacity={0.25}
+            strokeWidth={1.5}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ChartContainer>
     </div>
   );
 }
