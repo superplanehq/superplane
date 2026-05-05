@@ -165,7 +165,30 @@ go test ./test/... -v
 
 The pipeline definition is [.semaphore/semaphore.yml](.semaphore/semaphore.yml).
 
-In [Semaphore](https://semaphoreci.com/), create a **new project from this Git repository**. Semaphore 2.x picks up `.semaphore/semaphore.yml` on the default branch. Each push runs Go **1.22** on Ubuntu 22.04: module cache restore/store, **`gofmt` check**, **`go vet`**, **`make build`**, **`go test ./...`**.
+In [Semaphore](https://semaphoreci.com/), create a **new project from this Git repository**. Semaphore 2.x picks up `.semaphore/semaphore.yml` on the default branch. Each push runs Go **1.22** on Ubuntu **24.04**: module cache restore/store, **`gofmt` check**, **`go vet`**, **`make build`**, **`go test ./...`**.
+
+### Container images → GitHub Container Registry (GHCR)
+
+Publishing runs in [.semaphore/docker-publish.yml](.semaphore/docker-publish.yml); [.semaphore/semaphore.yml](.semaphore/semaphore.yml) promotes it via `pipeline_file: docker-publish.yml` (path relative to the `.semaphore/` directory).
+
+When **Build and test** completes with **`passed`**, Semaphore **[auto-promotes](https://docs.semaphoreci.com/using-semaphore/promotions)** only for the **`main`** branch.
+
+**Tags** (`v1.2.3`, etc.) and other branches do **not** auto-publish — run promotion **Publish Docker images to GHCR** manually from a finished pipeline in the Semaphore UI when you want images for those refs.
+
+Images are tagged as **`ghcr.io/<github-owner>/<repo>/<service>`** with:
+
+- **`fleet-manager`**, **`task-broker`**, **`runner`** as the `<service>` name  
+- A **12-character commit SHA** tag on every qualifying run  
+- **`latest`** only when publishing a **`main`** branch workflow  
+- The **literal git tag name** when the workflow is triggered by **`v*`** tags  
+
+**Semaphore setup**
+
+1. In GitHub, create a [**personal access token (classic)**](https://docs.github.com/en/packages/learn-github-packages/publishing-and-managing-packages/publishing-docker-images) (or organization-level bot PAT) with at least **`read:packages`** and **`write:packages`**. SSO-enabled orgs must **authorize** the token for that org.
+
+2. In Semaphore: **Secrets** → create a secret named exactly **`ghcr`** with environment variables **`GHCR_USERNAME`** (your GitHub username or the PAT owner account) and **`GHCR_TOKEN`** (the PAT value).
+
+For private packages, configure visibility under **GitHub → Packages** after the first successful push.
 
 ## License
 

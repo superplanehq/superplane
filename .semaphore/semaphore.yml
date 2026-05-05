@@ -7,6 +7,12 @@ agent:
     type: f1-standard-2
     os_image: ubuntu2404
 
+promotions:
+  - name: Publish Docker images to GHCR
+    pipeline_file: docker-publish.yml
+    auto_promote:
+      when: "result = 'passed' and branch = 'main'"
+
 blocks:
   - name: Build and test
     task:
