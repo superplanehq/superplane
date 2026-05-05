@@ -222,6 +222,7 @@ type CapabilityContext interface {
 	Clear()
 	IsRequested(capabilities ...string) bool
 	Requested() []string
+	Enabled() []string
 }
 
 type CapabilityGroup struct {

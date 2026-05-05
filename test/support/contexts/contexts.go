@@ -585,3 +585,7 @@ func (c *CapabilityContext) IsRequested(capabilities ...string) bool {
 func (c *CapabilityContext) Requested() []string {
 	return c.RequestedCapabilties
 }
+
+func (c *CapabilityContext) Enabled() []string {
+	return c.EnabledCapabilities
+}
