@@ -200,11 +200,7 @@ func renderConfigurationText(stdout io.Writer, configuration []openapi_client.Co
 		_, _ = fmt.Fprintf(writer, "  %s\t%s\t%s\t%s\n", field.GetName(), field.GetType(), required, field.GetDescription())
 	}
 
-	if err := writer.Flush(); err != nil {
-		return err
-	}
-
-	return nil
+	return writer.Flush()
 }
 
 func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]interface{}) error {
