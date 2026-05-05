@@ -59,7 +59,7 @@ function CliConnectSection({
   handleGenerateConnect,
 }: {
   organizationId: string;
-  connectCommand: string | undefined;
+  connectCommand: string | null;
   generating: boolean;
   handleGenerateConnect: () => void;
 }) {
