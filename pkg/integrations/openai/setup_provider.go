@@ -18,6 +18,7 @@ const (
 	SetupStepCapabilitySelection = "capabilitySelection"
 	SetupStepEnterAPIKey         = "enterAPIKey"
 	SetupStepEnterBaseURL        = "enterBaseURL"
+	SetupStepUpdatePermissions   = "updatePermissions"
 	SetupStepDone                = "done"
 )
 
@@ -36,6 +37,9 @@ const (
 
 //go:embed templates/api-key-instructions.tpl
 var apiKeyInstructionsTemplate []byte
+
+//go:embed templates/api-key-update-instructions.tpl
+var apiKeyUpdateInstructionsTemplate []byte
 
 //go:embed templates/base-url-instructions.tpl
 var baseURLInstructionsTemplate []byte
@@ -58,6 +62,13 @@ func apiKeyField() configuration.Field {
 		Sensitive:   true,
 		Description: apiKeyDescription,
 	}
+}
+
+func optionalAPIKeyField() configuration.Field {
+	field := apiKeyField()
+	field.Required = false
+	field.Description = "Optional replacement OpenAI API key"
+	return field
 }
 
 func baseURLField() configuration.Field {
@@ -134,12 +145,34 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 
 func (s *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
 	requested, ok := ctx.Changes[core.IntegrationCapabilityStateRequested]
-	if !ok {
+	if !ok || len(requested) == 0 {
 		return nil, errors.New("no requested capabilities")
 	}
 
-	ctx.Capabilities.Enable(requested...)
-	return nil, nil
+	mapper := NewCapabilityMapper()
+	existingPermissions := mapper.PermissionSet(ctx.Capabilities.Enabled(), true)
+	requestedPermissions := mapper.PermissionSet(requested, false)
+	newPermissions := FindPermissionUpdates(existingPermissions, requestedPermissions)
+	if newPermissions.IsEmpty() {
+		ctx.Capabilities.Enable(requested...)
+		return nil, nil
+	}
+
+	ctx.Capabilities.Request(requested...)
+	instructions, err := renderAPIKeyUpdateInstructions(newPermissions.ForHuman())
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.SetupStep{
+		Type:  core.SetupStepTypeInputs,
+		Name:  SetupStepUpdatePermissions,
+		Label: "Update OpenAI API key permissions",
+		Inputs: []configuration.Field{
+			optionalAPIKeyField(),
+		},
+		Instructions: instructions,
+	}, nil
 }
 
 func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
@@ -170,6 +203,8 @@ func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 		return s.onEnterBaseURLSubmit(ctx.Step.Inputs, ctx)
 	case SetupStepEnterAPIKey:
 		return s.onEnterAPIKeySubmit(ctx.Step.Inputs, ctx)
+	case SetupStepUpdatePermissions:
+		return s.onUpdatePermissionsSubmit(ctx.Step.Inputs, ctx)
 	}
 
 	return nil, errors.New("unknown step")
@@ -203,6 +238,8 @@ func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 		return s.onEnterBaseURLRevert(ctx)
 	case SetupStepEnterAPIKey:
 		return s.onEnterAPIKeyRevert(ctx)
+	case SetupStepUpdatePermissions:
+		return nil
 	}
 
 	return errors.New("unknown step")
@@ -310,6 +347,11 @@ func (s *SetupProvider) onEnterBaseURLSubmit(inputs any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error creating property: %v", err)
 	}
 
+	instructions, err := renderAPIKeyInstructions(baseURL, ctx.Capabilities.Requested())
+	if err != nil {
+		return nil, err
+	}
+
 	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
 		Name:  SetupStepEnterAPIKey,
@@ -317,8 +359,33 @@ func (s *SetupProvider) onEnterBaseURLSubmit(inputs any, ctx core.SetupStepConte
 		Inputs: []configuration.Field{
 			apiKeyField(),
 		},
-		Instructions: string(apiKeyInstructionsTemplate),
+		Instructions: instructions,
 	}, nil
+}
+
+func (s *SetupProvider) onUpdatePermissionsSubmit(inputs any, ctx core.SetupStepContext) (*core.SetupStep, error) {
+	apiKey, err := parseOptionalAPIKeyInput(inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	if apiKey != "" {
+		baseURL, err := ctx.Properties.GetString(PropertyBaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("error getting Base URL: %v", err)
+		}
+
+		if err := common.NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
+			return nil, err
+		}
+
+		if err := ctx.Secrets.Update(SecretAPIKey, apiKey); err != nil {
+			return nil, fmt.Errorf("error updating secret: %v", err)
+		}
+	}
+
+	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+	return nil, nil
 }
 
 func renderBaseURLInstructions() (string, error) {
@@ -339,6 +406,39 @@ func renderBaseURLInstructions() (string, error) {
 	return buf.String(), nil
 }
 
+func renderAPIKeyInstructions(baseURL string, capabilities []string) (string, error) {
+	permissions := NewCapabilityMapper().PermissionSet(capabilities, true).ForHuman()
+	return renderAPIKeyTemplate("apiKey", apiKeyInstructionsTemplate, baseURL, permissions)
+}
+
+func renderAPIKeyUpdateInstructions(permissions []Permission) (string, error) {
+	return renderAPIKeyTemplate("apiKeyUpdate", apiKeyUpdateInstructionsTemplate, "", permissions)
+}
+
+func renderAPIKeyTemplate(name string, templateBytes []byte, baseURL string, permissions []Permission) (string, error) {
+	tmpl, err := template.New(name).Parse(string(templateBytes))
+	if err != nil {
+		return "", fmt.Errorf("error parsing template: %v", err)
+	}
+
+	data := map[string]any{
+		"BaseURL":          baseURL,
+		"IsDefaultBaseURL": isDefaultBaseURL(baseURL),
+		"Permissions":      permissions,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("error executing template: %v", err)
+	}
+
+	return buf.String(), nil
+}
+
+func isDefaultBaseURL(baseURL string) bool {
+	return strings.TrimSpace(baseURL) == "" || strings.TrimSpace(baseURL) == common.DefaultBaseURL
+}
+
 func parseAPIKeyInput(inputs any) (string, error) {
 	m, ok := inputs.(map[string]any)
 	if !ok {
@@ -355,6 +455,19 @@ func parseBaseURLInput(inputs any) (string, error) {
 	}
 
 	return optionalStringInput(m, PropertyBaseURL, "invalid base URL")
+}
+
+func parseOptionalAPIKeyInput(inputs any) (string, error) {
+	if inputs == nil {
+		return "", nil
+	}
+
+	m, ok := inputs.(map[string]any)
+	if !ok {
+		return "", errors.New("invalid input")
+	}
+
+	return optionalStringInput(m, SecretAPIKey, "invalid API key")
 }
 
 func requiredStringInput(input map[string]any, name, invalidMessage, requiredMessage string) (string, error) {
