@@ -45,10 +45,10 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		"true or false: whether magic-link, password, and email sign-in may auto-accept pending email invitations",
 	)
 	core.Bind(updateCmd, &updateCommand{
-		name:                              &updateName,
-		description:                       &updateDescription,
-		changeManagementEnabled:           &updateChangeManagementEnabled,
-		allowedOAuthProvidersRaw:          &updateAllowedOAuthProviders,
+		name:                                &updateName,
+		description:                         &updateDescription,
+		changeManagementEnabled:             &updateChangeManagementEnabled,
+		allowedOAuthProvidersRaw:            &updateAllowedOAuthProviders,
 		allowDirectEmailInviteCompletionRaw: &updateAllowDirectEmailInviteCompletion,
 	}, options)
 
