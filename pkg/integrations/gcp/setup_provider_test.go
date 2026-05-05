@@ -300,6 +300,22 @@ func Test_GCP_SetupProvider_OnStepSubmit(t *testing.T) {
 		assert.Equal(t, "my-project", storedProject)
 	})
 
+	t.Run("enterWIFProvider normalizes IAM REST URL to canonical resource name", func(t *testing.T) {
+		props := contexts.NewIntegrationPropertyStorage()
+		ctx := newSetupCtx(props, &contexts.IntegrationContext{}, &contexts.HTTPContext{}, &contexts.CapabilityContext{})
+		ctx.Step = core.StepInfo{Name: SetupStepWIFProvider, Inputs: map[string]any{
+			PropertyWIFProvider: "https://iam.googleapis.com/v1/projects/999/locations/global/workloadIdentityPools/w-pool/providers/w-prov",
+			PropertyProjectID:   "my-project",
+		}}
+
+		next, err := s.OnStepSubmit(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		storedProvider, _ := props.GetString(PropertyWIFProvider)
+		assert.Equal(t, "//iam.googleapis.com/projects/999/locations/global/workloadIdentityPools/w-pool/providers/w-prov", storedProvider)
+		assert.Equal(t, SetupStepWIFServiceAccount, next.Name)
+	})
+
 	// --- enterWIFServiceAccount ---
 
 	t.Run("enterWIFServiceAccount with invalid input returns error", func(t *testing.T) {

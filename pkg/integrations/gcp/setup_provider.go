@@ -311,11 +311,11 @@ func (s *SetupProvider) onSelectConnectionMethodSubmit(ctx core.SetupStepContext
 			Inputs: []configuration.Field{
 				{
 					Name:        PropertyWIFProvider,
-					Label:       "Pool Provider Resource Name",
+					Label:       "Pool provider (resource name or URL)",
 					Type:        configuration.FieldTypeString,
 					Required:    true,
-					Description: "Full resource name of the OIDC provider.",
-					Placeholder: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/my-pool/providers/superplane",
+					Description: "OIDC provider resource name or full IAM URL from Google Cloud Console (for example https://iam.googleapis.com/v1/projects/…/providers/…). SuperPlane normalizes this to the //iam.googleapis.com/… resource name.",
+					Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
 				},
 				{
 					Name:        PropertyProjectID,
@@ -429,6 +429,12 @@ func (s *SetupProvider) onEnterWIFProviderSubmit(ctx core.SetupStepContext) (*co
 
 	provider = strings.TrimSpace(provider)
 	projectID = strings.TrimSpace(projectID)
+
+	normalizedProvider, err := NormalizeWorkloadIdentityProviderResourceName(provider)
+	if err != nil {
+		return nil, err
+	}
+	provider = normalizedProvider
 
 	if err := ctx.Properties.CreateMany([]core.IntegrationPropertyDefinition{
 		{Name: PropertyWIFProvider, Label: "WIF Pool Provider", Type: core.IntegrationPropertyTypeString, Value: provider, Editable: false},

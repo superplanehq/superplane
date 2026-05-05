@@ -13,9 +13,11 @@
    - Set **Audiences** to the pool provider resource name.
    - Set **Attribute mapping** to `google.subject=assertion.sub`
 
-   **Issuer URL must match OIDC discovery:** Open `{{.IssuerURL}}/.well-known/openid-configuration` in a browser. The JSON field `"issuer"` must be identical to what you paste as Issuer URL in GCP (scheme, host, no trailing slash). If your deployment sets `WEBHOOKS_BASE_URL` to a public or tunneled URL, that origin is what SuperPlane uses for OIDC—use it here (not e.g. `http://localhost:8000` if Google must reach a different public URL).
+   **Issuer URL must match OIDC discovery:** Open `{{.IssuerURL}}/.well-known/openid-configuration` in a browser. The JSON field `"issuer"` must be identical to what you paste as Issuer URL in GCP (scheme, host, no trailing slash).
 
-4. Copy the **Pool Provider Resource Name** from the provider details page. It looks like:
-   ~~~
-   //iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID
-   ~~~
+4. Copy the provider identifier from the provider details page. SuperPlane accepts either:
+   - The **resource name**:
+     ~~~
+     //iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID
+     ~~~
+   - Or the **IAM API URL** shown in the console or REST docs (for example `https://iam.googleapis.com/v1/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID`). SuperPlane extracts the resource name automatically.

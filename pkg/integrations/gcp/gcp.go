@@ -146,11 +146,11 @@ func (g *GCP) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "workloadIdentityProvider",
-			Label:       "Workload Identity Pool Provider Resource Name",
+			Label:       "Workload Identity pool provider (resource name or URL)",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Full resource name of the OIDC provider. Must match the audience configured in the provider.",
-			Placeholder: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/my-pool/providers/superplane",
+			Description: "OIDC provider resource name or full IAM URL from Google Cloud Console; must match the audience configured in the provider. SuperPlane normalizes this to //iam.googleapis.com/…",
+			Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "connectionMethod", Values: []string{ConnectionMethodWIF}},
 			},
@@ -300,6 +300,11 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 	if provider == "" {
 		return fmt.Errorf("Workload Identity Pool provider resource name is required")
 	}
+	normalizedProvider, err := NormalizeWorkloadIdentityProviderResourceName(provider)
+	if err != nil {
+		return fmt.Errorf("invalid workload identity provider: %w", err)
+	}
+	provider = normalizedProvider
 	projectID := strings.TrimSpace(config.WorkloadIdentityProjectID)
 	if projectID == "" {
 		return fmt.Errorf("Project ID is required for Workload Identity Federation")
