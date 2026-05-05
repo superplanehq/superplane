@@ -11,6 +11,8 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/openai/common"
+	"github.com/superplanehq/superplane/pkg/integrations/openai/components"
 )
 
 const (
@@ -66,7 +68,7 @@ func baseURLField() configuration.Field {
 		Type:        configuration.FieldTypeString,
 		Required:    false,
 		Description: baseURLDescription,
-		Placeholder: defaultBaseURL,
+		Placeholder: common.DefaultBaseURL,
 	}
 }
 
@@ -138,7 +140,7 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 			Label: "Models",
 			Capabilities: s.genCapabilities(
 				[]core.Action{
-					&CreateResponse{},
+					&components.CreateResponse{},
 				},
 				[]core.Trigger{},
 			),
@@ -246,7 +248,7 @@ func (s *SetupProvider) onBaseURLUpdate(ctx core.PropertyUpdateContext) (*core.S
 	}
 
 	baseURL := strings.TrimSpace(ctx.Value)
-	if err := NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
+	if err := common.NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
 		return nil, err
 	}
 
@@ -273,7 +275,7 @@ func (s *SetupProvider) onAPIKeyUpdate(ctx core.SecretUpdateContext) (*core.Setu
 	}
 
 	baseURL, _ := ctx.Properties.GetString(PropertyBaseURL)
-	if err := NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
+	if err := common.NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
 		return nil, err
 	}
 
@@ -317,7 +319,7 @@ func (s *SetupProvider) onEnterBaseURLSubmit(inputs any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error getting API key: %v", err)
 	}
 
-	if err := NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
+	if err := common.NewClientWithAPIKey(ctx.HTTP, apiKey, baseURL).Verify(); err != nil {
 		return nil, err
 	}
 
@@ -342,7 +344,7 @@ func renderBaseURLInstructions() (string, error) {
 	}
 
 	data := map[string]any{
-		"DefaultBaseURL": defaultBaseURL,
+		"DefaultBaseURL": common.DefaultBaseURL,
 	}
 
 	var buf bytes.Buffer

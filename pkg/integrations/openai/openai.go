@@ -6,6 +6,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/openai/common"
+	"github.com/superplanehq/superplane/pkg/integrations/openai/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -61,7 +63,7 @@ func (o *OpenAI) Configuration() []configuration.Field {
 
 func (o *OpenAI) Actions() []core.Action {
 	return []core.Action{
-		&CreateResponse{},
+		&components.CreateResponse{},
 	}
 }
 
@@ -89,7 +91,7 @@ func (o *OpenAI) Sync(ctx core.SyncContext) error {
 		}
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -111,7 +113,7 @@ func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContex
 		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
