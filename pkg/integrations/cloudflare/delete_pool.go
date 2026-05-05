@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -99,21 +98,7 @@ func (c *DeletePool) Setup(ctx core.SetupContext) error {
 }
 
 func (c *DeletePool) resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
-	meta := PoolNodeMetadata{}
-	if strings.Contains(poolID, "{{") {
-		meta.PoolName = poolID
-	} else {
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return fmt.Errorf("failed to create client: %w", err)
-		}
-		pool, err := client.GetPool(accountID, poolID)
-		if err != nil {
-			return fmt.Errorf("failed to get pool: %w", err)
-		}
-		meta.PoolName = pool.Name
-	}
-	return ctx.Metadata.Set(meta)
+	return resolvePoolMetadata(ctx, accountID, poolID)
 }
 
 func (c *DeletePool) Execute(ctx core.ExecutionContext) error {

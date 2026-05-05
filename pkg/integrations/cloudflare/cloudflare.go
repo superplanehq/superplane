@@ -83,6 +83,24 @@ func resolveAccountID(specAccountID string, integration core.IntegrationContext)
 	return accountIDFromIntegration(integration)
 }
 
+func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
+	meta := PoolNodeMetadata{}
+	if strings.Contains(poolID, "{{") {
+		meta.PoolName = poolID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		pool, err := client.GetPool(accountID, poolID)
+		if err != nil {
+			return fmt.Errorf("failed to get pool: %w", err)
+		}
+		meta.PoolName = pool.Name
+	}
+	return ctx.Metadata.Set(meta)
+}
+
 func (c *Cloudflare) Name() string {
 	return "cloudflare"
 }

@@ -342,6 +342,9 @@ func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
 	}
 
 	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+	if accountID == "" {
+		return errors.New("accountId is required")
+	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {

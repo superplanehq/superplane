@@ -48,7 +48,7 @@ export const deletePoolMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
     details["Pool ID"] = result.poolId?.toString() || "-";
