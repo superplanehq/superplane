@@ -1041,6 +1041,9 @@ function CanvasPage(props: CanvasPageProps) {
     [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
   );
 
+  const onPlaceholderAdd = props.onPlaceholderAdd;
+  const viewportRefProp = props.viewportRef;
+
   const handleBuildingBlocksShortcutOpen = useCallback(async () => {
     if (readOnly) {
       return;
@@ -1052,7 +1055,7 @@ function CanvasPage(props: CanvasPageProps) {
       return;
     }
 
-    if (!props.onPlaceholderAdd) {
+    if (!onPlaceholderAdd) {
       handleSidebarToggle(true);
       return;
     }
@@ -1064,13 +1067,13 @@ function CanvasPage(props: CanvasPageProps) {
     isCreatingStarterPlaceholderRef.current = true;
     try {
       const position = findFreePositionInViewport({
-        viewport: props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
+        viewport: viewportRefProp?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
         canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
         nodes: state.nodes || [],
         nodeSize: { width: 420, height: 200 },
         fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
       });
-      const placeholderId = await props.onPlaceholderAdd({ position });
+      const placeholderId = await onPlaceholderAdd({ position });
       if (!placeholderId) {
         handleSidebarToggle(true);
         return;
@@ -1082,7 +1085,15 @@ function CanvasPage(props: CanvasPageProps) {
     } finally {
       isCreatingStarterPlaceholderRef.current = false;
     }
-  }, [readOnly, templateNodeId, props, state.nodes, state.componentSidebar, handleSidebarToggle]);
+  }, [
+    readOnly,
+    templateNodeId,
+    onPlaceholderAdd,
+    viewportRefProp,
+    state.nodes,
+    state.componentSidebar,
+    handleSidebarToggle,
+  ]);
 
   useBuildingBlocksShortcut({
     disabled:

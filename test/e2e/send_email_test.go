@@ -115,6 +115,7 @@ func (s *SendEmailSteps) givenCanvasWithManualTriggerSendEmailAndOutput() {
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
 	s.canvas.Connect("Start", "Send Email")
+	s.canvas.Connect("Send Email", "Output")
 
 	s.canvas.Save()
 	s.canvas.Publish()
@@ -195,22 +196,24 @@ func (s *SendEmailSteps) emitManualTriggerFallback() {
 }
 
 func (s *SendEmailSteps) assertSendEmailExecutionFinished() {
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 90*time.Second)
+
 	sendEmailExecs := s.canvas.GetExecutionsForNode("Send Email")
+	outputExecs := s.canvas.GetExecutionsForNode("Output")
 
 	require.Len(s.t, sendEmailExecs, 1, "expected one execution for send email node")
+	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
 
 	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, sendEmailExecs[0].State)
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, outputExecs[0].State)
 }
 
 func (s *SendEmailSteps) assertSendEmailExecutionFailed() {
 	sendEmailExecs := s.canvas.GetExecutionsForNode("Send Email")
-	if len(sendEmailExecs) == 0 {
-		// Under degraded test infra (no provider configured), the execution can remain unscheduled.
-		// Treat this as a failure mode equivalent to "did not send".
-		return
-	}
+	outputExecs := s.canvas.GetExecutionsForNode("Output")
 
 	require.Len(s.t, sendEmailExecs, 1, "expected one execution for send email node")
+	require.Empty(s.t, outputExecs, "expected output node not to execute when send email fails")
 	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, sendEmailExecs[0].State)
 	require.Equal(s.t, models.CanvasNodeExecutionResultFailed, sendEmailExecs[0].Result)
 }
