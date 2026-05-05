@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 
+	"github.com/superplanehq/superplane/test/e2e/queries"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
@@ -165,9 +166,7 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-noop")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
@@ -193,9 +192,7 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-noop")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(500)
 
 	// Get the auto-generated name from the input field
@@ -227,9 +224,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -247,9 +242,7 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	startSource := q.TestID("building-block-start")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(startSource, pos)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
 }
@@ -258,9 +251,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-wait")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
@@ -282,9 +273,7 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-filter")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
@@ -295,9 +284,7 @@ func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-timeGate")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
@@ -307,9 +294,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
 	source := q.TestID("building-block-timeGate")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
@@ -322,12 +307,43 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Sleep(300)
 }
 
+func (s *CanvasSteps) AddBuildingBlockByTestID(blockTestID string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+	s.addBlockFromSidebar(q.TestID(blockTestID), pos)
+}
+
+func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Position) {
+	target := q.TestID("rf__wrapper")
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+}
+
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
-	sourceHandle := q.Locator(`.react-flow__node:has-text("` + sourceName + `") .react-flow__handle-right`)
-	targetHandle := q.Locator(`.react-flow__node:has-text("` + targetName + `") .react-flow__handle-left`)
+	sourceNodeID := s.waitForDraftNodeID(sourceName)
+	targetNodeID := s.waitForDraftNodeID(targetName)
+
+	sourceHandle := q.Locator(`.react-flow__node[data-id="` + sourceNodeID + `"] .react-flow__handle-right`)
+	targetHandle := q.Locator(`.react-flow__node[data-id="` + targetNodeID + `"] .react-flow__handle-left`)
 
 	s.session.DragAndDrop(sourceHandle, targetHandle, 6, 6)
 	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		draft := s.FindCurrentDraft()
+		if draft != nil {
+			for _, node := range draft.Nodes {
+				if node.Name == nodeName {
+					return node.ID
+				}
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	s.t.Fatalf("node %q not found in draft", nodeName)
+	return ""
 }
 
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {

@@ -1,7 +1,7 @@
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { filterBlocksInCategory, type TypeFilter } from "./filter";
@@ -69,8 +69,13 @@ function BlockItem({ block, onBlockClick }: BlockItemProps) {
   return (
     <Item
       data-testid={toTestId(`building-block-${block.name}`)}
+      draggable
       onClick={() => {
         if (onBlockClick) onBlockClick(block);
+      }}
+      onDragStart={(event: DragEvent<HTMLElement>) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("application/reactflow", JSON.stringify(block));
       }}
       className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-pointer ${hoverBg}`}
       size="sm"
