@@ -427,7 +427,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
 		Configuration: node.Configuration.Data(),
-		HTTP:          p.options.Registry.HTTPContext(),
+		HTTP:          p.options.Registry.HTTPContextInTransaction(p.tx),
 		Metadata:      contexts.NewNodeMetadataContext(p.tx, node),
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Events:        contexts.NewEventContext(p.tx, node, nil),
@@ -465,7 +465,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 	logger := logging.ForNode(*node)
 	setupCtx := core.SetupContext{
 		Configuration: node.Configuration.Data(),
-		HTTP:          p.options.Registry.HTTPContext(),
+		HTTP:          p.options.Registry.HTTPContextInTransaction(p.tx),
 		Metadata:      contexts.NewNodeMetadataContext(p.tx, node),
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),

@@ -108,6 +108,7 @@ func (t *OnBranchCreated) Setup(ctx core.TriggerContext) error {
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 

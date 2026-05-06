@@ -186,6 +186,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 	if err != nil {
@@ -214,12 +215,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -230,9 +226,8 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	// or just the path accepted by the API.
 	//
 	workflowFile := strings.Replace(spec.WorkflowFile, ".github/workflows/", "", 1)
-	dispatchDetails, _, err := client.Actions.CreateWorkflowDispatchEventByFileName(
+	dispatchDetails, _, err := client.CreateWorkflowDispatchEvent(
 		context.Background(),
-		appMetadata.Owner,
 		spec.Repository,
 		workflowFile,
 		github.CreateWorkflowDispatchEventRequest{
@@ -304,11 +299,6 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
 	// If no workflow run ID, nothing to cancel
 	if metadata.WorkflowRun == nil || metadata.WorkflowRun.ID == 0 {
 		ctx.Logger.Info("No workflow run to cancel")
@@ -324,17 +314,12 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	//
 	// Create GitHub client, and cancel workflow run
 	//
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	response, err := client.Actions.CancelWorkflowRunByID(
-		context.Background(),
-		appMetadata.Owner,
-		spec.Repository,
-		metadata.WorkflowRun.ID,
-	)
+	response, err := client.CancelWorkflowRun(spec.Repository, metadata.WorkflowRun.ID)
 
 	//
 	// GitHub SDK returns an error even though it got a 202 response back :)
@@ -512,23 +497,13 @@ func (r *RunWorkflow) poll(ctx core.ActionHookContext) error {
 		return nil
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return err
 	}
 
 	// Get the latest status of the workflow run
-	run, _, err := client.Actions.GetWorkflowRunByID(
-		context.Background(),
-		appMetadata.Owner,
-		spec.Repository,
-		metadata.WorkflowRun.ID,
-	)
+	run, _, err := client.GetWorkflowRun(spec.Repository, metadata.WorkflowRun.ID)
 	if err != nil {
 		return err
 	}

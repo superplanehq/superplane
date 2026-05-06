@@ -168,7 +168,7 @@ export const IntegrationResourceFieldRenderer = ({
 
   const disabledPicker = (
     <div>
-      <Select disabled>
+      <Select value="" disabled>
         <SelectTrigger className="w-full">
           <SelectValue placeholder={unavailablePlaceholder} />
         </SelectTrigger>
@@ -213,7 +213,7 @@ export const IntegrationResourceFieldRenderer = ({
         placeholder={field.placeholder ?? `Select ${resourceType}`}
       />
     ) : (
-      <Select disabled>
+      <Select value="" disabled>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="No resources available" />
         </SelectTrigger>
@@ -280,7 +280,7 @@ export const IntegrationResourceFieldRenderer = ({
   if (!hasResources) {
     return (
       <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
-        <Select disabled>
+        <Select value="" disabled>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="No resources available" />
           </SelectTrigger>
