@@ -143,30 +143,13 @@ dev.up:
 	$(COMPOSE) up -d --wait --wait-timeout 60
 
 dev.setup:
-	# $(MAKE) gen.setup
-	# $(MAKE) dev.setup.app
-	# $(MAKE) dev.setup.agent
-	# $(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
-	# $(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(COMPOSE) exec app go mod download
+	$(COMPOSE) exec app go build cmd/server/main.go
+	$(COMPOSE) exec app bash -c "cd web_src && npm install --no-fund --no-audit --silent"
+	$(MAKE) pb.gen
 
-dev.setup.app:
-	$(COMPOSE) run --rm app go mod download
-	$(COMPOSE) run --rm app go build cmd/server/main.go
-
-dev.setup.agent:
-	$(COMPOSE) run --rm agent uv sync --frozen || $(COMPOSE) run --rm agent uv sync
-
-dev.setup.no.cache:
-	rm -rf tmp
-	$(COMPOSE) down -v --remove-orphans
-	$(COMPOSE) build --no-cache
-	$(MAKE) gen.setup
-
-dev.start.fg:
-	$(COMPOSE) up
-
-dev.start:
-	$(COMPOSE) up --force-recreate --attach app
+dev.server:
+	$(COMPOSE) exec app bash -c "bash docker-entrypoint.dev.sh"
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
@@ -313,33 +296,6 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-gen.setup:
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-	$(MAKE) openapi.web.client.gen
-	$(MAKE) openapi.python.client.gen
-
-gen.setup.backend:
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-
-gen.setup.ui:
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.web.client.gen
-
-gen.setup.agent:
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.python.client.gen
-
-gen:
-	$(MAKE) gen.setup
-	$(MAKE) format.go
-	$(MAKE) format.js
-	$(MAKE) gen.components.docs
-
 gen.components.docs:
 	rm -rf docs/components
 	go run scripts/generate_components_docs.go
@@ -349,21 +305,16 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
+pb.gen:
+	$(COMPOSE) exec app bash -c "scripts/protoc.sh $(MODULES)"
+	$(COMPOSE) exec app bash -c "scripts/protoc_gateway.sh $(REST_API_MODULES)"
+	$(COMPOSE) exec app bash -c "scripts/protoc_openapi_spec.sh $(REST_API_MODULES)"
+	$(MAKE) openapi.client.gen
+	$(COMPOSE) exec app bash -c "rm -rf web_src/src/api-client"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run generate:api"
+
 MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,service_accounts,agents
-compose.setup:
-	@touch agent/.env
-
-pb.gen:
-	$(MAKE) compose.setup
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
-	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
-
-openapi.spec.gen:
-	$(MAKE) compose.setup
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
@@ -379,27 +330,6 @@ openapi.client.gen:
 	rm -rf pkg/openapi_client/.travis.yml
 	rm -rf pkg/openapi_client/README.md
 	rm -rf pkg/openapi_client/git_push.sh
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/openapi_client -name '*.go' -print0 | xargs -0 gofmt -s -w"
-
-openapi.web.client.gen:
-	$(MAKE) compose.setup
-	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm ci && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
-
-openapi.python.client.gen:
-	rm -rf agent/src/superplaneapi
-	$(DOCKER_RUN_AS_CURRENT_USER) \
-		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
-		-i /local/api/swagger/superplane.swagger.json \
-		-g python \
-		-o /local/agent/src/superplaneapi \
-		--package-name superplaneapi \
-		--additional-properties=packageName=superplaneapi,projectName=superplaneapi,generateSourceCodeOnly=true
-	cp -R agent/src/superplaneapi/superplaneapi/. agent/src/superplaneapi/
-	rm -rf agent/src/superplaneapi/superplaneapi
-	rm -rf agent/src/superplaneapi/docs
-	rm -rf agent/src/superplaneapi/test
-	rm -rf agent/src/superplaneapi/.openapi-generator
 
 #
 # Image and CLI build
