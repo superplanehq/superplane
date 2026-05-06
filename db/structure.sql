@@ -1486,17 +1486,17 @@ CREATE INDEX idx_workflow_versions_workflow_id ON public.workflow_versions USING
 
 
 --
--- Name: idx_workflows_folder_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflows_folder_id ON public.workflows USING btree (folder_id);
-
-
---
 -- Name: idx_workflows_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_at);
+
+
+--
+-- Name: idx_workflows_folder_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflows_folder_id ON public.workflows USING btree (folder_id);
 
 
 --
@@ -2043,3 +2043,4 @@ COPY public.data_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
+

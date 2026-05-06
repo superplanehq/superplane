@@ -20,7 +20,7 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Check, FolderMinus, FolderPlus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { FOLDER_COLOR_OPTIONS } from "./canvasFolderStyles";
@@ -45,10 +45,7 @@ export function CanvasFolderSubmenu({
   const updateCanvasFolderMembershipMutation = useUpdateCanvasFolderMembership(organizationId);
   const queryClient = useQueryClient();
   const folderActionLabel = canvas.canvasFolderId ? "Move to Folder" : "Add to Folder";
-  const normalizedNewFolderTitle = newFolderTitle.trim().toLowerCase();
-  const isDuplicateNewFolderTitle = canvasFolders.some(
-    (folder) => folder.title.trim().toLowerCase() === normalizedNewFolderTitle,
-  );
+  const isDuplicateNewFolderTitle = hasDuplicateFolderTitle(canvasFolders, newFolderTitle);
 
   const handleAssignToFolder = async (folderId: string) => {
     if (!canUpdateCanvases || folderId === canvas.canvasFolderId) return;
@@ -107,7 +104,12 @@ export function CanvasFolderSubmenu({
 
     try {
       const response = await createCanvasFolderMutation.mutateAsync({ title, backgroundColor: newFolderColor });
-      const folderId = await resolveCreatedFolderId(title, response.data?.folder?.metadata?.id);
+      const folderId = await resolveCreatedFolderId(
+        queryClient,
+        organizationId,
+        title,
+        response.data?.folder?.metadata?.id,
+      );
 
       await updateCanvasFolderMembershipMutation.mutateAsync({
         folderId,
@@ -122,25 +124,6 @@ export function CanvasFolderSubmenu({
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create folder"));
     }
-  };
-
-  const resolveCreatedFolderId = async (title: string, responseFolderId?: string) => {
-    if (responseFolderId) {
-      return responseFolderId;
-    }
-
-    await queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-    await queryClient.refetchQueries({ queryKey: canvasKeys.folderList(organizationId), type: "active" });
-
-    const folders = queryClient.getQueryData<CanvasFoldersCanvasFolder[]>(canvasKeys.folderList(organizationId)) || [];
-    const folderId =
-      folders.find((folder) => folder.spec?.title?.trim().toLowerCase() === title.toLowerCase())?.metadata?.id || "";
-
-    if (!folderId) {
-      throw new Error("missing canvas folder id");
-    }
-
-    return folderId;
   };
 
   return (
@@ -181,6 +164,35 @@ export function CanvasFolderSubmenu({
       ) : null}
     </>
   );
+}
+
+function hasDuplicateFolderTitle(canvasFolders: CanvasFolderData[], title: string) {
+  const normalizedTitle = title.trim().toLowerCase();
+  return canvasFolders.some((folder) => folder.title.trim().toLowerCase() === normalizedTitle);
+}
+
+async function resolveCreatedFolderId(
+  queryClient: QueryClient,
+  organizationId: string,
+  title: string,
+  responseFolderId?: string,
+) {
+  if (responseFolderId) {
+    return responseFolderId;
+  }
+
+  await queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
+  await queryClient.refetchQueries({ queryKey: canvasKeys.folderList(organizationId), type: "active" });
+
+  const folders = queryClient.getQueryData<CanvasFoldersCanvasFolder[]>(canvasKeys.folderList(organizationId)) || [];
+  const folderId =
+    folders.find((folder) => folder.spec?.title?.trim().toLowerCase() === title.toLowerCase())?.metadata?.id || "";
+
+  if (!folderId) {
+    throw new Error("missing canvas folder id");
+  }
+
+  return folderId;
 }
 
 function addCanvasToFolder(canvasIds: string[], canvasId: string) {
