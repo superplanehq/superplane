@@ -1192,7 +1192,7 @@ function CanvasPage(props: CanvasPageProps) {
 
           <AgentSidebar agentState={agentState} />
 
-          {props.headerMode === "launchpad" ? null : (
+          {props.headerMode === "launchpad" || props.headerMode === "runs" ? null : (
             <RightSideControls
               mode={readOnly ? "live" : "edit"}
               onSidebarOpen={() => handleSidebarToggle(true)}

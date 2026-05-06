@@ -158,6 +158,33 @@ import {
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const RUN_VIEW_MODE_STORAGE_KEY = "run-view-mode";
+//
+// Persists the active top-level tab (Apps / Canvas / Runs) per canvas so that
+// reloading the page keeps the user on the tab they last picked instead of
+// always falling back to the launchpad smart-default. Edit mode is NOT
+// persisted -- entering edit always requires explicit intent.
+//
+const CANVAS_VIEW_MODE_STORAGE_KEY = "canvas-view-mode";
+type StoredCanvasView = "launchpad" | "version-live" | "runs";
+const canvasViewStorageKey = (canvasId: string) => `${CANVAS_VIEW_MODE_STORAGE_KEY}:${canvasId}`;
+const loadStoredCanvasView = (canvasId: string | undefined): StoredCanvasView | null => {
+  if (!canvasId || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(canvasViewStorageKey(canvasId));
+    if (raw === "launchpad" || raw === "version-live" || raw === "runs") return raw;
+    return null;
+  } catch {
+    return null;
+  }
+};
+const persistCanvasView = (canvasId: string | undefined, view: StoredCanvasView) => {
+  if (!canvasId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(canvasViewStorageKey(canvasId), view);
+  } catch {
+    // localStorage is best-effort; ignore quota/access errors.
+  }
+};
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 
@@ -609,16 +636,22 @@ export function WorkflowPageV2() {
    * Runs mode: third tab in the canvas mode toggle. Reads from `?view=runs`
    * on initial load so runs links are shareable, and writes the query param
    * back when toggled. `selectedRunEventId` tracks the currently open run.
+   * When the URL doesn't pin a view, falls back to the localStorage-persisted
+   * tab so reloads keep the user where they were.
    */
   const [isRunsMode, setIsRunsModeState] = useState(() => {
     if (typeof window === "undefined") return false;
-    return new URLSearchParams(window.location.search).get("view") === "runs";
+    const url = new URLSearchParams(window.location.search).get("view");
+    if (url === "runs") return true;
+    if (url) return false;
+    return loadStoredCanvasView(canvasId) === "runs";
   });
   /**
    * Launchpad mode: leftmost tab in the canvas mode toggle. Reads from
    * `?view=launchpad` on initial load so launchpad links are shareable.
-   * The smart-default bootstrap below auto-opens the launchpad when the
-   * canvas already has at least one panel and the URL didn't pin a view.
+   * When the URL doesn't pin a view, falls back to the localStorage-persisted
+   * tab. The smart-default bootstrap below only fires if neither the URL nor
+   * localStorage has a stored preference.
    */
   const initialUrlViewRef = useRef<string | null>(null);
   if (initialUrlViewRef.current === null && typeof window !== "undefined") {
@@ -626,7 +659,10 @@ export function WorkflowPageV2() {
   }
   const [isLaunchpadMode, setIsLaunchpadModeState] = useState(() => {
     if (typeof window === "undefined") return false;
-    return new URLSearchParams(window.location.search).get("view") === "launchpad";
+    const url = new URLSearchParams(window.location.search).get("view");
+    if (url === "launchpad") return true;
+    if (url) return false;
+    return loadStoredCanvasView(canvasId) === "launchpad";
   });
   const [selectedRunEventId, setSelectedRunEventIdState] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -2056,8 +2092,11 @@ export function WorkflowPageV2() {
         setRunDetailNodeId(null);
       }
       setSearchParams(next, { replace: true });
+      // Turning Runs OFF transitions to live (launchpad is already off here
+      // since it can't coexist with runs); turning it ON pins the runs tab.
+      persistCanvasView(canvasId, on ? "runs" : "version-live");
     },
-    [searchParams, setSearchParams],
+    [canvasId, searchParams, setSearchParams],
   );
 
   const setLaunchpadMode = useCallback(
@@ -2078,8 +2117,9 @@ export function WorkflowPageV2() {
         next.delete("view");
       }
       setSearchParams(next, { replace: true });
+      persistCanvasView(canvasId, on ? "launchpad" : "version-live");
     },
-    [searchParams, setSearchParams],
+    [canvasId, searchParams, setSearchParams],
   );
 
   const handleSelectRun = useCallback(
@@ -5374,9 +5414,11 @@ export function WorkflowPageV2() {
   const launchpadQuery = useCanvasLaunchpad(canvasId!);
   const updateCanvasLaunchpadMutation = useUpdateCanvasLaunchpad(canvasId!);
   //
-  // Smart default: if the Launchpad has at least one panel and the URL didn't
-  // pin a view explicitly, land on the Launchpad. Guarded by a ref so this
-  // only runs once per page load.
+  // Smart default: if the Launchpad has at least one panel and neither the
+  // URL nor localStorage pinned a view, land on the Launchpad. Guarded by a
+  // ref so this only runs once per page load. A persisted localStorage view
+  // is respected -- the goal of the smart default is to give *new* visitors
+  // a useful first screen, not to override a returning user's choice.
   //
   const launchpadSmartDefaultRef = useRef(false);
   useEffect(() => {
@@ -5385,10 +5427,11 @@ export function WorkflowPageV2() {
     launchpadSmartDefaultRef.current = true;
     const initialView = initialUrlViewRef.current ?? "";
     if (initialView !== "") return;
+    if (loadStoredCanvasView(canvasId)) return;
     if ((launchpadQuery.data.panels?.length ?? 0) > 0) {
       setLaunchpadMode(true);
     }
-  }, [launchpadQuery.data, setLaunchpadMode]);
+  }, [canvasId, launchpadQuery.data, setLaunchpadMode]);
 
   //
   // Build slug -> display-name + slug -> node-id maps used by the Readme

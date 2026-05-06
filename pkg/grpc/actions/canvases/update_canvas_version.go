@@ -154,7 +154,6 @@ func UpdateCanvasVersionWithUsage(
 		}
 
 		now := time.Now()
-		previousReadmeLen := len(version.Readme)
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
 		//
@@ -167,23 +166,10 @@ func UpdateCanvasVersionWithUsage(
 		// To clear the readme, callers should call UpdateCanvasReadme with
 		// an empty content string.
 		//
-		incomingReadmeLen := 0
-		if pbCanvas.Spec != nil {
-			incomingReadmeLen = len(pbCanvas.Spec.Readme)
-		}
 		if pbCanvas.Spec != nil && pbCanvas.Spec.Readme != "" {
 			version.Readme = pbCanvas.Spec.Readme
 		}
 		version.UpdatedAt = &now
-
-		log.WithFields(log.Fields{
-			"action":             "UpdateCanvasVersion",
-			"canvas_id":          canvasID,
-			"version_id":         version.ID.String(),
-			"previous_readme_len": previousReadmeLen,
-			"incoming_readme_len": incomingReadmeLen,
-			"final_readme_len":   len(version.Readme),
-		}).Info("readme-debug: UpdateCanvasVersion saving version")
 
 		return tx.Save(version).Error
 	})
