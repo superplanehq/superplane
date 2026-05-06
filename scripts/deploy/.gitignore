@@ -1,0 +1,2 @@
+# Keep templates in-repo; deploy with FLEET_MANAGER_ENV_FILE=./fleet-manager.env
+*.env
