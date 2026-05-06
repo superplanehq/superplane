@@ -1,20 +1,20 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
-  OutputPayload,
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { CreateGPUDropletConfiguration, DropletData } from "./types";
+import type { CreateGPUDropletConfiguration } from "./types";
+import { buildBaseDropletDetails, findPublicIP, getDropletFromOutputs, gpuBaseEventSections } from "./gpu_droplet_base";
 
 export const createGPUDropletMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -40,21 +40,18 @@ export const createGPUDropletMapper: ComponentBaseMapper = {
       details["Created At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const droplet = outputs?.default?.[0]?.data as DropletData | undefined;
+    const droplet = getDropletFromOutputs(context.execution.outputs);
     if (!droplet) return details;
 
-    const ip = droplet.networks?.v4?.find((n) => n.type === "public")?.ip_address;
-
-    details["Droplet ID"] = droplet.id?.toString() || "-";
-    details["Name"] = droplet.name || "-";
-    details["Region"] = droplet.region?.name || droplet.region?.slug || "-";
-    details["GPU Size"] = droplet.size_slug || "-";
+    const base = buildBaseDropletDetails(droplet);
+    details["Droplet ID"] = base["Droplet ID"];
+    details["Name"] = base["Name"];
+    details["Region"] = base["Region"];
+    details["GPU Size"] = base["GPU Size"];
     details["OS"] = droplet.image?.name || droplet.image?.slug || "-";
 
-    if (ip) {
-      details["IP Address"] = ip;
-    }
+    const ip = findPublicIP(droplet);
+    if (ip) details["IP Address"] = ip;
 
     return details;
   },
@@ -85,18 +82,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
-    },
-  ];
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string) {
+  return gpuBaseEventSections(nodes, execution, componentName);
 }
