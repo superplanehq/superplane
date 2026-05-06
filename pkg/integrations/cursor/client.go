@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -18,15 +19,57 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, fmt.Errorf("no integration context")
 	}
 
-	launchAgentKey, _ := ctx.GetConfig("launchAgentKey")
-	adminAPIKey, _ := ctx.GetConfig("adminKey")
+	var launchAgentKey, adminKey string
+	if ctx.LegacySetup() {
+		if b, err := ctx.GetConfig(SecretLaunchAgentKey); err == nil {
+			launchAgentKey = string(b)
+		}
+		if b, err := ctx.GetConfig(SecretAdminKey); err == nil {
+			adminKey = string(b)
+		}
+	} else {
+		if v, err := ctx.Secrets().Get(SecretLaunchAgentKey); err == nil {
+			launchAgentKey = v
+		}
+		if v, err := ctx.Secrets().Get(SecretAdminKey); err == nil {
+			adminKey = v
+		}
+	}
 
 	return &Client{
-		LaunchAgentKey: string(launchAgentKey),
-		AdminKey:       string(adminAPIKey),
+		LaunchAgentKey: launchAgentKey,
+		AdminKey:       adminKey,
 		BaseURL:        defaultBaseURL,
 		http:           httpClient,
 	}, nil
+}
+
+// verifyCursorCredentials checks Cursor API keys.
+// verifyLaunch/verifyAdmin select which checks to run.
+func verifyCursorCredentials(httpClient core.HTTPContext, launchAgentKey, adminKey string, verifyLaunch, verifyAdmin bool) error {
+	c := &Client{
+		LaunchAgentKey: strings.TrimSpace(launchAgentKey),
+		AdminKey:       strings.TrimSpace(adminKey),
+		BaseURL:        defaultBaseURL,
+		http:           httpClient,
+	}
+	if verifyLaunch {
+		if c.LaunchAgentKey == "" {
+			return fmt.Errorf("cloud agent API key is required")
+		}
+		if err := c.VerifyLaunchAgent(); err != nil {
+			return fmt.Errorf("cloud agent key verification failed: %w", err)
+		}
+	}
+	if verifyAdmin {
+		if c.AdminKey == "" {
+			return fmt.Errorf("admin API key is required")
+		}
+		if err := c.VerifyAdmin(); err != nil {
+			return fmt.Errorf("admin key verification failed: %w", err)
+		}
+	}
+	return nil
 }
 
 type Client struct {
