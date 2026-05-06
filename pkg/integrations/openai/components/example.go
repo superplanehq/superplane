@@ -1,4 +1,4 @@
-package openai
+package components
 
 import (
 	_ "embed"
@@ -7,7 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
-//go:embed example_output_text_prompt.json
+//go:embed payloads/text_prompt.json
 var exampleOutputTextPromptBytes []byte
 
 var exampleOutputTextPromptOnce sync.Once
