@@ -1,4 +1,4 @@
-package openai
+package common
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const defaultBaseURL = "https://api.openai.com/v1"
+const DefaultBaseURL = "https://api.openai.com/v1"
 
 type Client struct {
 	APIKey  string
@@ -23,21 +23,50 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, fmt.Errorf("no integration context")
 	}
 
+	if !ctx.LegacySetup() {
+		return NewClientWithStorageContexts(httpClient, ctx.Properties(), ctx.Secrets())
+	}
+
 	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
 		return nil, err
 	}
 
-	baseURL := defaultBaseURL
+	baseURL := DefaultBaseURL
 	if customURL, err := ctx.GetConfig("baseURL"); err == nil && len(customURL) > 0 {
 		baseURL = string(customURL)
 	}
 
+	return NewClientWithAPIKey(httpClient, string(apiKey), baseURL), nil
+}
+
+func NewClientWithStorageContexts(httpClient core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+	apiKey, err := secrets.Get("apiKey")
+	if err != nil {
+		return nil, err
+	}
+
+	baseURL := DefaultBaseURL
+	if properties != nil {
+		customURL, err := properties.GetString("baseURL")
+		if err == nil && customURL != "" {
+			baseURL = customURL
+		}
+	}
+
+	return NewClientWithAPIKey(httpClient, apiKey, baseURL), nil
+}
+
+func NewClientWithAPIKey(httpClient core.HTTPContext, apiKey, baseURL string) *Client {
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
+	}
+
 	return &Client{
-		APIKey:  string(apiKey),
+		APIKey:  apiKey,
 		BaseURL: baseURL,
 		http:    httpClient,
-	}, nil
+	}
 }
 
 type CreateResponseRequest struct {
