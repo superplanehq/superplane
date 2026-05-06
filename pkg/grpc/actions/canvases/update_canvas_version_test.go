@@ -69,6 +69,70 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		require.NotNil(t, response.Version)
 	})
 
+	//
+	// Regression: editing nodes/edges via UpdateCanvasVersion must NOT clobber
+	// the draft's readme. The frontend's update-version mutation only ships
+	// nodes/edges; readme has its own dedicated UpdateCanvasReadme endpoint.
+	// Before the fix, an unset Spec.Readme defaulted to "" and was written
+	// straight onto the draft, wiping the readme on every node edit.
+	//
+	t.Run("does not clobber readme when spec.readme is empty", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, models.UpdateCanvasVersionReadmeInTransaction(database.Conn(), draftVersion, "# saved readme"))
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err = UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			testPbCanvas(canvas.Name),
+			nil,
+			"",
+			r.AuthService,
+		)
+		require.NoError(t, err)
+
+		reloaded, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draftVersion.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "# saved readme", reloaded.Readme, "readme should survive a node-only canvas update")
+	})
+
+	t.Run("non-empty spec.readme overwrites the draft readme (CLI YAML-apply path)", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, models.UpdateCanvasVersionReadmeInTransaction(database.Conn(), draftVersion, "# stale"))
+
+		pbCanvas := testPbCanvas(canvas.Name)
+		pbCanvas.Spec.Readme = "# from yaml"
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err = UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			pbCanvas,
+			nil,
+			"",
+			r.AuthService,
+		)
+		require.NoError(t, err)
+
+		reloaded, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draftVersion.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "# from yaml", reloaded.Readme)
+	})
+
 	t.Run("usage limit violation blocks oversized draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 

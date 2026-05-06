@@ -49,6 +49,13 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 			return liveVersionErr
 		}
 
+		log.WithFields(log.Fields{
+			"action":           "CreateCanvasVersion",
+			"canvas_id":        canvasID,
+			"live_version_id":  liveVersion.ID.String(),
+			"live_readme_len":  len(liveVersion.Readme),
+		}).Info("readme-debug: CreateCanvasVersion cloning from live")
+
 		version, err = models.SaveCanvasDraftWithReadmeInTransaction(
 			tx,
 			canvas.ID,
@@ -57,6 +64,14 @@ func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID st
 			liveVersion.Edges,
 			liveVersion.Readme,
 		)
+		if version != nil {
+			log.WithFields(log.Fields{
+				"action":           "CreateCanvasVersion",
+				"canvas_id":        canvasID,
+				"new_version_id":   version.ID.String(),
+				"new_readme_len":   len(version.Readme),
+			}).Info("readme-debug: CreateCanvasVersion produced draft")
+		}
 
 		return err
 	})

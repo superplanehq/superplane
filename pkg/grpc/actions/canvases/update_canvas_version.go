@@ -154,12 +154,36 @@ func UpdateCanvasVersionWithUsage(
 		}
 
 		now := time.Now()
+		previousReadmeLen := len(version.Readme)
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
+		//
+		// Readme is owned by the dedicated UpdateCanvasReadme endpoint. The
+		// frontend's update-version mutation only ships nodes/edges in the
+		// spec, so an empty pbCanvas.Spec.Readme means "field not set" --
+		// writing it would clobber the user's saved readme on every node
+		// edit. Only honor a non-empty Readme here, which keeps the CLI's
+		// YAML-apply flow working when readme is included in the spec.
+		// To clear the readme, callers should call UpdateCanvasReadme with
+		// an empty content string.
+		//
+		incomingReadmeLen := 0
 		if pbCanvas.Spec != nil {
+			incomingReadmeLen = len(pbCanvas.Spec.Readme)
+		}
+		if pbCanvas.Spec != nil && pbCanvas.Spec.Readme != "" {
 			version.Readme = pbCanvas.Spec.Readme
 		}
 		version.UpdatedAt = &now
+
+		log.WithFields(log.Fields{
+			"action":             "UpdateCanvasVersion",
+			"canvas_id":          canvasID,
+			"version_id":         version.ID.String(),
+			"previous_readme_len": previousReadmeLen,
+			"incoming_readme_len": incomingReadmeLen,
+			"final_readme_len":   len(version.Readme),
+		}).Info("readme-debug: UpdateCanvasVersion saving version")
 
 		return tx.Save(version).Error
 	})

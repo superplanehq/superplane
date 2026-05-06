@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -180,6 +181,12 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 }
 
 func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Node, edges []Edge) error {
+	log.WithFields(log.Fields{
+		"action":      "PromoteToLive",
+		"version_id":  version.ID.String(),
+		"workflow_id": version.WorkflowID.String(),
+		"readme_len":  len(version.Readme),
+	}).Info("readme-debug: PromoteToLiveInTransaction promoting draft")
 	canvas, err := lockCanvasForVersioningInTransaction(tx, version.WorkflowID)
 	if err != nil {
 		return err
