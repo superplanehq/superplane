@@ -52,6 +52,10 @@ func (t *OnTag) Color() string {
 	return "orange"
 }
 
+func (t *OnTag) DefaultRunTitle() string {
+	return "{{ root().data.ref }}"
+}
+
 func (t *OnTag) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

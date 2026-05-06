@@ -126,10 +126,12 @@ interface ComponentSidebarProps {
   blockName?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
+  nodeRunTitleTemplate?: string;
   onNodeConfigSave?: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    runTitleTemplate?: string,
   ) => void | Promise<void>;
   onNodeConfigCancel?: () => void;
   domainId?: string;
@@ -202,6 +204,7 @@ export const ComponentSidebar = ({
   blockName,
   nodeConfiguration = {},
   nodeConfigurationFields = [],
+  nodeRunTitleTemplate,
   onNodeConfigSave,
   onNodeConfigCancel,
   domainId,
@@ -292,6 +295,10 @@ export const ComponentSidebar = ({
   const createIntegrationDefinition = useMemo(
     () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
     [availableIntegrationDefinitions, integrationName],
+  );
+  const defaultRunTitle = useMemo(
+    () => (blockName ? triggers.find((trigger) => trigger.name === blockName)?.defaultRunTitle : undefined),
+    [blockName, triggers],
   );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const integrationHomeHref = useMemo(() => {
@@ -762,6 +769,7 @@ export const ComponentSidebar = ({
                   nodeLabel={nodeLabel}
                   configuration={nodeConfiguration}
                   configurationFields={nodeConfigurationFields}
+                  runTitleTemplate={nodeRunTitleTemplate}
                   onSave={onNodeConfigSave || (() => {})}
                   onCancel={onNodeConfigCancel}
                   domainId={domainId}
@@ -775,6 +783,7 @@ export const ComponentSidebar = ({
                   canCreateIntegrations={canCreateIntegrations}
                   canUpdateIntegrations={canUpdateIntegrations}
                   integrationDefinition={createIntegrationDefinition}
+                  defaultRunTitle={defaultRunTitle}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}

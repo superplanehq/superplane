@@ -69,6 +69,10 @@ func (w *OnWorkflowRun) Color() string {
 	return "gray"
 }
 
+func (w *OnWorkflowRun) DefaultRunTitle() string {
+	return "{{ root().data.workflow_run.display_title }}"
+}
+
 func (w *OnWorkflowRun) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

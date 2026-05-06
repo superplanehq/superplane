@@ -124,6 +124,10 @@ func (s *Schedule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 	return http.StatusOK, nil, nil
 }
 
+func (s *Schedule) DefaultRunTitle() string {
+	return `Schedule: {{ root().data.calendar.month }} {{ root().data.calendar.day }}, {{ root().data.calendar.year }} {{ root().data.calendar.hour }}:{{ root().data.calendar.minute }}`
+}
+
 func (s *Schedule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -173,9 +174,10 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	}
 
 	newNode := models.Node{
-		ID:          nodeID,
-		Name:        node.GetName(),
-		IsCollapsed: node.GetIsCollapsed(),
+		ID:               nodeID,
+		Name:             node.GetName(),
+		RunTitleTemplate: node.RunTitleTemplate,
+		IsCollapsed:      node.GetIsCollapsed(),
 	}
 
 	nodeType, nodeRef, err := p.findBlock(node)
@@ -185,6 +187,9 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 
 	newNode.Type = nodeType
 	newNode.Ref = *nodeRef
+	if newNode.RunTitleTemplate == nil {
+		newNode.RunTitleTemplate = p.defaultRunTitleTemplate(newNode.Type, newNode.Ref)
+	}
 
 	if node.GetPosition() != nil {
 		newNode.Position.X = int(node.GetPosition().GetX())
@@ -322,6 +327,10 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		currentNode.IsCollapsed = node.GetIsCollapsed()
 	}
 
+	if node.RunTitleTemplate != nil {
+		currentNode.RunTitleTemplate = node.RunTitleTemplate
+	}
+
 	//
 	// From here on out, we don't return errors,
 	// we save the error message alongside the new invalid configuration.
@@ -354,6 +363,24 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 
 	p.nodes[nodeID] = currentNode
 	return nil
+}
+
+func (p *CanvasPatcher) defaultRunTitleTemplate(nodeType string, nodeRef models.NodeRef) *string {
+	if nodeType != models.NodeTypeTrigger || nodeRef.Trigger == nil {
+		return nil
+	}
+
+	trigger, err := p.registry.GetTrigger(nodeRef.Trigger.Name)
+	if err != nil {
+		return nil
+	}
+
+	template := strings.TrimSpace(trigger.DefaultRunTitle())
+	if template == "" {
+		return nil
+	}
+
+	return &template
 }
 
 func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef models.NodeRef) ([]configuration.Field, error) {
