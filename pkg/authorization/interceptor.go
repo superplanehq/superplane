@@ -276,6 +276,11 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
+		pbCanvases.Canvases_UpdateCanvasFolderPosition_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 		pbCanvases.Canvases_DeleteCanvasFolder_FullMethodName: {
 			Resource:   "canvases",
 			Action:     "update",

@@ -274,6 +274,18 @@ service Canvases {
     };
   }
 
+  rpc UpdateCanvasFolderPosition(UpdateCanvasFolderPositionRequest) returns (UpdateCanvasFolderPositionResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvas-folders/{id}/position"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas folder position";
+      description: "Moves a canvas folder up or down";
+      tags: "CanvasFolder";
+    };
+  }
+
   rpc DeleteCanvasFolder(DeleteCanvasFolderRequest) returns (DeleteCanvasFolderResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvas-folders/{id}"
@@ -690,6 +702,15 @@ message CreateCanvasFolderResponse {
 }
 
 message UpdateCanvasFolderRequest {
+  string id = 1;
+  CanvasFolder folder = 2;
+}
+
+message UpdateCanvasFolderResponse {
+  CanvasFolder folder = 1;
+}
+
+message UpdateCanvasFolderPositionRequest {
   enum Direction {
     DIRECTION_UNSPECIFIED = 0;
     DIRECTION_UP = 1;
@@ -697,13 +718,11 @@ message UpdateCanvasFolderRequest {
   }
 
   string id = 1;
-  CanvasFolder folder = 2;
-  Direction direction = 3;
+  Direction direction = 2;
 }
 
-message UpdateCanvasFolderResponse {
-  CanvasFolder folder = 1;
-  repeated CanvasFolder folders = 2;
+message UpdateCanvasFolderPositionResponse {
+  repeated CanvasFolder folders = 1;
 }
 
 message DeleteCanvasFolderRequest {

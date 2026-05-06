@@ -8,6 +8,7 @@ import {
   canvasesListCanvasFolders,
   canvasesCreateCanvasFolder,
   canvasesUpdateCanvasFolder,
+  canvasesUpdateCanvasFolderPosition,
   canvasesDeleteCanvasFolder,
   canvasesUpdateCanvasFolderMembership,
   canvasesCreateCanvasVersion,
@@ -550,38 +551,43 @@ export const useUpdateCanvasFolder = (organizationId: string) => {
         | { folderId: string; title: string; backgroundColor: CanvasFolderColor; direction?: never }
         | { folderId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN"; title?: never; backgroundColor?: never },
     ) => {
-      const body =
-        "direction" in data
-          ? {
-              id: data.folderId,
+      if ("direction" in data) {
+        return await canvasesUpdateCanvasFolderPosition(
+          withOrganizationHeader({
+            organizationId,
+            path: { id: data.folderId },
+            body: {
               direction: data.direction,
-            }
-          : {
-              folder: {
-                spec: {
-                  title: data.title,
-                  backgroundColor: data.backgroundColor,
-                },
-              },
-            };
+            },
+          }),
+        );
+      }
 
       return await canvasesUpdateCanvasFolder(
         withOrganizationHeader({
           organizationId,
           path: { id: data.folderId },
-          body,
+          body: {
+            folder: {
+              spec: {
+                title: data.title,
+                backgroundColor: data.backgroundColor,
+              },
+            },
+          },
         }),
       );
     },
     onSuccess: (response) => {
-      const folders = response?.data?.folders;
+      const responseData = response?.data;
+      const folders = responseData && "folders" in responseData ? responseData.folders : undefined;
       if (folders) {
         queryClient.setQueryData(canvasKeys.folderList(organizationId), folders);
         queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
         return;
       }
 
-      const updatedFolder = response?.data?.folder;
+      const updatedFolder = responseData && "folder" in responseData ? responseData.folder : undefined;
       queryClient.setQueryData(canvasKeys.folderList(organizationId), (current: CanvasesCanvasFolder[] | undefined) => {
         if (!current || !updatedFolder?.metadata?.id) {
           return current;

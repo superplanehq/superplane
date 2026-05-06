@@ -10,12 +10,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func UpdateCanvasFolder(
+func UpdateCanvasFolderPosition(
 	_ context.Context,
 	organizationID,
 	id string,
-	folder *pb.CanvasFolder,
-) (*pb.UpdateCanvasFolderResponse, error) {
+	direction pb.UpdateCanvasFolderPositionRequest_Direction,
+) (*pb.UpdateCanvasFolderPositionResponse, error) {
 	organizationUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
@@ -26,16 +26,16 @@ func UpdateCanvasFolder(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas folder id: %v", err)
 	}
 
-	if folder == nil || folder.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas folder is required")
+	if direction == pb.UpdateCanvasFolderPositionRequest_DIRECTION_UNSPECIFIED {
+		return nil, status.Error(codes.InvalidArgument, "canvas folder move direction is required")
 	}
 
-	updatedFolder, err := models.UpdateCanvasFolder(organizationUUID, folderID, folder.Spec.Title, folder.Spec.BackgroundColor)
+	folders, err := models.MoveCanvasFolder(organizationUUID, folderID, direction.String())
 	if err != nil {
 		return nil, canvasFolderErrorToStatus(err)
 	}
 
-	return &pb.UpdateCanvasFolderResponse{
-		Folder: SerializeCanvasFolder(updatedFolder),
+	return &pb.UpdateCanvasFolderPositionResponse{
+		Folders: SerializeCanvasFolders(folders),
 	}, nil
 }
