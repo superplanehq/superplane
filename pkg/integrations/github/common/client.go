@@ -320,17 +320,21 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
 
-	ownerType := OwnerTypeUser
-	if metadata.Owner != "" {
-		ownerType = OwnerTypeOrganization
-	}
-
 	return &Client{
 		authMethod: AuthMethodApp,
-		ownerType:  ownerType,
+		ownerType:  determineLegacyOwnerType(ctx),
 		owner:      metadata.Owner,
 		underlying: github.NewClient(&http.Client{Transport: itr}),
 	}, nil
+}
+
+func determineLegacyOwnerType(ctx core.IntegrationContext) string {
+	_, err := ctx.GetConfig("organization")
+	if err != nil {
+		return OwnerTypeUser
+	}
+
+	return OwnerTypeOrganization
 }
 
 func newClientFromStorageContexts(httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
