@@ -96,7 +96,7 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 				NodeID:         execution.NodeID,
 				NodeName:       node.Name,
 				Configuration:  execution.Configuration.Data(),
-				HTTP:           registry.HTTPContext(),
+				HTTP:           registry.HTTPContextInTransaction(tx),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
