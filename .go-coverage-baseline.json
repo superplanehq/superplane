@@ -44,7 +44,7 @@
     "pkg/jwt": 55.3,
     "pkg/lint/examplepayloads": 84.6,
     "pkg/logging": 0,
-    "pkg/models": 9.1,
+    "pkg/models": 8.9,
     "pkg/networkpolicy": 87.9,
     "pkg/oidc": 70.4,
     "pkg/public": 51.8,
@@ -73,5 +73,5 @@
     "pkg/triggers",
     "pkg/web/assets"
   ],
-  "updatedAt": "2026-05-06T17:45:29Z"
+  "updatedAt": "2026-05-06T18:55:53Z"
 }
