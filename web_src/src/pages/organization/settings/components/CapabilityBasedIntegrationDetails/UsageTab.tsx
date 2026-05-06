@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { Fragment } from "react";
+import { INTEGRATION_INLINE_CODE_CLASSES } from "./lib";
 
 export type CapabilityIntegrationUsageGroup = {
   canvasId: string;
@@ -13,9 +14,6 @@ export interface UsageTabProps {
 }
 
 const MAX_COMPONENT_LABELS_SHOWN = 3;
-
-/** Same chip styling as inline `code` in Integration setup instructions markdown. */
-const INTEGRATION_INLINE_CODE_CLASSES = "rounded bg-black/10 px-1.5 py-0.5 font-mono text-xs";
 
 /** Drops a leading integration id prefix (e.g. `github.getIssue` → `getIssue`). */
 function workflowComponentDisplayName(nodeName: string): string {
