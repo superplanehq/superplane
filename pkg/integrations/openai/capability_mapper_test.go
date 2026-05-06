@@ -52,3 +52,16 @@ func Test__OpenAI__CapabilityMapper__FindPermissionUpdates(t *testing.T) {
 		assert.Equal(t, PermissionAccessWrite, diff[PermissionEndpointResponses])
 	})
 }
+
+func Test__OpenAI__PermissionSet__ForHuman(t *testing.T) {
+	permissions := PermissionSet{
+		PermissionEndpointModels:    PermissionAccessRead,
+		PermissionEndpointResponses: PermissionAccessWrite,
+	}.ForHuman()
+
+	require.Len(t, permissions, 2)
+	assert.Equal(t, "List models", permissions[0].Name)
+	assert.Equal(t, "Read", permissions[0].Access)
+	assert.Equal(t, "Responses (/v1/responses)", permissions[1].Name)
+	assert.Equal(t, "Write", permissions[1].Access)
+}

@@ -5,12 +5,12 @@ If you are using OpenAI:
 - Go to https://platform.openai.com/api-keys
 - Create a new secret key
 - Set **Permissions** to **Restricted**
-- Grant these endpoint permissions:
+- Grant these permissions:
 
-| Endpoint | Access |
+| Permission | Access |
 |----------|--------|
 {{- range $permission := .Permissions }}
-| `{{ $permission.Endpoint }}` | {{ $permission.Access }} |
+| {{ $permission.Name }} | {{ $permission.Access }} |
 {{- end }}
 
 Do not use **Read Only** for these capabilities. It can list models, but it cannot create responses.
@@ -19,9 +19,9 @@ You changed the Base URL in the previous step. Paste the API key or token for th
 
 Make sure the provider allows equivalent access for:
 
-| Endpoint | Access |
+| Permission | Access |
 |----------|--------|
 {{- range $permission := .Permissions }}
-| `{{ $permission.Endpoint }}` | {{ $permission.Access }} |
+| {{ $permission.Name }} | {{ $permission.Access }} |
 {{- end }}
 {{- end }}

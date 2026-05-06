@@ -24,8 +24,8 @@ type PermissionRequirement struct {
 }
 
 type Permission struct {
-	Endpoint string
-	Access   string
+	Name   string
+	Access string
 }
 
 type PermissionSet map[string]uint8
@@ -69,8 +69,8 @@ func (s PermissionSet) ForHuman() []Permission {
 	permissions := []Permission{}
 	for _, endpoint := range endpoints {
 		permissions = append(permissions, Permission{
-			Endpoint: endpoint,
-			Access:   accessString(s[endpoint]),
+			Name:   permissionName(endpoint),
+			Access: accessString(s[endpoint]),
 		})
 	}
 
@@ -102,4 +102,15 @@ func accessString(access uint8) string {
 	}
 
 	return "Read"
+}
+
+func permissionName(endpoint string) string {
+	switch endpoint {
+	case PermissionEndpointModels:
+		return "List models"
+	case PermissionEndpointResponses:
+		return "Responses (/v1/responses)"
+	default:
+		return endpoint
+	}
 }
