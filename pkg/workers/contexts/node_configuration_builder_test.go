@@ -72,8 +72,8 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "john", result["user"])
 	assert.Equal(t, "login", result["action"])
-	assert.Equal(t, "true", result["success"])
-	assert.Equal(t, "42", result["count"])
+	assert.Equal(t, true, result["success"])
+	assert.Equal(t, 42, result["count"])
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) {
@@ -128,8 +128,8 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) 
 	require.NoError(t, err)
 	assert.Equal(t, "john", result["user"])
 	assert.Equal(t, "login", result["action"])
-	assert.Equal(t, "true", result["success"])
-	assert.Equal(t, "42", result["count"])
+	assert.Equal(t, true, result["success"])
+	assert.Equal(t, 42, result["count"])
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
@@ -185,8 +185,8 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "john", result["user"])
 	assert.Equal(t, "login", result["action"])
-	assert.Equal(t, "true", result["success"])
-	assert.Equal(t, "42", result["count"])
+	assert.Equal(t, true, result["success"])
+	assert.Equal(t, 42, result["count"])
 }
 
 func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testing.T) {
@@ -1625,4 +1625,72 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	assert.Equal(t, "https://api.example.com", result["api_url"])
 	assert.Equal(t, "https://api.example.com", result["prev_api_url"])
 	assert.Equal(t, "ok", result["output_status"])
+}
+
+// Test_NodeConfigurationBuilder_NativeTypePreservation verifies that expressions
+// resolving to non-string values (numbers, booleans) preserve their native types
+// instead of being coerced to strings. This is required for HTTP actions that send
+// JSON bodies to APIs expecting numeric or boolean fields (e.g. float64 weights).
+func Test_NodeConfigurationBuilder_NativeTypePreservation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Name:   componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEventData := map[string]any{
+		"weight":  0.9,
+		"enabled": true,
+		"count":   42,
+		"label":   "hello",
+	}
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, rootEventData)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: rootEventData})
+
+	// Expressions that are the entire field value must return the native type.
+	// Expressions embedded inside a larger string must still produce a string.
+	configuration := map[string]any{
+		"weight":        "{{ $[\"" + triggerNode + "\"].weight }}",
+		"enabled":       "{{ $[\"" + triggerNode + "\"].enabled }}",
+		"count":         "{{ $[\"" + triggerNode + "\"].count }}",
+		"label":         "{{ $[\"" + triggerNode + "\"].label }}",
+		"interpolated":  "value is {{ $[\"" + triggerNode + "\"].count }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+
+	// Pure expressions: native types preserved.
+	assert.Equal(t, 0.9, result["weight"])
+	assert.Equal(t, true, result["enabled"])
+	assert.Equal(t, 42, result["count"])
+	assert.Equal(t, "hello", result["label"])
+
+	// Expression embedded in text: stringified as before.
+	assert.Equal(t, "value is 42", result["interpolated"])
 }
