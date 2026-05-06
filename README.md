@@ -1,3 +1,5 @@
+# I think I'm the perfect fit for this role - Luca Longoni
+
 # SuperPlane
 
 SuperPlane is an **open source control plane for platform engineering**.
