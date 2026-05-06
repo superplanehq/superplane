@@ -186,6 +186,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 	if err != nil {
@@ -214,7 +215,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -313,7 +314,7 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	//
 	// Create GitHub client, and cancel workflow run
 	//
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -496,7 +497,7 @@ func (r *RunWorkflow) poll(ctx core.ActionHookContext) error {
 		return nil
 	}
 
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return err
 	}

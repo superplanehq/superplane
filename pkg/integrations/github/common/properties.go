@@ -15,19 +15,19 @@ const OwnerTypeOrganization = "Organization"
  * these are the properties we get back from GitHub,
  * through the app creation / installation flow.
  */
-const PropertyAppID = "GitHub App ID"
-const PropertyAppSlug = "GitHub App Slug"
-const PropertyAppURL = "GitHub App URL"
-const PropertyAppInstallationID = "GitHub App Installation ID"
-const PropertyAppInstallationURL = "GitHub App Installation URL"
-const PropertyAppClientID = "GitHub App Client ID"
-const PropertyAppState = "GitHub App State"
+const PropertyAppID = "appID"
+const PropertyAppSlug = "appSlug"
+const PropertyAppURL = "appURL"
+const PropertyAppInstallationID = "appInstallationID"
+const PropertyAppInstallationURL = "appInstallationURL"
+const PropertyAppClientID = "appClientID"
+const PropertyAppState = "appState"
 
 /*
  * Two authentication methods are supported:
  * - Personal Access Token (PAT)
  * - GitHub App
  */
-const PropertyAuthMethod = "Authentication Method"
-const AuthMethodPAT = "Personal Access Token"
-const AuthMethodGitHubApp = "GitHub App"
+const PropertyAuthMethod = "authMethod"
+const AuthMethodPAT = "pat"
+const AuthMethodApp = "app"

@@ -96,7 +96,7 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		},
 	}
 
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 }
 
 func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return err
 	}

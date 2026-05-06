@@ -155,6 +155,7 @@ func (c *PublishCommitStatus) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -170,7 +171,7 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid commit SHA format: expected 40-character hexadecimal string, got %q", config.SHA)
 	}
 
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}

@@ -87,7 +87,7 @@ func (g *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 	switch authMethod {
 	case common.AuthMethodPAT:
 		return g.onCapabilityUpdateForPAT(ctx, requested, newPermissions.ForHuman())
-	case common.AuthMethodGitHubApp:
+	case common.AuthMethodApp:
 		return g.onCapabilityUpdateForGitHubApp(ctx, requested, newPermissions.ForHuman())
 	default:
 		return nil, fmt.Errorf("invalid authentication method: %s", authMethod)
@@ -297,14 +297,9 @@ func (g *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 }
 
 func (g *SetupProvider) onUpdateAppPermissionsSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	installationID, err := ctx.Properties.GetString(common.PropertyAppInstallationID)
+	installationURL, err := ctx.Properties.GetString(common.PropertyAppInstallationURL)
 	if err != nil {
 		return nil, fmt.Errorf("error getting app installation ID: %v", err)
-	}
-
-	installationURL, err := common.AppInstallationURL(ctx.Properties, installationID)
-	if err != nil {
-		return nil, fmt.Errorf("error getting app installation URL: %v", err)
 	}
 
 	acceptURL := fmt.Sprintf("%s/permissions/update", installationURL)
@@ -415,7 +410,7 @@ func (g *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (
 					Select: &configuration.SelectTypeOptions{
 						Options: []configuration.FieldOption{
 							{Label: "Personal Access Token", Value: common.AuthMethodPAT},
-							{Label: "GitHub App", Value: common.AuthMethodGitHubApp},
+							{Label: "GitHub App", Value: common.AuthMethodApp},
 						},
 					},
 				},
@@ -435,7 +430,7 @@ func (g *SetupProvider) onSelectAuthMethodSubmit(input any, ctx core.SetupStepCo
 		return nil, errors.New("invalid authentication method")
 	}
 
-	if authMethod != common.AuthMethodPAT && authMethod != common.AuthMethodGitHubApp {
+	if authMethod != common.AuthMethodPAT && authMethod != common.AuthMethodApp {
 		return nil, errors.New("invalid authentication method")
 	}
 
@@ -474,7 +469,7 @@ func (g *SetupProvider) onSelectAuthMethodSubmit(input any, ctx core.SetupStepCo
 			Instructions: instructions,
 		}, nil
 
-	case common.AuthMethodGitHubApp:
+	case common.AuthMethodApp:
 		state, err := crypto.Base64String(32)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to generate GitHub App state: %v", err)

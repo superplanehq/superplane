@@ -132,6 +132,7 @@ func (c *RemoveIssueLabel) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -147,7 +148,7 @@ func (c *RemoveIssueLabel) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}

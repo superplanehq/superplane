@@ -40,13 +40,13 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	})
 
 	t.Run("returns error when authentication method property is missing", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
+		intCtx := &contexts.IntegrationContext{}
 		_, err := g.OnCapabilityUpdate(core.CapabilityUpdateContext{
 			Logger: log,
 			Changes: map[core.IntegrationCapabilityState][]string{
 				core.IntegrationCapabilityStateRequested: {"github.runWorkflow"},
 			},
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Capabilities: &contexts.CapabilityContext{},
 		})
 		require.Error(t, err)
@@ -54,8 +54,8 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid authentication method", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyAuthMethod,
 			Value: "not-a-real-method",
 		}))
@@ -65,7 +65,7 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 			Changes: map[core.IntegrationCapabilityState][]string{
 				core.IntegrationCapabilityStateRequested: {"github.runWorkflow"},
 			},
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Capabilities: &contexts.CapabilityContext{},
 		})
 		require.Error(t, err)
@@ -73,8 +73,8 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	})
 
 	t.Run("enables capabilities when no new permissions are required", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyAuthMethod,
 			Value: common.AuthMethodPAT,
 		}))
@@ -88,7 +88,7 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 			Changes: map[core.IntegrationCapabilityState][]string{
 				core.IntegrationCapabilityStateRequested: {"github.onIssue"},
 			},
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Capabilities: capCtx,
 		})
 		require.NoError(t, err)
@@ -98,12 +98,12 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	})
 
 	t.Run("PAT requests permission update step when new permissions are needed", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyAuthMethod,
 			Value: common.AuthMethodPAT,
 		}))
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyOwner,
 			Value: "acme-corp",
 		}))
@@ -115,7 +115,7 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 			Changes: map[core.IntegrationCapabilityState][]string{
 				core.IntegrationCapabilityStateRequested: {"github.runWorkflow"},
 			},
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Capabilities: capCtx,
 		})
 		require.NoError(t, err)
@@ -127,9 +127,9 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	})
 
 	t.Run("GitHub App requests permission update step when new permissions are needed", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.CreateMany([]core.IntegrationPropertyDefinition{
-			{Name: common.PropertyAuthMethod, Value: common.AuthMethodGitHubApp},
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().CreateMany([]core.IntegrationPropertyDefinition{
+			{Name: common.PropertyAuthMethod, Value: common.AuthMethodApp},
 			{Name: common.PropertyOwner, Value: "acme-corp"},
 			{Name: common.PropertyOwnerType, Value: common.OwnerTypeUser},
 			{Name: common.PropertyAppSlug, Value: "superplane-dev"},
@@ -142,7 +142,7 @@ func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 			Changes: map[core.IntegrationCapabilityState][]string{
 				core.IntegrationCapabilityStateRequested: {"github.runWorkflow"},
 			},
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Capabilities: capCtx,
 		})
 		require.NoError(t, err)
@@ -164,17 +164,15 @@ func Test__GitHub__SetupProvider__OnPropertyUpdate(t *testing.T) {
 func Test__GitHub__SetupProvider__OnSecretUpdate(t *testing.T) {
 	g := &SetupProvider{}
 	log := logger.DiscardLogger()
-	props := contexts.NewIntegrationPropertyStorage()
 	intCtx := &contexts.IntegrationContext{}
-	secrets := intCtx.Secrets()
 
 	t.Run("unknown secret", func(t *testing.T) {
 		_, err := g.OnSecretUpdate(core.SecretUpdateContext{
 			Logger:     log,
 			SecretName: "other",
 			Value:      "x",
-			Properties: props,
-			Secrets:    secrets,
+			Properties: intCtx.Properties(),
+			Secrets:    intCtx.Secrets(),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown secret")
@@ -185,8 +183,8 @@ func Test__GitHub__SetupProvider__OnSecretUpdate(t *testing.T) {
 			Logger:     log,
 			SecretName: common.SecretPAT,
 			Value:      "   ",
-			Properties: props,
-			Secrets:    secrets,
+			Properties: intCtx.Properties(),
+			Secrets:    intCtx.Secrets(),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "value is required")
@@ -207,10 +205,11 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 	})
 
 	t.Run("selectOwner validation", func(t *testing.T) {
+		intCtx := &contexts.IntegrationContext{}
 		_, err := g.OnStepSubmit(core.SetupStepContext{
 			Step:       core.StepInfo{Name: SetupStepSelectOwner, Inputs: "not-a-map"},
 			Logger:     log,
-			Properties: contexts.NewIntegrationPropertyStorage(),
+			Properties: intCtx.Properties(),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid input")
@@ -221,7 +220,7 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 				common.PropertyOwner:     "x",
 			}},
 			Logger:     log,
-			Properties: contexts.NewIntegrationPropertyStorage(),
+			Properties: intCtx.Properties(),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid owner type")
@@ -232,38 +231,38 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 				common.PropertyOwner:     "",
 			}},
 			Logger:     log,
-			Properties: contexts.NewIntegrationPropertyStorage(),
+			Properties: intCtx.Properties(),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "owner is required")
 	})
 
 	t.Run("selectOwner success moves to capability selection", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
+		intCtx := &contexts.IntegrationContext{}
 		next, err := g.OnStepSubmit(core.SetupStepContext{
 			Step: core.StepInfo{Name: SetupStepSelectOwner, Inputs: map[string]any{
 				common.PropertyOwnerType: common.OwnerTypeUser,
 				common.PropertyOwner:     "superplanehq",
 			}},
 			Logger:     log,
-			Properties: props,
+			Properties: intCtx.Properties(),
 		})
 		require.NoError(t, err)
 		require.NotNil(t, next)
 		assert.Equal(t, SetupStepCapabilitySelection, next.Name)
 		assert.Equal(t, core.SetupStepTypeCapabilitySelection, next.Type)
 
-		ownerType, err := props.GetString(common.PropertyOwnerType)
+		ownerType, err := intCtx.Properties().GetString(common.PropertyOwnerType)
 		require.NoError(t, err)
 		assert.Equal(t, common.OwnerTypeUser, ownerType)
-		owner, err := props.GetString(common.PropertyOwner)
+		owner, err := intCtx.Properties().GetString(common.PropertyOwner)
 		require.NoError(t, err)
 		assert.Equal(t, "superplanehq", owner)
 	})
 
 	t.Run("capabilitySelection leads to auth method step", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyOwnerType,
 			Value: common.OwnerTypeUser,
 		}))
@@ -275,7 +274,7 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 				Capabilities: []string{"github.getIssue"},
 			},
 			Logger:       log,
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Capabilities: capCtx,
 		})
 		require.NoError(t, err)
@@ -285,10 +284,11 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 	})
 
 	t.Run("selectAuthMethod validation", func(t *testing.T) {
+		intCtx := &contexts.IntegrationContext{}
 		_, err := g.OnStepSubmit(core.SetupStepContext{
 			Step:       core.StepInfo{Name: SetupStepSelectAuthMethod, Inputs: 42},
 			Logger:     log,
-			Properties: contexts.NewIntegrationPropertyStorage(),
+			Properties: intCtx.Properties(),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid input")
@@ -298,15 +298,15 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 				common.PropertyAuthMethod: "nope",
 			}},
 			Logger:     log,
-			Properties: contexts.NewIntegrationPropertyStorage(),
+			Properties: intCtx.Properties(),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid authentication method")
 	})
 
 	t.Run("selectAuthMethod PAT produces enter PAT step", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyOwner,
 			Value: "my-org",
 		}))
@@ -319,25 +319,25 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 				common.PropertyAuthMethod: common.AuthMethodPAT,
 			}},
 			Logger:       log,
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Capabilities: capCtx,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, next)
 		assert.Equal(t, SetupStepEnterPAT, next.Name)
-		authMethod, err := props.GetString(common.PropertyAuthMethod)
+		authMethod, err := intCtx.Properties().GetString(common.PropertyAuthMethod)
 		require.NoError(t, err)
 		assert.Equal(t, common.AuthMethodPAT, authMethod)
 		assert.Contains(t, next.Instructions, "my-org")
 	})
 
 	t.Run("selectAuthMethod GitHub App produces redirect step for user owner", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyOwnerType,
 			Value: common.OwnerTypeUser,
 		}))
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyOwner,
 			Value: "devuser",
 		}))
@@ -348,10 +348,10 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 
 		next, err := g.OnStepSubmit(core.SetupStepContext{
 			Step: core.StepInfo{Name: SetupStepSelectAuthMethod, Inputs: map[string]any{
-				common.PropertyAuthMethod: common.AuthMethodGitHubApp,
+				common.PropertyAuthMethod: common.AuthMethodApp,
 			}},
 			Logger:          log,
-			Properties:      props,
+			Properties:      intCtx.Properties(),
 			Capabilities:    capCtx,
 			IntegrationID:   integrationID,
 			BaseURL:         "https://app.superplane.test",
@@ -366,17 +366,17 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 		assert.Equal(t, "https://github.com/settings/apps/new", next.RedirectPrompt.URL)
 		assert.Contains(t, next.RedirectPrompt.FormData["manifest"], "SuperPlane")
 		assert.Contains(t, next.RedirectPrompt.FormData["manifest"], integrationID.String())
-		_, err = props.GetString(common.PropertyAppState)
+		_, err = intCtx.Properties().GetString(common.PropertyAppState)
 		require.NoError(t, err)
 	})
 
 	t.Run("selectAuthMethod GitHub App uses organization app URL when owner type is org", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyOwnerType,
 			Value: common.OwnerTypeOrganization,
 		}))
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
+		require.NoError(t, intCtx.Properties().Create(core.IntegrationPropertyDefinition{
 			Name:  common.PropertyOwner,
 			Value: "bigcorp",
 		}))
@@ -386,10 +386,10 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 
 		next, err := g.OnStepSubmit(core.SetupStepContext{
 			Step: core.StepInfo{Name: SetupStepSelectAuthMethod, Inputs: map[string]any{
-				common.PropertyAuthMethod: common.AuthMethodGitHubApp,
+				common.PropertyAuthMethod: common.AuthMethodApp,
 			}},
 			Logger:          log,
-			Properties:      props,
+			Properties:      intCtx.Properties(),
 			Capabilities:    capCtx,
 			IntegrationID:   uuid.New(),
 			BaseURL:         "https://app.superplane.test",
@@ -401,13 +401,12 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 	})
 
 	t.Run("enterPAT validation", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
 		intCtx := &contexts.IntegrationContext{}
 
 		_, err := g.OnStepSubmit(core.SetupStepContext{
 			Step:         core.StepInfo{Name: SetupStepEnterPAT, Inputs: "not-map"},
 			Logger:       log,
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Secrets:      intCtx.Secrets(),
 			Capabilities: &contexts.CapabilityContext{},
 		})
@@ -417,7 +416,7 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 		_, err = g.OnStepSubmit(core.SetupStepContext{
 			Step:         core.StepInfo{Name: SetupStepEnterPAT, Inputs: map[string]any{common.SecretPAT: ""}},
 			Logger:       log,
-			Properties:   props,
+			Properties:   intCtx.Properties(),
 			Secrets:      intCtx.Secrets(),
 			Capabilities: &contexts.CapabilityContext{},
 		})
@@ -440,16 +439,22 @@ func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 	})
 
 	t.Run("update app permissions submit leads to accept step", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
-			Name:  common.PropertyAppInstallationID,
-			Value: "12345",
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().CreateMany([]core.IntegrationPropertyDefinition{
+			{
+				Name:  common.PropertyAppInstallationID,
+				Value: "12345",
+			},
+			{
+				Name:  common.PropertyAppInstallationURL,
+				Value: "https://github.com/organizations/testhq/settings/installations/12345",
+			},
 		}))
 
 		next, err := g.OnStepSubmit(core.SetupStepContext{
 			Step:       core.StepInfo{Name: SetupStepUpdateAppPermissions},
 			Logger:     log,
-			Properties: props,
+			Properties: intCtx.Properties(),
 		})
 		require.NoError(t, err)
 		require.NotNil(t, next)
@@ -496,8 +501,8 @@ func Test__GitHub__SetupProvider__OnStepRevert(t *testing.T) {
 	})
 
 	t.Run("selectOwner clears owner properties", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.CreateMany([]core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().CreateMany([]core.IntegrationPropertyDefinition{
 			{Name: common.PropertyOwnerType, Value: common.OwnerTypeUser},
 			{Name: common.PropertyOwner, Value: "acme"},
 		}))
@@ -505,9 +510,9 @@ func Test__GitHub__SetupProvider__OnStepRevert(t *testing.T) {
 		require.NoError(t, g.OnStepRevert(core.SetupStepContext{
 			Step:       core.StepInfo{Name: SetupStepSelectOwner},
 			Logger:     log,
-			Properties: props,
+			Properties: intCtx.Properties(),
 		}))
-		_, err := props.GetString(common.PropertyOwner)
+		_, err := intCtx.Properties().GetString(common.PropertyOwner)
 		require.Error(t, err)
 	})
 
@@ -527,8 +532,8 @@ func Test__GitHub__SetupProvider__OnStepRevert(t *testing.T) {
 	})
 
 	t.Run("selectAuthMethod clears auth properties", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
-		require.NoError(t, props.CreateMany([]core.IntegrationPropertyDefinition{
+		intCtx := &contexts.IntegrationContext{}
+		require.NoError(t, intCtx.Properties().CreateMany([]core.IntegrationPropertyDefinition{
 			{Name: common.PropertyAuthMethod, Value: common.AuthMethodPAT},
 			{Name: common.PropertyAppState, Value: "state-token"},
 		}))
@@ -536,9 +541,9 @@ func Test__GitHub__SetupProvider__OnStepRevert(t *testing.T) {
 		require.NoError(t, g.OnStepRevert(core.SetupStepContext{
 			Step:       core.StepInfo{Name: SetupStepSelectAuthMethod},
 			Logger:     log,
-			Properties: props,
+			Properties: intCtx.Properties(),
 		}))
-		_, err := props.GetString(common.PropertyAuthMethod)
+		_, err := intCtx.Properties().GetString(common.PropertyAuthMethod)
 		require.Error(t, err)
 	})
 

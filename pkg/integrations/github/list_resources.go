@@ -12,7 +12,7 @@ import (
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "repository":
-		client, err := common.NewClient(ctx.Integration)
+		client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
@@ -50,7 +50,7 @@ func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.Inte
 		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}

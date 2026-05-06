@@ -73,14 +73,6 @@ type Configuration struct {
 	Organization string `mapstructure:"organization" json:"organization"`
 }
 
-type Metadata struct {
-	InstallationID string                   `mapstructure:"installationId" json:"installationId"`
-	State          string                   `mapstructure:"state" json:"state"`
-	Owner          string                   `mapstructure:"owner" json:"owner"`
-	Repositories   []common.Repository      `mapstructure:"repositories" json:"repositories"`
-	GitHubApp      common.GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
-}
-
 func (g *GitHub) Name() string {
 	return "github"
 }
@@ -162,7 +154,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode configuration: %v", err)
 	}
 
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
@@ -190,7 +182,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		},
 	})
 
-	ctx.Integration.SetMetadata(Metadata{
+	ctx.Integration.SetMetadata(common.Metadata{
 		Owner: config.Organization,
 		State: state,
 	})
@@ -267,7 +259,7 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 
 func (g *GitHub) findInstallationID(ctx core.HTTPRequestContext) (string, error) {
 	if ctx.Integration.LegacySetup() {
-		metadata := Metadata{}
+		metadata := common.Metadata{}
 		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 		if err != nil {
 			return "", fmt.Errorf("failed to decode metadata: %v", err)
@@ -339,7 +331,7 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 	// we need to update metadata and browser action.
 	//
 	if ctx.Integration.LegacySetup() {
-		metadata := Metadata{}
+		metadata := common.Metadata{}
 		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 		if err != nil {
 			return
@@ -443,7 +435,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 		return
 	}
 
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		ctx.Logger.Errorf("failed to decode metadata: %v", err)
@@ -588,7 +580,7 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 }
 
 func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *GitHubAppData, state string) {
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return
@@ -779,7 +771,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 }
 
 func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
-	metadata := Metadata{}
+	metadata := common.Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return
@@ -1005,6 +997,10 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 		installationNumber,
 		[]byte(pem),
 	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create apps transport: %v", err)
+	}
 
 	return github.NewClient(&http.Client{Transport: itr}), nil
 }

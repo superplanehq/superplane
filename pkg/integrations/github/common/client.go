@@ -14,6 +14,18 @@ import (
 	"golang.org/x/oauth2"
 )
 
+/*
+ * For GitHub, we are using the SDK instead of plain HTTP calls,
+ * so we need a way to create the client using the HTTP context.
+ */
+type transport struct {
+	http core.HTTPContext
+}
+
+func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.http.Do(req)
+}
+
 type Client struct {
 	authMethod string
 	ownerType  string
@@ -23,7 +35,7 @@ type Client struct {
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
 	switch c.authMethod {
-	case AuthMethodGitHubApp:
+	case AuthMethodApp:
 		return c.findAppRepository(repository)
 	case AuthMethodPAT:
 		return c.findOwnerRepository(repository)
@@ -81,7 +93,7 @@ func (c *Client) listAppRepositories() ([]*github.Repository, error) {
 
 func (c *Client) ListRepositories() ([]*github.Repository, error) {
 	switch c.authMethod {
-	case AuthMethodGitHubApp:
+	case AuthMethodApp:
 		return c.listAppRepositories()
 	case AuthMethodPAT:
 		return c.listOwnerRepositories()
@@ -277,9 +289,9 @@ func (c *Client) GetOrganizationUsageReport() (*github.UsageReport, *github.Resp
 	return c.underlying.Billing.GetOrganizationUsageReport(context.Background(), c.owner, nil)
 }
 
-func NewClient(ctx core.IntegrationContext) (*Client, error) {
+func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {
 	if !ctx.LegacySetup() {
-		return newClientFromStorageContexts(ctx.Properties(), ctx.Secrets())
+		return newClientFromStorageContexts(httpCtx, ctx.Properties(), ctx.Secrets())
 	}
 
 	var metadata Metadata
@@ -298,7 +310,7 @@ func NewClient(ctx core.IntegrationContext) (*Client, error) {
 	}
 
 	itr, err := ghinstallation.New(
-		http.DefaultTransport,
+		&transport{http: httpCtx},
 		metadata.GitHubApp.ID,
 		int64(ID),
 		[]byte(pem),
@@ -314,14 +326,14 @@ func NewClient(ctx core.IntegrationContext) (*Client, error) {
 	}
 
 	return &Client{
-		authMethod: AuthMethodGitHubApp,
+		authMethod: AuthMethodApp,
 		ownerType:  ownerType,
 		owner:      metadata.Owner,
 		underlying: github.NewClient(&http.Client{Transport: itr}),
 	}, nil
 }
 
-func newClientFromStorageContexts(properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+func newClientFromStorageContexts(httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
 	authMethod, err := properties.GetString(PropertyAuthMethod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get authentication method: %v", err)
@@ -339,15 +351,15 @@ func newClientFromStorageContexts(properties core.IntegrationPropertyStorageRead
 
 	switch authMethod {
 	case AuthMethodPAT:
-		return newPATClient(owner, ownerType, secrets)
-	case AuthMethodGitHubApp:
-		return newGitHubAppClient(owner, ownerType, properties, secrets)
+		return newPATClient(owner, ownerType, httpCtx, secrets)
+	case AuthMethodApp:
+		return newGitHubAppClient(owner, ownerType, httpCtx, properties, secrets)
 	default:
 		return nil, fmt.Errorf("invalid authentication method: %s", authMethod)
 	}
 }
 
-func newPATClient(owner string, ownerType string, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+func newPATClient(owner string, ownerType string, httpCtx core.HTTPContext, secrets core.IntegrationSecretStorageReader) (*Client, error) {
 	pat, err := secrets.Get(SecretPAT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PAT: %v", err)
@@ -358,22 +370,22 @@ func newPATClient(owner string, ownerType string, secrets core.IntegrationSecret
 		return nil, fmt.Errorf("PAT is required")
 	}
 
-	underlying := github.NewClient(
-		oauth2.NewClient(
-			context.Background(),
-			oauth2.StaticTokenSource(&oauth2.Token{AccessToken: string(pat)}),
-		),
-	)
-
 	return &Client{
 		authMethod: AuthMethodPAT,
 		ownerType:  ownerType,
 		owner:      owner,
-		underlying: underlying,
+		underlying: github.NewClient(&http.Client{
+			Transport: &oauth2.Transport{
+				Base: &transport{http: httpCtx},
+				Source: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: strings.TrimSpace(pat),
+				}),
+			},
+		}),
 	}, nil
 }
 
-func newGitHubAppClient(owner string, ownerType string, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
+func newGitHubAppClient(owner string, ownerType string, httpCtx core.HTTPContext, properties core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
 	appID, err := properties.GetString(PropertyAppID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub app ID: %v", err)
@@ -400,7 +412,7 @@ func newGitHubAppClient(owner string, ownerType string, properties core.Integrat
 	}
 
 	itr, err := ghinstallation.New(
-		http.DefaultTransport,
+		&transport{http: httpCtx},
 		appNumber,
 		installationNumber,
 		[]byte(pem),
@@ -411,7 +423,7 @@ func newGitHubAppClient(owner string, ownerType string, properties core.Integrat
 	}
 
 	return &Client{
-		authMethod: AuthMethodGitHubApp,
+		authMethod: AuthMethodApp,
 		ownerType:  ownerType,
 		owner:      owner,
 		underlying: github.NewClient(&http.Client{Transport: itr}),

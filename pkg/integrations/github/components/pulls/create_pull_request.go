@@ -187,6 +187,7 @@ func (c *CreatePullRequest) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -217,7 +218,7 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return errors.New("head and base branches must be different")
 	}
 
-	client, err := common.NewClient(ctx.Integration)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}

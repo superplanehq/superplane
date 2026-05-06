@@ -32,7 +32,7 @@ type NodeMetadata struct {
 	Repository *Repository `json:"repository"`
 }
 
-func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationContext, configuration any) error {
+func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationContext, httpCtx core.HTTPContext, configuration any) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {
@@ -51,7 +51,7 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationC
 		return nil
 	}
 
-	client, err := NewClient(integration)
+	client, err := NewClient(integration, httpCtx)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
