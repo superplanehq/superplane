@@ -23,6 +23,7 @@ const {
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
   useDeleteCanvasFolder,
+  useUpdateCanvasFolderMembership,
 } = vi.hoisted(() => ({
   useCanvases: vi.fn(),
   useCanvasFolders: vi.fn(),
@@ -30,6 +31,7 @@ const {
   useCreateCanvasFolder: vi.fn(),
   useUpdateCanvasFolder: vi.fn(),
   useDeleteCanvasFolder: vi.fn(),
+  useUpdateCanvasFolderMembership: vi.fn(),
 }));
 
 const mutationMocks = vi.hoisted(() => ({
@@ -38,6 +40,7 @@ const mutationMocks = vi.hoisted(() => ({
   createCanvasFolder: vi.fn(),
   updateCanvasFolder: vi.fn(),
   deleteCanvasFolder: vi.fn(),
+  updateCanvasFolderMembership: vi.fn(),
 }));
 
 vi.mock("@/components/OrganizationMenuButton", () => ({
@@ -89,6 +92,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
   useDeleteCanvasFolder,
+  useUpdateCanvasFolderMembership,
 }));
 
 import HomePage from "./index";
@@ -137,6 +141,7 @@ describe("HomePage canvas folders", () => {
     mutationMocks.createCanvasFolder.mockResolvedValue({ data: { folder: { metadata: { id: "new-folder" } } } });
     mutationMocks.updateCanvasFolder.mockResolvedValue({});
     mutationMocks.deleteCanvasFolder.mockResolvedValue({});
+    mutationMocks.updateCanvasFolderMembership.mockResolvedValue({});
 
     useDeleteCanvas.mockReturnValue({
       mutate: mutationMocks.deleteCanvas,
@@ -146,6 +151,10 @@ describe("HomePage canvas folders", () => {
     useCreateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.createCanvasFolder, isPending: false });
     useUpdateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.updateCanvasFolder, isPending: false });
     useDeleteCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.deleteCanvasFolder, isPending: false });
+    useUpdateCanvasFolderMembership.mockReturnValue({
+      mutateAsync: mutationMocks.updateCanvasFolderMembership,
+      isPending: false,
+    });
   });
 
   it("uses the toolbar as the canvas creation entrypoint", () => {
@@ -292,9 +301,9 @@ describe("HomePage canvas folders", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: /deployments/i }));
 
     await waitFor(() => {
-      expect(mutationMocks.updateCanvasFolder).toHaveBeenCalledWith({
+      expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
         canvasId: "canvas-1",
-        targetFolderId: "folder-1",
+        folderId: "folder-1",
       });
     });
   });
@@ -342,9 +351,9 @@ describe("HomePage canvas folders", () => {
         title: "Release",
         backgroundColor: "color_1",
       });
-      expect(mutationMocks.updateCanvasFolder).toHaveBeenCalledWith({
+      expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
         canvasId: "canvas-1",
-        targetFolderId: "new-folder",
+        folderId: "new-folder",
       });
     });
   });
@@ -375,7 +384,7 @@ describe("HomePage canvas folders", () => {
     fireEvent.submit(input.closest("form")!);
 
     expect(mutationMocks.createCanvasFolder).not.toHaveBeenCalled();
-    expect(mutationMocks.updateCanvasFolder).not.toHaveBeenCalled();
+    expect(mutationMocks.updateCanvasFolderMembership).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalledWith("Folder name already exists");
   });
 
@@ -399,6 +408,6 @@ describe("HomePage canvas folders", () => {
     expect(await screen.findByText("Move to Folder")).toBeInTheDocument();
     expect(await screen.findByText("Remove from Folder")).toBeInTheDocument();
     await user.click(screen.getByText("Remove from Folder"));
-    expect(mutationMocks.updateCanvasFolder).toHaveBeenCalledWith({ canvasId: "foldered" });
+    expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({ canvasId: "foldered" });
   });
 });
