@@ -50,7 +50,7 @@ func UpdateCanvasFolderMembership(
 	if canvas.CreatedBy != nil {
 		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
 		if err != nil {
-			return nil, err
+			return nil, status.Error(codes.Internal, "failed to find canvas creator")
 		}
 	}
 

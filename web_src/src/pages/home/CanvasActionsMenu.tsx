@@ -2,36 +2,14 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
-import { Input } from "@/components/Input/input";
-import { Text } from "@/components/Text/text";
-import {
-  CANVAS_FOLDER_COLORS,
-  DEFAULT_CANVAS_FOLDER_COLOR,
-  canvasKeys,
-  useCreateCanvasFolder,
-  useDeleteCanvas,
-  useUpdateCanvasFolderMembership,
-  type CanvasFolderColor,
-} from "@/hooks/useCanvasData";
-import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { canvasKeys, useDeleteCanvas } from "@/hooks/useCanvasData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { getApiErrorMessage } from "@/lib/errors";
-import type { CanvasesCanvasFolder } from "@/api-client";
-import { Check, FolderMinus, FolderPlus, MoreVertical, Pencil, Trash2 } from "lucide-react";
-import { useState, type FormEvent, type MouseEvent } from "react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { useState, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { FOLDER_COLOR_OPTIONS } from "./canvasFolderStyles";
+import { CanvasFolderSubmenu } from "./CanvasFolderSubmenu";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 
 interface CanvasActionsMenuProps {
@@ -54,20 +32,11 @@ export function CanvasActionsMenu({
   permissionsLoading,
 }: CanvasActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newFolderTitle, setNewFolderTitle] = useState("");
-  const [newFolderColor, setNewFolderColor] = useState<CanvasFolderColor>(DEFAULT_CANVAS_FOLDER_COLOR);
   const deleteCanvasMutation = useDeleteCanvas(organizationId);
-  const createCanvasFolderMutation = useCreateCanvasFolder(organizationId);
-  const updateCanvasFolderMembershipMutation = useUpdateCanvasFolderMembership(organizationId);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const canManage = canUpdateCanvases || canDeleteCanvases;
-  const folderActionLabel = canvas.canvasFolderId ? "Move to Folder" : "Add to Folder";
-  const normalizedNewFolderTitle = newFolderTitle.trim().toLowerCase();
-  const isDuplicateNewFolderTitle = canvasFolders.some(
-    (folder) => folder.title.trim().toLowerCase() === normalizedNewFolderTitle,
-  );
 
   const closeDialog = () => {
     setIsDialogOpen(false);
@@ -77,67 +46,6 @@ export function CanvasActionsMenu({
     event.preventDefault();
     event.stopPropagation();
     setIsDialogOpen(true);
-  };
-
-  const handleAssignToFolder = async (folderId: string) => {
-    if (!canUpdateCanvases || folderId === canvas.canvasFolderId) return;
-
-    try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id, folderId });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to add canvas to folder"));
-    }
-  };
-
-  const handleRemoveFromFolder = async () => {
-    if (!canUpdateCanvases || !canvas.canvasFolderId) return;
-
-    try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to remove canvas from folder"));
-    }
-  };
-
-  const handleCreateFolder = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!canUpdateCanvases) return;
-
-    const title = newFolderTitle.trim();
-    if (!title) return;
-
-    if (isDuplicateNewFolderTitle) {
-      showErrorToast("Folder name already exists");
-      return;
-    }
-
-    try {
-      const response = await createCanvasFolderMutation.mutateAsync({ title, backgroundColor: newFolderColor });
-      let folderId = response.data?.folder?.metadata?.id;
-
-      if (!folderId) {
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-        await queryClient.refetchQueries({ queryKey: canvasKeys.folderList(organizationId), type: "active" });
-
-        const folders = queryClient.getQueryData<CanvasesCanvasFolder[]>(canvasKeys.folderList(organizationId)) || [];
-        folderId =
-          folders.find((folder) => folder.spec?.title?.trim().toLowerCase() === title.toLowerCase())?.metadata?.id ||
-          "";
-      }
-
-      if (!folderId) {
-        throw new Error("missing canvas folder id");
-      }
-
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id, folderId });
-
-      setNewFolderTitle("");
-      setNewFolderColor(DEFAULT_CANVAS_FOLDER_COLOR);
-      showSuccessToast("Folder created");
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to create folder"));
-    }
   };
 
   const handleDelete = async () => {
@@ -204,7 +112,7 @@ export function CanvasActionsMenu({
               <button
                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Canvas actions"
-                disabled={deleteCanvasMutation.isPending || updateCanvasFolderMembershipMutation.isPending}
+                disabled={deleteCanvasMutation.isPending}
               >
                 <MoreVertical size={16} />
               </button>
@@ -228,94 +136,12 @@ export function CanvasActionsMenu({
                 </DropdownMenuItem>
               </PermissionTooltip>
 
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger disabled={!canUpdateCanvases}>
-                  <FolderPlus size={16} />
-                  {folderActionLabel}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-64">
-                  {canvasFolders.length > 0 && (
-                    <>
-                      {canvasFolders.map((folder) => (
-                        <DropdownMenuItem
-                          key={folder.id}
-                          onClick={() => handleAssignToFolder(folder.id)}
-                          disabled={
-                            folder.id === canvas.canvasFolderId || updateCanvasFolderMembershipMutation.isPending
-                          }
-                        >
-                          <span
-                            className={cn(
-                              "h-3 w-3 rounded-full",
-                              FOLDER_COLOR_OPTIONS[folder.backgroundColor].swatchClass,
-                            )}
-                          />
-                          <span className="truncate">{folder.title}</span>
-                          {folder.id === canvas.canvasFolderId ? <Check className="ml-auto h-4 w-4" /> : null}
-                        </DropdownMenuItem>
-                      ))}
-
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-
-                  <form
-                    className="space-y-3 p-3"
-                    onSubmit={handleCreateFolder}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Input
-                      value={newFolderTitle}
-                      onChange={(event) => setNewFolderTitle(event.target.value)}
-                      onKeyDown={(event) => event.stopPropagation()}
-                      placeholder="New folder name"
-                      className="h-8"
-                      maxLength={128}
-                      disabled={!canUpdateCanvases || createCanvasFolderMutation.isPending}
-                    />
-                    {isDuplicateNewFolderTitle ? (
-                      <Text className="text-xs text-red-600 dark:text-red-300">Folder name already exists</Text>
-                    ) : null}
-                    <div className="flex items-center gap-2">
-                      {CANVAS_FOLDER_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          aria-label={`${FOLDER_COLOR_OPTIONS[color].label} folder color`}
-                          className={cn(
-                            "flex h-5 w-5 items-center justify-center rounded-full border border-slate-950/15 text-white",
-                            FOLDER_COLOR_OPTIONS[color].swatchClass,
-                            newFolderColor === color && "ring-2 ring-gray-900 ring-offset-1",
-                          )}
-                          onClick={() => setNewFolderColor(color)}
-                        >
-                          {newFolderColor === color ? <Check className="h-3 w-3" /> : null}
-                        </button>
-                      ))}
-                    </div>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      className="w-full"
-                      disabled={
-                        !newFolderTitle.trim() || isDuplicateNewFolderTitle || createCanvasFolderMutation.isPending
-                      }
-                    >
-                      Create Folder
-                    </Button>
-                  </form>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-
-              {canvas.canvasFolderId ? (
-                <DropdownMenuItem
-                  onClick={handleRemoveFromFolder}
-                  disabled={!canUpdateCanvases || updateCanvasFolderMembershipMutation.isPending}
-                >
-                  <FolderMinus size={16} />
-                  Remove from Folder
-                </DropdownMenuItem>
-              ) : null}
+              <CanvasFolderSubmenu
+                canvas={canvas}
+                canvasFolders={canvasFolders}
+                organizationId={organizationId}
+                canUpdateCanvases={canUpdateCanvases}
+              />
 
               <PermissionTooltip
                 allowed={canDeleteCanvases || permissionsLoading}
