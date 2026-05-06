@@ -178,6 +178,21 @@ type CanvasNodeReference struct {
 	CanvasName string
 	NodeID     string
 	NodeName   string
+	NodeType   string
+	NodeRef    datatypes.JSONType[NodeRef]
+}
+
+func (c *CanvasNodeReference) ComponentName() string {
+	r := c.NodeRef.Data()
+	if c.NodeType == NodeTypeComponent && r.Component != nil {
+		return r.Component.Name
+	}
+
+	if c.NodeType == NodeTypeTrigger && r.Trigger != nil {
+		return r.Trigger.Name
+	}
+
+	return ""
 }
 
 func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReference, error) {
@@ -186,7 +201,7 @@ func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReferen
 		Table("workflow_nodes AS wn").
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
 		Joins("JOIN workflow_versions AS live_version ON live_version.id = w.live_version_id").
-		Select("w.id as canvas_id, live_version.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
+		Select("w.id as canvas_id, live_version.name as canvas_name, wn.node_id as node_id, wn.name as node_name, wn.type as node_type, wn.ref as node_ref").
 		Where("wn.app_installation_id = ?", integrationID).
 		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).
