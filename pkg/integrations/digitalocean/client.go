@@ -109,9 +109,10 @@ func (c *Client) GetAccount() (*Account, error) {
 
 // Region represents a DigitalOcean region
 type Region struct {
-	Slug      string `json:"slug"`
-	Name      string `json:"name"`
-	Available bool   `json:"available"`
+	Slug      string   `json:"slug"`
+	Name      string   `json:"name"`
+	Sizes     []string `json:"sizes"`
+	Available bool     `json:"available"`
 }
 
 // ListRegions retrieves all available regions
@@ -140,6 +141,7 @@ type Size struct {
 	VCPUs        int     `json:"vcpus"`
 	Disk         int     `json:"disk"`
 	PriceMonthly float64 `json:"price_monthly"`
+	Description  string  `json:"description"`
 	Available    bool    `json:"available"`
 }
 
@@ -3150,4 +3152,225 @@ func resolveAppMetadata(ctx core.SetupContext, appID string) error {
 		AppID:   appID,
 		AppName: appName,
 	})
+}
+
+// ListGPUSizes returns only GPU-specific droplet sizes
+func (c *Client) ListGPUSizes() ([]Size, error) {
+	sizes, err := c.ListSizes()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuSizes := make([]Size, 0)
+	for _, size := range sizes {
+		if !size.Available {
+			continue
+		}
+		if strings.HasPrefix(size.Slug, "gpu-") {
+			gpuSizes = append(gpuSizes, size)
+		}
+	}
+
+	return gpuSizes, nil
+}
+
+// ListGPURegions returns only regions that support GPU droplets
+func (c *Client) ListGPURegions() ([]Region, error) {
+	regions, err := c.ListRegions()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuRegions := make([]Region, 0)
+	for _, region := range regions {
+		if !region.Available {
+			continue
+		}
+
+		for _, size := range region.Sizes {
+			if strings.HasPrefix(size, "gpu-") {
+				gpuRegions = append(gpuRegions, region)
+				break
+			}
+		}
+	}
+
+	return gpuRegions, nil
+}
+
+// ListGPUDroplets returns only GPU droplets (droplets using GPU sizes)
+func (c *Client) ListGPUDroplets() ([]Droplet, error) {
+	droplets, err := c.ListDroplets()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuDroplets := make([]Droplet, 0)
+	for _, droplet := range droplets {
+		if strings.HasPrefix(droplet.SizeSlug, "gpu-") {
+			gpuDroplets = append(gpuDroplets, droplet)
+		}
+	}
+
+	return gpuDroplets, nil
+}
+
+// ListGPUImagesApplication returns only GPU-related one-click/marketplace application images.
+func (c *Client) ListGPUImagesApplication() ([]Image, error) {
+	appImages, err := c.ListImages("application")
+	if err != nil {
+		return nil, err
+	}
+
+	gpuImages := make([]Image, 0)
+	for _, image := range appImages {
+		if isGPURelatedImage(image) {
+			gpuImages = append(gpuImages, image)
+		}
+	}
+
+	return gpuImages, nil
+}
+
+// ListGPUImagesDistribution returns only GPU-compatible base OS distribution images.
+func (c *Client) ListGPUImagesDistribution() ([]Image, error) {
+	distImages, err := c.ListImages("distribution")
+	if err != nil {
+		return nil, err
+	}
+
+	gpuImages := make([]Image, 0)
+	for _, image := range distImages {
+		if isGPUSupportedDistribution(image) {
+			gpuImages = append(gpuImages, image)
+		}
+	}
+
+	return gpuImages, nil
+}
+
+// isGPURelatedImage checks if an image is GPU-related based on keywords in name/slug
+func isGPURelatedImage(image Image) bool {
+	// Use more specific keywords to avoid false positives like "rails", "portainer", "phpmyadmin"
+	gpuKeywords := []string{
+		"gpu", "cuda", "nvidia", "ml-in-a-box", "pytorch", "tensorflow",
+		"machine learning", "deep learning", "machine-learning", "deep-learning",
+	}
+
+	lowerName := strings.ToLower(image.Name)
+	lowerSlug := strings.ToLower(image.Slug)
+
+	for _, keyword := range gpuKeywords {
+		if strings.Contains(lowerName, keyword) || strings.Contains(lowerSlug, keyword) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// gpuMinVersions defines the minimum OS version (major*100+minor) required for GPU droplet
+// support per distribution slug prefix. New versions released by DigitalOcean will automatically
+// be included once they meet or exceed these minimums.
+// All versions are encoded as major*100+minor (e.g. 22.04 → 2204, 11.x → 1100).
+var gpuMinVersions = map[string]int{
+	"ubuntu":     2204, // Ubuntu 22.04+
+	"fedora":     4200, // Fedora 42+
+	"debian":     1100, // Debian 11+
+	"rockylinux": 800,  // Rocky Linux 8+
+}
+
+// isGPUSupportedDistribution checks if a distribution image meets the minimum version
+// required for DigitalOcean GPU droplet support.
+// Slug format for distributions is: <distro>-<major>-<minor>-<arch> (e.g. ubuntu-22-04-x64)
+func isGPUSupportedDistribution(image Image) bool {
+	slug := image.Slug
+	if slug == "" {
+		return false
+	}
+
+	for prefix, minVersion := range gpuMinVersions {
+		if !strings.HasPrefix(slug, prefix+"-") {
+			continue
+		}
+
+		// Strip the prefix and parse version parts.
+		// Version is always encoded as major*100+minor (minor defaults to 0 if absent).
+		rest := strings.TrimPrefix(slug, prefix+"-")
+		parts := strings.SplitN(rest, "-", 3)
+
+		major, err := strconv.Atoi(parts[0])
+		if err != nil {
+			continue
+		}
+
+		minor := 0
+		if len(parts) >= 2 {
+			if m, err := strconv.Atoi(parts[1]); err == nil {
+				minor = m
+			}
+		}
+
+		version := major*100 + minor
+		if version >= minVersion {
+			return true
+		}
+	}
+
+	return false
+}
+func (c *Client) RenameDroplet(dropletID int, name string) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]string{
+		"type": "rename",
+		"name": name,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// ResizeDroplet resizes a droplet to a new size (only supports upsizing)
+func (c *Client) ResizeDroplet(dropletID int, size string, resizeDisk bool) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]any{
+		"type": "resize",
+		"size": size,
+		"disk": resizeDisk,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
 }
