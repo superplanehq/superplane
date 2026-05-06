@@ -307,6 +307,7 @@ func (c *IntegrationContext) GetState() string {
 }
 
 func (c *IntegrationContext) Ready() {
+	c.integration.SetupState = nil
 	c.integration.State = models.IntegrationStateReady
 	c.integration.StateDescription = ""
 }
