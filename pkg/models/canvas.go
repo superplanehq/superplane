@@ -15,6 +15,7 @@ type Canvas struct {
 	ID                      uuid.UUID
 	OrganizationID          uuid.UUID
 	LiveVersionID           *uuid.UUID
+	CanvasGroupID           *uuid.UUID
 	IsTemplate              bool
 	ChangeManagementEnabled bool
 	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover]

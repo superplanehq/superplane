@@ -5,6 +5,12 @@ import {
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
   canvasesUpdateCanvas,
+  canvasesListCanvasGroups,
+  canvasesCreateCanvasGroup,
+  canvasesUpdateCanvasGroup,
+  canvasesUpdateCanvasGroupPosition,
+  canvasesDeleteCanvasGroup,
+  canvasesUpdateCanvasGroupMembership,
   canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
   canvasesUpdateCanvasVersion,
@@ -37,6 +43,7 @@ import {
 } from "../api-client/sdk.gen";
 import type {
   CanvasesCanvas,
+  CanvasesCanvasGroup,
   CanvasesCanvasVersion,
   SuperplaneComponentsNode,
   ComponentsPosition,
@@ -50,6 +57,8 @@ export const canvasKeys = {
   all: ["canvases"] as const,
   lists: () => [...canvasKeys.all, "list"] as const,
   list: (orgId: string) => [...canvasKeys.lists(), orgId] as const,
+  groups: () => [...canvasKeys.all, "groups"] as const,
+  groupList: (orgId: string) => [...canvasKeys.groups(), orgId] as const,
   templates: () => [...canvasKeys.all, "templates"] as const,
   templateList: (orgId: string) => [...canvasKeys.templates(), orgId] as const,
   details: () => [...canvasKeys.all, "detail"] as const,
@@ -116,6 +125,9 @@ export const canvasKeys = {
   canvasLaunchpad: (canvasId: string) => [...canvasKeys.all, "launchpad", canvasId] as const,
 };
 
+export const CANVAS_GROUP_COLORS = ["blue-800", "green-800", "slate-700", "violet-800", "yellow-800"] as const;
+export type CanvasGroupColor = (typeof CANVAS_GROUP_COLORS)[number];
+
 export const triggerKeys = {
   all: ["triggers"] as const,
   lists: () => [...triggerKeys.all, "list"] as const,
@@ -161,6 +173,17 @@ export const useCanvasTemplates = (organizationId: string) => {
       );
       const canvases = response.data?.canvases || [];
       return canvases.filter((canvas) => canvas.metadata?.isTemplate);
+    },
+    enabled: !!organizationId,
+  });
+};
+
+export const useCanvasGroups = (organizationId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.groupList(organizationId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasGroups(withOrganizationHeader({}));
+      return response.data?.groups || [];
     },
     enabled: !!organizationId,
   });
@@ -465,6 +488,159 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           };
         });
       }
+    },
+  });
+};
+
+export const useCreateCanvasGroup = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { title: string; backgroundColor?: CanvasGroupColor }) => {
+      return await canvasesCreateCanvasGroup(
+        withOrganizationHeader({
+          body: {
+            group: {
+              spec: {
+                title: data.title,
+                backgroundColor: data.backgroundColor || "blue-800",
+              },
+            },
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const createdGroup = response?.data?.group;
+      queryClient.setQueryData(canvasKeys.groupList(organizationId), (current: CanvasesCanvasGroup[] | undefined) => {
+        if (!createdGroup?.metadata?.id) {
+          return current;
+        }
+
+        const nextGroups = current ? [...current] : [];
+        const existingGroupIndex = nextGroups.findIndex((group) => group.metadata?.id === createdGroup.metadata?.id);
+        if (existingGroupIndex >= 0) {
+          nextGroups[existingGroupIndex] = createdGroup;
+        } else {
+          nextGroups.unshift(createdGroup);
+        }
+
+        return nextGroups;
+      });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.groupList(organizationId) });
+    },
+  });
+};
+
+export const useUpdateCanvasGroup = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { groupId: string; title: string; backgroundColor: CanvasGroupColor }) => {
+      return await canvasesUpdateCanvasGroup(
+        withOrganizationHeader({
+          path: { id: data.groupId },
+          body: {
+            group: {
+              spec: {
+                title: data.title,
+                backgroundColor: data.backgroundColor,
+              },
+            },
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const updatedGroup = response?.data?.group;
+      queryClient.setQueryData(canvasKeys.groupList(organizationId), (current: CanvasesCanvasGroup[] | undefined) => {
+        if (!current || !updatedGroup?.metadata?.id) {
+          return current;
+        }
+
+        const nextGroups = current.map((group) =>
+          group.metadata?.id === updatedGroup.metadata?.id ? updatedGroup : group,
+        );
+        return nextGroups;
+      });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.groupList(organizationId) });
+    },
+  });
+};
+
+export const useUpdateCanvasGroupPosition = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { groupId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN" }) => {
+      return await canvasesUpdateCanvasGroupPosition(
+        withOrganizationHeader({
+          path: { id: data.groupId },
+          body: {
+            id: data.groupId,
+            direction: data.direction,
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const groups = response?.data?.groups;
+      if (groups) {
+        queryClient.setQueryData(canvasKeys.groupList(organizationId), groups);
+      }
+      queryClient.invalidateQueries({ queryKey: canvasKeys.groupList(organizationId) });
+    },
+  });
+};
+
+export const useDeleteCanvasGroup = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (groupId: string) => {
+      return await canvasesDeleteCanvasGroup(
+        withOrganizationHeader({
+          path: { id: groupId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.groupList(organizationId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    },
+  });
+};
+
+export const useUpdateCanvasGroupMembership = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { canvasId: string; groupId?: string }) => {
+      return await canvasesUpdateCanvasGroupMembership(
+        withOrganizationHeader({
+          path: { canvasId: data.canvasId },
+          body: {
+            groupId: data.groupId || "",
+          },
+        }),
+      );
+    },
+    onSuccess: (response, variables) => {
+      const updatedCanvas = response?.data?.canvas;
+
+      if (updatedCanvas) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, variables.canvasId), updatedCanvas);
+        queryClient.setQueryData(canvasKeys.list(organizationId), (current: CanvasesCanvas[] | undefined) => {
+          if (!current) {
+            return current;
+          }
+
+          return current.map((canvas) => (canvas.metadata?.id === updatedCanvas.metadata?.id ? updatedCanvas : canvas));
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.groupList(organizationId) });
     },
   });
 };

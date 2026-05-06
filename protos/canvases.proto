@@ -239,6 +239,76 @@ service Canvases {
     };
   }
 
+  rpc ListCanvasGroups(ListCanvasGroupsRequest) returns (ListCanvasGroupsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvas-groups"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas groups";
+      description: "Returns all canvas groups for an organization";
+      tags: "CanvasGroup";
+    };
+  }
+
+  rpc CreateCanvasGroup(CreateCanvasGroupRequest) returns (CreateCanvasGroupResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvas-groups"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create canvas group";
+      description: "Creates a canvas group";
+      tags: "CanvasGroup";
+    };
+  }
+
+  rpc UpdateCanvasGroup(UpdateCanvasGroupRequest) returns (UpdateCanvasGroupResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvas-groups/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas group";
+      description: "Updates a canvas group";
+      tags: "CanvasGroup";
+    };
+  }
+
+  rpc DeleteCanvasGroup(DeleteCanvasGroupRequest) returns (DeleteCanvasGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvas-groups/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete canvas group";
+      description: "Deletes a canvas group without deleting its canvases";
+      tags: "CanvasGroup";
+    };
+  }
+
+  rpc UpdateCanvasGroupPosition(UpdateCanvasGroupPositionRequest) returns (UpdateCanvasGroupPositionResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvas-groups/{id}/position"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas group position";
+      description: "Moves a canvas group up or down in the manual ordering";
+      tags: "CanvasGroup";
+    };
+  }
+
+  rpc UpdateCanvasGroupMembership(UpdateCanvasGroupMembershipRequest) returns (UpdateCanvasGroupMembershipResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/group"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas group membership";
+      description: "Adds a canvas to a group, moves it between groups, or removes it from a group";
+      tags: "CanvasGroup";
+    };
+  }
+
   rpc ListNodeQueueItems(ListNodeQueueItemsRequest) returns (ListNodeQueueItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue"
@@ -674,9 +744,79 @@ message DeleteCanvasRequest {
 
 message DeleteCanvasResponse {}
 
+message ListCanvasGroupsRequest {}
+
+message ListCanvasGroupsResponse {
+  repeated CanvasGroup groups = 1;
+}
+
+message CreateCanvasGroupRequest {
+  CanvasGroup group = 1;
+}
+
+message CreateCanvasGroupResponse {
+  CanvasGroup group = 1;
+}
+
+message UpdateCanvasGroupRequest {
+  string id = 1;
+  CanvasGroup group = 2;
+}
+
+message UpdateCanvasGroupResponse {
+  CanvasGroup group = 1;
+}
+
+message DeleteCanvasGroupRequest {
+  string id = 1;
+}
+
+message DeleteCanvasGroupResponse {}
+
+message UpdateCanvasGroupPositionRequest {
+  enum Direction {
+    DIRECTION_UNSPECIFIED = 0;
+    DIRECTION_UP = 1;
+    DIRECTION_DOWN = 2;
+  }
+
+  string id = 1;
+  Direction direction = 2;
+}
+
+message UpdateCanvasGroupPositionResponse {
+  repeated CanvasGroup groups = 1;
+}
+
+message UpdateCanvasGroupMembershipRequest {
+  string canvas_id = 1;
+  string group_id = 2;
+}
+
+message UpdateCanvasGroupMembershipResponse {
+  Canvas canvas = 1;
+}
+
 message UserRef {
   string id = 1;
   string name = 2;
+}
+
+message CanvasGroup {
+  message Metadata {
+    string id = 1;
+    string organization_id = 2;
+    google.protobuf.Timestamp created_at = 3;
+    google.protobuf.Timestamp updated_at = 4;
+  }
+
+  message Spec {
+    string title = 1;
+    string background_color = 2;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message Canvas {
@@ -689,6 +829,7 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     bool is_template = 8;
+    string canvas_group_id = 9;
   }
 
   message ChangeManagement {

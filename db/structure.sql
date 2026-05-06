@@ -188,6 +188,22 @@ CREATE TABLE public.blueprints (
 
 
 --
+-- Name: canvas_groups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_groups (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    title character varying(128) NOT NULL,
+    background_color character varying(32) DEFAULT 'blue-800'::character varying NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    sort_order bigint NOT NULL,
+    CONSTRAINT canvas_groups_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue-800'::character varying, 'green-800'::character varying, 'slate-700'::character varying, 'violet-800'::character varying, 'yellow-800'::character varying])::text[])))
+);
+
+
+--
 -- Name: canvas_launchpads; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -651,7 +667,8 @@ CREATE TABLE public.workflows (
     is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
     change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL,
-    change_management_enabled boolean DEFAULT false NOT NULL
+    change_management_enabled boolean DEFAULT false NOT NULL,
+    canvas_group_id uuid
 );
 
 
@@ -780,6 +797,22 @@ ALTER TABLE ONLY public.blueprints
 
 ALTER TABLE ONLY public.blueprints
     ADD CONSTRAINT blueprints_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: canvas_groups canvas_groups_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_groups
+    ADD CONSTRAINT canvas_groups_organization_id_title_key UNIQUE (organization_id, title);
+
+
+--
+-- Name: canvas_groups canvas_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_groups
+    ADD CONSTRAINT canvas_groups_pkey PRIMARY KEY (id);
 
 
 --
@@ -1183,6 +1216,13 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 
 
 --
+-- Name: idx_canvas_groups_organization_id_title; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvas_groups_organization_id_title ON public.canvas_groups USING btree (organization_id, title);
+
+
+--
 -- Name: idx_canvas_memories_canvas_namespace; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1463,6 +1503,13 @@ CREATE INDEX idx_workflow_versions_workflow_id ON public.workflow_versions USING
 
 
 --
+-- Name: idx_workflows_canvas_group_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflows_canvas_group_id ON public.workflows USING btree (canvas_group_id);
+
+
+--
 -- Name: idx_workflows_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1574,6 +1621,14 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 ALTER TABLE ONLY public.app_installations
     ADD CONSTRAINT app_installations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_groups canvas_groups_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_groups
+    ADD CONSTRAINT canvas_groups_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -1929,6 +1984,14 @@ ALTER TABLE ONLY public.workflow_versions
 
 
 --
+-- Name: workflows workflows_canvas_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflows
+    ADD CONSTRAINT workflows_canvas_group_id_fkey FOREIGN KEY (canvas_group_id) REFERENCES public.canvas_groups(id) ON DELETE SET NULL;
+
+
+--
 -- Name: workflows workflows_live_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1968,7 +2031,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260430070945	f
+20260506080325	f
 \.
 
 
