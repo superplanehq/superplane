@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
 	"github.com/superplane/runner/fleet-manager/internal/store"
 	"github.com/superplane/runner/shared/webhook"
@@ -38,6 +40,34 @@ func main() {
 		Webhook: webhook.DefaultSender(),
 		Log:     log,
 	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	ecCfg, ecErr := ec2provision.ConfigFromEnv()
+	switch {
+	case ecErr == nil:
+		launcher, err := ec2provision.New(context.Background(), ecCfg, log)
+		if err != nil {
+			log.Error("ec2 provision init", slog.Any("err", err))
+			os.Exit(1)
+		}
+		reconcileEvery := 60 * time.Second
+		if v := getenv("EC2_PROVISION_RECONCILE_INTERVAL_SEC", ""); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 15 {
+				reconcileEvery = time.Duration(n) * time.Second
+			}
+		}
+		go ec2provision.RunReconcileLoop(ctx, log, reconcileEvery, launcher)
+		log.Info("ec2 hot runner pool enabled",
+			slog.Int("hot_instance_count", ecCfg.HotInstanceCount),
+			slog.String("reconcile_interval", reconcileEvery.String()))
+	case errors.Is(ecErr, ec2provision.ErrDisabled):
+		// EC2 pool off
+	default:
+		log.Error("ec2 provision config", slog.Any("err", ecErr))
+		os.Exit(1)
+	}
 	auth := getenv("AUTH_TOKEN", "")
 	handler := fleetmanager.NewRouter(srv, fleetmanager.RouterOptions{AuthToken: auth})
 
@@ -47,9 +77,6 @@ func main() {
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	reapInterval := 15 * time.Second
 	if v := getenv("REAP_INTERVAL_SEC", ""); v != "" {

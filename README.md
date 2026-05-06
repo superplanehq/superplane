@@ -84,6 +84,8 @@ export BROKER_PUBLIC_URL=http://127.0.0.1:8081   # fleet-manager must reach this
 | `AUTH_TOKEN`         | (empty)      | If set, requires `Authorization: Bearer <token>` for `/v1/*` |
 | `REAP_INTERVAL_SEC`  | `15`         | How often to return expired leases to the queue              |
 
+Optional **EC2 hot runner pool** — set **`AWS_REGION`**, **`EC2_PROVISION_HOT_INSTANCE_COUNT`** (non-negative target for `pending`+`running` instances tagged `superplane_managed_runner`), plus **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`** (comma-separated), and **`EC2_PROVISION_FLEET_MANAGER_URL`** (base URL runners use to reach fleet-manager, often a **private** VPC URL). Fleet-manager **reconciles in the background** (default every **60** s, override with **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**) via **`ec2:RunInstances`** / **`ec2:TerminateInstances`**. Omit **`EC2_PROVISION_HOT_INSTANCE_COUNT`** to disable EC2 logic entirely. Optional: **`EC2_PROVISION_INSTANCE_TYPE`** (default `t3.micro`), **`EC2_PROVISION_RUNNER_IMAGE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**. IAM needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, **`ec2:CreateTags`**, **`ec2:TerminateInstances`**, and **`iam:PassRole`** when using an instance profile.
+
 ```bash
 export DATABASE_PATH=./fleet.db
 ./bin/fleet-manager
