@@ -659,7 +659,7 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
-    canvas_folder_id uuid
+    folder_id uuid
 );
 
 
@@ -1486,10 +1486,10 @@ CREATE INDEX idx_workflow_versions_workflow_id ON public.workflow_versions USING
 
 
 --
--- Name: idx_workflows_canvas_folder_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflows_folder_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflows_canvas_folder_id ON public.workflows USING btree (canvas_folder_id);
+CREATE INDEX idx_workflows_folder_id ON public.workflows USING btree (folder_id);
 
 
 --
@@ -1951,11 +1951,11 @@ ALTER TABLE ONLY public.workflow_versions
 
 
 --
--- Name: workflows workflows_canvas_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflows workflows_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflows
-    ADD CONSTRAINT workflows_canvas_folder_id_fkey FOREIGN KEY (canvas_folder_id) REFERENCES public.canvas_folders(id) ON DELETE SET NULL;
+    ADD CONSTRAINT workflows_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.canvas_folders(id) ON DELETE SET NULL;
 
 
 --
@@ -2043,4 +2043,3 @@ COPY public.data_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
-

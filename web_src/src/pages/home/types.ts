@@ -16,4 +16,5 @@ export interface CanvasFolderData {
   id: string;
   title: string;
   backgroundColor: CanvasFolderColor;
+  canvasIds: string[];
 }

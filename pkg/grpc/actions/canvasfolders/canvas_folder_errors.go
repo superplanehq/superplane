@@ -1,4 +1,4 @@
-package canvases
+package canvasfolders
 
 import (
 	"errors"
@@ -21,6 +21,8 @@ func canvasFolderErrorToStatus(err error) error {
 		return status.Error(codes.InvalidArgument, "invalid canvas folder move direction")
 	case errors.Is(err, models.ErrCanvasFolderTitleAlreadyExists):
 		return status.Error(codes.AlreadyExists, "canvas folder with the same title already exists")
+	case errors.Is(err, models.ErrCanvasFolderCanvasNotFound):
+		return status.Error(codes.NotFound, "canvas not found")
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return status.Error(codes.NotFound, "canvas folder not found")
 	default:

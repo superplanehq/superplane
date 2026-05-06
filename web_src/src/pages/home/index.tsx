@@ -19,7 +19,7 @@ import {
 } from "../../hooks/useCanvasData";
 import { Button } from "@/components/ui/button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
-import type { CanvasesCanvas, CanvasesCanvasFolder } from "@/api-client";
+import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import type { CanvasCardData, CanvasFolderData } from "./types";
@@ -44,7 +44,7 @@ function toCanvasCardData(canvas: CanvasesCanvas, formatDate: (value?: string) =
     name,
     description: canvas.metadata?.description,
     createdAt: formatDate(canvas.metadata?.createdAt),
-    canvasFolderId: canvas.metadata?.canvasFolderId || undefined,
+    canvasFolderId: canvas.metadata?.folderId || undefined,
     createdBy: canvas.metadata?.createdBy,
     nodes: canvas.spec?.nodes || [],
     edges: canvas.spec?.edges || [],
@@ -89,10 +89,11 @@ const HomePage = () => {
     .sort(compareByName);
 
   const canvasFolders: CanvasFolderData[] = (canvasFoldersData || [])
-    .map((folder: CanvasesCanvasFolder) => ({
+    .map((folder: CanvasFoldersCanvasFolder) => ({
       id: folder.metadata?.id || "",
       title: folder.spec?.title || "",
       backgroundColor: asCanvasFolderColor(folder.spec?.backgroundColor),
+      canvasIds: folder.spec?.canvases?.map((canvas) => canvas.id || "").filter(Boolean) || [],
     }))
     .filter((folder) => folder.id && folder.title);
 

@@ -31,6 +31,7 @@ var (
 	ErrCanvasFolderTitleTooLong           = errors.New("canvas folder title is too long")
 	ErrCanvasFolderInvalidBackgroundColor = errors.New("invalid canvas folder background color")
 	ErrCanvasFolderInvalidMoveDirection   = errors.New("invalid canvas folder move direction")
+	ErrCanvasFolderCanvasNotFound         = errors.New("canvas not found")
 )
 
 var CanvasFolderBackgroundColors = []string{
@@ -50,6 +51,7 @@ type CanvasFolder struct {
 	SortOrder       int64
 	CreatedAt       *time.Time
 	UpdatedAt       *time.Time
+	Canvases        []Canvas `gorm:"foreignKey:CanvasFolderID"`
 }
 
 func (f *CanvasFolder) TableName() string {
@@ -63,6 +65,9 @@ func ListCanvasFolders(organizationID uuid.UUID) ([]CanvasFolder, error) {
 func ListCanvasFoldersInTransaction(tx *gorm.DB, organizationID uuid.UUID) ([]CanvasFolder, error) {
 	var folders []CanvasFolder
 	err := tx.
+		Preload("Canvases", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("name ASC").Order("id ASC")
+		}).
 		Where("organization_id = ?", organizationID).
 		Order("sort_order ASC").
 		Order("created_at DESC").
@@ -152,6 +157,38 @@ func CreateCanvasFolderInTransaction(tx *gorm.DB, organizationID uuid.UUID, titl
 
 func UpdateCanvasFolder(organizationID, id uuid.UUID, title, backgroundColor string) (*CanvasFolder, error) {
 	return UpdateCanvasFolderInTransaction(database.Conn(), organizationID, id, title, backgroundColor)
+}
+
+func UpdateCanvasFolderWithMembership(
+	organizationID,
+	id uuid.UUID,
+	title,
+	backgroundColor string,
+	canvasIDs []uuid.UUID,
+) (*CanvasFolder, []Canvas, error) {
+	var folder *CanvasFolder
+	var affectedCanvases []Canvas
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		updatedFolder, err := UpdateCanvasFolderInTransaction(tx, organizationID, id, title, backgroundColor)
+		if err != nil {
+			return err
+		}
+
+		canvases, affected, err := ReplaceCanvasFolderMembershipInTransaction(tx, organizationID, id, canvasIDs)
+		if err != nil {
+			return err
+		}
+
+		updatedFolder.Canvases = canvases
+		folder = updatedFolder
+		affectedCanvases = affected
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return folder, affectedCanvases, nil
 }
 
 func UpdateCanvasFolderInTransaction(tx *gorm.DB, organizationID, id uuid.UUID, title, backgroundColor string) (*CanvasFolder, error) {
@@ -344,14 +381,117 @@ func UpdateCanvasFolderMembershipInTransaction(tx *gorm.DB, organizationID, canv
 		Where("organization_id = ?", organizationID).
 		Where("id = ?", canvasID).
 		Updates(map[string]any{
-			"canvas_folder_id": folderValue,
-			"updated_at":       time.Now(),
+			"folder_id":  folderValue,
+			"updated_at": time.Now(),
 		}).
 		Error; err != nil {
 		return nil, err
 	}
 
 	return FindCanvasInTransaction(tx, organizationID, canvasID)
+}
+
+func ReplaceCanvasFolderMembershipInTransaction(tx *gorm.DB, organizationID, folderID uuid.UUID, canvasIDs []uuid.UUID) ([]Canvas, []Canvas, error) {
+	if _, err := FindCanvasFolderInTransaction(tx.Clauses(clause.Locking{Strength: "UPDATE"}), organizationID, folderID); err != nil {
+		return nil, nil, err
+	}
+
+	uniqueCanvasIDs := make([]uuid.UUID, 0, len(canvasIDs))
+	for _, id := range canvasIDs {
+		if slices.Contains(uniqueCanvasIDs, id) {
+			continue
+		}
+
+		uniqueCanvasIDs = append(uniqueCanvasIDs, id)
+	}
+
+	var existingCanvases []Canvas
+	if err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("organization_id = ?", organizationID).
+		Where("folder_id = ?", folderID).
+		Find(&existingCanvases).
+		Error; err != nil {
+		return nil, nil, err
+	}
+
+	affectedCanvases := make([]Canvas, 0, len(existingCanvases)+len(uniqueCanvasIDs))
+	affectedCanvasIDs := make([]uuid.UUID, 0, len(existingCanvases)+len(uniqueCanvasIDs))
+	for _, canvas := range existingCanvases {
+		affectedCanvases = append(affectedCanvases, canvas)
+		affectedCanvasIDs = append(affectedCanvasIDs, canvas.ID)
+	}
+
+	if len(uniqueCanvasIDs) > 0 {
+		var canvases []Canvas
+		if err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("organization_id = ?", organizationID).
+			Where("id IN ?", uniqueCanvasIDs).
+			Find(&canvases).
+			Error; err != nil {
+			return nil, nil, err
+		}
+
+		if len(canvases) != len(uniqueCanvasIDs) {
+			return nil, nil, ErrCanvasFolderCanvasNotFound
+		}
+
+		for _, canvas := range canvases {
+			if slices.Contains(affectedCanvasIDs, canvas.ID) {
+				continue
+			}
+
+			affectedCanvases = append(affectedCanvases, canvas)
+			affectedCanvasIDs = append(affectedCanvasIDs, canvas.ID)
+		}
+	}
+
+	now := time.Now()
+	clearQuery := tx.
+		Model(&Canvas{}).
+		Where("organization_id = ?", organizationID).
+		Where("folder_id = ?", folderID)
+
+	if len(uniqueCanvasIDs) > 0 {
+		clearQuery = clearQuery.Where("id NOT IN ?", uniqueCanvasIDs)
+	}
+
+	if err := clearQuery.
+		Updates(map[string]any{
+			"folder_id":  nil,
+			"updated_at": now,
+		}).
+		Error; err != nil {
+		return nil, nil, err
+	}
+
+	if len(uniqueCanvasIDs) > 0 {
+		if err := tx.
+			Model(&Canvas{}).
+			Where("organization_id = ?", organizationID).
+			Where("id IN ?", uniqueCanvasIDs).
+			Updates(map[string]any{
+				"folder_id":  folderID,
+				"updated_at": now,
+			}).
+			Error; err != nil {
+			return nil, nil, err
+		}
+	}
+
+	var canvases []Canvas
+	if err := tx.
+		Where("organization_id = ?", organizationID).
+		Where("folder_id = ?", folderID).
+		Order("name ASC").
+		Order("id ASC").
+		Find(&canvases).
+		Error; err != nil {
+		return nil, nil, err
+	}
+
+	return canvases, affectedCanvases, nil
 }
 
 func normalizeCanvasFolderTitle(title string) (string, error) {

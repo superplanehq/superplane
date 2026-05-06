@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CanvasesCanvas, CanvasesCanvasFolder } from "@/api-client";
+import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
 import type { ReactNode } from "react";
 import { showErrorToast } from "@/lib/toast";
 
@@ -102,18 +102,23 @@ function makeCanvas(id: string, name: string, canvasFolderId?: string): Canvases
     metadata: {
       id,
       name,
-      canvasFolderId,
+      folderId: canvasFolderId,
       createdAt: "2026-05-05T00:00:00Z",
     },
     spec: { nodes: [], edges: [] },
   } as CanvasesCanvas;
 }
 
-function makeFolder(id: string, title: string, backgroundColor = "color_1"): CanvasesCanvasFolder {
+function makeFolder(
+  id: string,
+  title: string,
+  backgroundColor = "color_1",
+  canvasIds: string[] = [],
+): CanvasFoldersCanvasFolder {
   return {
     metadata: { id },
-    spec: { title, backgroundColor },
-  } as CanvasesCanvasFolder;
+    spec: { title, backgroundColor, canvases: canvasIds.map((canvasId) => ({ id: canvasId })) },
+  } as CanvasFoldersCanvasFolder;
 }
 
 function renderHome() {
@@ -302,8 +307,10 @@ describe("HomePage canvas folders", () => {
 
     await waitFor(() => {
       expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
-        canvasId: "canvas-1",
         folderId: "folder-1",
+        title: "Deployments",
+        backgroundColor: "color_1",
+        canvasIds: ["canvas-1"],
       });
     });
   });
@@ -352,8 +359,10 @@ describe("HomePage canvas folders", () => {
         backgroundColor: "color_1",
       });
       expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
-        canvasId: "canvas-1",
         folderId: "new-folder",
+        title: "Release",
+        backgroundColor: "color_1",
+        canvasIds: ["canvas-1"],
       });
     });
   });
@@ -366,7 +375,7 @@ describe("HomePage canvas folders", () => {
       error: null,
     });
     useCanvasFolders.mockReturnValue({
-      data: [makeFolder("folder-1", "Deployments")],
+      data: [makeFolder("folder-1", "Deployments", "color_1", ["foldered"])],
       isLoading: false,
       error: null,
     });
@@ -408,6 +417,11 @@ describe("HomePage canvas folders", () => {
     expect(await screen.findByText("Move to Folder")).toBeInTheDocument();
     expect(await screen.findByText("Remove from Folder")).toBeInTheDocument();
     await user.click(screen.getByText("Remove from Folder"));
-    expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({ canvasId: "foldered" });
+    expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
+      folderId: "folder-1",
+      title: "Deployments",
+      backgroundColor: "color_1",
+      canvasIds: [],
+    });
   });
 });

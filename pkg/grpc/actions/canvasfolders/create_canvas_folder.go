@@ -1,11 +1,11 @@
-package canvases
+package canvasfolders
 
 import (
 	"context"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

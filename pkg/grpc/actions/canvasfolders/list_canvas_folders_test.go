@@ -1,4 +1,4 @@
-package canvases
+package canvasfolders
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	"github.com/superplanehq/superplane/test/support"
 )
 

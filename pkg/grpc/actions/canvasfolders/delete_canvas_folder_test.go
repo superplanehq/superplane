@@ -1,4 +1,4 @@
-package canvases
+package canvasfolders
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -40,7 +40,19 @@ func Test__DeleteCanvasFolder__FreesCanvases(t *testing.T) {
 	require.NoError(t, err)
 	folderID := folderResponse.Folder.Metadata.Id
 
-	_, err = UpdateCanvasFolderMembership(ctx, r.Organization.ID.String(), canvas.ID.String(), folderID)
+	_, err = UpdateCanvasFolder(
+		ctx,
+		r.Organization.ID.String(),
+		folderID,
+		&pb.CanvasFolder{
+			Spec: &pb.CanvasFolder_Spec{
+				Title:           "Temporary",
+				BackgroundColor: models.CanvasFolderColor1,
+				Canvases:        []*pb.CanvasRef{{Id: canvas.ID.String()}},
+			},
+		},
+		true,
+	)
 	require.NoError(t, err)
 
 	_, err = DeleteCanvasFolder(ctx, r.Organization.ID.String(), folderID)

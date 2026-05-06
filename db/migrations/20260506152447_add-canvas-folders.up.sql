@@ -18,13 +18,13 @@ CREATE INDEX IF NOT EXISTS idx_canvas_folders_organization_id_title
   ON public.canvas_folders (organization_id, title);
 
 ALTER TABLE public.workflows
-  ADD COLUMN IF NOT EXISTS canvas_folder_id uuid;
+  ADD COLUMN IF NOT EXISTS folder_id uuid;
 
 ALTER TABLE public.workflows
-  ADD CONSTRAINT workflows_canvas_folder_id_fkey
-  FOREIGN KEY (canvas_folder_id) REFERENCES public.canvas_folders(id) ON DELETE SET NULL;
+  ADD CONSTRAINT workflows_folder_id_fkey
+  FOREIGN KEY (folder_id) REFERENCES public.canvas_folders(id) ON DELETE SET NULL;
 
-CREATE INDEX IF NOT EXISTS idx_workflows_canvas_folder_id
-  ON public.workflows (canvas_folder_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_folder_id
+  ON public.workflows (folder_id);
 
 COMMIT;

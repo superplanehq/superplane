@@ -1,4 +1,4 @@
-import type { CanvasesCanvasFolder } from "@/api-client";
+import type { CanvasFoldersCanvasFolder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/Input/input";
 import { Text } from "@/components/Text/text";
@@ -53,8 +53,19 @@ export function CanvasFolderSubmenu({
   const handleAssignToFolder = async (folderId: string) => {
     if (!canUpdateCanvases || folderId === canvas.canvasFolderId) return;
 
+    const folder = canvasFolders.find((canvasFolder) => canvasFolder.id === folderId);
+    if (!folder) {
+      showErrorToast("Folder not found");
+      return;
+    }
+
     try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id, folderId });
+      await updateCanvasFolderMembershipMutation.mutateAsync({
+        folderId: folder.id,
+        title: folder.title,
+        backgroundColor: folder.backgroundColor,
+        canvasIds: addCanvasToFolder(folder.canvasIds, canvas.id),
+      });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to add canvas to folder"));
     }
@@ -63,8 +74,19 @@ export function CanvasFolderSubmenu({
   const handleRemoveFromFolder = async () => {
     if (!canUpdateCanvases || !canvas.canvasFolderId) return;
 
+    const folder = canvasFolders.find((canvasFolder) => canvasFolder.id === canvas.canvasFolderId);
+    if (!folder) {
+      showErrorToast("Folder not found");
+      return;
+    }
+
     try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id });
+      await updateCanvasFolderMembershipMutation.mutateAsync({
+        folderId: folder.id,
+        title: folder.title,
+        backgroundColor: folder.backgroundColor,
+        canvasIds: removeCanvasFromFolder(folder.canvasIds, canvas.id),
+      });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to remove canvas from folder"));
     }
@@ -87,7 +109,12 @@ export function CanvasFolderSubmenu({
       const response = await createCanvasFolderMutation.mutateAsync({ title, backgroundColor: newFolderColor });
       const folderId = await resolveCreatedFolderId(title, response.data?.folder?.metadata?.id);
 
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id, folderId });
+      await updateCanvasFolderMembershipMutation.mutateAsync({
+        folderId,
+        title,
+        backgroundColor: newFolderColor,
+        canvasIds: [canvas.id],
+      });
 
       setNewFolderTitle("");
       setNewFolderColor(DEFAULT_CANVAS_FOLDER_COLOR);
@@ -105,7 +132,7 @@ export function CanvasFolderSubmenu({
     await queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
     await queryClient.refetchQueries({ queryKey: canvasKeys.folderList(organizationId), type: "active" });
 
-    const folders = queryClient.getQueryData<CanvasesCanvasFolder[]>(canvasKeys.folderList(organizationId)) || [];
+    const folders = queryClient.getQueryData<CanvasFoldersCanvasFolder[]>(canvasKeys.folderList(organizationId)) || [];
     const folderId =
       folders.find((folder) => folder.spec?.title?.trim().toLowerCase() === title.toLowerCase())?.metadata?.id || "";
 
@@ -154,6 +181,14 @@ export function CanvasFolderSubmenu({
       ) : null}
     </>
   );
+}
+
+function addCanvasToFolder(canvasIds: string[], canvasId: string) {
+  return canvasIds.includes(canvasId) ? canvasIds : [...canvasIds, canvasId];
+}
+
+function removeCanvasFromFolder(canvasIds: string[], canvasId: string) {
+  return canvasIds.filter((id) => id !== canvasId);
 }
 
 function CanvasFolderList({

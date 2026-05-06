@@ -12,6 +12,7 @@ import (
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -261,36 +262,30 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: defaultResourceResolver,
 		},
-		pbCanvases.Canvases_ListCanvasFolders_FullMethodName: {
+		pbCanvasFolders.CanvasFolders_ListCanvasFolders_FullMethodName: {
 			Resource:   "canvases",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
-		pbCanvases.Canvases_CreateCanvasFolder_FullMethodName: {
+		pbCanvasFolders.CanvasFolders_CreateCanvasFolder_FullMethodName: {
 			Resource:   "canvases",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
-		pbCanvases.Canvases_UpdateCanvasFolder_FullMethodName: {
+		pbCanvasFolders.CanvasFolders_UpdateCanvasFolder_FullMethodName: {
 			Resource:   "canvases",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
-		pbCanvases.Canvases_UpdateCanvasFolderPosition_FullMethodName: {
+		pbCanvasFolders.CanvasFolders_UpdateCanvasFolderPosition_FullMethodName: {
 			Resource:   "canvases",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
-		pbCanvases.Canvases_DeleteCanvasFolder_FullMethodName: {
+		pbCanvasFolders.CanvasFolders_DeleteCanvasFolder_FullMethodName: {
 			Resource:   "canvases",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
-		},
-		pbCanvases.Canvases_UpdateCanvasFolderMembership_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
 		},
 		pbCanvases.Canvases_ListNodeExecutions_FullMethodName: {
 			Resource:         "canvases",

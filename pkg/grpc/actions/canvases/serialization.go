@@ -62,30 +62,6 @@ func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
 	return protoCanvases, nil
 }
 
-func SerializeCanvasFolders(folders []models.CanvasFolder) []*pb.CanvasFolder {
-	protoFolders := make([]*pb.CanvasFolder, len(folders))
-	for i, folder := range folders {
-		protoFolders[i] = SerializeCanvasFolder(&folder)
-	}
-
-	return protoFolders
-}
-
-func SerializeCanvasFolder(folder *models.CanvasFolder) *pb.CanvasFolder {
-	return &pb.CanvasFolder{
-		Metadata: &pb.CanvasFolder_Metadata{
-			Id:             folder.ID.String(),
-			OrganizationId: folder.OrganizationID.String(),
-			CreatedAt:      timestamppb.New(*folder.CreatedAt),
-			UpdatedAt:      timestamppb.New(*folder.UpdatedAt),
-		},
-		Spec: &pb.CanvasFolder_Spec{
-			Title:           folder.Title,
-			BackgroundColor: folder.BackgroundColor,
-		},
-	}
-}
-
 func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), canvas)
 	if err != nil {
@@ -123,7 +99,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
 				IsTemplate:     canvas.IsTemplate,
-				CanvasFolderId: canvasFolderID,
+				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes:            serializedNodes,
@@ -176,7 +152,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
 			IsTemplate:     canvas.IsTemplate,
-			CanvasFolderId: canvasFolderID,
+			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes:            serializedNodes,
