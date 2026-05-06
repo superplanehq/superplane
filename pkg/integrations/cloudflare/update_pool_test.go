@@ -60,10 +60,31 @@ func Test__UpdatePool__Setup(t *testing.T) {
 				"accountId": "acc123",
 				"pool":      "pool123",
 			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"success": true,
+							"result": {"id": "pool123", "name": "my-pool"}
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "token123"},
+			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		require.NoError(t, err)
+
+		meta, ok := ctx.Metadata.(*contexts.MetadataContext)
+		require.True(t, ok)
+		poolMeta, ok := meta.Metadata.(PoolNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "my-pool", poolMeta.PoolName)
 	})
 
 	t.Run("valid configuration with origins passes", func(t *testing.T) {
@@ -76,10 +97,31 @@ func Test__UpdatePool__Setup(t *testing.T) {
 					map[string]any{"name": "canary", "address": "1.2.3.5", "enabled": true, "weight": 0.1},
 				},
 			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"success": true,
+							"result": {"id": "pool123", "name": "my-pool"}
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "token123"},
+			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		require.NoError(t, err)
+
+		meta, ok := ctx.Metadata.(*contexts.MetadataContext)
+		require.True(t, ok)
+		poolMeta, ok := meta.Metadata.(PoolNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "my-pool", poolMeta.PoolName)
 	})
 }
 

@@ -20,6 +20,10 @@ interface UpdatePoolConfiguration {
   pool?: string;
 }
 
+interface UpdatePoolNodeMetadata {
+  poolName?: string;
+}
+
 export const updatePoolMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -71,12 +75,12 @@ export const updatePoolMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as UpdatePoolNodeMetadata | undefined;
   const configuration = node.configuration as UpdatePoolConfiguration;
 
-  if (configuration?.name) {
-    metadata.push({ icon: "network", label: configuration.name });
-  } else if (configuration?.pool) {
-    metadata.push({ icon: "network", label: configuration.pool });
+  const label = nodeMetadata?.poolName || configuration?.pool;
+  if (label) {
+    metadata.push({ icon: "network", label });
   }
 
   return metadata;

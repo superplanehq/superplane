@@ -326,7 +326,11 @@ func (c *UpdatePool) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	return nil
+	return c.resolvePoolMetadata(ctx, accountID, spec.Pool)
+}
+
+func (c *UpdatePool) resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
+	return resolvePoolMetadata(ctx, accountID, poolID)
 }
 
 func (c *UpdatePool) Execute(ctx core.ExecutionContext) error {
