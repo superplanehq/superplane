@@ -133,7 +133,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),
-			HTTP:           registry.HTTPContext(),
+			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
 			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),

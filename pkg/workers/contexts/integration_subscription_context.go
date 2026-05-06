@@ -74,7 +74,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToAction(message any) error 
 	}
 
 	return integrationAction.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
+		HTTP:          c.registry.HTTPContextInTransaction(c.tx),
 		Configuration: c.node.Configuration.Data(),
 		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
@@ -105,7 +105,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:              c.registry.HTTPContext(),
+		HTTP:              c.registry.HTTPContextInTransaction(c.tx),
 		Configuration:     c.node.Configuration.Data(),
 		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
 		Integration:       c.integrationCtx,
@@ -139,7 +139,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		NodeID:         execution.NodeID,
 		NodeName:       c.node.Name,
 		Configuration:  execution.Configuration.Data(),
-		HTTP:           c.registry.HTTPContext(),
+		HTTP:           c.registry.HTTPContextInTransaction(c.tx),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
 		ExecutionState: NewExecutionStateContext(c.tx, execution, c.onNewEvents),

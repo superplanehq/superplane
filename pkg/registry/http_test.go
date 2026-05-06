@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func Test__NewHTTPContext_InvalidCIDR(t *testing.T) {
@@ -376,6 +377,29 @@ func Test__HTTPContext__PolicyResolver(t *testing.T) {
 
 	ctx.InvalidatePolicyCache()
 	require.NoError(t, ctx.validateURL(parsed))
+}
+
+func Test__HTTPContext__PolicyResolverInTransaction(t *testing.T) {
+	var transactionResolverCalls atomic.Int32
+
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			transactionResolverCalls.Add(1)
+			require.NotNil(t, tx)
+			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+		},
+	})
+	require.NoError(t, err)
+
+	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	require.NoError(t, err)
+
+	_, err = (&HTTPContextInTransaction{httpCtx: ctx, tx: &gorm.DB{}}).Do(request)
+	require.ErrorContains(t, err, "access to example.com is not allowed")
+	assert.Equal(t, int32(1), transactionResolverCalls.Load())
 }
 
 func defaultHTTPOptions() HTTPOptions {
