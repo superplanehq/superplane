@@ -75,7 +75,7 @@ export function StepHistory({ previousSteps, currentStep, onDiscard, discardDisa
               className="h-auto gap-1.5 px-0 py-0 text-xs font-medium leading-none text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400 has-[>svg]:px-0 hover:!no-underline"
             >
               <Trash2 aria-hidden className="size-[1em] shrink-0 opacity-80" />
-              Discard
+              Delete
             </Button>
           </div>
         </div>

@@ -220,7 +220,6 @@ function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegratio
   const currentStep = getCurrentSetupStep(createdIntegration);
   const canRevertCurrentStep = canRevertSetupStep(createdIntegration);
   const integrationReady = createdIntegration?.status?.state === "ready";
-  const showSetupStepBack = Boolean(createdIntegration) && (!integrationReady || canRevertCurrentStep);
   const setupPageTitle = useMemo(
     () => getSetupPageTitle(createdIntegration, currentStep, integrationLabel),
     [createdIntegration, currentStep, integrationLabel],
@@ -230,7 +229,6 @@ function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegratio
     currentStep,
     canRevertCurrentStep,
     integrationReady,
-    showSetupStepBack,
     setupPageTitle,
   };
 }
