@@ -11,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type HTTPPolicy struct {
@@ -19,22 +21,23 @@ type HTTPPolicy struct {
 }
 
 type HTTPContext struct {
-	client           *http.Client
-	dialer           *net.Dialer
-	maxResponseBytes int64
-	policyResolver   func() (HTTPPolicy, error)
-	policyCacheTTL   time.Duration
-	policyMu         sync.RWMutex
-	policy           compiledHTTPPolicy
-	policyExpiresAt  time.Time
+	client                      *http.Client
+	maxResponseBytes            int64
+	policyResolver              func() (HTTPPolicy, error)
+	policyResolverInTransaction func(*gorm.DB) (HTTPPolicy, error)
+	policyCacheTTL              time.Duration
+	policyMu                    sync.RWMutex
+	policy                      compiledHTTPPolicy
+	policyExpiresAt             time.Time
 }
 
 type HTTPOptions struct {
-	BlockedHosts     []string
-	PrivateIPRanges  []string
-	MaxResponseBytes int64
-	PolicyResolver   func() (HTTPPolicy, error)
-	PolicyCacheTTL   time.Duration
+	BlockedHosts                []string
+	PrivateIPRanges             []string
+	MaxResponseBytes            int64
+	PolicyResolver              func() (HTTPPolicy, error)
+	PolicyResolverInTransaction func(*gorm.DB) (HTTPPolicy, error)
+	PolicyCacheTTL              time.Duration
 }
 
 type compiledHTTPPolicy struct {
@@ -42,14 +45,22 @@ type compiledHTTPPolicy struct {
 	privateIPRanges []*net.IPNet
 }
 
+type httpTransactionContextKey struct{}
+
+type HTTPContextInTransaction struct {
+	httpCtx *HTTPContext
+	tx      *gorm.DB
+}
+
 func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	httpCtx := &HTTPContext{
-		maxResponseBytes: options.MaxResponseBytes,
-		policyResolver:   options.PolicyResolver,
-		policyCacheTTL:   options.PolicyCacheTTL,
+		maxResponseBytes:            options.MaxResponseBytes,
+		policyResolver:              options.PolicyResolver,
+		policyResolverInTransaction: options.PolicyResolverInTransaction,
+		policyCacheTTL:              options.PolicyCacheTTL,
 	}
 
-	if httpCtx.policyResolver == nil {
+	if httpCtx.policyResolver == nil && httpCtx.policyResolverInTransaction == nil {
 		compiledPolicy, err := compileHTTPPolicy(HTTPPolicy{
 			BlockedHosts:    options.BlockedHosts,
 			PrivateIPRanges: options.PrivateIPRanges,
@@ -64,33 +75,6 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	// Creates a new HTTP dialer that validates IP addresses at connection time.
 	// This prevents DNS rebinding attacks by checking the resolved IP just before connecting.
 	//
-	httpCtx.dialer = &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-		Control: func(network, address string, c syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return fmt.Errorf("invalid address: %w", err)
-			}
-
-			ip := net.ParseIP(host)
-			if ip == nil {
-				return fmt.Errorf("invalid IP address: %s", host)
-			}
-
-			policy, err := httpCtx.activePolicy()
-			if err != nil {
-				return err
-			}
-
-			if err := httpCtx.validateIPWithPolicy(policy, ip); err != nil {
-				return fmt.Errorf("connection blocked: %w", err)
-			}
-
-			return nil
-		},
-	}
-
 	httpCtx.client = &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
@@ -100,7 +84,7 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return httpCtx.dialer.DialContext(ctx, network, addr)
+				return httpCtx.dialer(transactionFromContext(ctx)).DialContext(ctx, network, addr)
 			},
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -108,7 +92,7 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 				return fmt.Errorf("stopped after 10 redirects")
 			}
 
-			policy, err := httpCtx.activePolicy()
+			policy, err := httpCtx.activePolicy(transactionFromContext(req.Context()))
 			if err != nil {
 				return err
 			}
@@ -121,15 +105,56 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 		},
 	}
 
-	if _, err := httpCtx.activePolicy(); err != nil {
+	if _, err := httpCtx.activePolicy(nil); err != nil {
 		return nil, err
 	}
 
 	return httpCtx, nil
 }
 
+func (c *HTTPContext) dialer(tx *gorm.DB) *net.Dialer {
+	return &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Control: func(network, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return fmt.Errorf("invalid address: %w", err)
+			}
+
+			ip := net.ParseIP(host)
+			if ip == nil {
+				return fmt.Errorf("invalid IP address: %s", host)
+			}
+
+			policy, err := c.activePolicy(tx)
+			if err != nil {
+				return err
+			}
+
+			if err := c.validateIPWithPolicy(policy, ip); err != nil {
+				return fmt.Errorf("connection blocked: %w", err)
+			}
+
+			return nil
+		},
+	}
+}
+
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
-	policy, err := c.activePolicy()
+	return c.doWithTransaction(request, nil)
+}
+
+func (c *HTTPContextInTransaction) Do(request *http.Request) (*http.Response, error) {
+	return c.httpCtx.doWithTransaction(request, c.tx)
+}
+
+func (c *HTTPContext) doWithTransaction(request *http.Request, tx *gorm.DB) (*http.Response, error) {
+	if tx != nil {
+		request = request.WithContext(context.WithValue(request.Context(), httpTransactionContextKey{}, tx))
+	}
+
+	policy, err := c.activePolicy(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +244,7 @@ func (r *LimitedReadCloser) Close() error {
  * to prevent DNS rebinding attacks.
  */
 func (c *HTTPContext) validateURL(URL *url.URL) error {
-	policy, err := c.activePolicy()
+	policy, err := c.activePolicy(nil)
 	if err != nil {
 		return err
 	}
@@ -262,7 +287,7 @@ func (c *HTTPContext) validateURLWithPolicy(policy compiledHTTPPolicy, URL *url.
 }
 
 func (c *HTTPContext) validateIP(ip net.IP) error {
-	policy, err := c.activePolicy()
+	policy, err := c.activePolicy(nil)
 	if err != nil {
 		return err
 	}
@@ -287,9 +312,18 @@ func (c *HTTPContext) validateIPWithPolicy(policy compiledHTTPPolicy, ip net.IP)
 	return nil
 }
 
-func (c *HTTPContext) activePolicy() (compiledHTTPPolicy, error) {
-	if c.policyResolver == nil {
+func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
+	if c.policyResolver == nil && c.policyResolverInTransaction == nil {
 		return c.policy, nil
+	}
+
+	if tx != nil && c.policyResolverInTransaction != nil {
+		policy, err := c.policyResolverInTransaction(tx)
+		if err != nil {
+			return compiledHTTPPolicy{}, err
+		}
+
+		return compileHTTPPolicy(policy)
 	}
 
 	now := time.Now()
@@ -307,6 +341,10 @@ func (c *HTTPContext) activePolicy() (compiledHTTPPolicy, error) {
 
 	now = time.Now()
 	if !c.policyExpiresAt.IsZero() && now.Before(c.policyExpiresAt) {
+		return c.policy, nil
+	}
+
+	if c.policyResolver == nil {
 		return c.policy, nil
 	}
 
@@ -328,6 +366,14 @@ func (c *HTTPContext) activePolicy() (compiledHTTPPolicy, error) {
 	}
 
 	return c.policy, nil
+}
+
+func transactionFromContext(ctx context.Context) *gorm.DB {
+	if tx, ok := ctx.Value(httpTransactionContextKey{}).(*gorm.DB); ok {
+		return tx
+	}
+
+	return nil
 }
 
 func compileHTTPPolicy(policy HTTPPolicy) (compiledHTTPPolicy, error) {

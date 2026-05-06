@@ -134,7 +134,7 @@ func submitStep(
 			WebhooksBaseURL: webhooksBaseURL,
 			IntegrationID:   integration.ID,
 			OrganizationID:  integration.OrganizationID.String(),
-			HTTP:            registry.HTTPContext(),
+			HTTP:            registry.HTTPContextInTransaction(tx),
 			Properties:      contexts.NewIntegrationPropertyStorage(integration),
 			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:    capabilityCtx,

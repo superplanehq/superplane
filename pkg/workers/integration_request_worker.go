@@ -108,7 +108,7 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil)
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
-		HTTP:            w.registry.HTTPContext(),
+		HTTP:            w.registry.HTTPContextInTransaction(tx),
 		Integration:     integrationCtx,
 		Configuration:   instance.Configuration.Data(),
 		BaseURL:         w.baseURL,
@@ -152,7 +152,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 		Configuration:   integration.Configuration.Data(),
 		Logger:          logger,
 		Integration:     integrationCtx,
-		HTTP:            w.registry.HTTPContext(),
+		HTTP:            w.registry.HTTPContextInTransaction(tx),
 	}
 
 	err = hookProvider.HandleHook(hookCtx)
