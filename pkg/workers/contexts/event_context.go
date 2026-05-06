@@ -28,7 +28,7 @@ func NewEventContext(
 ) *EventContext {
 	ctx := &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize, onNewEvents: onNewEvents}
 	if len(registries) > 0 {
-		ctx.defaultRunTitleTemplate = defaultRunTitleTemplate(registries[0], node)
+		ctx.defaultRunTitleTemplate = DefaultRunTitleTemplate(registries[0], node)
 	}
 
 	return ctx
@@ -112,7 +112,7 @@ func (s *EventContext) resolveRunTitle(payload any, rootPayload any) (*string, e
 	return &resolvedTitle, nil
 }
 
-func defaultRunTitleTemplate(registry *registry.Registry, node *models.CanvasNode) string {
+func DefaultRunTitleTemplate(registry *registry.Registry, node *models.CanvasNode) string {
 	if registry == nil || node == nil || node.Type != models.NodeTypeTrigger {
 		return ""
 	}

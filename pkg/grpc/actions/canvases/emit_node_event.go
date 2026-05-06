@@ -12,12 +12,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 )
 
 func EmitNodeEvent(
 	ctx context.Context,
+	registry *registry.Registry,
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
 	nodeID string,
@@ -44,7 +46,7 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	runTitle, err := resolveRunTitle(node, data, buildRootPayload(channel, data, now))
+	runTitle, err := resolveRunTitle(registry, node, data, data)
 	if err != nil {
 		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
 		event.RunTitle = &failed
@@ -68,16 +70,12 @@ func EmitNodeEvent(
 	}, nil
 }
 
-func buildRootPayload(channel string, payload map[string]any, timestamp time.Time) map[string]any {
-	return map[string]any{
-		"type":      channel,
-		"timestamp": timestamp,
-		"data":      payload,
+func resolveRunTitle(registry *registry.Registry, node *models.CanvasNode, payload map[string]any, rootPayload map[string]any) (*string, error) {
+	template := strings.TrimSpace(contexts.DefaultRunTitleTemplate(registry, node))
+	if node.RunTitleTemplate != nil {
+		template = strings.TrimSpace(*node.RunTitleTemplate)
 	}
-}
 
-func resolveRunTitle(node *models.CanvasNode, payload map[string]any, rootPayload map[string]any) (*string, error) {
-	template := strings.TrimSpace(valueOrEmpty(node.RunTitleTemplate))
 	if template == "" {
 		return nil, nil
 	}
