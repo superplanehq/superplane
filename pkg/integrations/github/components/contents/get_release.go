@@ -166,6 +166,7 @@ func (c *GetRelease) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -189,12 +190,7 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -211,24 +207,19 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("invalid release ID '%s': must be a valid number", *config.ReleaseID)
 		}
 
-		r, _, err := client.Repositories.GetRelease(
-			context.Background(),
-			appMetadata.Owner,
-			config.Repository,
-			releaseID,
-		)
+		r, _, err := client.GetRelease(context.Background(), config.Repository, releaseID)
 		if err != nil {
 			return fmt.Errorf("failed to get release with ID %d: %w", releaseID, err)
 		}
 		release = r
 	case "specific":
-		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, *config.TagName)
+		r, err := fetchReleaseByStrategy(client, config.Repository, config.ReleaseStrategy, *config.TagName)
 		if err != nil {
 			return err
 		}
 		release = r
 	default:
-		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, "")
+		r, err := fetchReleaseByStrategy(client, config.Repository, config.ReleaseStrategy, "")
 		if err != nil {
 			return err
 		}

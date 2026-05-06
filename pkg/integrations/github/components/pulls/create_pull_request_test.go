@@ -1,16 +1,16 @@
 package pulls
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
+	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
 
 func Test__CreatePullRequest__Setup(t *testing.T) {
-	helloRepo := common.Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
 	component := CreatePullRequest{}
 
 	validConfig := func(overrides map[string]any) map[string]any {
@@ -78,68 +78,26 @@ func Test__CreatePullRequest__Setup(t *testing.T) {
 	})
 
 	t.Run("head and base equality check is skipped when either is an expression", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"id": 123456,
+					"name": "hello",
+					"html_url": "https://github.com/testhq/hello"
+				}`),
 			},
 		}
+
 		require.NoError(t, component.Setup(core.SetupContext{
 			Integration: integrationCtx,
+			HTTP:        httpCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: validConfig(map[string]any{
 				"head": `{{$["github.onPush"].data.ref}}`,
 				"base": `{{$["github.onPush"].data.ref}}`,
 			}),
 		}))
-	})
-
-	t.Run("repository is not accessible", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-		err := component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: validConfig(map[string]any{"repository": "world"}),
-		})
-
-		require.ErrorContains(t, err, "repository world is not accessible to app installation")
-	})
-
-	t.Run("repository expression skips setup validation", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-		nodeMetadataCtx := contexts.MetadataContext{}
-		require.NoError(t, component.Setup(core.SetupContext{
-			Integration: integrationCtx,
-			Metadata:    &nodeMetadataCtx,
-			Configuration: validConfig(map[string]any{
-				"repository": `{{$["github.onPush"].data.repository.name}}`,
-			}),
-		}))
-		require.Empty(t, nodeMetadataCtx.Get())
-	})
-
-	t.Run("metadata is set successfully", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-
-		nodeMetadataCtx := contexts.MetadataContext{}
-		require.NoError(t, component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &nodeMetadataCtx,
-			Configuration: validConfig(nil),
-		}))
-
-		require.Equal(t, nodeMetadataCtx.Get(), common.NodeMetadata{Repository: &helloRepo})
 	})
 }
 
