@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 var (
@@ -180,6 +181,13 @@ func (r *Registry) Init() {
 
 func (r *Registry) HTTPContext() *HTTPContext {
 	return r.httpCtx
+}
+
+func (r *Registry) HTTPContextInTransaction(tx *gorm.DB) *HTTPContextInTransaction {
+	return &HTTPContextInTransaction{
+		httpCtx: r.httpCtx,
+		tx:      tx,
+	}
 }
 
 func (r *Registry) FindConfigurableComponent(name string) (core.Configurable, error) {

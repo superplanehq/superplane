@@ -229,7 +229,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContext(), tx, node, queueItem, configFields, onNewEvents)
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents)
 	if err != nil {
 
 		//
