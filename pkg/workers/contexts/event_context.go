@@ -7,19 +7,31 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type EventContext struct {
-	tx             *gorm.DB
-	node           *models.CanvasNode
-	maxPayloadSize int
-	onNewEvents    func([]models.CanvasEvent)
+	tx                      *gorm.DB
+	node                    *models.CanvasNode
+	maxPayloadSize          int
+	defaultRunTitleTemplate string
+	onNewEvents             func([]models.CanvasEvent)
 }
 
-func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) *EventContext {
-	return &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize, onNewEvents: onNewEvents}
+func NewEventContext(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	onNewEvents func([]models.CanvasEvent),
+	registries ...*registry.Registry,
+) *EventContext {
+	ctx := &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize, onNewEvents: onNewEvents}
+	if len(registries) > 0 {
+		ctx.defaultRunTitleTemplate = defaultRunTitleTemplate(registries[0], node)
+	}
+
+	return ctx
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
@@ -53,12 +65,12 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload, structuredPayload)
+	runTitle, err := s.resolveRunTitle(wrappedPayload, structuredPayload)
 	if err != nil {
 		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
-		event.CustomName = &failed
-	} else if customName != nil {
-		event.CustomName = customName
+		event.RunTitle = &failed
+	} else if runTitle != nil {
+		event.RunTitle = runTitle
 	}
 
 	err = s.tx.Create(&event).Error
@@ -73,23 +85,12 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string, error) {
-	config := s.node.Configuration.Data()
-	if config == nil {
-		return nil, nil
+func (s *EventContext) resolveRunTitle(payload any, rootPayload any) (*string, error) {
+	template := strings.TrimSpace(s.defaultRunTitleTemplate)
+	if s.node.RunTitleTemplate != nil {
+		template = strings.TrimSpace(*s.node.RunTitleTemplate)
 	}
 
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return nil, nil
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return nil, nil
-	}
-
-	template = strings.TrimSpace(template)
 	if template == "" {
 		return nil, nil
 	}
@@ -103,10 +104,28 @@ func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string,
 		return nil, err
 	}
 
-	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedName == "" {
+	resolvedTitle := strings.TrimSpace(fmt.Sprintf("%v", resolved))
+	if resolvedTitle == "" {
 		return nil, nil
 	}
 
-	return &resolvedName, nil
+	return &resolvedTitle, nil
+}
+
+func defaultRunTitleTemplate(registry *registry.Registry, node *models.CanvasNode) string {
+	if registry == nil || node == nil || node.Type != models.NodeTypeTrigger {
+		return ""
+	}
+
+	ref := node.Ref.Data()
+	if ref.Trigger == nil {
+		return ""
+	}
+
+	trigger, err := registry.GetTrigger(ref.Trigger.Name)
+	if err != nil {
+		return ""
+	}
+
+	return trigger.DefaultRunTitle()
 }

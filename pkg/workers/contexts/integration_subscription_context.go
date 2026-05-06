@@ -78,7 +78,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToAction(message any) error 
 		Configuration: c.node.Configuration.Data(),
 		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
-		Events:        NewEventContext(c.tx, c.node, c.onNewEvents),
+		Events:        NewEventContext(c.tx, c.node, c.onNewEvents, c.registry),
 		Message:       message,
 		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
@@ -110,7 +110,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
 		Integration:       c.integrationCtx,
 		Message:           message,
-		Events:            NewEventContext(c.tx, c.node, c.onNewEvents),
+		Events:            NewEventContext(c.tx, c.node, c.onNewEvents, c.registry),
 		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 		FindExecutionByKV: c.findExecutionByKV,
 	})

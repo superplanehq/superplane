@@ -173,9 +173,10 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	}
 
 	newNode := models.Node{
-		ID:          nodeID,
-		Name:        node.GetName(),
-		IsCollapsed: node.GetIsCollapsed(),
+		ID:               nodeID,
+		Name:             node.GetName(),
+		RunTitleTemplate: node.RunTitleTemplate,
+		IsCollapsed:      node.GetIsCollapsed(),
 	}
 
 	nodeType, nodeRef, err := p.findBlock(node)
@@ -320,6 +321,10 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 
 	if node.IsCollapsed != nil {
 		currentNode.IsCollapsed = node.GetIsCollapsed()
+	}
+
+	if node.RunTitleTemplate != nil {
+		currentNode.RunTitleTemplate = node.RunTitleTemplate
 	}
 
 	//

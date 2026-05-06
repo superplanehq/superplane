@@ -275,7 +275,7 @@ export const ConfigurationFieldRenderer = ({
       integrationId,
       organizationId,
       allowExpressions,
-      excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
+      excludedSuggestions: field.name === "runTitleTemplate" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
     };
 
     switch (field.type) {

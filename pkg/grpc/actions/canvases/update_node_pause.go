@@ -88,15 +88,16 @@ func serializeCanvasNode(node *models.CanvasNode) (*componentpb.Node, error) {
 	}
 
 	modelNode := models.Node{
-		ID:            node.NodeID,
-		Name:          node.Name,
-		Type:          node.Type,
-		Ref:           node.Ref.Data(),
-		Configuration: node.Configuration.Data(),
-		Metadata:      node.Metadata.Data(),
-		Position:      node.Position.Data(),
-		IsCollapsed:   node.IsCollapsed,
-		IntegrationID: integrationID,
+		ID:               node.NodeID,
+		Name:             node.Name,
+		Type:             node.Type,
+		Ref:              node.Ref.Data(),
+		Configuration:    node.Configuration.Data(),
+		RunTitleTemplate: node.RunTitleTemplate,
+		Metadata:         node.Metadata.Data(),
+		Position:         node.Position.Data(),
+		IsCollapsed:      node.IsCollapsed,
+		IntegrationID:    integrationID,
 	}
 
 	serialized := actions.NodesToProto([]models.Node{modelNode})

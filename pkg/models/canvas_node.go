@@ -37,6 +37,7 @@ type CanvasNode struct {
 	Position          datatypes.JSONType[Position]
 	Ref               datatypes.JSONType[NodeRef]
 	Configuration     datatypes.JSONType[map[string]any]
+	RunTitleTemplate  *string
 	Metadata          datatypes.JSONType[map[string]any]
 	IsCollapsed       bool
 	WebhookID         *uuid.UUID
