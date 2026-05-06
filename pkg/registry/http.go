@@ -45,8 +45,6 @@ type compiledHTTPPolicy struct {
 	privateIPRanges []*net.IPNet
 }
 
-type httpTransactionContextKey struct{}
-
 type HTTPContextInTransaction struct {
 	httpCtx *HTTPContext
 	tx      *gorm.DB
@@ -76,32 +74,10 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	// This prevents DNS rebinding attacks by checking the resolved IP just before connecting.
 	//
 	httpCtx.client = &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return httpCtx.dialer(transactionFromContext(ctx)).DialContext(ctx, network, addr)
-			},
-		},
+		Timeout:   30 * time.Second,
+		Transport: httpCtx.transport(nil, false),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("stopped after 10 redirects")
-			}
-
-			policy, err := httpCtx.activePolicy(transactionFromContext(req.Context()))
-			if err != nil {
-				return err
-			}
-
-			if err := httpCtx.validateURLWithPolicy(policy, req.URL); err != nil {
-				return fmt.Errorf("redirect blocked: %w", err)
-			}
-
-			return nil
+			return httpCtx.checkRedirect(req, via, nil)
 		},
 	}
 
@@ -110,6 +86,47 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	}
 
 	return httpCtx, nil
+}
+
+func (c *HTTPContext) clientInTransaction(tx *gorm.DB) *http.Client {
+	return &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: c.transport(tx, true),
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return c.checkRedirect(req, via, tx)
+		},
+	}
+}
+
+func (c *HTTPContext) transport(tx *gorm.DB, disableKeepAlives bool) *http.Transport {
+	return &http.Transport{
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     disableKeepAlives,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return c.dialer(tx).DialContext(ctx, network, addr)
+		},
+	}
+}
+
+func (c *HTTPContext) checkRedirect(req *http.Request, via []*http.Request, tx *gorm.DB) error {
+	if len(via) >= 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+
+	policy, err := c.activePolicy(tx)
+	if err != nil {
+		return err
+	}
+
+	if err := c.validateURLWithPolicy(policy, req.URL); err != nil {
+		return fmt.Errorf("redirect blocked: %w", err)
+	}
+
+	return nil
 }
 
 func (c *HTTPContext) dialer(tx *gorm.DB) *net.Dialer {
@@ -150,24 +167,20 @@ func (c *HTTPContextInTransaction) Do(request *http.Request) (*http.Response, er
 }
 
 func (c *HTTPContext) doWithTransaction(request *http.Request, tx *gorm.DB) (*http.Response, error) {
-	if tx != nil {
-		request = request.WithContext(context.WithValue(request.Context(), httpTransactionContextKey{}, tx))
-	}
-
 	policy, err := c.activePolicy(tx)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(policy.privateIPRanges) == 0 && len(policy.blockedHosts) == 0 {
-		return c.do(request)
+		return c.do(request, tx)
 	}
 
 	if err := c.validateURLWithPolicy(policy, request.URL); err != nil {
 		return nil, err
 	}
 
-	return c.do(request)
+	return c.do(request, tx)
 }
 
 func (c *HTTPContext) InvalidatePolicyCache() {
@@ -177,8 +190,13 @@ func (c *HTTPContext) InvalidatePolicyCache() {
 	c.policyExpiresAt = time.Time{}
 }
 
-func (c *HTTPContext) do(request *http.Request) (*http.Response, error) {
-	resp, err := c.client.Do(request)
+func (c *HTTPContext) do(request *http.Request, tx *gorm.DB) (*http.Response, error) {
+	client := c.client
+	if tx != nil {
+		client = c.clientInTransaction(tx)
+	}
+
+	resp, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -366,14 +384,6 @@ func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
 	}
 
 	return c.policy, nil
-}
-
-func transactionFromContext(ctx context.Context) *gorm.DB {
-	if tx, ok := ctx.Value(httpTransactionContextKey{}).(*gorm.DB); ok {
-		return tx
-	}
-
-	return nil
 }
 
 func compileHTTPPolicy(policy HTTPPolicy) (compiledHTTPPolicy, error) {

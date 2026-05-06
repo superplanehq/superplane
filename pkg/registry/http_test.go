@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"context"
 	"io"
 	"net"
 	"net/http"
@@ -451,12 +450,45 @@ func Test__HTTPContextInTransaction__DoUsesTransactionPolicy(t *testing.T) {
 	require.ErrorContains(t, err, "access to example.com is not allowed")
 }
 
-func Test__HTTPContext__TransactionFromContext(t *testing.T) {
-	tx := &gorm.DB{}
-	ctx := context.WithValue(context.Background(), httpTransactionContextKey{}, tx)
+func Test__HTTPContextInTransaction__DoDoesNotUseSharedTransportPool(t *testing.T) {
+	var newConnections atomic.Int32
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "2")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			newConnections.Add(1)
+		}
+	}
+	server.Start()
+	defer server.Close()
 
-	assert.Same(t, tx, transactionFromContext(ctx))
-	assert.Nil(t, transactionFromContext(context.Background()))
+	ctx, err := NewHTTPContext(HTTPOptions{})
+	require.NoError(t, err)
+
+	doRequest := func(httpCtx interface {
+		Do(*http.Request) (*http.Response, error)
+	}) {
+		request, err := http.NewRequest(http.MethodGet, server.URL, nil)
+		require.NoError(t, err)
+
+		response, err := httpCtx.Do(request)
+		require.NoError(t, err)
+		_, err = io.ReadAll(response.Body)
+		require.NoError(t, err)
+		require.NoError(t, response.Body.Close())
+	}
+
+	doRequest(ctx)
+	doRequest(ctx)
+	assert.Equal(t, int32(1), newConnections.Load())
+
+	doRequest(&HTTPContextInTransaction{httpCtx: ctx, tx: &gorm.DB{}})
+	assert.Equal(t, int32(2), newConnections.Load())
+
+	doRequest(ctx)
+	assert.Equal(t, int32(2), newConnections.Load())
 }
 
 func defaultHTTPOptions() HTTPOptions {
