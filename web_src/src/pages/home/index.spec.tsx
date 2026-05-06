@@ -83,7 +83,8 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
-  CANVAS_GROUP_COLORS: ["blue-800", "green-800", "slate-700", "violet-800", "yellow-800"],
+  CANVAS_GROUP_COLORS: ["color_1", "color_2", "color_3", "color_4", "color_5", "color_6"],
+  DEFAULT_CANVAS_GROUP_COLOR: "color_1",
   canvasKeys: {
     detail: (organizationId: string, canvasId: string) => ["canvases", "detail", organizationId, canvasId],
   },
@@ -111,7 +112,7 @@ function makeCanvas(id: string, name: string, canvasGroupId?: string): CanvasesC
   } as CanvasesCanvas;
 }
 
-function makeGroup(id: string, title: string, backgroundColor = "blue-800"): CanvasesCanvasGroup {
+function makeGroup(id: string, title: string, backgroundColor = "color_1"): CanvasesCanvasGroup {
   return {
     metadata: { id },
     spec: { title, backgroundColor },
@@ -187,7 +188,7 @@ describe("HomePage canvas groups", () => {
       error: null,
     });
     useCanvasGroups.mockReturnValue({
-      data: [makeGroup("group-2", "Zulu", "green-800"), makeGroup("group-1", "Alpha", "blue-800")],
+      data: [makeGroup("group-2", "Zulu", "color_2"), makeGroup("group-1", "Alpha", "color_1")],
       isLoading: false,
       error: null,
     });
@@ -229,7 +230,7 @@ describe("HomePage canvas groups", () => {
     const user = userEvent.setup();
     useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
     useCanvasGroups.mockReturnValue({
-      data: [makeGroup("group-1", "Deployments", "green-800")],
+      data: [makeGroup("group-1", "Deployments", "color_2")],
       isLoading: false,
       error: null,
     });
@@ -243,7 +244,7 @@ describe("HomePage canvas groups", () => {
       expect(mutationMocks.updateCanvasGroup).toHaveBeenCalledWith({
         groupId: "group-1",
         title: "Deployments",
-        backgroundColor: "violet-800",
+        backgroundColor: "color_3",
       });
     });
   });
@@ -252,7 +253,7 @@ describe("HomePage canvas groups", () => {
     const user = userEvent.setup();
     useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
     useCanvasGroups.mockReturnValue({
-      data: [makeGroup("group-1", "Deployments", "green-800")],
+      data: [makeGroup("group-1", "Deployments", "color_2")],
       isLoading: false,
       error: null,
     });
@@ -268,7 +269,7 @@ describe("HomePage canvas groups", () => {
       expect(mutationMocks.updateCanvasGroup).toHaveBeenCalledWith({
         groupId: "group-1",
         title: "Operations",
-        backgroundColor: "green-800",
+        backgroundColor: "color_2",
       });
     });
   });
@@ -277,7 +278,7 @@ describe("HomePage canvas groups", () => {
     const user = userEvent.setup();
     useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
     useCanvasGroups.mockReturnValue({
-      data: [makeGroup("group-1", "Deployments", "green-800")],
+      data: [makeGroup("group-1", "Deployments", "color_2")],
       isLoading: false,
       error: null,
     });
@@ -335,7 +336,7 @@ describe("HomePage canvas groups", () => {
     await waitFor(() => {
       expect(mutationMocks.createCanvasGroup).toHaveBeenCalledWith({
         title: "Release",
-        backgroundColor: "blue-800",
+        backgroundColor: "color_1",
       });
       expect(mutationMocks.updateCanvasGroupMembership).toHaveBeenCalledWith({
         canvasId: "canvas-1",

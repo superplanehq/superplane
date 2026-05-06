@@ -21,7 +21,7 @@ func Test__CanvasGroups__CreateListUpdateAndDelete(t *testing.T) {
 	createResponse, err := CreateCanvasGroup(ctx, r.Organization.ID.String(), &pb.CanvasGroup{
 		Spec: &pb.CanvasGroup_Spec{
 			Title:           "  Production  ",
-			BackgroundColor: models.CanvasGroupColorGreen800,
+			BackgroundColor: models.CanvasGroupColor2,
 		},
 	})
 	require.NoError(t, err)
@@ -29,7 +29,7 @@ func Test__CanvasGroups__CreateListUpdateAndDelete(t *testing.T) {
 	require.NotNil(t, createResponse.Group.Metadata)
 	require.NotNil(t, createResponse.Group.Spec)
 	assert.Equal(t, "Production", createResponse.Group.Spec.Title)
-	assert.Equal(t, models.CanvasGroupColorGreen800, createResponse.Group.Spec.BackgroundColor)
+	assert.Equal(t, models.CanvasGroupColor2, createResponse.Group.Spec.BackgroundColor)
 
 	listResponse, err := ListCanvasGroups(ctx, r.Organization.ID.String())
 	require.NoError(t, err)
@@ -39,14 +39,14 @@ func Test__CanvasGroups__CreateListUpdateAndDelete(t *testing.T) {
 	updateResponse, err := UpdateCanvasGroup(ctx, r.Organization.ID.String(), createResponse.Group.Metadata.Id, &pb.CanvasGroup{
 		Spec: &pb.CanvasGroup_Spec{
 			Title:           "Production Ops",
-			BackgroundColor: models.CanvasGroupColorViolet800,
+			BackgroundColor: models.CanvasGroupColor3,
 		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, updateResponse.Group)
 	require.NotNil(t, updateResponse.Group.Spec)
 	assert.Equal(t, "Production Ops", updateResponse.Group.Spec.Title)
-	assert.Equal(t, models.CanvasGroupColorViolet800, updateResponse.Group.Spec.BackgroundColor)
+	assert.Equal(t, models.CanvasGroupColor3, updateResponse.Group.Spec.BackgroundColor)
 
 	_, err = DeleteCanvasGroup(ctx, r.Organization.ID.String(), createResponse.Group.Metadata.Id)
 	require.NoError(t, err)
@@ -117,7 +117,7 @@ func Test__CanvasGroups__RejectsDuplicateTitleOnUpdate(t *testing.T) {
 	_, err = UpdateCanvasGroup(ctx, r.Organization.ID.String(), secondGroup.Group.Metadata.Id, &pb.CanvasGroup{
 		Spec: &pb.CanvasGroup_Spec{
 			Title:           firstGroup.Group.Spec.Title,
-			BackgroundColor: models.CanvasGroupColorBlue800,
+			BackgroundColor: models.CanvasGroupColor1,
 		},
 	})
 	require.Error(t, err)
@@ -145,7 +145,7 @@ func Test__CanvasGroups__MembershipCanBeAssignedAndRemoved(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	groupResponse, err := CreateCanvasGroup(ctx, r.Organization.ID.String(), &pb.CanvasGroup{
-		Spec: &pb.CanvasGroup_Spec{Title: "Team A", BackgroundColor: models.CanvasGroupColorBlue800},
+		Spec: &pb.CanvasGroup_Spec{Title: "Team A", BackgroundColor: models.CanvasGroupColor1},
 	})
 	require.NoError(t, err)
 	groupID := groupResponse.Group.Metadata.Id

@@ -116,8 +116,9 @@ export const canvasKeys = {
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
 };
 
-export const CANVAS_GROUP_COLORS = ["blue-800", "green-800", "slate-700", "violet-800", "yellow-800"] as const;
+export const CANVAS_GROUP_COLORS = ["color_1", "color_2", "color_3", "color_4", "color_5", "color_6"] as const;
 export type CanvasGroupColor = (typeof CANVAS_GROUP_COLORS)[number];
+export const DEFAULT_CANVAS_GROUP_COLOR: CanvasGroupColor = "color_1";
 
 export const triggerKeys = {
   all: ["triggers"] as const,
@@ -507,7 +508,7 @@ export const useCreateCanvasGroup = (organizationId: string) => {
             group: {
               spec: {
                 title: data.title,
-                backgroundColor: data.backgroundColor || "blue-800",
+                backgroundColor: data.backgroundColor || DEFAULT_CANVAS_GROUP_COLOR,
               },
             },
           },

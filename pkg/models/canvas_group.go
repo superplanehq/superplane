@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	CanvasGroupColorBlue800   = "blue-800"
-	CanvasGroupColorGreen800  = "green-800"
-	CanvasGroupColorSlate700  = "slate-700"
-	CanvasGroupColorViolet800 = "violet-800"
-	CanvasGroupColorYellow800 = "yellow-800"
+	CanvasGroupColor1 = "color_1"
+	CanvasGroupColor2 = "color_2"
+	CanvasGroupColor3 = "color_3"
+	CanvasGroupColor4 = "color_4"
+	CanvasGroupColor5 = "color_5"
+	CanvasGroupColor6 = "color_6"
 
 	canvasGroupTitleUniqueConstraint = "canvas_groups_organization_id_title_key"
 	canvasGroupTitleMaxLength        = 128
@@ -33,11 +34,12 @@ var (
 )
 
 var CanvasGroupBackgroundColors = []string{
-	CanvasGroupColorBlue800,
-	CanvasGroupColorGreen800,
-	CanvasGroupColorSlate700,
-	CanvasGroupColorViolet800,
-	CanvasGroupColorYellow800,
+	CanvasGroupColor1,
+	CanvasGroupColor2,
+	CanvasGroupColor3,
+	CanvasGroupColor4,
+	CanvasGroupColor5,
+	CanvasGroupColor6,
 }
 
 type CanvasGroup struct {
@@ -323,7 +325,7 @@ func normalizeCanvasGroupTitle(title string) (string, error) {
 
 func normalizeCanvasGroupBackgroundColor(backgroundColor string) (string, error) {
 	if backgroundColor == "" {
-		return CanvasGroupColorBlue800, nil
+		return CanvasGroupColor1, nil
 	}
 
 	if !slices.Contains(CanvasGroupBackgroundColors, backgroundColor) {

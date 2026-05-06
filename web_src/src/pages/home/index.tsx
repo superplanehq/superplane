@@ -38,6 +38,7 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import {
   CANVAS_GROUP_COLORS,
+  DEFAULT_CANVAS_GROUP_COLOR,
   canvasKeys,
   useCanvasGroups,
   useCanvases,
@@ -80,25 +81,21 @@ interface CanvasGroupData {
   backgroundColor: CanvasGroupColor;
 }
 
-const GROUP_BACKGROUND_CLASSES: Record<CanvasGroupColor, string> = {
-  "blue-800": "bg-blue-800",
-  "green-800": "bg-green-800",
-  "slate-700": "bg-slate-700",
-  "violet-800": "bg-violet-800",
-  "yellow-800": "bg-yellow-800",
-};
-
-const GROUP_SWATCH_CLASSES: Record<CanvasGroupColor, string> = {
-  "blue-800": "bg-blue-800",
-  "green-800": "bg-green-800",
-  "slate-700": "bg-slate-700",
-  "violet-800": "bg-violet-800",
-  "yellow-800": "bg-yellow-800",
+const GROUP_COLOR_OPTIONS: Record<CanvasGroupColor, { label: string; backgroundClass: string; swatchClass: string }> = {
+  color_1: { label: "blue", backgroundClass: "bg-blue-500", swatchClass: "bg-blue-500" },
+  color_2: { label: "green", backgroundClass: "bg-green-600", swatchClass: "bg-green-600" },
+  color_3: { label: "violet", backgroundClass: "bg-violet-500", swatchClass: "bg-violet-500" },
+  color_4: { label: "yellow", backgroundClass: "bg-yellow-950", swatchClass: "bg-yellow-950" },
+  color_5: { label: "slate", backgroundClass: "bg-slate-700", swatchClass: "bg-slate-700" },
+  color_6: { label: "orange", backgroundClass: "bg-orange-500", swatchClass: "bg-orange-500" },
 };
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
+
 function asCanvasGroupColor(value?: string): CanvasGroupColor {
-  return CANVAS_GROUP_COLORS.includes(value as CanvasGroupColor) ? (value as CanvasGroupColor) : "blue-800";
+  return CANVAS_GROUP_COLORS.includes(value as CanvasGroupColor)
+    ? (value as CanvasGroupColor)
+    : DEFAULT_CANVAS_GROUP_COLOR;
 }
 
 const HomePage = () => {
@@ -505,7 +502,7 @@ function CanvasGroupSection({
   };
 
   return (
-    <section className={cn("w-full rounded-md p-4", GROUP_BACKGROUND_CLASSES[group.backgroundColor])}>
+    <section className={cn("w-full rounded-md p-4", GROUP_COLOR_OPTIONS[group.backgroundColor].backgroundClass)}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           {canUpdateCanvases ? (
@@ -965,10 +962,10 @@ function CanvasGroupActionsMenu({
                     <button
                       key={color}
                       type="button"
-                      aria-label={`${color.replace("-800", "")} group color`}
+                      aria-label={`${GROUP_COLOR_OPTIONS[color].label} group color`}
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-full border border-slate-950/15 text-white",
-                        GROUP_SWATCH_CLASSES[color],
+                        GROUP_COLOR_OPTIONS[color].swatchClass,
                         group.backgroundColor === color && "ring-2 ring-gray-900 ring-offset-1",
                       )}
                       onClick={() => void handleColorChange(color)}
@@ -1045,7 +1042,7 @@ function CanvasActionsMenu({
 }: CanvasActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newGroupTitle, setNewGroupTitle] = useState("");
-  const [newGroupColor, setNewGroupColor] = useState<CanvasGroupColor>("blue-800");
+  const [newGroupColor, setNewGroupColor] = useState<CanvasGroupColor>(DEFAULT_CANVAS_GROUP_COLOR);
   const deleteCanvasMutation = useDeleteCanvas(organizationId);
   const createCanvasGroupMutation = useCreateCanvasGroup(organizationId);
   const updateCanvasGroupMembershipMutation = useUpdateCanvasGroupMembership(organizationId);
@@ -1112,7 +1109,7 @@ function CanvasActionsMenu({
       await updateCanvasGroupMembershipMutation.mutateAsync({ canvasId: canvas.id, groupId });
 
       setNewGroupTitle("");
-      setNewGroupColor("blue-800");
+      setNewGroupColor(DEFAULT_CANVAS_GROUP_COLOR);
       showSuccessToast("Group created");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create group"));
@@ -1221,7 +1218,12 @@ function CanvasActionsMenu({
                           onClick={() => handleAssignToGroup(group.id)}
                           disabled={group.id === canvas.canvasGroupId || updateCanvasGroupMembershipMutation.isPending}
                         >
-                          <span className={cn("h-3 w-3 rounded-full", GROUP_SWATCH_CLASSES[group.backgroundColor])} />
+                          <span
+                            className={cn(
+                              "h-3 w-3 rounded-full",
+                              GROUP_COLOR_OPTIONS[group.backgroundColor].swatchClass,
+                            )}
+                          />
                           <span className="truncate">{group.title}</span>
                           {group.id === canvas.canvasGroupId ? <Check className="ml-auto h-4 w-4" /> : null}
                         </DropdownMenuItem>
@@ -1250,10 +1252,10 @@ function CanvasActionsMenu({
                         <button
                           key={color}
                           type="button"
-                          aria-label={`${color.replace("-800", "")} group color`}
+                          aria-label={`${GROUP_COLOR_OPTIONS[color].label} group color`}
                           className={cn(
                             "flex h-5 w-5 items-center justify-center rounded-full border border-slate-950/15 text-white",
-                            GROUP_SWATCH_CLASSES[color],
+                            GROUP_COLOR_OPTIONS[color].swatchClass,
                             newGroupColor === color && "ring-2 ring-gray-900 ring-offset-1",
                           )}
                           onClick={() => setNewGroupColor(color)}

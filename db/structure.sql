@@ -201,11 +201,11 @@ CREATE TABLE public.canvas_groups (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     title character varying(128) NOT NULL,
-    background_color character varying(32) DEFAULT 'blue-800'::character varying NOT NULL,
+    background_color character varying(32) DEFAULT 'color_1'::character varying NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     sort_order bigint NOT NULL,
-    CONSTRAINT canvas_groups_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue-800'::character varying, 'green-800'::character varying, 'slate-700'::character varying, 'violet-800'::character varying, 'yellow-800'::character varying])::text[])))
+    CONSTRAINT canvas_groups_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['color_1'::character varying, 'color_2'::character varying, 'color_3'::character varying, 'color_4'::character varying, 'color_5'::character varying, 'color_6'::character varying])::text[])))
 );
 
 
@@ -1998,7 +1998,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260505145345	f
+20260506100756	f
 \.
 
 
