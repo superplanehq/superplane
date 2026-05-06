@@ -25,6 +25,7 @@ export function triggersFromCapabilities(capabilities: IntegrationsCapabilityDef
       label: capability.label,
       description: capability.description,
       configuration: capability.configuration,
+      defaultRunTitle: capability.defaultRunTitle,
     }));
 }
 

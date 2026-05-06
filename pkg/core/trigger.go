@@ -49,6 +49,11 @@ type Trigger interface {
 	ExampleData() map[string]any
 
 	/*
+	 * Default run title template for events emitted by the trigger.
+	 */
+	DefaultRunTitle() string
+
+	/*
 	 * The configuration fields exposed by the trigger.
 	 */
 	Configuration() []configuration.Field

@@ -353,14 +353,15 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 	inputNodes := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		inputNodes[i] = models.Node{
-			ID:            node.NodeID,
-			Name:          node.Name,
-			Type:          node.Type,
-			Ref:           node.Ref.Data(),
-			Configuration: node.Configuration.Data(),
-			Metadata:      node.Metadata.Data(),
-			Position:      node.Position.Data(),
-			IsCollapsed:   node.IsCollapsed,
+			ID:               node.NodeID,
+			Name:             node.Name,
+			Type:             node.Type,
+			Ref:              node.Ref.Data(),
+			Configuration:    node.Configuration.Data(),
+			RunTitleTemplate: node.RunTitleTemplate,
+			Metadata:         node.Metadata.Data(),
+			Position:         node.Position.Data(),
+			IsCollapsed:      node.IsCollapsed,
 		}
 	}
 
@@ -399,19 +400,20 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			}
 
 			canvasNode := models.CanvasNode{
-				WorkflowID:    workflow.ID,
-				NodeID:        node.ID,
-				ParentNodeID:  parentNodeID,
-				Name:          node.Name,
-				State:         models.CanvasNodeStateReady,
-				Type:          node.Type,
-				Ref:           datatypes.NewJSONType(node.Ref),
-				Configuration: datatypes.NewJSONType(node.Configuration),
-				Position:      datatypes.NewJSONType(node.Position),
-				Metadata:      datatypes.NewJSONType(node.Metadata),
-				IsCollapsed:   node.IsCollapsed,
-				CreatedAt:     &now,
-				UpdatedAt:     &now,
+				WorkflowID:       workflow.ID,
+				NodeID:           node.ID,
+				ParentNodeID:     parentNodeID,
+				Name:             node.Name,
+				State:            models.CanvasNodeStateReady,
+				Type:             node.Type,
+				Ref:              datatypes.NewJSONType(node.Ref),
+				Configuration:    datatypes.NewJSONType(node.Configuration),
+				RunTitleTemplate: node.RunTitleTemplate,
+				Position:         datatypes.NewJSONType(node.Position),
+				Metadata:         datatypes.NewJSONType(node.Metadata),
+				IsCollapsed:      node.IsCollapsed,
+				CreatedAt:        &now,
+				UpdatedAt:        &now,
 			}
 
 			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {

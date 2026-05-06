@@ -30,10 +30,12 @@ interface SettingsTabProps {
   nodeLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
+  runTitleTemplate?: string;
   onSave: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    runTitleTemplate?: string,
   ) => void | Promise<void>;
   onCancel?: () => void;
   domainId?: string;
@@ -43,6 +45,7 @@ interface SettingsTabProps {
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
   integrationDefinition?: { name?: string; label?: string; icon?: string };
+  defaultRunTitle?: string;
   autocompleteExampleObj?: Record<string, unknown> | null;
   onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
@@ -54,14 +57,25 @@ interface SettingsTabProps {
   configurationSaveMode?: "manual" | "auto";
 }
 
+const RUN_TITLE_FIELD: ConfigurationField = {
+  name: "runTitleTemplate",
+  label: "Run title",
+  type: "string",
+  togglable: true,
+  description: "Give each run a dynamic title using expressions. Use root().data to access the trigger payload.",
+  placeholder: "{{ root().data.foo }}",
+};
+
 function buildAutosaveSnapshot(
   configuration: Record<string, unknown>,
   nodeName: string,
   integrationRef?: ComponentsIntegrationRef,
+  runTitleTemplate?: string,
 ): string {
   return JSON.stringify({
     configuration,
     nodeName,
+    runTitleTemplate,
     integrationRef: integrationRef
       ? {
           id: integrationRef.id || "",
@@ -72,11 +86,12 @@ function buildAutosaveSnapshot(
 }
 
 export function SettingsTab({
-  nodeId: _nodeId,
+  nodeId,
   nodeName,
   nodeLabel: _nodeLabel,
   configuration,
   configurationFields,
+  runTitleTemplate,
   onSave,
   onCancel: _onCancel,
   domainId,
@@ -86,6 +101,7 @@ export function SettingsTab({
   integrationRef,
   integrations = [],
   integrationDefinition,
+  defaultRunTitle,
   autocompleteExampleObj,
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
@@ -103,16 +119,35 @@ export function SettingsTab({
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
+  const [currentRunTitleTemplate, setCurrentRunTitleTemplate] = useState<string>(runTitleTemplate || "");
+  const [runTitleTemplateEnabled, setRunTitleTemplateEnabled] = useState(
+    runTitleTemplate !== undefined && runTitleTemplate !== "",
+  );
+  const [runTitleTemplateTouched, setRunTitleTemplateTouched] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
-  const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
+  const autosaveBaselineSnapshotRef = useRef(
+    buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef, runTitleTemplate),
+  );
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
+  const currentRunTitleTemplateForField = runTitleTemplateEnabled ? currentRunTitleTemplate : null;
+  const runTitleTemplateForSave = (() => {
+    if (!runTitleTemplateEnabled) {
+      return runTitleTemplate !== undefined || runTitleTemplateTouched ? "" : undefined;
+    }
+
+    if (currentRunTitleTemplate === "" && (runTitleTemplate === undefined || runTitleTemplate === "")) {
+      return runTitleTemplate;
+    }
+
+    return runTitleTemplate !== undefined || runTitleTemplateTouched ? currentRunTitleTemplate : undefined;
+  })();
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -138,14 +173,22 @@ export function SettingsTab({
     if (!id) return undefined;
     return integrations.find((i) => i.metadata?.id === id);
   }, [integrations, selectedIntegration?.id, integrationRef?.id]);
+  const validationFields = useMemo(() => {
+    if (defaultRunTitle === undefined) {
+      return configurationFields;
+    }
+
+    return [RUN_TITLE_FIELD, ...configurationFields];
+  }, [configurationFields, defaultRunTitle]);
+
   const {
     validationErrors: realtimeValidationErrors,
     validateNow,
     clearErrors: _clearRealtimeErrors,
     hasFieldError: hasRealtimeFieldError,
   } = useRealtimeValidation(
-    configurationFields,
-    { ...nodeConfiguration, nodeName: currentNodeName },
+    validationFields,
+    { ...nodeConfiguration, runTitleTemplate: currentRunTitleTemplateForField, nodeName: currentNodeName },
     {
       debounceMs: 200,
       validateOnMount: false,
@@ -245,20 +288,36 @@ export function SettingsTab({
     }
 
     const filteredConfig = filterVisibleFields(newConfig);
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+      filteredConfig,
+      nodeName,
+      integrationRef,
+      runTitleTemplate,
+    );
     pendingAutosaveSnapshotRef.current = null;
     setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
     setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
+  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef, runTitleTemplate]);
+
+  useEffect(() => {
+    setCurrentRunTitleTemplate(runTitleTemplate || "");
+    setRunTitleTemplateEnabled(runTitleTemplate !== undefined && runTitleTemplate !== "");
+    setRunTitleTemplateTouched(false);
+  }, [nodeId, runTitleTemplate]);
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
-        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
+        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+          nodeConfiguration,
+          currentNodeName,
+          undefined,
+          runTitleTemplateForSave,
+        );
         setSelectedIntegration(undefined);
       }
       return;
@@ -277,12 +336,17 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     };
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, nextIntegration);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      nextIntegration,
+      runTitleTemplateForSave,
+    );
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName, runTitleTemplateForSave]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -341,7 +405,12 @@ export function SettingsTab({
       return;
     }
 
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const snapshot = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      selectedIntegration,
+      runTitleTemplateForSave,
+    );
     if (configurationSaveMode === "auto" && snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
@@ -358,7 +427,7 @@ export function SettingsTab({
       return;
     }
 
-    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration, runTitleTemplateForSave);
     if (!(result instanceof Promise)) {
       updateAutosaveBaseline(snapshot);
       return;
@@ -379,6 +448,7 @@ export function SettingsTab({
     validateNow,
     currentNodeName,
     selectedIntegration,
+    runTitleTemplateForSave,
     configurationSaveMode,
     nodeConfiguration,
     onSave,
@@ -430,7 +500,12 @@ export function SettingsTab({
     if (configurationSaveMode !== "auto" || isReadOnly) {
       return;
     }
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const snapshot = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      selectedIntegration,
+      runTitleTemplateForSave,
+    );
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       return;
     }
@@ -446,7 +521,14 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [
+    configurationSaveMode,
+    isReadOnly,
+    nodeConfiguration,
+    currentNodeName,
+    selectedIntegration,
+    runTitleTemplateForSave,
+  ]);
 
   return (
     <div
@@ -488,24 +570,33 @@ export function SettingsTab({
 
         {/* Run title field — rendered right after name, before the separator */}
         {(() => {
-          const runTitleField = configurationFields?.find((f) => f.name === "customName");
-          if (!runTitleField || !shouldShowConfiguration) return null;
+          if (defaultRunTitle === undefined || !shouldShowConfiguration) return null;
+          const runTitleFieldWithDefaultPlaceholder = {
+            ...RUN_TITLE_FIELD,
+            placeholder: defaultRunTitle.trim() || RUN_TITLE_FIELD.placeholder,
+          };
           return (
             <div className={isReadOnly ? "pointer-events-none opacity-60" : ""}>
               <ConfigurationFieldRenderer
                 allowExpressions={true}
-                field={runTitleField}
-                value={nodeConfiguration[runTitleField.name!]}
+                field={runTitleFieldWithDefaultPlaceholder}
+                value={currentRunTitleTemplateForField}
                 onChange={(value) => {
-                  setNodeConfiguration((prev) => ({
-                    ...prev,
-                    [runTitleField.name!]: value,
-                  }));
-                  if (value === undefined || value === null || value === "") {
+                  const wasEnabled = runTitleTemplateEnabled;
+                  setRunTitleTemplateTouched(true);
+                  if (value === undefined || value === null) {
+                    setRunTitleTemplateEnabled(false);
+                    requestAutosave();
+                    return;
+                  }
+
+                  setRunTitleTemplateEnabled(true);
+                  setCurrentRunTitleTemplate(String(value));
+                  if (value === "" && wasEnabled) {
                     requestAutosave();
                   }
                 }}
-                allValues={nodeConfiguration}
+                allValues={{ ...nodeConfiguration, runTitleTemplate: currentRunTitleTemplateForField }}
                 domainId={domainId}
                 domainType={domainType}
                 organizationId={domainId}
@@ -695,7 +786,7 @@ export function SettingsTab({
             className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
           >
             {configurationFields.map((field) => {
-              if (!field.name || field.name === "customName") return null;
+              if (!field.name) return null;
               const fieldName = field.name;
               return (
                 <ConfigurationFieldRenderer

@@ -168,7 +168,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		Logger:        logging.ForNode(*node),
 		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
-		Events:        contexts.NewEventContext(tx, node, onNewEvents),
+		Events:        contexts.NewEventContext(tx, node, onNewEvents, w.registry),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 	}
 

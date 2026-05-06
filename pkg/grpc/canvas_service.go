@@ -288,6 +288,7 @@ func (s *CanvasService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEvent
 
 	return canvases.EmitNodeEvent(
 		ctx,
+		s.registry,
 		uuid.MustParse(organizationID),
 		canvasID,
 		req.NodeId,

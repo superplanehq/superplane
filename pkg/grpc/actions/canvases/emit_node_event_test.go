@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
@@ -23,6 +24,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			r.Organization.ID,
 			uuid.New(),
 			"node-1",
@@ -53,6 +55,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		_, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
 			"non-existent-node",
@@ -88,6 +91,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		response, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
 			"node-1",
@@ -118,7 +122,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		assert.Equal(t, float64(42), dataMap["count"])
 	})
 
-	t.Run("custom name is resolved from node configuration", func(t *testing.T) {
+	t.Run("run title template is resolved from node", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
@@ -138,13 +142,13 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		node, err := canvas.FindNode("node-1")
 		require.NoError(t, err)
-		node.Configuration = datatypes.NewJSONType(map[string]any{
-			"customName": "Run: {{ $[\"node-1\"].message }}",
-		})
+		runTitleTemplate := "Run: {{ $[\"node-1\"].message }}"
+		node.RunTitleTemplate = &runTitleTemplate
 		require.NoError(t, database.Conn().Save(node).Error)
 
 		response, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
 			"node-1",
@@ -158,8 +162,145 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
-		require.NotNil(t, event.CustomName)
-		assert.Equal(t, "Run: hello", *event.CustomName)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
+	})
+
+	t.Run("run title template resolves raw root payload", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: "node-1",
+					Name:   "node-1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		node, err := canvas.FindNode("node-1")
+		require.NoError(t, err)
+		runTitleTemplate := "Run: {{ root().message }}"
+		node.RunTitleTemplate = &runTitleTemplate
+		require.NoError(t, database.Conn().Save(node).Error)
+
+		response, err := EmitNodeEvent(
+			ctx,
+			r.Registry,
+			r.Organization.ID,
+			canvas.ID,
+			"node-1",
+			"default",
+			map[string]any{"message": "hello"},
+		)
+		require.NoError(t, err)
+
+		eventID, err := uuid.Parse(response.EventId)
+		require.NoError(t, err)
+
+		event, err := models.FindCanvasEvent(eventID)
+		require.NoError(t, err)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
+	})
+
+	t.Run("run title falls back to trigger default when node template is unset", func(t *testing.T) {
+		triggerName := "testEmitNodeEventDefaultRunTitle"
+		r.Registry.Triggers[triggerName] = impl.NewDummyTrigger(impl.DummyTriggerOptions{
+			Name:            triggerName,
+			DefaultRunTitle: "Run: {{ root().message }}",
+		})
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: "node-1",
+					Name:   "node-1",
+					Type:   models.NodeTypeTrigger,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Trigger: &models.TriggerRef{Name: triggerName},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		response, err := EmitNodeEvent(
+			ctx,
+			r.Registry,
+			r.Organization.ID,
+			canvas.ID,
+			"node-1",
+			"default",
+			map[string]any{"message": "hello"},
+		)
+		require.NoError(t, err)
+
+		eventID, err := uuid.Parse(response.EventId)
+		require.NoError(t, err)
+
+		event, err := models.FindCanvasEvent(eventID)
+		require.NoError(t, err)
+		require.NotNil(t, event.RunTitle)
+		assert.Equal(t, "Run: hello", *event.RunTitle)
+	})
+
+	t.Run("empty node run title template disables trigger default", func(t *testing.T) {
+		triggerName := "testEmitNodeEventEmptyRunTitle"
+		r.Registry.Triggers[triggerName] = impl.NewDummyTrigger(impl.DummyTriggerOptions{
+			Name:            triggerName,
+			DefaultRunTitle: "Run: {{ root().message }}",
+		})
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: "node-1",
+					Name:   "node-1",
+					Type:   models.NodeTypeTrigger,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Trigger: &models.TriggerRef{Name: triggerName},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		node, err := canvas.FindNode("node-1")
+		require.NoError(t, err)
+		runTitleTemplate := ""
+		node.RunTitleTemplate = &runTitleTemplate
+		require.NoError(t, database.Conn().Save(node).Error)
+
+		response, err := EmitNodeEvent(
+			ctx,
+			r.Registry,
+			r.Organization.ID,
+			canvas.ID,
+			"node-1",
+			"default",
+			map[string]any{"message": "hello"},
+		)
+		require.NoError(t, err)
+
+		eventID, err := uuid.Parse(response.EventId)
+		require.NoError(t, err)
+
+		event, err := models.FindCanvasEvent(eventID)
+		require.NoError(t, err)
+		assert.Nil(t, event.RunTitle)
 	})
 
 	t.Run("successful event emission publishes RabbitMQ message", func(t *testing.T) {
@@ -187,6 +328,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		_, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
 			"node-1",
@@ -202,6 +344,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 	t.Run("invalid organization ID -> error", func(t *testing.T) {
 		_, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			uuid.New(),
 			uuid.New(),
 			"node-1",
@@ -232,6 +375,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		_, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
 			"",
@@ -262,6 +406,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 		response, err := EmitNodeEvent(
 			ctx,
+			r.Registry,
 			r.Organization.ID,
 			canvas.ID,
 			"node-1",
