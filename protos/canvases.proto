@@ -266,10 +266,14 @@ service Canvases {
     option (google.api.http) = {
       put: "/api/v1/canvas-folders/{id}"
       body: "*"
+      additional_bindings {
+        put: "/api/v1/canvas-folder-memberships"
+        body: "*"
+      }
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update canvas folder";
-      description: "Updates a canvas folder";
+      description: "Updates a canvas folder or a canvas folder membership";
       tags: "CanvasFolder";
     };
   }
@@ -281,18 +285,6 @@ service Canvases {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete canvas folder";
       description: "Deletes a canvas folder without deleting its canvases";
-      tags: "CanvasFolder";
-    };
-  }
-
-  rpc UpdateCanvasFolderMembership(UpdateCanvasFolderMembershipRequest) returns (UpdateCanvasFolderMembershipResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/folder"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas folder membership";
-      description: "Adds a canvas to a folder, moves it between folders, or removes it from a folder";
       tags: "CanvasFolder";
     };
   }
@@ -697,13 +689,18 @@ message UpdateCanvasFolderRequest {
   }
 
   string id = 1;
-  CanvasFolder folder = 2;
-  Direction direction = 3;
+  oneof operation {
+    UpdateCanvasFolderFields update = 2;
+    MoveCanvasFolder move = 3;
+    UpdateCanvasFolderMembership membership = 4;
+  }
 }
 
 message UpdateCanvasFolderResponse {
   CanvasFolder folder = 1;
   repeated CanvasFolder folders = 2;
+  Canvas canvas = 3;
+  repeated Canvas canvases = 4;
 }
 
 message DeleteCanvasFolderRequest {
@@ -712,13 +709,17 @@ message DeleteCanvasFolderRequest {
 
 message DeleteCanvasFolderResponse {}
 
-message UpdateCanvasFolderMembershipRequest {
-  string canvas_id = 1;
-  string folder_id = 2;
+message UpdateCanvasFolderFields {
+  CanvasFolder folder = 1;
 }
 
-message UpdateCanvasFolderMembershipResponse {
-  Canvas canvas = 1;
+message MoveCanvasFolder {
+  UpdateCanvasFolderRequest.Direction direction = 1;
+}
+
+message UpdateCanvasFolderMembership {
+  repeated string canvas_ids = 1;
+  string folder_id = 2;
 }
 
 message UserRef {

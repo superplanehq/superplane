@@ -79,6 +79,30 @@ func canvasResourceResolver(req any) []string {
 	return nil
 }
 
+func canvasFolderUpdateResourceResolver(req any) []string {
+	if request, ok := req.(*pbCanvases.UpdateCanvasFolderRequest); ok {
+		canvasIDs := request.GetMembership().GetCanvasIds()
+		if len(canvasIDs) > 0 {
+			resourceIDs := make([]string, 0, len(canvasIDs))
+			for _, canvasID := range canvasIDs {
+				resourceID := strings.TrimSpace(canvasID)
+				if resourceID != "" {
+					resourceIDs = append(resourceIDs, resourceID)
+				}
+			}
+
+			return resourceIDs
+		}
+	}
+
+	resourceIDs := canvasResourceResolver(req)
+	if len(resourceIDs) > 0 {
+		return resourceIDs
+	}
+
+	return defaultResourceResolver(req)
+}
+
 func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterceptor {
 	rules := map[string]AuthorizationRule{
 		// Secrets rules
@@ -272,20 +296,15 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType: models.DomainTypeOrganization,
 		},
 		pbCanvases.Canvases_UpdateCanvasFolder_FullMethodName: {
-			Resource:   "canvases",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasFolderUpdateResourceResolver,
 		},
 		pbCanvases.Canvases_DeleteCanvasFolder_FullMethodName: {
 			Resource:   "canvases",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
-		},
-		pbCanvases.Canvases_UpdateCanvasFolderMembership_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
 		},
 		pbCanvases.Canvases_ListNodeExecutions_FullMethodName: {
 			Resource:         "canvases",

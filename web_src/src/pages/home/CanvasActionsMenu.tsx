@@ -20,7 +20,7 @@ import {
   canvasKeys,
   useCreateCanvasFolder,
   useDeleteCanvas,
-  useUpdateCanvasFolderMembership,
+  useUpdateCanvasFolder,
   type CanvasFolderColor,
 } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,7 @@ export function CanvasActionsMenu({
   const [newFolderColor, setNewFolderColor] = useState<CanvasFolderColor>(DEFAULT_CANVAS_FOLDER_COLOR);
   const deleteCanvasMutation = useDeleteCanvas(organizationId);
   const createCanvasFolderMutation = useCreateCanvasFolder(organizationId);
-  const updateCanvasFolderMembershipMutation = useUpdateCanvasFolderMembership(organizationId);
+  const updateCanvasFolderMutation = useUpdateCanvasFolder(organizationId);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -83,7 +83,7 @@ export function CanvasActionsMenu({
     if (!canUpdateCanvases || folderId === canvas.canvasFolderId) return;
 
     try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id, folderId });
+      await updateCanvasFolderMutation.mutateAsync({ canvasId: canvas.id, targetFolderId: folderId });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to add canvas to folder"));
     }
@@ -93,7 +93,7 @@ export function CanvasActionsMenu({
     if (!canUpdateCanvases || !canvas.canvasFolderId) return;
 
     try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id });
+      await updateCanvasFolderMutation.mutateAsync({ canvasId: canvas.id });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to remove canvas from folder"));
     }
@@ -130,7 +130,7 @@ export function CanvasActionsMenu({
         throw new Error("missing canvas folder id");
       }
 
-      await updateCanvasFolderMembershipMutation.mutateAsync({ canvasId: canvas.id, folderId });
+      await updateCanvasFolderMutation.mutateAsync({ canvasId: canvas.id, targetFolderId: folderId });
 
       setNewFolderTitle("");
       setNewFolderColor(DEFAULT_CANVAS_FOLDER_COLOR);
@@ -204,7 +204,7 @@ export function CanvasActionsMenu({
               <button
                 className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Canvas actions"
-                disabled={deleteCanvasMutation.isPending || updateCanvasFolderMembershipMutation.isPending}
+                disabled={deleteCanvasMutation.isPending || updateCanvasFolderMutation.isPending}
               >
                 <MoreVertical size={16} />
               </button>
@@ -240,9 +240,7 @@ export function CanvasActionsMenu({
                         <DropdownMenuItem
                           key={folder.id}
                           onClick={() => handleAssignToFolder(folder.id)}
-                          disabled={
-                            folder.id === canvas.canvasFolderId || updateCanvasFolderMembershipMutation.isPending
-                          }
+                          disabled={folder.id === canvas.canvasFolderId || updateCanvasFolderMutation.isPending}
                         >
                           <span
                             className={cn(
@@ -310,7 +308,7 @@ export function CanvasActionsMenu({
               {canvas.canvasFolderId ? (
                 <DropdownMenuItem
                   onClick={handleRemoveFromFolder}
-                  disabled={!canUpdateCanvases || updateCanvasFolderMembershipMutation.isPending}
+                  disabled={!canUpdateCanvases || updateCanvasFolderMutation.isPending}
                 >
                   <FolderMinus size={16} />
                   Remove from Folder

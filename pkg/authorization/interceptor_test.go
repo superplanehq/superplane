@@ -36,6 +36,24 @@ func TestCanvasResourceResolver(t *testing.T) {
 	})
 }
 
+func TestCanvasFolderUpdateResourceResolver(t *testing.T) {
+	t.Run("prefers canvas id when membership is updated", func(t *testing.T) {
+		resourceIDs := canvasFolderUpdateResourceResolver(&pbCanvases.UpdateCanvasFolderRequest{
+			Operation: &pbCanvases.UpdateCanvasFolderRequest_Membership{
+				Membership: &pbCanvases.UpdateCanvasFolderMembership{
+					CanvasIds: []string{"canvas-123", "canvas-456"},
+				},
+			},
+		})
+		require.Equal(t, []string{"canvas-123", "canvas-456"}, resourceIDs)
+	})
+
+	t.Run("falls back to folder id when folder fields are updated", func(t *testing.T) {
+		resourceIDs := canvasFolderUpdateResourceResolver(&pbCanvases.UpdateCanvasFolderRequest{Id: "folder-123"})
+		require.Equal(t, []string{"folder-123"}, resourceIDs)
+	})
+}
+
 func TestHasRequiredScopedTokenPermission(t *testing.T) {
 	ruleWithDefaultResolver := AuthorizationRule{
 		Resource:         "canvases",

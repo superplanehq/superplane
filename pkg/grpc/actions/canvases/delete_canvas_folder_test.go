@@ -40,7 +40,11 @@ func Test__DeleteCanvasFolder__FreesCanvases(t *testing.T) {
 	require.NoError(t, err)
 	folderID := folderResponse.Folder.Metadata.Id
 
-	_, err = UpdateCanvasFolderMembership(ctx, r.Organization.ID.String(), canvas.ID.String(), folderID)
+	_, err = UpdateCanvasFolder(
+		ctx,
+		r.Organization.ID.String(),
+		membershipRequest([]string{canvas.ID.String()}, folderID),
+	)
 	require.NoError(t, err)
 
 	_, err = DeleteCanvasFolder(ctx, r.Organization.ID.String(), folderID)

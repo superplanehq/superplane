@@ -65,20 +65,12 @@ func (s *CanvasService) CreateCanvasFolder(ctx context.Context, req *pb.CreateCa
 
 func (s *CanvasService) UpdateCanvasFolder(ctx context.Context, req *pb.UpdateCanvasFolderRequest) (*pb.UpdateCanvasFolderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvasFolder(ctx, organizationID, req.Id, req.Folder, req.Direction)
+	return canvases.UpdateCanvasFolder(ctx, organizationID, req)
 }
 
 func (s *CanvasService) DeleteCanvasFolder(ctx context.Context, req *pb.DeleteCanvasFolderRequest) (*pb.DeleteCanvasFolderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.DeleteCanvasFolder(ctx, organizationID, req.Id)
-}
-
-func (s *CanvasService) UpdateCanvasFolderMembership(
-	ctx context.Context,
-	req *pb.UpdateCanvasFolderMembershipRequest,
-) (*pb.UpdateCanvasFolderMembershipResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvasFolderMembership(ctx, organizationID, req.CanvasId, req.FolderId)
 }
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
