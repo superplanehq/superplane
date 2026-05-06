@@ -8,7 +8,6 @@ import {
   canvasesListCanvasFolders,
   canvasesCreateCanvasFolder,
   canvasesUpdateCanvasFolder,
-  canvasesUpdateCanvasFolderPosition,
   canvasesDeleteCanvasFolder,
   canvasesUpdateCanvasFolderMembership,
   canvasesCreateCanvasVersion,
@@ -546,23 +545,42 @@ export const useUpdateCanvasFolder = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { folderId: string; title: string; backgroundColor: CanvasFolderColor }) => {
+    mutationFn: async (
+      data:
+        | { folderId: string; title: string; backgroundColor: CanvasFolderColor; direction?: never }
+        | { folderId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN"; title?: never; backgroundColor?: never },
+    ) => {
+      const body =
+        "direction" in data
+          ? {
+              id: data.folderId,
+              direction: data.direction,
+            }
+          : {
+              folder: {
+                spec: {
+                  title: data.title,
+                  backgroundColor: data.backgroundColor,
+                },
+              },
+            };
+
       return await canvasesUpdateCanvasFolder(
         withOrganizationHeader({
           organizationId,
           path: { id: data.folderId },
-          body: {
-            folder: {
-              spec: {
-                title: data.title,
-                backgroundColor: data.backgroundColor,
-              },
-            },
-          },
+          body,
         }),
       );
     },
     onSuccess: (response) => {
+      const folders = response?.data?.folders;
+      if (folders) {
+        queryClient.setQueryData(canvasKeys.folderList(organizationId), folders);
+        queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
+        return;
+      }
+
       const updatedFolder = response?.data?.folder;
       queryClient.setQueryData(canvasKeys.folderList(organizationId), (current: CanvasesCanvasFolder[] | undefined) => {
         if (!current || !updatedFolder?.metadata?.id) {
@@ -574,32 +592,6 @@ export const useUpdateCanvasFolder = (organizationId: string) => {
         );
         return nextFolders;
       });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-    },
-  });
-};
-
-export const useUpdateCanvasFolderPosition = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { folderId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN" }) => {
-      return await canvasesUpdateCanvasFolderPosition(
-        withOrganizationHeader({
-          organizationId,
-          path: { id: data.folderId },
-          body: {
-            id: data.folderId,
-            direction: data.direction,
-          },
-        }),
-      );
-    },
-    onSuccess: (response) => {
-      const folders = response?.data?.folders;
-      if (folders) {
-        queryClient.setQueryData(canvasKeys.folderList(organizationId), folders);
-      }
       queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
     },
   });

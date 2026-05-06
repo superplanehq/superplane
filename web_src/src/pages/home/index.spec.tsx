@@ -22,7 +22,6 @@ const {
   useDeleteCanvas,
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
-  useUpdateCanvasFolderPosition,
   useDeleteCanvasFolder,
   useUpdateCanvasFolderMembership,
 } = vi.hoisted(() => ({
@@ -31,7 +30,6 @@ const {
   useDeleteCanvas: vi.fn(),
   useCreateCanvasFolder: vi.fn(),
   useUpdateCanvasFolder: vi.fn(),
-  useUpdateCanvasFolderPosition: vi.fn(),
   useDeleteCanvasFolder: vi.fn(),
   useUpdateCanvasFolderMembership: vi.fn(),
 }));
@@ -41,7 +39,6 @@ const mutationMocks = vi.hoisted(() => ({
   deleteCanvasAsync: vi.fn(),
   createCanvasFolder: vi.fn(),
   updateCanvasFolder: vi.fn(),
-  updateCanvasFolderPosition: vi.fn(),
   deleteCanvasFolder: vi.fn(),
   updateCanvasFolderMembership: vi.fn(),
 }));
@@ -94,7 +91,6 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useDeleteCanvas,
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
-  useUpdateCanvasFolderPosition,
   useDeleteCanvasFolder,
   useUpdateCanvasFolderMembership,
 }));
@@ -144,7 +140,6 @@ describe("HomePage canvas folders", () => {
     vi.clearAllMocks();
     mutationMocks.createCanvasFolder.mockResolvedValue({ data: { folder: { metadata: { id: "new-folder" } } } });
     mutationMocks.updateCanvasFolder.mockResolvedValue({});
-    mutationMocks.updateCanvasFolderPosition.mockResolvedValue({});
     mutationMocks.deleteCanvasFolder.mockResolvedValue({});
     mutationMocks.updateCanvasFolderMembership.mockResolvedValue({});
 
@@ -155,10 +150,6 @@ describe("HomePage canvas folders", () => {
     });
     useCreateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.createCanvasFolder, isPending: false });
     useUpdateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.updateCanvasFolder, isPending: false });
-    useUpdateCanvasFolderPosition.mockReturnValue({
-      mutateAsync: mutationMocks.updateCanvasFolderPosition,
-      isPending: false,
-    });
     useDeleteCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.deleteCanvasFolder, isPending: false });
     useUpdateCanvasFolderMembership.mockReturnValue({
       mutateAsync: mutationMocks.updateCanvasFolderMembership,
@@ -220,7 +211,7 @@ describe("HomePage canvas folders", () => {
     await user.click(await screen.findByText("Move Up"));
 
     await waitFor(() => {
-      expect(mutationMocks.updateCanvasFolderPosition).toHaveBeenCalledWith({
+      expect(mutationMocks.updateCanvasFolder).toHaveBeenCalledWith({
         folderId: "folder-2",
         direction: "DIRECTION_UP",
       });
