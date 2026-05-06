@@ -384,22 +384,51 @@ func Test__HTTPContext__PolicyResolverInTransaction(t *testing.T) {
 
 	ctx, err := NewHTTPContext(HTTPOptions{
 		PolicyResolver: func() (HTTPPolicy, error) {
-			return HTTPPolicy{}, nil
+			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
 		},
 		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
 			transactionResolverCalls.Add(1)
 			require.NotNil(t, tx)
-			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+			return HTTPPolicy{}, nil
 		},
+		PolicyCacheTTL: time.Hour,
 	})
 	require.NoError(t, err)
 
-	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	parsed, err := url.Parse("https://example.com")
 	require.NoError(t, err)
 
-	_, err = (&HTTPContextInTransaction{httpCtx: ctx, tx: &gorm.DB{}}).Do(request)
-	require.ErrorContains(t, err, "access to example.com is not allowed")
+	require.ErrorContains(t, ctx.validateURL(parsed), "access to example.com is not allowed")
+
+	policy, err := ctx.activePolicy(&gorm.DB{})
+	require.NoError(t, err)
+	require.NoError(t, ctx.validateURLWithPolicy(policy, parsed))
 	assert.Equal(t, int32(1), transactionResolverCalls.Load())
+
+	require.ErrorContains(t, ctx.validateURL(parsed), "access to example.com is not allowed")
+}
+
+func Test__HTTPContext__PolicyResolverInTransactionDoesNotUpdateSharedCache(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			require.NotNil(t, tx)
+			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+		},
+		PolicyCacheTTL: time.Hour,
+	})
+	require.NoError(t, err)
+
+	parsed, err := url.Parse("https://example.com")
+	require.NoError(t, err)
+
+	policy, err := ctx.activePolicy(&gorm.DB{})
+	require.NoError(t, err)
+	require.ErrorContains(t, ctx.validateURLWithPolicy(policy, parsed), "access to example.com is not allowed")
+
+	require.NoError(t, ctx.validateURL(parsed))
 }
 
 func defaultHTTPOptions() HTTPOptions {

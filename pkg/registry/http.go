@@ -317,6 +317,15 @@ func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
 		return c.policy, nil
 	}
 
+	if tx != nil && c.policyResolverInTransaction != nil {
+		policy, err := c.policyResolverInTransaction(tx)
+		if err != nil {
+			return compiledHTTPPolicy{}, err
+		}
+
+		return compileHTTPPolicy(policy)
+	}
+
 	now := time.Now()
 
 	c.policyMu.RLock()
@@ -335,18 +344,11 @@ func (c *HTTPContext) activePolicy(tx *gorm.DB) (compiledHTTPPolicy, error) {
 		return c.policy, nil
 	}
 
-	resolver := c.policyResolver
-	if tx != nil && c.policyResolverInTransaction != nil {
-		resolver = func() (HTTPPolicy, error) {
-			return c.policyResolverInTransaction(tx)
-		}
-	}
-
-	if resolver == nil {
+	if c.policyResolver == nil {
 		return c.policy, nil
 	}
 
-	policy, err := resolver()
+	policy, err := c.policyResolver()
 	if err != nil {
 		return compiledHTTPPolicy{}, err
 	}
