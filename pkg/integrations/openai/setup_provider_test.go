@@ -17,7 +17,7 @@ import (
 func Test__OpenAI__SetupProvider__OnStepSubmit(t *testing.T) {
 	provider := newSetupProvider()
 	intCtx := &contexts.IntegrationContext{}
-	props := contexts.NewIntegrationPropertyStorage()
+	props := contexts.NewIntegrationPropertyStorage(intCtx)
 	capCtx := &contexts.CapabilityContext{RequestedCapabilties: []string{"openai.textPrompt"}}
 
 	next, err := provider.OnStepSubmit(core.SetupStepContext{
@@ -81,7 +81,7 @@ func Test__OpenAI__SetupProvider__OnStepSubmit(t *testing.T) {
 func Test__OpenAI__SetupProvider__OnSecretUpdate(t *testing.T) {
 	provider := newSetupProvider()
 	intCtx := &contexts.IntegrationContext{}
-	props := contexts.NewIntegrationPropertyStorage()
+	props := contexts.NewIntegrationPropertyStorage(intCtx)
 	require.NoError(t, props.Create(core.IntegrationPropertyDefinition{Name: "baseURL", Value: "https://custom.example.com/v1"}))
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -152,7 +152,7 @@ func Test__OpenAI__SetupProvider__OnUpdatePermissionsSubmit(t *testing.T) {
 	intCtx := &contexts.IntegrationContext{}
 	require.NoError(t, intCtx.SetSecret("apiKey", []byte("sk-old")))
 
-	props := contexts.NewIntegrationPropertyStorage()
+	props := contexts.NewIntegrationPropertyStorage(intCtx)
 	require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
 		Name:  "baseURL",
 		Value: "https://custom.example.com/v1",
