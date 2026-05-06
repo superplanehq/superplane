@@ -428,3 +428,17 @@ func (r *Registry) FindIntegrationHook(integrationName, hookName string) (core.I
 
 	return nil, nil, fmt.Errorf("hook %s not found for integration %s", hookName, integrationName)
 }
+
+func (r *Registry) AllCapabilities(name string) []core.Capability {
+	setupProvider, err := r.GetSetupProvider(name)
+	if err != nil {
+		return []core.Capability{}
+	}
+
+	capabilities := []core.Capability{}
+	for _, group := range setupProvider.CapabilityGroups() {
+		capabilities = append(capabilities, group.Capabilities...)
+	}
+
+	return capabilities
+}

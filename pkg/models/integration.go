@@ -386,3 +386,25 @@ func (a *Integration) CreateActionRequest(tx *gorm.DB, actionName string, parame
 		}),
 	}).Error
 }
+
+func (a *Integration) IsLegacy() bool {
+	if a.SetupState != nil {
+		return false
+	}
+
+	return len(a.Capabilities) == 0
+}
+
+func (a *Integration) HasCapabilityEnabled(name string) bool {
+	if a.IsLegacy() {
+		return true
+	}
+
+	for _, capability := range a.Capabilities {
+		if capability.Name == name && capability.State == core.IntegrationCapabilityStateEnabled {
+			return true
+		}
+	}
+
+	return false
+}

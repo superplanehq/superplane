@@ -238,3 +238,11 @@ type Capability struct {
 	Configuration  []configuration.Field     `json:"configuration"`
 	OutputChannels []OutputChannel           `json:"outputChannels"`
 }
+
+/*
+ * IntegrationSetupContext allows integrations to manage setup state
+ * from outside the setup flow (e.g. from an HTTP request handler).
+ */
+type IntegrationSetupContext interface {
+	SetStep(step SetupStep) error
+}
