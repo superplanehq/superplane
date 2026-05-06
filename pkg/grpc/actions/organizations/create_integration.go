@@ -255,7 +255,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			Metadata:         metadata,
 			UsedIn:           []*pb.Integration_NodeRef{},
 			Capabilities:     serializeCapabilities(registry, instance),
-			LegacySetup:      isLegacySetup(instance),
+			LegacySetup:      instance.IsLegacy(),
 		},
 	}
 
@@ -522,12 +522,4 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 	}
 
 	return sanitized
-}
-
-func isLegacySetup(integration *models.Integration) bool {
-	if integration.SetupState != nil {
-		return false
-	}
-
-	return len(integration.Capabilities) == 0
 }
