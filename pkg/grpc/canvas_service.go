@@ -53,6 +53,42 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 	return canvases.UpdateCanvas(ctx, s.authService, organizationID, req.Id, req.Name, req.Description, req.ChangeManagement)
 }
 
+func (s *CanvasService) ListCanvasFolders(ctx context.Context, req *pb.ListCanvasFoldersRequest) (*pb.ListCanvasFoldersResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasFolders(ctx, organizationID)
+}
+
+func (s *CanvasService) CreateCanvasFolder(ctx context.Context, req *pb.CreateCanvasFolderRequest) (*pb.CreateCanvasFolderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasFolder(ctx, organizationID, req.Folder)
+}
+
+func (s *CanvasService) UpdateCanvasFolder(ctx context.Context, req *pb.UpdateCanvasFolderRequest) (*pb.UpdateCanvasFolderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasFolder(ctx, organizationID, req.Id, req.Folder)
+}
+
+func (s *CanvasService) DeleteCanvasFolder(ctx context.Context, req *pb.DeleteCanvasFolderRequest) (*pb.DeleteCanvasFolderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DeleteCanvasFolder(ctx, organizationID, req.Id)
+}
+
+func (s *CanvasService) UpdateCanvasFolderPosition(
+	ctx context.Context,
+	req *pb.UpdateCanvasFolderPositionRequest,
+) (*pb.UpdateCanvasFolderPositionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasFolderPosition(ctx, organizationID, req.Id, req.Direction)
+}
+
+func (s *CanvasService) UpdateCanvasFolderMembership(
+	ctx context.Context,
+	req *pb.UpdateCanvasFolderMembershipRequest,
+) (*pb.UpdateCanvasFolderMembershipResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasFolderMembership(ctx, organizationID, req.CanvasId, req.FolderId)
+}
+
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
 	if req.Canvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
