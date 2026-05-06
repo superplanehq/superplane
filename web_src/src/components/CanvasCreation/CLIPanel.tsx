@@ -1,5 +1,5 @@
 import { BookOpen, ExternalLink, KeyRound, Loader2 } from "lucide-react";
-import { SUPPORTED_CLI_PLATFORMS, getInstallCommand, getManualInstallCommand } from "@/lib/cli";
+import { getInstallCommand } from "@/lib/cli";
 import { useConnectCommand } from "@/hooks/useConnectCommand";
 import { CopyButton } from "@/ui/CopyButton";
 
@@ -25,29 +25,6 @@ function CliInstallSection() {
         <span className="text-gray-500 select-none">$ </span>
         {installCommand}
       </div>
-      <details className="mt-3">
-        <summary className="cursor-pointer text-[11px] font-sans text-gray-500 hover:text-gray-300 transition-colors">
-          Manual binary downloads
-        </summary>
-        <div className="mt-3 space-y-2">
-          {SUPPORTED_CLI_PLATFORMS.map((manualPlatform) => {
-            const manualInstallCommand = getManualInstallCommand(manualPlatform);
-
-            return (
-              <div key={manualPlatform}>
-                <div className="text-[11px] font-sans text-gray-500 mb-0.5">{manualPlatform}</div>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-gray-300 break-all">
-                    <span className="text-gray-500 select-none">$ </span>
-                    {manualInstallCommand}
-                  </div>
-                  <CopyButton text={manualInstallCommand} dark />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </details>
     </div>
   );
 }
