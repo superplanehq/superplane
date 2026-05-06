@@ -1,5 +1,8 @@
 #!/bin/bash
 
+MODULES=authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
+REST_API_MODULES=authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,service_accounts,agents
+
 << 'DOCS'
   Generate protobuf files from internal_api definitions.
 DOCS

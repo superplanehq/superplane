@@ -11,7 +11,6 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
-DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client agent/src/superplaneapi api/swagger/superplane.swagger.json agent/src/usage_pb2.py agent/src/private/agents_pb2.py agent/src/private/agents_pb2_grpc.py
 
 #
@@ -296,6 +295,17 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,service_accounts,agents
+
+pb.gen:
+	$(COMPOSE) exec app bash -c "scripts/protoc.sh $(MODULES)"
+	$(COMPOSE) exec app bash -c "scripts/protoc_gateway.sh $(REST_API_MODULES)"
+	$(COMPOSE) exec app bash -c "scripts/protoc_openapi_spec.sh $(REST_API_MODULES)"
+	$(COMPOSE) exec app bash -c "rm -rf web_src/src/api-client"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run generate:api"
+	bash ./scripts/protoc_client_gen.sh
+
 gen.components.docs:
 	rm -rf docs/components
 	go run scripts/generate_components_docs.go
@@ -304,32 +314,6 @@ check.components.docs:
 	rm -rf docs/components
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
-
-pb.gen:
-	$(COMPOSE) exec app bash -c "scripts/protoc.sh $(MODULES)"
-	$(COMPOSE) exec app bash -c "scripts/protoc_gateway.sh $(REST_API_MODULES)"
-	$(COMPOSE) exec app bash -c "scripts/protoc_openapi_spec.sh $(REST_API_MODULES)"
-	$(MAKE) openapi.client.gen
-	$(COMPOSE) exec app bash -c "rm -rf web_src/src/api-client"
-	$(COMPOSE) exec app bash -c "cd web_src && npm run generate:api"
-
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,service_accounts,agents
-
-openapi.client.gen:
-	rm -rf pkg/openapi_client
-	$(DOCKER_RUN_AS_CURRENT_USER) \
-		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
-		-i /local/api/swagger/superplane.swagger.json \
-		-g go \
-		-o /local/pkg/openapi_client \
-		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
-	rm -rf pkg/openapi_client/test
-	rm -rf pkg/openapi_client/docs
-	rm -rf pkg/openapi_client/api
-	rm -rf pkg/openapi_client/.travis.yml
-	rm -rf pkg/openapi_client/README.md
-	rm -rf pkg/openapi_client/git_push.sh
 
 #
 # Image and CLI build
