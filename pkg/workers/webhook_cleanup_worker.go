@@ -105,7 +105,7 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 	})
 
 	if err != nil {
-		return err
+		w.log("Best-effort cleanup failed for webhook %s: %v", webhook.ID, err)
 	}
 
 	return tx.Unscoped().Delete(webhook).Error
