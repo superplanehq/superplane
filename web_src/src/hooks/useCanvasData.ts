@@ -548,23 +548,7 @@ export const useUpdateCanvasFolder = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      data:
-        | { folderId: string; title: string; backgroundColor: CanvasFolderColor; direction?: never }
-        | { folderId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN"; title?: never; backgroundColor?: never },
-    ) => {
-      if ("direction" in data) {
-        return await canvasFoldersUpdateCanvasFolderPosition(
-          withOrganizationHeader({
-            organizationId,
-            path: { id: data.folderId },
-            body: {
-              direction: data.direction,
-            },
-          }),
-        );
-      }
-
+    mutationFn: async (data: { folderId: string; title: string; backgroundColor: CanvasFolderColor }) => {
       return await canvasFoldersUpdateCanvasFolder(
         withOrganizationHeader({
           organizationId,
@@ -581,15 +565,7 @@ export const useUpdateCanvasFolder = (organizationId: string) => {
       );
     },
     onSuccess: (response) => {
-      const responseData = response?.data;
-      const folders = responseData && "folders" in responseData ? responseData.folders : undefined;
-      if (folders) {
-        queryClient.setQueryData(canvasKeys.folderList(organizationId), folders);
-        queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
-        return;
-      }
-
-      const updatedFolder = responseData && "folder" in responseData ? responseData.folder : undefined;
+      const updatedFolder = response?.data?.folder;
       queryClient.setQueryData(
         canvasKeys.folderList(organizationId),
         (current: CanvasFoldersCanvasFolder[] | undefined) => {
@@ -603,6 +579,32 @@ export const useUpdateCanvasFolder = (organizationId: string) => {
           return nextFolders;
         },
       );
+      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
+    },
+  });
+};
+
+export const useMoveCanvasFolder = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { folderId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN" }) => {
+      return await canvasFoldersUpdateCanvasFolderPosition(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: data.folderId },
+          body: {
+            direction: data.direction,
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const folders = response?.data?.folders;
+      if (folders) {
+        queryClient.setQueryData(canvasKeys.folderList(organizationId), folders);
+      }
+
       queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
     },
   });

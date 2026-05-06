@@ -6,7 +6,15 @@ import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
 import { FolderOpen } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type MutableRefObject, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MutableRefObject,
+  type RefObject,
+} from "react";
 import { CanvasFolderActionsMenu } from "./CanvasFolderActionsMenu";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { FOLDER_COLOR_OPTIONS } from "./canvasFolderStyles";
@@ -39,6 +47,21 @@ interface CanvasFolderTitleProps {
   onFocusRenameInput: () => void;
   isSubmittingRenameRef: MutableRefObject<boolean>;
   ignoreBlurUntilRef: MutableRefObject<number>;
+}
+
+interface SubmitCanvasFolderRenameOptions {
+  canUpdateCanvases: boolean;
+  isSubmittingRenameRef: MutableRefObject<boolean>;
+  draftTitle: string;
+  folder: CanvasFolderData;
+  focusRenameInput: () => void;
+  cancelRenaming: () => void;
+  updateFolder: (data: {
+    folderId: string;
+    title: string;
+    backgroundColor: CanvasFolderData["backgroundColor"];
+  }) => Promise<unknown>;
+  setIsRenaming: (isRenaming: boolean) => void;
 }
 
 function CanvasFolderTitle({
@@ -144,63 +167,49 @@ export function CanvasFolderSection({
     }
   }, [folder.title, isRenaming]);
 
-  const focusRenameInput = (selectText = false) => {
+  const focusRenameInput = useCallback((selectText = false) => {
     window.setTimeout(() => {
       renameInputRef.current?.focus();
       if (selectText) {
         renameInputRef.current?.select();
       }
     }, 0);
-  };
+  }, []);
 
-  const startRenaming = ({ preserveFocus = false }: { preserveFocus?: boolean } = {}) => {
-    if (!canUpdateCanvases || updateCanvasFolderMutation.isPending) return;
+  const startRenaming = useCallback(
+    ({ preserveFocus = false }: { preserveFocus?: boolean } = {}) => {
+      if (!canUpdateCanvases || updateCanvasFolderMutation.isPending) return;
 
-    if (preserveFocus) {
-      ignoreBlurUntilRef.current = Date.now() + 200;
-    }
+      if (preserveFocus) {
+        ignoreBlurUntilRef.current = Date.now() + 200;
+      }
 
-    setIsRenaming(true);
-    focusRenameInput(true);
-  };
+      setIsRenaming(true);
+      focusRenameInput(true);
+    },
+    [canUpdateCanvases, focusRenameInput, updateCanvasFolderMutation.isPending],
+  );
+
+  const startRenamingPreservingFocus = useCallback(() => {
+    startRenaming({ preserveFocus: true });
+  }, [startRenaming]);
 
   const cancelRenaming = () => {
     setDraftTitle(folder.title);
     setIsRenaming(false);
   };
 
-  const submitRename = async () => {
-    if (!canUpdateCanvases || isSubmittingRenameRef.current) return;
-
-    const title = draftTitle.trim();
-    if (!title) {
-      showErrorToast("Folder name is required");
-      focusRenameInput();
-      return;
-    }
-
-    if (title === folder.title) {
-      cancelRenaming();
-      return;
-    }
-
-    isSubmittingRenameRef.current = true;
-
-    try {
-      await updateCanvasFolderMutation.mutateAsync({
-        folderId: folder.id,
-        title,
-        backgroundColor: folder.backgroundColor,
-      });
-      setIsRenaming(false);
-      showSuccessToast("Folder renamed");
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to rename folder"));
-      focusRenameInput();
-    } finally {
-      isSubmittingRenameRef.current = false;
-    }
-  };
+  const submitRename = () =>
+    submitCanvasFolderRename({
+      canUpdateCanvases,
+      isSubmittingRenameRef,
+      draftTitle,
+      folder,
+      focusRenameInput,
+      cancelRenaming,
+      updateFolder: updateCanvasFolderMutation.mutateAsync,
+      setIsRenaming,
+    });
 
   return (
     <section className={cn("w-full rounded-md p-4", FOLDER_COLOR_OPTIONS[folder.backgroundColor].backgroundClass)}>
@@ -229,7 +238,7 @@ export function CanvasFolderSection({
           permissionsLoading={permissionsLoading}
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
-          onRenameRequest={() => startRenaming({ preserveFocus: true })}
+          onRenameRequest={startRenamingPreservingFocus}
         />
       </div>
 
@@ -244,11 +253,59 @@ export function CanvasFolderSection({
           permissionsLoading={permissionsLoading}
         />
       ) : (
-        <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md px-4 py-8 text-center text-[13px] font-medium text-white/80">
-          <FolderOpen size={18} className="text-white/80" />
-          <span>No canvases in this folder</span>
-        </div>
+        <EmptyCanvasFolder />
       )}
     </section>
   );
+}
+
+function EmptyCanvasFolder() {
+  return (
+    <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md px-4 py-8 text-center text-[13px] font-medium text-white/80">
+      <FolderOpen size={18} className="text-white/80" />
+      <span>No canvases in this folder</span>
+    </div>
+  );
+}
+
+async function submitCanvasFolderRename({
+  canUpdateCanvases,
+  isSubmittingRenameRef,
+  draftTitle,
+  folder,
+  focusRenameInput,
+  cancelRenaming,
+  updateFolder,
+  setIsRenaming,
+}: SubmitCanvasFolderRenameOptions) {
+  if (!canUpdateCanvases || isSubmittingRenameRef.current) return;
+
+  const title = draftTitle.trim();
+  if (!title) {
+    showErrorToast("Folder name is required");
+    focusRenameInput();
+    return;
+  }
+
+  if (title === folder.title) {
+    cancelRenaming();
+    return;
+  }
+
+  isSubmittingRenameRef.current = true;
+
+  try {
+    await updateFolder({
+      folderId: folder.id,
+      title,
+      backgroundColor: folder.backgroundColor,
+    });
+    setIsRenaming(false);
+    showSuccessToast("Folder renamed");
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "Failed to rename folder"));
+    focusRenameInput();
+  } finally {
+    isSubmittingRenameRef.current = false;
+  }
 }

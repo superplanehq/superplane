@@ -15,6 +15,7 @@ import {
 import {
   CANVAS_FOLDER_COLORS,
   useDeleteCanvasFolder,
+  useMoveCanvasFolder,
   useUpdateCanvasFolder,
   type CanvasFolderColor,
 } from "@/hooks/useCanvasData";
@@ -214,7 +215,7 @@ export function CanvasFolderActionsMenu({
   const [shouldStartRename, setShouldStartRename] = useState(false);
   const [shouldOpenDeleteDialog, setShouldOpenDeleteDialog] = useState(false);
   const updateCanvasFolderMutation = useUpdateCanvasFolder(organizationId);
-  const moveCanvasFolderMutation = useUpdateCanvasFolder(organizationId);
+  const moveCanvasFolderMutation = useMoveCanvasFolder(organizationId);
   const deleteCanvasFolderMutation = useDeleteCanvasFolder(organizationId);
   const allowed = canUpdateCanvases || permissionsLoading;
 
