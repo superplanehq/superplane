@@ -33,9 +33,10 @@ export function gpuBaseEventSections(
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent ?? {} });
+  const rootEvent = execution.rootEvent;
+  const { title } = rootEvent ? rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent }) : { title: "" };
   const createdAt = execution.createdAt ?? new Date().toISOString();
-  const eventId = execution.rootEvent?.id ?? "";
+  const eventId = rootEvent?.id ?? "";
 
   return [
     {
