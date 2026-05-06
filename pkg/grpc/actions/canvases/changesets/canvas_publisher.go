@@ -357,28 +357,10 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *pb.CanvasChang
 func (p *CanvasPublisher) runTitleTemplateForNode(node models.Node) *string {
 	if node.RunTitleTemplate != nil {
 		template := strings.TrimSpace(*node.RunTitleTemplate)
-		if template == "" {
-			return nil
-		}
-
 		return &template
 	}
 
-	if node.Type != models.NodeTypeTrigger || node.Ref.Trigger == nil {
-		return nil
-	}
-
-	trigger, err := p.options.Registry.GetTrigger(node.Ref.Trigger.Name)
-	if err != nil {
-		return nil
-	}
-
-	template := strings.TrimSpace(trigger.DefaultRunTitle())
-	if template == "" {
-		return nil
-	}
-
-	return &template
+	return nil
 }
 
 func (p *CanvasPublisher) deleteNode(change *pb.CanvasChangeset_Change) error {
@@ -430,7 +412,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		HTTP:          p.options.Registry.HTTPContextInTransaction(p.tx),
 		Metadata:      contexts.NewNodeMetadataContext(p.tx, node),
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
-		Events:        contexts.NewEventContext(p.tx, node, nil),
+		Events:        contexts.NewEventContext(p.tx, node, nil, p.options.Registry),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 	}
 

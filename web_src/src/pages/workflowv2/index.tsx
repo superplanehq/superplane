@@ -4807,14 +4807,18 @@ export function WorkflowPageV2() {
     }
 
     clearPendingAutoSaveWork();
+    const discardedVersionId = activeCanvasVersionId;
 
     try {
       setIsResetDraftPending(true);
-      await deleteCanvasVersionMutation.mutateAsync(activeCanvasVersionId);
+      await deleteCanvasVersionMutation.mutateAsync(discardedVersionId);
 
       setIsCreateChangeRequestMode(false);
       setSelectedChangeRequestId("");
+      activeCanvasVersionIdRef.current = "";
       setActiveCanvasVersion(null);
+      setDraftCanvasSpec(null);
+      draftCanvasSpecsRef.current.delete(discardedVersionId);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
@@ -4836,6 +4840,15 @@ export function WorkflowPageV2() {
           };
         });
       }
+
+      queryClient.setQueryData<CanvasesCanvasVersion[] | undefined>(canvasKeys.versionList(canvasId), (current) =>
+        current?.filter((version) => version.metadata?.id !== discardedVersionId),
+      );
+      queryClient.removeQueries({ queryKey: canvasKeys.versionDetail(canvasId, discardedVersionId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId), refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId), refetchType: "all" }),
+      ]);
 
       showSuccessToast("Draft discarded");
     } catch (error) {

@@ -83,6 +83,7 @@ export function buildDraftNodeDiffSummary(
     position: node.position || null,
     isCollapsed: node.isCollapsed || false,
     integrationId: getComparableIntegrationId(node),
+    runTitleTemplate: node.runTitleTemplate ?? null,
   });
 
   const formatDiffValueLines = (value: unknown): string[] => {

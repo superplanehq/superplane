@@ -100,6 +100,10 @@ func (t *OnInstanceStateChange) Color() string {
 	return "red"
 }
 
+func (t *OnInstanceStateChange) DefaultRunTitle() string {
+	return "{{ root().data.data.resourceName }}"
+}
+
 func (t *OnInstanceStateChange) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

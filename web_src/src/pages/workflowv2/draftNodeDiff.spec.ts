@@ -56,4 +56,38 @@ describe("hasDraftVersusLiveGraphDiff", () => {
 
     expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
   });
+
+  it("returns true when only the run title template changes", () => {
+    const live = {
+      spec: {
+        nodes: [node("a")],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+    const draft = {
+      spec: {
+        nodes: [{ ...node("a"), runTitleTemplate: "Run: {{ root().data.message }}" }],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+
+    expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
+  });
+
+  it("returns true when the run title template is explicitly disabled", () => {
+    const live = {
+      spec: {
+        nodes: [node("a")],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+    const draft = {
+      spec: {
+        nodes: [{ ...node("a"), runTitleTemplate: "" }],
+        edges: [] as { sourceId: string; targetId: string; channel: string }[],
+      },
+    };
+
+    expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
+  });
 });

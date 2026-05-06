@@ -86,7 +86,7 @@ function buildAutosaveSnapshot(
 }
 
 export function SettingsTab({
-  nodeId: _nodeId,
+  nodeId,
   nodeName,
   nodeLabel: _nodeLabel,
   configuration,
@@ -120,6 +120,9 @@ export function SettingsTab({
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [currentRunTitleTemplate, setCurrentRunTitleTemplate] = useState<string>(runTitleTemplate || "");
+  const [runTitleTemplateEnabled, setRunTitleTemplateEnabled] = useState(
+    runTitleTemplate !== undefined && runTitleTemplate !== "",
+  );
   const [runTitleTemplateTouched, setRunTitleTemplateTouched] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
@@ -133,8 +136,18 @@ export function SettingsTab({
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
-  const runTitleTemplateForSave =
-    runTitleTemplate !== undefined || runTitleTemplateTouched ? currentRunTitleTemplate : undefined;
+  const currentRunTitleTemplateForField = runTitleTemplateEnabled ? currentRunTitleTemplate : null;
+  const runTitleTemplateForSave = (() => {
+    if (!runTitleTemplateEnabled) {
+      return runTitleTemplate !== undefined || runTitleTemplateTouched ? "" : undefined;
+    }
+
+    if (currentRunTitleTemplate === "" && (runTitleTemplate === undefined || runTitleTemplate === "")) {
+      return runTitleTemplate;
+    }
+
+    return runTitleTemplate !== undefined || runTitleTemplateTouched ? currentRunTitleTemplate : undefined;
+  })();
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -175,7 +188,7 @@ export function SettingsTab({
     hasFieldError: hasRealtimeFieldError,
   } = useRealtimeValidation(
     validationFields,
-    { ...nodeConfiguration, runTitleTemplate: currentRunTitleTemplate, nodeName: currentNodeName },
+    { ...nodeConfiguration, runTitleTemplate: currentRunTitleTemplateForField, nodeName: currentNodeName },
     {
       debounceMs: 200,
       validateOnMount: false,
@@ -284,12 +297,16 @@ export function SettingsTab({
     pendingAutosaveSnapshotRef.current = null;
     setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
-    setCurrentRunTitleTemplate(runTitleTemplate || "");
-    setRunTitleTemplateTouched(false);
     setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
   }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef, runTitleTemplate]);
+
+  useEffect(() => {
+    setCurrentRunTitleTemplate(runTitleTemplate || "");
+    setRunTitleTemplateEnabled(runTitleTemplate !== undefined && runTitleTemplate !== "");
+    setRunTitleTemplateTouched(false);
+  }, [nodeId, runTitleTemplate]);
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
@@ -563,16 +580,23 @@ export function SettingsTab({
               <ConfigurationFieldRenderer
                 allowExpressions={true}
                 field={runTitleFieldWithDefaultPlaceholder}
-                value={currentRunTitleTemplate}
+                value={currentRunTitleTemplateForField}
                 onChange={(value) => {
-                  const nextValue = value === undefined || value === null ? "" : String(value);
+                  const wasEnabled = runTitleTemplateEnabled;
                   setRunTitleTemplateTouched(true);
-                  setCurrentRunTitleTemplate(nextValue);
-                  if (value === undefined || value === null || value === "") {
+                  if (value === undefined || value === null) {
+                    setRunTitleTemplateEnabled(false);
+                    requestAutosave();
+                    return;
+                  }
+
+                  setRunTitleTemplateEnabled(true);
+                  setCurrentRunTitleTemplate(String(value));
+                  if (value === "" && wasEnabled) {
                     requestAutosave();
                   }
                 }}
-                allValues={{ ...nodeConfiguration, runTitleTemplate: currentRunTitleTemplate }}
+                allValues={{ ...nodeConfiguration, runTitleTemplate: currentRunTitleTemplateForField }}
                 domainId={domainId}
                 domainType={domainType}
                 organizationId={domainId}
