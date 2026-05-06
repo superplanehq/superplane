@@ -187,6 +187,7 @@ func (c *CreatePullRequest) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -217,12 +218,7 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return errors.New("head and base branches must be different")
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -241,12 +237,7 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 		prRequest.Draft = &config.Draft
 	}
 
-	pr, _, err := client.PullRequests.Create(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		prRequest,
-	)
+	pr, _, err := client.CreatePullRequest(context.Background(), config.Repository, prRequest)
 	if err != nil {
 		return fmt.Errorf("failed to create pull request: %w", explainGitHubError(err))
 	}

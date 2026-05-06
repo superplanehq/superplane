@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v84/github"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
@@ -13,60 +12,36 @@ import (
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "repository":
-		return g.listRepositoryResources(ctx)
+		client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		repositories, err := client.ListRepositories()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list repositories: %w", err)
+		}
+
+		return toIntegrationResources(repositories), nil
+
 	case "branch":
 		return g.listBranchResources(ctx)
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
 }
 
-func (g *GitHub) listRepositoryResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	// Decode metadata to get GitHub App ID and Installation ID
-	metadata := common.Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+func toIntegrationResources(repositories []*github.Repository) []core.IntegrationResource {
+	resources := make([]core.IntegrationResource, 0, len(repositories))
+	for _, repo := range repositories {
+		resources = append(resources, core.IntegrationResource{
+			Type: "repository",
+			Name: repo.GetName(),
+			ID:   fmt.Sprintf("%d", repo.GetID()),
+		})
 	}
-
-	// Create GitHub client
-	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
-	}
-
-	// Fetch repositories accessible to the installation from GitHub API
-	// This ensures we always get the latest list including newly created repos
-	var allRepos []*github.Repository
-	opts := &github.ListOptions{
-		PerPage: 100, // Maximum per page
-	}
-
-	for {
-		repos, resp, err := client.Apps.ListRepos(context.Background(), opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list repositories from GitHub API: %w", err)
-		}
-
-		allRepos = append(allRepos, repos.Repositories...)
-
-		if resp.NextPage == 0 {
-			break
-		}
-		opts.Page = resp.NextPage
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(allRepos))
-	for _, repo := range allRepos {
-		if repo.Name != nil && repo.ID != nil {
-			resources = append(resources, core.IntegrationResource{
-				Type: "repository",
-				Name: *repo.Name,
-				ID:   fmt.Sprintf("%d", *repo.ID),
-			})
-		}
-	}
-
-	return resources, nil
+	return resources
 }
 
 func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -75,12 +50,7 @@ func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.Inte
 		return []core.IntegrationResource{}, nil
 	}
 
-	metadata := common.Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
@@ -91,21 +61,16 @@ func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.Inte
 	}
 
 	for {
-		branches, resp, err := client.Repositories.ListBranches(
-			context.Background(),
-			metadata.Owner,
-			repository,
-			opts,
-		)
+		branches, resp, err := client.ListBranches(context.Background(), repository, opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list branches: %w", err)
 		}
 
 		allBranches = append(allBranches, branches...)
-
 		if resp.NextPage == 0 {
 			break
 		}
+
 		opts.Page = resp.NextPage
 	}
 

@@ -15,7 +15,7 @@ interface SetupCardProps {
   createdIntegration: OrganizationsIntegration | null;
   currentStep: IntegrationSetupStepDefinition | null;
   stepInputs: Record<string, unknown>;
-  showSetupStepBack: boolean;
+  canRevertCurrentStep: boolean;
   instanceName: string;
   integrationName: string;
   integrationDefinition: IntegrationsIntegrationDefinition | undefined;
@@ -39,7 +39,7 @@ export function SetupCard({
   createdIntegration,
   currentStep,
   stepInputs,
-  showSetupStepBack,
+  canRevertCurrentStep,
   instanceName,
   integrationName,
   integrationDefinition,
@@ -80,7 +80,7 @@ export function SetupCard({
           values={stepInputs}
           onChange={onStepInputChange}
           onSubmit={onSubmitCurrentStep}
-          onBack={showSetupStepBack ? onSetupStepBack : undefined}
+          onBack={canRevertCurrentStep ? onSetupStepBack : undefined}
           isSubmitting={isSubmitting}
           isReverting={isReverting}
           integrationDefinition={integrationDefinition}
