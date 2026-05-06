@@ -95,7 +95,21 @@ func FindCanvasFolderInTransaction(tx *gorm.DB, organizationID, id uuid.UUID) (*
 }
 
 func CreateCanvasFolder(organizationID uuid.UUID, title, backgroundColor string) (*CanvasFolder, error) {
-	return CreateCanvasFolderInTransaction(database.Conn(), organizationID, title, backgroundColor)
+	var folder *CanvasFolder
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		createdFolder, err := CreateCanvasFolderInTransaction(tx, organizationID, title, backgroundColor)
+		if err != nil {
+			return err
+		}
+
+		folder = createdFolder
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return folder, nil
 }
 
 func CreateCanvasFolderInTransaction(tx *gorm.DB, organizationID uuid.UUID, title, backgroundColor string) (*CanvasFolder, error) {
@@ -106,6 +120,10 @@ func CreateCanvasFolderInTransaction(tx *gorm.DB, organizationID uuid.UUID, titl
 
 	normalizedColor, err := normalizeCanvasFolderBackgroundColor(backgroundColor)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := lockOrganizationForCanvasFolderSort(tx, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -189,10 +207,28 @@ func DeleteCanvasFolderInTransaction(tx *gorm.DB, organizationID, id uuid.UUID) 
 }
 
 func MoveCanvasFolder(organizationID, id uuid.UUID, direction string) ([]CanvasFolder, error) {
-	return MoveCanvasFolderInTransaction(database.Conn(), organizationID, id, direction)
+	var folders []CanvasFolder
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		updatedFolders, err := MoveCanvasFolderInTransaction(tx, organizationID, id, direction)
+		if err != nil {
+			return err
+		}
+
+		folders = updatedFolders
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return folders, nil
 }
 
 func MoveCanvasFolderInTransaction(tx *gorm.DB, organizationID, id uuid.UUID, direction string) ([]CanvasFolder, error) {
+	if err := lockOrganizationForCanvasFolderSort(tx, organizationID); err != nil {
+		return nil, err
+	}
+
 	var folders []CanvasFolder
 	if err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -253,6 +289,14 @@ func MoveCanvasFolderInTransaction(tx *gorm.DB, organizationID, id uuid.UUID, di
 	}
 
 	return ListCanvasFoldersInTransaction(tx, organizationID)
+}
+
+func lockOrganizationForCanvasFolderSort(tx *gorm.DB, organizationID uuid.UUID) error {
+	return tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", organizationID).
+		First(&Organization{}).
+		Error
 }
 
 func UpdateCanvasFolderMembership(organizationID, canvasID uuid.UUID, folderID *uuid.UUID) (*Canvas, error) {
