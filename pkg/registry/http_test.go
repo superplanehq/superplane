@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -429,6 +430,33 @@ func Test__HTTPContext__PolicyResolverInTransactionDoesNotUpdateSharedCache(t *t
 	require.ErrorContains(t, ctx.validateURLWithPolicy(policy, parsed), "access to example.com is not allowed")
 
 	require.NoError(t, ctx.validateURL(parsed))
+}
+
+func Test__HTTPContextInTransaction__DoUsesTransactionPolicy(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			require.NotNil(t, tx)
+			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+		},
+	})
+	require.NoError(t, err)
+
+	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	require.NoError(t, err)
+
+	_, err = (&HTTPContextInTransaction{httpCtx: ctx, tx: &gorm.DB{}}).Do(request)
+	require.ErrorContains(t, err, "access to example.com is not allowed")
+}
+
+func Test__HTTPContext__TransactionFromContext(t *testing.T) {
+	tx := &gorm.DB{}
+	ctx := context.WithValue(context.Background(), httpTransactionContextKey{}, tx)
+
+	assert.Same(t, tx, transactionFromContext(ctx))
+	assert.Nil(t, transactionFromContext(context.Background()))
 }
 
 func defaultHTTPOptions() HTTPOptions {
