@@ -205,6 +205,7 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 			"id",
 			"organization_id",
 			"live_version_id",
+			"canvas_folder_id",
 			"is_template",
 			"name",
 			"created_by",
@@ -242,7 +243,15 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	canvas.LiveVersionID = &version.ID
 	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
-	return MapCanvasNameUniqueConstraintError(tx.Save(canvas).Error)
+	return MapCanvasNameUniqueConstraintError(tx.
+		Model(&Canvas{}).
+		Where("id = ?", canvas.ID).
+		Updates(map[string]any{
+			"live_version_id": version.ID,
+			"name":            version.Name,
+			"updated_at":      now,
+		}).
+		Error)
 }
 
 func SaveCanvasDraftInTransaction(
@@ -366,7 +375,15 @@ func PublishCanvasDraftInTransaction(
 	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 
-	if err := tx.Save(canvas).Error; err != nil {
+	if err := tx.
+		Model(&Canvas{}).
+		Where("id = ?", canvas.ID).
+		Updates(map[string]any{
+			"live_version_id": version.ID,
+			"name":            version.Name,
+			"updated_at":      now,
+		}).
+		Error; err != nil {
 		return nil, MapCanvasNameUniqueConstraintError(err)
 	}
 
