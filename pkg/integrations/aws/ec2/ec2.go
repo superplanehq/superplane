@@ -12,3 +12,12 @@ const (
 	ImageStateDeregistered = "deregistered"
 	ImageStateDisabled     = "disabled"
 )
+
+const (
+	InstanceStatePending      = "pending"
+	InstanceStateRunning      = "running"
+	InstanceStateStopping     = "stopping"
+	InstanceStateStopped      = "stopped"
+	InstanceStateShuttingDown = "shutting-down"
+	InstanceStateTerminated   = "terminated"
+)
