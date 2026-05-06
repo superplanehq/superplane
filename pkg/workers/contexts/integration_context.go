@@ -463,11 +463,7 @@ func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSub
 }
 
 func (c *IntegrationContext) LegacySetup() bool {
-	if c.integration.SetupState != nil {
-		return false
-	}
-
-	return len(c.integration.Capabilities) == 0
+	return c.integration.IsLegacy()
 }
 
 func (c *IntegrationContext) Properties() core.IntegrationPropertyStorage {
