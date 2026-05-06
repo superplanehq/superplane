@@ -216,32 +216,33 @@ func asAnyMap(value any) (map[string]any, bool) {
 }
 
 func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string) (any, error) {
-	if !expressionRegex.MatchString(expression) {
+	matches := expressionRegex.FindAllStringSubmatchIndex(expression, -1)
+	if len(matches) == 0 {
 		return expression, nil
 	}
 
-	var err error
-
-	result := expressionRegex.ReplaceAllStringFunc(expression, func(match string) string {
-		matches := expressionRegex.FindStringSubmatch(match)
-		if len(matches) != 2 {
-			return match
-		}
-
-		value, e := b.ResolveExpression(matches[1])
-		if e != nil {
-			err = e
-			return ""
-		}
-
-		return fmt.Sprintf("%v", value)
-	})
-
-	if err != nil {
-		return nil, err
+	// When the entire field value is a single {{ ... }} expression, return the
+	// raw result so that numbers, booleans, and objects survive into typed
+	// contexts like JSON request bodies. See issue #4499.
+	if len(matches) == 1 && matches[0][0] == 0 && matches[0][1] == len(expression) {
+		return b.ResolveExpression(expression[matches[0][2]:matches[0][3]])
 	}
 
-	return result, nil
+	// Otherwise the result is a string: stringify each expression and
+	// concatenate with the surrounding text.
+	var sb strings.Builder
+	pos := 0
+	for _, m := range matches {
+		sb.WriteString(expression[pos:m[0]])
+		value, err := b.ResolveExpression(expression[m[2]:m[3]])
+		if err != nil {
+			return nil, err
+		}
+		sb.WriteString(fmt.Sprintf("%v", value))
+		pos = m[1]
+	}
+	sb.WriteString(expression[pos:])
+	return sb.String(), nil
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
