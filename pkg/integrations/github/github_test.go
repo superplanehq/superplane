@@ -21,7 +21,7 @@ type githubManifest struct {
 	DefaultEvents []string `json:"default_events"`
 }
 
-func Test__GitHub__Setup(t *testing.T) {
+func Test__GitHub__Sync(t *testing.T) {
 	g := &GitHub{}
 
 	t.Run("personal scope", func(t *testing.T) {

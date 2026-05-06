@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -170,21 +169,12 @@ func (g *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	report, _, err := client.Billing.GetOrganizationUsageReport(
-		context.Background(),
-		appMetadata.Owner,
-		nil,
-	)
+	report, _, err := client.GetOrganizationUsageReport()
 	if err != nil {
 		return fmt.Errorf("failed to get billing usage: %w", err)
 	}
