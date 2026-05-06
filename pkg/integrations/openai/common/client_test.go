@@ -1,4 +1,4 @@
-package openai
+package common
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ func Test__NewClient(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "sk-123", client.APIKey)
-		assert.Equal(t, defaultBaseURL, client.BaseURL)
+		assert.Equal(t, DefaultBaseURL, client.BaseURL)
 	})
 
 	t.Run("custom base URL", func(t *testing.T) {
@@ -52,7 +52,7 @@ func Test__NewClient(t *testing.T) {
 		client, err := NewClient(httpCtx, integrationCtx)
 
 		require.NoError(t, err)
-		assert.Equal(t, defaultBaseURL, client.BaseURL)
+		assert.Equal(t, DefaultBaseURL, client.BaseURL)
 	})
 
 	t.Run("nil context -> error", func(t *testing.T) {
@@ -83,7 +83,7 @@ func Test__Client__Verify(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "test-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
@@ -132,7 +132,7 @@ func Test__Client__Verify(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "bad-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
@@ -153,7 +153,7 @@ func Test__Client__Verify(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "test-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
@@ -181,7 +181,7 @@ func Test__Client__ListModels(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "test-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
@@ -205,7 +205,7 @@ func Test__Client__ListModels(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "test-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
@@ -227,7 +227,7 @@ func Test__Client__ListModels(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "test-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
@@ -262,7 +262,7 @@ func Test__Client__CreateResponse(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "my-secret-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
@@ -300,7 +300,7 @@ func Test__Client__CreateResponse(t *testing.T) {
 
 		client := &Client{
 			APIKey:  "test-key",
-			BaseURL: defaultBaseURL,
+			BaseURL: DefaultBaseURL,
 			http:    httpCtx,
 		}
 
