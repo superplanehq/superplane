@@ -136,17 +136,18 @@ format.js.check:
 # Targets for dev environment
 #
 
-dev.setup:
+dev.up:
 	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
-	$(MAKE) gen.setup
-	$(MAKE) dev.setup.app
-	$(MAKE) dev.setup.agent
-	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
-	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
-	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(COMPOSE) up -d --wait --wait-timeout 60
+
+dev.setup:
+	# $(MAKE) gen.setup
+	# $(MAKE) dev.setup.app
+	# $(MAKE) dev.setup.agent
+	# $(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	# $(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.setup.app:
 	$(COMPOSE) run --rm app go mod download
@@ -160,17 +161,12 @@ dev.setup.no.cache:
 	$(COMPOSE) down -v --remove-orphans
 	$(COMPOSE) build --no-cache
 	$(MAKE) gen.setup
-	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
-	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
-	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.start.fg:
 	$(COMPOSE) up
 
 dev.start:
-	$(COMPOSE) up -d
-	@bash ./scripts/wait-for-app
+	$(COMPOSE) up --force-recreate --attach app
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)

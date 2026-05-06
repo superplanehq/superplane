@@ -6,7 +6,7 @@ services:
       cache_from:
         - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
-    command: bash /app/docker-entrypoint.dev.sh
+    command: sleep infinity
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
