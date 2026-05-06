@@ -34,38 +34,12 @@ type Client struct {
 }
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
-	switch c.authMethod {
-	case AuthMethodApp:
-		return c.findAppRepository(repository)
-	case AuthMethodPAT:
-		return c.findOwnerRepository(repository)
-	}
-
-	return nil, fmt.Errorf("invalid auth method: %s", c.authMethod)
-}
-
-func (c *Client) findOwnerRepository(repository string) (*github.Repository, error) {
 	repo, _, err := c.underlying.Repositories.Get(context.Background(), c.owner, repository)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository: %w", err)
 	}
 
 	return repo, nil
-}
-
-func (c *Client) findAppRepository(repository string) (*github.Repository, error) {
-	repositories, err := c.listAppRepositories()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list repositories: %w", err)
-	}
-
-	for _, repo := range repositories {
-		if repo.GetName() == repository {
-			return repo, nil
-		}
-	}
-
-	return nil, fmt.Errorf("repository not found: %s", repository)
 }
 
 func (c *Client) listAppRepositories() ([]*github.Repository, error) {

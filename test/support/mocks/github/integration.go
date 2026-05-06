@@ -24,6 +24,24 @@ func IntegrationContextForNewSetupFlow() *contexts.IntegrationContext {
 	}
 }
 
+func IntegrationContextForLegacySetupFlow(pem []byte) *contexts.IntegrationContext {
+	return &contexts.IntegrationContext{
+		Metadata: map[string]any{
+			"installationId": "67890",
+			"owner":          "testhq",
+			"githubApp": map[string]any{
+				"id": int64(12345),
+			},
+		},
+		Configuration: map[string]any{
+			"organization": "testhq",
+		},
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			"pem": {Name: "pem", Value: pem},
+		},
+	}
+}
+
 func GitHubResponse(statusCode int, body string) *http.Response {
 	return &http.Response{
 		StatusCode: statusCode,
