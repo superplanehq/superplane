@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func Test__NewHTTPContext_InvalidCIDR(t *testing.T) {
@@ -376,6 +378,85 @@ func Test__HTTPContext__PolicyResolver(t *testing.T) {
 
 	ctx.InvalidatePolicyCache()
 	require.NoError(t, ctx.validateURL(parsed))
+}
+
+func Test__HTTPContext__PolicyResolverInTransaction(t *testing.T) {
+	var transactionResolverCalls atomic.Int32
+
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			transactionResolverCalls.Add(1)
+			require.NotNil(t, tx)
+			return HTTPPolicy{}, nil
+		},
+		PolicyCacheTTL: time.Hour,
+	})
+	require.NoError(t, err)
+
+	parsed, err := url.Parse("https://example.com")
+	require.NoError(t, err)
+
+	require.ErrorContains(t, ctx.validateURL(parsed), "access to example.com is not allowed")
+
+	policy, err := ctx.activePolicy(&gorm.DB{})
+	require.NoError(t, err)
+	require.NoError(t, ctx.validateURLWithPolicy(policy, parsed))
+	assert.Equal(t, int32(1), transactionResolverCalls.Load())
+
+	require.ErrorContains(t, ctx.validateURL(parsed), "access to example.com is not allowed")
+}
+
+func Test__HTTPContext__PolicyResolverInTransactionDoesNotUpdateSharedCache(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			require.NotNil(t, tx)
+			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+		},
+		PolicyCacheTTL: time.Hour,
+	})
+	require.NoError(t, err)
+
+	parsed, err := url.Parse("https://example.com")
+	require.NoError(t, err)
+
+	policy, err := ctx.activePolicy(&gorm.DB{})
+	require.NoError(t, err)
+	require.ErrorContains(t, ctx.validateURLWithPolicy(policy, parsed), "access to example.com is not allowed")
+
+	require.NoError(t, ctx.validateURL(parsed))
+}
+
+func Test__HTTPContextInTransaction__DoUsesTransactionPolicy(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			require.NotNil(t, tx)
+			return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+		},
+	})
+	require.NoError(t, err)
+
+	request, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	require.NoError(t, err)
+
+	_, err = (&HTTPContextInTransaction{httpCtx: ctx, tx: &gorm.DB{}}).Do(request)
+	require.ErrorContains(t, err, "access to example.com is not allowed")
+}
+
+func Test__HTTPContext__TransactionFromContext(t *testing.T) {
+	tx := &gorm.DB{}
+	ctx := context.WithValue(context.Background(), httpTransactionContextKey{}, tx)
+
+	assert.Same(t, tx, transactionFromContext(ctx))
+	assert.Nil(t, transactionFromContext(context.Background()))
 }
 
 func defaultHTTPOptions() HTTPOptions {

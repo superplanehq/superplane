@@ -98,7 +98,7 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 	}
 
 	err = handler.Cleanup(core.WebhookHandlerContext{
-		HTTP:        w.registry.HTTPContext(),
+		HTTP:        w.registry.HTTPContextInTransaction(tx),
 		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil),
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
