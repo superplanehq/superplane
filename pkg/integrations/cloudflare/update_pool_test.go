@@ -19,7 +19,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "",
-				"pool":    "pool123",
+				"pool":      "pool123",
 			},
 		}
 
@@ -31,7 +31,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "",
+				"pool":      "",
 			},
 		}
 
@@ -43,7 +43,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "pool123",
+				"pool":      "pool123",
 				"origins": []any{
 					map[string]any{"name": "o1", "address": "", "enabled": true, "weight": 1},
 				},
@@ -58,7 +58,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "pool123",
+				"pool":      "pool123",
 			},
 		}
 
@@ -70,7 +70,7 @@ func Test__UpdatePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "pool123",
+				"pool":      "pool123",
 				"origins": []any{
 					map[string]any{"name": "stable", "address": "1.2.3.4", "enabled": true, "weight": 0.9},
 					map[string]any{"name": "canary", "address": "1.2.3.5", "enabled": true, "weight": 0.1},
@@ -178,7 +178,7 @@ func Test__UpdatePool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "pool123",
+				"pool":      "pool123",
 				"name":      "renamed-pool",
 			},
 			HTTP:           httpContext,

@@ -19,7 +19,7 @@ func Test__DeletePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "",
-				"pool":    "pool123",
+				"pool":      "pool123",
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -32,7 +32,7 @@ func Test__DeletePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "",
+				"pool":      "",
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -45,7 +45,7 @@ func Test__DeletePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "{{ $.trigger.data.poolId }}",
+				"pool":      "{{ $.trigger.data.poolId }}",
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -73,7 +73,7 @@ func Test__DeletePool__Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "pool123",
+				"pool":      "pool123",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -129,7 +129,7 @@ func Test__DeletePool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "pool123",
+				"pool":      "pool123",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -172,7 +172,7 @@ func Test__DeletePool__Execute(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"accountId": "acc123",
-				"pool":    "pool123",
+				"pool":      "pool123",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

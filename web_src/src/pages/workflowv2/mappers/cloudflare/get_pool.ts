@@ -40,7 +40,7 @@ export const getPoolMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext) {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
