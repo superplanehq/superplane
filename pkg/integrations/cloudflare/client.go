@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -739,7 +740,7 @@ func (c *Client) GetKVNamespace(accountID, namespaceID string) (*KVNamespace, er
 
 // PutKVValue writes a key-value pair to a Workers KV namespace using multipart/form-data
 func (c *Client) PutKVValue(accountID, namespaceID, key, value string, expirationTTL *int) error {
-	rawURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, key)
+	rawURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, url.PathEscape(key))
 
 	buf := &bytes.Buffer{}
 	writer := multipart.NewWriter(buf)
@@ -783,7 +784,7 @@ func (c *Client) PutKVValue(accountID, namespaceID, key, value string, expiratio
 // GetKVValue retrieves the value for a key from a Workers KV namespace.
 // The Cloudflare API returns the raw value as the response body (not a JSON envelope).
 func (c *Client) GetKVValue(accountID, namespaceID, key string) (string, error) {
-	rawURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, key)
+	rawURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, url.PathEscape(key))
 
 	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -812,7 +813,7 @@ func (c *Client) GetKVValue(accountID, namespaceID, key string) (string, error) 
 
 // DeleteKVValue deletes a key-value pair from a Workers KV namespace
 func (c *Client) DeleteKVValue(accountID, namespaceID, key string) error {
-	kvURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, key)
+	kvURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, url.PathEscape(key))
 
 	responseBody, err := c.execRequest(http.MethodDelete, kvURL, nil)
 	if err != nil {

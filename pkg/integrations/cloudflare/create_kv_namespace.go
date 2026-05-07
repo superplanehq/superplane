@@ -13,10 +13,6 @@ import (
 
 type CreateKVNamespace struct{}
 
-type KVNamespaceNodeMetadata struct {
-	Title string `json:"title"`
-}
-
 type CreateKVNamespaceSpec struct {
 	AccountID string `json:"accountId"`
 	Title     string `json:"title"`
